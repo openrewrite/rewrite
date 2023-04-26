@@ -17,12 +17,14 @@ package org.openrewrite.gradle.plugins;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 
 class RemoveBuildPluginTest implements RewriteTest {
+    @DocumentExample
     @Test
     void removePlugin() {
         rewriteRun(

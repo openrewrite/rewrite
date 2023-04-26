@@ -17,6 +17,7 @@ package org.openrewrite.properties;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.properties.Assertions.properties;
@@ -75,6 +76,7 @@ class ChangePropertyTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void newProperty() {
         rewriteRun(

@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -75,6 +76,7 @@ class UseStringReplaceTest implements RewriteTest {
 
     @Test
     @DisplayName("String#replaceAll replaced by String#replace, because first argument is not a regular expression")
+    @DocumentExample
     void replaceAllReplacedByReplace() {
         rewriteRun(
           java(

@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -23,6 +24,7 @@ import static org.openrewrite.java.Assertions.java;
 @SuppressWarnings({"UnnecessaryContinue", "UnnecessaryReturnStatement"})
 class NoRedundantJumpStatementsTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void noRedundantJumpStatements() {
         rewriteRun(

@@ -16,6 +16,7 @@
 package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -28,6 +29,7 @@ class FindPluginsTest implements RewriteTest {
         spec.recipe(new FindPlugins("com.jfrog.bintray"));
     }
 
+    @DocumentExample
     @Test
     void findPlugin() {
         rewriteRun(

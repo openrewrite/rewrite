@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -95,6 +96,7 @@ class ControlFlowIndentationTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @SuppressWarnings({"SuspiciousIndentAfterControlStatement", "IfStatementWithIdenticalBranches"})
     @Test
     void removesIndentationFromStatementAfterIfElse() {

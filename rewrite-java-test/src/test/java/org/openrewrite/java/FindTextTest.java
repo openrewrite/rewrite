@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.config.Environment;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.search.FindText;
 import org.openrewrite.test.RewriteTest;
 
@@ -26,6 +27,7 @@ import static org.openrewrite.java.Assertions.java;
 
 class FindTextTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void findText() {
         rewriteRun(

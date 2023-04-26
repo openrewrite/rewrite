@@ -16,12 +16,14 @@
 package org.openrewrite.hcl;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.hcl.Assertions.hcl;
 
 class MoveContentToFileTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void newFile() {
         rewriteRun(

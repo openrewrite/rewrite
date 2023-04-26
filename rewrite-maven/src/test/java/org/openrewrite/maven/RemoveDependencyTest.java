@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.test.RewriteTest;
@@ -26,6 +27,7 @@ import static org.openrewrite.maven.Assertions.pomXml;
 
 class RemoveDependencyTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void removeDependency() {
         rewriteRun(

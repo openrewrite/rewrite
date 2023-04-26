@@ -16,6 +16,7 @@
 package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -27,6 +28,7 @@ class DeclaresTypeTest implements RewriteTest {
         spec.recipe(RewriteTest.toRecipe(() -> new DeclaresType<>("com.sample.Foo")));
     }
 
+    @DocumentExample
     @Test
     void declares() {
         rewriteRun(java("""

@@ -20,6 +20,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -76,6 +77,7 @@ class FindDeprecatedMethodsTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void findDeprecations() {
         rewriteRun(

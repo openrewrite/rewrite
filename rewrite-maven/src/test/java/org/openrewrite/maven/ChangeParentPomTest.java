@@ -19,6 +19,7 @@ import com.google.common.collect.Lists;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Collections;
@@ -28,6 +29,7 @@ import static org.openrewrite.maven.Assertions.pomXml;
 
 class ChangeParentPomTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void changeParent() {
         rewriteRun(
@@ -543,6 +545,7 @@ class ChangeParentPomTest implements RewriteTest {
     @Nested
     @Issue("https://github.com/openrewrite/rewrite/issues/2418")
     class RetainVersions {
+        @DocumentExample
         @Test
         void dependencyWithExplicitVersionRemovedFromDepMgmt() {
             rewriteRun(spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-config-dependencies", null, "3.1.4", null, null,

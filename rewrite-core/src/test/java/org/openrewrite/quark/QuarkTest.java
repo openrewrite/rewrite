@@ -20,6 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
@@ -28,6 +29,7 @@ import static org.openrewrite.test.SourceSpecs.other;
 
 class QuarkTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void renderMarkersOnQuarks() {
         rewriteRun(

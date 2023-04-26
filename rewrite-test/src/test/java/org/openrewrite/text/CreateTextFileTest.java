@@ -16,6 +16,7 @@
 package org.openrewrite.text;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.test.SourceSpecs.text;
@@ -34,6 +35,7 @@ class CreateTextFileTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void hasOverwrittenFile() {
         rewriteRun(

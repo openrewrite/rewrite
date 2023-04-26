@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Collections;
@@ -30,6 +31,7 @@ import static org.openrewrite.maven.Assertions.pomXml;
 
 class UpgradeDependencyVersionTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void doNotOverrideImplicitProperty() {
         rewriteRun(
@@ -1273,6 +1275,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Nested
     @Issue("https://github.com/openrewrite/rewrite/issues/2418")
     class RetainVersions {
+        @DocumentExample
         @Test
         void dependencyWithExplicitVersionRemovedFromDepMgmt() {
             rewriteRun(spec -> spec.recipe(new UpgradeDependencyVersion("org.springframework.cloud", "spring-cloud-config-dependencies", "3.1.4", null, true, Collections.singletonList("com.jcraft:jsch"))),

@@ -19,6 +19,7 @@ package org.openrewrite.xml;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.tree.Xml;
 
@@ -29,6 +30,7 @@ import static org.openrewrite.xml.Assertions.xml;
 @SuppressWarnings("CheckTagEmptyBody")
 class AddToTagTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void addElement() {
         rewriteRun(

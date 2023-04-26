@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -360,6 +361,7 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void matchesOwnDmThenRemoveIt() {
         rewriteRun(

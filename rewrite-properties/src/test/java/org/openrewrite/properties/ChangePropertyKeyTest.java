@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -54,6 +55,7 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void changeKey() {
         rewriteRun(

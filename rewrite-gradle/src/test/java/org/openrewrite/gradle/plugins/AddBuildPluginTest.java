@@ -16,11 +16,13 @@
 package org.openrewrite.gradle.plugins;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
 class AddBuildPluginTest implements RewriteTest {
+    @DocumentExample
     @Test
     void addPluginWithoutVersionToNewBlock() {
         rewriteRun(

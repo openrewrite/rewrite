@@ -17,12 +17,14 @@ package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class ChangeValueTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void changeNestedKeyValue() {
         rewriteRun(

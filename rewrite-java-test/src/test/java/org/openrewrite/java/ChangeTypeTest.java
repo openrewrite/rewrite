@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.PathUtils;
 import org.openrewrite.config.CompositeRecipe;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
@@ -55,6 +56,7 @@ class ChangeTypeTest implements RewriteTest {
       }
       """;
 
+    @DocumentExample
     @Test
     void doNotAddJavaLangWrapperImports() {
         rewriteRun(

@@ -16,11 +16,13 @@
 package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.properties.Assertions.properties;
 
 class FindGradleWrapperTest implements RewriteTest {
+    @DocumentExample
     @Test
     void findGradleWrapperVersion() {
         rewriteRun(

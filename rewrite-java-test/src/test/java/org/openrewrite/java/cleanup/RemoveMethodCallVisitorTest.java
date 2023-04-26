@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
@@ -33,6 +34,7 @@ class RemoveMethodCallVisitorTest implements RewriteTest {
           (arg, expr) -> arg == 0 && J.Literal.isLiteralValue(expr, true))));
     }
 
+    @DocumentExample
     @Test
     void assertTrueIsRemoved() {
         rewriteRun(

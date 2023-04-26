@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -24,6 +25,7 @@ import static org.openrewrite.java.Assertions.java;
 @Issue("https://github.com/openrewrite/rewrite/issues/466")
 class StaticMethodNotFinalTest implements RewriteTest {
 
+    @DocumentExample
     @SuppressWarnings("FinalStaticMethod")
     @Test
     void removeFinalFromStaticMethods() {

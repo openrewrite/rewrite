@@ -16,12 +16,14 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
 class ExplicitCharsetOnStringGetBytesTest implements RewriteTest {
 
+    @DocumentExample
     @SuppressWarnings("ResultOfMethodCallIgnored")
     @Test
     void addUtf8() {

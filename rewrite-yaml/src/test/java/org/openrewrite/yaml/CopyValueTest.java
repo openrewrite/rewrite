@@ -16,12 +16,14 @@
 package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class CopyValueTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void copyValueAndItsFormatting() {
         rewriteRun(

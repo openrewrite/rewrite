@@ -17,11 +17,13 @@ package org.openrewrite.json;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Example;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.json.Assertions.json;
 
 class ChangeKeyTest implements RewriteTest {
+    @DocumentExample
     @Test
     void simpleChangeRootKey() {
         rewriteRun(

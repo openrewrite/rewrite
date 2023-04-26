@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -31,6 +32,7 @@ class ApplicabilityTest implements RewriteTest {
         spec.validateRecipeSerialization(false);
     }
 
+    @DocumentExample
     @Test
     void not() {
         rewriteRun(

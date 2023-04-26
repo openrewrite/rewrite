@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
@@ -28,6 +29,7 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 class TreeObserverTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void observePropertyChange() {
         var observed = new AtomicInteger(0);

@@ -17,6 +17,7 @@ package org.openrewrite.table;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,6 +25,7 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 
 class SourcesFileResultsTest implements RewriteTest {
+    @DocumentExample
     @Test
     void twoResultsOnly() {
         @Language("yaml")

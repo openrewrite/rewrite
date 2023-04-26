@@ -16,6 +16,7 @@
 package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
@@ -24,6 +25,7 @@ import static org.openrewrite.yaml.Assertions.yaml;
 
 class AppendToSequenceTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void appendToSequenceHasDashTrue() {
         rewriteRun(

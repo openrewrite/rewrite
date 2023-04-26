@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
@@ -97,6 +98,7 @@ class AddPropertyTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void addFirstProperty() {
         rewriteRun(

@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.HideUtilityClassConstructorStyle;
 import org.openrewrite.style.NamedStyles;
@@ -58,6 +59,7 @@ class HideUtilityClassConstructorTest implements RewriteTest {
     /**
      * Should be a utility class since all methods are static, but class has public constructor
      */
+    @DocumentExample
     @Test
     void changePublicConstructorToPrivate() {
         rewriteRun(

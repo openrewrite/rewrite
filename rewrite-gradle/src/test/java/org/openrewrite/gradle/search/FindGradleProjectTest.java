@@ -18,6 +18,7 @@ package org.openrewrite.gradle.search;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -54,6 +55,7 @@ class FindGradleProjectTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void isGradleKotlinProject() {
         rewriteRun(

@@ -16,12 +16,14 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class RemovePluginDependencyTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void removeDependency() {
         rewriteRun(

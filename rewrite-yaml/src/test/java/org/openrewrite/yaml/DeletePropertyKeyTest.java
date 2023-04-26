@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -30,6 +31,7 @@ class DeletePropertyKeyTest implements RewriteTest {
         spec.recipe(new DeleteProperty("management.metrics.binders.files.enabled", null, null, null));
     }
 
+    @DocumentExample
     @Test
     void singleEntry() {
         rewriteRun(

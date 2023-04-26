@@ -18,6 +18,7 @@ package org.openrewrite.gradle;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -35,6 +36,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           .recipe(new UpgradeDependencyVersion("com.google.guava", "guava", "30.x", "-jre"));
     }
 
+    @DocumentExample
     @Test
     void guava() {
         rewriteRun(

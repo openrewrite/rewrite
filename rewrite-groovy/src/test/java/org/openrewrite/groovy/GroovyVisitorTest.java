@@ -18,6 +18,7 @@ package org.openrewrite.groovy;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
@@ -25,6 +26,7 @@ import static org.openrewrite.groovy.Assertions.groovy;
 
 class GroovyVisitorTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void autoFormatIncludesOmitParentheses() {
         rewriteRun(

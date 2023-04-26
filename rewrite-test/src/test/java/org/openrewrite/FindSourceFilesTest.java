@@ -18,6 +18,7 @@ package org.openrewrite;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -30,6 +31,7 @@ class FindSourceFilesTest implements RewriteTest {
         spec.recipe(new FindSourceFiles("**/hello.txt"));
     }
 
+    @DocumentExample
     @Test
     void findMatchingFile() {
         rewriteRun(

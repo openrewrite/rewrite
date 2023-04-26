@@ -17,6 +17,7 @@ package org.openrewrite.java.dataflow;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Cursor;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -44,6 +45,7 @@ class FindLocalFlowPathsNumericTest implements RewriteTest {
         })));
     }
 
+    @DocumentExample
     @Test
     void transitiveAssignment() {
         rewriteRun(

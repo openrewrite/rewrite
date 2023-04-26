@@ -16,12 +16,14 @@
 package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
 class FindDependencyTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void findDependency() {
         rewriteRun(

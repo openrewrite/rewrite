@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.J;
@@ -67,6 +68,7 @@ class AddImportTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void importIsAddedToCorrectBlock() {
         rewriteRun(

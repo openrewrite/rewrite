@@ -17,6 +17,7 @@ package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
@@ -48,6 +49,7 @@ class NormalizeTabsOrSpacesTest implements RewriteTest {
           )));
     }
 
+    @DocumentExample
     @Test
     void mixedToTabs() {
         rewriteRun(

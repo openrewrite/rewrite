@@ -18,6 +18,7 @@ package org.openrewrite.java.search;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -39,6 +40,7 @@ class FindTypesTest implements RewriteTest {
       }
       """;
 
+    @DocumentExample
     @Test
     void simpleName() {
         rewriteRun(

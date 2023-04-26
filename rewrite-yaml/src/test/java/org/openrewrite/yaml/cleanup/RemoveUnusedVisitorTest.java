@@ -16,6 +16,7 @@
 package org.openrewrite.yaml.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -27,6 +28,7 @@ class RemoveUnusedVisitorTest implements RewriteTest {
         spec.recipe(new RemoveUnused());
     }
 
+    @DocumentExample
     @Test
     void unusedMappings() {
         rewriteRun(

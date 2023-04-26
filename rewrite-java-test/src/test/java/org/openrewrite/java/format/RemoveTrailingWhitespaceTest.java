@@ -17,6 +17,7 @@ package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
@@ -30,6 +31,7 @@ class RemoveTrailingWhitespaceTest implements RewriteTest {
         spec.recipe(new RemoveTrailingWhitespace());
     }
 
+    @DocumentExample
     @SuppressWarnings("TrailingWhitespacesInTextBlock")
     @Test
     void removeTrailing() {

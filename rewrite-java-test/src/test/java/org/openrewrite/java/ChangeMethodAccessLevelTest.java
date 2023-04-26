@@ -17,12 +17,14 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
 class ChangeMethodAccessLevelTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void publicToPrivate() {
         rewriteRun(

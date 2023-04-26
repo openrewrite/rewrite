@@ -22,6 +22,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -431,6 +432,7 @@ class VariableNameUtilsTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void incrementExistingNumberPostFix() {
         rewriteRun(

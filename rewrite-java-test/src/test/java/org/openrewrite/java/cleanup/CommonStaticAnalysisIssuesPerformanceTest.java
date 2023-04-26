@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -36,6 +37,7 @@ public class CommonStaticAnalysisIssuesPerformanceTest implements RewriteTest {
 //          });
     }
 
+    @DocumentExample
     @Test
     void indexOfOnList() {
         rewriteRun(

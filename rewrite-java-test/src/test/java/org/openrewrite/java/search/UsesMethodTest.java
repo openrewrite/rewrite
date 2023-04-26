@@ -17,6 +17,7 @@ package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -70,6 +71,7 @@ class UsesMethodTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void usesMethodReferences() {
         rewriteRun(

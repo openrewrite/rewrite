@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -39,6 +40,7 @@ class UnwrapParenthesesTest implements RewriteTest {
         }));
     }
 
+    @DocumentExample
     @Test
     void unwrapAssignment() {
         rewriteRun(

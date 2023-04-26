@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.NeedBracesStyle;
@@ -56,6 +57,7 @@ class NeedBracesTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void addBraces() {
         rewriteRun(

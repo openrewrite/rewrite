@@ -16,12 +16,14 @@
 package org.openrewrite.gradle.plugins;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 
 class UpgradePluginVersionTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void upgradeGradleSettingsPlugin() {
         rewriteRun(

@@ -17,6 +17,7 @@ package org.openrewrite.config;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 
@@ -33,6 +34,7 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 class EnvironmentTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void declarativeRecipesDontAddToEstimatedTimeFixed() {
         rewriteRun(

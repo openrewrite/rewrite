@@ -17,6 +17,7 @@ package org.openrewrite.maven.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -48,6 +49,7 @@ class DependencyInsightTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void findDependency() {
         rewriteRun(

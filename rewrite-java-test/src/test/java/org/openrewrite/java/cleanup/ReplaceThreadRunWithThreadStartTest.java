@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.config.Environment;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -32,6 +33,7 @@ class ReplaceThreadRunWithThreadStartTest implements RewriteTest {
           .activateRecipes("org.openrewrite.java.cleanup.ReplaceThreadRunWithThreadStart"));
     }
 
+    @DocumentExample
     @SuppressWarnings("CallToThreadRun")
     @Test
     void replaceThreadRun() {

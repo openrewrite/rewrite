@@ -17,6 +17,7 @@ package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -41,6 +42,7 @@ class FindFieldsOfTypeTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void findPrivateNonInheritedField() {
         rewriteRun(

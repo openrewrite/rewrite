@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -36,6 +37,7 @@ class StringLiteralEqualityTest implements RewriteTest {
         spec.recipe(new StringLiteralEquality());
     }
 
+    @DocumentExample
     @Test
     void stringLiteralEqualityReplacedWithEquals() {
         rewriteRun(

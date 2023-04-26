@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
@@ -145,6 +146,7 @@ class UseStaticImportTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void junit5Assertions() {
         rewriteRun(

@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.cleanup.MethodParamPad;
 import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.style.MethodParamPadStyle;
@@ -48,6 +49,7 @@ class MethodParamPadTest implements RewriteTest {
         return singletonList(new NamedStyles(Tree.randomId(), "Test", "test", "test", emptySet(), styles));
     }
 
+    @DocumentExample
     @Test
     void addSpacePadding() {
         rewriteRun(

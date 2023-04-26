@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
@@ -194,6 +195,7 @@ class RenameVariableTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void doNotRenameForLoopVariables() {
         rewriteRun(

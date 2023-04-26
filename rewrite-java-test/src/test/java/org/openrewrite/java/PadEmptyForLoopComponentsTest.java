@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.cleanup.PadEmptyForLoopComponents;
 import org.openrewrite.java.format.SpacesVisitor;
 import org.openrewrite.java.style.EmptyForInitializerPadStyle;
@@ -52,6 +53,7 @@ class PadEmptyForLoopComponentsTest implements RewriteTest {
         return singletonList(new NamedStyles(Tree.randomId(), "Test", "test", "test", emptySet(), styles));
     }
 
+    @DocumentExample
     @Test
     void addSpaceToEmptyInitializer() {
         rewriteRun(

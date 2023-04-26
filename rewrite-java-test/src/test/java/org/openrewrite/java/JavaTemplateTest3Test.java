@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
@@ -29,6 +30,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings({"ConstantConditions", "PatternVariableCanBeUsed", "UnusedAssignment"})
 class JavaTemplateTest3Test implements RewriteTest {
 
+    @DocumentExample
     @Test
     void replacePackage() {
         rewriteRun(

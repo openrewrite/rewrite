@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
@@ -37,6 +38,7 @@ class ChangeFieldNameTest implements RewriteTest {
         });
     }
 
+    @DocumentExample
     @SuppressWarnings("rawtypes")
     @Test
     void changeFieldName() {

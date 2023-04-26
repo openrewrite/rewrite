@@ -16,6 +16,7 @@
 package org.openrewrite.xml.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.tree.Xml;
 
@@ -24,6 +25,7 @@ import static org.openrewrite.xml.Assertions.xml;
 
 class FindTagsTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void simpleElement() {
         rewriteRun(

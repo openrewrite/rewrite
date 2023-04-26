@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
@@ -79,6 +80,7 @@ class JavaTemplateTest2Test implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void chainedMethodInvocationsAsNewClassArgument2() {
         rewriteRun(

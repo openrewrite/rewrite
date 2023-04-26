@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.cleanup.OperatorWrap;
 import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.style.Checkstyle;
@@ -57,6 +58,7 @@ class OperatorWrapTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void binaryOnNewline() {
         rewriteRun(

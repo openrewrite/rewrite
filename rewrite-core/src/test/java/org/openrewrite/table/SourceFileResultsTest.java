@@ -16,6 +16,7 @@
 package org.openrewrite.table;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
@@ -25,6 +26,7 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 class SourceFileResultsTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void hierarchical() {
         rewriteRun(

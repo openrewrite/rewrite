@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -30,6 +31,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings("ConstantConditions")
 class JavaTemplateTest4Test implements RewriteTest {
 
+    @DocumentExample
     @Test
     void replaceMethodParameters() {
         rewriteRun(

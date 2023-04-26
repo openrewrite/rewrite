@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.cleanup.IndexOfReplaceableByContains;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RewriteTest;
@@ -137,6 +138,7 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @SuppressWarnings({"RedundantOperationOnEmptyContainer"})
     @Test
     void replaceForEachControlVariableType() {

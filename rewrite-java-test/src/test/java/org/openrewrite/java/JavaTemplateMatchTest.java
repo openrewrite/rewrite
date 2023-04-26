@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
@@ -27,6 +28,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 class JavaTemplateMatchTest implements RewriteTest {
 
     // IMPORTANT: This test needs to stay at the top, so that the name of `JavaTemplateMatchTest$1_Equals1` matches the expectations
+    @DocumentExample
     @SuppressWarnings("ConstantValue")
     @Test
     void matchBinaryUsingCompile() {

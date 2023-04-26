@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Contributor;
 import org.openrewrite.Maintainer;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
@@ -92,6 +93,7 @@ class YamlResourceLoaderTest implements RewriteTest {
         assertThat(jon.getLogo()).isNull();
     }
 
+    @DocumentExample
     @Test
     void singleSourceApplicability() {
         rewriteRun(

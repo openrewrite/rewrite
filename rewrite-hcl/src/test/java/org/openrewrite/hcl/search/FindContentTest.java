@@ -16,12 +16,14 @@
 package org.openrewrite.hcl.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.hcl.Assertions.hcl;
 
 class FindContentTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void find() {
         rewriteRun(

@@ -17,6 +17,7 @@ package org.openrewrite.yaml.format;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.yaml.style.YamlDefaultStyles;
@@ -35,6 +36,7 @@ class IndentsTest implements RewriteTest {
         ));
     }
 
+    @DocumentExample
     @Test
     void indentSequence() {
         rewriteRun(

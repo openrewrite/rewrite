@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -30,6 +31,7 @@ public class RenameFileTest implements RewriteTest {
         spec.recipe(new RenameFile("**/hello.txt", "goodbye.txt"));
     }
 
+    @DocumentExample
     @Test
     void hasFileMatch() {
         rewriteRun(

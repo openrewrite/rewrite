@@ -16,6 +16,7 @@
 package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -28,6 +29,7 @@ class FindFieldsTest implements RewriteTest {
         spec.recipe(new FindFields("java.nio.charset.StandardCharsets", "UTF_8"));
     }
 
+    @DocumentExample
     @Test
     void findFullyQualifiedFields() {
         rewriteRun(

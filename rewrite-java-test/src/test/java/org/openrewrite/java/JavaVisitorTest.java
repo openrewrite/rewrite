@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
@@ -27,6 +28,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class JavaVisitorTest implements RewriteTest {
 
+    @DocumentExample
     @SuppressWarnings("RedundantThrows")
     @Test
     void javaVisitorHandlesPaddedWithNullElem() {

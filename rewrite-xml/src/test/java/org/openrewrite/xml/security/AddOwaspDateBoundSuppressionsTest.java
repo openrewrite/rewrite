@@ -18,6 +18,7 @@ package org.openrewrite.xml.security;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import java.time.LocalDate;
@@ -27,6 +28,7 @@ import static org.openrewrite.xml.Assertions.xml;
 
 class AddOwaspDateBoundSuppressionsTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void addsUntilIfNotPresent() {
         rewriteRun(

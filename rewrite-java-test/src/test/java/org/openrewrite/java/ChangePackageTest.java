@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -74,6 +75,7 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void renameUsingSimplePackageName() {
         rewriteRun(

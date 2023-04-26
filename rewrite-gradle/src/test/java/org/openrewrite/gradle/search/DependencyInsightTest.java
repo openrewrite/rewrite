@@ -16,6 +16,7 @@
 package org.openrewrite.gradle.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.maven.table.DependenciesInUse;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -32,6 +33,7 @@ class DependencyInsightTest implements RewriteTest {
           .recipe(new DependencyInsight("com.google.guava", "failureaccess", null));
     }
 
+    @DocumentExample
     @Test
     void findTransitiveDependency() {
         rewriteRun(

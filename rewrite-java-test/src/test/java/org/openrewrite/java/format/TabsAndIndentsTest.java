@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
@@ -166,6 +167,7 @@ class TabsAndIndentsTest implements RewriteTest {
     }
 
     // https://rules.sonarsource.com/java/tag/confusing/RSPEC-3973
+    @DocumentExample
     @SuppressWarnings("SuspiciousIndentAfterControlStatement")
     @Test
     void rspec3973() {

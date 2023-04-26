@@ -18,6 +18,7 @@ package org.openrewrite.maven.search;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.test.RecipeSpec;
@@ -58,6 +59,7 @@ public class EffectiveMavenRepositoriesTest implements RewriteTest {
         spec.recipe(new EffectiveMavenRepositories());
     }
 
+    @DocumentExample
     @Test
     void emptyRepositories() {
         rewriteRun(

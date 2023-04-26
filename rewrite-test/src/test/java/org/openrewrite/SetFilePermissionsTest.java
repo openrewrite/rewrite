@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 
@@ -23,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class SetFilePermissionsTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void revokeReadPermissions() {
         rewriteRun(

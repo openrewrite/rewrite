@@ -16,6 +16,7 @@
 package org.openrewrite.maven.security;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -28,6 +29,7 @@ class UseHttpsForRepositoriesTest implements RewriteTest {
         spec.recipe(new UseHttpsForRepositories());
     }
 
+    @DocumentExample
     @Test
     void replaceHttpInRepositoryBlock() {
         rewriteRun(

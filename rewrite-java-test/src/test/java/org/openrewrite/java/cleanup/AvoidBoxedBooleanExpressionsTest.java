@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -28,6 +29,7 @@ public class AvoidBoxedBooleanExpressionsTest implements RewriteTest {
         spec.recipe(new AvoidBoxedBooleanExpressions());
     }
 
+    @DocumentExample
     @Test
     void guardAgainstNpe() {
         rewriteRun(

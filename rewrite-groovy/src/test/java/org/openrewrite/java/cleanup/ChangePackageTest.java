@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.PathUtils;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
@@ -32,6 +33,7 @@ public class ChangePackageTest implements RewriteTest {
         spec.recipe(new ChangePackage("a.b", "x.y", false));
     }
 
+    @DocumentExample
     @SuppressWarnings("GrPackage")
     @Test
     void changePackage() {

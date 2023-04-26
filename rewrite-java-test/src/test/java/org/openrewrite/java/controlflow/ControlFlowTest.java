@@ -17,6 +17,7 @@ package org.openrewrite.java.controlflow;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
@@ -32,6 +33,7 @@ class ControlFlowTest implements RewriteTest {
           .expectedCyclesThatMakeChanges(1).cycles(1);
     }
 
+    @DocumentExample
     @Test
     void displayControlFlowGraphForSingleBasicBlock() {
         rewriteRun(

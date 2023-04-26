@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.table.SourcesFileResults;
 import org.openrewrite.test.RewriteTest;
 
@@ -25,6 +26,7 @@ import static org.openrewrite.java.Assertions.java;
 
 class DataTableTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void resultsDataTable() {
         rewriteRun(

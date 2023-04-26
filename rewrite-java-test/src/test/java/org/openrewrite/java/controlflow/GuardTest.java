@@ -17,6 +17,7 @@ package org.openrewrite.java.controlflow;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
@@ -54,6 +55,7 @@ class GuardTest implements RewriteTest {
         }));
     }
 
+    @DocumentExample
     @Test
     void identifiesGuards() {
         rewriteRun(

@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
@@ -31,6 +32,7 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
         spec.recipe(new ShortenFullyQualifiedTypeReferences());
     }
 
+    @DocumentExample
     @Test
     void redundantImport() {
         rewriteRun(
