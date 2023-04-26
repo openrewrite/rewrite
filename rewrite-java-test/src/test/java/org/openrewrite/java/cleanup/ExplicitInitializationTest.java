@@ -90,7 +90,7 @@ class ExplicitInitializationTest implements RewriteTest {
                   private int d = 1;
                   private long e = 2L;
                   private int f;
-                  private char g = '\0';
+                  private char g = '\\0';
 
                   private boolean h = false;
                   private boolean i = true;
