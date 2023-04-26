@@ -115,9 +115,7 @@ public class ExamplesExtractor extends JavaIsoVisitor<ExecutionContext> {
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
                 if (DOCUMENT_EXAMPLE_ANNOTATION_MATCHER.matches(annotation)) {
                     List<Expression> args = annotation.getArguments();
-
-
-                    if (args.size() == 1) {
+                    if (args != null && args.size() == 1) {
                         Expression arg = args.get(0);
                         if (arg instanceof J.Assignment) {
                             J.Assignment assignment = (J.Assignment) args.get(0);
