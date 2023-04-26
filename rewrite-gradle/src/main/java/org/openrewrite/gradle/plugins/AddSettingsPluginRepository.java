@@ -36,7 +36,6 @@ import java.util.List;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class AddSettingsPluginRepository extends Recipe {
-    private static final GradleParser GRADLE_PARSER = GradleParser.builder().build();
 
     @Option(displayName = "Type",
             description = "The type of the artifact repository",
@@ -134,7 +133,7 @@ public class AddSettingsPluginRepository extends Recipe {
                            "}";
                 }
 
-                return (J.MethodInvocation) GRADLE_PARSER.parseInputs(Collections.singletonList(Parser.Input.fromString(Paths.get("settings.gradle"), code)), null, ctx)
+                return (J.MethodInvocation) GradleParser.builder().build().parseInputs(Collections.singletonList(Parser.Input.fromString(Paths.get("settings.gradle"), code)), null, ctx)
                         .get(0).getStatements().get(0);
             }
 
