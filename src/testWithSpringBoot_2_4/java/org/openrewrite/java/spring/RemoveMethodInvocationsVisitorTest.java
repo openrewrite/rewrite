@@ -17,6 +17,7 @@ package org.openrewrite.java.spring;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.DocumentExample;
 import org.openrewrite.test.AdHocRecipe;
 import org.openrewrite.test.RewriteTest;
 
@@ -31,6 +32,7 @@ public class RemoveMethodInvocationsVisitorTest implements RewriteTest {
         return new AdHocRecipe(null, null, null, () -> new RemoveMethodInvocationsVisitor(List.of(methods)), null, null, null, emptyList());
     }
 
+    @DocumentExample
     @Test
     void removeFromEnd() {
         //language=java
