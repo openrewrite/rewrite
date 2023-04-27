@@ -463,6 +463,47 @@ class JavaTemplateMatchTest implements RewriteTest {
               """)
         );
     }
+
+    @Test
+    @SuppressWarnings("ConstantValue")
+    void matchExpressionInThrow() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              private final JavaTemplate template = JavaTemplate.builder(
+                this::getCursor,
+                "\"a\" + \"b\""
+              ).build();
+
+              @Override
+              public J visitBinary(J.Binary binary, ExecutionContext ctx) {
+                  return template.matches(binary) ? SearchResult.found(binary) : super.visitBinary(binary, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  int m() {
+                      if (true)
+                          throw new IllegalArgumentException("a" + "b");
+                      else
+                          return ("a" + "b").length();
+                  }
+                  int f = 1;
+              }
+              """,
+            """
+              class Test {
+                  int m() {
+                      if (true)
+                          throw new IllegalArgumentException(/*~~>*/"a" + "b");
+                      else
+                          return (/*~~>*/"a" + "b").length();
+                  }
+                  int f = 1;
+              }
+              """)
+        );
+    }
 }
 
 /**

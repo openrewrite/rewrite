@@ -448,6 +448,12 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.Return) {
             before.insert(0, "return ");
             after.append(";");
+        } else if (j instanceof J.Throw) {
+            before.insert(0, "throw ");
+            after.append(";");
+        } else if (j instanceof J.Parentheses) {
+            before.insert(0, '(');
+            after.append(')');
         } else if (j instanceof J.If) {
             J.If iff = (J.If) j;
             if (referToSameElement(prior, iff.getIfCondition())) {
