@@ -31,7 +31,6 @@ import org.openrewrite.marker.Markers;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -149,7 +148,7 @@ public class FinalizePrivateFields extends Recipe {
     }
 
     private static boolean isInnerClass(J.ClassDeclaration classDecl) {
-        return classDecl.getType().getOwningClass() != null;
+        return classDecl.getType() != null && classDecl.getType().getOwningClass() != null;
     }
 
     private static class CollectPrivateFieldsAssignmentCounts extends JavaIsoVisitor<Map<JavaType.Variable, Integer>> {
