@@ -350,7 +350,7 @@ class JavaTemplateMatchTest implements RewriteTest {
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  return template.matches(method) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+                  return method.getMarkers().findFirst(SearchResult.class).isEmpty() && template.matches(method) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
               }
           })),
           java(
@@ -395,7 +395,7 @@ class JavaTemplateMatchTest implements RewriteTest {
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  return template.matches(method) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+                  return method.getMarkers().findFirst(SearchResult.class).isEmpty() && template.matches(method) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
               }
           })),
           java(
@@ -439,7 +439,7 @@ class JavaTemplateMatchTest implements RewriteTest {
 
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
-                  return template.matches(binary) ? SearchResult.found(binary) : super.visitBinary(binary, ctx);
+                  return binary.getMarkers().findFirst(SearchResult.class).isEmpty() && template.matches(binary) ? SearchResult.found(binary) : super.visitBinary(binary, ctx);
               }
           })),
           java(
@@ -500,6 +500,34 @@ class JavaTemplateMatchTest implements RewriteTest {
                           return (/*~~>*/"a" + "b").length();
                   }
                   int f = 1;
+              }
+              """)
+        );
+    }
+
+    @Test
+    void matchExpressionInAnnotationAssignment() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              private final JavaTemplate template = JavaTemplate.builder(
+                this::getCursor,
+                "\"a\" + \"b\""
+              ).build();
+
+              @Override
+              public J visitBinary(J.Binary binary, ExecutionContext ctx) {
+                  return binary.getMarkers().findFirst(SearchResult.class).isEmpty() && template.matches(binary) ? SearchResult.found(binary) : super.visitBinary(binary, ctx);
+              }
+          })),
+          java(
+            """
+              @SuppressWarnings(value = {"a" + "b", "c"})
+              class Test {
+              }
+              """,
+            """
+              @SuppressWarnings(value = {/*~~>*/"a" + "b", "c"})
+              class Test {
               }
               """)
         );

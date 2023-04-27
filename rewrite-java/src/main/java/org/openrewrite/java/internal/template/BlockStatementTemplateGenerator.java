@@ -505,7 +505,10 @@ public class BlockStatementTemplateGenerator {
             J.Assignment as = (J.Assignment) j;
             if (referToSameElement(prior, as.getAssignment())) {
                 before.insert(0, as.getVariable() + " = ");
-                after.append(";");
+                J parent = next(cursor).getValue();
+                if (!(parent instanceof J.Annotation)) {
+                    after.append(";");
+                }
             }
         } else if (j instanceof J.AssignmentOperation) {
             J.AssignmentOperation as = (J.AssignmentOperation) j;
