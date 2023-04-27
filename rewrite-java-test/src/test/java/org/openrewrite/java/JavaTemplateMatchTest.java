@@ -16,8 +16,8 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
@@ -422,6 +422,42 @@ class JavaTemplateMatchTest implements RewriteTest {
                               /*~~>*/s.executeUpdate(sb.toString());
                           }
                       }
+                  }
+              }
+              """)
+        );
+    }
+
+    @Test
+    void matchExpressionInAssignmentOperation() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              private final JavaTemplate template = JavaTemplate.builder(
+                this::getCursor,
+                "1 + 1"
+              ).build();
+
+              @Override
+              public J visitBinary(J.Binary binary, ExecutionContext ctx) {
+                  return template.matches(binary) ? SearchResult.found(binary) : super.visitBinary(binary, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  int m() {
+                      int i = 1;
+                      i += 1 + 1;
+                      return i;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  int m() {
+                      int i = 1;
+                      i += /*~~>*/1 + 1;
+                      return i;
                   }
               }
               """)

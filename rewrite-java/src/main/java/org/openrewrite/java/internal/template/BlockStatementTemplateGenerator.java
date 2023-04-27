@@ -501,6 +501,12 @@ public class BlockStatementTemplateGenerator {
                 before.insert(0, as.getVariable() + " = ");
                 after.append(";");
             }
+        } else if (j instanceof J.AssignmentOperation) {
+            J.AssignmentOperation as = (J.AssignmentOperation) j;
+            if (referToSameElement(prior, as.getAssignment())) {
+                before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ = ");
+                after.append(";");
+            }
         } else if (j instanceof J.EnumValue) {
             J.EnumValue ev = (J.EnumValue) j;
             before.insert(0, ev.getName());
