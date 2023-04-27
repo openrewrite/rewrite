@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -28,6 +29,7 @@ public class FindKotlinSourcesTest implements RewriteTest {
         spec.recipe(new FindKotlinSources());
     }
 
+    @DocumentExample
     @Test
     void kotlinFile() {
         rewriteRun(

@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.PathUtils;
 import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.tree.TypeUtils;
@@ -31,6 +32,7 @@ class ChangePackageTest implements RewriteTest {
         spec.recipe(new ChangePackage("a.b", "x.y", false));
     }
 
+    @DocumentExample
     @Test
     void changePackage() {
         rewriteRun(

@@ -17,6 +17,7 @@ package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -144,6 +145,7 @@ public class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void changeDefinition() {
         rewriteRun(
