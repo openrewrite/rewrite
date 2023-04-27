@@ -1,9 +1,5 @@
 plugins {
-    id("org.openrewrite.build.language-library")
-}
-
-tasks.withType<JavaCompile> {
-    options.release.set(null as Int?) // remove `--release 8` set in `org.openrewrite.java-base`
+    id("org.openrewrite.build.language-library") version("latest.release")
 }
 
 sourceSets {
@@ -29,4 +25,8 @@ dependencies {
     modelAnnotationProcessor("org.projectlombok:lombok:latest.release")
     modelCompileOnly("org.projectlombok:lombok:latest.release")
     modelImplementation("ch.qos.logback:logback-classic:latest.release")
+}
+
+license {
+    header = file("../../gradle/licenseHeader.txt")
 }
