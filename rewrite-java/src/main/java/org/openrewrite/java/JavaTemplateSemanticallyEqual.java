@@ -52,8 +52,13 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         }
 
         J[] parameters = createTemplateParameters(template.getCode());
-        J templateTree = template.withTemplate(input, coordinates, parameters);
-        return matchTemplate(templateTree, input);
+        try {
+            J templateTree = template.withTemplate(input, coordinates, parameters);
+            return matchTemplate(templateTree, input);
+        } catch (RuntimeException e) {
+            // FIXME this is just a workaround, as template matching finds many new corner cases in `JavaTemplate` which we need to fix
+            return new TemplateMatchResult(false, Collections.emptyList());
+        }
     }
 
     private static J[] createTemplateParameters(String code) {
