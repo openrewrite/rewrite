@@ -112,7 +112,7 @@ public class UpgradeDependencyVersion extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
         VersionComparator versionComparator = requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
         return new GroovyVisitor<ExecutionContext>() {
