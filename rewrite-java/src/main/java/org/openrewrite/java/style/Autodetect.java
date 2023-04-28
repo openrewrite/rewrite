@@ -1105,8 +1105,35 @@ public class Autodetect extends NamedStyles {
         }
 
         @Override
+        public J.Lambda visitLambda(J.Lambda lambda, SpacesStatistics stats) {
+            List<J> parameters = lambda.getParameters().getParameters();
+            if (parameters.size() > 1) {
+                List<JRightPadded<J>> paddedParameters = lambda.getParameters().getPadding().getParams();
+                for (int i = 0; i < paddedParameters.size() - 1; i++) {
+                    stats.beforeComma += hasSpace(paddedParameters.get(i).getAfter());
+                }
+                for (int i = 1; i < parameters.size(); i++) {
+                    stats.afterComma += hasSpace(parameters.get(i).getPrefix());
+                }
+            }
+
+            return super.visitLambda(lambda, stats);
+        }
+
+        @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, SpacesStatistics stats) {
             stats.beforeMethodDeclaration += hasSpace(method.getPadding().getParameters().getBefore());
+
+            List<Statement> parameters = method.getParameters();
+            if (parameters.size() > 1) {
+                List<JRightPadded<Statement>> paddedParameters = method.getPadding().getParameters().getPadding().getElements();
+                for (int i = 0; i < paddedParameters.size() - 1; i++) {
+                    stats.beforeComma += hasSpace(paddedParameters.get(i).getAfter());
+                }
+                for (int i = 1; i < parameters.size(); i++) {
+                    stats.afterComma += hasSpace(parameters.get(i).getPrefix());
+                }
+            }
             return super.visitMethodDeclaration(method, stats);
         }
 
@@ -1114,14 +1141,17 @@ public class Autodetect extends NamedStyles {
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, SpacesStatistics stats) {
             stats.beforeMethodCall += hasSpace(method.getPadding().getArguments().getBefore());
 
-            if (method.getArguments().size() > 1) {
-                stats.withinMethodCallParentheses += hasSpace(method.getPadding().getArguments().getPadding().getElements().get(0).getElement().getPrefix());
-                stats.withinMethodCallParentheses += hasSpace(method.getPadding().getArguments().getPadding().getElements().get(method.getArguments().size() - 1).getAfter());
-                for (JRightPadded<Expression> elem : method.getPadding().getArguments().getPadding().getElements()) {
+            List<Expression> arguments = method.getArguments();
+            if (arguments.size() > 1) {
+                List<JRightPadded<Expression>> paddedArguments = method.getPadding().getArguments().getPadding().getElements();
+                stats.withinMethodCallParentheses += hasSpace(paddedArguments.get(0).getElement().getPrefix());
+                stats.withinMethodCallParentheses += hasSpace(paddedArguments.get(method.getArguments().size() - 1).getAfter());
+                for (int i = 0; i < paddedArguments.size() - 1; i++) {
+                    JRightPadded<Expression> elem = paddedArguments.get(i);
                     stats.beforeComma += hasSpace(elem.getAfter());
                 }
-                for (Expression e : method.getArguments()) {
-                    stats.afterComma += hasSpace(e.getPrefix());
+                for (int i = 1; i < arguments.size(); i++) {
+                    stats.afterComma += hasSpace(arguments.get(i).getPrefix());
                 }
             }
             return super.visitMethodInvocation(method, stats);
@@ -1130,15 +1160,37 @@ public class Autodetect extends NamedStyles {
         @Override
         public J.NewArray visitNewArray(J.NewArray newArray, SpacesStatistics stats) {
             JContainer<Expression> initializer = newArray.getPadding().getInitializer();
-            if (newArray.getInitializer() != null && initializer != null && initializer.getElements().size() > 0) {
-                for (JRightPadded<Expression> elem : initializer.getPadding().getElements()) {
-                    stats.beforeComma += hasSpace(elem.getAfter());
+            List<Expression> elements = newArray.getInitializer();
+            if (elements != null && initializer != null && elements.size() > 1) {
+                List<JRightPadded<Expression>> paddedElements = initializer.getPadding().getElements();
+                for (int i = 0; i < paddedElements.size() - 1; i++) {
+                    stats.beforeComma += hasSpace(paddedElements.get(i).getAfter());
                 }
-                for (Expression e : newArray.getInitializer()) {
-                    stats.afterComma += hasSpace(e.getPrefix());
+                for (int i = 1; i < elements.size(); i++) {
+                    stats.afterComma += hasSpace(elements.get(i).getPrefix());
                 }
             }
             return super.visitNewArray(newArray, stats);
+        }
+
+        @Override
+        public J.NewClass visitNewClass(J.NewClass newClass, SpacesStatistics stats) {
+            stats.beforeMethodCall += hasSpace(newClass.getPadding().getArguments().getBefore());
+
+            List<Expression> arguments = newClass.getArguments();
+            if (arguments.size() > 1) {
+                List<JRightPadded<Expression>> paddedArguments = newClass.getPadding().getArguments().getPadding().getElements();
+                stats.withinMethodCallParentheses += hasSpace(paddedArguments.get(0).getElement().getPrefix());
+                stats.withinMethodCallParentheses += hasSpace(paddedArguments.get(newClass.getArguments().size() - 1).getAfter());
+                for (int i = 0; i < paddedArguments.size() - 1; i++) {
+                    JRightPadded<Expression> elem = paddedArguments.get(i);
+                    stats.beforeComma += hasSpace(elem.getAfter());
+                }
+                for (int i = 1; i < arguments.size(); i++) {
+                    stats.afterComma += hasSpace(arguments.get(i).getPrefix());
+                }
+            }
+            return super.visitNewClass(newClass, stats);
         }
 
         @Override

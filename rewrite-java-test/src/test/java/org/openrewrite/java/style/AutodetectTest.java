@@ -660,6 +660,56 @@ class AutodetectTest implements RewriteTest {
         assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3172")
+    void detectAfterCommaShouldIgnoreFirstElement() {
+        var cu = jp().parse(
+          """
+                class T {
+                    static {
+                        int[] i0 = new int[]{1, 2};
+                        int[] i1 = new int[]{2, 3};
+                        int[] i2 = new int[]{3, 4};
+                        int[] i3 = new int[]{4,5};
+                    }
+                }
+            """
+        );
+
+        var styles = Autodetect.detect(cu);
+        var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
+
+        assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
+        assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3172")
+    void detectAfterCommaBasedOnLambdas() {
+        var cu = jp().parse(
+          """
+                import java.util.function.BiConsumer;
+                
+                class T {
+                    static {
+                        int[] i0 = new int[]{1,2};
+                        int[] i1 = new int[]{2,3};
+
+                        BiConsumer<?, ?> c0 = (a, b) -> {};
+                        BiConsumer<?, ?> c1 = (a, b) -> {};
+                        BiConsumer<?, ?> c2 = (a, b) -> {};
+                    }
+                }
+            """
+        );
+
+        var styles = Autodetect.detect(cu);
+        var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
+
+        assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
+        assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2098")
     @Test
     void detectNoSpacesWithinMethodCall() {
