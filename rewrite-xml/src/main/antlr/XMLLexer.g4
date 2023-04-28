@@ -42,10 +42,11 @@ CharRef           :  '&#' DIGIT+ ';'
 SEA_WS            :  (' '|'\t'|'\r'? '\n')+        -> skip ;
 UTF_ENCODING_BOM  :  (UTF_8_BOM_CHARS | UTF_8_BOM) -> skip ;
 
-SPECIAL_OPEN_XML  :  '<?xml'                       -> pushMode(INSIDE) ;
+QUESTION_MARK     : '?' ;
+SPECIAL_OPEN_XML  :  '<' QUESTION_MARK 'xml'       -> pushMode(INSIDE) ;
 OPEN              :  '<'                           -> pushMode(INSIDE) ;
 
-SPECIAL_OPEN      :  '<?'Name                      -> pushMode(INSIDE_PROCESS_INSTRUCTION) ;
+SPECIAL_OPEN      :  '<' QUESTION_MARK Name        -> pushMode(INSIDE_PROCESS_INSTRUCTION) ;
 
 DTD_OPEN          :  '<!'                          -> pushMode(INSIDE_DTD) ;
 
@@ -97,16 +98,23 @@ TXT            :  .   -> more ;  // Collect all of the markup subset text.
 // INSIDE of a Processing instruction ---------------------
 mode INSIDE_PROCESS_INSTRUCTION;
 
-PI_SPECIAL_CLOSE  :  SPECIAL_CLOSE        -> type(SPECIAL_CLOSE), popMode ; // close <?Name...?>
-PI_S              :  S                    -> skip ;
+PI_SPECIAL_CLOSE  : SPECIAL_CLOSE -> type(SPECIAL_CLOSE), popMode ; // close <?Name...?>
+PI_S              : S -> skip ;
 
-PI_TEXT           : ~[?>]+ ;  // match any 16 bit char other than ? and >
+// This rule separates the `?` in PI_TEXT from a special close `?>`, and is used to simplify parsing.
+PI_QUESTION_MARK  : QUESTION_MARK -> more, pushMode(INSIDE_PI_TEXT);
+
+PI_TEXT           : ~[?]+ ; // match any 16 bit char other than ?
+
+// INSIDE of a processing instruction's text --------------
+mode INSIDE_PI_TEXT;
+PI_TEXT_SPECIAL_CASE : . -> more, popMode;
 
 // INSIDE of a tag ----------------------------------------
 mode INSIDE;
 
 CLOSE          :  '>'                     -> popMode ;
-SPECIAL_CLOSE  :  '?>'                    -> popMode ; // close <?xml...?>
+SPECIAL_CLOSE  :  QUESTION_MARK '>'       -> popMode ; // close <?xml...?>
 SLASH_CLOSE    :  '/>'                    -> popMode ;
 S              :  [ \t\r\n]               -> skip ;
 

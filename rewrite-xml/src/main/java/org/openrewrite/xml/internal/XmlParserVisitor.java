@@ -198,8 +198,16 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         return convert(ctx, (c, prefix) -> {
                     String name = convert(ctx.SPECIAL_OPEN(), (n, p) -> n.getText()).substring(2);
 
-                    Xml.CharData piText = convert(c.PI_TEXT(), (cdata, p) ->
-                            charData(cdata.getText(), false, p));
+                    List<Xml.CharData> piTexts = c.PI_TEXT().stream()
+                            .map(piText -> convert(piText, (cdata, p) -> charData(cdata.getText(), false, p)))
+                            .collect(toList());
+                    Xml.CharData piText = piTexts.get(0);
+                    if (piTexts.size() > 1) {
+                        StringBuilder sb = new StringBuilder();
+                        piTexts.forEach(it -> sb.append(it.getText()));
+                        piText = piText.withText(sb.toString());
+                    }
+
                     return new Xml.ProcessingInstruction(
                             randomId(),
                             prefix,

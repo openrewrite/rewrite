@@ -69,7 +69,7 @@ externalid
     ;
 
 processinginstruction
-    :   SPECIAL_OPEN PI_TEXT SPECIAL_CLOSE
+    :   SPECIAL_OPEN PI_TEXT+ SPECIAL_CLOSE
     ;
 
 content
