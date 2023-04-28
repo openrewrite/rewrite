@@ -6,6 +6,10 @@ When building from the command line invoke the wrapper with `./gradlew build` on
 
 NOTE: windows-style users should ensure that they configure `core.autocrlf = false` as Rewrite requires unix-style line endings. This can be done at clone time by using `git clone -c core.autocrlf=false https://github.com/openrewrite/rewrite.git`.
 
+NOTE: the used gradle wrapper requires a jdk8 installed on the system.
+If not present the build fails at task _:rewrite-gradle:compileGroovy_ because the script is unable to download the toolchain.
+The solution to this is installing jkd8, see [Adoptium installation](https://adoptium.net/de/installation/) for guidance.
+
 ## CLI Environment Configuration:
 
 * [JDK](https://adoptium.net/) version: 17
