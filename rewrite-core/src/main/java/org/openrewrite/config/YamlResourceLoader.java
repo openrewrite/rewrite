@@ -467,6 +467,7 @@ public class YamlResourceLoader implements ResourceLoader {
         return recipeNameToExamples;
     }
 
+    @Override
     public Map<String, List<Contributor>> listContributors() {
         if(contributors == null) {
             Collection<Map<String, Object>> rawAttribution = loadResources(ResourceType.Attribution);

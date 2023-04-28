@@ -90,6 +90,16 @@ public class Environment {
                 recipeToExamples.putAll(((YamlResourceLoader) r).listRecipeExamples());
             } else if (r instanceof ClasspathScanningLoader) {
                 ClasspathScanningLoader classpathScanningLoader = (ClasspathScanningLoader) r;
+
+                Map<String, List<Contributor>> contributors = classpathScanningLoader.listContributors();
+                for (String key : contributors.keySet()) {
+                    if (recipeToContributors.containsKey(key)) {
+                        recipeToContributors.get(key).addAll(contributors.get(key));
+                    } else {
+                        recipeToContributors.put(key, contributors.get(key));
+                    }
+                }
+
                 Map<String, List<RecipeExample>> examplesMap = classpathScanningLoader.listRecipeExamples();
                 for (String key : examplesMap.keySet()) {
                     if (recipeToExamples.containsKey(key)) {

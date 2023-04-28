@@ -15,6 +15,7 @@
  */
 package org.openrewrite.config;
 
+import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
 import org.openrewrite.style.NamedStyles;
 
@@ -30,6 +31,8 @@ public interface ResourceLoader {
     Collection<NamedStyles> listStyles();
 
     Collection<CategoryDescriptor> listCategoryDescriptors();
+
+    Map<String, List<Contributor>> listContributors();
 
     Map<String, List<RecipeExample>> listRecipeExamples();
 }

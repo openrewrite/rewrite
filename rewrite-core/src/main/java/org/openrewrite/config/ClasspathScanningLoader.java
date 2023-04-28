@@ -181,4 +181,9 @@ public class ClasspathScanningLoader implements ResourceLoader {
     public Map<String, List<RecipeExample>> listRecipeExamples() {
         return recipeExamples;
     }
+
+    @Override
+    public Map<String, List<Contributor>> listContributors() {
+        return recipeAttributions;
+    }
 }
