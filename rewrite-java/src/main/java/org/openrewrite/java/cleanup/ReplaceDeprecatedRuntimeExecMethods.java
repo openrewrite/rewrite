@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
@@ -53,13 +54,8 @@ public class ReplaceDeprecatedRuntimeExecMethods extends Recipe {
     }
 
     @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesJavaVersion<>(18);
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesJavaVersion<>(18), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
@@ -67,7 +63,7 @@ public class ReplaceDeprecatedRuntimeExecMethods extends Recipe {
                 if (RUNTIME_EXEC_CMD.matches(m) || RUNTIME_EXEC_CMD_ENVP.matches(m) || RUNTIME_EXEC_CMD_ENVP_FILE.matches(m)) {
                     Expression command = m.getArguments().get(0);
                     List<Expression> commands = new ArrayList<>();
-                    boolean flattenAble= ChainStringBuilderAppendCalls.flatAdditiveExpressions(command, commands);
+                    boolean flattenAble = ChainStringBuilderAppendCalls.flatAdditiveExpressions(command, commands);
 
                     StringBuilder sb = new StringBuilder();
                     if (flattenAble) {
@@ -85,16 +81,18 @@ public class ReplaceDeprecatedRuntimeExecMethods extends Recipe {
                         String[] cmds = sb.toString().split(" ");
                         String templateCode = String.format("new String[] {%s}", toStringArguments(cmds));
                         JavaTemplate template = JavaTemplate.builder(
-                            this::getCursor, templateCode).build();
+                                this::getCursor, templateCode).build();
 
                         List<Expression> args = m.getArguments();
                         args.set(0, args.get(0).withTemplate(template, args.get(0).getCoordinates().replace()));
 
-                        List<JavaType> parameterTypes = m.getMethodType().getParameterTypes();
-                        parameterTypes.set(0, JavaType.ShallowClass.build("java.lang.String[]"));
+                        if (m.getMethodType() != null) {
+                            List<JavaType> parameterTypes = m.getMethodType().getParameterTypes();
+                            parameterTypes.set(0, JavaType.ShallowClass.build("java.lang.String[]"));
 
-                        return m.withArguments(args)
-                         .withMethodType(m.getMethodType().withParameterTypes(parameterTypes));
+                            return m.withArguments(args)
+                                    .withMethodType(m.getMethodType().withParameterTypes(parameterTypes));
+                        }
                     } else {
                         // replace argument to 'command.split(" ")'
                         List<Expression> args = m.getArguments();
@@ -108,20 +106,23 @@ public class ReplaceDeprecatedRuntimeExecMethods extends Recipe {
 
                         String code = needWrap ? "(#{any()}).split(\" \")" : "#{any()}.split(\" \")";
                         JavaTemplate template = JavaTemplate.builder(
-                            this::getCursor, code).build();
+                                this::getCursor, code).build();
                         arg0 = args.get(0).withTemplate(template, args.get(0).getCoordinates().replace(), args.get(0));
                         args.set(0, arg0);
 
-                        List<JavaType> parameterTypes = m.getMethodType().getParameterTypes();
-                        parameterTypes.set(0, JavaType.ShallowClass.build("java.lang.String[]"));
+                        if (m.getMethodType() != null) {
+                            List<JavaType> parameterTypes = m.getMethodType().getParameterTypes();
+                            parameterTypes.set(0, JavaType.ShallowClass.build("java.lang.String[]"));
 
-                        return m.withArguments(args).withMethodType(m.getMethodType().withParameterTypes(parameterTypes));
+                            return m.withArguments(args).withMethodType(m.getMethodType().withParameterTypes(parameterTypes));
+                        }
+                        return m;
                     }
                 }
 
                 return m;
             }
-        };
+        });
     }
 
     private static String toStringArguments(String[] cmds) {
@@ -132,8 +133,8 @@ public class ReplaceDeprecatedRuntimeExecMethods extends Recipe {
                 sb.append(", ");
             }
             sb.append("\"")
-                .append(token)
-                .append("\"");
+                    .append(token)
+                    .append("\"");
         }
         return sb.toString();
     }

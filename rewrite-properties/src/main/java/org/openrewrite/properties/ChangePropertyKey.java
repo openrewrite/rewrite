@@ -15,7 +15,6 @@
  */
 package org.openrewrite.properties;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
@@ -45,36 +44,11 @@ public class ChangePropertyKey extends Recipe {
     @Nullable
     Boolean relaxedBinding;
 
-    @Incubating(since = "7.8.0")
-    @Option(displayName = "Optional file matcher",
-            description = "Matching files will be modified. This is a glob expression.",
-            required = false,
-            example = "**/application-*.properties")
-    @Nullable
-    String fileMatcher;
-
     @Option(displayName = "Regex",
             description = "Default false. If enabled, `oldPropertyKey` will be interepreted as a Regular Expression, and capture group contents will be available in `newPropertyKey`",
             required = false)
     @Nullable
     Boolean regex;
-
-    @Deprecated
-    public ChangePropertyKey(String oldPropertyKey, String newPropertyKey,
-            @Nullable Boolean relaxedBinding, @Nullable String fileMatcher) {
-        this(oldPropertyKey, newPropertyKey, relaxedBinding, fileMatcher, null);
-    }
-
-    @JsonCreator
-    public ChangePropertyKey(String oldPropertyKey, String newPropertyKey,
-            @Nullable Boolean relaxedBinding, @Nullable String fileMatcher,
-            @Nullable Boolean regex) {
-        this.oldPropertyKey = oldPropertyKey;
-        this.newPropertyKey = newPropertyKey;
-        this.relaxedBinding = relaxedBinding;
-        this.fileMatcher = fileMatcher;
-        this.regex = regex;
-    }
 
     @Override
     public String getDisplayName() {
@@ -84,14 +58,6 @@ public class ChangePropertyKey extends Recipe {
     @Override
     public String getDescription() {
         return "Change a property key leaving the value intact.";
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        if (fileMatcher != null) {
-            return new HasSourcePath<>(fileMatcher);
-        }
-        return null;
     }
 
     @Override

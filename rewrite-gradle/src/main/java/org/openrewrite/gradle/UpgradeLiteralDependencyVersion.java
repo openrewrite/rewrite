@@ -15,35 +15,42 @@
  */
 package org.openrewrite.gradle;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.Collections;
+import java.util.List;
+
+@Value
+@EqualsAndHashCode(callSuper = true)
 @Deprecated // Replace with UpgradeDependencyVersion
 public class UpgradeLiteralDependencyVersion extends Recipe {
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
             example = "com.fasterxml.jackson*")
-    final String groupId;
+    String groupId;
 
     @Option(displayName = "Artifact",
             description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
             example = "jackson-module*")
-    final String artifactId;
+    String artifactId;
 
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number.",
             example = "29.X")
-    final String newVersion;
+    String newVersion;
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
-    final String versionPattern;
+    String versionPattern;
 
     @Override
     public String getDisplayName() {
@@ -56,11 +63,8 @@ public class UpgradeLiteralDependencyVersion extends Recipe {
         return "Deprecated form of `UpgradeDependencyVersion`. Use that instead.";
     }
 
-    public UpgradeLiteralDependencyVersion(String groupId, String artifactId, String newVersion, @Nullable String versionPattern) {
-        this.groupId = groupId;
-        this.artifactId = artifactId;
-        this.newVersion = newVersion;
-        this.versionPattern = versionPattern;
-        doNext(new UpgradeDependencyVersion(groupId, artifactId, newVersion, versionPattern));
+    @Override
+    public List<Recipe> getRecipeList() {
+        return Collections.singletonList(new UpgradeDependencyVersion(groupId, artifactId, newVersion, versionPattern));
     }
 }

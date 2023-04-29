@@ -15,12 +15,16 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -51,13 +55,8 @@ public class IsEmptyCallOnCollections extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(COLLECTION_SIZE);
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesMethod<>(COLLECTION_SIZE), new JavaVisitor<ExecutionContext>() {
             final JavaTemplate isEmpty = JavaTemplate.builder(this::getCursor, "#{}#{any(java.util.Collection)}.isEmpty()")
                     .build();
             final JavaTemplate isEmptyNoReceiver = JavaTemplate.builder(this::getCursor, "#{}isEmpty()")
@@ -71,7 +70,7 @@ public class IsEmptyCallOnCollections extends Recipe {
                     if (binary.getOperator() == J.Binary.Type.Equal || binary.getOperator() == J.Binary.Type.NotEqual
                         || zeroRight && binary.getOperator() == J.Binary.Type.GreaterThan
                         || !zeroRight && binary.getOperator() == J.Binary.Type.LessThan) {
-                        if(maybeSizeCall instanceof J.MethodInvocation) {
+                        if (maybeSizeCall instanceof J.MethodInvocation) {
                             J.MethodInvocation maybeSizeCallMethod = (J.MethodInvocation) maybeSizeCall;
                             if (COLLECTION_SIZE.matches(maybeSizeCallMethod)) {
                                 String op = binary.getOperator() == J.Binary.Type.Equal ? "" : "!";
@@ -85,7 +84,7 @@ public class IsEmptyCallOnCollections extends Recipe {
                 }
                 return super.visitBinary(binary, ctx);
             }
-        };
+        });
     }
 
     private static boolean isZero(Expression expression) {

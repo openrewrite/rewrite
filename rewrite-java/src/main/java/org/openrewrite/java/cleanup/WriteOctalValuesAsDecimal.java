@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 
@@ -46,20 +47,20 @@ public class WriteOctalValuesAsDecimal extends Recipe {
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
                 String src = literal.getValueSource();
                 if (src != null && src.startsWith("0")) {
                     if (src.length() >= 2 &&
-                            src.charAt(1) != 'x' && src.charAt(1) != 'X' &&
-                            src.charAt(1) != 'b' && src.charAt(1) != 'B' &&
-                            src.charAt(1) != '.' &&
-                            src.charAt(src.length() - 1) != 'L' && src.charAt(src.length() - 1) != 'l' &&
-                            src.charAt(src.length() - 1) != 'F' && src.charAt(src.length() - 1) != 'f' &&
-                            src.charAt(src.length() - 1) != 'D' && src.charAt(src.length() - 1) != 'd' &&
-                            !src.contains(".")) {
+                        src.charAt(1) != 'x' && src.charAt(1) != 'X' &&
+                        src.charAt(1) != 'b' && src.charAt(1) != 'B' &&
+                        src.charAt(1) != '.' &&
+                        src.charAt(src.length() - 1) != 'L' && src.charAt(src.length() - 1) != 'l' &&
+                        src.charAt(src.length() - 1) != 'F' && src.charAt(src.length() - 1) != 'f' &&
+                        src.charAt(src.length() - 1) != 'D' && src.charAt(src.length() - 1) != 'd' &&
+                        !src.contains(".")) {
                         assert literal.getValue() != null;
                         return literal.withValueSource(literal.getValue().toString());
                     }

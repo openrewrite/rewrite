@@ -17,6 +17,7 @@ package org.openrewrite.hcl.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.hcl.HclVisitor;
 
 public class AutoFormat extends Recipe {
@@ -31,7 +32,7 @@ public class AutoFormat extends Recipe {
     }
 
     @Override
-    public HclVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new AutoFormatVisitor<>();
     }
 }

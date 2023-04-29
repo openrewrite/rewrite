@@ -83,7 +83,7 @@ public class DeclarationSiteTypeVariance extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         List<VariantTypeSpec> variantTypeSpecs = variantTypes.stream().map(VariantTypeSpec::build).collect(Collectors.toList());
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override

@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -41,11 +42,6 @@ public class NoToStringOnStringType extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(TO_STRING);
-    }
-
-    @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-1858");
     }
@@ -56,8 +52,8 @@ public class NoToStringOnStringType extends Recipe {
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesMethod<>(TO_STRING), new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
@@ -66,6 +62,6 @@ public class NoToStringOnStringType extends Recipe {
                 }
                 return mi;
             }
-        };
+        });
     }
 }

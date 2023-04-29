@@ -16,7 +16,6 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
@@ -35,12 +34,12 @@ class ExecutionContextTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new PlainTextVisitor<>() {
               @Override
-              public @Nullable PlainText visit(@Nullable Tree tree, ExecutionContext p) {
-                  if(p.pollMessage("test") == null) {
-                      p.putMessage("test", "test");
+              public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                  if (ctx.pollMessage("test") == null) {
+                      ctx.putMessage("test", "test");
                   }
                   cycles.incrementAndGet();
-                  return super.visit(tree, p);
+                  return text;
               }
           }).withCausesAnotherCycle(true)),
           text("hello world")

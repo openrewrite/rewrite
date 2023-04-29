@@ -17,9 +17,7 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -60,10 +58,10 @@ public class FindDeprecatedFields extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         TypeMatcher typeMatcher = typePattern == null ? null : new TypeMatcher(typePattern);
 
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
                 for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
@@ -77,14 +75,7 @@ public class FindDeprecatedFields extends Recipe {
                 }
                 return cu;
             }
-        };
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        TypeMatcher typeMatcher = typePattern == null ? null : new TypeMatcher(typePattern);
-
-        return new JavaIsoVisitor<ExecutionContext>() {
+        }, new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
                 J.Identifier i = super.visitIdentifier(identifier, ctx);
@@ -97,11 +88,11 @@ public class FindDeprecatedFields extends Recipe {
                                 while (cursorPath.hasNext()) {
                                     Object ancestor = cursorPath.next();
                                     if (ancestor instanceof J.MethodDeclaration &&
-                                            isDeprecated(((J.MethodDeclaration) ancestor).getAllAnnotations())) {
+                                        isDeprecated(((J.MethodDeclaration) ancestor).getAllAnnotations())) {
                                         return i;
                                     }
                                     if (ancestor instanceof J.ClassDeclaration &&
-                                            isDeprecated(((J.ClassDeclaration) ancestor).getAllAnnotations())) {
+                                        isDeprecated(((J.ClassDeclaration) ancestor).getAllAnnotations())) {
                                         return i;
                                     }
                                 }
@@ -123,6 +114,6 @@ public class FindDeprecatedFields extends Recipe {
                 }
                 return false;
             }
-        };
+        });
     }
 }

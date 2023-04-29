@@ -15,9 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.MethodMatcher;
@@ -38,18 +36,13 @@ public class UseForEachRemoveInsteadOfSetRemoveAll extends Recipe {
     }
 
     @Override
-    protected UsesMethod<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(new MethodMatcher("java.util.Set removeAll(java.util.Collection)"));
-    }
-
-    @Override
-    protected JavaIsoVisitor<ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>(){
-            final MethodMatcher rmaMatcher = new MethodMatcher("java.util.Set removeAll(java.util.Collection)");
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        MethodMatcher removeAll = new MethodMatcher("java.util.Set removeAll(java.util.Collection)");
+        return Preconditions.check(new UsesMethod<>(removeAll), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                 J.MethodInvocation mi = super.visitMethodInvocation(method, executionContext);
-                if (rmaMatcher.matches(mi) && !returnValueIsUsed()) {
+                if (removeAll.matches(mi) && !returnValueIsUsed()) {
                     mi = mi.withTemplate(JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "#{any(java.util.Collection)}.forEach(#{any(java.util.Set)}::remove)").build(),
                             mi.getCoordinates().replace(), mi.getArguments().get(0), mi.getSelect());
                 }
@@ -61,18 +54,18 @@ public class UseForEachRemoveInsteadOfSetRemoveAll extends Recipe {
                 while (cIterator.hasNext()) {
                     Cursor p = cIterator.next();
                     if (p.getValue() instanceof J.ClassDeclaration
-                            || p.getValue() instanceof J.Block
-                            || p.getValue() instanceof J.Lambda) {
+                        || p.getValue() instanceof J.Block
+                        || p.getValue() instanceof J.Lambda) {
                         return false;
                     } else if (p.getValue() instanceof J.ControlParentheses
-                            || p.getValue() instanceof J.Return
-                            || p.getValue() instanceof J.VariableDeclarations
-                            || p.getValue() instanceof J.Assignment) {
+                               || p.getValue() instanceof J.Return
+                               || p.getValue() instanceof J.VariableDeclarations
+                               || p.getValue() instanceof J.Assignment) {
                         return true;
                     }
                 }
                 return true;
             }
-        };
+        });
     }
 }

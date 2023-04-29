@@ -16,7 +16,9 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
@@ -49,8 +51,8 @@ public class AtomicPrimitiveEqualsUsesGet extends Recipe {
     }
 
     @Override
-    protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
                 doAfterVisit(new UsesType<>("java.util.concurrent.atomic.AtomicBoolean", true));
@@ -58,19 +60,14 @@ public class AtomicPrimitiveEqualsUsesGet extends Recipe {
                 doAfterVisit(new UsesType<>("java.util.concurrent.atomic.AtomicLong", true));
                 return cu;
             }
-        };
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
+        }, new JavaVisitor<ExecutionContext>() {
             private final MethodMatcher aiMethodMatcher = new MethodMatcher("java.lang.Object equals(java.lang.Object)");
 
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                 J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
                 if (mi.getSelect() != null && isAtomicEqualsType(mi.getSelect().getType()) && aiMethodMatcher.matches(mi)
-                        && TypeUtils.isOfType(mi.getSelect().getType(), mi.getArguments().get(0).getType())) {
+                    && TypeUtils.isOfType(mi.getSelect().getType(), mi.getArguments().get(0).getType())) {
                     JavaType.FullyQualified fqt = TypeUtils.asFullyQualified(mi.getSelect().getType());
                     if (fqt != null) {
                         String templateString = "#{any(" + fqt.getFullyQualifiedName() + ")}.get() == #{any(" + fqt.getFullyQualifiedName() + ")}.get()";
@@ -92,6 +89,6 @@ public class AtomicPrimitiveEqualsUsesGet extends Recipe {
                 }
                 return false;
             }
-        };
+        });
     }
 }

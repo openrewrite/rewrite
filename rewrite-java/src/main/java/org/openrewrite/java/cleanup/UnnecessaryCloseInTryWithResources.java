@@ -22,7 +22,6 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.marker.SearchResult;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -50,26 +49,16 @@ public class UnnecessaryCloseInTryWithResources extends Recipe {
     }
 
     @Override
-    protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public J.Try.Resource visitTryResource(J.Try.Resource tryResource, ExecutionContext executionContext) {
-                return SearchResult.found(tryResource);
-            }
-        };
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new UnnecessaryAutoCloseableVisitor();
     }
 
     private static class UnnecessaryAutoCloseableVisitor extends JavaIsoVisitor<ExecutionContext> {
-        private static final MethodMatcher AUTO_CLOSEABLE_METHOD_MATCHER = new MethodMatcher( "java.lang.AutoCloseable close()", true);
+        private static final MethodMatcher AUTO_CLOSEABLE_METHOD_MATCHER = new MethodMatcher("java.lang.AutoCloseable close()", true);
 
         @Override
-        public J.Try visitTry(J.Try _try, ExecutionContext executionContext) {
-            J.Try tr = super.visitTry(_try, executionContext);
+        public J.Try visitTry(J.Try aTry, ExecutionContext executionContext) {
+            J.Try tr = super.visitTry(aTry, executionContext);
             if (tr.getResources() != null) {
                 String[] resourceNames = new String[tr.getResources().size()];
                 for (int i = 0; i < tr.getResources().size(); i++) {

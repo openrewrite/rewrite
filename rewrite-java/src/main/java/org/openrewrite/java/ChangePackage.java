@@ -68,8 +68,8 @@ public class ChangePackage extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        JavaIsoVisitor<ExecutionContext> condition = new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 if (cu.getPackageDeclaration() != null) {
@@ -98,11 +98,8 @@ public class ChangePackage extends Recipe {
                 return cu;
             }
         };
-    }
 
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ChangePackageVisitor();
+        return Preconditions.check(condition, new ChangePackageVisitor());
     }
 
     private class ChangePackageVisitor extends JavaVisitor<ExecutionContext> {
@@ -119,9 +116,9 @@ public class ChangePackage extends Recipe {
             if (((J.FieldAccess) f).isFullyQualifiedClassReference(oldPackageName)) {
                 Cursor parent = getCursor().getParent();
                 if (parent != null &&
-                        // Ensure the parent isn't a J.FieldAccess OR the parent doesn't match the target package name.
-                        (!(parent.getValue() instanceof J.FieldAccess) ||
-                        (!(((J.FieldAccess) parent.getValue()).isFullyQualifiedClassReference(newPackageName))))) {
+                    // Ensure the parent isn't a J.FieldAccess OR the parent doesn't match the target package name.
+                    (!(parent.getValue() instanceof J.FieldAccess) ||
+                     (!(((J.FieldAccess) parent.getValue()).isFullyQualifiedClassReference(newPackageName))))) {
 
                     f = TypeTree.build(((JavaType.FullyQualified) newPackageType).getFullyQualifiedName())
                             .withPrefix(f.getPrefix());
@@ -306,14 +303,14 @@ public class ChangePackage extends Recipe {
         }
 
         private String getNewPackageName(String packageName) {
-            return (recursive == null || recursive) && !newPackageName.endsWith(packageName.substring(oldPackageName.length()))?
+            return (recursive == null || recursive) && !newPackageName.endsWith(packageName.substring(oldPackageName.length())) ?
                     newPackageName + packageName.substring(oldPackageName.length()) : newPackageName;
         }
 
         private boolean isTargetFullyQualifiedType(@Nullable JavaType.FullyQualified fq) {
             return fq != null &&
-                    (fq.getPackageName().equals(oldPackageName) && !fq.getClassName().isEmpty() ||
-                            isTargetRecursivePackageName(fq.getPackageName()));
+                   (fq.getPackageName().equals(oldPackageName) && !fq.getClassName().isEmpty() ||
+                    isTargetRecursivePackageName(fq.getPackageName()));
         }
 
         private boolean isTargetRecursivePackageName(String packageName) {

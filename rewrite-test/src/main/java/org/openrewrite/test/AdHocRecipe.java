@@ -23,13 +23,14 @@ import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
-import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class AdHocRecipe extends Recipe {
+public class AdHocRecipe extends ScanningRecipe<Void> {
     @With
     @Nullable
     @Language("markdown")
@@ -48,18 +49,15 @@ public class AdHocRecipe extends Recipe {
 
     @Nullable
     @With
-    BiFunction<List<SourceFile>, ExecutionContext, List<SourceFile>> visit;
+    Supplier<Collection<SourceFile>> generator;
 
+    @With
     @Nullable
-    @With
-    Supplier<TreeVisitor<?, ExecutionContext>> getSingleSourceApplicableTest;
-
-    @Nullable
-    @With
-    Supplier<TreeVisitor<?, ExecutionContext>> getApplicableTest;
-
-    @With
     List<Maintainer> maintainers;
+
+    @With
+    @Nullable
+    Integer maxCycles;
 
     public String getDisplayName() {
         return StringUtils.isBlank(displayName) ? "Ad hoc recipe" : displayName;
@@ -75,22 +73,31 @@ public class AdHocRecipe extends Recipe {
     }
 
     @Override
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        return visit == null ? before : visit.apply(before, ctx);
+    public int maxCycles() {
+        return maxCycles == null ? super.maxCycles() : maxCycles;
+    }
+
+    public List<Maintainer> getMaintainers() {
+        return maintainers == null ? Collections.emptyList() : maintainers;
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    public Void getInitialValue() {
+        return null;
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Void acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public Collection<SourceFile> generate(Void acc, ExecutionContext ctx) {
+        return generator == null ? Collections.emptyList() : generator.get();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Void acc) {
         return getVisitor.get();
-    }
-
-    @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return getSingleSourceApplicableTest == null ? super.getSingleSourceApplicableTest() : getSingleSourceApplicableTest.get();
-    }
-
-    @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getApplicableTest() {
-        return getApplicableTest == null ? super.getApplicableTest() : getApplicableTest.get();
     }
 }

@@ -28,12 +28,12 @@ import java.util.Optional;
 public class OmitParenthesesFormat extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Tabs and indents";
+        return "Stylize Groovy code to omit parentheses";
     }
 
     @Override
     public String getDescription() {
-        return "Format tabs and indents in Java code.";
+        return "Omit parentheses for last argument lambdas in Groovy code.";
     }
 
     @Override
@@ -45,8 +45,8 @@ public class OmitParenthesesFormat extends Recipe {
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
             OmitParenthesesStyle style = Optional.ofNullable(((SourceFile) cu).getStyle(OmitParenthesesStyle.class)).orElse(OmitParenthesesStyle.DEFAULT);
-            if(style.getLastArgumentLambda()) {
-                doAfterVisit(new OmitParenthesesForLastArgumentLambda().getVisitor());
+            if (style.getLastArgumentLambda()) {
+                doAfterVisit(new OmitParenthesesForLastArgumentLambda());
             }
             return cu;
         }

@@ -17,9 +17,9 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TextComment;
 
@@ -35,14 +35,14 @@ public class SingleLineComments extends Recipe {
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public Space visitSpace(Space space, Space.Location loc, ExecutionContext ctx) {
                 return space.withComments(ListUtils.map(space.getComments(), c -> {
                     if (!c.isMultiline()) {
                         TextComment tc = (TextComment) c;
-                        if(!tc.getText().startsWith(" ")) {
+                        if (!tc.getText().startsWith(" ")) {
                             return tc.withText(" " + tc.getText());
                         }
                     }

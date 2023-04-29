@@ -17,6 +17,7 @@ package org.openrewrite.java.search;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -49,13 +50,13 @@ public class FindEmptyClasses extends Recipe {
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
                 if (classDecl.getType() != null && JavaType.Class.Kind.Class.equals(classDecl.getType().getKind()) &&
-                        (classDecl.getBody() == null || classDecl.getBody().getStatements().isEmpty()) &&
-                        classDecl.getLeadingAnnotations().isEmpty() && classDecl.getExtends() == null && classDecl.getImplements() == null) {
+                    (classDecl.getBody() == null || classDecl.getBody().getStatements().isEmpty()) &&
+                    classDecl.getLeadingAnnotations().isEmpty() && classDecl.getExtends() == null && classDecl.getImplements() == null) {
                     return SearchResult.found(classDecl);
                 }
                 return super.visitClassDeclaration(classDecl, executionContext);

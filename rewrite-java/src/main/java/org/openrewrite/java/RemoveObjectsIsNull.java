@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Applicability;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.cleanup.UnnecessaryParenthesesVisitor;
@@ -41,14 +41,8 @@ public class RemoveObjectsIsNull extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return Applicability.or(new UsesMethod<>(IS_NULL), new UsesMethod<>(NON_NULL));
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
-
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(Preconditions.or(new UsesMethod<>(IS_NULL), new UsesMethod<>(NON_NULL)), new JavaVisitor<ExecutionContext>() {
             @Override
             public Expression visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
@@ -67,6 +61,6 @@ public class RemoveObjectsIsNull extends Recipe {
                 UnnecessaryParenthesesVisitor<ExecutionContext> v = new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses());
                 return (Expression) v.visitNonNull(replaced, executionContext, getCursor());
             }
-        };
+        });
     }
 }

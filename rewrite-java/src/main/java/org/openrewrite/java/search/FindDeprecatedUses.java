@@ -15,40 +15,44 @@
  */
 package org.openrewrite.java.search;
 
-import lombok.Getter;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
 
-@Getter
+import java.util.Arrays;
+import java.util.List;
+
+@Value
+@EqualsAndHashCode(callSuper = false)
 public class FindDeprecatedUses extends Recipe {
     @Option(displayName = "Type pattern",
             description = "A type pattern that is used to find deprecations from certain types.",
             example = "org.springframework..*",
             required = false)
     @Nullable
-    private final String typePattern;
+    String typePattern;
 
     @Option(displayName = "Match inherited",
             description = "When enabled, find types that inherit from a deprecated type.",
             required = false)
     @Nullable
-    private final Boolean matchInherited;
+    Boolean matchInherited;
 
     @Option(displayName = "Ignore deprecated scopes",
             description = "When a deprecated type is used in a deprecated method or class, ignore it.",
             required = false)
     @Nullable
-    private final Boolean ignoreDeprecatedScopes;
+    Boolean ignoreDeprecatedScopes;
 
-    public FindDeprecatedUses(@Nullable String typePattern, @Nullable Boolean matchInherited, @Nullable Boolean ignoreDeprecatedScopes) {
-        this.typePattern = typePattern;
-        this.matchInherited = matchInherited;
-        this.ignoreDeprecatedScopes = ignoreDeprecatedScopes;
-
-        doNext(new FindDeprecatedMethods((typePattern == null || typePattern.isEmpty() ? null : typePattern + " *(..)"), ignoreDeprecatedScopes));
-        doNext(new FindDeprecatedClasses(typePattern, matchInherited, ignoreDeprecatedScopes));
-        doNext(new FindDeprecatedFields(typePattern, ignoreDeprecatedScopes));
+    @Override
+    public List<Recipe> getRecipeList() {
+        return Arrays.asList(
+                new FindDeprecatedMethods((typePattern == null || typePattern.isEmpty() ? null : typePattern + " *(..)"), ignoreDeprecatedScopes),
+                new FindDeprecatedClasses(typePattern, matchInherited, ignoreDeprecatedScopes),
+                new FindDeprecatedFields(typePattern, ignoreDeprecatedScopes)
+        );
     }
 
     @Override

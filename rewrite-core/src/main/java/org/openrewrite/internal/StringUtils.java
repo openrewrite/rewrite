@@ -35,7 +35,11 @@ public class StringUtils {
     private StringUtils() {
     }
 
-    public static String trimIndentPreserveCRLF(String text) {
+    public static String trimIndentPreserveCRLF(@Nullable String text) {
+        if (text == null) {
+            //noinspection DataFlowIssue
+            return null;
+        }
         return trimIndent((text.endsWith("\r\n") ? text.substring(0, text.length() - 2) : text)
                 .replace('\r', '⏎'))
                 .replace('⏎', '\r');
@@ -432,6 +436,7 @@ public class StringUtils {
                 false
         );
     }
+
     private static final char wrongFileSeparatorChar = File.separatorChar == '/' ? '\\' : '/';
 
     private static boolean matchesGlob(String pattern, String str, boolean caseSensitive) {
@@ -698,9 +703,7 @@ public class StringUtils {
     }
 
     /**
-     * Considering C-style comments to be whitespace, return the index of the next non-whitespace character
-     *
-     * @return
+     * @return Considering C-style comments to be whitespace, return the index of the next non-whitespace character.
      */
     public static int indexOfNextNonWhitespace(int cursor, String source) {
         boolean inMultiLineComment = false;

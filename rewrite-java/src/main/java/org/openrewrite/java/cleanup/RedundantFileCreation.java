@@ -16,11 +16,11 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
@@ -37,13 +37,8 @@ public class RedundantFileCreation extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("java.io.FileInputStream", true);
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesType<>("java.io.FileInputStream", true), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
                 J.NewClass n = super.visitNewClass(newClass, executionContext);
@@ -53,7 +48,7 @@ public class RedundantFileCreation extends Recipe {
                         if (arg instanceof J.NewClass) {
                             J.NewClass newClassArg = (J.NewClass) arg;
                             if (newClassArg.getClazz() != null &&
-                                    TypeUtils.isOfClassType(newClassArg.getClazz().getType(), "java.io.File")) {
+                                TypeUtils.isOfClassType(newClassArg.getClazz().getType(), "java.io.File")) {
                                 if (newClassArg.getArguments().size() == 1 && !(newClassArg.getArguments().get(0) instanceof J.Empty)) {
                                     maybeRemoveImport("java.io.File");
                                     return newClassArg.getArguments().get(0);
@@ -65,6 +60,6 @@ public class RedundantFileCreation extends Recipe {
                 }
                 return n;
             }
-        };
+        });
     }
 }

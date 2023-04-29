@@ -16,7 +16,9 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
@@ -48,60 +50,53 @@ public class UseStandardCharset extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("java.nio.charset.Charset", false);
-    }
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesType<>("java.nio.charset.Charset", false), new JavaVisitor<ExecutionContext>() {
+            final MethodMatcher CHARSET_FOR_NAME = new MethodMatcher("java.nio.charset.Charset forName(java.lang.String)");
 
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new UseStandardCharsetVisitor();
-    }
-
-    private static class UseStandardCharsetVisitor extends JavaVisitor<ExecutionContext> {
-        MethodMatcher CHARSET_FOR_NAME = new MethodMatcher("java.nio.charset.Charset forName(java.lang.String)");
-
-        @Override
-        public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-            J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
-            if (CHARSET_FOR_NAME.matches(m)) {
-                Expression charsetName = m.getArguments().get(0);
-                if (!(charsetName instanceof J.Literal)) {
-                    return m;
-                }
-                String maybeReplace = (String) ((J.Literal) charsetName).getValue();
-                if (maybeReplace != null) {
-                    maybeAddImport("java.nio.charset.StandardCharsets");
-
-                    Charset charset;
-                    try {
-                        charset = Charset.forName(maybeReplace);
-                    } catch (UnsupportedCharsetException ex) {
-                        // This should never happen in practice.
-                        return method;
+            @Override
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
+                if (CHARSET_FOR_NAME.matches(m)) {
+                    Expression charsetName = m.getArguments().get(0);
+                    if (!(charsetName instanceof J.Literal)) {
+                        return m;
                     }
+                    String maybeReplace = (String) ((J.Literal) charsetName).getValue();
+                    if (maybeReplace != null) {
+                        maybeAddImport("java.nio.charset.StandardCharsets");
 
-                    String standardName = "";
-                    if (charset == StandardCharsets.ISO_8859_1) {
-                        standardName = "ISO_8859_1";
-                    } else if (charset == StandardCharsets.US_ASCII) {
-                        standardName = "US_ASCII";
-                    } else if (charset == StandardCharsets.UTF_8) {
-                        standardName = "UTF_8";
-                    } else if (charset == StandardCharsets.UTF_16) {
-                        standardName = "UTF_16";
-                    } else if (charset == StandardCharsets.UTF_16BE) {
-                        standardName = "UTF_16BE";
-                    } else if (charset == StandardCharsets.UTF_16LE) {
-                        standardName = "UTF_16LE";
-                    }
+                        Charset charset;
+                        try {
+                            charset = Charset.forName(maybeReplace);
+                        } catch (UnsupportedCharsetException ex) {
+                            // This should never happen in practice.
+                            return method;
+                        }
 
-                    if (!StringUtils.isBlank(standardName)) {
-                        return m.withTemplate(JavaTemplate.builder(this::getCursor, "StandardCharsets." + standardName)
-                                .imports("java.nio.charset.StandardCharsets").build(), m.getCoordinates().replace());
+                        String standardName = "";
+                        if (charset == StandardCharsets.ISO_8859_1) {
+                            standardName = "ISO_8859_1";
+                        } else if (charset == StandardCharsets.US_ASCII) {
+                            standardName = "US_ASCII";
+                        } else if (charset == StandardCharsets.UTF_8) {
+                            standardName = "UTF_8";
+                        } else if (charset == StandardCharsets.UTF_16) {
+                            standardName = "UTF_16";
+                        } else if (charset == StandardCharsets.UTF_16BE) {
+                            standardName = "UTF_16BE";
+                        } else if (charset == StandardCharsets.UTF_16LE) {
+                            standardName = "UTF_16LE";
+                        }
+
+                        if (!StringUtils.isBlank(standardName)) {
+                            return m.withTemplate(JavaTemplate.builder(this::getCursor, "StandardCharsets." + standardName)
+                                    .imports("java.nio.charset.StandardCharsets").build(), m.getCoordinates().replace());
+                        }
                     }
                 }
+                return m;
             }
-            return m;
-        }
+        });
     }
 }

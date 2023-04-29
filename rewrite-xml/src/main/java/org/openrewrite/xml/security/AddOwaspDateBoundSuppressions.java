@@ -41,8 +41,8 @@ public class AddOwaspDateBoundSuppressions extends Recipe {
     @Override
     public String getDescription() {
         return "Adds an expiration date to all OWASP suppressions in order to ensure that they are periodically reviewed. " +
-                "For use with the OWASP `dependency-check` tool. " +
-                "More details: https://jeremylong.github.io/DependencyCheck/general/suppression.html.";
+               "For use with the OWASP `dependency-check` tool. " +
+               "More details: https://jeremylong.github.io/DependencyCheck/general/suppression.html.";
     }
 
     @Option(displayName = "Until date",
@@ -51,16 +51,6 @@ public class AddOwaspDateBoundSuppressions extends Recipe {
             example = "2023-01-01")
     @Nullable
     String untilDate;
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new DateBoundSuppressionsVisitor();
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsOwaspSuppressionsFile().getVisitor();
-    }
 
     @Override
     public Validated validate() {
@@ -76,29 +66,32 @@ public class AddOwaspDateBoundSuppressions extends Recipe {
         }));
     }
 
-    private class DateBoundSuppressionsVisitor extends XmlIsoVisitor<ExecutionContext> {
-        @Override
-        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            Xml.Tag t = super.visitTag(tag, ctx);
-            if (new XPathMatcher("/suppressions/suppress").matches(getCursor())) {
-                boolean hasUntil = false;
-                List<Xml.Attribute> attributes = t.getAttributes();
-                for (Xml.Attribute attribute : attributes) {
-                    if (attribute.getKeyAsString().equals("until")) {
-                        hasUntil = true;
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new IsOwaspSuppressionsFile(), new XmlIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = super.visitTag(tag, ctx);
+                if (new XPathMatcher("/suppressions/suppress").matches(getCursor())) {
+                    boolean hasUntil = false;
+                    List<Xml.Attribute> attributes = t.getAttributes();
+                    for (Xml.Attribute attribute : attributes) {
+                        if (attribute.getKeyAsString().equals("until")) {
+                            hasUntil = true;
+                        }
+                    }
+                    if (!hasUntil) {
+                        String date = (untilDate != null && !untilDate.isEmpty()) ? untilDate : LocalDate.now().plus(30, ChronoUnit.DAYS).toString();
+                        return t.withAttributes(ListUtils.concat(attributes, autoFormat(new Xml.Attribute(Tree.randomId(), "", Markers.EMPTY,
+                                new Xml.Ident(Tree.randomId(), "", Markers.EMPTY, "until"),
+                                "",
+                                autoFormat(new Xml.Attribute.Value(Tree.randomId(), "", Markers.EMPTY,
+                                        Xml.Attribute.Value.Quote.Double,
+                                        date + "Z"), ctx)), ctx)));
                     }
                 }
-                if (!hasUntil) {
-                    String date = (untilDate != null && !untilDate.isEmpty()) ? untilDate : LocalDate.now().plus(30, ChronoUnit.DAYS).toString();
-                    return t.withAttributes(ListUtils.concat(attributes, autoFormat(new Xml.Attribute(Tree.randomId(), "", Markers.EMPTY,
-                            new Xml.Ident(Tree.randomId(), "", Markers.EMPTY, "until"),
-                            "",
-                            autoFormat(new Xml.Attribute.Value(Tree.randomId(), "", Markers.EMPTY,
-                                    Xml.Attribute.Value.Quote.Double,
-                                    date + "Z"), ctx)), ctx)));
-                }
+                return t;
             }
-            return t;
-        }
+        });
     }
 }

@@ -107,13 +107,8 @@ public class AddGradleEnterprise extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return Applicability.or(new IsBuildGradle<>(), new IsSettingsGradle<>());
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new GroovyIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new GroovyIsoVisitor<ExecutionContext>() {
             @Override
             public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
                 Optional<BuildTool> maybeBuildTool = cu.getMarkers().findFirst(BuildTool.class);
@@ -143,7 +138,7 @@ public class AddGradleEnterprise extends Recipe {
 
                 return cu;
             }
-        };
+        });
     }
 
     private G.CompilationUnit withPlugin(G.CompilationUnit cu, String pluginId, VersionComparator versionComparator, ExecutionContext ctx) {
@@ -232,7 +227,8 @@ public class AddGradleEnterprise extends Recipe {
         G.CompilationUnit cu = GradleParser.builder().build()
                 .parseInputs(singletonList(
                         Parser.Input.fromString(Paths.get("settings.gradle"), ge.toString())), null, ctx)
-                .get(0);
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
 
         return (J.MethodInvocation) cu.getStatements().get(0);
     }

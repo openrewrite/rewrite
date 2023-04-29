@@ -20,6 +20,7 @@ import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
+import org.openrewrite.internal.InMemoryLargeIterable;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
@@ -27,7 +28,6 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
-import org.openrewrite.scheduling.DirectScheduler;
 
 import java.io.ByteArrayInputStream;
 import java.nio.file.Path;
@@ -40,7 +40,6 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
@@ -48,11 +47,11 @@ import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 @SuppressWarnings("unused")
 public interface RewriteTest extends SourceSpecs {
     static AdHocRecipe toRecipe(Supplier<TreeVisitor<?, ExecutionContext>> visitor) {
-        return new AdHocRecipe(null, null, null, visitor, null, null, null, emptyList());
+        return new AdHocRecipe(null, null, null, visitor, null, null, null);
     }
 
     static AdHocRecipe toRecipe() {
-        return new AdHocRecipe(null, null, null, () -> Recipe.NOOP, null, null, null, emptyList());
+        return new AdHocRecipe(null, null, null, () -> Recipe.NOOP, null, null, null);
     }
 
     static AdHocRecipe toRecipe(Function<Recipe, TreeVisitor<?, ExecutionContext>> visitor) {
@@ -159,7 +158,7 @@ public interface RewriteTest extends SourceSpecs {
                 .as("Recipe validation must have no failures")
                 .isEmpty();
 
-        if (!(recipe instanceof AdHocRecipe) &&
+        if (!(recipe instanceof AdHocRecipe) && !(recipe instanceof CompositeRecipe) &&
             testClassSpec.serializationValidation &&
             testMethodSpec.serializationValidation) {
             RecipeSerializer recipeSerializer = new RecipeSerializer();
@@ -189,7 +188,7 @@ public interface RewriteTest extends SourceSpecs {
         }
 
         RecipeSchedulerCheckingExpectedCycles recipeSchedulerCheckingExpectedCycles =
-                new RecipeSchedulerCheckingExpectedCycles(DirectScheduler.common(), expectedCyclesThatMakeChanges);
+                new RecipeSchedulerCheckingExpectedCycles(expectedCyclesThatMakeChanges);
 
         ExecutionContext executionContext;
         if (testMethodSpec.getExecutionContext() != null) {
@@ -254,8 +253,8 @@ public interface RewriteTest extends SourceSpecs {
 
             Iterator<SourceSpec<?>> sourceSpecIter = inputs.keySet().iterator();
 
-            //noinspection unchecked
-            List<SourceFile> sourceFiles = (List<SourceFile>) parser.parseInputs(inputs.values(), relativeTo, executionContext);
+            List<SourceFile> sourceFiles = parser.parseInputs(inputs.values(), relativeTo, executionContext)
+                    .collect(Collectors.toList());
             assertThat(sourceFiles.size())
                     .as("Every input should be parsed into a SourceFile.")
                     .isEqualTo(inputs.size());
@@ -316,7 +315,7 @@ public interface RewriteTest extends SourceSpecs {
         }
 
         RecipeRun recipeRun = recipe.run(
-                runnableSourceFiles,
+                new InMemoryLargeIterable<>(runnableSourceFiles),
                 recipeExecutionContext,
                 recipeSchedulerCheckingExpectedCycles,
                 cycles,
@@ -435,7 +434,7 @@ public interface RewriteTest extends SourceSpecs {
                                     .as("The recipe must not make changes to \"" + result.getBefore().getSourcePath() + "\"")
                                     .isEqualTo(result.getBefore().printAll(out.clone()));
                         }
-                    } else if (result.getAfter() == null) {
+                    } else {
                         if (sourceSpec.after == null) {
                             // If the source spec was not expecting a change (spec.after == null) but the file has been
                             // deleted, assert failure.
@@ -466,6 +465,7 @@ public interface RewriteTest extends SourceSpecs {
                            && !expectedNewResults.contains(result)
                            && testMethodSpec.afterRecipes.isEmpty()
                 ) {
+                    assertThat(result.getAfter()).isNotNull();
                     // falsely added files detected.
                     fail("The recipe added a source file \"" + result.getAfter().getSourcePath()
                          + "\" that was not expected.");

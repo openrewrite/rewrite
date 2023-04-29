@@ -15,16 +15,10 @@
  */
 package org.openrewrite.gradle;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.*;
 import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
@@ -49,23 +43,18 @@ public class AddDelegatesToGradleApi extends Recipe {
     @Override
     public String getDescription() {
         return "The Gradle API has methods which accept `groovy.lang.Closure`. " +
-                "Typically, there is an overload which accepts an `org.gradle.api.Action`." +
-                "This recipe takes the type declared as the receiver of the `Action` overload and adds an appropriate " +
-                "`@groovy.lang.DelegatesTo` annotation to the `Closure` overload.";
+               "Typically, there is an overload which accepts an `org.gradle.api.Action`." +
+               "This recipe takes the type declared as the receiver of the `Action` overload and adds an appropriate " +
+               "`@groovy.lang.DelegatesTo` annotation to the `Closure` overload.";
     }
 
     @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("groovy.lang.Closure", true);
-    }
-
-    @Override
-    public JavaIsoVisitor<ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesType<>("groovy.lang.Closure", true), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext context) {
                 J.MethodDeclaration md = super.visitMethodDeclaration(method, context);
-                if(!hasClosureParameter(md) || commentSuggestsNoDelegate(getCursor())) {
+                if (!hasClosureParameter(md) || commentSuggestsNoDelegate(getCursor())) {
                     return md;
                 }
                 md = md.withParameters(ListUtils.map(md.getParameters(), it -> {
@@ -106,7 +95,7 @@ public class AddDelegatesToGradleApi extends Recipe {
                     if (delegateType == null) {
                         return param;
                     }
-                    String simpleName =  delegateType.getFullyQualifiedName().substring( delegateType.getFullyQualifiedName().lastIndexOf('.') + 1);
+                    String simpleName = delegateType.getFullyQualifiedName().substring(delegateType.getFullyQualifiedName().lastIndexOf('.') + 1);
                     param = param.withTemplate(
                             JavaTemplate.builder(this::getCursor, "@DelegatesTo(#{}.class)")
                                     .imports(delegateType.getFullyQualifiedName(), DELEGATES_TO_TYPE.getFullyQualifiedName())
@@ -119,13 +108,13 @@ public class AddDelegatesToGradleApi extends Recipe {
                 }));
                 return md;
             }
-        };
+        });
     }
 
     @Nullable
     private static JavaType.FullyQualified unwrapGenericTypeVariable(JavaType type) {
         if (type instanceof JavaType.GenericTypeVariable) {
-            JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable)type;
+            JavaType.GenericTypeVariable genericType = (JavaType.GenericTypeVariable) type;
             if (genericType.getBounds().size() == 1) {
                 return unwrapGenericTypeVariable(genericType.getBounds().get(0));
             } else {
@@ -144,6 +133,6 @@ public class AddDelegatesToGradleApi extends Recipe {
 
     private static boolean hasClosureParameter(J.MethodDeclaration methodDeclaration) {
         return methodDeclaration.getParameters().stream()
-                .anyMatch(param -> param instanceof J.VariableDeclarations && TypeUtils.isOfClassType(((J.VariableDeclarations)param).getType(), CLOSURE_TYPE.getFullyQualifiedName()));
+                .anyMatch(param -> param instanceof J.VariableDeclarations && TypeUtils.isOfClassType(((J.VariableDeclarations) param).getType(), CLOSURE_TYPE.getFullyQualifiedName()));
     }
 }

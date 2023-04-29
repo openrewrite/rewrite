@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.ChangeMethodName;
@@ -23,7 +24,6 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -43,7 +43,7 @@ public class RenameMethodsNamedHashcodeEqualOrTostring extends Recipe {
     @Override
     public String getDescription() {
         return "Methods should not be named `hashcode`, `equal`, or `tostring`. " +
-                "Any of these are confusing as they appear to be intended as overridden methods from the `Object` base class, despite being case-insensitive.";
+               "Any of these are confusing as they appear to be intended as overridden methods from the `Object` base class, despite being case-insensitive.";
     }
 
     @Override
@@ -57,20 +57,8 @@ public class RenameMethodsNamedHashcodeEqualOrTostring extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                doAfterVisit(new DeclaresMethod<>(NO_ARGS));
-                doAfterVisit(new DeclaresMethod<>(OBJECT_ARG));
-                return cu;
-            }
-        };
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(Preconditions.or(new DeclaresMethod<>(NO_ARGS), new DeclaresMethod<>(OBJECT_ARG)), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                 if (method.getMethodType() != null && method.getReturnTypeExpression() != null) {
@@ -91,6 +79,6 @@ public class RenameMethodsNamedHashcodeEqualOrTostring extends Recipe {
             private boolean equalsIgnoreCaseExclusive(String inputToCheck, String targetToCheck) {
                 return inputToCheck.equalsIgnoreCase(targetToCheck) && !inputToCheck.equals(targetToCheck);
             }
-        };
+        });
     }
 }

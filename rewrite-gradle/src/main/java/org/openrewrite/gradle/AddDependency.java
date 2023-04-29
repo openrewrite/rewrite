@@ -22,7 +22,6 @@ import org.openrewrite.gradle.util.Dependency;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
@@ -31,23 +30,25 @@ import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.semver.Semver;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import static java.util.Objects.requireNonNull;
+
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class AddDependency extends Recipe {
+public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "com.google.guava")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'",
+            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`",
             example = "guava")
     String artifactId;
 
@@ -58,7 +59,7 @@ public class AddDependency extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example, " +
-                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -66,7 +67,7 @@ public class AddDependency extends Recipe {
 
     @Option(displayName = "Configuration",
             description = "A configuration to use when it is not what can be inferred from usage. Most of the time this will be left empty, but " +
-                    "is used when adding a new as of yet unused dependency.",
+                          "is used when adding a new as of yet unused dependency.",
             example = "implementation",
             required = false)
     @Nullable
@@ -93,7 +94,7 @@ public class AddDependency extends Recipe {
 
     @Option(displayName = "Family pattern",
             description = "A pattern, applied to groupIds, used to determine which other dependencies should have aligned version numbers. " +
-                    "Accepts '*' as a wildcard character.",
+                          "Accepts '*' as a wildcard character.",
             example = "com.fasterxml.jackson*",
             required = false)
     @Nullable
@@ -120,42 +121,47 @@ public class AddDependency extends Recipe {
         return validated;
     }
 
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
-        if (onlyIfUsing == null) {
-            return null;
-        }
-
-        return new UsesType<>(onlyIfUsing, true);
+    static class Scanned {
+        boolean usingType;
+        Map<JavaProject, String> configurationByProject = new HashMap<>();
     }
 
     @Override
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        Map<JavaProject, String> configurationByProject = new HashMap<>();
-        for (SourceFile source : before) {
-            source.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
-                    source.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
-                        if (source != new UsesType<>(onlyIfUsing, true).visit(source, ctx)) {
-                            configurationByProject.compute(javaProject, (jp, configuration) -> "implementation".equals(configuration) ?
-                                    configuration :
-                                    "test".equals(sourceSet.getName()) ? "testImplementation" : "implementation"
-                            );
-                        }
-                    }));
-        }
+    public Scanned getInitialValue() {
+        return new Scanned();
+    }
 
-        if (configurationByProject.isEmpty()) {
-            return before;
-        }
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Scanned acc) {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
+                        sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
+                            if (sourceFile != new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx)) {
+                                acc.usingType = true;
+                                acc.configurationByProject.compute(javaProject, (jp, configuration) -> "implementation".equals(configuration) ?
+                                        configuration :
+                                        "test".equals(sourceSet.getName()) ? "testImplementation" : "implementation"
+                                );
+                            }
+                        }));
+                return tree;
+            }
+        };
+    }
 
-        MethodMatcher dependencyDslMatcher = new MethodMatcher("DependencyHandlerSpec *(..)");
-        Pattern familyPatternCompiled = StringUtils.isBlank(familyPattern) ? null : Pattern.compile(familyPattern.replace("*", ".*"));
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
+        return Preconditions.check(acc.usingType && !acc.configurationByProject.isEmpty(),
+                Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
+                    final MethodMatcher dependencyDslMatcher = new MethodMatcher("DependencyHandlerSpec *(..)");
+                    final Pattern familyPatternCompiled = StringUtils.isBlank(familyPattern) ? null : Pattern.compile(familyPattern.replace("*", ".*"));
 
-        return ListUtils.map(before, s -> s.getMarkers().findFirst(JavaProject.class)
-                .map(javaProject -> (Tree) new GroovyIsoVisitor<ExecutionContext>() {
                     @Override
-                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                        J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                         if (dependencyDslMatcher.matches(m) && (StringUtils.isBlank(configuration) || configuration.equals(m.getSimpleName()))) {
                             if (m.getArguments().get(0) instanceof J.Literal) {
                                 //noinspection ConstantConditions
@@ -192,7 +198,7 @@ public class AddDependency extends Recipe {
                                 }
 
                                 if (groupId.equals(((J.Literal) groupEntry.getValue()).getValue())
-                                        && artifactId.equals(((J.Literal) artifactEntry.getValue()).getValue())) {
+                                    && artifactId.equals(((J.Literal) artifactEntry.getValue()).getValue())) {
                                     getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, DEPENDENCY_PRESENT, true);
                                 }
                             }
@@ -202,17 +208,20 @@ public class AddDependency extends Recipe {
                     }
 
                     @Override
-                    public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext executionContext) {
+                    public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
                         if (!cu.getSourcePath().toString().endsWith(".gradle") || cu.getSourcePath().getFileName().toString().equals("settings.gradle")) {
                             return cu;
                         }
 
-                        String maybeConfiguration = configurationByProject.get(javaProject);
+                        JavaProject javaProject = getCursor().firstEnclosingOrThrow(JavaSourceFile.class)
+                                .getMarkers().findFirst(JavaProject.class).orElse(null);
+                        String maybeConfiguration = javaProject == null ? null :
+                                acc.configurationByProject.get(javaProject);
                         if (maybeConfiguration == null) {
                             return cu;
                         }
 
-                        G.CompilationUnit g = super.visitCompilationUnit(cu, executionContext);
+                        G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
 
                         if (getCursor().getMessage(DEPENDENCY_PRESENT, false)) {
                             return g;
@@ -223,9 +232,7 @@ public class AddDependency extends Recipe {
                         return (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, StringUtils.isBlank(versionPattern) ? null : versionPattern, resolvedConfiguration,
                                 StringUtils.isBlank(classifier) ? null : classifier, StringUtils.isBlank(extension) ? null : extension, familyPatternCompiled).visitNonNull(g, ctx);
                     }
-                }.visit(s, ctx))
-                .map(SourceFile.class::cast)
-                .orElse(s)
+                })
         );
     }
 }

@@ -37,7 +37,8 @@ class DefaultJavaTypeSignatureBuilderTest implements JavaTypeSignatureBuilderTes
     private final J.CompilationUnit goatCu = JavaParser.fromJavaVersion()
             .build()
             .parse(goat)
-            .get(0);
+      .findFirst()
+      .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
 
     private final JavaType.Parameterized goatCuType = requireNonNull(TypeUtils.asParameterized(goatCu
             .getClasses()

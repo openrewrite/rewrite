@@ -39,6 +39,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static java.util.Collections.*;
 import static org.openrewrite.Tree.randomId;
@@ -48,12 +49,12 @@ public class MavenParser implements Parser<Xml.Document> {
     private final Collection<String> activeProfiles;
 
     @Override
-    public List<Xml.Document> parse(@Language("xml") String... sources) {
+    public Stream<Xml.Document> parse(@Language("xml") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
     @Override
-    public List<Xml.Document> parse(ExecutionContext ctx, @Language("xml") String... sources) {
+    public Stream<Xml.Document> parse(ExecutionContext ctx, @Language("xml") String... sources) {
         return Parser.super.parse(ctx, sources);
     }
 
@@ -65,7 +66,7 @@ public class MavenParser implements Parser<Xml.Document> {
     }
 
     @Override
-    public List<Xml.Document> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
+    public Stream<Xml.Document> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
                                           ExecutionContext ctx) {
         Map<Xml.Document, Pom> projectPoms = new LinkedHashMap<>();
         Map<Path, Pom> projectPomsByPath = new HashMap<>();
@@ -145,7 +146,7 @@ public class MavenParser implements Parser<Xml.Document> {
             }
         }
 
-        return parsed;
+        return parsed.stream();
     }
 
     @Override

@@ -19,9 +19,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.search.FindPlugin;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
-import org.openrewrite.maven.search.FindPlugin;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -98,14 +98,9 @@ public class UpgradePluginVersion extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new FindPlugin(groupId, artifactId).getVisitor();
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         VersionComparator versionComparator = requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
-        return new MavenVisitor<ExecutionContext>() {
+        return Preconditions.check(new FindPlugin(groupId, artifactId), new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isPluginTag(groupId, artifactId)) {
@@ -152,7 +147,7 @@ public class UpgradePluginVersion extends Recipe {
                 }
                 return versionComparator.upgrade(currentVersion, availableVersions);
             }
-        };
+        });
     }
 
     private static class ChangePluginVersionVisitor extends MavenVisitor<ExecutionContext> {

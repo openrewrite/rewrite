@@ -17,13 +17,7 @@ package org.openrewrite.groovy.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.groovy.GroovyIsoVisitor;
-import org.openrewrite.groovy.GroovyVisitor;
-import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.marker.OmitParentheses;
-import org.openrewrite.java.tree.J;
-
-import static org.openrewrite.Tree.randomId;
+import org.openrewrite.TreeVisitor;
 
 public class OmitParenthesesForLastArgumentLambda extends Recipe {
 
@@ -38,9 +32,7 @@ public class OmitParenthesesForLastArgumentLambda extends Recipe {
     }
 
     @Override
-    public GroovyVisitor<ExecutionContext> getVisitor() {
-        return new GroovyIsoVisitor<ExecutionContext>() {
-
-        };
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new OmitParenthesesForLastArgumentLambdaVisitor<>(null);
     }
 }

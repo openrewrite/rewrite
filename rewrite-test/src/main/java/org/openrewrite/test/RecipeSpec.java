@@ -19,8 +19,10 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
+import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.lang.Nullable;
@@ -99,6 +101,31 @@ public class RecipeSpec {
     public RecipeSpec recipe(Recipe recipe) {
         this.recipe = recipe;
         return this;
+    }
+
+    public RecipeSpec recipes(Recipe... recipes) {
+        this.recipe = new CompositeRecipe(Arrays.asList(recipes));
+        return this;
+    }
+
+    @RequiredArgsConstructor
+    public static class MultipleRecipes extends Recipe {
+        private final Recipe[] recipes;
+
+        @Override
+        public String getDisplayName() {
+            return "Multiple recipes running in sequence";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Run multiple recipes in order.";
+        }
+
+        @Override
+        public List<Recipe> getRecipeList() {
+            return Arrays.asList(recipes);
+        }
     }
 
     public RecipeSpec recipe(InputStream yaml, String... activeRecipes) {

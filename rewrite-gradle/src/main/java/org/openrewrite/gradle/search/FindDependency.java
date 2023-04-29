@@ -17,10 +17,7 @@ package org.openrewrite.gradle.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.internal.StringUtils;
@@ -36,12 +33,12 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = true)
 public class FindDependency extends Recipe {
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "com.google.guava")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "guava")
     String artifactId;
 
@@ -65,14 +62,9 @@ public class FindDependency extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsBuildGradle<>();
-    }
-
-    @Override
-    public GroovyVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher dependency = new MethodMatcher("DependencyHandlerSpec *(..)");
-        return new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
                 if (dependency.matches(method)) {
@@ -93,6 +85,6 @@ public class FindDependency extends Recipe {
                 }
                 return super.visitMethodInvocation(method, context);
             }
-        };
+        });
     }
 }

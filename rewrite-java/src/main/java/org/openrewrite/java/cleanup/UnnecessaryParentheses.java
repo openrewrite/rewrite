@@ -18,8 +18,8 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -52,11 +52,11 @@ public class UnnecessaryParentheses extends Recipe {
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                UnnecessaryParenthesesStyle style = ((SourceFile)cu).getStyle(UnnecessaryParenthesesStyle.class);
+                UnnecessaryParenthesesStyle style = ((SourceFile) cu).getStyle(UnnecessaryParenthesesStyle.class);
                 if (style == null) {
                     style = Checkstyle.unnecessaryParentheses();
                 }

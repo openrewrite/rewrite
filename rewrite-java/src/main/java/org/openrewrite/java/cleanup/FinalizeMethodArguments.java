@@ -10,17 +10,9 @@
  **/
 package org.openrewrite.java.cleanup;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
@@ -36,6 +28,10 @@ import org.openrewrite.java.tree.JavaType.Method;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.Markers;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
 
@@ -55,7 +51,7 @@ public class FinalizeMethodArguments extends Recipe {
     }
 
     @Override
-    public JavaIsoVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public MethodDeclaration visitMethodDeclaration(MethodDeclaration methodDeclaration, ExecutionContext executionContext) {
@@ -75,7 +71,7 @@ public class FinalizeMethodArguments extends Recipe {
                     return declarations;
                 }
 
-                List<Statement> parameters = ListUtils.map(declarations.getParameters(), p -> updateParam(p));
+                List<Statement> parameters = ListUtils.map(declarations.getParameters(), FinalizeMethodArguments::updateParam);
                 declarations = declarations.withParameters(parameters);
                 return declarations;
             }
@@ -84,12 +80,12 @@ public class FinalizeMethodArguments extends Recipe {
                 if (p instanceof VariableDeclarations) {
                     VariableDeclarations variableDeclarations = (VariableDeclarations) p;
                     if (variableDeclarations.getVariables().stream()
-                        .anyMatch(namedVariable ->
-                            FindAssignmentReferencesToVariable.find(getCursor()
-                                        .getParentTreeCursor()
-                                        .getValue(),
-                                    namedVariable)
-                                .get())) {
+                            .anyMatch(namedVariable ->
+                                    FindAssignmentReferencesToVariable.find(getCursor()
+                                                            .getParentTreeCursor()
+                                                            .getValue(),
+                                                    namedVariable)
+                                            .get())) {
                         assigned.set(true);
                     }
                 }
@@ -104,10 +100,10 @@ public class FinalizeMethodArguments extends Recipe {
 
     private static boolean isWrongKind(final MethodDeclaration methodDeclaration) {
         return Optional.ofNullable(methodDeclaration.getMethodType())
-            .map(Method::getDeclaringType)
-            .map(FullyQualified::getKind)
-            .filter(Kind.Interface::equals)
-            .isPresent();
+                .map(Method::getDeclaringType)
+                .map(FullyQualified::getKind)
+                .filter(Kind.Interface::equals)
+                .isPresent();
     }
 
     private static boolean isAbstractMethod(MethodDeclaration method) {
@@ -121,13 +117,13 @@ public class FinalizeMethodArguments extends Recipe {
         VariableDeclarations.NamedVariable variable;
 
         /**
-         * @param subtree The subtree to search.
+         * @param subtree  The subtree to search.
          * @param variable A {@link J.VariableDeclarations.NamedVariable} to check for any reassignment calls.
          * @return An {@link AtomicBoolean} that is true if the variable has been reassigned and false otherwise.
          */
         static AtomicBoolean find(J subtree, VariableDeclarations.NamedVariable variable) {
             return new FindAssignmentReferencesToVariable(variable)
-                .reduce(subtree, new AtomicBoolean());
+                    .reduce(subtree, new AtomicBoolean());
         }
 
         @Override
@@ -165,16 +161,16 @@ public class FinalizeMethodArguments extends Recipe {
 
     private static VariableDeclarations updateDeclarations(final VariableDeclarations variableDeclarations) {
         return variableDeclarations.withTypeExpression(variableDeclarations.getTypeExpression() != null ?
-            variableDeclarations.getTypeExpression().withPrefix(Space.SINGLE_SPACE) : null);
+                variableDeclarations.getTypeExpression().withPrefix(Space.SINGLE_SPACE) : null);
     }
 
     private static VariableDeclarations updateModifiers(final VariableDeclarations variableDeclarations, final boolean leadingAnnotations) {
         List<Modifier> modifiers = variableDeclarations.getModifiers();
         Modifier finalModifier = new Modifier(Tree.randomId(),
-            Space.EMPTY,
-            Markers.EMPTY,
-            Type.Final,
-            emptyList());
+                Space.EMPTY,
+                Markers.EMPTY,
+                Type.Final,
+                emptyList());
         if (leadingAnnotations) {
             finalModifier = finalModifier.withPrefix(Space.SINGLE_SPACE);
         }
@@ -186,8 +182,8 @@ public class FinalizeMethodArguments extends Recipe {
             if (p instanceof VariableDeclarations) {
                 final List<Modifier> modifiers = ((VariableDeclarations) p).getModifiers();
                 return !modifiers.isEmpty()
-                    && modifiers.stream()
-                    .allMatch(m -> m.getType().equals(Type.Final));
+                       && modifiers.stream()
+                               .allMatch(m -> m.getType().equals(Type.Final));
             }
             return false;
         });

@@ -58,13 +58,6 @@ public class ChangePropertyValue extends Recipe {
     @Nullable
     Boolean relaxedBinding;
 
-    @Option(displayName = "Optional file matcher",
-            description = "Matching files will be modified. This is a glob expression.",
-            required = false,
-            example = "'**/application-*.properties'")
-    @Nullable
-    String fileMatcher;
-
     @Override
     public String getDisplayName() {
         return "Change property value";
@@ -73,14 +66,6 @@ public class ChangePropertyValue extends Recipe {
     @Override
     public String getDescription() {
         return "Change a property value leaving the key intact.";
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        if (fileMatcher != null) {
-            return new HasSourcePath<>(fileMatcher);
-        }
-        return null;
     }
 
     @Override

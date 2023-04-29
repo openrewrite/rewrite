@@ -127,8 +127,10 @@ class FindTypesTest implements RewriteTest {
     @Test
     void classDecl() {
         rewriteRun(
-          spec -> spec.recipe(new FindTypes("I1", false)
-            .doNext(new FindTypes("a.A1", false))),
+          spec -> spec.recipes(
+            new FindTypes("I1", false),
+            new FindTypes("a.A1", false)
+          ),
           java(
             """
               import a.A1;

@@ -21,7 +21,10 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.*;
+import org.openrewrite.Contributor;
+import org.openrewrite.Maintainer;
+import org.openrewrite.Recipe;
+import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.net.URI;
@@ -32,7 +35,7 @@ import static java.util.Collections.emptyList;
 import static org.openrewrite.Validated.invalid;
 
 @RequiredArgsConstructor
-public class DeclarativeRecipe extends CompositeRecipe {
+public class DeclarativeRecipe extends Recipe {
     @Getter
     private final String name;
 
@@ -52,7 +55,6 @@ public class DeclarativeRecipe extends CompositeRecipe {
 
     private final URI source;
 
-    private final Map<RecipeUse, List<Recipe>> uninitializedRecipes = new HashMap<>();
 
     private final boolean causesAnotherCycle;
 
@@ -64,77 +66,61 @@ public class DeclarativeRecipe extends CompositeRecipe {
     @Getter
     private final List<Maintainer> maintainers;
 
+    private final List<Recipe> uninitializedRecipes = new ArrayList<>();
+    private final List<Recipe> recipeList = new ArrayList<>();
+
     @JsonIgnore
     private Validated validation = Validated.test("initialization",
             "initialize(..) must be called on DeclarativeRecipe prior to use.",
             this, r -> uninitializedRecipes.isEmpty());
 
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return estimatedEffortPerOccurrence == null ? super.getEstimatedEffortPerOccurrence() :
+                estimatedEffortPerOccurrence;
+    }
+
     public void initialize(Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
-        for (Map.Entry<RecipeUse, List<Recipe>> recipesByUse : uninitializedRecipes.entrySet()) {
-            for (int i = 0; i < recipesByUse.getValue().size(); i++) {
-                Recipe recipe = recipesByUse.getValue().get(i);
-                if (recipe instanceof LazyLoadedRecipe) {
-                    String recipeFqn = ((LazyLoadedRecipe) recipe).getRecipeFqn();
-                    Optional<Recipe> next = availableRecipes.stream()
-                            .filter(r -> r.getName().equals(recipeFqn)).findAny();
-                    if (next.isPresent()) {
-                        configureByUse(recipesByUse.getKey(), next.get());
-                    } else {
-                        String useProperty = "";
-                        switch (recipesByUse.getKey()) {
-                            case SingleSourceApplicability:
-                                useProperty = "applicability.singleSource";
-                                break;
-                            case AnySourceApplicability:
-                                useProperty = "applicability.anySource";
-                                break;
-                            case Recipe:
-                                useProperty = "recipeList";
-                                break;
-                        }
-                        validation = validation.and(
-                                invalid(name + "." + useProperty +
-                                        "[" + i + "] (in " + source + ")",
-                                        recipeFqn,
-                                        "recipe '" + recipeFqn + "' does not exist.",
-                                        null));
-                    }
+        for (int i = 0; i < uninitializedRecipes.size(); i++) {
+            Recipe recipe = uninitializedRecipes.get(i);
+            if (recipe instanceof LazyLoadedRecipe) {
+                String recipeFqn = ((LazyLoadedRecipe) recipe).getRecipeFqn();
+                Optional<Recipe> next = availableRecipes.stream()
+                        .filter(r -> r.getName().equals(recipeFqn)).findAny();
+                if (next.isPresent()) {
+                    recipeList.add(next.get());
                 } else {
-                    recipe.setContributors(recipeToContributors.getOrDefault(recipe.getName(), emptyList()));
-                    configureByUse(recipesByUse.getKey(), recipe);
+                    validation = validation.and(
+                            invalid(name + ".recipeList" +
+                                    "[" + i + "] (in " + source + ")",
+                                    recipeFqn,
+                                    "recipe '" + recipeFqn + "' does not exist.",
+                                    null));
                 }
+            } else {
+                recipe.setContributors(recipeToContributors.getOrDefault(recipe.getName(), emptyList()));
+                recipeList.add(recipe);
             }
         }
         uninitializedRecipes.clear();
     }
 
-    private void configureByUse(RecipeUse use, Recipe recipe) {
-        switch(use) {
-            case SingleSourceApplicability:
-                addSingleSourceApplicableTest(recipe);
-                break;
-            case AnySourceApplicability:
-                addApplicableTest(recipe);
-                break;
-            case Recipe:
-                doNext(recipe);
-                break;
-        }
+    @Override
+    public List<Recipe> getRecipeList() {
+        return recipeList;
     }
 
-    public void addUninitialized(RecipeUse use, Recipe recipe) {
-        uninitializedRecipes.computeIfAbsent(use, u -> new ArrayList<>()).add(recipe);
+    public void addUninitialized(Recipe recipe) {
+        uninitializedRecipes.add(recipe);
     }
 
-    public void addUninitialized(RecipeUse use, String recipeName, @Nullable ClassLoader classLoader) {
+    public void addUninitialized(String recipeName, @Nullable ClassLoader classLoader) {
         try {
-            uninitializedRecipes.computeIfAbsent(use, u -> new ArrayList<>())
-                    .add((Recipe) Class.forName(recipeName, true, classLoader != null ? classLoader : this.getClass().getClassLoader())
-                            .getDeclaredConstructor()
-                            .newInstance());
+            uninitializedRecipes.add((Recipe) Class.forName(recipeName, true, classLoader != null ? classLoader : this.getClass().getClassLoader())
+                    .getDeclaredConstructor()
+                    .newInstance());
         } catch (Exception e) {
-            uninitializedRecipes.computeIfAbsent(use, u -> new ArrayList<>())
-                    .add(new DeclarativeRecipe.LazyLoadedRecipe(recipeName));
+            uninitializedRecipes.add(new DeclarativeRecipe.LazyLoadedRecipe(recipeName));
         }
     }
 
@@ -150,7 +136,6 @@ public class DeclarativeRecipe extends CompositeRecipe {
     @Value
     @EqualsAndHashCode(callSuper = true)
     private static class LazyLoadedRecipe extends Recipe {
-
         String recipeFqn;
 
         @Override
@@ -165,10 +150,9 @@ public class DeclarativeRecipe extends CompositeRecipe {
         for (Recipe childRecipe : getRecipeList()) {
             recipeList.add(childRecipe.getDescriptor());
         }
-        //noinspection deprecation
         return new RecipeDescriptor(getName(), getDisplayName(), getDescription(),
                 getTags(), getEstimatedEffortPerOccurrence(),
-                emptyList(), getLanguages(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(),
+                emptyList(), recipeList, getDataTableDescriptors(), getMaintainers(), getContributors(),
                 getExamples(), source);
     }
 
@@ -180,11 +164,11 @@ public class DeclarativeRecipe extends CompositeRecipe {
 
     @Override
     public List<Contributor> getContributors() {
-        if(contributors == null) {
+        if (contributors == null) {
             Map<NameEmail, Integer> contributorToLineCount = new HashMap<>();
             contributors = new ArrayList<>();
-            for(Recipe recipe : getRecipeList()) {
-                for(Contributor contributor : recipe.getContributors()) {
+            for (Recipe recipe : getRecipeList()) {
+                for (Contributor contributor : recipe.getContributors()) {
                     NameEmail nameEmail = new NameEmail(contributor.getName(), contributor.getEmail());
                     contributorToLineCount.put(nameEmail, contributorToLineCount.getOrDefault(nameEmail, 0) + contributor.getLineCount());
                 }
@@ -195,15 +179,5 @@ public class DeclarativeRecipe extends CompositeRecipe {
             contributors.sort(Comparator.comparing(Contributor::getLineCount).reversed());
         }
         return contributors;
-    }
-
-    public enum RecipeUse {
-        /**
-         * If multiple applicable tests configured for SingleSourceApplicability or AnySourceApplicability, the final
-         * result of the applicable test depends on all conditions being met, that is, a logical 'AND' relationship.
-         */
-        SingleSourceApplicability,
-        AnySourceApplicability,
-        Recipe
     }
 }

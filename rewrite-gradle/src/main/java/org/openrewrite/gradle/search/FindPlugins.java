@@ -17,10 +17,7 @@ package org.openrewrite.gradle.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.tree.GradlePlugin;
 import org.openrewrite.java.JavaVisitor;
@@ -55,14 +52,9 @@ public class FindPlugins extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsBuildGradle<>();
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher pluginMatcher = new MethodMatcher("PluginSpec id(..)", false);
-        return new JavaVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (pluginMatcher.matches(method)) {
@@ -73,7 +65,7 @@ public class FindPlugins extends Recipe {
                 }
                 return super.visitMethodInvocation(method, ctx);
             }
-        };
+        });
     }
 
     /**

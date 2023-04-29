@@ -16,6 +16,7 @@
 package org.openrewrite.java.recipes;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -30,10 +31,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import static java.util.Objects.requireNonNull;
 
 public class UseJavaParserBuilderInJavaTemplate extends Recipe {
-    private static final MethodMatcher SUPPLIER_BASED_JAVA_PARSER = new MethodMatcher(
-            "org.openrewrite.java.JavaTemplate$Builder javaParser(java.util.function.Supplier)");
-    private static final MethodMatcher JAVA_PARSER_BUILD = new MethodMatcher(
-            "org.openrewrite.java.JavaParser$Builder build()");
 
     @Override
     public String getDisplayName() {
@@ -47,13 +44,12 @@ public class UseJavaParserBuilderInJavaTemplate extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(SUPPLIER_BASED_JAVA_PARSER);
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        MethodMatcher SUPPLIER_BASED_JAVA_PARSER = new MethodMatcher(
+                "org.openrewrite.java.JavaTemplate$Builder javaParser(java.util.function.Supplier)");
+        MethodMatcher JAVA_PARSER_BUILD = new MethodMatcher(
+                "org.openrewrite.java.JavaParser$Builder build()");
+        return Preconditions.check(new UsesMethod<>(SUPPLIER_BASED_JAVA_PARSER), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
@@ -74,6 +70,6 @@ public class UseJavaParserBuilderInJavaTemplate extends Recipe {
                 }
                 return m;
             }
-        };
+        });
     }
 }

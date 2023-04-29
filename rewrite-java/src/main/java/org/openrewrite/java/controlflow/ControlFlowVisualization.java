@@ -41,7 +41,7 @@ public class ControlFlowVisualization extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ControlFlowVisualizationVisitor<>(
                 includeDotfile ? ControlFlowDotFileGenerator.create() : null,
                 darkMode);

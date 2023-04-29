@@ -42,12 +42,12 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
     ));
 
     @Option(displayName = "Old groupId",
-            description = "The old groupId to replace. The groupId is the first part of a managed dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The old groupId to replace. The groupId is the first part of a managed dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "org.openrewrite.recipe")
     String oldGroupId;
 
     @Option(displayName = "Old artifactId",
-            description = "The old artifactId to replace. The artifactId is the second part of a managed dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The old artifactId to replace. The artifactId is the second part of a managed dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "rewrite-testing-frameworks")
     String oldArtifactId;
 

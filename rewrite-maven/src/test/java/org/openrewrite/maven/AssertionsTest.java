@@ -17,17 +17,17 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.XmlIsoVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.xml.Assertions.xml;
@@ -104,22 +104,22 @@ class AssertionsTest implements RewriteTest {
             return "Super description.";
         }
 
-        private MavenOnlyRecipe() {
-            doNext(new NonMavenRecipe());
+        @Override
+        public List<Recipe> getRecipeList() {
+            return Collections.singletonList(new NonMavenRecipe());
         }
 
         @Override
-        protected TreeVisitor<?, ExecutionContext> getVisitor() {
-            return new MavenIsoVisitor<>() {
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new MavenIsoVisitor<ExecutionContext>() {
                 @Nullable
                 private String filename;
 
                 @Override
-                @Nullable
-                public Xml visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
-                    Xml xml = super.visitSourceFile(sourceFile, executionContext);
+                public Xml visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                     filename = sourceFile.getSourcePath().getFileName().toString();
-                    return xml;
+                    return (Xml) sourceFile;
                 }
 
                 @Override
@@ -143,12 +143,13 @@ class AssertionsTest implements RewriteTest {
         }
 
         @Override
-        protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new XmlIsoVisitor<>() {
                 @Override
-                public @Nullable Xml visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
+                public Xml visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                     xmlCount.incrementAndGet();
-                    return super.visitSourceFile(sourceFile, executionContext);
+                    return (Xml) sourceFile;
                 }
             };
         }

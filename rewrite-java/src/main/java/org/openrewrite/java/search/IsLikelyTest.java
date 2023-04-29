@@ -38,8 +38,8 @@ public class IsLikelyTest extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Applicability.or(
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.or(
                 new HasSourceSet("test").getVisitor(),
                 new HasSourceSetNameContainingTestVisitor<>(),
                 new UsesType<>("org.junit..*", true), // Covers both JUnit 4 and 5

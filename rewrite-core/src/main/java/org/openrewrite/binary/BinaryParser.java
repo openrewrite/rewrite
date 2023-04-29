@@ -21,13 +21,10 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.Objects;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StreamUtils.readAllBytes;
@@ -36,24 +33,26 @@ import static org.openrewrite.internal.StreamUtils.readAllBytes;
  * Doesn't actually _parse_ anything, but if you want to wrap binary data into a SourceFile, this will do the trick
  */
 public class BinaryParser implements Parser<Binary> {
+
     @Override
-    public List<Binary> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        List<Binary> binaries = new ArrayList<>();
-        for (Input source : sources) {
-            Path path = source.getRelativePath(relativeTo);
-            try {
-                binaries.add(new Binary(randomId(),
-                        path,
-                        Markers.EMPTY,
-                        source.getFileAttributes(),
-                        null,
-                        readAllBytes(source.getSource(ctx))));
-            } catch (Exception e) {
-                ParsingExecutionContextView.view(ctx).parseFailure(source, relativeTo, this, e);
-                ctx.getOnError().accept(e);
-            }
-        }
-        return binaries;
+    public Stream<Binary> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+        return StreamSupport.stream(sources.spliterator(), false)
+                .map(source -> {
+                    Path path = source.getRelativePath(relativeTo);
+                    try {
+                        return new Binary(randomId(),
+                                path,
+                                Markers.EMPTY,
+                                source.getFileAttributes(),
+                                null,
+                                readAllBytes(source.getSource(ctx)));
+                    } catch (Exception e) {
+                        ParsingExecutionContextView.view(ctx).parseFailure(source, relativeTo, this, e);
+                        ctx.getOnError().accept(e);
+                    }
+                    return null;
+                })
+                .filter(Objects::nonNull);
     }
 
     @Override

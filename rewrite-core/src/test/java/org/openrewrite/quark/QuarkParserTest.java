@@ -19,10 +19,8 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Result;
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
@@ -32,6 +30,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -73,9 +72,10 @@ class QuarkParserTest implements RewriteTest {
           spec ->
             spec
               .expectedCyclesThatMakeChanges(1)
-              .recipe(toRecipe(() -> new TreeVisitor<SourceFile, ExecutionContext>() {
+              .recipe(toRecipe(() -> new TreeVisitor<>() {
                   @Override
-                  public SourceFile visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
+                  public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                      SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                       if (sourceFile.getSourcePath().toString().endsWith(".bak")) {
                           return sourceFile;
                       }

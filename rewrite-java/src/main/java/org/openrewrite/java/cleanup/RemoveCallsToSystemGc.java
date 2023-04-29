@@ -15,11 +15,10 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Applicability;
+import org.openrewrite.Preconditions;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
@@ -55,22 +54,18 @@ public class RemoveCallsToSystemGc extends Recipe {
     }
 
     @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return Applicability.or(new UsesMethod<>(SYSTEM_GC), new UsesMethod<>(RUNTIME_GC));
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(Preconditions.or(new UsesMethod<>(SYSTEM_GC), new UsesMethod<>(RUNTIME_GC)), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
                 J.MethodInvocation invocation = super.visitMethodInvocation(method, context);
                 if (SYSTEM_GC.matches(invocation) || RUNTIME_GC.matches(invocation)) {
                     doAfterVisit(new EmptyBlock());
+                    //noinspection DataFlowIssue
                     return null;
                 }
                 return invocation;
             }
-        };
+        });
     }
 }

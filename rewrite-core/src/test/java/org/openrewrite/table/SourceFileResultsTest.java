@@ -38,6 +38,7 @@ class SourceFileResultsTest implements RewriteTest {
                   type: specs.openrewrite.org/v1beta/recipe
                   name: test.ChangeTextToHello
                   displayName: Change text to hello
+                  description: Hello world.
                   recipeList:
                       - org.openrewrite.text.ChangeText:
                           toText: Hello!

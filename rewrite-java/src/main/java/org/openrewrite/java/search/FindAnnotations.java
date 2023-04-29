@@ -17,10 +17,7 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -65,34 +62,40 @@ public class FindAnnotations extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        AnnotationMatcher annotationMatcher = new AnnotationMatcher(annotationPattern, matchMetaAnnotations);
-        return new JavaVisitor<ExecutionContext>() {
-            @Override
-            public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext o) {
-                for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
-                    if(annotationMatcher.matchesAnnotationOrMetaAnnotation(TypeUtils.asFullyQualified(type))) {
-                        return SearchResult.found(cu);
-                    }
-                }
-                return cu;
-            }
-        };
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         AnnotationMatcher annotationMatcher = new AnnotationMatcher(annotationPattern, matchMetaAnnotations);
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
-                J.Annotation a = super.visitAnnotation(annotation, ctx);
-                if (annotationMatcher.matches(annotation)) {
-                    a = SearchResult.found(a);
+        return Preconditions.check(
+                new JavaIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext o) {
+                        for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
+                            if (annotationMatcher.matchesAnnotationOrMetaAnnotation(TypeUtils.asFullyQualified(type))) {
+                                return SearchResult.found(cu);
+                            }
+                        }
+                        return cu;
+                    }
+
+                    @Override
+                    public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                        J.Annotation a = super.visitAnnotation(annotation, ctx);
+                        if (annotationMatcher.matches(annotation)) {
+                            a = SearchResult.found(a);
+                        }
+                        return a;
+                    }
+                },
+                new JavaIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+                        J.Annotation a = super.visitAnnotation(annotation, ctx);
+                        if (annotationMatcher.matches(annotation)) {
+                            a = SearchResult.found(a);
+                        }
+                        return a;
+                    }
                 }
-                return a;
-            }
-        };
+        );
     }
 
     public static Set<J.Annotation> find(J j, String annotationPattern) {

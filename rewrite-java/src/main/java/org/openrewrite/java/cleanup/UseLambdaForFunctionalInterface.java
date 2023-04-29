@@ -37,14 +37,14 @@ import static java.util.Collections.singleton;
 public class UseLambdaForFunctionalInterface extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Use lambdas expression to replace anonymous class where possible";
+        return "Use lambda expressions instead of anonymous classes";
     }
 
     @Override
     public String getDescription() {
         return "Instead of anonymous class declarations, use a lambda where possible. Using lambdas to replace " +
-               "anonymous classes can lead to more expressive and maintainable code, improve code readability, reduce" +
-               " code duplication, and achieve better performance in some cases.";
+               "anonymous classes can lead to more expressive and maintainable code, improve code readability, reduce " +
+               "code duplication, and achieve better performance in some cases.";
     }
 
     @Override
@@ -58,7 +58,7 @@ public class UseLambdaForFunctionalInterface extends Recipe {
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
@@ -131,7 +131,7 @@ public class UseLambdaForFunctionalInterface extends Recipe {
 
                         lambda = lambda.withBody(lambdaBody.withPrefix(Space.format(" ")));
 
-                        lambda = (J.Lambda) new LambdaBlockToExpression().getVisitor().visitNonNull(lambda, ctx);
+                        lambda = (J.Lambda) new LambdaBlockToExpression().getVisitor().visitNonNull(lambda, ctx, getCursor().getParentOrThrow());
 
                         doAfterVisit(new RemoveUnusedImports());
 

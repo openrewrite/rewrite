@@ -30,7 +30,7 @@ class DeletePropertyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new DeleteProperty("delete.me", null, null));
+        spec.recipe(new DeleteProperty("delete.me", null));
     }
 
     @DocumentExample
@@ -73,7 +73,7 @@ class DeletePropertyTest implements RewriteTest {
     })
     void relaxedBinding(String propertyKey) {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty(propertyKey, true, null)),
+          spec -> spec.recipe(new DeleteProperty(propertyKey, true)),
           properties(
             """
               spring.datasource.schema=classpath*:db/database/schema.sql
@@ -90,7 +90,7 @@ class DeletePropertyTest implements RewriteTest {
     @Test
     void exactMatch() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("acme.my-project.person.first-name", false, null)),
+          spec -> spec.recipe(new DeleteProperty("acme.my-project.person.first-name", false)),
           properties(
             """
               spring.datasource.schema=classpath*:db/database/schema.sql
@@ -111,7 +111,7 @@ class DeletePropertyTest implements RewriteTest {
     @Test
     void updatePrefix() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("acme.my-project.person.first-name", false, null)),
+          spec -> spec.recipe(new DeleteProperty("acme.my-project.person.first-name", false)),
           properties(
             """
               acme.my-project.person.first-name=example
@@ -130,7 +130,7 @@ class DeletePropertyTest implements RewriteTest {
     @Test
     void matchesGlob() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("management.metrics.export.dynatrace.*", false, null)),
+          spec -> spec.recipe(new DeleteProperty("management.metrics.export.dynatrace.*", false)),
           properties(
             """
               management.metrics.export.dynatrace.api-token=YOUR_TOKEN
@@ -155,7 +155,7 @@ class DeletePropertyTest implements RewriteTest {
     })
     void matchesGlobWithRelaxedBinding(String propertyKey) {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty(propertyKey, true, null)),
+          spec -> spec.recipe(new DeleteProperty(propertyKey, true)),
             properties(
               """
                 acme.notMyProject.person=example

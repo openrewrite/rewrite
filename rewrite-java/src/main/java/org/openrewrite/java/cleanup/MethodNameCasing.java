@@ -17,10 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -35,14 +32,12 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.time.Duration;
-import java.util.Collections;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Pattern;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class MethodNameCasing extends Recipe {
+public class MethodNameCasing extends ScanningRecipe<List<ChangeMethodName>> {
 
     @Option(displayName = "Apply recipe to test source set",
             description = "Changes only apply to main by default. `includeTestSources` will apply the recipe to `test` source files.",
@@ -77,7 +72,12 @@ public class MethodNameCasing extends Recipe {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    public List<ChangeMethodName> getInitialValue() {
+        return new ArrayList<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(List<ChangeMethodName> acc) {
         Pattern standardMethodName = Pattern.compile("^[a-z][a-zA-Z0-9]*$");
         Pattern snakeCase = Pattern.compile("^[a-zA-Z0-9]+_\\w+$");
         return new JavaIsoVisitor<ExecutionContext>() {
@@ -137,7 +137,7 @@ public class MethodNameCasing extends Recipe {
                         && !methodExists(method.getMethodType(), standardized.toString())) {
                         String toName = standardized.toString();
                         if (!StringUtils.isNumeric(toName)) {
-                            doNext(new ChangeMethodName(MethodMatcher.methodPattern(method), standardized.toString(), true, false));
+                            acc.add(new ChangeMethodName(MethodMatcher.methodPattern(method), standardized.toString(), true, false));
                         }
                     }
                 }
@@ -151,6 +151,19 @@ public class MethodNameCasing extends Recipe {
 
             private boolean methodExists(JavaType.Method method, String newName) {
                 return TypeUtils.findDeclaredMethod(method.getDeclaringType(), newName, method.getParameterTypes()).orElse(null) != null;
+            }
+        };
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(List<ChangeMethodName> acc) {
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
+                for (ChangeMethodName changeMethodName : acc) {
+                    doAfterVisit(changeMethodName);
+                }
+                return cu;
             }
         };
     }

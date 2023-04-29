@@ -16,7 +16,9 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -50,13 +52,8 @@ public class CaseInsensitiveComparisonsDoNotChangeCase extends Recipe {
     }
 
     @Override
-    protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>("java.lang.String equalsIgnoreCase(java.lang.String)");
-    }
-
-    @Override
-    public CaseInsensitiveComparisonVisitor<ExecutionContext> getVisitor() {
-        return new CaseInsensitiveComparisonVisitor<>();
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesMethod<>("java.lang.String equalsIgnoreCase(java.lang.String)"), new CaseInsensitiveComparisonVisitor<>());
     }
 
     private static class CaseInsensitiveComparisonVisitor<ExecutionContext> extends JavaIsoVisitor<ExecutionContext> {

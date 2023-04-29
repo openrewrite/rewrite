@@ -18,7 +18,6 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
@@ -31,16 +30,18 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;
 
 @Incubating(since = "7.20.0")
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class AddManagedDependency extends Recipe {
+public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Scanned> {
     @EqualsAndHashCode.Exclude
-    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+    transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'org.apache.logging.log4j:ARTIFACT_ID:VERSION'.",
@@ -128,107 +129,117 @@ public class AddManagedDependency extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Add Managed Maven Dependency";
+        return "Add managed Maven dependency";
     }
 
     @Override
     public String getDescription() {
-        return "Add a managed maven dependency to a pom.xml file.";
+        return "Add a managed Maven dependency to a `pom.xml` file.";
     }
 
-    @Override
-    protected MavenIsoVisitor<ExecutionContext> getApplicableTest() {
-        if (!StringUtils.isNullOrEmpty(onlyIfUsing) && onlyIfUsing.contains(":")) {
-            String[] ga = onlyIfUsing.split(":");
-            return new MavenIsoVisitor<ExecutionContext>() {
-                @Override
-                public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext context) {
-                    Xml.Tag t = super.visitTag(tag, context);
-
-                    if (isDependencyTag()) {
-                        ResolvedDependency dependency = findDependency(t, null);
-                        if (dependency != null) {
-                            ResolvedDependency match = dependency.findDependency(ga[0], ga[1]);
-                            if (match != null) {
-                                t = SearchResult.found(t);
-                            }
-                        }
-                    }
-
-                    return t;
-                }
-            };
-        }
-        return null;
-    }
-
-    @Override
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
+    static class Scanned {
+        boolean usingType;
         List<SourceFile> rootPoms = new ArrayList<>();
-        for (SourceFile source : before) {
-            source.getMarkers().findFirst(MavenResolutionResult.class).ifPresent(mavenResolutionResult -> {
-                if (mavenResolutionResult.getParent() == null) {
-                    rootPoms.add(source);
+    }
+
+    @Override
+    public Scanned getInitialValue() {
+        Scanned scanned = new Scanned();
+        scanned.usingType = onlyIfUsing == null;
+        return scanned;
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Scanned acc) {
+        return Preconditions.check(acc.usingType || (!StringUtils.isNullOrEmpty(onlyIfUsing) && onlyIfUsing.contains(":")), new MavenIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                document.getMarkers().findFirst(MavenResolutionResult.class).ifPresent(mavenResolutionResult -> {
+                    if (mavenResolutionResult.getParent() == null) {
+                        acc.rootPoms.add(document);
+                    }
+                });
+                if(acc.usingType) {
+                    return SearchResult.found(document);
                 }
-            });
-        }
 
-        return ListUtils.map(before, s -> s.getMarkers().findFirst(MavenResolutionResult.class)
-                .map(javaProject -> (Tree) new MavenVisitor<ExecutionContext>() {
-                    @Override
-                    public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                        Xml maven = super.visitDocument(document, executionContext);
+                return super.visitDocument(document, ctx);
+            }
 
-                        if (!Boolean.TRUE.equals(addToRootPom) || rootPoms.contains(document)) {
-                            Validated versionValidation = Semver.validate(version, versionPattern);
-                            if (versionValidation.isValid()) {
-                                VersionComparator versionComparator = requireNonNull(versionValidation.getValue());
-                                try {
-                                    String versionToUse = findVersionToUse(versionComparator, ctx);
-                                    if (!Objects.equals(versionToUse, existingManagedDependencyVersion())) {
-                                        doAfterVisit(new AddManagedDependencyVisitor(groupId, artifactId,
-                                                versionToUse, scope, type, classifier));
-                                        maybeUpdateModel();
-                                    }
-                                } catch (MavenDownloadingException e) {
-                                    return e.warn(document);
-                                }
-                            }
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = super.visitTag(tag, ctx);
+
+                if (isDependencyTag()) {
+                    ResolvedDependency dependency = findDependency(t, null);
+                    if (dependency != null) {
+                        String[] ga = requireNonNull(onlyIfUsing).split(":");
+                        ResolvedDependency match = dependency.findDependency(ga[0], ga[1]);
+                        if (match != null) {
+                            acc.usingType = true;
                         }
-
-                        return maven;
                     }
+                }
 
-                    @Nullable
-                    private String existingManagedDependencyVersion() {
-                        return getResolutionResult().getPom().getDependencyManagement().stream()
-                                .map(resolvedManagedDep -> {
-                                    if (resolvedManagedDep.matches(groupId, artifactId, type, classifier)) {
-                                        return resolvedManagedDep.getGav().getVersion();
-                                    } else if (resolvedManagedDep.getRequestedBom() != null
-                                               && resolvedManagedDep.getRequestedBom().getGroupId().equals(groupId)
-                                               && resolvedManagedDep.getRequestedBom().getArtifactId().equals(artifactId)) {
-                                        return resolvedManagedDep.getRequestedBom().getVersion();
-                                    }
-                                    return null;
-                                })
-                                .filter(Objects::nonNull)
-                                .findFirst().orElse(null);
-                    }
+                return t;
+            }
+        });
+    }
 
-                    @Nullable
-                    private String findVersionToUse(VersionComparator versionComparator, ExecutionContext ctx) throws MavenDownloadingException {
-                        MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
-                        LatestRelease latest = new LatestRelease(versionPattern);
-                        return mavenMetadata.getVersioning().getVersions().stream()
-                                .filter(v -> versionComparator.isValid(null, v))
-                                .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
-                                .max((v1, v2) -> versionComparator.compare(null, v1, v2))
-                                .orElse(null);
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
+        return Preconditions.check(acc.usingType, new MavenVisitor<ExecutionContext>() {
+            @Override
+            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
+                Xml maven = super.visitDocument(document, ctx);
+
+                if (!Boolean.TRUE.equals(addToRootPom) || acc.rootPoms.contains(document)) {
+                    Validated versionValidation = Semver.validate(version, versionPattern);
+                    if (versionValidation.isValid()) {
+                        VersionComparator versionComparator = requireNonNull(versionValidation.getValue());
+                        try {
+                            String versionToUse = findVersionToUse(versionComparator, ctx);
+                            if (!Objects.equals(versionToUse, existingManagedDependencyVersion())) {
+                                doAfterVisit(new AddManagedDependencyVisitor(groupId, artifactId,
+                                        versionToUse, scope, type, classifier));
+                                maybeUpdateModel();
+                            }
+                        } catch (MavenDownloadingException e) {
+                            return e.warn(document);
+                        }
                     }
-                }.visit(s, ctx))
-                .map(SourceFile.class::cast)
-                .orElse(s)
-        );
+                }
+
+                return maven;
+            }
+
+            @Nullable
+            private String existingManagedDependencyVersion() {
+                return getResolutionResult().getPom().getDependencyManagement().stream()
+                        .map(resolvedManagedDep -> {
+                            if (resolvedManagedDep.matches(groupId, artifactId, type, classifier)) {
+                                return resolvedManagedDep.getGav().getVersion();
+                            } else if (resolvedManagedDep.getRequestedBom() != null
+                                       && resolvedManagedDep.getRequestedBom().getGroupId().equals(groupId)
+                                       && resolvedManagedDep.getRequestedBom().getArtifactId().equals(artifactId)) {
+                                return resolvedManagedDep.getRequestedBom().getVersion();
+                            }
+                            return null;
+                        })
+                        .filter(Objects::nonNull)
+                        .findFirst().orElse(null);
+            }
+
+            @Nullable
+            private String findVersionToUse(VersionComparator versionComparator, ExecutionContext ctx) throws MavenDownloadingException {
+                MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
+                LatestRelease latest = new LatestRelease(versionPattern);
+                return mavenMetadata.getVersioning().getVersions().stream()
+                        .filter(v -> versionComparator.isValid(null, v))
+                        .filter(v -> !Boolean.TRUE.equals(releasesOnly) || latest.isValid(null, v))
+                        .max((v1, v2) -> versionComparator.compare(null, v1, v2))
+                        .orElse(null);
+            }
+        });
     }
 }

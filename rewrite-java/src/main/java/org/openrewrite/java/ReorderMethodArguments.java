@@ -18,9 +18,7 @@ package org.openrewrite.java;
 import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
@@ -69,7 +67,7 @@ public class ReorderMethodArguments extends Recipe {
 
     @Option(displayName = "Ignore type definition",
             description = "When set to `true` the definition of the old type will be left untouched. " +
-                    "This is useful when you're replacing usage of a class but don't want to rename it.",
+                          "This is useful when you're replacing usage of a class but don't want to rename it.",
             required = false)
     @Nullable
     Boolean ignoreDefinition;
@@ -89,24 +87,19 @@ public class ReorderMethodArguments extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                if(Boolean.TRUE.equals(ignoreDefinition)) {
+                if (Boolean.TRUE.equals(ignoreDefinition)) {
                     J j = new DeclaresMethod<>(methodPattern, true).visitNonNull(cu, ctx);
-                    if(cu != j) {
+                    if (cu != j) {
                         return cu;
                     }
                 }
                 return new UsesMethod<>(methodPattern).visitNonNull(cu, ctx);
             }
-        };
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new ReorderMethodArgumentsVisitor(new MethodMatcher(methodPattern));
+        }, new ReorderMethodArgumentsVisitor(new MethodMatcher(methodPattern)));
     }
 
     private class ReorderMethodArgumentsVisitor extends JavaIsoVisitor<ExecutionContext> {

@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
@@ -64,18 +65,13 @@ public class SimplifyDurationCreationUnits extends Recipe {
     }
 
     @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getApplicableTest() {
-        return new UsesMethod<>(new MethodMatcher("java.time.Duration of*(long)"));
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesMethod<>("java.time.Duration of*(long)"), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 method = super.visitMethodInvocation(method, ctx);
 
-                @Nullable DurationUnits invocationUnits = null;
+                DurationUnits invocationUnits = null;
                 for (DurationUnits maybeUnit : DurationUnits.values()) {
                     if (maybeUnit.methodMatcher.matches(method)) {
                         invocationUnits = maybeUnit;
@@ -92,8 +88,8 @@ public class SimplifyDurationCreationUnits extends Recipe {
                     return method;
                 }
 
-                final long millis = invocationUnitCount * invocationUnits.millisFactor;
-                @Nullable DurationUnits simplifiedUnits = null;
+                long millis = invocationUnitCount * invocationUnits.millisFactor;
+                DurationUnits simplifiedUnits = null;
                 for (DurationUnits maybeUnit : DurationUnits.values()) {
                     if (millis % maybeUnit.millisFactor == 0) {
                         simplifiedUnits = maybeUnit;
@@ -117,10 +113,11 @@ public class SimplifyDurationCreationUnits extends Recipe {
                         ctx
                 );
             }
-        };
+        });
     }
 
-    private static @Nullable Long getConstantIntegralValue(Expression expression) {
+    @Nullable
+    private static Long getConstantIntegralValue(Expression expression) {
         if (expression instanceof J.Literal) {
             J.Literal literal = (J.Literal) expression;
             if (literal.getType() != JavaType.Primitive.Int && literal.getType() != JavaType.Primitive.Long) {

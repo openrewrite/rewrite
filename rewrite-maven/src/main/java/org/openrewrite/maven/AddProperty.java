@@ -17,10 +17,7 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.AddToTagVisitor;
@@ -52,7 +49,7 @@ public class AddProperty extends Recipe {
 
     @Option(displayName = "Trust parent POM",
             description = "Even if the parent defines a property with the same key, trust it even if the value isn't the same. " +
-                    "Useful when you want to wait for the parent to have its value changed first. The parent is not trusted by default.",
+                          "Useful when you want to wait for the parent to have its value changed first. The parent is not trusted by default.",
             required = false)
     @Nullable
     Boolean trustParent;
@@ -68,8 +65,8 @@ public class AddProperty extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new MavenVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
                 String currentValue = getResolutionResult().getPom().getProperties().get(key);
@@ -84,12 +81,7 @@ public class AddProperty extends Recipe {
                 }
                 return document;
             }
-        };
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new MavenIsoVisitor<ExecutionContext>() {
+        }, new MavenIsoVisitor<ExecutionContext>() {
             final String propertyName = key.replace("${", "").replace("}", "");
 
             @Override
@@ -110,12 +102,12 @@ public class AddProperty extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (!Boolean.TRUE.equals(preserveExistingValue)
-                        && isPropertyTag() && propertyName.equals(tag.getName())
-                        && !value.equals(tag.getValue().orElse(null))) {
+                    && isPropertyTag() && propertyName.equals(tag.getName())
+                    && !value.equals(tag.getValue().orElse(null))) {
                     doAfterVisit(new ChangeTagValueVisitor<>(tag, value));
                 }
                 return super.visitTag(tag, ctx);
             }
-        };
+        });
     }
 }

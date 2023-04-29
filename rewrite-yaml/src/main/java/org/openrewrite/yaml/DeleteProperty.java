@@ -55,14 +55,6 @@ public class DeleteProperty extends Recipe {
     @Nullable
     Boolean relaxedBinding;
 
-    @Incubating(since = "7.8.0")
-    @Option(displayName = "Optional file matcher",
-            description = "Matching files will be modified. This is a glob expression.",
-            required = false,
-            example = "**/application-*.yml")
-    @Nullable
-    String fileMatcher;
-
     @Override
     public String getDisplayName() {
         return "Delete property";
@@ -75,15 +67,7 @@ public class DeleteProperty extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        if (fileMatcher != null) {
-            return new HasSourcePath<>(fileMatcher);
-        }
-        return null;
-    }
-
-    @Override
-    public YamlVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new YamlIsoVisitor<ExecutionContext>() {
 
             @Override

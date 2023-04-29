@@ -48,13 +48,8 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesJavaVersion<>(14);
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RemoveInstanceOfPatternMatchVisitor();
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesJavaVersion<>(14), new RemoveInstanceOfPatternMatchVisitor());
     }
 
     /**
@@ -150,14 +145,16 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
                             ctx);
                     elsePart = result.getElsePart();
                 }
-                // Add variable declarations in the order of "instanceof" expressions
-                Iterator<J.InstanceOf> iter = variableUsage.declarations.get(iff).descendingIterator();
-                while (iter.hasNext()) {
-                    J.InstanceOf instanceOf = iter.next();
-                    if (elseInstanceOfs.contains(instanceOf)) {
-                        result = result.withElsePart(elsePart.withBody(
-                                addVariableDeclaration(
-                                        (J.Block) elsePart.getBody(), instanceOf, ctx)));
+                if (elsePart != null) {
+                    // Add variable declarations in the order of "instanceof" expressions
+                    Iterator<J.InstanceOf> iter = variableUsage.declarations.get(iff).descendingIterator();
+                    while (iter.hasNext()) {
+                        J.InstanceOf instanceOf = iter.next();
+                        if (elseInstanceOfs.contains(instanceOf)) {
+                            result = result.withElsePart(elsePart.withBody(
+                                    addVariableDeclaration(
+                                            (J.Block) elsePart.getBody(), instanceOf, ctx)));
+                        }
                     }
                 }
             }
@@ -169,9 +166,9 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
          * declaration is based on a pattern variable declared in an instanceof
          * expression.
          *
-         * @param block the statement block
+         * @param block      the statement block
          * @param instanceOf the instanceof expression
-         * @param ctx the execution context
+         * @param ctx        the execution context
          * @return the updated block
          */
         private J.Block addVariableDeclaration(J.Block block, J.InstanceOf instanceOf, ExecutionContext ctx) {
@@ -189,7 +186,7 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
         /**
          * Creates a type cast expression.
          *
-         * @param typeTree the type tree
+         * @param typeTree   the type tree
          * @param expression the expression to cast
          * @return the type cast expression
          */
@@ -209,7 +206,7 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
         /**
          * Wraps a tree in parentheses.
          *
-         * @param <T> the expression type
+         * @param <T>  the expression type
          * @param tree the tree
          * @return the wrapped tree
          */
@@ -220,7 +217,7 @@ public class RemoveInstanceOfPatternMatch extends Recipe {
         /**
          * Wraps a tree in a {@link JRightPadded<T>} object.
          *
-         * @param <T> the expression type
+         * @param <T>  the expression type
          * @param tree the tree
          * @return the wrapped tree
          */

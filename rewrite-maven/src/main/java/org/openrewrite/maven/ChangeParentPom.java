@@ -17,10 +17,7 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.table.MavenMetadataFailures;
@@ -34,7 +31,10 @@ import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -110,29 +110,13 @@ public class ChangeParentPom extends Recipe {
     List<String> retainVersions;
 
     @Override
-    protected MavenVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new MavenVisitor<ExecutionContext>() {
-            @Override
-            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                Parent parent = getResolutionResult().getPom().getRequested().getParent();
-                if (parent != null &&
-                    matchesGlob(parent.getArtifactId(), oldArtifactId) &&
-                    matchesGlob(parent.getGroupId(), oldGroupId)) {
-                    return SearchResult.found(document);
-                }
-                return document;
-            }
-        };
-    }
-
-    @Override
     public Validated validate() {
         Validated validated = super.validate();
         //noinspection ConstantConditions
         if (newVersion != null) {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
         }
-        if(retainVersions != null) {
+        if (retainVersions != null) {
             for (int i = 0; i < retainVersions.size(); i++) {
                 String retainVersion = retainVersions.get(i);
                 validated = validated.and(Validated.test(
@@ -149,11 +133,22 @@ public class ChangeParentPom extends Recipe {
     }
 
     @Override
-    public MavenVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
         assert versionComparator != null;
 
-        return new MavenIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new MavenVisitor<ExecutionContext>() {
+            @Override
+            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                Parent parent = getResolutionResult().getPom().getRequested().getParent();
+                if (parent != null &&
+                    matchesGlob(parent.getArtifactId(), oldArtifactId) &&
+                    matchesGlob(parent.getGroupId(), oldGroupId)) {
+                    return SearchResult.found(document);
+                }
+                return document;
+            }
+        }, new MavenIsoVisitor<ExecutionContext>() {
             @Nullable
             private Collection<String> availableVersions;
 
@@ -225,7 +220,7 @@ public class ChangeParentPom extends Recipe {
                 }
                 return Boolean.TRUE.equals(allowVersionDowngrades) ? availableVersions.stream().max((v1, v2) -> versionComparator.compare(finalCurrentVersion, v1, v2)) : versionComparator.upgrade(finalCurrentVersion, availableVersions);
             }
-        };
+        });
     }
 }
 

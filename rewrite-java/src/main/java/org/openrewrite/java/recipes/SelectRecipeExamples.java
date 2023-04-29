@@ -15,11 +15,10 @@
  */
 package org.openrewrite.java.recipes;
 
-import org.openrewrite.Applicability;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.*;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.Expression;
@@ -40,15 +39,13 @@ public class SelectRecipeExamples extends Recipe {
     private static final AnnotationMatcher DISABLED_ANNOTATION_MATCHER = new AnnotationMatcher("@org.junit.jupiter" +
                                                                                                ".api.Disabled");
     private static final AnnotationMatcher DOCUMENT_EXAMPLE_ANNOTATION_MATCHER =
-        new AnnotationMatcher("@" + DOCUMENT_EXAMPLE_ANNOTATION_FQN);
+            new AnnotationMatcher("@" + DOCUMENT_EXAMPLE_ANNOTATION_FQN);
 
     private static final MethodMatcher REWRITE_RUN_METHOD_MATCHER_ALL =
-        new MethodMatcher("org.openrewrite.test.RewriteTest rewriteRun(..)");
+            new MethodMatcher("org.openrewrite.test.RewriteTest rewriteRun(..)");
 
     private static final MethodMatcher REWRITE_RUN_METHOD_MATCHER_WITH_SPEC =
-        new MethodMatcher("org.openrewrite.test.RewriteTest rewriteRun(java.util.function.Consumer, org.openrewrite.test.SourceSpecs[])");
-    private static final MethodMatcher REWRITE_RUN_METHOD_MATCHER =
-        new MethodMatcher("org.openrewrite.test.RewriteTest rewriteRun(org.openrewrite.test.SourceSpecs[])");
+            new MethodMatcher("org.openrewrite.test.RewriteTest rewriteRun(java.util.function.Consumer, org.openrewrite.test.SourceSpecs[])");
 
     private static final String REWRITE_TEST_FQN = "org.openrewrite.test.RewriteTest";
 
@@ -64,13 +61,8 @@ public class SelectRecipeExamples extends Recipe {
     }
 
     @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return Applicability.not(new UsesType<>(DOCUMENT_EXAMPLE_ANNOTATION_FQN, false));
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(Preconditions.not(new UsesType<>(DOCUMENT_EXAMPLE_ANNOTATION_FQN, false)), new JavaIsoVisitor<ExecutionContext>() {
             private int selectedCount = 0;
 
             @Override
@@ -94,16 +86,16 @@ public class SelectRecipeExamples extends Recipe {
 
                 List<J.Annotation> annotations = method.getLeadingAnnotations();
 
-                boolean isTest = annotations.stream().anyMatch(a -> TEST_ANNOTATION_MATCHER.matches(a));
+                boolean isTest = annotations.stream().anyMatch(TEST_ANNOTATION_MATCHER::matches);
                 if (!isTest) {
                     return method;
                 }
 
                 boolean hasIssueOrDisabledAnnotation =
-                    annotations.stream().anyMatch(a -> ISSUE_ANNOTATION_MATCHER.matches(a) ||
-                                                       DISABLED_ANNOTATION_MATCHER.matches(a) ||
-                                                       DOCUMENT_EXAMPLE_ANNOTATION_MATCHER.matches(a)
-                    );
+                        annotations.stream().anyMatch(a -> ISSUE_ANNOTATION_MATCHER.matches(a) ||
+                                                           DISABLED_ANNOTATION_MATCHER.matches(a) ||
+                                                           DOCUMENT_EXAMPLE_ANNOTATION_MATCHER.matches(a)
+                        );
 
                 if (hasIssueOrDisabledAnnotation) {
                     return method;
@@ -115,13 +107,9 @@ public class SelectRecipeExamples extends Recipe {
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method,
                                                                     AtomicBoolean isGood) {
                         if (REWRITE_RUN_METHOD_MATCHER_ALL.matches(method)) {
-
                             int argIndex = 0;
-
                             if (REWRITE_RUN_METHOD_MATCHER_WITH_SPEC.matches(method)) {
                                 argIndex = 1;
-                            } else if (REWRITE_RUN_METHOD_MATCHER.matches(method)) {
-                                argIndex = 0;
                             }
 
                             Expression arg = method.getArguments().get(argIndex);
@@ -129,8 +117,8 @@ public class SelectRecipeExamples extends Recipe {
                             if (arg instanceof J.MethodInvocation) {
 
                                 J.MethodInvocation methodInvocation = (J.MethodInvocation) arg;
-                                if (methodInvocation.getArguments() != null && methodInvocation.getArguments().size() > 1) {
-
+                                methodInvocation.getArguments();
+                                if (methodInvocation.getArguments().size() > 1) {
                                     Expression arg0 = methodInvocation.getArguments().get(0);
                                     Expression arg1 = methodInvocation.getArguments().get(1);
 
@@ -149,19 +137,19 @@ public class SelectRecipeExamples extends Recipe {
                 }
 
                 JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "@DocumentExample")
-                    .imports(DOCUMENT_EXAMPLE_ANNOTATION_FQN)
-                    .javaParser(JavaParser.fromJavaVersion()
-                        .classpath(JavaParser.runtimeClasspath()))
-                    .build();
+                        .imports(DOCUMENT_EXAMPLE_ANNOTATION_FQN)
+                        .javaParser(JavaParser.fromJavaVersion()
+                                .classpath(JavaParser.runtimeClasspath()))
+                        .build();
 
                 maybeAddImport(DOCUMENT_EXAMPLE_ANNOTATION_FQN);
 
                 selectedCount++;
                 return method.withTemplate(
-                    t,
-                    method.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
+                        t,
+                        method.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
             }
-        };
+        });
     }
 
     private static boolean isStringLiteral(Expression expression) {

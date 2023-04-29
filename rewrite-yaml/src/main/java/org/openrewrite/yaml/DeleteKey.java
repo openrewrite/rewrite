@@ -32,14 +32,6 @@ public class DeleteKey extends Recipe {
             example = "$.source.kind")
     String keyPath;
 
-    @Incubating(since = "7.8.0")
-    @Option(displayName = "Optional file matcher",
-            description = "Matching files will be modified. This is a glob expression.",
-            required = false,
-            example = "**/application-*.yml")
-    @Nullable
-    String fileMatcher;
-
     @Override
     public String getDisplayName() {
         return "Delete key";
@@ -48,14 +40,6 @@ public class DeleteKey extends Recipe {
     @Override
     public String getDescription() {
         return "Delete a YAML mapping entry key.";
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        if (fileMatcher != null) {
-            return new HasSourcePath<>(fileMatcher);
-        }
-        return null;
     }
 
     @Override

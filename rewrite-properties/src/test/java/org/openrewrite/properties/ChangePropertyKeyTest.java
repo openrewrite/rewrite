@@ -34,7 +34,6 @@ class ChangePropertyKeyTest implements RewriteTest {
           "management.metrics.binders.files.enabled",
           "management.metrics.enable.process.files",
           null,
-          null,
           null));
     }
 
@@ -79,7 +78,6 @@ class ChangePropertyKeyTest implements RewriteTest {
             propertyKey,
             "acme.my-project.person.change-to",
             true,
-            null,
             null)),
           properties(
             """
@@ -102,7 +100,6 @@ class ChangePropertyKeyTest implements RewriteTest {
             "acme.my-project.person.first-name",
             "acme.my-project.person.change-to",
             false,
-            null,
             null)),
           properties(
             """
@@ -120,30 +117,9 @@ class ChangePropertyKeyTest implements RewriteTest {
     }
 
     @Test
-    void changeOnlyMatchingFile() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey(
-            "management.metrics",
-            "management.stats",
-            null,
-            "**/a.properties",
-            null)),
-          properties(
-            "management.metrics=true",
-            "management.stats=true",
-            spec -> spec.path("a.properties")
-          ),
-          properties(
-            "management.metrics=true",
-            spec -> spec.path("b.properties")
-          )
-        );
-    }
-
-    @Test
     void regexMatch() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("spring\\.resources\\.(.+)", "spring.web.resources.$1", null, null, true)),
+          spec -> spec.recipe(new ChangePropertyKey("spring\\.resources\\.(.+)", "spring.web.resources.$1", null, true)),
           properties(
             "spring.resources.chain.strategy.content.enabled=true",
             "spring.web.resources.chain.strategy.content.enabled=true"
@@ -158,7 +134,7 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Test
     void regexMatchDefaultDisabled() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("spring\\.resources\\.(.+)", "spring.web.resources.$1", null, null, null)),
+          spec -> spec.recipe(new ChangePropertyKey("spring\\.resources\\.(.+)", "spring.web.resources.$1", null, null)),
           properties(
             "spring.resources.chain.strategy.content.enabled=true"
           )

@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.FindAnnotations;
@@ -27,34 +28,26 @@ import java.text.ParseException;
 import java.text.RuleBasedCollator;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 public class ExtractInterface {
-    public static List<JavaSourceFile> extract(JavaSourceFile cu, String fullyQualifiedInterfaceName) {
-        return Arrays.asList(
-                (JavaSourceFile) new CreateInterface(fullyQualifiedInterfaceName).visitNonNull(cu, 0),
-                (JavaSourceFile) new ImplementAndAddOverrideAnnotations(fullyQualifiedInterfaceName).visitNonNull(cu, 0)
-        );
-    }
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class CreateInterface extends JavaIsoVisitor<Integer> {
+    public static class CreateInterface extends JavaIsoVisitor<ExecutionContext> {
         String fullyQualifiedInterfaceName;
 
         @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, Integer p) {
+        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
             String pkg = cu.getPackageDeclaration() == null ? "" :
                     Arrays.stream(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()).split("\\."))
                             .map(subpackage -> "..")
                             .collect(Collectors.joining("/", "../", "/"));
 
-            JavaSourceFile c = super.visitJavaSourceFile(cu, p)
+            JavaSourceFile c = super.visitJavaSourceFile(cu, ctx)
                     .withId(Tree.randomId());
 
             String interfacePkg = JavaType.ShallowClass.build(fullyQualifiedInterfaceName).getPackageName();
@@ -74,7 +67,7 @@ public class ExtractInterface {
         }
 
         @Override
-        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
             J.ClassDeclaration c = classDecl;
 
             c = c.withKind(J.ClassDeclaration.Kind.Type.Interface);
@@ -84,13 +77,13 @@ public class ExtractInterface {
                     fullyQualifiedInterfaceName.lastIndexOf('.') + 1
             )));
 
-            return autoFormat(super.visitClassDeclaration(c, p), p);
+            return autoFormat(super.visitClassDeclaration(c, ctx), ctx);
         }
 
         @Override
-        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
+        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             if (method.hasModifier(J.Modifier.Type.Static) || !method.hasModifier(J.Modifier.Type.Public) ||
-                    method.isConstructor()) {
+                method.isConstructor()) {
                 //noinspection ConstantConditions
                 return null;
             }
@@ -98,35 +91,35 @@ public class ExtractInterface {
             return method
                     .withModifiers(ListUtils.map(method.getModifiers(), m ->
                             m.getType() == J.Modifier.Type.Public ||
-                                    m.getType() == J.Modifier.Type.Final ||
-                                    m.getType() == J.Modifier.Type.Native ? null : m))
+                            m.getType() == J.Modifier.Type.Final ||
+                            m.getType() == J.Modifier.Type.Native ? null : m))
                     .withBody(null);
         }
     }
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class ImplementAndAddOverrideAnnotations extends JavaIsoVisitor<Integer> {
+    public static class ImplementAndAddOverrideAnnotations extends JavaIsoVisitor<ExecutionContext> {
         String fullyQualifiedInterfaceName;
 
         @Override
-        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
             maybeAddImport(fullyQualifiedInterfaceName);
             JavaType.ShallowClass type = JavaType.ShallowClass.build(fullyQualifiedInterfaceName);
 
             J.Block body = classDecl.getBody();
-            return ((J.ClassDeclaration) new ImplementInterface<>(classDecl, type).visitNonNull(classDecl, p))
+            return ((J.ClassDeclaration) new ImplementInterface<>(classDecl, type).visitNonNull(classDecl, ctx))
                     .withBody(body.withStatements(ListUtils.map(body.getStatements(), s -> {
                         if (s instanceof J.MethodDeclaration) {
                             J.MethodDeclaration methodDeclaration = (J.MethodDeclaration) s;
                             try {
                                 if (!methodDeclaration.hasModifier(J.Modifier.Type.Public) ||
-                                        methodDeclaration.hasModifier(J.Modifier.Type.Static) ||
-                                        methodDeclaration.isConstructor()) {
+                                    methodDeclaration.hasModifier(J.Modifier.Type.Static) ||
+                                    methodDeclaration.isConstructor()) {
                                     return s;
                                 }
 
-                                if(FindAnnotations.find(methodDeclaration, "@java.lang.Override").isEmpty()) {
+                                if (FindAnnotations.find(methodDeclaration, "@java.lang.Override").isEmpty()) {
                                     return methodDeclaration.withTemplate(
                                             JavaTemplate.builder(this::getCursor, "@Override").build(),
                                             methodDeclaration.getCoordinates().addAnnotation(

@@ -16,12 +16,12 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
@@ -58,13 +58,8 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("java.math.BigDecimal", false);
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesType<>("java.math.BigDecimal", false), new JavaIsoVisitor<ExecutionContext>() {
             private final JavaTemplate twoArgDivide = JavaTemplate.builder(this::getCursor, "#{any(java.math.BigDecimal)}, #{}")
                     .imports("java.math.RoundingMode")
                     .build();
@@ -80,7 +75,7 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
                 if (BIG_DECIMAL_DIVIDE.matches(m) &&
-                        isConvertibleBigDecimalConstant(m.getArguments().get(1))) {
+                    isConvertibleBigDecimalConstant(m.getArguments().get(1))) {
                     String roundingModeEnum = getTemplateText(m.getArguments().get(1));
                     if (roundingModeEnum == null) {
                         return m;
@@ -97,7 +92,7 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
                             m.getArguments().get(0), roundingModeEnum);
                     maybeAddImport("java.math.RoundingMode");
                 } else if (BIG_DECIMAL_DIVIDE_WITH_SCALE.matches(m) &&
-                        isConvertibleBigDecimalConstant(m.getArguments().get(2))) {
+                           isConvertibleBigDecimalConstant(m.getArguments().get(2))) {
                     String roundingModeEnum = getTemplateText(m.getArguments().get(2));
                     if (roundingModeEnum == null) {
                         return m;
@@ -160,6 +155,6 @@ public class BigDecimalRoundingConstantsToEnums extends Recipe {
                 }
                 return null;
             }
-        };
+        });
     }
 }

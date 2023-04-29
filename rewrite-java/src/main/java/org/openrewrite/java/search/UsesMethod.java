@@ -18,6 +18,7 @@ package org.openrewrite.java.search;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
@@ -49,5 +50,29 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
             }
         }
         return cu;
+    }
+
+    @Override
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
+        if (methodMatcher.matches(method)) {
+            return SearchResult.found(method);
+        }
+        return super.visitMethodInvocation(method, p);
+    }
+
+    @Override
+    public J.MemberReference visitMemberReference(J.MemberReference memberRef, P p) {
+        if (methodMatcher.matches(memberRef)) {
+            return SearchResult.found(memberRef);
+        }
+        return super.visitMemberReference(memberRef, p);
+    }
+
+    @Override
+    public J.NewClass visitNewClass(J.NewClass newClass, P p) {
+        if (methodMatcher.matches(newClass)) {
+            return SearchResult.found(newClass);
+        }
+        return super.visitNewClass(newClass, p);
     }
 }

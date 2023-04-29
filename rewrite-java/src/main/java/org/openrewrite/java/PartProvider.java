@@ -28,7 +28,8 @@ import java.util.List;
  * Produce a part by user provided sample code and type, make sure the part can be produced from the sample code and only once.
  */
 public final class PartProvider {
-    private PartProvider(){}
+    private PartProvider() {
+    }
 
     public static <J2 extends J> J2 buildPart(@Language("java") String codeToProvideAPart,
                                               Class<J2> expected,
@@ -39,13 +40,16 @@ public final class PartProvider {
         }
 
         J.CompilationUnit cu = builder.build()
-            .parse(codeToProvideAPart).get(0);
+                .parse(codeToProvideAPart)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
 
         List<J2> parts = new ArrayList<>(1);
         new JavaVisitor<List<J2>>() {
             @Override
             public @Nullable J visit(@Nullable Tree tree, List<J2> j2s) {
                 if (expected.isInstance(tree)) {
+                    //noinspection unchecked
                     J2 j2 = (J2) tree;
                     j2s.add(j2);
                     return j2;

@@ -34,18 +34,18 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Stream;
 
-import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 public class PropertiesParser implements Parser<Properties.File> {
     @Override
-    public List<Properties.File> parse(@Language("properties") String... sources) {
+    public Stream<Properties.File> parse(@Language("properties") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
     @Override
-    public List<Properties.File> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<Properties.File> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
@@ -67,8 +67,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                         return null;
                     }
                 })
-                .filter(Objects::nonNull)
-                .collect(toList());
+                .filter(Objects::nonNull);
     }
 
     private Properties.File parseFromInput(Path sourceFile, EncodingDetectingInputStream source) {

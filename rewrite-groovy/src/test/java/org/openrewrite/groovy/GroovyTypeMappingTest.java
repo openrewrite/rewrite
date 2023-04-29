@@ -46,7 +46,8 @@ class GroovyTypeMappingTest implements JavaTypeMappingTest {
           .logCompilationWarningsAndErrors(true)
           .build()
           .parse(new InMemoryExecutionContext(), goat)
-          .get(0)
+          .findFirst()
+          .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"))
           .getClasses()
           .get(0)
           .getType()
@@ -62,7 +63,8 @@ class GroovyTypeMappingTest implements JavaTypeMappingTest {
               def a = "hi"
               """
           )
-          .get(0)
+          .findFirst()
+          .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"))
           .getStatements()
           .get(0);
 

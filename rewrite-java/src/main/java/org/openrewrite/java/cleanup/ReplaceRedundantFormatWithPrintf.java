@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Applicability;
+import org.openrewrite.Preconditions;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -55,27 +55,22 @@ public class ReplaceRedundantFormatWithPrintf extends Recipe {
     }
 
     @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return Applicability.and(
-                Applicability.or(
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(Preconditions.and(
+                Preconditions.or(
                         new UsesMethod<>(STRING_FORMAT_MATCHER_LOCALE),
                         new UsesMethod<>(STRING_FORMAT_MATCHER_NO_LOCALE)
                 ),
-                Applicability.or(
+                Preconditions.or(
                         new UsesMethod<>(PRINTSTREAM_PRINT_MATCHER),
                         new UsesMethod<>(PRINTSTREAM_PRINTLN_MATCHER)
                 )
-        );
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+        ), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 method = super.visitMethodInvocation(method, ctx);
 
-                final boolean needsNewline;
+                boolean needsNewline;
                 if (PRINTSTREAM_PRINTLN_MATCHER.matches(method)) {
                     needsNewline = true;
                 } else if (PRINTSTREAM_PRINT_MATCHER.matches(method)) {
@@ -84,14 +79,14 @@ public class ReplaceRedundantFormatWithPrintf extends Recipe {
                     return method;
                 }
 
-                final Expression arg = method.getArguments().get(0);
+                Expression arg = method.getArguments().get(0);
                 if (!(arg instanceof J.MethodInvocation)) {
                     return method;
                 }
 
-                final J.MethodInvocation innerMethodInvocation = (J.MethodInvocation) arg;
+                J.MethodInvocation innerMethodInvocation = (J.MethodInvocation) arg;
 
-                final boolean hasLocaleArg;
+                boolean hasLocaleArg;
                 if (STRING_FORMAT_MATCHER_NO_LOCALE.matches(innerMethodInvocation)) {
                     hasLocaleArg = false;
                 } else if (STRING_FORMAT_MATCHER_LOCALE.matches(innerMethodInvocation)) {
@@ -100,7 +95,7 @@ public class ReplaceRedundantFormatWithPrintf extends Recipe {
                     return method;
                 }
 
-                final List<Expression> originalFormatArgs = innerMethodInvocation.getArguments();
+                List<Expression> originalFormatArgs = innerMethodInvocation.getArguments();
 
                 List<Expression> printfArgs;
                 if (needsNewline) {
@@ -115,7 +110,7 @@ public class ReplaceRedundantFormatWithPrintf extends Recipe {
                         return method;
                     }
 
-                    formatStringLiteral = appendToStringLiteral(formatStringLiteral, "%n");
+                    formatStringLiteral = appendToStringLiteral(formatStringLiteral);
                     if (formatStringLiteral == null) {
                         return method;
                     }
@@ -131,18 +126,18 @@ public class ReplaceRedundantFormatWithPrintf extends Recipe {
                 }
 
                 // need to build the JavaTemplate code dynamically due to varargs
-                final StringBuilder code = new StringBuilder();
+                StringBuilder code = new StringBuilder();
                 code.append("printf(");
                 for (int i = 0; i < originalFormatArgs.size(); i++) {
                     JavaType argType = originalFormatArgs.get(i).getType();
                     if (i != 0) {
                         code.append(", ");
                     }
-                    code.append("#{any(" + argType + ")}");
+                    code.append("#{any(").append(argType).append(")}");
                 }
                 code.append(")");
 
-                final JavaTemplate template = JavaTemplate.builder(this::getCursor, code.toString()).build();
+                JavaTemplate template = JavaTemplate.builder(this::getCursor, code.toString()).build();
                 return maybeAutoFormat(
                         method,
                         method.withTemplate(
@@ -153,32 +148,31 @@ public class ReplaceRedundantFormatWithPrintf extends Recipe {
                         ctx
                 );
             }
-        };
+        });
     }
 
-    @Nullable
-    private static J.Literal appendToStringLiteral(J.Literal literal, String textToAppend) {
+    private static J.@Nullable Literal appendToStringLiteral(J.Literal literal) {
         if (literal.getType() != JavaType.Primitive.String) {
             return null;
         }
 
-        final Object value = literal.getValue();
+        Object value = literal.getValue();
         if (!(value instanceof String)) {
             return null;
         }
-        final String stringValue = (String) value;
-        final String newStringValue = stringValue + textToAppend;
+        String stringValue = (String) value;
+        String newStringValue = stringValue + "%n";
 
-        final String valueSource = literal.getValueSource();
-        if (valueSource.startsWith("\"\"\"") && valueSource.endsWith("\"\"\"")) {
+        String valueSource = literal.getValueSource();
+        if (valueSource != null && valueSource.startsWith("\"\"\"") && valueSource.endsWith("\"\"\"")) {
             // text block
             return literal
-                    .withValueSource(valueSource.substring(0, valueSource.length() - 3) + textToAppend + "\"\"\"")
+                    .withValueSource(valueSource.substring(0, valueSource.length() - 3) + "%n" + "\"\"\"")
                     .withValue(newStringValue);
-        } else if (valueSource.startsWith("\"") && valueSource.endsWith("\"")) {
+        } else if (valueSource != null && valueSource.startsWith("\"") && valueSource.endsWith("\"")) {
             // regular string literal
             return literal
-                    .withValueSource(valueSource.substring(0, valueSource.length() - 1) + textToAppend + "\"")
+                    .withValueSource(valueSource.substring(0, valueSource.length() - 1) + "%n" + "\"")
                     .withValue(newStringValue);
         } else {
             return null;

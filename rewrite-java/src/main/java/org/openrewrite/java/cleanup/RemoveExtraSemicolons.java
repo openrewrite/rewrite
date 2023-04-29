@@ -17,8 +17,8 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 
 import java.time.Duration;
@@ -50,7 +50,7 @@ public class RemoveExtraSemicolons extends Recipe {
 
     @SuppressWarnings("ConstantConditions")
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Empty visitEmpty(J.Empty empty, ExecutionContext ctx) {
@@ -64,8 +64,8 @@ public class RemoveExtraSemicolons extends Recipe {
             public J.Try.Resource visitTryResource(J.Try.Resource tr, ExecutionContext executionContext) {
                 J.Try _try = getCursor().dropParentUntil(is -> is instanceof J.Try).getValue();
                 if (_try.getResources().isEmpty() ||
-                        _try.getResources().get(_try.getResources().size() - 1) != tr ||
-                        !_try.getResources().get(_try.getResources().size() - 1).isTerminatedWithSemicolon()) {
+                    _try.getResources().get(_try.getResources().size() - 1) != tr ||
+                    !_try.getResources().get(_try.getResources().size() - 1).isTerminatedWithSemicolon()) {
                     return tr;
                 }
                 return tr.withTerminatedWithSemicolon(false);

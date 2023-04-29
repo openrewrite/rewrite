@@ -16,8 +16,9 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.*;
+import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.PartProvider;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -53,13 +54,8 @@ public class ReplaceStringBuilderWithString extends Recipe {
     }
 
     @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return Applicability.and(new UsesMethod<>(STRING_BUILDER_APPEND), new UsesMethod<>(STRING_BUILDER_TO_STRING));
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(Preconditions.and(new UsesMethod<>(STRING_BUILDER_APPEND), new UsesMethod<>(STRING_BUILDER_TO_STRING)), new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
@@ -76,7 +72,7 @@ public class ReplaceStringBuilderWithString extends Recipe {
                     adjustExpressions(arguments);
 
                     Expression additive = ChainStringBuilderAppendCalls.additiveExpression(arguments)
-                        .withPrefix(method.getPrefix());
+                            .withPrefix(method.getPrefix());
 
                     if (isAMethodSelect(method)) {
                         additive = wrapExpression(additive);
@@ -95,7 +91,7 @@ public class ReplaceStringBuilderWithString extends Recipe {
                 }
                 return ((J.MethodInvocation) parent.getValue()).getSelect() == method;
             }
-        };
+        });
     }
 
     private J.Literal toStringLiteral(J.Literal input) {
@@ -105,21 +101,21 @@ public class ReplaceStringBuilderWithString extends Recipe {
 
         String value = input.getValueSource();
         return new J.Literal(randomId(), Space.EMPTY, Markers.EMPTY, value,
-            "\"" + value + "\"", null, JavaType.Primitive.String);
+                "\"" + value + "\"", null, JavaType.Primitive.String);
     }
 
     private void adjustExpressions(List<Expression> arguments) {
         for (int i = 0; i < arguments.size(); i++) {
             if (i == 0) {
                 // the first expression must be a String type to support case like `new StringBuilder().append(1)`
-                if (!arguments.isEmpty() && !TypeUtils.isString(arguments.get(0).getType())) {
+                if (!TypeUtils.isString(arguments.get(0).getType())) {
                     if (arguments.get(0) instanceof J.Literal) {
                         // wrap by ""
                         arguments.set(0, toStringLiteral((J.Literal) arguments.get(0)));
                     } else {
                         J.MethodInvocation stringValueOf = getStringValueOfMethodInvocationTemplate()
-                            .withArguments(Collections.singletonList(arguments.get(0)))
-                            .withPrefix(arguments.get(0).getPrefix());
+                                .withArguments(Collections.singletonList(arguments.get(0)))
+                                .withPrefix(arguments.get(0).getPrefix());
                         arguments.set(0, stringValueOf);
                     }
                 }
@@ -135,13 +131,14 @@ public class ReplaceStringBuilderWithString extends Recipe {
 
     /**
      * Return ture if the method calls chain is like "new StringBuilder().append("A")....append("B");"
-     * @param method a StringBuilder.toString() method call
+     *
+     * @param method      a StringBuilder.toString() method call
      * @param methodChain output methods chain
-     * @param arguments output expression list to be chained by '+'.
+     * @param arguments   output expression list to be chained by '+'.
      */
     private static boolean flatMethodInvocationChain(J.MethodInvocation method,
-        List<Expression> methodChain,
-        List<Expression> arguments
+                                                     List<Expression> methodChain,
+                                                     List<Expression> arguments
     ) {
         Expression select = method.getSelect();
         while (select != null) {
@@ -165,7 +162,9 @@ public class ReplaceStringBuilderWithString extends Recipe {
             }
         }
 
-        if (select instanceof J.NewClass && TypeUtils.isOfClassType(((J.NewClass) select).getClazz().getType(), "java.lang.StringBuilder")) {
+        if (select instanceof J.NewClass &&
+            ((J.NewClass) select).getClazz() != null &&
+            TypeUtils.isOfClassType(((J.NewClass) select).getClazz().getType(), "java.lang.StringBuilder")) {
             J.NewClass nc = (J.NewClass) select;
             if (nc.getArguments().size() == 1 && TypeUtils.isString(nc.getArguments().get(0).getType())) {
                 arguments.add(nc.getArguments().get(0));
@@ -190,7 +189,7 @@ public class ReplaceStringBuilderWithString extends Recipe {
                                                            "        String.valueOf(obj);\n" +
                                                            "    }\n" +
                                                            "}",
-                J.MethodInvocation.class);
+                    J.MethodInvocation.class);
         }
         return stringValueOfTemplate;
     }

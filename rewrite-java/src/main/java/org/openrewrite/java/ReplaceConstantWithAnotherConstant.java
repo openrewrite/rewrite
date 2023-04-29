@@ -46,13 +46,9 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>(existingFullyQualifiedConstantName.substring(0, existingFullyQualifiedConstantName.lastIndexOf('.')), false);
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new ReplaceConstantWithAnotherConstantVisitor(existingFullyQualifiedConstantName, fullyQualifiedConstantName);
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesType<>(existingFullyQualifiedConstantName.substring(0, existingFullyQualifiedConstantName.lastIndexOf('.')), false),
+                new ReplaceConstantWithAnotherConstantVisitor(existingFullyQualifiedConstantName, fullyQualifiedConstantName));
     }
 
     private static class ReplaceConstantWithAnotherConstantVisitor extends JavaVisitor<ExecutionContext> {
@@ -102,7 +98,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
 
         private boolean isConstant(@Nullable JavaType.Variable varType) {
             return varType != null && TypeUtils.isOfClassType(varType.getOwner(), existingOwningType) &&
-                    varType.getName().equals(constantName);
+                   varType.getName().equals(constantName);
         }
 
         private boolean isVariableDeclaration() {
@@ -121,7 +117,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             }
 
             return constantName.equals(((J.VariableDeclarations) maybeVariable.getValue()).getVariables().get(0).getSimpleName()) &&
-                    existingOwningType.equals(ownerFqn.getFullyQualifiedName());
+                   existingOwningType.equals(ownerFqn.getFullyQualifiedName());
         }
     }
 }

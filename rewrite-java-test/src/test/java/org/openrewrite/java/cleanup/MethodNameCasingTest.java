@@ -121,13 +121,13 @@ class MethodNameCasingTest implements RewriteTest {
     @Test
     void doNotRenamePublicMethodsNullOptions() {
         rewriteRun(
-        spec -> spec.recipe(new MethodNameCasing(null, null)),
+          spec -> spec.recipe(new MethodNameCasing(null, null)),
           java(
             """
-            class Test {
-                public void getFoo_bar() {}
-            }
-            """
+              class Test {
+                  public void getFoo_bar() {}
+              }
+              """
           )
         );
     }
@@ -426,12 +426,17 @@ class MethodNameCasingTest implements RewriteTest {
     @Test
     void doesNotRenameMethodInvocationsWhenTheMethodDeclarationsClassTypeIsNull() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()).recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
-                  return super.visitClassDeclaration(classDecl, executionContext).withType(null);
-              }
-          }).doNext(new MethodNameCasing(true, false))),
+          spec -> spec
+            .typeValidationOptions(TypeValidation.none())
+            .recipes(
+              toRecipe(() -> new JavaIsoVisitor<>() {
+                  @Override
+                  public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
+                      return super.visitClassDeclaration(classDecl, executionContext).withType(null);
+                  }
+              }),
+              new MethodNameCasing(true, false)
+            ),
           java(
             """
               package abc;

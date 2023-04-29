@@ -39,7 +39,7 @@ public class UpdateSourcePositions extends Recipe {
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         Map<Tree, Range> positionMap = new IdentityHashMap<>();
         PositionPrintOutputCapture ppoc = new PositionPrintOutputCapture();
 

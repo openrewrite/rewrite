@@ -25,7 +25,7 @@ import org.openrewrite.text.PlainTextVisitor;
 
 import static org.openrewrite.test.SourceSpecs.text;
 
-class ApplicabilityTest implements RewriteTest {
+class PreconditionsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -36,7 +36,7 @@ class ApplicabilityTest implements RewriteTest {
     @Test
     void not() {
         rewriteRun(
-          spec -> spec.recipe(recipe(Applicability.not(contains("z")))),
+          spec -> spec.recipe(recipe(Preconditions.not(contains("z")))),
           text("hello", "goodbye")
         );
     }
@@ -44,7 +44,7 @@ class ApplicabilityTest implements RewriteTest {
     @Test
     void notNot() {
         rewriteRun(
-          spec -> spec.recipe(recipe(Applicability.not(contains("h")))),
+          spec -> spec.recipe(recipe(Preconditions.not(contains("h")))),
           text("hello")
         );
     }
@@ -53,7 +53,7 @@ class ApplicabilityTest implements RewriteTest {
     @Test
     void or() {
         rewriteRun(
-          spec -> spec.recipe(recipe(Applicability.or(contains("h"), contains("z")))),
+          spec -> spec.recipe(recipe(Preconditions.or(contains("h"), contains("z")))),
           text("hello", "goodbye")
         );
     }
@@ -61,7 +61,7 @@ class ApplicabilityTest implements RewriteTest {
     @Test
     void notOr() {
         rewriteRun(
-          spec -> spec.recipe(recipe(Applicability.or(contains("x"), contains("z")))),
+          spec -> spec.recipe(recipe(Preconditions.or(contains("x"), contains("z")))),
           text("hello")
         );
     }
@@ -69,7 +69,7 @@ class ApplicabilityTest implements RewriteTest {
     @Test
     void and() {
         rewriteRun(
-          spec -> spec.recipe(recipe(Applicability.and(contains("h"), contains("ello")))),
+          spec -> spec.recipe(recipe(Preconditions.and(contains("h"), contains("ello")))),
           text("hello", "goodbye")
         );
     }
@@ -77,7 +77,7 @@ class ApplicabilityTest implements RewriteTest {
     @Test
     void notAnd() {
         rewriteRun(
-          spec -> spec.recipe(recipe(Applicability.and(contains("h"), contains("z")))),
+          spec -> spec.recipe(recipe(Preconditions.and(contains("h"), contains("z")))),
           text("hello")
         );
     }
@@ -90,18 +90,13 @@ class ApplicabilityTest implements RewriteTest {
             }
 
             @Override
-            protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-                return applicability;
-            }
-
-            @Override
-            protected TreeVisitor<?, ExecutionContext> getVisitor() {
-                return new PlainTextVisitor<>() {
+            public TreeVisitor<?, ExecutionContext> getVisitor() {
+                return Preconditions.check(applicability, new PlainTextVisitor<ExecutionContext>() {
                     @Override
                     public PlainText visitText(PlainText text, ExecutionContext executionContext) {
                         return text.withText("goodbye");
                     }
-                };
+                });
             }
         };
     }

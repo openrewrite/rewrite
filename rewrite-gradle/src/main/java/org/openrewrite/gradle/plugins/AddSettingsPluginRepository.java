@@ -32,6 +32,9 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
+
+import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -58,13 +61,8 @@ public class AddSettingsPluginRepository extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsSettingsGradle<>();
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new GroovyIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new IsSettingsGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
             @Override
             public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
                 if (cu == new FindRepository(type, url, FindRepository.Purpose.Plugin).getVisitor().visit(cu, ctx)) {
@@ -78,7 +76,7 @@ public class AddSettingsPluginRepository extends Recipe {
                     } else {
                         Statement statement = statements.get(0);
                         if (statement instanceof J.MethodInvocation
-                                && ((J.MethodInvocation) statement).getSimpleName().equals("pluginManagement")) {
+                            && ((J.MethodInvocation) statement).getSimpleName().equals("pluginManagement")) {
                             J.MethodInvocation m = (J.MethodInvocation) statement;
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
                                 if (arg instanceof J.Lambda && ((J.Lambda) arg).getBody() instanceof J.Block) {
@@ -86,7 +84,7 @@ public class AddSettingsPluginRepository extends Recipe {
                                     J.Block block = (J.Block) lambda.getBody();
                                     return lambda.withBody(block.withStatements(ListUtils.map(block.getStatements(), statement2 -> {
                                         if ((statement2 instanceof J.MethodInvocation && ((J.MethodInvocation) statement2).getSimpleName().equals("repositories"))
-                                                || (statement2 instanceof J.Return && ((J.Return) statement2).getExpression() instanceof J.MethodInvocation && ((J.MethodInvocation) ((J.Return) statement2).getExpression()).getSimpleName().equals("repositories"))) {
+                                            || (statement2 instanceof J.Return && ((J.Return) statement2).getExpression() instanceof J.MethodInvocation && ((J.MethodInvocation) ((J.Return) statement2).getExpression()).getSimpleName().equals("repositories"))) {
                                             J.MethodInvocation m2 = (J.MethodInvocation) (statement2 instanceof J.Return ? ((J.Return) statement2).getExpression() : statement2);
                                             return m2.withArguments(ListUtils.mapFirst(m2.getArguments(), arg2 -> {
                                                 if (arg2 instanceof J.Lambda && ((J.Lambda) arg2).getBody() instanceof J.Block) {
@@ -134,13 +132,15 @@ public class AddSettingsPluginRepository extends Recipe {
                 }
 
                 return (J.MethodInvocation) GradleParser.builder().build().parseInputs(Collections.singletonList(Parser.Input.fromString(Paths.get("settings.gradle"), code)), null, ctx)
-                        .get(0).getStatements().get(0);
+                        .collect(Collectors.toList()).get(0).getStatements().get(0);
             }
 
             private J.MethodInvocation extractRepository(J.MethodInvocation pluginManagement) {
-                J.MethodInvocation repositories = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) pluginManagement.getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
-                return (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) repositories.getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
+                J.MethodInvocation repositories = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) pluginManagement
+                        .getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
+                return (J.MethodInvocation) requireNonNull(((J.Return) ((J.Block) ((J.Lambda) requireNonNull(repositories)
+                        .getArguments().get(0)).getBody()).getStatements().get(0)).getExpression());
             }
-        };
+        });
     }
 }

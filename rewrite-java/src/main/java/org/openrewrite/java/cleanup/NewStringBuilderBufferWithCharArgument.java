@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Applicability;
+import org.openrewrite.Preconditions;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -54,27 +54,20 @@ public class NewStringBuilderBufferWithCharArgument extends Recipe {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return Applicability.or(
-                new UsesType<>("java.lang.StringBuilder", true),
-                new UsesType<>("java.lang.StringBuffer", true)
-        );
-    }
-
-    @Override
-    public JavaIsoVisitor<ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        TreeVisitor<?, ExecutionContext> condition = Preconditions.or(new UsesType<>("java.lang.StringBuilder", true), new UsesType<>("java.lang.StringBuffer", true));
+        return Preconditions.check(condition, new JavaIsoVisitor<ExecutionContext>() {
             private final JavaTemplate toString = JavaTemplate.builder(this::getCursor, "String.valueOf(#{any()})").build();
 
             @Override
             public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
                 J.NewClass nc = super.visitNewClass(newClass, executionContext);
                 if ((TypeUtils.isOfClassType(nc.getType(), "java.lang.StringBuilder") ||
-                        TypeUtils.isOfClassType(nc.getType(), "java.lang.StringBuffer"))) {
+                     TypeUtils.isOfClassType(nc.getType(), "java.lang.StringBuffer"))) {
                     nc.getArguments();
                     if (nc.getArguments().get(0).getType() == JavaType.Primitive.Char) {
                         nc = nc.withArguments(ListUtils.mapFirst(nc.getArguments(), arg -> {
-                            if (arg instanceof J.Literal){
+                            if (arg instanceof J.Literal) {
                                 J.Literal l = (J.Literal) arg;
                                 l = l.withType(JavaType.buildType("String"));
                                 if (l.getValueSource() != null) {
@@ -89,6 +82,6 @@ public class NewStringBuilderBufferWithCharArgument extends Recipe {
                 }
                 return nc;
             }
-        };
+        });
     }
 }

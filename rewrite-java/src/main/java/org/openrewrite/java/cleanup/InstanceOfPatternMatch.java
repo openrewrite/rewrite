@@ -50,7 +50,7 @@ public class InstanceOfPatternMatch extends Recipe {
     @Override
     public String getDescription() {
         return "Adds pattern variables to `instanceof` expressions wherever the same (side effect free) expression is referenced in a corresponding type cast expression within the flow scope of the `instanceof`."
-                + " Currently, this recipe supports `if` statements and ternary operator expressions.";
+               + " Currently, this recipe supports `if` statements and ternary operator expressions.";
     }
 
     @Override
@@ -59,14 +59,8 @@ public class InstanceOfPatternMatch extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesJavaVersion<>(17);
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
-
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesJavaVersion<>(17), new JavaVisitor<ExecutionContext>() {
             @Override
             public @Nullable J postVisit(J tree, ExecutionContext executionContext) {
                 J result = super.postVisit(tree, executionContext);
@@ -101,7 +95,7 @@ public class InstanceOfPatternMatch extends Recipe {
                         // TODO this could be improved (the pattern variable may be applicable in the else case
                         // or even in subsequent statements (due to the flow scope semantics)
                         flowScopeBreakEncountered = true;
-                    } else if (value instanceof Statement || value instanceof J.Ternary) {
+                    } else if (value instanceof Statement) {
                         maybeReplacementRoot = next;
                         break;
                     }
@@ -141,7 +135,7 @@ public class InstanceOfPatternMatch extends Recipe {
                 }
                 return result;
             }
-        };
+        });
     }
 
     @Data
@@ -165,7 +159,7 @@ public class InstanceOfPatternMatch extends Recipe {
 
             Optional<ExpressionAndType> existing = instanceOfs.keySet().stream()
                     .filter(k -> TypeUtils.isAssignableTo(type, k.getType())
-                            && SemanticallyEqual.areEqual(k.getExpression(), expression))
+                                 && SemanticallyEqual.areEqual(k.getExpression(), expression))
                     .findAny();
             if (!existing.isPresent()) {
                 instanceOfs.put(new ExpressionAndType(expression, type), instanceOf);
@@ -180,7 +174,7 @@ public class InstanceOfPatternMatch extends Recipe {
 
             Optional<ExpressionAndType> match = instanceOfs.keySet().stream()
                     .filter(k -> TypeUtils.isAssignableTo(type, k.getType())
-                            && SemanticallyEqual.areEqual(k.getExpression(), expression))
+                                 && SemanticallyEqual.areEqual(k.getExpression(), expression))
                     .findAny();
             if (match.isPresent()) {
                 Cursor parent = cursor.getParentTreeCursor();
@@ -190,7 +184,7 @@ public class InstanceOfPatternMatch extends Recipe {
                     Object next = it.next();
                     if (validContexts.contains(next)) {
                         if (parent.getValue() instanceof J.VariableDeclarations.NamedVariable
-                                && !variablesToDelete.containsKey(instanceOf)) {
+                            && !variablesToDelete.containsKey(instanceOf)) {
                             variablesToDelete.put(instanceOf, parent.getValue());
                         } else {
                             replacements.put(typeCast, instanceOf);
@@ -357,9 +351,11 @@ public class InstanceOfPatternMatch extends Recipe {
         static VariableNameStrategy short_() {
             return new VariableNameStrategy(Style.SHORT, null, Collections.emptySet());
         }
+
         static VariableNameStrategy normal(Set<Cursor> contextScopes) {
             return new VariableNameStrategy(Style.NORMAL, null, contextScopes);
         }
+
         static VariableNameStrategy exact(String name) {
             return new VariableNameStrategy(Style.EXACT, name, Collections.emptySet());
         }
@@ -411,7 +407,8 @@ public class InstanceOfPatternMatch extends Recipe {
                         baseName = "obj";
                 }
                 String candidate = baseName;
-                OUTER: while (true) {
+                OUTER:
+                while (true) {
                     for (Cursor scope : contextScopes) {
                         String newCandidate = VariableNameUtils.generateVariableName(candidate, scope, VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER);
                         if (!newCandidate.equals(candidate)) {
