@@ -16,7 +16,9 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.search.UsesType;
@@ -53,13 +55,9 @@ public class ExternalizableHasNoArgsConstructor extends Recipe {
     }
 
     @Override
-    protected UsesType<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("java.io.Externalizable", false);
-    }
-
-    @Override
-    public ExternalizableHasNoArgsConstructorVisitor getVisitor() {
-        return new ExternalizableHasNoArgsConstructorVisitor();
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesType<>("java.io.Externalizable", false),
+                new ExternalizableHasNoArgsConstructorVisitor());
     }
 
     private static class ExternalizableHasNoArgsConstructorVisitor extends JavaIsoVisitor<ExecutionContext> {
@@ -76,7 +74,7 @@ public class ExternalizableHasNoArgsConstructor extends Recipe {
                 for (int i = 0; i < statements.size(); i++) {
                     Statement statement = statements.get(i);
                     if (statement instanceof J.VariableDeclarations) {
-                        J.VariableDeclarations varDecls = (J.VariableDeclarations)statement;
+                        J.VariableDeclarations varDecls = (J.VariableDeclarations) statement;
                         if (J.Modifier.hasModifier(varDecls.getModifiers(), J.Modifier.Type.Final)
                             && varDecls.getVariables().stream().anyMatch(v -> v.getInitializer() == null)) {
                             hasFinalUninitializedFieldVar = true;

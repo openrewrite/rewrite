@@ -51,6 +51,7 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
@@ -66,7 +67,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
     private final List<Consumer<CompilerConfiguration>> compilerCustomizers;
 
     @Override
-    public List<G.CompilationUnit> parse(@Language("groovy") String... sources) {
+    public Stream<G.CompilationUnit> parse(@Language("groovy") String... sources) {
         Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
         Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
 
@@ -82,7 +83,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                             String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
 
                             String className = Optional.ofNullable(simpleName.apply(sourceFile))
-                                    .orElse(Long.toString(System.nanoTime())) + ".java";
+                                                       .orElse(Long.toString(System.nanoTime())) + ".java";
 
                             Path path = Paths.get(pkg + className);
                             return new Input(
@@ -98,40 +99,39 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
     }
 
     @Override
-    public List<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         ParsingEventListener parsingListener = pctx.getParsingListener();
         Map<CompiledGroovySource, List<ParseWarning>> compilerCus = parseInputsToCompilerAst(sources, relativeTo, pctx);
-        List<G.CompilationUnit> cus = new ArrayList<>(compilerCus.size());
-
-        for (Map.Entry<CompiledGroovySource, List<ParseWarning>> entry : compilerCus.entrySet()) {
-            CompiledGroovySource compiled = entry.getKey();
-            List<ParseWarning> warnings = entry.getValue();
-            try {
-                GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
-                        compiled.getInput().getRelativePath(relativeTo),
-                        compiled.getInput().getFileAttributes(),
-                        compiled.getInput().getSource(ctx),
-                        typeCache,
-                        ctx
-                );
-                G.CompilationUnit gcu = mappingVisitor.visit(compiled.getSourceUnit(), compiled.getModule());
-                if(warnings.size() > 0) {
-                    Markers m = gcu.getMarkers();
-                    for(ParseWarning warning : warnings) {
-                        m = m.add(warning);
+        return StreamSupport.stream(compilerCus.entrySet().spliterator(), false)
+                .map(entry -> {
+                    CompiledGroovySource compiled = entry.getKey();
+                    List<ParseWarning> warnings = entry.getValue();
+                    try {
+                        GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
+                                compiled.getInput().getRelativePath(relativeTo),
+                                compiled.getInput().getFileAttributes(),
+                                compiled.getInput().getSource(ctx),
+                                typeCache,
+                                ctx
+                        );
+                        G.CompilationUnit gcu = mappingVisitor.visit(compiled.getSourceUnit(), compiled.getModule());
+                        if (warnings.size() > 0) {
+                            Markers m = gcu.getMarkers();
+                            for (ParseWarning warning : warnings) {
+                                m = m.add(warning);
+                            }
+                            gcu = gcu.withMarkers(m);
+                        }
+                        parsingListener.parsed(compiled.getInput(), gcu);
+                        return gcu;
+                    } catch (Throwable t) {
+                        pctx.parseFailure(compiled.getInput(), relativeTo, this, t);
+                        ctx.getOnError().accept(t);
                     }
-                    gcu = gcu.withMarkers(m);
-                }
-                cus.add(gcu);
-                parsingListener.parsed(compiled.getInput(), gcu);
-            } catch (Throwable t) {
-                pctx.parseFailure(compiled.getInput(), relativeTo, this, t);
-                ctx.getOnError().accept(t);
-            }
-        }
-
-        return cus;
+                    return null;
+                })
+                .filter(Objects::nonNull);
     }
 
     Map<CompiledGroovySource, List<ParseWarning>> parseInputsToCompilerAst(Iterable<Input> sources, @Nullable Path relativeTo, ParsingExecutionContextView ctx) {
@@ -144,7 +144,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                 .flatMap(cp -> {
                     try {
                         return Stream.of(cp.toFile().toString());
-                    } catch(UnsupportedOperationException e) {
+                    } catch (UnsupportedOperationException e) {
                         // can happen e.g. in the case of jdk.internal.jrtfs.JrtPath
                         return Stream.empty();
                     }

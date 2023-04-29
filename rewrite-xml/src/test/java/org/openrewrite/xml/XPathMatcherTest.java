@@ -40,7 +40,7 @@ class XPathMatcherTest {
             </dependency>
         </dependencies>
         """
-    ).get(0);
+    ).findFirst().orElseThrow(() -> new IllegalArgumentException("Could not parse as XML"));
 
     private final Xml.Document pomXml = new XmlParser().parse(
       """
@@ -61,9 +61,9 @@ class XPathMatcherTest {
               </plugin>
             </plugins>
           </build>
-        </project> 
+        </project>
         """
-    ).get(0);
+    ).toList().get(0);
 
     @Test
     void matchAbsolute() {
@@ -112,7 +112,7 @@ class XPathMatcherTest {
         return !TreeVisitor.collect(new XmlVisitor<>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if(matcher.matches(getCursor())) {
+                if (matcher.matches(getCursor())) {
                     return SearchResult.found(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -120,7 +120,7 @@ class XPathMatcherTest {
 
             @Override
             public Xml visitAttribute(Xml.Attribute attribute, ExecutionContext ctx) {
-                if(matcher.matches(getCursor())) {
+                if (matcher.matches(getCursor())) {
                     return SearchResult.found(attribute);
                 }
                 return super.visitAttribute(attribute, ctx);

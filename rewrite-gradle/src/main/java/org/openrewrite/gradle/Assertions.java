@@ -25,7 +25,6 @@ import org.openrewrite.gradle.toolingapi.OpenRewriteModelBuilder;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.OperatingSystemProvenance;
 import org.openrewrite.properties.tree.Properties;
@@ -47,8 +46,6 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 import static java.util.Objects.requireNonNull;
-import static org.openrewrite.properties.Assertions.properties;
-import static org.openrewrite.test.SourceSpecs.*;
 
 public class Assertions {
 
@@ -92,14 +89,14 @@ public class Assertions {
                                 "zipStorePath=wrapper/dists").getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW);
                         Files.write(projectDir.resolve(GradleWrapper.WRAPPER_JAR_LOCATION), gradleWrapper.asRemote().printAllAsBytes(), StandardOpenOption.CREATE_NEW);
                         Path gradleSh = projectDir.resolve(GradleWrapper.WRAPPER_SCRIPT_LOCATION);
-                        Files.copy(requireNonNull(AddGradleWrapper.class.getResourceAsStream("/gradlew")), gradleSh);
+                        Files.copy(requireNonNull(UpdateGradleWrapper.class.getResourceAsStream("/gradlew")), gradleSh);
                         OperatingSystemProvenance current = OperatingSystemProvenance.current();
                         if (current.isLinux() || current.isMacOsX()) {
                             Set<PosixFilePermission> permissions = Files.getPosixFilePermissions(gradleSh);
                             permissions.add(PosixFilePermission.OWNER_EXECUTE);
                             Files.setPosixFilePermissions(gradleSh, permissions);
                         }
-                        Files.copy(requireNonNull(AddGradleWrapper.class.getResourceAsStream("/gradlew.bat")), projectDir.resolve(GradleWrapper.WRAPPER_BATCH_LOCATION));
+                        Files.copy(requireNonNull(UpdateGradleWrapper.class.getResourceAsStream("/gradlew.bat")), projectDir.resolve(GradleWrapper.WRAPPER_BATCH_LOCATION));
                     }
 
                     OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile());

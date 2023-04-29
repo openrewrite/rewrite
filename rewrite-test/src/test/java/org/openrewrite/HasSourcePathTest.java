@@ -79,8 +79,8 @@ class HasSourcePathTest implements RewriteTest {
         }
 
         @Override
-        protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-            return new HasSourcePath<>(syntax, filePattern);
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return Preconditions.check(new HasSourcePath<>(syntax, filePattern), super.getVisitor());
         }
     }
 }

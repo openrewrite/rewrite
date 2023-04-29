@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Applicability;
+import org.openrewrite.Preconditions;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -52,28 +52,23 @@ public class UpperCaseLiteralSuffixes extends Recipe {
     }
 
     @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return Applicability.or(
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(Preconditions.or(
                 new UsesType<>("long", false),
                 new UsesType<>("java.lang.Long", false),
                 new UsesType<>("double", false),
                 new UsesType<>("java.lang.Double", false),
                 new UsesType<>("float", false),
                 new UsesType<>("java.lang.Float", false)
-        );
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+        ), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext executionContext) {
                 J.VariableDeclarations.NamedVariable nv = super.visitVariable(variable, executionContext);
                 if (nv.getInitializer() instanceof J.Literal && nv.getInitializer().getType() != null) {
-                    J.Literal initializer = (J.Literal)nv.getInitializer();
+                    J.Literal initializer = (J.Literal) nv.getInitializer();
                     if (initializer.getType() == JavaType.Primitive.Double
-                            || initializer.getType() == JavaType.Primitive.Float
-                            || initializer.getType() == JavaType.Primitive.Long) {
+                        || initializer.getType() == JavaType.Primitive.Float
+                        || initializer.getType() == JavaType.Primitive.Long) {
                         String upperValueSource = upperCaseSuffix(initializer.getValueSource());
                         if (upperValueSource != null && !upperValueSource.equals(initializer.getValueSource())) {
                             nv = nv.withInitializer(initializer.withValueSource(upperValueSource));
@@ -88,9 +83,8 @@ public class UpperCaseLiteralSuffixes extends Recipe {
                 if (valueSource == null || valueSource.length() < 2) {
                     return valueSource;
                 }
-                return valueSource.substring(0, valueSource.length() - 1) + valueSource.substring(valueSource.length()-1).toUpperCase();
+                return valueSource.substring(0, valueSource.length() - 1) + valueSource.substring(valueSource.length() - 1).toUpperCase();
             }
-
-        };
+        });
     }
 }

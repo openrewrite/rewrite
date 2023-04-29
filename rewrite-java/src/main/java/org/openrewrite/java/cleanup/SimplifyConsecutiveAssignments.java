@@ -18,11 +18,11 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -47,7 +47,7 @@ public class SimplifyConsecutiveAssignments extends Recipe {
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             // TODO if we had a `replace()` coordinate on every `Expression`, we wouldn't need the left side of this
             final JavaTemplate combinedAssignment = JavaTemplate
@@ -89,7 +89,7 @@ public class SimplifyConsecutiveAssignments extends Recipe {
                     }));
                 } while (combined != b);
 
-                if(b != block) {
+                if (b != block) {
                     b = (J.Block) new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses())
                             .visitNonNull(b, ctx, getCursor().getParentOrThrow());
                 }
@@ -198,7 +198,7 @@ public class SimplifyConsecutiveAssignments extends Recipe {
                             namedVar.withInitializer(after.getAssignment()) : namedVar));
                 }
                 throw new UnsupportedOperationException("Attempted to combine assignments into a " +
-                        "single statement with type " + s.getClass().getSimpleName());
+                                                        "single statement with type " + s.getClass().getSimpleName());
             }
         };
     }

@@ -16,9 +16,9 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.MethodMatcher;
@@ -38,22 +38,17 @@ public class UseListSort extends Recipe {
     }
 
     @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(new MethodMatcher("java.util.Collections sort(..)"));
-    }
-
-    @Override
-    protected JavaIsoVisitor<ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            final MethodMatcher csM = new MethodMatcher("java.util.Collections sort(..)");
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        final MethodMatcher collectionsSort = new MethodMatcher("java.util.Collections sort(..)");
+        return Preconditions.check(new UsesMethod<>(collectionsSort), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                 J.MethodInvocation mi = super.visitMethodInvocation(method, executionContext);
-                if (csM.matches(mi)) {
+                if (collectionsSort.matches(mi)) {
                     maybeRemoveImport("java.util.Collections");
                     if (mi.getArguments().size() == 1) {
                         return mi.withTemplate(JavaTemplate.builder(() -> getCursor().getParent(), "#{any(java.util.List)}.sort(null)")
-                                .imports("java.util.List").build(),
+                                        .imports("java.util.List").build(),
                                 mi.getCoordinates().replace(), mi.getArguments().get(0));
                     } else {
                         return mi.withTemplate(JavaTemplate.builder(() -> getCursor().getParent(), "#{any(java.util.List)}.sort(#{any(java.util.Comparator)})")
@@ -63,6 +58,6 @@ public class UseListSort extends Recipe {
                 }
                 return mi;
             }
-        };
+        });
     }
 }

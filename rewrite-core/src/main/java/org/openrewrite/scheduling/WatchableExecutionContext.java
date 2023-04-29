@@ -19,7 +19,6 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.time.Duration;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -64,10 +63,5 @@ public class WatchableExecutionContext implements ExecutionContext {
     @Override
     public BiConsumer<Throwable, ExecutionContext> getOnTimeout() {
         return delegate.getOnTimeout();
-    }
-
-    @Override
-    public Duration getRunTimeout(int inputs) {
-        return delegate.getRunTimeout(inputs);
     }
 }

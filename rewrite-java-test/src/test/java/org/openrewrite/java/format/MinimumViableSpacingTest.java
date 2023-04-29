@@ -32,15 +32,18 @@ class MinimumViableSpacingTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-            @Override
-            public Space visitSpace(Space space, Space.Location loc, ExecutionContext ctx) {
-                if(ctx.getMessage("cyclesThatResultedInChanges",0) == 0) {
-                    return space.withWhitespace("");
-                }
-                return space;
-            }
-        }).doNext(toRecipe(() -> new MinimumViableSpacingVisitor<>(null))));
+        spec.recipes(
+          toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public Space visitSpace(Space space, Space.Location loc, ExecutionContext ctx) {
+                  if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                      return space.withWhitespace("");
+                  }
+                  return space;
+              }
+          }),
+          toRecipe(() -> new MinimumViableSpacingVisitor<>(null))
+        );
     }
 
     @DocumentExample

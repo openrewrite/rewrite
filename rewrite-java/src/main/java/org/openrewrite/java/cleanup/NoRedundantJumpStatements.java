@@ -17,10 +17,10 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.InvertCondition;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Loop;
@@ -52,7 +52,7 @@ public class NoRedundantJumpStatements extends Recipe {
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
 
             @Override
@@ -72,7 +72,7 @@ public class NoRedundantJumpStatements extends Recipe {
 
                     if (enclosing instanceof Loop) {
                         if (thenIsOnlyContinue &&
-                                i.getElsePart() != null && !(i.getElsePart().getBody() instanceof J.If)) {
+                            i.getElsePart() != null && !(i.getElsePart().getBody() instanceof J.If)) {
                             Loop loop = (Loop) enclosing;
                             if (loop.getBody() instanceof J.Block) {
                                 J.Block loopBlock = (J.Block) loop.getBody();

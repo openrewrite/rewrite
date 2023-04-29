@@ -17,10 +17,7 @@ package org.openrewrite.gradle.plugins;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.gradle.IsBuildGradle;
 
 @Value
@@ -43,12 +40,7 @@ public class RemoveBuildPlugin extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsBuildGradle<>();
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RemovePluginVisitor(pluginId);
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new IsBuildGradle<>(), new RemovePluginVisitor(pluginId));
     }
 }

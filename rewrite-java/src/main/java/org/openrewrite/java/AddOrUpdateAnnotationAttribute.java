@@ -17,10 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesType;
@@ -43,7 +40,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     @Override
     public String getDescription() {
         return "Some annotations accept arguments. This recipe sets an existing argument to the specified value, " +
-                "or adds the argument if it is not already set.";
+               "or adds the argument if it is not already set.";
     }
 
     @Option(displayName = "Annotation Type",
@@ -69,13 +66,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     Boolean addOnly;
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>(annotationType, false);
-    }
-
-    @Override
-    public JavaIsoVisitor<ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesType<>(annotationType, false), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Annotation visitAnnotation(J.Annotation a, ExecutionContext context) {
                 if (!TypeUtils.isOfClassType(a.getType(), annotationType)) {
@@ -153,7 +145,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                 return a;
             }
-        };
+        });
     }
 
     private static String maybeQuoteStringArgument(@Nullable String attributeName, String attributeValue, J.Annotation annotation) {

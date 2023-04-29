@@ -249,7 +249,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     }
 
     @Override
-    default List<J.CompilationUnit> parse(ExecutionContext ctx, @Language("java") String... sources) {
+    default Stream<J.CompilationUnit> parse(ExecutionContext ctx, @Language("java") String... sources) {
         return parseInputs(
                 Arrays.stream(sources)
                         .map(sourceFile -> new Input(
@@ -263,7 +263,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     }
 
     @Override
-    default List<J.CompilationUnit> parse(@Language("java") String... sources) {
+    default Stream<J.CompilationUnit> parse(@Language("java") String... sources) {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         return parse(ctx, sources);
     }

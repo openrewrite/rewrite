@@ -18,25 +18,27 @@ package org.openrewrite.text;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.Collection;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
+
+import static java.util.Objects.requireNonNull;
 
 @Incubating(since = "7.12.0")
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class CreateTextFile extends Recipe {
+public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
 
-    @Option(displayName = "File Contents",
+    @Option(displayName = "File contents",
             description = "Multiline text content for the file.",
             example = "Some text.")
     String fileContents;
 
-    @Option(displayName = "Relative File Path",
+    @Option(displayName = "Relative file path",
             description = "File path of new file.",
             example = "foo/bar/baz.txt")
     String relativeFileName;
@@ -58,39 +60,46 @@ public class CreateTextFile extends Recipe {
     }
 
     @Override
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        Path path = Paths.get(relativeFileName);
-        AtomicReference<SourceFile> matchingFile = new AtomicReference<>();
-
-        for (SourceFile sourceFile : before) {
-            if (path.toString().equals(sourceFile.getSourcePath().toString())) {
-                matchingFile.set(sourceFile);
-            }
-        }
-
-        // return early if file exists and there's no explicit permission to overwrite
-        if (matchingFile.get() != null) {
-            if (!Boolean.TRUE.equals(overwriteExisting)) {
-                return before;
-            }
-            if (matchingFile.get() instanceof PlainText && ((PlainText) matchingFile.get()).getText().equals(fileContents)) {
-                return before;
-            }
-        }
-
-        PlainText newFile = createNewFile(relativeFileName, fileContents);
-
-        if (matchingFile.get() != null) {
-            return ListUtils.map(before, sourceFile -> sourceFile == matchingFile.get() ?
-                    newFile.withId(matchingFile.get().getId()) : sourceFile);
-        }
-
-        return ListUtils.concat(before, newFile);
+    public AtomicBoolean getInitialValue() {
+        return new AtomicBoolean();
     }
 
-    public static PlainText createNewFile(String relativeFilePath, String fileContents) {
-        PlainTextParser parser = new PlainTextParser();
-        PlainText brandNewFile = parser.parse(fileContents).get(0);
-        return brandNewFile.withSourcePath(Paths.get(relativeFilePath));
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean shouldCreate) {
+        Path path = Paths.get(relativeFileName);
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                if (path.toString().equals(sourceFile.getSourcePath().toString())) {
+                    if (Boolean.TRUE.equals(overwriteExisting) || !(sourceFile instanceof PlainText) ||
+                        !((PlainText) sourceFile).getText().equals(fileContents)) {
+                        shouldCreate.set(true);
+                    }
+                }
+                return sourceFile;
+            }
+        };
+    }
+
+    @Override
+    public Collection<SourceFile> generate(AtomicBoolean acc, ExecutionContext ctx) {
+        return new PlainTextParser().parse("")
+                .map(brandNewFile -> brandNewFile.withSourcePath(Paths.get(relativeFileName)))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean acc) {
+        Path path = Paths.get(relativeFileName);
+        return new PlainTextVisitor<ExecutionContext>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
+                if (path.toString().equals(text.getSourcePath().toString())) {
+                    return text.withText(fileContents);
+                }
+                return text;
+            }
+        };
     }
 }

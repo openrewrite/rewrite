@@ -15,11 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
@@ -45,12 +41,6 @@ public class NoEmptyCollectionWithRawType extends Recipe {
         return "Replaces `Collections#EMPTY_..` with methods that return generic types.";
     }
 
-    @Nullable
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("java.util.Collections", false);
-    }
-
     @Override
     public Set<String> getTags() {
         return Collections.singleton("RSPEC-1596");
@@ -62,18 +52,18 @@ public class NoEmptyCollectionWithRawType extends Recipe {
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         Map<String, String> updateFields = new HashMap<>();
         updateFields.put("EMPTY_LIST", "emptyList");
         updateFields.put("EMPTY_MAP", "emptyMap");
         updateFields.put("EMPTY_SET", "emptySet");
 
-        return new JavaVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesType<>("java.util.Collections", false), new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitImport(J.Import anImport, ExecutionContext executionContext) {
                 J.Identifier name = anImport.getQualid().getName();
                 if (anImport.isStatic() && name.getSimpleName().startsWith("EMPTY_") &&
-                        TypeUtils.isOfClassType(anImport.getQualid().getTarget().getType(), "java.util.Collections")) {
+                    TypeUtils.isOfClassType(anImport.getQualid().getTarget().getType(), "java.util.Collections")) {
                     return anImport.withQualid(anImport.getQualid().withName(name.withSimpleName(updateFields.get(name.getSimpleName()))));
                 }
                 return super.visitImport(anImport, executionContext);
@@ -84,7 +74,7 @@ public class NoEmptyCollectionWithRawType extends Recipe {
                 J.Identifier id = (J.Identifier) super.visitIdentifier(identifier, ctx);
                 JavaType.Variable varType = id.getFieldType();
                 if (varType != null && TypeUtils.isOfClassType(varType.getOwner(), "java.util.Collections") &&
-                        varType.getName().startsWith("EMPTY_")) {
+                    varType.getName().startsWith("EMPTY_")) {
 
                     J.Identifier methodId = new J.Identifier(
                             Tree.randomId(),
@@ -118,6 +108,6 @@ public class NoEmptyCollectionWithRawType extends Recipe {
                 }
                 return id;
             }
-        };
+        });
     }
 }

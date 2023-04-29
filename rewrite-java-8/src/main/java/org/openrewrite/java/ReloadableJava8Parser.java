@@ -143,7 +143,7 @@ class ReloadableJava8Parser implements JavaParser {
     }
 
     @Override
-    public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         if (classpath != null) { // override classpath
@@ -191,7 +191,7 @@ class ReloadableJava8Parser implements JavaParser {
             ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
         }
 
-        List<J.CompilationUnit> mappedCus = cus.entrySet().stream()
+        return cus.entrySet().stream()
                 .map(cuByPath -> {
                     Timer.Sample sample = Timer.start();
                     Input input = cuByPath.getKey();
@@ -225,10 +225,7 @@ class ReloadableJava8Parser implements JavaParser {
                         return null;
                     }
                 })
-                .filter(Objects::nonNull)
-                .collect(toList());
-
-        return mappedCus;
+                .filter(Objects::nonNull);
     }
 
     @Override

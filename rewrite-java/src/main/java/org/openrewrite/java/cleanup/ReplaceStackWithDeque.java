@@ -15,10 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.dataflow.FindLocalFlowPaths;
@@ -36,17 +33,12 @@ public class ReplaceStackWithDeque extends Recipe {
     @Override
     public String getDescription() {
         return "From the Javadoc of `Stack`:\n" +
-                "> A more complete and consistent set of LIFO stack operations is provided by the Deque interface and its implementations, which should be used in preference to this class.";
+               "> A more complete and consistent set of LIFO stack operations is provided by the Deque interface and its implementations, which should be used in preference to this class.";
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("java.util.Stack", false);
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesType<>("java.util.Stack", false), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
                 J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
@@ -75,7 +67,7 @@ public class ReplaceStackWithDeque extends Recipe {
             @Override
             public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                 J.VariableDeclarations v = super.visitVariableDeclarations(multiVariable, ctx);
-                if(getCursor().getMessage("replace", false)) {
+                if (getCursor().getMessage("replace", false)) {
                     v = (J.VariableDeclarations) new ChangeType("java.util.Stack", "java.util.Deque", false)
                             .getVisitor().visitNonNull(v, ctx, getCursor().getParentOrThrow());
                     maybeAddImport("java.util.ArrayDeque");
@@ -83,6 +75,6 @@ public class ReplaceStackWithDeque extends Recipe {
                 }
                 return v;
             }
-        };
+        });
     }
 }

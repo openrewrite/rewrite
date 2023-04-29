@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Applicability;
+import org.openrewrite.Preconditions;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -51,8 +51,8 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return Applicability.or(
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        TreeVisitor<?, ExecutionContext> condition = Preconditions.or(
                 new UsesType<>("java.lang.Boolean", false),
                 new UsesType<>("java.lang.Byte", false),
                 new UsesType<>("java.lang.Character", false),
@@ -62,11 +62,7 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
                 new UsesType<>("java.lang.Long", false),
                 new UsesType<>("java.lang.Short", false)
         );
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
+        return Preconditions.check(condition, new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
                 J.NewClass nc = (J.NewClass) super.visitNewClass(newClass, executionContext);
@@ -116,6 +112,6 @@ public class PrimitiveWrapperClassConstructorToValueOf extends Recipe {
                 }
                 return nc;
             }
-        };
+        });
     }
 }

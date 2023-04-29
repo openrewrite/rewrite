@@ -19,7 +19,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.json.tree.Space;
 
@@ -33,14 +32,6 @@ public class DeleteKey extends Recipe {
             example = "$.subjects.kind")
     String keyPath;
 
-    @Incubating(since = "7.11.0")
-    @Option(displayName = "Optional file matcher",
-            description = "Matching files will be modified. This is a glob expression.",
-            required = false,
-            example = "**/application-*.json")
-    @Nullable
-    String fileMatcher;
-
     @Override
     public String getDisplayName() {
         return "Delete key";
@@ -49,14 +40,6 @@ public class DeleteKey extends Recipe {
     @Override
     public String getDescription() {
         return "Delete a JSON mapping entry key.";
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        if (fileMatcher != null) {
-            return new HasSourcePath<>(fileMatcher);
-        }
-        return null;
     }
 
     @Override

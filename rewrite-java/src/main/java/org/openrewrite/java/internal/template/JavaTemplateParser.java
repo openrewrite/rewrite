@@ -48,7 +48,6 @@ public class JavaTemplateParser {
     private static final String PACKAGE_STUB = "package #{}; class $Template {}";
     private static final String PARAMETER_STUB = "abstract class $Template { abstract void $template(#{}); }";
     private static final String LAMBDA_PARAMETER_STUB = "class $Template { { Object o = (#{}) -> {}; } }";
-    private static final String EXPRESSION_STUB = "class $Template { { Object o = #{}; } }";
     private static final String EXTENDS_STUB = "class $Template extends #{} {}";
     private static final String IMPLEMENTS_STUB = "class $Template implements #{} {}";
     private static final String THROWS_STUB = "abstract class $Template { abstract void $template() throws #{}; }";
@@ -240,9 +239,10 @@ public class JavaTemplateParser {
         ExecutionContext ctx = new InMemoryExecutionContext();
         ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
         JavaParser jp = parser.clone().build();
-        return stub.contains("@SubAnnotation") ?
-                jp.reset().parse(ctx, stub, SUBSTITUTED_ANNOTATION).get(0) :
-                jp.reset().parse(ctx, stub).get(0);
+        return (stub.contains("@SubAnnotation") ?
+                jp.reset().parse(ctx, stub, SUBSTITUTED_ANNOTATION) :
+                jp.reset().parse(ctx, stub)
+        ).findFirst().orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
     }
 
     @SuppressWarnings("unchecked")

@@ -172,12 +172,6 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return visit(tree, p);
     }
 
-    @Nullable
-    public T visitSourceFile(SourceFile sourceFile, P p) {
-        //noinspection unchecked
-        return (T) sourceFile;
-    }
-
     /**
      * By calling this method, you are asserting that you know that the outcome will be non-null
      * when the compiler couldn't otherwise prove this to be the case. This method is a shortcut
@@ -255,9 +249,6 @@ public abstract class TreeVisitor<T extends Tree, P> {
             topLevel = true;
             visitCount = 0;
             sample = Timer.start();
-            if (p instanceof ExecutionContext) {
-                cursor.putMessage("org.openrewrite.ExecutionContext", p);
-            }
             afterVisit = new CopyOnWriteArrayList<>();
         }
 

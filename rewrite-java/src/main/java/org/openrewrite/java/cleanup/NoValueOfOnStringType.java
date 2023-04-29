@@ -16,7 +16,9 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -41,13 +43,8 @@ public class NoValueOfOnStringType extends Recipe {
     @Override
     public String getDescription() {
         return "Replace unnecessary `String#valueOf(..)` method invocations with the argument directly. " +
-                "This occurs when the argument to `String#valueOf(arg)` is a string literal, such as `String.valueOf(\"example\")`. " +
-                "Or, when the `String#valueOf(..)` invocation is used in a concatenation, such as `\"example\" + String.valueOf(\"example\")`.";
-    }
-
-    @Override
-    protected UsesMethod<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(new MethodMatcher("java.lang.String valueOf(..)"));
+               "This occurs when the argument to `String#valueOf(arg)` is a string literal, such as `String.valueOf(\"example\")`. " +
+               "Or, when the `String#valueOf(..)` invocation is used in a concatenation, such as `\"example\" + String.valueOf(\"example\")`.";
     }
 
     @Override
@@ -61,8 +58,8 @@ public class NoValueOfOnStringType extends Recipe {
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesMethod<>(new MethodMatcher("java.lang.String valueOf(..)")), new JavaVisitor<ExecutionContext>() {
             private final JavaTemplate t = JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}").build();
 
             @Override
@@ -101,9 +98,6 @@ public class NoValueOfOnStringType extends Recipe {
                 }
                 return false;
             }
-
-        };
+        });
     }
-
-
 }

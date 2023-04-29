@@ -28,6 +28,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.FindMethods;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
@@ -41,6 +42,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.gradle.plugins.GradlePluginUtils.availablePluginVersions;
 
 @Incubating(since = "7.33.0")
@@ -80,13 +82,15 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
             AtomicInteger singleQuote = new AtomicInteger();
             AtomicInteger doubleQuote = new AtomicInteger();
             new GroovyIsoVisitor<Integer>() {
-                MethodMatcher pluginIdMatcher = new MethodMatcher("PluginSpec id(..)");
+                final MethodMatcher pluginIdMatcher = new MethodMatcher("PluginSpec id(..)");
+
                 @Override
                 public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
                     J.MethodInvocation m = super.visitMethodInvocation(method, integer);
                     if (pluginIdMatcher.matches(m)) {
                         if (m.getArguments().get(0) instanceof J.Literal) {
                             J.Literal l = (J.Literal) m.getArguments().get(0);
+                            assert l.getValueSource() != null;
                             if (l.getValueSource().startsWith("'")) {
                                 singleQuote.incrementAndGet();
                             } else {
@@ -103,20 +107,21 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                     .parseInputs(
                             singletonList(
                                     Parser.Input.fromString("plugins {\n" +
-                                            "    id " + delimiter + pluginId + delimiter + (version.map(s -> " version " + delimiter + s + delimiter).orElse("")) + "\n" +
-                                            "}")),
+                                                            "    id " + delimiter + pluginId + delimiter + (version.map(s -> " version " + delimiter + s + delimiter).orElse("")) + "\n" +
+                                                            "}")),
                             null,
                             ctx
                     )
-                    .get(0)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"))
                     .getStatements();
 
             if (FindMethods.find(cu, "RewriteGradleProject plugins(..)").isEmpty() && FindMethods.find(cu, "RewriteSettings plugins(..)").isEmpty()) {
                 Space leadingSpace = Space.firstPrefix(cu.getStatements());
                 if (cu.getSourcePath().endsWith(Paths.get("settings.gradle"))
-                        && !cu.getStatements().isEmpty()
-                        && cu.getStatements().get(0) instanceof J.MethodInvocation
-                        && ((J.MethodInvocation) cu.getStatements().get(0)).getSimpleName().equals("pluginManagement")) {
+                    && !cu.getStatements().isEmpty()
+                    && cu.getStatements().get(0) instanceof J.MethodInvocation
+                    && ((J.MethodInvocation) cu.getStatements().get(0)).getSimpleName().equals("pluginManagement")) {
                     return cu.withStatements(ListUtils.concatAll(ListUtils.concat(cu.getStatements().get(0), Space.formatFirstPrefix(statements, leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace()))),
                             Space.formatFirstPrefix(cu.getStatements().subList(1, cu.getStatements().size()), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace()))));
                 } else {
@@ -138,7 +143,8 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                                     List<Statement> pluginStatements = b.getStatements();
                                     if (!pluginStatements.isEmpty() && pluginStatements.get(pluginStatements.size() - 1) instanceof J.Return) {
                                         Statement last = pluginStatements.remove(pluginStatements.size() - 1);
-                                        pluginStatements.add(((J.Return) last).getExpression().withPrefix(last.getPrefix()));
+                                        Expression lastExpr = requireNonNull(((J.Return) last).getExpression());
+                                        pluginStatements.add(lastExpr.withPrefix(last.getPrefix()));
                                     }
                                     pluginStatements.add(pluginDef);
                                     return l.withBody(autoFormat(b.withStatements(pluginStatements), ctx, getCursor()));

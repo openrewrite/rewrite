@@ -17,9 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
@@ -47,7 +45,7 @@ public class ChangeMethodName extends Recipe {
 
     @Option(displayName = "Ignore type definition",
             description = "When set to `true` the definition of the old type will be left untouched. " +
-                    "This is useful when you're replacing usage of a class but don't want to rename it.",
+                          "This is useful when you're replacing usage of a class but don't want to rename it.",
             required = false)
     @Nullable
     Boolean ignoreDefinition;
@@ -63,13 +61,18 @@ public class ChangeMethodName extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+    public boolean causesAnotherCycle() {
+        return true;
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        JavaIsoVisitor<ExecutionContext> condition = new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                if(Boolean.TRUE.equals(ignoreDefinition)) {
+                if (Boolean.TRUE.equals(ignoreDefinition)) {
                     J j = new DeclaresMethod<>(methodPattern, matchOverrides).visitNonNull(cu, executionContext);
-                    if(cu != j) {
+                    if (cu != j) {
                         return cu;
                     }
                 }
@@ -78,90 +81,76 @@ public class ChangeMethodName extends Recipe {
                 return cu;
             }
         };
-    }
 
-    @Override
-    public boolean causesAnotherCycle() {
-        return true;
-    }
+        return Preconditions.check(condition, new JavaIsoVisitor<ExecutionContext>() {
+            private final MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
 
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new ChangeMethodNameVisitor(new MethodMatcher(methodPattern, matchOverrides));
-    }
-
-    private class ChangeMethodNameVisitor extends JavaIsoVisitor<ExecutionContext> {
-        private final MethodMatcher methodMatcher;
-
-        private ChangeMethodNameVisitor(MethodMatcher methodMatcher) {
-            this.methodMatcher = methodMatcher;
-        }
-
-        @Override
-        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-            J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-            J.ClassDeclaration classDecl = getCursor().firstEnclosing(J.ClassDeclaration.class);
-            if(classDecl == null) {
+            @Override
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
+                J.ClassDeclaration classDecl = getCursor().firstEnclosing(J.ClassDeclaration.class);
+                if (classDecl == null) {
+                    return m;
+                }
+                if (methodMatcher.matches(method, classDecl)) {
+                    JavaType.Method type = m.getMethodType();
+                    if (type != null) {
+                        type = type.withName(newMethodName);
+                    }
+                    m = m.withName(m.getName().withSimpleName(newMethodName))
+                            .withMethodType(type);
+                }
                 return m;
             }
-            if (methodMatcher.matches(method, classDecl)) {
-                JavaType.Method type = m.getMethodType();
-                if (type != null) {
-                    type = type.withName(newMethodName);
-                }
-                m = m.withName(m.getName().withSimpleName(newMethodName))
-                        .withMethodType(type);
-            }
-            return m;
-        }
 
-        @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if (methodMatcher.matches(method) && !method.getSimpleName().equals(newMethodName)) {
-                JavaType.Method type = m.getMethodType();
-                if (type != null) {
-                    type = type.withName(newMethodName);
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                if (methodMatcher.matches(method) && !method.getSimpleName().equals(newMethodName)) {
+                    JavaType.Method type = m.getMethodType();
+                    if (type != null) {
+                        type = type.withName(newMethodName);
+                    }
+                    m = m.withName(m.getName().withSimpleName(newMethodName))
+                            .withMethodType(type);
                 }
-                m = m.withName(m.getName().withSimpleName(newMethodName))
-                        .withMethodType(type);
+                return m;
             }
-            return m;
-        }
 
-        @Override
-        public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext context) {
-            J.MemberReference m = super.visitMemberReference(memberRef, context);
-            if (methodMatcher.matches(m.getMethodType()) && !m.getReference().getSimpleName().equals(newMethodName)) {
-                JavaType.Method type = m.getMethodType();
-                if (type != null) {
-                    type = type.withName(newMethodName);
+            @Override
+            public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext context) {
+                J.MemberReference m = super.visitMemberReference(memberRef, context);
+                if (methodMatcher.matches(m.getMethodType()) && !m.getReference().getSimpleName().equals(newMethodName)) {
+                    JavaType.Method type = m.getMethodType();
+                    if (type != null) {
+                        type = type.withName(newMethodName);
+                    }
+                    m = m.withReference(m.getReference().withSimpleName(newMethodName)).withMethodType(type);
                 }
-                m = m.withReference(m.getReference().withSimpleName(newMethodName)).withMethodType(type);
+                return m;
             }
-            return m;
-        }
 
-        /**
-         * The only time field access should be relevant to changing method names is static imports.
-         * This exists to turn
-         * import static com.abc.B.static1;
-         * into
-         * import static com.abc.B.static2;
-         */
-        @Override
-        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
-            J.FieldAccess f = super.visitFieldAccess(fieldAccess, ctx);
-            if (methodMatcher.isFullyQualifiedClassReference(f)) {
-                Expression target = f.getTarget();
-                if (target instanceof J.FieldAccess) {
-                    String className = target.printTrimmed(getCursor());
-                    String fullyQualified = className + "." + newMethodName;
-                    return TypeTree.build(fullyQualified)
-                            .withPrefix(f.getPrefix());
+            /**
+             * The only time field access should be relevant to changing method names is static imports.
+             * This exists to turn
+             * import static com.abc.B.static1;
+             * into
+             * import static com.abc.B.static2;
+             */
+            @Override
+            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                J.FieldAccess f = super.visitFieldAccess(fieldAccess, ctx);
+                if (methodMatcher.isFullyQualifiedClassReference(f)) {
+                    Expression target = f.getTarget();
+                    if (target instanceof J.FieldAccess) {
+                        String className = target.printTrimmed(getCursor());
+                        String fullyQualified = className + "." + newMethodName;
+                        return TypeTree.build(fullyQualified)
+                                .withPrefix(f.getPrefix());
+                    }
                 }
+                return f;
             }
-            return f;
-        }
+        });
     }
 }

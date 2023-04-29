@@ -19,7 +19,6 @@ import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
 import org.openrewrite.style.NamedStyles;
-import org.yaml.snakeyaml.Yaml;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -35,15 +34,15 @@ public class Environment {
     private final Collection<? extends ResourceLoader> resourceLoaders;
     private final Collection<? extends ResourceLoader> dependencyResourceLoaders;
 
-    public Collection<Recipe> listRecipes() {
+    public List<Recipe> listRecipes() {
         List<Recipe> dependencyRecipes = new ArrayList<>();
         for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
             dependencyRecipes.addAll(dependencyResourceLoader.listRecipes());
         }
         Map<String, List<Contributor>> recipeToContributors = new HashMap<>();
         Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
-        for(ResourceLoader r : resourceLoaders) {
-            if(r instanceof YamlResourceLoader) {
+        for (ResourceLoader r : resourceLoaders) {
+            if (r instanceof YamlResourceLoader) {
                 recipeExamples.putAll(((YamlResourceLoader) r).listRecipeExamples());
                 recipeToContributors.putAll(((YamlResourceLoader) r).listContributors());
             }
@@ -135,14 +134,14 @@ public class Environment {
     }
 
     public Recipe activateRecipes(Iterable<String> activeRecipes) {
-        Recipe root = new CompositeRecipe();
-        Collection<Recipe> recipes = listRecipes();
+        List<Recipe> allRecipes = listRecipes();
         List<String> recipesNotFound = new ArrayList<>();
+        List<Recipe> activatedRecipes = new ArrayList<>();
         for (String activeRecipe : activeRecipes) {
             boolean foundRecipe = false;
-            for (Recipe recipe : recipes) {
+            for (Recipe recipe : allRecipes) {
                 if (activeRecipe.equals(recipe.getName())) {
-                    root.doNext(recipe);
+                    activatedRecipes.add(recipe);
                     foundRecipe = true;
                     break;
                 }
@@ -154,7 +153,7 @@ public class Environment {
         if (!recipesNotFound.isEmpty()) {
             throw new RecipeException("Recipes not found: " + String.join(", ", recipesNotFound));
         }
-        return root;
+        return new CompositeRecipe(activatedRecipes);
     }
 
     public Recipe activateRecipes(String... activeRecipes) {
@@ -162,9 +161,7 @@ public class Environment {
     }
 
     public Recipe activateAll() {
-        Recipe root = new CompositeRecipe();
-        listRecipes().forEach(root::doNext);
-        return root;
+        return new CompositeRecipe(listRecipes());
     }
 
     /**

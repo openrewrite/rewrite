@@ -17,10 +17,7 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.MethodMatcher;
@@ -61,13 +58,8 @@ public class ChangeJavaCompatibility extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsBuildGradle<>();
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
             final MethodMatcher sourceCompatibilityDsl = new MethodMatcher("RewriteGradleProject setSourceCompatibility(..)");
             final MethodMatcher targetCompatibilityDsl = new MethodMatcher("RewriteGradleProject setTargetCompatibility(..)");
 
@@ -229,6 +221,6 @@ public class ChangeJavaCompatibility extends Recipe {
 
                 return expression;
             }
-        };
+        });
     }
 }

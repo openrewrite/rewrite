@@ -810,6 +810,8 @@ class JsonPathMatcherTest {
                 }
                 return s;
             }
-        }.reduce(new YamlParser().parse(before.toArray(new String[0])), new ArrayList<>());
+        }.reduce(new YamlParser().parse(before.toArray(new String[0]))
+          .findFirst()
+          .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML")), new ArrayList<>());
     }
 }

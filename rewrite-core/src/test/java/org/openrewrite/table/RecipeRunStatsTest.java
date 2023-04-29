@@ -17,8 +17,6 @@ package org.openrewrite.table;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -30,7 +28,7 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 public class RecipeRunStatsTest implements RewriteTest {
 
-    static class RecipeWithApplicabilityTest  extends Recipe {
+    static class RecipeWithApplicabilityTest extends Recipe {
         @Override
         public String getDisplayName() {
             return "Recipe with an applicability test";
@@ -42,26 +40,23 @@ public class RecipeRunStatsTest implements RewriteTest {
         }
 
         @Override
-        protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-            return new PlainTextVisitor<>() {
-                @Override
-                public PlainText visitText(PlainText text, ExecutionContext executionContext) {
-                    if(!"sam".equals(text.getText())) {
-                        return SearchResult.found(text);
-                    }
-                    return text;
-                }
-            };
-        }
-
-        @Override
-        protected TreeVisitor<?, ExecutionContext> getVisitor() {
-            return new PlainTextVisitor<>() {
-                @Override
-                public PlainText preVisit(PlainText tree, ExecutionContext ctx) {
-                    return tree.withText("sam");
-                }
-            };
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return Preconditions.check(
+              new PlainTextVisitor<>() {
+                  @Override
+                  public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+                      if (!"sam".equals(text.getText())) {
+                          return SearchResult.found(text);
+                      }
+                      return text;
+                  }
+              },
+              new PlainTextVisitor<>() {
+                  @Override
+                  public PlainText preVisit(PlainText tree, ExecutionContext ctx) {
+                      return tree.withText("sam");
+                  }
+              });
         }
     }
 
@@ -74,27 +69,21 @@ public class RecipeRunStatsTest implements RewriteTest {
     @Test
     void singleRow() {
         rewriteRun(
-          spec -> {
-              spec.dataTable(RecipeRunStats.Row.class, rows -> {
-                  assertThat(rows)
-                    .as("Running a single recipe on a single source should produce a single row in the RecipeRunStats table")
-                    .hasSize(1);
-                  RecipeRunStats.Row row = rows.get(0);
-                  assertThat(row.getRecipe()).endsWith("RecipeWithApplicabilityTest");
-                  assertThat(row.getCalls())
-                    .as("Test framework will invoke the recipe once when it is expected to make a change, " +
-                      "then once again when it is expected to make no change")
-                    .isEqualTo(2);
-                  assertThat(row.getCumulative()).isGreaterThan(0);
-                  assertThat(row.getMax()).isGreaterThan(0);
-                  assertThat(row.getCumulative())
-                    .as("Cumulative time should be greater than any single visit time")
-                    .isGreaterThan(row.getMax());
-                  assertThat(row.getOwnGetVisitor()).isGreaterThan(0);
-                  assertThat(row.getApplicability()).isGreaterThan(0);
-
-              });
-          },
+          spec -> spec.dataTable(RecipeRunStats.Row.class, rows -> {
+              assertThat(rows)
+                .as("Running a single recipe on a single source should produce a single row in the RecipeRunStats table")
+                .hasSize(1);
+              RecipeRunStats.Row row = rows.get(0);
+              assertThat(row.getRecipe()).endsWith("RecipeWithApplicabilityTest");
+              assertThat(row.getSourceFiles())
+                .as("Test framework will invoke the recipe once when it is expected to make a change, " +
+                    "then once again when it is expected to make no change")
+                .isEqualTo(2);
+              assertThat(row.getEditMax()).isGreaterThan(0);
+              assertThat(row.getEditTotalTime())
+                .as("Cumulative time should be greater than any single visit time")
+                .isGreaterThan(row.getEditMax());
+          }),
           text("samuel", "sam")
         );
     }

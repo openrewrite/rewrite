@@ -18,14 +18,16 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Make existing dependencies "dependency managed", moving the version to the dependencyManagement
@@ -38,18 +40,18 @@ import java.util.*;
 @Incubating(since = "7.19.0")
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class ManageDependencies extends Recipe {
+public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion, Collection<ResolvedDependency>>> {
     private static final XPathMatcher MANAGED_DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies");
 
     @Option(displayName = "Group",
             description = "Group glob expression pattern used to match dependencies that should be managed." +
-                          "Group is the first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+                          "Group is the first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "com.google.*")
     String groupPattern;
 
     @Option(displayName = "Artifact",
             description = "Artifact glob expression pattern used to match dependencies that should be managed." +
-                          "Artifact is the second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+                          "Artifact is the second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "guava*",
             required = false)
     @Nullable
@@ -81,68 +83,67 @@ public class ManageDependencies extends Recipe {
     }
 
     @Override
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        Map<GroupArtifactVersion, Collection<ResolvedDependency>> rootGavToDependencies = new HashMap<>();
-        if (Boolean.TRUE.equals(addToRootPom)) {
-            for (SourceFile source : before) {
-                new MavenIsoVisitor<ExecutionContext>() {
-                    @Override
-                    public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                        Xml.Document doc = super.visitDocument(document, executionContext);
-                        Collection<ResolvedDependency> manageableDependencies = findDependencies(groupPattern, artifactPattern != null ? artifactPattern : "*");
-                        ResolvedGroupArtifactVersion root = findRootPom(getResolutionResult()).getPom().getGav();
-                        rootGavToDependencies.computeIfAbsent(new GroupArtifactVersion(root.getGroupId(), root.getArtifactId(), root.getVersion()), v -> new ArrayList<>()).addAll(manageableDependencies);
-                        return doc;
-                    }
-                }.visit(source, ctx);
+    public Map<GroupArtifactVersion, Collection<ResolvedDependency>> getInitialValue() {
+        return new HashMap<>();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Map<GroupArtifactVersion, Collection<ResolvedDependency>> rootGavToDependencies) {
+        return Preconditions.check(Boolean.TRUE.equals(addToRootPom), new MavenIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                Xml.Document doc = super.visitDocument(document, executionContext);
+                Collection<ResolvedDependency> manageableDependencies = findDependencies(groupPattern, artifactPattern != null ? artifactPattern : "*");
+                ResolvedGroupArtifactVersion root = findRootPom(getResolutionResult()).getPom().getGav();
+                rootGavToDependencies.computeIfAbsent(new GroupArtifactVersion(root.getGroupId(), root.getArtifactId(), root.getVersion()), v -> new ArrayList<>()).addAll(manageableDependencies);
+                return doc;
             }
-        }
+        });
+    }
 
-        return ListUtils.map(before, s -> s.getMarkers().findFirst(MavenResolutionResult.class)
-                .map(javaProject -> (Tree) new MavenVisitor<ExecutionContext>() {
-                    @Override
-                    public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                        Xml maven = super.visitDocument(document, executionContext);
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Map<GroupArtifactVersion, Collection<ResolvedDependency>> rootGavToDependencies) {
+        return new MavenVisitor<ExecutionContext>() {
+            @Override
+            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                Xml maven = super.visitDocument(document, executionContext);
 
-                        Collection<ResolvedDependency> manageableDependencies;
-                        if (Boolean.TRUE.equals(addToRootPom)) {
-                            ResolvedPom pom = getResolutionResult().getPom();
-                            GroupArtifactVersion gav = new GroupArtifactVersion(pom.getGav().getGroupId(), pom.getGav().getArtifactId(), pom.getGav().getVersion());
-                            manageableDependencies = rootGavToDependencies.get(gav);
-                        } else {
-                            manageableDependencies = findDependencies(groupPattern, artifactPattern != null ? artifactPattern : "*");
+                Collection<ResolvedDependency> manageableDependencies;
+                if (Boolean.TRUE.equals(addToRootPom)) {
+                    ResolvedPom pom = getResolutionResult().getPom();
+                    GroupArtifactVersion gav = new GroupArtifactVersion(pom.getGav().getGroupId(), pom.getGav().getArtifactId(), pom.getGav().getVersion());
+                    manageableDependencies = rootGavToDependencies.get(gav);
+                } else {
+                    manageableDependencies = findDependencies(groupPattern, artifactPattern != null ? artifactPattern : "*");
+                }
+
+                if (manageableDependencies != null) {
+                    Map<GroupArtifact, ResolvedDependency> maxVersionByGroupArtifact = new HashMap<>(manageableDependencies.size());
+
+                    for (ResolvedDependency rmd : manageableDependencies) {
+                        String alreadyManagedVersion = getResolutionResult().getPom().getManagedVersion(rmd.getGroupId(), rmd.getArtifactId(), rmd.getType(),
+                                rmd.getClassifier());
+                        if (rmd.getDepth() <= 1 && alreadyManagedVersion == null) {
+                            maxVersionByGroupArtifact.compute(new GroupArtifact(rmd.getGroupId(), rmd.getArtifactId()),
+                                    (ga, existing) -> existing == null || existing.getVersion().compareTo(rmd.getVersion()) < 0 ?
+                                            rmd : existing);
                         }
-
-                        if (manageableDependencies != null) {
-                            Map<GroupArtifact, ResolvedDependency> maxVersionByGroupArtifact = new HashMap<>(manageableDependencies.size());
-
-                            for (ResolvedDependency rmd : manageableDependencies) {
-                                String alreadyManagedVersion = getResolutionResult().getPom().getManagedVersion(rmd.getGroupId(), rmd.getArtifactId(), rmd.getType(),
-                                        rmd.getClassifier());
-                                if (rmd.getDepth() <= 1 && alreadyManagedVersion == null) {
-                                    maxVersionByGroupArtifact.compute(new GroupArtifact(rmd.getGroupId(), rmd.getArtifactId()),
-                                            (ga, existing) -> existing == null || existing.getVersion().compareTo(rmd.getVersion()) < 0 ?
-                                                    rmd : existing);
-                                }
-                            }
-
-                            for (ResolvedDependency rmd : maxVersionByGroupArtifact.values()) {
-                                doAfterVisit(new AddManagedDependencyVisitor(rmd.getGroupId(),
-                                        rmd.getArtifactId(), rmd.getVersion(), null,
-                                        null, rmd.getRequested().getClassifier()));
-                                if (!Boolean.TRUE.equals(skipModelUpdate)) {
-                                    maybeUpdateModel();
-                                }
-                            }
-                        }
-
-                        doAfterVisit(new RemoveVersionTagVisitor(groupPattern, artifactPattern != null ? artifactPattern : "*"));
-                        return maven;
                     }
-                }.visit(s, ctx))
-                .map(SourceFile.class::cast)
-                .orElse(s)
-        );
+
+                    for (ResolvedDependency rmd : maxVersionByGroupArtifact.values()) {
+                        doAfterVisit(new AddManagedDependencyVisitor(rmd.getGroupId(),
+                                rmd.getArtifactId(), rmd.getVersion(), null,
+                                null, rmd.getRequested().getClassifier()));
+                        if (!Boolean.TRUE.equals(skipModelUpdate)) {
+                            maybeUpdateModel();
+                        }
+                    }
+                }
+
+                doAfterVisit(new RemoveVersionTagVisitor(groupPattern, artifactPattern != null ? artifactPattern : "*"));
+                return maven;
+            }
+        };
     }
 
     private MavenResolutionResult findRootPom(MavenResolutionResult pom) {

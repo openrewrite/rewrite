@@ -31,6 +31,8 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.UUID;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * Represents a source hosted at a remote URI.
  * <p>
@@ -110,7 +112,8 @@ public interface Remote extends SourceFile {
     default <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
         return new TreeVisitor<Tree, PrintOutputCapture<P>>() {
             @Override
-            public Tree visitSourceFile(SourceFile sourceFile, PrintOutputCapture<P> p) {
+            public Tree visit(@Nullable Tree tree, PrintOutputCapture<P> p) {
+                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 ExecutionContext ctx = p.getContext() instanceof ExecutionContext ? (ExecutionContext) p.getContext() :
                         new InMemoryExecutionContext();
                 HttpSender sender = HttpSenderExecutionContextView.view(ctx).getHttpSender();

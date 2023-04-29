@@ -15,10 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.UsesType;
@@ -50,18 +47,13 @@ public class AvoidBoxedBooleanExpressions extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("java.lang.Boolean", true);
-    }
-
-    @Override
     public Duration getEstimatedEffortPerOccurrence() {
         return Duration.of(5, ChronoUnit.MINUTES);
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesType<>("java.lang.Boolean", true), new JavaVisitor<ExecutionContext>() {
             @Override
             public Expression visitExpression(Expression expression, ExecutionContext ctx) {
                 Expression e = (Expression) super.visitExpression(expression, ctx);
@@ -95,14 +87,13 @@ public class AvoidBoxedBooleanExpressions extends Recipe {
             private boolean isControlExpression(Expression expression) {
                 Cursor parentCursor = getCursor().getParentTreeCursor();
                 if (parentCursor.getValue() instanceof J.ControlParentheses &&
-                        parentCursor.getParentTreeCursor().getValue() instanceof J.If) {
+                    parentCursor.getParentTreeCursor().getValue() instanceof J.If) {
                     return true;
-                }
-                else if (parentCursor.getValue() instanceof J.Ternary) {
-                    return ((J.Ternary)parentCursor.getValue()).getCondition() == expression;
+                } else if (parentCursor.getValue() instanceof J.Ternary) {
+                    return ((J.Ternary) parentCursor.getValue()).getCondition() == expression;
                 }
                 return false;
             }
-        };
+        });
     }
 }

@@ -15,17 +15,12 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Incubating;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -58,19 +53,13 @@ public class IndexOfReplaceableByContains extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new IndexOfReplaceableByContainsVisitor();
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                doAfterVisit(new UsesMethod<>(STRING_INDEX_MATCHER));
-                doAfterVisit(new UsesMethod<>(LIST_INDEX_MATCHER));
-                return cu;
-            }
-        };
+        return Preconditions.check(
+                Preconditions.or(
+                        new UsesMethod<>(STRING_INDEX_MATCHER),
+                        new UsesMethod<>(LIST_INDEX_MATCHER)
+                ),
+                new IndexOfReplaceableByContainsVisitor()
+        );
     }
 
     private static class IndexOfReplaceableByContainsVisitor extends JavaVisitor<ExecutionContext> {

@@ -16,7 +16,9 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -56,22 +58,20 @@ public class NoPrimitiveWrappersForToStringOrCompareTo extends Recipe {
     }
 
     @Override
-    public JavaIsoVisitor<ExecutionContext> getVisitor() {
-        return new NoPrimitiveWrapperVisitor();
-    }
-
-    @Override
-    protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                doAfterVisit(new UsesMethod<>(NUMBER_COMPARE_TO_MATCHER));
-                doAfterVisit(new UsesMethod<>(NUMBER_TO_STRING_MATCHER));
-                doAfterVisit(new UsesMethod<>(BOOLEAN_COMPARE_TO_MATCHER));
-                doAfterVisit(new UsesMethod<>(BOOLEAN_TO_STRING_MATCHER));
-                return cu;
-            }
-        };
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(
+                new JavaIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
+                        doAfterVisit(new UsesMethod<>(NUMBER_COMPARE_TO_MATCHER));
+                        doAfterVisit(new UsesMethod<>(NUMBER_TO_STRING_MATCHER));
+                        doAfterVisit(new UsesMethod<>(BOOLEAN_COMPARE_TO_MATCHER));
+                        doAfterVisit(new UsesMethod<>(BOOLEAN_TO_STRING_MATCHER));
+                        return cu;
+                    }
+                },
+                new NoPrimitiveWrapperVisitor()
+        );
     }
 
     private static class NoPrimitiveWrapperVisitor extends JavaIsoVisitor<ExecutionContext> {

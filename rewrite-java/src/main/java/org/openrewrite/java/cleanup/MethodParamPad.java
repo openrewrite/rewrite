@@ -18,9 +18,13 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.format.SpacesVisitor;
-import org.openrewrite.java.style.*;
+import org.openrewrite.java.style.Checkstyle;
+import org.openrewrite.java.style.IntelliJ;
+import org.openrewrite.java.style.MethodParamPadStyle;
+import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
@@ -39,7 +43,7 @@ public class MethodParamPad extends Recipe {
     }
 
     @Override
-    public JavaIsoVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MethodParamPadVisitor();
     }
 
@@ -96,12 +100,15 @@ public class MethodParamPad extends Recipe {
         @Override
         public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
             J.NewClass nc = super.visitNewClass(newClass, ctx);
-            if (!methodParamPadStyle.getAllowLineBreaks() && nc.getPadding().getArguments() != null && nc.getPadding().getArguments().getBefore().getWhitespace().contains("\n")) {
-                nc = nc.getPadding().withArguments(
-                        nc.getPadding().getArguments().withBefore(
-                                nc.getPadding().getArguments().getBefore().withWhitespace("")
-                        )
-                );
+            if (!methodParamPadStyle.getAllowLineBreaks()) {
+                nc.getPadding().getArguments();
+                if (nc.getPadding().getArguments().getBefore().getWhitespace().contains("\n")) {
+                    nc = nc.getPadding().withArguments(
+                            nc.getPadding().getArguments().withBefore(
+                                    nc.getPadding().getArguments().getBefore().withWhitespace("")
+                            )
+                    );
+                }
             }
             nc = (J.NewClass)new SpacesVisitor<>(spacesStyle, null, null, nc)
                     .visitNonNull(nc, ctx, getCursor().getParentTreeCursor().fork());

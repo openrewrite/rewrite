@@ -16,10 +16,11 @@
 package org.openrewrite.java.recipes;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -48,17 +49,12 @@ public class SetDefaultEstimatedEffortPerOccurrence extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("org.openrewrite.Recipe", false);
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesType<>("org.openrewrite.Recipe", false), new JavaIsoVisitor<ExecutionContext>() {
             final JavaTemplate addMethod = JavaTemplate.builder(this::getCursor,
                             "@Override public Duration getEstimatedEffortPerOccurrence() {\n" +
-                                    "return Duration.ofMinutes(5);\n" +
-                                    "}")
+                            "return Duration.ofMinutes(5);\n" +
+                            "}")
                     .imports("java.time.Duration")
                     .build();
 
@@ -89,6 +85,6 @@ public class SetDefaultEstimatedEffortPerOccurrence extends Recipe {
                 }
                 return super.visitClassDeclaration(classDecl, executionContext);
             }
-        };
+        });
     }
 }

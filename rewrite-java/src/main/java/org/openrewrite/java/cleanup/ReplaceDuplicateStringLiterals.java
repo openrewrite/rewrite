@@ -64,14 +64,8 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("java.lang.String", false);
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
-
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesType<>("java.lang.String", false), new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
@@ -212,7 +206,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                 for (int i = 0; i < valueOfLiteral.length(); i++) {
                     char c = valueOfLiteral.charAt(i);
                     if (i > 0 && newName.lastIndexOf("_") != newName.length() - 1 &&
-                            (Character.isUpperCase(c) && prevIsLower || !prevIsCharacter)) {
+                        (Character.isUpperCase(c) && prevIsLower || !prevIsCharacter)) {
                         newName.append("_");
                     }
                     prevIsCharacter = Character.isLetterOrDigit(c);
@@ -227,7 +221,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                 }
                 return VariableNameUtils.normalizeName(newName.toString());
             }
-        };
+        });
     }
 
     private static class FindDuplicateStringLiterals extends JavaIsoVisitor<Map<String, Set<J.Literal>>> {
@@ -253,25 +247,25 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
         @Override
         public J.Literal visitLiteral(J.Literal literal, Map<String, Set<J.Literal>> literalsMap) {
             if (JavaType.Primitive.String.equals(literal.getType()) &&
-                    literal.getValue() instanceof String &&
-                    ((String) literal.getValue()).length() >= 5) {
+                literal.getValue() instanceof String &&
+                ((String) literal.getValue()).length() >= 5) {
 
                 Cursor parent = getCursor().dropParentUntil(is -> is instanceof J.ClassDeclaration ||
-                        is instanceof J.Annotation ||
-                        is instanceof J.VariableDeclarations ||
-                        is instanceof J.NewClass ||
-                        is instanceof J.MethodInvocation);
+                                                                  is instanceof J.Annotation ||
+                                                                  is instanceof J.VariableDeclarations ||
+                                                                  is instanceof J.NewClass ||
+                                                                  is instanceof J.MethodInvocation);
                 // EnumValue can accept constructor arguments, including string literals
                 // But the static field can't be placed before them, so these literals are ineligible for replacement
-                if(parent.getValue() instanceof J.NewClass && parent.firstEnclosing(J.EnumValueSet.class) != null) {
+                if (parent.getValue() instanceof J.NewClass && parent.firstEnclosing(J.EnumValueSet.class) != null) {
                     return literal;
                 }
 
                 if ((parent.getValue() instanceof J.VariableDeclarations &&
-                        ((J.VariableDeclarations) parent.getValue()).hasModifier(J.Modifier.Type.Final) &&
-                        !(((J.VariableDeclarations) parent.getValue()).hasModifier(J.Modifier.Type.Private) && ((J.VariableDeclarations) parent.getValue()).hasModifier(J.Modifier.Type.Static))) ||
-                        parent.getValue() instanceof J.NewClass ||
-                        parent.getValue() instanceof J.MethodInvocation) {
+                     ((J.VariableDeclarations) parent.getValue()).hasModifier(J.Modifier.Type.Final) &&
+                     !(((J.VariableDeclarations) parent.getValue()).hasModifier(J.Modifier.Type.Private) && ((J.VariableDeclarations) parent.getValue()).hasModifier(J.Modifier.Type.Static))) ||
+                    parent.getValue() instanceof J.NewClass ||
+                    parent.getValue() instanceof J.MethodInvocation) {
 
                     literalsMap.computeIfAbsent(((String) literal.getValue()), k -> new HashSet<>());
                     literalsMap.get((String) literal.getValue()).add(literal);
@@ -283,8 +277,8 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
 
     private static boolean isPrivateStaticFinalVariable(J.VariableDeclarations declaration) {
         return declaration.hasModifier(J.Modifier.Type.Private) &&
-                declaration.hasModifier(J.Modifier.Type.Static) &&
-                declaration.hasModifier(J.Modifier.Type.Final);
+               declaration.hasModifier(J.Modifier.Type.Static) &&
+               declaration.hasModifier(J.Modifier.Type.Final);
     }
 
     private static class FindVariableNames extends JavaIsoVisitor<Set<String>> {
@@ -306,10 +300,10 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
             Cursor parentScope = getCursor().dropParentUntil(is -> is instanceof J.ClassDeclaration || is instanceof J.MethodDeclaration);
             J.VariableDeclarations declaration = getCursor().firstEnclosing(J.VariableDeclarations.class);
             if (parentScope.getValue() instanceof J.MethodDeclaration ||
-                    (parentScope.getValue() instanceof J.ClassDeclaration && declaration != null &&
-                            // `private static final String`(s) are handled separately by `FindExistingPrivateStaticFinalFields`.
-                            !(isPrivateStaticFinalVariable(declaration) && variable.getInitializer() instanceof J.Literal &&
-                                    ((J.Literal) variable.getInitializer()).getValue() instanceof String))) {
+                (parentScope.getValue() instanceof J.ClassDeclaration && declaration != null &&
+                 // `private static final String`(s) are handled separately by `FindExistingPrivateStaticFinalFields`.
+                 !(isPrivateStaticFinalVariable(declaration) && variable.getInitializer() instanceof J.Literal &&
+                   ((J.Literal) variable.getInitializer()).getValue() instanceof String))) {
                 variableNames.add(variable.getSimpleName());
             }
             return variable;
@@ -330,13 +324,13 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Map<String, String> stringStringMap) {
             Cursor parentScope = getCursor().dropParentUntil(is -> is instanceof J.ClassDeclaration ||
-                    // Prevent checks on most of the literals.
-                    is instanceof J.MethodDeclaration);
+                                                                   // Prevent checks on most of the literals.
+                                                                   is instanceof J.MethodDeclaration);
             J.VariableDeclarations declaration = getCursor().firstEnclosing(J.VariableDeclarations.class);
             if (parentScope.getValue() instanceof J.ClassDeclaration &&
-                    declaration != null && isPrivateStaticFinalVariable(declaration) &&
-                    variable.getInitializer() instanceof J.Literal &&
-                    ((J.Literal) variable.getInitializer()).getValue() instanceof String) {
+                declaration != null && isPrivateStaticFinalVariable(declaration) &&
+                variable.getInitializer() instanceof J.Literal &&
+                ((J.Literal) variable.getInitializer()).getValue() instanceof String) {
                 String value = (String) (((J.Literal) variable.getInitializer()).getValue());
                 stringStringMap.putIfAbsent(value, variable.getSimpleName());
             }

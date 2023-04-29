@@ -78,7 +78,10 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
         }
 
         if (dependenciesBlockMissing) {
-            Statement dependenciesInvocation = GRADLE_PARSER.parse("dependencies {}").get(0).getStatements().get(0);
+            Statement dependenciesInvocation = GRADLE_PARSER.parse("dependencies {}")
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
+                    .getStatements().get(0);
             dependenciesInvocation = autoFormat(dependenciesInvocation, ctx, new Cursor(getCursor(), cu));
             groovy = groovy.withStatements(ListUtils.concat(groovy.getStatements(),
                     groovy.getStatements().isEmpty() ?
@@ -121,7 +124,9 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                                "\n}";
             }
             J.MethodInvocation addDependencyInvocation = requireNonNull((J.MethodInvocation) ((J.Return) (((J.Block) ((J.Lambda) ((J.MethodInvocation) GRADLE_PARSER.parse(codeTemplate)
-                    .get(0).getStatements().get(0)).getArguments().get(0)).getBody()).getStatements().get(0))).getExpression());
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
+                    .getStatements().get(0)).getArguments().get(0)).getBody()).getStatements().get(0))).getExpression());
             addDependencyInvocation = autoFormat(addDependencyInvocation, ctx, new Cursor(getCursor(), body));
             InsertDependencyComparator dependencyComparator = new InsertDependencyComparator(body.getStatements(), addDependencyInvocation);
 

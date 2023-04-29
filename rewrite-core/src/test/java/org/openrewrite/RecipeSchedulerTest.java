@@ -60,7 +60,7 @@ class BoomRecipe extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new PlainTextVisitor<>() {
             @Override
             public PlainText visitText(PlainText text, ExecutionContext executionContext) {

@@ -28,7 +28,7 @@ class DeleteKeyTest implements RewriteTest {
     @Test
     void deleteNestedKey() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.metadata.name", null)),
+          spec -> spec.recipe(new DeleteKey("$.metadata.name")),
           yaml(
             """
                   apiVersion: v1
@@ -48,7 +48,7 @@ class DeleteKeyTest implements RewriteTest {
     @Test
     void deleteRelativeKey() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey(".name", null)),
+          spec -> spec.recipe(new DeleteKey(".name")),
           yaml(
             """
                   apiVersion: v1
@@ -68,7 +68,7 @@ class DeleteKeyTest implements RewriteTest {
     @Test
     void deleteSequenceEntry() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.subjects[?(@.kind == 'User')]", null)),
+          spec -> spec.recipe(new DeleteKey("$.subjects[?(@.kind == 'User')]")),
           yaml(
             """
                   subjects:
@@ -91,7 +91,7 @@ class DeleteKeyTest implements RewriteTest {
     @Test
     void deleteScalarSequenceEntry() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.widget.list[?(@ == 'item 2')]", null)),
+          spec -> spec.recipe(new DeleteKey("$.widget.list[?(@ == 'item 2')]")),
           yaml(
             """
                   widget:
@@ -115,7 +115,7 @@ class DeleteKeyTest implements RewriteTest {
     @Test
     void deleteSequenceKeyByWildcard() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.subjects[*].kind", null)),
+          spec -> spec.recipe(new DeleteKey("$.subjects[*].kind")),
           yaml(
             """
                   subjects:
@@ -136,7 +136,7 @@ class DeleteKeyTest implements RewriteTest {
     @Test
     void deleteSubSequenceKeyByExactMatch() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.subjects[?(@.kind == 'ServiceAccount')].kind", null)),
+          spec -> spec.recipe(new DeleteKey("$.subjects[?(@.kind == 'ServiceAccount')].kind")),
           yaml(
             """
                   subjects:
@@ -159,7 +159,7 @@ class DeleteKeyTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1175")
     void deleteNestedKeyRemovingUnusedKeysRecursively() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.b.c.d", null)),
+          spec -> spec.recipe(new DeleteKey("$.b.c.d")),
           yaml(
             """
                   a: a-value
@@ -178,7 +178,7 @@ class DeleteKeyTest implements RewriteTest {
     @Test
     void deleteKeyKeepingUnrelatedUnusedKeys() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.jobs.build.strategy.fail-fast", null)),
+          spec -> spec.recipe(new DeleteKey("$.jobs.build.strategy.fail-fast")),
           yaml(
             """
                   on:
@@ -222,15 +222,6 @@ class DeleteKeyTest implements RewriteTest {
                           os: ["ubuntu-latest"]
               """
           )
-        );
-    }
-
-    @Test
-    void changeOnlyMatchingFile() {
-        rewriteRun(
-          spec -> spec.recipe(new DeleteKey(".apiVersion", "**/a.yml")),
-          yaml("apiVersion: v1", "", spec -> spec.path("a.yml")),
-          yaml("apiVersion: v1", spec -> spec.path("b.yml"))
         );
     }
 }

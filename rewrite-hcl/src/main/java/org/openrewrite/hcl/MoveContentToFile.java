@@ -17,43 +17,33 @@ package org.openrewrite.hcl;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
+import org.openrewrite.*;
 import org.openrewrite.hcl.tree.BodyContent;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.hcl.tree.Space;
-import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collection;
 import java.util.Collections;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicReference;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class MoveContentToFile extends Recipe {
-    @Option(
-            displayName = "Content path",
+public class MoveContentToFile extends ScanningRecipe<MoveContentToFile.Scanned> {
+    @Option(displayName = "Content path",
             description = "A JSONPath expression specifying the block to move.",
-            example = "$.provider"
-    )
+            example = "$.provider")
     String contentPath;
 
-    @Option(
-            displayName = "From path",
+    @Option(displayName = "From path",
             description = "The source path of the file from which content is being moved.",
-            example = "from.tf"
-    )
+            example = "from.tf")
     String fromPath;
 
-    @Option(
-            displayName = "To path",
+    @Option(displayName = "To path",
             description = "The source path of the file to move the content to.",
-            example = "to.tf"
-    )
+            example = "to.tf")
     String destinationPath;
 
     @Override
@@ -66,54 +56,80 @@ public class MoveContentToFile extends Recipe {
         return "Move content to another HCL file, deleting it in the original file.";
     }
 
+    static class Scanned {
+        @Nullable
+        BodyContent toMove;
+
+        boolean destinationExists;
+    }
+
     @Override
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        AtomicReference<BodyContent> toMove = new AtomicReference<>();
+    public Scanned getInitialValue() {
+        return new Scanned();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Scanned acc) {
         JsonPathMatcher pathMatcher = new JsonPathMatcher(contentPath);
-
         Path from = Paths.get(fromPath);
-        List<SourceFile> after = ListUtils.map(before, sourceFile ->
-                sourceFile.getSourcePath().equals(from) ?
-                        (SourceFile) new HclIsoVisitor<ExecutionContext>() {
-                            @Override
-                            public BodyContent visitBodyContent(BodyContent bodyContent, ExecutionContext ctx) {
-                                BodyContent b = super.visitBodyContent(bodyContent, ctx);
-                                if (pathMatcher.matches(getCursor())) {
-                                    toMove.set(bodyContent);
-                                    //noinspection ConstantConditions
-                                    return null;
-                                }
-                                return b;
-                            }
-                        }.visit(sourceFile, ctx) : sourceFile
-        );
-
-        if (toMove.get() == null) {
-            return before;
-        }
-
         Path dest = Paths.get(destinationPath);
-        if (after.stream().anyMatch(sourceFile -> sourceFile.getSourcePath().equals(dest))) {
-            return ListUtils.map(after, sourceFile -> {
-                if (sourceFile.getSourcePath().equals(dest)) {
-                    return (SourceFile) new HclIsoVisitor<ExecutionContext>() {
-                        @Override
-                        public BodyContent visitBodyContent(BodyContent bodyContent, ExecutionContext ctx) {
-                            BodyContent b = super.visitBodyContent(bodyContent, ctx);
-                            if (pathMatcher.matches(getCursor())) {
-                                return toMove.get();
-                            }
-                            return b;
-                        }
-                    }.visit(sourceFile, ctx);
-                }
-                return sourceFile;
-            });
-        }
 
-        Hcl.ConfigFile configFile = HclParser.builder().build().parse("").get(0);
-        configFile = configFile.withBody(Collections.singletonList(toMove.get().withPrefix(Space.EMPTY)))
-                .withSourcePath(dest);
-        return ListUtils.concat(after, configFile);
+        return new HclIsoVisitor<ExecutionContext>() {
+            @Override
+            public Hcl.ConfigFile visitConfigFile(Hcl.ConfigFile configFile, ExecutionContext ctx) {
+                if (configFile.getSourcePath().equals(from)) {
+                    return super.visitConfigFile(configFile, ctx);
+                } else if (configFile.getSourcePath().equals(dest)) {
+                    acc.destinationExists = true;
+                }
+                return configFile;
+            }
+
+            @Override
+            public BodyContent visitBodyContent(BodyContent bodyContent, ExecutionContext ctx) {
+                BodyContent b = super.visitBodyContent(bodyContent, ctx);
+                if (pathMatcher.matches(getCursor())) {
+                    acc.toMove = bodyContent;
+                    //noinspection ConstantConditions
+                }
+                return b;
+            }
+        };
+    }
+
+    @Override
+    public Collection<SourceFile> generate(Scanned acc, ExecutionContext ctx) {
+        if (acc.destinationExists || acc.toMove == null) {
+            return Collections.emptyList();
+        }
+        Hcl.ConfigFile configFile = HclParser.builder().build().parse("")
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as HCL"));
+        configFile = configFile.withBody(Collections.singletonList(acc.toMove.withPrefix(Space.EMPTY)))
+                .withSourcePath(Paths.get(destinationPath));
+        return Collections.singletonList(configFile);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
+        JsonPathMatcher pathMatcher = new JsonPathMatcher(contentPath);
+        Path from = Paths.get(fromPath);
+        Path dest = Paths.get(destinationPath);
+
+        return Preconditions.check(acc.toMove != null, new HclIsoVisitor<ExecutionContext>() {
+            @Override
+            public BodyContent visitBodyContent(BodyContent bodyContent, ExecutionContext ctx) {
+                BodyContent b = super.visitBodyContent(bodyContent, ctx);
+                Path sourcePath = getCursor().firstEnclosingOrThrow(Hcl.ConfigFile.class).getSourcePath();
+                if (sourcePath.equals(from) && pathMatcher.matches(getCursor())) {
+                    // delete the block from the original file
+                    //noinspection ConstantConditions
+                    return null;
+                } else if (sourcePath.equals(dest) && pathMatcher.matches(getCursor())) {
+                    return acc.toMove;
+                }
+                return b;
+            }
+        });
     }
 }

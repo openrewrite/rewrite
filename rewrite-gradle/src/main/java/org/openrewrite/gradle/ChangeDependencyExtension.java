@@ -17,11 +17,7 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.gradle.util.Dependency;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
@@ -80,13 +76,8 @@ public class ChangeDependencyExtension extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsBuildGradle<>();
-    }
-
-    @Override
-    public GroovyVisitor<ExecutionContext> getVisitor() {
-        return new GroovyVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
 
@@ -166,6 +157,6 @@ public class ChangeDependencyExtension extends Recipe {
 
                 return m;
             }
-        };
+        });
     }
 }

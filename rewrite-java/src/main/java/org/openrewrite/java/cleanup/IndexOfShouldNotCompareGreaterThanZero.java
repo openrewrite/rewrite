@@ -15,15 +15,11 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Incubating;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -42,10 +38,10 @@ public class IndexOfShouldNotCompareGreaterThanZero extends Recipe {
     @Override
     public String getDescription() {
         return "Replaces `String#indexOf(String) > 0` and `List#indexOf(Object) > 0` with `>=1`. " +
-                "Checking `indexOf` against `>0` ignores the first element, whereas `>-1` is inclusive of the first element. " +
-                "For clarity, `>=1` is used, because `>0` and `>=1` are semantically equal. Using `>0` may appear to be a mistake " +
-                "with the intent of including all elements. If the intent is to check whether a value in included in a `String` or `List`, " +
-                "the `String#contains(String)` or `List#contains(Object)` methods may be better options altogether.";
+               "Checking `indexOf` against `>0` ignores the first element, whereas `>-1` is inclusive of the first element. " +
+               "For clarity, `>=1` is used, because `>0` and `>=1` are semantically equal. Using `>0` may appear to be a mistake " +
+               "with the intent of including all elements. If the intent is to check whether a value in included in a `String` or `List`, " +
+               "the `String#contains(String)` or `List#contains(Object)` methods may be better options altogether.";
     }
 
     @Override
@@ -60,19 +56,13 @@ public class IndexOfShouldNotCompareGreaterThanZero extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new IndexOfShouldNotCompareGreaterThanZeroVisitor();
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                doAfterVisit(new UsesMethod<>(STRING_INDEX_MATCHER));
-                doAfterVisit(new UsesMethod<>(LIST_INDEX_MATCHER));
-                return cu;
-            }
-        };
+        return Preconditions.check(
+                Preconditions.or(
+                        new UsesMethod<>(STRING_INDEX_MATCHER),
+                        new UsesMethod<>(LIST_INDEX_MATCHER)
+                ),
+                new IndexOfShouldNotCompareGreaterThanZeroVisitor()
+        );
     }
 
     private static class IndexOfShouldNotCompareGreaterThanZeroVisitor extends JavaIsoVisitor<ExecutionContext> {

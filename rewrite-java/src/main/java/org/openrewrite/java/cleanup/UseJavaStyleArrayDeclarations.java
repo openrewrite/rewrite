@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -24,7 +25,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.J.VariableDeclarations;
 import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.marker.SearchResult;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -54,26 +54,7 @@ public class UseJavaStyleArrayDeclarations extends Recipe {
     }
 
     @Override
-    protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public J.ArrayType visitArrayType(J.ArrayType arrayType, ExecutionContext executionContext) {
-                return SearchResult.found(arrayType);
-            }
-
-            @Override
-            public VariableDeclarations.NamedVariable visitVariable(VariableDeclarations.NamedVariable variable, ExecutionContext executionContext) {
-                if (!variable.getDimensionsAfterName().isEmpty()) {
-                    variable = SearchResult.found(variable);
-                }
-                return variable;
-            }
-        };
-    }
-
-    @Override
-    public JavaIsoVisitor<ExecutionContext> getVisitor() {
-
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public VariableDeclarations visitVariableDeclarations(VariableDeclarations multiVariable, ExecutionContext executionContext) {

@@ -30,8 +30,7 @@ class ChangeValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(
             "$.metadata.name",
-            "\"monitoring\"",
-            null
+            "\"monitoring\""
           )),
           json("""
               {
@@ -60,8 +59,7 @@ class ChangeValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(
             "$.subjects.kind",
-            "\"Deployment\"",
-            null
+            "\"Deployment\""
           )),
           json("""
               {

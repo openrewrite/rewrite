@@ -37,7 +37,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 public class RemoveRedundantDependencyVersions extends Recipe {
     @Option(displayName = "Group",
             description = "Group glob expression pattern used to match dependencies that should be managed." +
-                    "Group is the first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+                    "Group is the first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "com.google.*",
             required = false)
     @Nullable
@@ -45,7 +45,7 @@ public class RemoveRedundantDependencyVersions extends Recipe {
 
     @Option(displayName = "Artifact",
             description = "Artifact glob expression pattern used to match dependencies that should be managed." +
-                    "Artifact is the second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+                    "Artifact is the second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "guava*",
             required = false)
     @Nullable

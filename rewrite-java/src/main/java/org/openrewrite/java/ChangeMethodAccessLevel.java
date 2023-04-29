@@ -17,10 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.tree.J;
@@ -63,12 +60,7 @@ public class ChangeMethodAccessLevel extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new DeclaresMethod<>(methodPattern, matchOverrides);
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         J.Modifier.Type type;
         switch (newAccessLevel) {
             case "public":
@@ -84,6 +76,7 @@ public class ChangeMethodAccessLevel extends Recipe {
                 type = null;
         }
 
-        return new ChangeMethodAccessLevelVisitor<>(new MethodMatcher(methodPattern, matchOverrides), type);
+        return Preconditions.check(new DeclaresMethod<>(methodPattern, matchOverrides),
+                new ChangeMethodAccessLevelVisitor<>(new MethodMatcher(methodPattern, matchOverrides), type));
     }
 }

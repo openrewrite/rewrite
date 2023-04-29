@@ -28,7 +28,7 @@ import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 public class GradleParser implements Parser<G.CompilationUnit> {
@@ -71,15 +71,14 @@ public class GradleParser implements Parser<G.CompilationUnit> {
     }
 
     @Override
-    public List<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         return StreamSupport.stream(sources.spliterator(), false)
                 .flatMap(source -> {
                     if (source.getPath().endsWith("settings.gradle")) {
-                        return settingsParser.parseInputs(Collections.singletonList(source), relativeTo, ctx).stream();
+                        return settingsParser.parseInputs(Collections.singletonList(source), relativeTo, ctx);
                     }
-                    return buildParser.parseInputs(Collections.singletonList(source), relativeTo, ctx).stream();
-                })
-                .collect(Collectors.toList());
+                    return buildParser.parseInputs(Collections.singletonList(source), relativeTo, ctx);
+                });
     }
 
     @Override

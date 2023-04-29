@@ -26,7 +26,6 @@ import static java.util.Collections.emptyList;
 
 @Value
 public class RecipeRun {
-    RecipeRunStats stats;
 
     @With
     List<Result> results;

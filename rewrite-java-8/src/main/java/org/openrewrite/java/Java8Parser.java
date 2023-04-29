@@ -31,7 +31,7 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
-import java.util.List;
+import java.util.stream.Stream;
 
 public class Java8Parser implements JavaParser {
     private final JavaParser delegate;
@@ -41,7 +41,7 @@ public class Java8Parser implements JavaParser {
     }
 
     @Override
-    public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return delegate.parseInputs(sourceFiles, relativeTo, ctx);
     }
 

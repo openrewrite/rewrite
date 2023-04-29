@@ -45,7 +45,6 @@ import static org.openrewrite.test.SourceSpecs.other;
 @SuppressWarnings("UnusedProperty")
 class AddGradleWrapperTest implements RewriteTest {
 
-
     private <S extends SourceFile> S result(RecipeRun run, Class<S> clazz, String endsWith) {
         return run.getResults().stream()
           .map(Result::getAfter)
@@ -57,62 +56,68 @@ class AddGradleWrapperTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"latest.release","  "})
+    @ValueSource(strings = {"latest.release", "  "})
     @NullSource
     void addWrapperWithReleaseTag(String desiredVersion) {
         mockGradleServices(mockWebServer -> {
             String expectedUrl = "http://%s:%d/distributions/gradle-7.6-bin.zip".formatted(mockWebServer.getHostName(), mockWebServer.getPort());
             rewriteRun(
-              spec ->spec
-                  .recipe(
-                    //language=yaml
-                    new ByteArrayInputStream(
+              spec -> spec
+                .recipe(
+                  //language=yaml
+                  new ByteArrayInputStream(
+                    """
+                      ---
+                      type: specs.openrewrite.org/v1beta/recipe
+                      name: org.openrewrite.test.AddGradleWrapper
+                      displayName: Adds a Gradle wrapper
+                      description: Add latest release of the gradle wrapper
+                      recipeList:
+                        - org.openrewrite.gradle.UpdateGradleWrapper:
+                            version: %s
+                            repositoryUrl: http://%s:%d/versions/all
                       """
-                        ---
-                        type: specs.openrewrite.org/v1beta/recipe
-                        name: org.openrewrite.test.AddGradleWrapper
-                        displayName: Adds a Gradle wrapper
-                        description: Add latest release of the gradle wrapper
-                        recipeList:
-                          - org.openrewrite.gradle.AddGradleWrapper:
-                              version: %s
-                              repositoryUrl: http://%s:%d/versions/all
-                        """
-                        .formatted(desiredVersion, mockWebServer.getHostName(), mockWebServer.getPort())
-                        .getBytes()
-                    ),
-                    "org.openrewrite.test.AddGradleWrapper"
-                  )
-                  .afterRecipe(run -> {
+                      .formatted(desiredVersion, mockWebServer.getHostName(), mockWebServer.getPort())
+                      .getBytes()
+                  ),
+                  "org.openrewrite.test.AddGradleWrapper"
+                )
+                .afterRecipe(run -> {
 
-                      validateGradlewFiles(run);
+                    validateGradlewFiles(run);
 
-                      var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
-                      assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
+                    var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
+                    assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
 
-                      assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create(expectedUrl));
-                  }),
+                    assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create(expectedUrl));
+
+                }),
 
               buildGradle(""),
 
               dir(
                 "gradle/wrapper",
-                properties(null, createWrapperPropertyFile(expectedUrl,"7ba68c54029790ab444b39d7e293d3236b2632631fb5f2e012bb28b4ff669e4b"), spec -> spec.path(Paths.get("gradle-wrapper.properties")))
+                properties(
+                  null,
+                  //language=properties
+                  """
+                    distributionBase=GRADLE_USER_HOME
+                    distributionPath=wrapper/dists
+                    distributionUrl=%s
+                    distributionSha256Sum=%s
+                    zipStoreBase=GRADLE_USER_HOME
+                    zipStorePath=wrapper/dists
+                    """
+                    .formatted(
+                      //language=none
+                      expectedUrl.replace("://", "\\://"),
+                      "7ba68c54029790ab444b39d7e293d3236b2632631fb5f2e012bb28b4ff669e4b"
+                    ),
+                  spec -> spec.path(Paths.get("gradle-wrapper.properties"))
+                )
               ));
         });
     }
-
-    private static String createWrapperPropertyFile(String url, String hash) {
-        return """
-              distributionBase=GRADLE_USER_HOME
-              distributionPath=wrapper/dists
-              distributionUrl=%s
-              distributionSha256Sum=%s
-              zipStoreBase=GRADLE_USER_HOME
-              zipStorePath=wrapper/dists
-          """.formatted(url.replace("://", "\\://"), hash);
-    }
-
 
     private void validateGradlewFiles(RecipeRun run) {
         var gradleSh = result(run, PlainText.class, "gradlew");
@@ -141,22 +146,22 @@ class AddGradleWrapperTest implements RewriteTest {
                       displayName: Adds a Gradle wrapper
                       description: Add latest release of the gradle wrapper
                       recipeList:
-                        - org.openrewrite.gradle.AddGradleWrapper:
-                            version: %s
+                        - org.openrewrite.gradle.UpdateGradleWrapper:
+                            version: 7.6
                             repositoryUrl: http://%s:%d/versions/all
                       """
-                      .formatted("7.6", mockWebServer.getHostName(), mockWebServer.getPort())
+                      .formatted(mockWebServer.getHostName(), mockWebServer.getPort())
                       .getBytes()
                   ),
                   "org.openrewrite.test.AddGradleWrapper"
                 )
                 .afterRecipe(run -> {
-                  var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
-                  assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
-                  assertThat(gradleWrapperJar.getUri()).isEqualTo(
-                    URI.create("http://%s:%d/distributions/gradle-7.6-bin.zip"
-                      .formatted(mockWebServer.getHostName(), mockWebServer.getPort())));
-              }).expectedCyclesThatMakeChanges(1),
+                    var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
+                    assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
+                    assertThat(gradleWrapperJar.getUri()).isEqualTo(
+                      URI.create("http://%s:%d/distributions/gradle-7.6-bin.zip"
+                        .formatted(mockWebServer.getHostName(), mockWebServer.getPort())));
+                }).expectedCyclesThatMakeChanges(1),
               other("", spec -> spec.path("gradlew")),
               other("", spec -> spec.path("gradlew.bat")),
               other("", spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")),
@@ -181,11 +186,11 @@ class AddGradleWrapperTest implements RewriteTest {
                       displayName: Adds a Gradle wrapper
                       description: Add latest release of the gradle wrapper
                       recipeList:
-                        - org.openrewrite.gradle.AddGradleWrapper:
-                            version: %s
+                        - org.openrewrite.gradle.UpdateGradleWrapper:
+                            version: 7.6
                             repositoryUrl: http://%s:%d/versions/all
                       """
-                      .formatted("7.6", mockWebServer.getHostName(), mockWebServer.getPort())
+                      .formatted(mockWebServer.getHostName(), mockWebServer.getPort())
                       .getBytes()
                   ),
                   "org.openrewrite.test.AddGradleWrapper"

@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
@@ -36,9 +37,9 @@ public class UnnecessaryCatch extends Recipe {
 
     @Option(displayName = "Include `java.lang.Exception`",
             description = "Whether to include java.lang.Exception in the list of checked exceptions to remove. " +
-                    "Unlike other checked exceptions, `java.lang.Exception` is also the superclass of unchecked exceptions. " +
-                    "So removing `catch(Exception e)` may result in changed runtime behavior in the presence of unchecked exceptions. " +
-                    "Default `false`",
+                          "Unlike other checked exceptions, `java.lang.Exception` is also the superclass of unchecked exceptions. " +
+                          "So removing `catch(Exception e)` may result in changed runtime behavior in the presence of unchecked exceptions. " +
+                          "Default `false`",
             required = false)
     boolean includeJavaLangException;
 
@@ -53,7 +54,7 @@ public class UnnecessaryCatch extends Recipe {
     }
 
     @Override
-    public JavaIsoVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
 
             @Override
@@ -104,7 +105,7 @@ public class UnnecessaryCatch extends Recipe {
                     if (parameterType == null || TypeUtils.isAssignableTo("java.lang.RuntimeException", parameterType)) {
                         return aCatch;
                     }
-                    if(!includeJavaLangException && TypeUtils.isOfClassType(parameterType, "java.lang.Exception")) {
+                    if (!includeJavaLangException && TypeUtils.isOfClassType(parameterType, "java.lang.Exception")) {
                         return aCatch;
                     }
                     for (JavaType.FullyQualified e : thrownExceptions) {

@@ -30,13 +30,12 @@ class AppendToSequenceTest implements RewriteTest {
     void appendToSequenceHasDashTrue() {
         rewriteRun(
           spec -> spec
-                .recipe(new AppendToSequence(
-            "$.things.fruit",
-            "strawberry",
-                  null,
-                  null,
-                  null
-          )),
+            .recipe(new AppendToSequence(
+              "$.things.fruit",
+              "strawberry",
+              null,
+              null
+            )),
           yaml(
             """
                   things:
@@ -63,8 +62,7 @@ class AppendToSequenceTest implements RewriteTest {
               "$.things.fruit",
               "strawberry",
               List.of("apple", "blueberry"),
-              "true",
-              null
+              true
             )),
           yaml(
             """
@@ -92,8 +90,7 @@ class AppendToSequenceTest implements RewriteTest {
               "$.things.fruit",
               "strawberry",
               List.of("apple", "blueberry"),
-              "false",
-              null
+              false
             )),
           yaml(
             """
@@ -121,8 +118,7 @@ class AppendToSequenceTest implements RewriteTest {
               "$.things.fruit",
               "strawberry",
               List.of("blueberry", "apple"),
-              "true",
-              null
+              true
             )),
           yaml(
             """
@@ -150,8 +146,7 @@ class AppendToSequenceTest implements RewriteTest {
               "$.things.fruit",
               "strawberry",
               List.of("zzz"),
-              "false",
-              null
+              false
             )),
           yaml(
             """
@@ -168,13 +163,12 @@ class AppendToSequenceTest implements RewriteTest {
     void appendToSequenceOfNameValuePair() {
         rewriteRun(
           spec -> spec
-                .recipe(new AppendToSequence(
-            "$.things.fruit",
-            "name: strawberry",
-                  null,
-            null,
-            null
-          )),
+            .recipe(new AppendToSequence(
+              "$.things.fruit",
+              "name: strawberry",
+              null,
+              null
+            )),
           yaml(
             """
                   things:
@@ -207,8 +201,7 @@ class AppendToSequenceTest implements RewriteTest {
               "$.things.fruit",
               "name: strawberry",
               List.of("name: blueberry", "name: apple"),
-              "true",
-              null
+              true
             )),
           yaml(
             """
@@ -238,13 +231,12 @@ class AppendToSequenceTest implements RewriteTest {
     void appendToSequenceOfLiteralsHasDashFalse() {
         rewriteRun(
           spec -> spec
-                .recipe(new AppendToSequence(
-            "$.things.fruit",
-            "strawberry",
-                  null,
-                  null,
-                  null
-          )),
+            .recipe(new AppendToSequence(
+              "$.things.fruit",
+              "strawberry",
+              null,
+              null
+            )),
           yaml(
             """
                   things:
@@ -271,7 +263,6 @@ class AppendToSequenceTest implements RewriteTest {
             .recipe(new AppendToSequence(
               "$.things.fruit",
               "strawberry",
-              null,
               null,
               null
             )),
@@ -302,7 +293,6 @@ class AppendToSequenceTest implements RewriteTest {
               "$.things.fruit",
               "strawberry",
               null,
-              null,
               null
             )),
           yaml(
@@ -328,13 +318,12 @@ class AppendToSequenceTest implements RewriteTest {
     void appendToEmptySequence() {
         rewriteRun(
           spec -> spec
-                .recipe(new AppendToSequence(
-            "$.things.fruit",
-            "strawberry",
-                  null,
-            null,
-            null
-          )),
+            .recipe(new AppendToSequence(
+              "$.things.fruit",
+              "strawberry",
+              null,
+              null
+            )),
           yaml(
             """
                   things:
@@ -349,16 +338,6 @@ class AppendToSequenceTest implements RewriteTest {
     }
 
     @Test
-    void modifyOnlyMatchingFile() {
-        rewriteRun(
-          spec -> spec
-                    .recipe(new AppendToSequence("$.list", "newThing", null, null, "**/a.yml")),
-          yaml("list:\n  - existingThing\n", "list:\n  - existingThing\n  - newThing", spec -> spec.path("a.yml")),
-          yaml("list:\n  - existingThing\n", spec -> spec.path("b.yml"))
-        );
-    }
-
-    @Test
     void modifyRegionList() {
         rewriteRun(
           spec -> spec
@@ -366,8 +345,7 @@ class AppendToSequenceTest implements RewriteTest {
               "$.prod.regions",
               "name: us-foo-2",
               List.of("name: us-foo-1", "name: us-bar-1"),
-              "true",
-              null
+              true
             )),
           yaml(
             """
@@ -399,8 +377,7 @@ class AppendToSequenceTest implements RewriteTest {
               "$.prod.regions",
               "name: us-foo-2",
               List.of("name: us-foo-1", "name: us-bar-1"),
-              "true",
-              null
+              true
             )),
           yaml(
             """

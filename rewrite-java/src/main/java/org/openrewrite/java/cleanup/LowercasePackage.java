@@ -15,18 +15,21 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ScanningRecipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
 
-import java.time.Duration;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 
-public class LowercasePackage extends Recipe {
+public class LowercasePackage extends ScanningRecipe<Map<String, String>> {
     @Override
     public String getDisplayName() {
         return "Rename packages to lowercase";
@@ -35,7 +38,7 @@ public class LowercasePackage extends Recipe {
     @Override
     public String getDescription() {
         return "By convention all Java package names should contain only lowercase letters, numbers, and dashes. " +
-                "This recipe converts any uppercase letters in package names to be lowercase.";
+               "This recipe converts any uppercase letters in package names to be lowercase.";
     }
 
     @Override
@@ -44,22 +47,48 @@ public class LowercasePackage extends Recipe {
     }
 
     @Override
-    public @Nullable Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
+    public Map<String, String> getInitialValue() {
+        return new HashMap<>();
     }
 
     @Override
-    public JavaIsoVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getScanner(Map<String, String> acc) {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.Package visitPackage(J.Package pkg, ExecutionContext executionContext) {
-                String packageText = pkg.getExpression().print(getCursor()).replaceAll("\\s", "");
-                String lowerCase = packageText.toLowerCase();
-                if(!packageText.equals(lowerCase)) {
-                    doNext(new ChangePackage(packageText, lowerCase, true));
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
+                J.Package pkg = cu.getPackageDeclaration();
+                if (pkg != null) {
+                    String packageText = getPackageText(getCursor(), pkg);
+                    String lowerCase = packageText.toLowerCase();
+                    if (!packageText.equals(lowerCase)) {
+                        acc.put(packageText, lowerCase);
+                    }
                 }
-                return pkg;
+                return cu;
             }
         };
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Map<String, String> acc) {
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
+                J.Package pkg = cu.getPackageDeclaration();
+                if (pkg != null) {
+                    String packageText = getPackageText(getCursor(), pkg);
+                    if (acc.containsKey(packageText)) {
+                        return (JavaSourceFile) new ChangePackage(packageText, acc.get(packageText), true)
+                                .getVisitor().visitNonNull(cu, ctx);
+                    }
+                }
+                return cu;
+            }
+
+        };
+    }
+
+    private String getPackageText(Cursor cursor, J.Package pkg) {
+        return pkg.getExpression().print(cursor).replaceAll("\\s", "");
     }
 }

@@ -16,9 +16,9 @@
 package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
@@ -56,15 +56,9 @@ public class RemoveUnusedImports extends Recipe {
         return Duration.ofMinutes(5);
     }
 
-    @Nullable
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new NoMissingTypes();
-    }
-
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RemoveUnusedImportsVisitor();
+        return Preconditions.check(new NoMissingTypes(), new RemoveUnusedImportsVisitor());
     }
 
     private static class RemoveUnusedImportsVisitor extends JavaIsoVisitor<ExecutionContext> {

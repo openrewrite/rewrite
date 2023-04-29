@@ -70,7 +70,9 @@ public class HclTemplateParser {
     }
 
     private Hcl.ConfigFile compileTemplate(String stub) {
-        return parser.parse(stub).get(0);
+        return parser.parse(stub)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as HCL"));
     }
 
     private String substitute(String stub, String template) {

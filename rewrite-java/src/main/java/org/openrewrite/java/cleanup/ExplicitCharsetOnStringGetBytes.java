@@ -17,14 +17,10 @@ package org.openrewrite.java.cleanup;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
@@ -49,17 +45,12 @@ public class ExplicitCharsetOnStringGetBytes extends Recipe {
     @Override
     public String getDescription() {
         return "This makes the behavior of the code platform neutral. It will not override any " +
-                "existing explicit encodings, even if they don't match the default encoding option.";
+               "existing explicit encodings, even if they don't match the default encoding option.";
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(GET_BYTES);
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesMethod<>(GET_BYTES), new JavaIsoVisitor<ExecutionContext>() {
             final JavaTemplate WITH_ENCODING = JavaTemplate
                     .builder(this::getCursor, "getBytes(StandardCharsets.#{})")
                     .imports("java.nio.charset.StandardCharsets")
@@ -75,6 +66,6 @@ public class ExplicitCharsetOnStringGetBytes extends Recipe {
                 }
                 return m;
             }
-        };
+        });
     }
 }

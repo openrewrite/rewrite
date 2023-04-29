@@ -21,9 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.format.TabsAndIndents;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 
@@ -40,7 +38,7 @@ public class UseAsBuilder extends Recipe {
     @Option(
             displayName = "Immutable state",
             description = "The builder is immutable if you must assign the result of calls to intermediate variables " +
-                    "or use directly. Defaults to true as many purpose-built builders will be immutable.",
+                          "or use directly. Defaults to true as many purpose-built builders will be immutable.",
             required = false
     )
     @Nullable
@@ -65,13 +63,8 @@ public class UseAsBuilder extends Recipe {
     }
 
     @Override
-    protected @Nullable JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return builderCreator == null ? null : new UsesMethod<>(builderCreator);
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        JavaIsoVisitor<ExecutionContext> v = new JavaIsoVisitor<ExecutionContext>() {
             final MethodMatcher builderCall = new MethodMatcher(builderType + " *(..)");
 
             @Override
@@ -181,7 +174,7 @@ public class UseAsBuilder extends Recipe {
 
             private boolean matchesBuilder(@Nullable Expression j) {
                 return builderCall.matches(j) || (builderCreator != null &&
-                        new MethodMatcher(builderCreator).matches(j));
+                                                  new MethodMatcher(builderCreator).matches(j));
             }
 
             private J.VariableDeclarations consolidateBuilder(J.VariableDeclarations consolidatedBuilder,
@@ -203,5 +196,7 @@ public class UseAsBuilder extends Recipe {
                 return cb;
             }
         };
+
+        return builderCreator == null ? v : Preconditions.check(new UsesMethod<>(builderCreator), v);
     }
 }

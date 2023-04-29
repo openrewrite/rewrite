@@ -75,7 +75,9 @@ class PatternVariablesTest {
                     }
                 }
                 """.replace("$condition", condition);
-        J.CompilationUnit cu = parser.parse(source).get(0);
+        J.CompilationUnit cu = parser.parse(source)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
         J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
         @SuppressWarnings("DataFlowIssue") J.If ifStatement = (J.If) method.getBody().getStatements().get(0);
         return simplifiedPatternVariableCondition(ifStatement.getIfCondition().getTree(), null);

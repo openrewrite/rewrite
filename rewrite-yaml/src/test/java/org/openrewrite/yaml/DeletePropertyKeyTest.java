@@ -28,7 +28,7 @@ import static org.openrewrite.yaml.Assertions.yaml;
 class DeletePropertyKeyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new DeleteProperty("management.metrics.binders.files.enabled", null, null, null));
+        spec.recipe(new DeleteProperty("management.metrics.binders.files.enabled", null, null));
     }
 
     @DocumentExample
@@ -113,7 +113,7 @@ class DeletePropertyKeyTest implements RewriteTest {
     @Test
     void aliasAnchorPairs() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("bar.yo", null, null, null)),
+          spec -> spec.recipe(new DeleteProperty("bar.yo", null, null)),
           yaml(
             """
               bar:
@@ -134,7 +134,7 @@ class DeletePropertyKeyTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void relaxedBinding(String propertyKey) {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty(propertyKey, false, true, null)),
+          spec -> spec.recipe(new DeleteProperty(propertyKey, false, true)),
           yaml("acme.my-project.person.first-name: example",
             ""
           )
@@ -145,7 +145,7 @@ class DeletePropertyKeyTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void exactMatch() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("acme.my-project.person.first-name", false, false, null)),
+          spec -> spec.recipe(new DeleteProperty("acme.my-project.person.first-name", false, false)),
           yaml(
             """
               acme.myProject.person.firstName: example
@@ -160,21 +160,11 @@ class DeletePropertyKeyTest implements RewriteTest {
         );
     }
 
-    @Test
-    void changeOnlyMatchingFile() {
-        rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("apiVersion", true, null, "**/a.yml")),
-          yaml("apiVersion: v1", "", spec -> spec.path("a.yml")),
-          yaml("apiVersion: v1", spec -> spec.path("b.yml"))
-        );
-
-    }
-
     @Issue("https://github.com/openrewrite/rewrite/issues/1769")
     @Test
     void preservesOriginalIndentStructureOfExistingHierarchy() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteProperty("my.old.key", false, null, null)),
+          spec -> spec.recipe(new DeleteProperty("my.old.key", false, null)),
           yaml(
             """
                 my:

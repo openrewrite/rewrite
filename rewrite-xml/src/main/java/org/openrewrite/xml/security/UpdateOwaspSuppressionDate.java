@@ -41,8 +41,8 @@ public class UpdateOwaspSuppressionDate extends Recipe {
     @Override
     public String getDescription() {
         return "Updates the expiration date for OWASP suppressions having a matching cve tag. " +
-                "For use with the OWASP `dependency-check` tool. " +
-                "More details: https://jeremylong.github.io/DependencyCheck/general/suppression.html.";
+               "For use with the OWASP `dependency-check` tool. " +
+               "More details: https://jeremylong.github.io/DependencyCheck/general/suppression.html.";
     }
 
     @Option(displayName = "CVE List",
@@ -58,16 +58,6 @@ public class UpdateOwaspSuppressionDate extends Recipe {
     String untilDate;
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new UpdateDateBoundedSuppressionVisitor();
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsOwaspSuppressionsFile().getVisitor();
-    }
-
-    @Override
     public Validated validate() {
         return super.validate().and(Validated.test("untilDate", "Must be empty or a valid date of format yyyy-MM-dd", untilDate, date -> {
             if (date != null && !date.isEmpty()) {
@@ -81,36 +71,39 @@ public class UpdateOwaspSuppressionDate extends Recipe {
         }));
     }
 
-    private class UpdateDateBoundedSuppressionVisitor extends XmlIsoVisitor<ExecutionContext> {
-        @Override
-        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            Xml.Tag t = super.visitTag(tag, ctx);
-            if (new XPathMatcher("/suppressions/suppress").matches(getCursor())) {
-                boolean hasCve = false;
-                List<Xml.Tag> cveTags = t.getChildren("cve");
-                for (Xml.Tag xml : cveTags) {
-                    String cveNum = xml.getValue().orElse("");
-                    for (String cve : cveList) {
-                        if (!StringUtils.isNullOrEmpty(cve) && cve.equals(cveNum)) {
-                            hasCve = true;
-                            break;
-                        }
-                    }
-                }
-                if (hasCve) {
-                    String date = (untilDate != null && !untilDate.isEmpty()) ? untilDate : LocalDate.now().plus(30, ChronoUnit.DAYS).toString();
-                    final String zuluDate = date + "Z";
-                    t = t.withAttributes(ListUtils.map(t.getAttributes(), attr -> {
-                        if ("until".equals(attr.getKeyAsString())) {
-                            if (!zuluDate.equals(attr.getValueAsString())) {
-                                attr = attr.withValue(attr.getValue().withValue(zuluDate));
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new IsOwaspSuppressionsFile(), new XmlIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = super.visitTag(tag, ctx);
+                if (new XPathMatcher("/suppressions/suppress").matches(getCursor())) {
+                    boolean hasCve = false;
+                    List<Xml.Tag> cveTags = t.getChildren("cve");
+                    for (Xml.Tag xml : cveTags) {
+                        String cveNum = xml.getValue().orElse("");
+                        for (String cve : cveList) {
+                            if (!StringUtils.isNullOrEmpty(cve) && cve.equals(cveNum)) {
+                                hasCve = true;
+                                break;
                             }
                         }
-                        return attr;
-                    }));
+                    }
+                    if (hasCve) {
+                        String date = (untilDate != null && !untilDate.isEmpty()) ? untilDate : LocalDate.now().plus(30, ChronoUnit.DAYS).toString();
+                        final String zuluDate = date + "Z";
+                        t = t.withAttributes(ListUtils.map(t.getAttributes(), attr -> {
+                            if ("until".equals(attr.getKeyAsString())) {
+                                if (!zuluDate.equals(attr.getValueAsString())) {
+                                    attr = attr.withValue(attr.getValue().withValue(zuluDate));
+                                }
+                            }
+                            return attr;
+                        }));
+                    }
                 }
+                return t;
             }
-            return t;
-        }
+        });
     }
 }

@@ -15,11 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -53,18 +49,13 @@ public class CompareEnumsWithEqualityOperator extends Recipe {
     }
 
     @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>("java.lang.Enum equals(java.lang.Object)");
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        final MethodMatcher ENUM_EQUALS = new MethodMatcher("java.lang.Enum equals(java.lang.Object)");
-        return new JavaVisitor<ExecutionContext>() {
+        MethodMatcher enumEquals = new MethodMatcher("java.lang.Enum equals(java.lang.Object)");
+        return Preconditions.check(new UsesMethod<>(enumEquals), new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
-                if (ENUM_EQUALS.matches(m)) {
+                if (enumEquals.matches(m)) {
                     Cursor parent = getCursor().dropParentUntil(is -> is instanceof J.Unary || is instanceof J.Block);
                     boolean isNot = parent.getValue() instanceof J.Unary && ((J.Unary) parent.getValue()).getOperator() == J.Unary.Type.Not;
                     if (isNot) {
@@ -87,11 +78,11 @@ public class CompareEnumsWithEqualityOperator extends Recipe {
                 J j = super.visitUnary(unary, executionContext);
                 J.Unary asUnary = (J.Unary) j;
                 if (executionContext.getMessage("REMOVE_UNARY_NOT") instanceof J.Unary &&
-                        asUnary.equals(executionContext.getMessage("REMOVE_UNARY_NOT"))) {
+                    asUnary.equals(executionContext.getMessage("REMOVE_UNARY_NOT"))) {
                     return asUnary.getExpression().unwrap().withPrefix(asUnary.getPrefix());
                 }
                 return j;
             }
-        };
+        });
     }
 }

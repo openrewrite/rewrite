@@ -20,7 +20,6 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.dataflow.FindLocalFlowPaths;
 import org.openrewrite.java.dataflow.LocalFlowSpec;
@@ -28,6 +27,8 @@ import org.openrewrite.java.dataflow.LocalTaintFlowSpec;
 import org.openrewrite.java.dataflow.internal.InvocationMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Finds either Taint or Data flow between specified start and end methods.
@@ -51,10 +52,10 @@ public class FindFlowBetweenMethods extends Recipe {
     @Option(displayName = "Match end method on overrides", description = "When enabled, find methods that are overrides of the method pattern.", required = false)
     @Nullable Boolean endMatchOverrides;
 
-    @Option(displayName = "To target", description = "The part of the method flow should traverse to", required = true, valid = {"Select", "Arguments", "Both"})
+    @Option(displayName = "To target", description = "The part of the method flow should traverse to", valid = {"Select", "Arguments", "Both"})
     String target;
 
-    @Option(displayName = "Show flow", description = "When enabled, show the data or taint flow of the method invocation.", valid = {"Data", "Taint"}, required = true)
+    @Option(displayName = "Show flow", description = "When enabled, show the data or taint flow of the method invocation.", valid = {"Data", "Taint"})
     @Nullable String flow;
 
 
@@ -69,21 +70,16 @@ public class FindFlowBetweenMethods extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesAllMethods<>(new MethodMatcher(startMethodPattern, startMatchOverrides), new MethodMatcher(endMethodPattern, endMatchOverrides));
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher startMethodMatcher = new MethodMatcher(startMethodPattern, startMatchOverrides);
         MethodMatcher endMethodMatcher = new MethodMatcher(endMethodPattern, endMatchOverrides);
 
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesAllMethods<>(new MethodMatcher(startMethodPattern, startMatchOverrides), new MethodMatcher(endMethodPattern, endMatchOverrides)), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (startMethodMatcher.matches(method)) {
-                    doAfterVisit(new FindLocalFlowPaths(getFlowSpec(method, endMethodMatcher)));
+                    doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(method, endMethodMatcher)));
                 }
                 return m;
             }
@@ -92,7 +88,7 @@ public class FindFlowBetweenMethods extends Recipe {
             public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
                 J.MemberReference m = super.visitMemberReference(memberRef, ctx);
                 if (startMethodMatcher.matches(m.getMethodType())) {
-                    doAfterVisit(new FindLocalFlowPaths(getFlowSpec(memberRef, endMethodMatcher)));
+                    doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(memberRef, endMethodMatcher)));
                 }
                 return m;
             }
@@ -101,7 +97,7 @@ public class FindFlowBetweenMethods extends Recipe {
             public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
                 J.NewClass n = super.visitNewClass(newClass, ctx);
                 if (startMethodMatcher.matches(newClass)) {
-                    doAfterVisit(new FindLocalFlowPaths(getFlowSpec(newClass, endMethodMatcher)));
+                    doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(newClass, endMethodMatcher)));
                 }
                 return n;
             }
@@ -122,7 +118,7 @@ public class FindFlowBetweenMethods extends Recipe {
 
             private LocalFlowSpec<Expression, Expression> getFlowSpec(Expression source, MethodMatcher sink) {
                 final InvocationMatcher sinkMatcher = InvocationMatcher.fromMethodMatcher(sink);
-                switch (flow) {
+                switch (requireNonNull(flow)) {
                     case "Data":
                         return new LocalFlowSpec<Expression, Expression>() {
 
@@ -152,6 +148,6 @@ public class FindFlowBetweenMethods extends Recipe {
                         throw new IllegalStateException("Unknown flow: " + flow);
                 }
             }
-        };
+        });
     }
 }

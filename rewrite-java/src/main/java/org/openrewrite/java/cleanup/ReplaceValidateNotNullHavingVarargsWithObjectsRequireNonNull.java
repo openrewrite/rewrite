@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
@@ -32,7 +33,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNull extends Recipe {
-
     private static final MethodMatcher VALIDATE_NOTNULL = new MethodMatcher("org.apache.commons.lang3.Validate notNull(Object, String, Object[])");
 
     @Override
@@ -46,13 +46,8 @@ public class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNull extend
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(VALIDATE_NOTNULL);
-    }
-
-    @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesMethod<>(VALIDATE_NOTNULL), new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
                 J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, p);
@@ -94,7 +89,6 @@ public class ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNull extend
                 lambda = maybeAutoFormat(lambda, lambda.withBody(stringFormatMi), p);
                 return maybeAutoFormat(mi, mi.withArguments(Stream.of(arg0, lambda).collect(Collectors.toList())), p);
             }
-        };
+        });
     }
-
 }

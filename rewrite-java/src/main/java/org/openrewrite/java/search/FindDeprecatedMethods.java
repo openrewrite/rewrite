@@ -17,12 +17,9 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -60,10 +57,9 @@ public class FindDeprecatedMethods extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = methodPattern == null || methodPattern.isEmpty() ? null : new MethodMatcher(methodPattern, true);
-
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
                 for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
@@ -77,13 +73,7 @@ public class FindDeprecatedMethods extends Recipe {
                 }
                 return cu;
             }
-        };
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        MethodMatcher methodMatcher = methodPattern == null || methodPattern.isEmpty() ? null : new MethodMatcher(methodPattern, true);
-        return new JavaIsoVisitor<ExecutionContext>() {
+        }, new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
@@ -95,11 +85,11 @@ public class FindDeprecatedMethods extends Recipe {
                                 while (cursorPath.hasNext()) {
                                     Object ancestor = cursorPath.next();
                                     if (ancestor instanceof J.MethodDeclaration &&
-                                            isDeprecated(((J.MethodDeclaration) ancestor).getAllAnnotations())) {
+                                        isDeprecated(((J.MethodDeclaration) ancestor).getAllAnnotations())) {
                                         return m;
                                     }
                                     if (ancestor instanceof J.ClassDeclaration &&
-                                            isDeprecated(((J.ClassDeclaration) ancestor).getAllAnnotations())) {
+                                        isDeprecated(((J.ClassDeclaration) ancestor).getAllAnnotations())) {
                                         return m;
                                     }
                                 }
@@ -120,6 +110,6 @@ public class FindDeprecatedMethods extends Recipe {
                 }
                 return false;
             }
-        };
+        });
     }
 }

@@ -22,12 +22,13 @@ import io.github.classgraph.ScanResult;
 import org.openrewrite.table.ClasspathReport;
 
 import java.net.URI;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-public class ListRuntimeClasspath extends Recipe {
-
+public class ListRuntimeClasspath extends ScanningRecipe<Void> {
     transient ClasspathReport report = new ClasspathReport(this);
 
     @Override
@@ -41,7 +42,17 @@ public class ListRuntimeClasspath extends Recipe {
     }
 
     @Override
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
+    public Void getInitialValue() {
+        return null;
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Void acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public Collection<SourceFile> generate(Void acc, ExecutionContext ctx) {
         try (ScanResult result = new ClassGraph().scan()) {
             ResourceList resources = result.getResourcesWithExtension(".jar");
             Map<String, List<Resource>> classpathEntriesWithJarResources = resources.stream()
@@ -57,6 +68,6 @@ public class ListRuntimeClasspath extends Recipe {
                 }
             }
         }
-        return before;
+        return Collections.emptyList();
     }
 }

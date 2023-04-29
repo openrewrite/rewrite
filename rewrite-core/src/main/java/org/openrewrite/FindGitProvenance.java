@@ -15,17 +15,18 @@
  */
 package org.openrewrite;
 
-import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.GitProvenance;
-import org.openrewrite.marker.Markup;
 import org.openrewrite.table.DistinctGitProvenance;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
-public class FindGitProvenance extends Recipe {
+import static java.util.Objects.requireNonNull;
+
+public class FindGitProvenance extends ScanningRecipe<Set<GitProvenance>> {
+    // we are looking for substantive differences, not just ID differences
+    private static final UUID DONT_CONSIDER_ID_IN_HASH_CODE = UUID.randomUUID();
+
     private final DistinctGitProvenance distinct = new DistinctGitProvenance(this);
 
     @Override
@@ -41,17 +42,26 @@ public class FindGitProvenance extends Recipe {
     }
 
     @Override
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        Set<GitProvenance> provenances = new HashSet<>();
+    public Set<GitProvenance> getInitialValue() {
+        return new HashSet<>();
+    }
 
-        // we are looking for substantive differences, not just ID differences
-        UUID dontConsiderIdInHashCode = UUID.randomUUID();
-
-        return ListUtils.map(before, sourceFile -> {
-            GitProvenance provenance = sourceFile.getMarkers().findFirst(GitProvenance.class).orElse(null);
-            if (provenance == null || !provenances.add(provenance.withId(dontConsiderIdInHashCode))) {
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Set<GitProvenance> provenances) {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                sourceFile.getMarkers().findFirst(GitProvenance.class).ifPresent(provenance ->
+                        provenances.add(provenance.withId(DONT_CONSIDER_ID_IN_HASH_CODE)));
                 return sourceFile;
             }
+        };
+    }
+
+    @Override
+    public Collection<SourceFile> generate(Set<GitProvenance> provenances, ExecutionContext ctx) {
+        for (GitProvenance provenance : provenances) {
             distinct.insertRow(ctx, new DistinctGitProvenance.Row(
                     provenance.getOrigin(),
                     provenance.getBranch(),
@@ -59,17 +69,7 @@ public class FindGitProvenance extends Recipe {
                     provenance.getAutocrlf(),
                     provenance.getEol())
             );
-            return Markup.info(sourceFile, String.format("GitProvenance:\n" +
-                                                         "    origin: %s\n" +
-                                                         "    branch: %s\n" +
-                                                         "    changeset: %s\n" +
-                                                         "    autocrlf: %s\n" +
-                                                         "    eol: %s",
-                    provenance.getOrigin(),
-                    provenance.getBranch(),
-                    provenance.getChange(),
-                    provenance.getAutocrlf() != null ? provenance.getAutocrlf().toString() : "null",
-                    provenance.getEol() != null ? provenance.getEol().toString() : "null"));
-        });
+        }
+        return Collections.emptyList();
     }
 }

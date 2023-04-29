@@ -56,7 +56,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new UpdateGradleWrapper("7.4.2", null));
+        spec.recipe(new UpdateGradleWrapper("7.4.2", null, null));
     }
 
     @ParameterizedTest

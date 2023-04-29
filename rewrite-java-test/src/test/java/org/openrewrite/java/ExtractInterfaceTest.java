@@ -16,21 +16,19 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.*;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.openrewrite.java.Assertions.java;
 
 class ExtractInterfaceTest implements RewriteTest {
 
-    private static class ExtractTestInterface extends Recipe {
+    private static class ExtractTestInterface extends ScanningRecipe<AtomicReference<J.CompilationUnit>> {
         @Override
         public String getDisplayName() {
             return "Extract interface";
@@ -42,10 +40,30 @@ class ExtractInterfaceTest implements RewriteTest {
         }
 
         @Override
-        protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-            return ListUtils.flatMap(before, b ->
-              ExtractInterface.extract((JavaSourceFile) b,
-                "org.openrewrite.interfaces.ITest"));
+        public AtomicReference<J.CompilationUnit> getInitialValue() {
+            return new AtomicReference<>();
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getScanner(AtomicReference<J.CompilationUnit> acc) {
+            return new JavaIsoVisitor<>() {
+                @Override
+                public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+                    acc.set(cu);
+                    return cu;
+                }
+            };
+        }
+
+        @Override
+        public Collection<SourceFile> generate(AtomicReference<J.CompilationUnit> acc, ExecutionContext ctx) {
+            return List.of((SourceFile) new ExtractInterface.CreateInterface("org.openrewrite.interfaces.ITest")
+              .visitNonNull(acc.get(), ctx));
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor(AtomicReference<J.CompilationUnit> acc) {
+            return new ExtractInterface.ImplementAndAddOverrideAnnotations("org.openrewrite.interfaces.ITest");
         }
     }
 
@@ -103,9 +121,9 @@ class ExtractInterfaceTest implements RewriteTest {
             null,
             """
               package org.openrewrite.interfaces;
-              
+                            
               interface ITest {
-              
+                            
                   int test();
               }
               """,

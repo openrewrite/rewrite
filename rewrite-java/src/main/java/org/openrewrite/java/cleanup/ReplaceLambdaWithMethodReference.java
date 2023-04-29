@@ -19,17 +19,11 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.Flag;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.MethodCall;
-import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.tree.TypeTree;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -61,7 +55,7 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitLambda(J.Lambda lambda, ExecutionContext executionContext) {
@@ -78,7 +72,7 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                     if (statement instanceof J.MethodInvocation) {
                         body = statement;
                     } else if (statement instanceof J.Return &&
-                            (((J.Return) statement).getExpression()) instanceof MethodCall) {
+                               (((J.Return) statement).getExpression()) instanceof MethodCall) {
                         body = ((J.Return) statement).getExpression();
                     }
                 } else if (body instanceof J.InstanceOf) {
@@ -94,7 +88,7 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                         if (j != null) {
                             @SuppressWarnings("rawtypes") J tree = ((J.ControlParentheses) j).getTree();
                             if (tree instanceof J.Identifier &&
-                                    !(j.getType() instanceof JavaType.GenericTypeVariable)) {
+                                !(j.getType() instanceof JavaType.GenericTypeVariable)) {
                                 body = tree;
                                 code = "#{}.class::cast";
                             }
@@ -107,7 +101,7 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                     JavaType.FullyQualified fullyQualified = TypeUtils.asFullyQualified(identifier.getType());
                     @Language("java") String stub = fullyQualified == null ? "" :
                             "package " + fullyQualified.getPackageName() + "; public class " +
-                                    fullyQualified.getClassName();
+                            fullyQualified.getClassName();
                     JavaTemplate template = JavaTemplate.builder(this::getCursor, code)
                             .javaParser(JavaParser.fromJavaVersion().dependsOn(stub))
                             .imports(fullyQualified == null ? "" : fullyQualified.getFullyQualifiedName()).build();
@@ -115,7 +109,7 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                 } else if (body instanceof J.Binary) {
                     J.Binary binary = (J.Binary) body;
                     if (isNullCheck(binary.getLeft(), binary.getRight()) ||
-                            isNullCheck(binary.getRight(), binary.getLeft())) {
+                        isNullCheck(binary.getRight(), binary.getLeft())) {
                         maybeAddImport("java.util.Objects");
                         code = J.Binary.Type.Equal.equals(binary.getOperator()) ? "Objects::isNull" :
                                 "Objects::nonNull";
@@ -141,7 +135,7 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                     }
 
                     if (multipleMethodInvocations(method) ||
-                            !methodArgumentsMatchLambdaParameters(method, lambda)) {
+                        !methodArgumentsMatchLambdaParameters(method, lambda)) {
                         return l;
                     }
 
@@ -151,7 +145,7 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
                     if (methodType != null) {
                         JavaType.FullyQualified declaringType = methodType.getDeclaringType();
                         if (methodType.hasFlags(Flag.Static) ||
-                                methodSelectMatchesFirstLambdaParameter(method, lambda)) {
+                            methodSelectMatchesFirstLambdaParameter(method, lambda)) {
                             maybeAddImport(declaringType);
                             return l.withTemplate(JavaTemplate.builder(this::getCursor, "#{}::#{}")
                                             .imports(declaringType.getFullyQualifiedName())
@@ -183,7 +177,7 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
 
             private boolean multipleMethodInvocations(MethodCall method) {
                 return method instanceof J.MethodInvocation &&
-                        ((J.MethodInvocation) method).getSelect() instanceof J.MethodInvocation;
+                       ((J.MethodInvocation) method).getSelect() instanceof J.MethodInvocation;
             }
 
             private boolean methodArgumentsMatchLambdaParameters(MethodCall method, J.Lambda lambda) {
@@ -222,20 +216,20 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
 
             private boolean methodSelectMatchesFirstLambdaParameter(MethodCall method, J.Lambda lambda) {
                 if (!(method instanceof J.MethodInvocation) ||
-                        !(((J.MethodInvocation) method).getSelect() instanceof J.Identifier) ||
-                        lambda.getParameters().getParameters().isEmpty() ||
-                        !(lambda.getParameters().getParameters().get(0) instanceof J.VariableDeclarations)) {
+                    !(((J.MethodInvocation) method).getSelect() instanceof J.Identifier) ||
+                    lambda.getParameters().getParameters().isEmpty() ||
+                    !(lambda.getParameters().getParameters().get(0) instanceof J.VariableDeclarations)) {
                     return false;
                 }
                 J.VariableDeclarations firstLambdaParameter = (J.VariableDeclarations) lambda.getParameters()
                         .getParameters().get(0);
                 return ((J.Identifier) ((J.MethodInvocation) method).getSelect()).getFieldType() ==
-                        firstLambdaParameter.getVariables().get(0).getVariableType();
+                       firstLambdaParameter.getVariables().get(0).getVariableType();
             }
 
             private boolean isNullCheck(J j1, J j2) {
                 return j1 instanceof J.Identifier && j2 instanceof J.Literal &&
-                        "null".equals(((J.Literal) j2).getValueSource());
+                       "null".equals(((J.Literal) j2).getValueSource());
             }
         };
 
@@ -244,7 +238,7 @@ public class ReplaceLambdaWithMethodReference extends Recipe {
     private static boolean isAMethodInvocationArgument(J.Lambda lambda, Cursor cursor) {
         Cursor parent = cursor.dropParentUntil(p -> p instanceof J.MethodInvocation || p instanceof J.CompilationUnit);
         if (parent.getValue() instanceof J.MethodInvocation) {
-            J.MethodInvocation m = (J.MethodInvocation) parent.getValue();
+            J.MethodInvocation m = parent.getValue();
             return m.getArguments().stream().anyMatch(arg -> arg == lambda);
         }
         return false;

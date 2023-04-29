@@ -57,7 +57,10 @@ class UseLambdaForFunctionalInterfaceTest implements RewriteTest {
     @Test
     void useLambdaThenSimplifyFurther() {
         rewriteRun(
-          spec -> spec.recipe(new UseLambdaForFunctionalInterface().doNext(new ReplaceLambdaWithMethodReference())),
+          spec -> spec.recipes(
+            new UseLambdaForFunctionalInterface(),
+            new ReplaceLambdaWithMethodReference()
+          ),
           java(
             """
               class Test {
@@ -174,7 +177,7 @@ class UseLambdaForFunctionalInterfaceTest implements RewriteTest {
           java(
             """
               import java.util.function.Consumer;
-              
+                            
               class Test {
                   void bar(Consumer<Integer> c) {
                   }
@@ -194,7 +197,7 @@ class UseLambdaForFunctionalInterfaceTest implements RewriteTest {
               """,
             """
               import java.util.function.Consumer;
-              
+                            
               class Test {
                   void bar(Consumer<Integer> c) {
                   }

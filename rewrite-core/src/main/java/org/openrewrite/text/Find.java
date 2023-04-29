@@ -30,6 +30,8 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Objects.requireNonNull;
+
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class Find extends Recipe {
@@ -59,25 +61,26 @@ public class Find extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Tree visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
-                if(sourceFile instanceof Quark || sourceFile instanceof Remote || sourceFile instanceof Binary) {
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                if (sourceFile instanceof Quark || sourceFile instanceof Remote || sourceFile instanceof Binary) {
                     return sourceFile;
                 }
                 PlainText plainText = PlainTextParser.convert(sourceFile);
                 String searchStr = find;
-                if(!Boolean.TRUE.equals(regex)) {
+                if (!Boolean.TRUE.equals(regex)) {
                     searchStr = Pattern.quote(searchStr);
                 }
                 Pattern pattern = Pattern.compile(searchStr);
                 Matcher matcher = pattern.matcher(plainText.getText());
                 String rawText = plainText.getText();
-                if(!matcher.find()) {
+                if (!matcher.find()) {
                     return sourceFile;
                 }
                 matcher.reset();
                 List<PlainText.Snippet> snippets = new ArrayList<>();
                 int previousEnd = 0;
-                while(matcher.find()) {
+                while (matcher.find()) {
                     int matchStart = matcher.start();
                     snippets.add(snippet(rawText.substring(previousEnd, matchStart)));
                     snippets.add(SearchResult.found(snippet(rawText.substring(matchStart, matcher.end()))));

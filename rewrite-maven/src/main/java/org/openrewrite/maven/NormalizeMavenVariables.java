@@ -38,7 +38,7 @@ public class NormalizeMavenVariables extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
             private final List<String> properties = Arrays.asList(
                     "basedir",

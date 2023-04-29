@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -54,7 +55,7 @@ public class ReplaceConstant extends Recipe {
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
             @Nullable
             J.Literal literal;
@@ -104,7 +105,8 @@ public class ReplaceConstant extends Recipe {
             private J.Literal buildLiteral() {
                 if (literal == null) {
                     JavaParser parser = JavaParser.fromJavaVersion().build();
-                    List<J.CompilationUnit> result = parser.parse("class $ { Object o = " + literalValue + "; }");
+                    List<J.CompilationUnit> result = parser.parse("class $ { Object o = " + literalValue + "; }")
+                            .collect(Collectors.toList());
 
                     J j = ((J.VariableDeclarations) result.get(0).getClasses().get(0).getBody().getStatements().get(0)).getVariables().get(0).getInitializer();
                     if (!(j instanceof J.Literal)) {

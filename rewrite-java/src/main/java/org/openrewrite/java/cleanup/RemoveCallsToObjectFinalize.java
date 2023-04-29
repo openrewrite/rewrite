@@ -16,9 +16,9 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesMethod;
@@ -39,7 +39,7 @@ public class RemoveCallsToObjectFinalize extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Removes calls to `Object.finalize()`. This method is called during garbage collection and calling it manually is misleading.";
+        return "Remove calls to `Object.finalize()`. This method is called during garbage collection and calling it manually is misleading.";
     }
 
     @Override
@@ -53,23 +53,19 @@ public class RemoveCallsToObjectFinalize extends Recipe {
     }
 
     @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(OBJECT_FINALIZE);
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesMethod<>(OBJECT_FINALIZE), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
                 J.MethodInvocation invocation = super.visitMethodInvocation(method, context);
 
                 if (invocation.getMethodType() != null && "finalize".equals(invocation.getMethodType().getName())
-                        &&(invocation.getMethodType().getDeclaringType().getSupertype() != null && Object.class.getName().equals(invocation.getMethodType().getDeclaringType().getSupertype().getFullyQualifiedName()))) {
+                    && (invocation.getMethodType().getDeclaringType().getSupertype() != null && Object.class.getName().equals(invocation.getMethodType().getDeclaringType().getSupertype().getFullyQualifiedName()))) {
+                    //noinspection DataFlowIssue
                     return null;
                 }
                 return invocation;
             }
-        };
+        });
     }
 }

@@ -17,8 +17,8 @@ package org.openrewrite.hcl.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.hcl.HclIsoVisitor;
-import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.style.SpacesStyle;
 import org.openrewrite.hcl.tree.Hcl;
 
@@ -35,7 +35,7 @@ public class Spaces extends Recipe {
     }
 
     @Override
-    public HclVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new SpacesFromCompilationUnitStyle();
     }
 

@@ -27,7 +27,7 @@ class ChangeTagNameTest implements RewriteTest {
     @Test
     void renamesWhitelistToAllowlist() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeTagName("/virtual-patches/enhanced-virtual-patch/whitelist-pattern", "allowlist-pattern", null)),
+          spec -> spec.recipe(new ChangeTagName("/virtual-patches/enhanced-virtual-patch/whitelist-pattern", "allowlist-pattern")),
           xml(
             """
               <virtual-patches>

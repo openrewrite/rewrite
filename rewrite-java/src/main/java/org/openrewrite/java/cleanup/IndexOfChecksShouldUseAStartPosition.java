@@ -15,10 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.MethodMatcher;
@@ -56,30 +53,19 @@ public class IndexOfChecksShouldUseAStartPosition extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                doAfterVisit(new UsesMethod<>(STRING_INDEX_MATCHER));
-                return cu;
-            }
-        };
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesMethod<>(STRING_INDEX_MATCHER), new JavaIsoVisitor<ExecutionContext>() {
 
             private boolean isValueNotCompliant(J.Literal literal) {
-                return !(literal.getValue() instanceof Integer && ((Integer)(literal.getValue()) <= 0));
+                return !(literal.getValue() instanceof Integer && ((Integer) (literal.getValue()) <= 0));
             }
 
             @Override
             public J.Binary visitBinary(J.Binary binary, ExecutionContext ctx) {
                 J.Binary b = super.visitBinary(binary, ctx);
                 if (b.getLeft() instanceof J.MethodInvocation && STRING_INDEX_MATCHER.matches(b.getLeft()) &&
-                        b.getOperator() == J.Binary.Type.GreaterThan &&
-                        b.getRight() instanceof J.Literal && isValueNotCompliant((J.Literal)b.getRight())) {
+                    b.getOperator() == J.Binary.Type.GreaterThan &&
+                    b.getRight() instanceof J.Literal && isValueNotCompliant((J.Literal) b.getRight())) {
 
                     J.MethodInvocation m = (J.MethodInvocation) b.getLeft();
                     b = b.withLeft(m.withTemplate(JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}, #{any(int)}").build(),
@@ -98,6 +84,6 @@ public class IndexOfChecksShouldUseAStartPosition extends Recipe {
                 }
                 return b;
             }
-        };
+        });
     }
 }

@@ -16,7 +16,9 @@
 package org.openrewrite.java.search;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
@@ -38,8 +40,8 @@ public class FindRepeatableAnnotations extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                 for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
@@ -49,12 +51,7 @@ public class FindRepeatableAnnotations extends Recipe {
                 }
                 return cu;
             }
-        };
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
+        }, new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
                 if (isRepeatable(annotation.getType())) {
@@ -62,12 +59,12 @@ public class FindRepeatableAnnotations extends Recipe {
                 }
                 return super.visitAnnotation(annotation, ctx);
             }
-        };
+        });
     }
 
     public static boolean isRepeatable(@Nullable JavaType javaType) {
         JavaType.FullyQualified type = TypeUtils.asFullyQualified(javaType);
-        if (TypeUtils.isAssignableTo("java.lang.annotation.Annotation", type)) {
+        if (type != null && TypeUtils.isAssignableTo("java.lang.annotation.Annotation", type)) {
             for (JavaType.FullyQualified ann : type.getAnnotations()) {
                 if (TypeUtils.isOfClassType(ann, "java.lang.annotation.Repeatable")) {
                     return true;

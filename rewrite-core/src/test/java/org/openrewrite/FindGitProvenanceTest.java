@@ -18,12 +18,14 @@ package org.openrewrite;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.marker.GitProvenance;
+import org.openrewrite.table.DistinctGitProvenance;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.marker.GitProvenance.AutoCRLF.False;
 import static org.openrewrite.marker.GitProvenance.EOL.Native;
 import static org.openrewrite.test.SourceSpecs.text;
+import static org.assertj.core.api.Assertions.assertThat;
 
 class FindGitProvenanceTest implements RewriteTest {
 
@@ -36,13 +38,14 @@ class FindGitProvenanceTest implements RewriteTest {
     @Test
     void showGitProvenance() {
         rewriteRun(
-          text("Hello, World!", """
-              ~~(GitProvenance:
-                  origin: https://github.com/openrewrite/rewrite
-                  branch: main
-                  changeset: 1234567
-                  autocrlf: False
-                  eol: Native)~~>Hello, World!""",
+          spec -> spec.dataTable(DistinctGitProvenance.Row.class, rows -> {
+              assertThat(rows).hasSize(1);
+              assertThat(rows.get(0).getBranch()).isEqualTo("main");
+              assertThat(rows.get(0).getChangeset()).isEqualTo("1234567");
+              assertThat(rows.get(0).getOrigin()).isEqualTo("https://github.com/openrewrite/rewrite");
+          }),
+          text(
+            "Hello, World!",
             spec -> spec.markers(new GitProvenance(Tree.randomId(), "https://github.com/openrewrite/rewrite", "main", "1234567", False, Native))
           )
         );

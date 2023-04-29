@@ -16,6 +16,7 @@
 package org.openrewrite.gradle.security;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.gradle.util.ChangeStringLiteral;
@@ -54,13 +55,8 @@ public class UseHttpsForRepositories extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(REPO_URL);
-    }
-
-    @Override
-    public GroovyVisitor<ExecutionContext> getVisitor() {
-        return new GroovyVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesMethod<>(REPO_URL), new GroovyVisitor<ExecutionContext>() {
             private J.Literal fixupLiteralIfNeeded(J.Literal arg) {
                 String url = (String) arg.getValue();
                 //noinspection HttpUrlsUsage
@@ -88,6 +84,6 @@ public class UseHttpsForRepositories extends Recipe {
                 }
                 return m;
             }
-        };
+        });
     }
 }

@@ -19,15 +19,21 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
+import java.nio.file.Path;
+
 public class IsBuildGradle<P> extends JavaIsoVisitor<P> {
     @Override
     public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        if ((cu.getSourcePath().toString().endsWith(".gradle") ||
-             cu.getSourcePath().toString().endsWith(".gradle.kts")) &&
-            !(cu.getSourcePath().toString().endsWith("settings.gradle") ||
-              cu.getSourcePath().toString().endsWith("settings.gradle.kts"))) {
+        if (matches(cu.getSourcePath())) {
             return SearchResult.found(cu);
         }
         return super.visitJavaSourceFile(cu, p);
+    }
+
+    public static boolean matches(Path sourcePath) {
+        return (sourcePath.toString().endsWith(".gradle") ||
+                sourcePath.toString().endsWith(".gradle.kts")) &&
+               !(sourcePath.toString().endsWith("settings.gradle") ||
+                 sourcePath.toString().endsWith("settings.gradle.kts"));
     }
 }

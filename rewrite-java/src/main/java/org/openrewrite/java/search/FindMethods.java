@@ -21,7 +21,6 @@ import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.dataflow.FindLocalFlowPaths;
 import org.openrewrite.java.dataflow.LocalFlowSpec;
@@ -78,23 +77,18 @@ public class FindMethods extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(methodPattern, matchOverrides);
-    }
-
-    @Override
     @SuppressWarnings("ConstantConditions")
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
         boolean flowEnabled = !StringUtils.isBlank(flow) && !"none".equals(flow);
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesMethod<>(methodPattern, matchOverrides), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(method)) {
                     if (!flowEnabled) {
                         JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                        if(javaSourceFile != null) {
+                        if (javaSourceFile != null) {
                             methodCalls.insertRow(ctx, new MethodCalls.Row(
                                     javaSourceFile.getSourcePath().toString(),
                                     method.printTrimmed(getCursor())
@@ -114,7 +108,7 @@ public class FindMethods extends Recipe {
                 if (methodMatcher.matches(m.getMethodType())) {
                     if (!flowEnabled) {
                         JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                        if(javaSourceFile != null) {
+                        if (javaSourceFile != null) {
                             methodCalls.insertRow(ctx, new MethodCalls.Row(
                                     javaSourceFile.getSourcePath().toString(),
                                     memberRef.printTrimmed(getCursor())
@@ -134,7 +128,7 @@ public class FindMethods extends Recipe {
                 if (methodMatcher.matches(newClass)) {
                     if (!flowEnabled) {
                         JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                        if(javaSourceFile != null) {
+                        if (javaSourceFile != null) {
                             methodCalls.insertRow(ctx, new MethodCalls.Row(
                                     javaSourceFile.getSourcePath().toString(),
                                     newClass.printTrimmed(getCursor())
@@ -178,7 +172,7 @@ public class FindMethods extends Recipe {
                         throw new IllegalStateException("Unknown flow: " + flow);
                 }
             }
-        };
+        });
     }
 
     public static Set<J> find(J j, String methodPattern) {

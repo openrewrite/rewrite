@@ -17,7 +17,6 @@ package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
 
-import java.time.Duration;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -30,9 +29,9 @@ import java.util.function.Supplier;
  */
 public interface ExecutionContext {
     String CURRENT_RECIPE = "org.openrewrite.currentRecipe";
-    String PARENT_RECIPE = "org.openrewrite.parentRecipe";
     String UNCAUGHT_EXCEPTION_COUNT = "org.openrewrite.uncaughtExceptionCount";
     String DATA_TABLES = "org.openrewrite.dataTables";
+    String RUN_TIMEOUT = "org.openrewrite.runTimeout";
 
     @Incubating(since = "7.20.0")
     default ExecutionContext addObserver(TreeObserver.Subscription observer) {
@@ -89,26 +88,6 @@ public interface ExecutionContext {
         putMessage(CURRENT_RECIPE, recipe);
     }
 
-    /**
-     * @return The previous parent recipe.
-     * @implNote For use in the {@link RecipeScheduler} only.
-     */
-    @Nullable
-    @Incubating(since = "7.37.0")
-    default Recipe putParentRecipe(@Nullable Recipe recipe) {
-        Recipe previousParent = getMessage(PARENT_RECIPE);
-        putMessage(PARENT_RECIPE, recipe);
-        return previousParent;
-    }
-
-    /**
-     * The recipe that scheduled this recipe's execution via {@link Recipe#getApplicableTests()} or {@link Recipe#getSingleSourceApplicableTests()}.
-     */
-    @Incubating(since = "7.37.0")
-    default Optional<Recipe> getParentRecipe() {
-        return Optional.ofNullable(getMessage(PARENT_RECIPE));
-    }
-
     default int incrementAndGetUncaughtExceptionCount() {
         int count = getMessage(UNCAUGHT_EXCEPTION_COUNT, 0) + 1;
         putMessage(UNCAUGHT_EXCEPTION_COUNT, count);
@@ -118,13 +97,4 @@ public interface ExecutionContext {
     Consumer<Throwable> getOnError();
 
     BiConsumer<Throwable, ExecutionContext> getOnTimeout();
-
-    /**
-     * @param inputs The number of inputs to the run. Allows the duration to be scaled to the number of inputs.
-     * @return The maximum duration a run (e.g. parse operation, recipe run) can take.
-     */
-    @Incubating(since = "7.3.0")
-    default Duration getRunTimeout(int inputs) {
-        return Duration.ofHours(2);
-    }
 }

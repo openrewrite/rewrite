@@ -37,7 +37,6 @@ class MergeYamlTest implements RewriteTest {
                   - cron: "0 18 * * *"
               """,
             true,
-            null,
             null
           )),
           yaml(
@@ -63,7 +62,6 @@ class MergeYamlTest implements RewriteTest {
                   description: a description
               """,
             false,
-            null,
             null
           )),
           yaml(
@@ -92,7 +90,6 @@ class MergeYamlTest implements RewriteTest {
                   description: a description
               """,
             false,
-            null,
             null
           )),
           yaml(
@@ -126,7 +123,6 @@ class MergeYamlTest implements RewriteTest {
                         age: 7
               """,
             false,
-            null,
             null
           )),
           yaml(
@@ -163,7 +159,7 @@ class MergeYamlTest implements RewriteTest {
                   list:
                     - item 2
                 """,
-              false, null, null
+              false, null
             )),
           yaml(
             """
@@ -194,7 +190,7 @@ class MergeYamlTest implements RewriteTest {
                   list:
                     - item 2
                 """,
-              true, null, null
+              true, null
             )
           ),
           yaml(
@@ -217,7 +213,6 @@ class MergeYamlTest implements RewriteTest {
               bucketPolicyOnly: true
               """,
             false,
-            null,
             null
           )),
           yaml(
@@ -254,7 +249,6 @@ class MergeYamlTest implements RewriteTest {
                           age: 7
                 """,
               false,
-              null,
               null
             )),
           yaml(
@@ -287,7 +281,6 @@ class MergeYamlTest implements RewriteTest {
             //language=yaml
             "spec: 0",
             true,
-            null,
             null
           )),
           yaml(
@@ -311,7 +304,6 @@ class MergeYamlTest implements RewriteTest {
             "$.spec.containers",
             "imagePullPolicy: Always",
             true,
-            null,
             null
           )),
           yaml(
@@ -341,7 +333,6 @@ class MergeYamlTest implements RewriteTest {
             //language=yaml
             "imagePullPolicy: Always",
             true,
-            null,
             null
           )),
           yaml(
@@ -375,7 +366,6 @@ class MergeYamlTest implements RewriteTest {
                 privileged: false
               """,
             true,
-            null,
             null
           )),
           yaml(
@@ -411,7 +401,6 @@ class MergeYamlTest implements RewriteTest {
                 privileged: false
               """,
             true,
-            null,
             null
           )),
           yaml(
@@ -444,7 +433,6 @@ class MergeYamlTest implements RewriteTest {
                 cache: 'gradle'
               """,
             false,
-            null,
             null
           )),
           yaml(
@@ -486,7 +474,6 @@ class MergeYamlTest implements RewriteTest {
                       - Mangrove
               """,
             true,
-            null,
             null
           )),
           yaml(
@@ -529,7 +516,6 @@ class MergeYamlTest implements RewriteTest {
                       - 2
               """,
             true,
-            null,
             null
           )),
           yaml(
@@ -566,7 +552,6 @@ class MergeYamlTest implements RewriteTest {
                     nnmap2: v222
               """,
             true,
-            null,
             null
           )),
           yaml(
@@ -610,7 +595,6 @@ class MergeYamlTest implements RewriteTest {
                     value: 18
                 """,
               false,
-              null,
               "name"
             )),
           yaml(
@@ -647,7 +631,6 @@ class MergeYamlTest implements RewriteTest {
                     value: 18
                 """,
               false,
-              null,
               "name"
             )),
           yaml(
@@ -680,7 +663,6 @@ class MergeYamlTest implements RewriteTest {
                     value: 18
               """,
             false,
-            null,
             null
           )),
           yaml(
@@ -713,7 +695,6 @@ class MergeYamlTest implements RewriteTest {
                     row2key2: maven
                 """,
               false,
-              null,
               "name"
             )),
           yaml(
@@ -750,7 +731,6 @@ class MergeYamlTest implements RewriteTest {
                     value: 17
                 """,
               false,
-              null,
               "name"
             )),
           yaml(
@@ -788,7 +768,6 @@ class MergeYamlTest implements RewriteTest {
                       name: customer-profile-database-02
                 """,
               false,
-              null,
               "name"
             )),
           yaml(
@@ -837,7 +816,6 @@ class MergeYamlTest implements RewriteTest {
                       name: relation-profile-database
                 """,
               false,
-              null,
               "name"
             )),
           yaml(
@@ -863,22 +841,4 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
-    @Test
-    void changeOnlyMatchingFile() {
-        rewriteRun(
-          spec -> spec.recipe(new MergeYaml("$", "spec: 0", true, "**/a.yml", null)),
-          yaml(
-            "apiVersion: policy/v1beta1",
-            """
-              apiVersion: policy/v1beta1
-              spec: 0
-              """,
-            spec -> spec.path("a.yml")
-          ),
-          yaml(
-            "apiVersion: policy/v1beta1",
-            spec -> spec.path("b.yml")
-          )
-        );
-    }
 }

@@ -57,7 +57,7 @@ public class FinalizePrivateFields extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             private Set<JavaType.Variable> privateFieldsToBeFinalized = new HashSet<>();
 

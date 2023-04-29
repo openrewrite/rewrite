@@ -15,6 +15,7 @@
  */
 package org.openrewrite.config;
 
+import lombok.RequiredArgsConstructor;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -26,7 +27,10 @@ import java.util.List;
  * A recipe that exists only to wrap other recipes.
  * Anonymous recipe classes aren't serializable/deserializable so use this, or another named type, instead
  */
+@RequiredArgsConstructor
 public class CompositeRecipe extends Recipe {
+    private final List<Recipe> recipeList;
+
     @Override
     public String getDisplayName() {
         return getName();
@@ -35,6 +39,11 @@ public class CompositeRecipe extends Recipe {
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
         return null;
+    }
+
+    @Override
+    public List<Recipe> getRecipeList() {
+        return recipeList;
     }
 
     @Override

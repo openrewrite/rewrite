@@ -15,10 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.UsesJavaVersion;
 import org.openrewrite.java.tree.Expression;
@@ -48,13 +45,8 @@ public class ReplaceTextBlockWithString extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesJavaVersion<>(13);
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ReplaceTextBlockWithStringVisitor();
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesJavaVersion<>(13), new ReplaceTextBlockWithStringVisitor());
     }
 
     private static class ReplaceTextBlockWithStringVisitor extends JavaVisitor<ExecutionContext> {
@@ -62,9 +54,9 @@ public class ReplaceTextBlockWithString extends Recipe {
         @Override
         public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
             if (literal.getType() == Primitive.String &&
-                    literal.getValue() != null &&
-                    literal.getValueSource() != null &&
-                    literal.getValueSource().startsWith("\"\"\"")) {
+                literal.getValue() != null &&
+                literal.getValueSource() != null &&
+                literal.getValueSource().startsWith("\"\"\"")) {
                 // Split the literal into lines, including trailing empty lines
                 String[] lines = ((String) literal.getValue()).split("\n", -1);
                 // Add trailing "\n" to each line but the last one
@@ -85,7 +77,9 @@ public class ReplaceTextBlockWithString extends Recipe {
                     literals[i] = toLiteral(lines[i]).withPrefix(Space.build("\n", Collections.emptyList()));
                 }
                 // Format the resulting expression
-                return autoFormat(ChainStringBuilderAppendCalls.additiveExpression(literals), ctx);
+                Expression j = ChainStringBuilderAppendCalls.additiveExpression(literals);
+                //noinspection DataFlowIssue
+                return j == null ? null : autoFormat(j, ctx);
             }
             return literal;
         }

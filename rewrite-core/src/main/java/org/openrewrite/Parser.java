@@ -32,12 +32,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static java.util.stream.Collectors.toList;
 
 public interface Parser<S extends SourceFile> {
-    default List<S> parse(Iterable<Path> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    default Stream<S> parse(Iterable<Path> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return parseInputs(StreamSupport
                         .stream(sourceFiles.spliterator(), false)
                         .map(sourceFile -> new Input(sourceFile, () -> {
@@ -54,11 +55,11 @@ public interface Parser<S extends SourceFile> {
         );
     }
 
-    default List<S> parse(String... sources) {
+    default Stream<S> parse(String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
-    default List<S> parse(ExecutionContext ctx, String... sources) {
+    default Stream<S> parse(ExecutionContext ctx, String... sources) {
         return parseInputs(
                 Arrays.stream(sources).map(source ->
                         new Input(
@@ -77,9 +78,9 @@ public interface Parser<S extends SourceFile> {
      *                   are closed.
      * @param relativeTo A common relative path for all {@link Input#path}.
      * @param ctx        The execution context
-     * @return A list of {@link SourceFile}.
+     * @return A stream of {@link SourceFile}.
      */
-    List<S> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx);
+    Stream<S> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx);
 
     boolean accept(Path path);
 
@@ -106,11 +107,10 @@ public interface Parser<S extends SourceFile> {
         return charset == null ? StandardCharsets.UTF_8 : charset;
     }
 
-
     /**
      * A source input. {@link Input#path} may be a synthetic path and not
      * represent a resolvable path on disk, as is the case when parsing sources
-     * from BigQuery (we have a relative path from the original Github repository
+     * from BigQuery (we have a relative path from the original GitHub repository
      * and the sources, but don't have these sources on disk).
      * <p>
      * Nevertheless, this class is a generalization that applies well enough to

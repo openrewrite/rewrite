@@ -156,11 +156,11 @@ public class ReloadableJava11Parser implements JavaParser {
     }
 
     @Override
-    public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
 
-        List<J.CompilationUnit> mappedCus = cus.entrySet().stream()
+        return cus.entrySet().stream()
                 .map(cuByPath -> {
                     Timer.Sample sample = Timer.start();
                     Input input = cuByPath.getKey();
@@ -196,10 +196,7 @@ public class ReloadableJava11Parser implements JavaParser {
                         return null;
                     }
                 })
-                .filter(Objects::nonNull)
-                .collect(toList());
-
-        return mappedCus;
+                .filter(Objects::nonNull);
     }
 
     LinkedHashMap<Input, JCTree.JCCompilationUnit> parseInputsToCompilerAst(Iterable<Input> sourceFiles, ExecutionContext ctx) {

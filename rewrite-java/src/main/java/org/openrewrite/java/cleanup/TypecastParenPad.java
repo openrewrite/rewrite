@@ -18,6 +18,7 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.format.SpacesVisitor;
 import org.openrewrite.java.style.*;
@@ -35,11 +36,11 @@ public class TypecastParenPad extends Recipe {
     @Override
     public String getDescription() {
         return "Fixes whitespace padding between a typecast type identifier and the enclosing left and right parenthesis. " +
-                "For example, when configured to remove spacing, `( int ) 0L;` becomes `(int) 0L;`.";
+               "For example, when configured to remove spacing, `( int ) 0L;` becomes `(int) 0L;`.";
     }
 
     @Override
-    public JavaIsoVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TypecastParenPadVisitor();
     }
 
@@ -49,12 +50,12 @@ public class TypecastParenPad extends Recipe {
 
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext ctx) {
-            SourceFile cu = (SourceFile)javaSourceFile;
+            SourceFile cu = (SourceFile) javaSourceFile;
             spacesStyle = Optional.ofNullable(cu.getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces());
             typecastParenPadStyle = Optional.ofNullable(cu.getStyle(TypecastParenPadStyle.class)).orElse(Checkstyle.typecastParenPadStyle());
 
             spacesStyle = spacesStyle.withWithin(spacesStyle.getWithin().withTypeCastParentheses(typecastParenPadStyle.getSpace()));
-            return super.visitJavaSourceFile((JavaSourceFile)cu, ctx);
+            return super.visitJavaSourceFile((JavaSourceFile) cu, ctx);
         }
 
         @Override

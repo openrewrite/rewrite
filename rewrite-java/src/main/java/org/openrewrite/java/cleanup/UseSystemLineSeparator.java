@@ -16,9 +16,9 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -28,7 +28,6 @@ import org.openrewrite.java.tree.J;
 import java.time.Duration;
 
 public class UseSystemLineSeparator extends Recipe {
-
     private static final MethodMatcher GET_PROPERTY = new MethodMatcher("java.lang.System getProperty(..)");
     private static final String LINE_SEPARATOR = "line.separator";
 
@@ -39,28 +38,28 @@ public class UseSystemLineSeparator extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Replaces calls to `System.getProperty(\"line.separator\")` with `System.lineSeparator()`.";
+        return "Replace calls to `System.getProperty(\"line.separator\")` with `System.lineSeparator()`.";
     }
+
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
         return Duration.ofMinutes(1);
     }
 
     @Override
-    protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(GET_PROPERTY);
-    }
-
-    @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesMethod<>(GET_PROPERTY), new JavaVisitor<ExecutionContext>() {
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation invocation = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
 
                 if (GET_PROPERTY.matches(method)) {
                     String param = "";
                     if (method.getArguments().size() == 1 && method.getArguments().get(0) instanceof J.Literal) {
-                        param = ((J.Literal) method.getArguments().get(0)).getValue().toString();
+                        Object value = ((J.Literal) method.getArguments().get(0)).getValue();
+                        if (value == null) {
+                            return method;
+                        }
+                        param = value.toString();
                     }
                     if (!LINE_SEPARATOR.equals(param)) {
                         return invocation;
@@ -68,30 +67,30 @@ public class UseSystemLineSeparator extends Recipe {
 
                     if (method.getSelect() != null) {
                         final JavaTemplate template = JavaTemplate
-                            .builder(this::getCursor, "#{any(java.lang.System)}.lineSeparator()")
-                            .build();
+                                .builder(this::getCursor, "#{any(java.lang.System)}.lineSeparator()")
+                                .build();
 
                         return method.withTemplate(template,
-                            method.getCoordinates().replace(),
-                            method.getSelect());
+                                method.getCoordinates().replace(),
+                                method.getSelect());
                     } else {
                         // static import scenario
                         maybeRemoveImport("java.lang.System.getProperty");
                         maybeAddImport("java.lang.System", "lineSeparator");
 
                         final JavaTemplate template = JavaTemplate
-                            .builder(this::getCursor, "lineSeparator()")
-                            .staticImports("java.lang.System.lineSeparator")
-                            .build();
+                                .builder(this::getCursor, "lineSeparator()")
+                                .staticImports("java.lang.System.lineSeparator")
+                                .build();
 
                         return method.withTemplate(template,
-                            method.getCoordinates()
-                                .replace());
+                                method.getCoordinates()
+                                        .replace());
                     }
                 }
 
                 return invocation;
             }
-        };
+        });
     }
 }

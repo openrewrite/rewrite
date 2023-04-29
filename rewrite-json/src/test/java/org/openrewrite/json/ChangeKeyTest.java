@@ -29,8 +29,7 @@ class ChangeKeyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeKey(
             "$.description",
-            "\"newDescription\"",
-            null
+            "\"newDescription\""
           )),
           json("""
               {
@@ -56,8 +55,7 @@ class ChangeKeyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeKey(
             "$.metadata.name",
-            "\"name2\"",
-            null
+            "\"name2\""
           )),
           json("""
               {
@@ -86,8 +84,7 @@ class ChangeKeyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeKey(
             "$.subjects.kind",
-            "\"kind2\"",
-            null
+            "\"kind2\""
           )),
           json("""
               {

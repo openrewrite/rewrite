@@ -18,9 +18,7 @@ package org.openrewrite.java;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
@@ -40,7 +38,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
      */
     @Option(displayName = "Method pattern",
             description = "A method pattern that is used to find matching method invocations. " +
-                    "The original method call may or may not be a static method invocation.",
+                          "The original method call may or may not be a static method invocation.",
             example = "com.google.common.collect.ImmutableSet of(..)")
     String methodPattern;
 
@@ -64,14 +62,14 @@ public class ChangeMethodTargetToStatic extends Recipe {
 
     @Option(displayName = "Match unknown types",
             description = "When enabled, include method invocations which appear to match if full type information is missing. " +
-            "Using matchUnknownTypes can improve recipe resiliency for an AST with missing type information, but " +
-            "also increases the risk of false-positive matches on unrelated method invocations.",
+                          "Using matchUnknownTypes can improve recipe resiliency for an AST with missing type information, but " +
+                          "also increases the risk of false-positive matches on unrelated method invocations.",
             required = false)
     @Nullable
     Boolean matchUnknownTypes;
 
     public ChangeMethodTargetToStatic(String methodPattern, String fullyQualifiedTargetTypeName,
-            @Nullable String returnType, @Nullable Boolean matchOverrides) {
+                                      @Nullable String returnType, @Nullable Boolean matchOverrides) {
         this(methodPattern, fullyQualifiedTargetTypeName, returnType, matchOverrides, false);
     }
 
@@ -95,14 +93,9 @@ public class ChangeMethodTargetToStatic extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(methodPattern, matchOverrides);
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new ChangeMethodTargetToStaticVisitor(new MethodMatcher(methodPattern, matchOverrides),
-                Boolean.TRUE.equals(matchUnknownTypes));
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesMethod<>(methodPattern, matchOverrides), new ChangeMethodTargetToStaticVisitor(new MethodMatcher(methodPattern, matchOverrides),
+                Boolean.TRUE.equals(matchUnknownTypes)));
     }
 
     private class ChangeMethodTargetToStaticVisitor extends JavaIsoVisitor<ExecutionContext> {
@@ -120,7 +113,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             boolean isStatic = method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static);
             boolean isSameReceiverType = method.getSelect() != null &&
-                    TypeUtils.isOfClassType(method.getSelect().getType(), fullyQualifiedTargetTypeName);
+                                         TypeUtils.isOfClassType(method.getSelect().getType(), fullyQualifiedTargetTypeName);
 
             if ((!isStatic || !isSameReceiverType) && methodMatcher.matches(method, matchUnknownTypes)) {
                 JavaType.Method transformedType = null;

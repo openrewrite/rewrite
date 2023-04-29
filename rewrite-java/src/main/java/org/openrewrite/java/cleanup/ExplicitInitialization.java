@@ -37,7 +37,11 @@ public class ExplicitInitialization extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Checks if any class or object member is explicitly initialized to default for its type value (`null` for object references, zero for numeric types and `char` and `false` for `boolean`.";
+        return "Checks if any class or object member is explicitly initialized to default for its type value:\n" +
+               "- `null` for object references\n" +
+               "- zero for numeric types and `char`\n" +
+               "- and `false` for `boolean`\n" +
+               "Removes explicit initializations where they aren't necessary.";
     }
 
     @Override
@@ -52,18 +56,16 @@ public class ExplicitInitialization extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new ExplicitInitializationFromCompilationUnitStyle();
-    }
-
-    private static class ExplicitInitializationFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
-        @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-            ExplicitInitializationStyle style = ((SourceFile)cu).getStyle(ExplicitInitializationStyle.class);
-            if (style == null) {
-                style = Checkstyle.explicitInitialization();
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
+                ExplicitInitializationStyle style = ((SourceFile) cu).getStyle(ExplicitInitializationStyle.class);
+                if (style == null) {
+                    style = Checkstyle.explicitInitialization();
+                }
+                doAfterVisit(new ExplicitInitializationVisitor<>(style));
+                return cu;
             }
-            doAfterVisit(new ExplicitInitializationVisitor<>(style));
-            return cu;
-        }
+        };
     }
 }
