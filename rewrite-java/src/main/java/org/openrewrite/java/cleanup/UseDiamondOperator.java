@@ -22,6 +22,7 @@ import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.search.UsesJavaVersion;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -62,9 +63,18 @@ public class UseDiamondOperator extends Recipe {
     }
 
     private static class UseDiamondOperatorVisitor extends JavaIsoVisitor<ExecutionContext> {
+
+        private boolean java9;
+
         @Override
         public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-            return cu instanceof J.CompilationUnit ? visitCompilationUnit((J.CompilationUnit) cu, ctx) : cu;
+            if (cu instanceof J.CompilationUnit) {
+                if (new UsesJavaVersion<Integer>(9).visit(cu, 0) != cu) {
+                    java9 = true;
+                }
+                return visitCompilationUnit((J.CompilationUnit) cu, ctx);
+            }
+            return cu;
         }
 
         @Override
@@ -108,7 +118,7 @@ public class UseDiamondOperator extends Recipe {
                 mi = mi.withArguments(ListUtils.map(mi.getArguments(), (i, arg) -> {
                     if (arg instanceof J.NewClass) {
                         J.NewClass nc = (J.NewClass) arg;
-                        if (nc.getBody() == null && !methodType.getParameterTypes().isEmpty()) {
+                        if ((java9 || nc.getBody() == null) && !methodType.getParameterTypes().isEmpty()) {
                             JavaType.Parameterized paramType = TypeUtils.asParameterized(getMethodParamType(methodType, i));
                             if (paramType != null && nc.getClazz() instanceof J.ParameterizedType) {
                                 return maybeRemoveParams(paramType.getTypeParameters(), nc);
@@ -132,14 +142,14 @@ public class UseDiamondOperator extends Recipe {
         @Override
         public J.Return visitReturn(J.Return _return, ExecutionContext executionContext) {
             J.Return rtn = super.visitReturn(_return, executionContext);
-            J.NewClass returnExpNewClass = rtn.getExpression() instanceof J.NewClass ? (J.NewClass)rtn.getExpression() : null;
-            if (returnExpNewClass != null && returnExpNewClass.getBody() == null && returnExpNewClass.getClazz() instanceof J.ParameterizedType) {
+            J.NewClass nc = rtn.getExpression() instanceof J.NewClass ? (J.NewClass)rtn.getExpression() : null;
+            if (nc != null && (java9 || nc.getBody() == null) && nc.getClazz() instanceof J.ParameterizedType) {
                 J parentBlock = getCursor().dropParentUntil(v -> v instanceof J.MethodDeclaration || v instanceof J.Lambda).getValue();
                 if (parentBlock instanceof J.MethodDeclaration) {
                     J.MethodDeclaration md = (J.MethodDeclaration) parentBlock;
                     if (md.getReturnTypeExpression() instanceof J.ParameterizedType) {
                         rtn = rtn.withExpression(
-                                maybeRemoveParams(parameterizedTypes((J.ParameterizedType) md.getReturnTypeExpression()), returnExpNewClass));
+                                maybeRemoveParams(parameterizedTypes((J.ParameterizedType) md.getReturnTypeExpression()), nc));
                     }
                 }
             }
@@ -160,7 +170,7 @@ public class UseDiamondOperator extends Recipe {
 
 
         private J.NewClass maybeRemoveParams(@Nullable List<JavaType> paramTypes, J.NewClass newClass) {
-            if (paramTypes != null && newClass.getBody() == null && newClass.getClazz() instanceof J.ParameterizedType) {
+            if (paramTypes != null && (java9 || newClass.getBody() == null) && newClass.getClazz() instanceof J.ParameterizedType) {
                 J.ParameterizedType newClassType = (J.ParameterizedType) newClass.getClazz();
                 if (newClassType.getTypeParameters() != null){
                     if (paramTypes.size() != newClassType.getTypeParameters().size()) {

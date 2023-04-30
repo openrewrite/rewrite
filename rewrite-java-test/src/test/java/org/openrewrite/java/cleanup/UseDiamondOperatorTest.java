@@ -16,12 +16,13 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Issue;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.javaVersion;
 
 @SuppressWarnings({"Convert2Diamond", "unchecked", "rawtypes"})
 class UseDiamondOperatorTest implements RewriteTest {
@@ -92,6 +93,29 @@ class UseDiamondOperatorTest implements RewriteTest {
                       something(new ArrayList<>());
                       somethingElse(new String[0], new ArrayList<>());
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void anonymousNewClassJava9Plus() {
+        rewriteRun(
+          spec -> spec.allSources(s -> s.markers(javaVersion(11))),
+          java(
+            """
+              import java.util.*;
+
+              class Foo {
+                  List<String> l = new ArrayList<String>() {};
+              }
+              """,
+            """
+              import java.util.*;
+
+              class Foo {
+                  List<String> l = new ArrayList<>() {};
               }
               """
           )
