@@ -19,6 +19,8 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
+import java.nio.file.Path;
+
 public class IsSettingsGradle<P> extends JavaIsoVisitor<P> {
 
     @Override
