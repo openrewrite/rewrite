@@ -30,6 +30,8 @@ import org.openrewrite.marker.SearchResult;
 import java.util.Iterator;
 import java.util.List;
 
+import static java.util.Objects.requireNonNull;
+
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindDeprecatedMethods extends Recipe {
@@ -61,17 +63,20 @@ public class FindDeprecatedMethods extends Recipe {
         MethodMatcher methodMatcher = methodPattern == null || methodPattern.isEmpty() ? null : new MethodMatcher(methodPattern, true);
         return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
-                    if (methodMatcher == null || methodMatcher.matches(method)) {
-                        for (JavaType.FullyQualified annotation : method.getAnnotations()) {
-                            if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
-                                return SearchResult.found(cu);
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    for (JavaType.Method method : cu.getTypesInUse().getUsedMethods()) {
+                        if (methodMatcher == null || methodMatcher.matches(method)) {
+                            for (JavaType.FullyQualified annotation : method.getAnnotations()) {
+                                if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
+                                    return SearchResult.found(cu);
+                                }
                             }
                         }
                     }
                 }
-                return cu;
+                return (J) tree;
             }
         }, new JavaIsoVisitor<ExecutionContext>() {
             @Override

@@ -60,16 +60,12 @@ public class NoPrimitiveWrappersForToStringOrCompareTo extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(
-                new JavaIsoVisitor<ExecutionContext>() {
-                    @Override
-                    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                        doAfterVisit(new UsesMethod<>(NUMBER_COMPARE_TO_MATCHER));
-                        doAfterVisit(new UsesMethod<>(NUMBER_TO_STRING_MATCHER));
-                        doAfterVisit(new UsesMethod<>(BOOLEAN_COMPARE_TO_MATCHER));
-                        doAfterVisit(new UsesMethod<>(BOOLEAN_TO_STRING_MATCHER));
-                        return cu;
-                    }
-                },
+                Preconditions.or(
+                        new UsesMethod<>(NUMBER_COMPARE_TO_MATCHER),
+                        new UsesMethod<>(NUMBER_TO_STRING_MATCHER),
+                        new UsesMethod<>(BOOLEAN_COMPARE_TO_MATCHER),
+                        new UsesMethod<>(BOOLEAN_TO_STRING_MATCHER)
+                ),
                 new NoPrimitiveWrapperVisitor()
         );
     }

@@ -15,18 +15,19 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.EqualsAvoidsNullStyle;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
+
+import static java.util.Objects.requireNonNull;
 
 public class EqualsAvoidsNull extends Recipe {
 
@@ -57,13 +58,16 @@ public class EqualsAvoidsNull extends Recipe {
 
     private static class EqualsAvoidsNullFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-            EqualsAvoidsNullStyle style = ((SourceFile) cu).getStyle(EqualsAvoidsNullStyle.class);
-            if (style == null) {
-                style = Checkstyle.equalsAvoidsNull();
+        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof JavaSourceFile) {
+                JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                EqualsAvoidsNullStyle style = ((SourceFile) cu).getStyle(EqualsAvoidsNullStyle.class);
+                if (style == null) {
+                    style = Checkstyle.equalsAvoidsNull();
+                }
+                return new EqualsAvoidsNullVisitor<>(style).visit(cu, ctx);
             }
-            doAfterVisit(new EqualsAvoidsNullVisitor<>(style));
-            return cu;
+            return (J) tree;
         }
     }
 }

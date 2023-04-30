@@ -42,7 +42,7 @@ public class BlankLines extends Recipe {
             if (style == null) {
                 style = BlankLinesStyle.DEFAULT;
             }
-            doAfterVisit(new BlankLinesVisitor<>(style));
+            return new BlankLinesVisitor<>(style).visit(cu, ctx);
             return configFile;
         }
     }

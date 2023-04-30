@@ -15,18 +15,19 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.FallThroughStyle;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
+
+import static java.util.Objects.requireNonNull;
 
 public class FallThrough extends Recipe {
     @Override
@@ -56,13 +57,16 @@ public class FallThrough extends Recipe {
 
     private static class FallThroughFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-            FallThroughStyle style = ((SourceFile)cu).getStyle(FallThroughStyle.class);
-            if (style == null) {
-                style = Checkstyle.fallThrough();
+        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof JavaSourceFile) {
+                JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                FallThroughStyle style = ((SourceFile) cu).getStyle(FallThroughStyle.class);
+                if (style == null) {
+                    style = Checkstyle.fallThrough();
+                }
+                return new FallThroughVisitor<>(style).visit(cu, ctx);
             }
-            doAfterVisit(new FallThroughVisitor<>(style));
-            return cu;
+            return (J) tree;
         }
     }
 }

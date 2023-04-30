@@ -35,6 +35,8 @@ import java.time.Duration;
 import java.util.*;
 import java.util.regex.Pattern;
 
+import static java.util.Objects.requireNonNull;
+
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class MethodNameCasing extends ScanningRecipe<List<ChangeMethodName>> {
@@ -77,22 +79,26 @@ public class MethodNameCasing extends ScanningRecipe<List<ChangeMethodName>> {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(List<ChangeMethodName> acc) {
+    public TreeVisitor<?, ExecutionContext> getScanner(List<ChangeMethodName> changes) {
         Pattern standardMethodName = Pattern.compile("^[a-z][a-zA-Z0-9]*$");
         Pattern snakeCase = Pattern.compile("^[a-zA-Z0-9]+_\\w+$");
         return new JavaIsoVisitor<ExecutionContext>() {
-
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
-                if (sourceSet.isPresent() && (Boolean.TRUE.equals(includeTestSources) || "main".equals(sourceSet.get().getName()))) {
-                    return super.visitJavaSourceFile(cu, executionContext);
+            public J preVisit(J tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
+                    if (!sourceSet.isPresent()) {
+                        stopAfterPreVisit();
+                    } else if (!Boolean.TRUE.equals(includeTestSources) && !"main".equals(sourceSet.get().getName())) {
+                        stopAfterPreVisit();
+                    }
                 }
-                return cu;
+                return super.preVisit(tree, ctx);
             }
 
             @Override
-            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                 J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
                 if (enclosingClass == null || enclosingClass.getKind() != J.ClassDeclaration.Kind.Type.Class) {
                     return method;
@@ -137,12 +143,12 @@ public class MethodNameCasing extends ScanningRecipe<List<ChangeMethodName>> {
                         && !methodExists(method.getMethodType(), standardized.toString())) {
                         String toName = standardized.toString();
                         if (!StringUtils.isNumeric(toName)) {
-                            acc.add(new ChangeMethodName(MethodMatcher.methodPattern(method), standardized.toString(), true, false));
+                            changes.add(new ChangeMethodName(MethodMatcher.methodPattern(method), standardized.toString(), true, false));
                         }
                     }
                 }
 
-                return super.visitMethodDeclaration(method, executionContext);
+                return super.visitMethodDeclaration(method, ctx);
             }
 
             private boolean containsValidModifiers(J.MethodDeclaration method) {
@@ -156,14 +162,18 @@ public class MethodNameCasing extends ScanningRecipe<List<ChangeMethodName>> {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(List<ChangeMethodName> acc) {
+    public TreeVisitor<?, ExecutionContext> getVisitor(List<ChangeMethodName> changes) {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                for (ChangeMethodName changeMethodName : acc) {
-                    doAfterVisit(changeMethodName);
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    for (ChangeMethodName changeMethodName : changes) {
+                        cu = (JavaSourceFile) changeMethodName.getVisitor().visitNonNull(cu, ctx);
+                    }
+                    return cu;
                 }
-                return cu;
+                return (J) tree;
             }
         };
     }

@@ -15,11 +15,9 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.search.UsesType;
@@ -62,16 +60,6 @@ public class UnnecessaryPrimitiveAnnotations extends Recipe {
                 Preconditions.or(new UsesType<>("javax.annotation.CheckForNull", false), new UsesType<>("javax.annotation.Nullable", false)),
                 new JavaIsoVisitor<ExecutionContext>() {
                     @Override
-                    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                        JavaSourceFile c = super.visitJavaSourceFile(cu, executionContext);
-                        if (cu != c) {
-                            maybeRemoveImport("javax.annotation.CheckForNull");
-                            maybeRemoveImport("javax.annotation.Nullable");
-                        }
-                        return c;
-                    }
-
-                    @Override
                     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
                         J.MethodDeclaration md = super.visitMethodDeclaration(method, executionContext);
                         if (md.getReturnTypeExpression() != null
@@ -94,6 +82,8 @@ public class UnnecessaryPrimitiveAnnotations extends Recipe {
                     private List<J.Annotation> filterAnnotations(List<J.Annotation> annotations) {
                         return ListUtils.map(annotations, anno -> {
                             if (NULLABLE_ANNOTATION_MATCHER.matches(anno) || CHECK_FOR_NULL_ANNOTATION_MATCHER.matches(anno)) {
+                                maybeRemoveImport("javax.annotation.CheckForNull");
+                                maybeRemoveImport("javax.annotation.Nullable");
                                 return null;
                             }
                             return anno;

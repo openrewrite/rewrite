@@ -17,6 +17,7 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.gradle.api.tasks.Exec;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
@@ -35,6 +36,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -118,32 +120,34 @@ public class UpgradeDependencyVersion extends Recipe {
         return new GroovyVisitor<ExecutionContext>() {
 
             @Override
-            public J visitJavaSourceFile(JavaSourceFile sourceFile, ExecutionContext ctx) {
-                JavaSourceFile cu = (JavaSourceFile) super.visitJavaSourceFile(sourceFile, ctx);
-                String variableName = getCursor().getMessage(VERSION_VARIABLE_KEY);
-                if(variableName != null) {
-                    Optional<GradleProject> maybeGp = cu.getMarkers()
-                            .findFirst(GradleProject.class);
-                    if(!maybeGp.isPresent()) {
-                        return cu;
-                    }
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    String variableName = getCursor().getMessage(VERSION_VARIABLE_KEY);
+                    if (variableName != null) {
+                        Optional<GradleProject> maybeGp = cu.getMarkers()
+                                .findFirst(GradleProject.class);
+                        if (!maybeGp.isPresent()) {
+                            return cu;
+                        }
 
-                    cu = (JavaSourceFile) new UpdateVariable(variableName, versionComparator, maybeGp.get()).visitNonNull(cu, ctx);
-                }
-                Set<GroupArtifactVersion> versionUpdates = getCursor().getMessage(NEW_VERSION_KEY);
-                if(versionUpdates != null) {
-                    Optional<GradleProject> maybeGp = cu.getMarkers()
-                            .findFirst(GradleProject.class);
-                    if(!maybeGp.isPresent()) {
-                        return cu;
+                        cu = (JavaSourceFile) new UpdateVariable(variableName, versionComparator, maybeGp.get()).visitNonNull(cu, ctx);
                     }
-                    GradleProject newGp = maybeGp.get();
-                    for (GroupArtifactVersion gav : versionUpdates) {
-                        newGp = replaceVersion(newGp, ctx, gav);
+                    Set<GroupArtifactVersion> versionUpdates = getCursor().getMessage(NEW_VERSION_KEY);
+                    if (versionUpdates != null) {
+                        Optional<GradleProject> maybeGp = cu.getMarkers()
+                                .findFirst(GradleProject.class);
+                        if (!maybeGp.isPresent()) {
+                            return cu;
+                        }
+                        GradleProject newGp = maybeGp.get();
+                        for (GroupArtifactVersion gav : versionUpdates) {
+                            newGp = replaceVersion(newGp, ctx, gav);
+                        }
+                        cu = cu.withMarkers(cu.getMarkers().removeByType(GradleProject.class).add(newGp));
                     }
-                    cu = cu.withMarkers(cu.getMarkers().removeByType(GradleProject.class).add(newGp));
                 }
-                return cu;
+                return super.visit(tree, ctx);
             }
 
             @Override

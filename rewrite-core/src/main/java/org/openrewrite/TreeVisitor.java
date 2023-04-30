@@ -34,12 +34,14 @@ import java.beans.Transient;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Abstract {@link TreeVisitor} for processing {@link Tree elements}
@@ -54,6 +56,8 @@ import java.util.function.Function;
  * @param <P> An input object that is passed to every visit method.
  */
 public abstract class TreeVisitor<T extends Tree, P> {
+    private static final String STOP_AFTER_PRE_VISIT = "__org.openrewrite.stopVisitor__";
+
     Cursor cursor = new Cursor(null, Cursor.ROOT_VALUE);
 
     public static <T extends Tree, P> TreeVisitor<T, P> noop() {
@@ -130,6 +134,9 @@ public abstract class TreeVisitor<T extends Tree, P> {
      * @param visitor The visitor to run.
      */
     protected void doAfterVisit(TreeVisitor<T, P> visitor) {
+        if (afterVisit == null) {
+            afterVisit = new ArrayList<>(2);
+        }
         afterVisit.add(visitor);
     }
 
@@ -144,12 +151,15 @@ public abstract class TreeVisitor<T extends Tree, P> {
      * @param recipe The recipe whose visitor to run.
      */
     protected void doAfterVisit(Recipe recipe) {
+        if (afterVisit == null) {
+            afterVisit = new ArrayList<>(2);
+        }
         //noinspection unchecked
         afterVisit.add((TreeVisitor<T, P>) recipe.getVisitor());
     }
 
     protected List<TreeVisitor<T, P>> getAfterVisit() {
-        return afterVisit;
+        return afterVisit == null ? emptyList() : afterVisit;
     }
 
     public final Cursor getCursor() {
@@ -245,11 +255,10 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
         Timer.Sample sample = null;
         boolean topLevel = false;
-        if (afterVisit == null) {
+        if (cursor.getParent() == null) {
             topLevel = true;
             visitCount = 0;
             sample = Timer.start();
-            afterVisit = new CopyOnWriteArrayList<>();
         }
 
         visitCount++;
@@ -263,11 +272,13 @@ public abstract class TreeVisitor<T extends Tree, P> {
             if (isAcceptable) {
                 //noinspection unchecked
                 t = preVisit((T) tree, p);
-                if (t != null) {
-                    t = t.accept(this, p);
-                }
-                if (t != null) {
-                    t = postVisit(t, p);
+                if (!cursor.getMessage(STOP_AFTER_PRE_VISIT, false)) {
+                    if (t != null) {
+                        t = t.accept(this, p);
+                    }
+                    if (t != null) {
+                        t = postVisit(t, p);
+                    }
                 }
                 if (t != tree && t != null && p instanceof ExecutionContext) {
                     ExecutionContext ctx = (ExecutionContext) p;
@@ -412,5 +423,15 @@ public abstract class TreeVisitor<T extends Tree, P> {
             return null;
         }
         return sourceFile.getSourcePath().toString();
+    }
+
+    /**
+     * Can be used in {@link TreeVisitor#preVisit(Tree, Object)} to prevent a call
+     * to {@link TreeVisitor#visit(Tree, Object)} and {@link TreeVisitor#postVisit(Tree, Object)}, therefore
+     * stopping further navigation down the tree.
+     */
+    @Incubating(since = "8.0.0")
+    public void stopAfterPreVisit() {
+        getCursor().putMessage(STOP_AFTER_PRE_VISIT, true);
     }
 }

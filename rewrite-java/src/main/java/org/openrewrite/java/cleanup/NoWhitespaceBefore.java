@@ -24,6 +24,8 @@ import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
+import static java.util.Objects.requireNonNull;
+
 @Incubating(since = "7.12.0")
 public class NoWhitespaceBefore extends Recipe {
     @Override
@@ -53,13 +55,15 @@ public class NoWhitespaceBefore extends Recipe {
         EmptyForIteratorPadStyle emptyForIteratorPadStyle;
 
         @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext ctx) {
-            SourceFile cu = (SourceFile) javaSourceFile;
-            spacesStyle = cu.getStyle(SpacesStyle.class) == null ? IntelliJ.spaces() : cu.getStyle(SpacesStyle.class);
-            noWhitespaceBeforeStyle = cu.getStyle(NoWhitespaceBeforeStyle.class) == null ? Checkstyle.noWhitespaceBeforeStyle() : cu.getStyle(NoWhitespaceBeforeStyle.class);
-            emptyForInitializerPadStyle = cu.getStyle(EmptyForInitializerPadStyle.class);
-            emptyForIteratorPadStyle = cu.getStyle(EmptyForIteratorPadStyle.class);
-            return super.visitJavaSourceFile((JavaSourceFile) cu, ctx);
+        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof JavaSourceFile) {
+                SourceFile cu = (SourceFile) requireNonNull(tree);
+                spacesStyle = cu.getStyle(SpacesStyle.class) == null ? IntelliJ.spaces() : cu.getStyle(SpacesStyle.class);
+                noWhitespaceBeforeStyle = cu.getStyle(NoWhitespaceBeforeStyle.class) == null ? Checkstyle.noWhitespaceBeforeStyle() : cu.getStyle(NoWhitespaceBeforeStyle.class);
+                emptyForInitializerPadStyle = cu.getStyle(EmptyForInitializerPadStyle.class);
+                emptyForIteratorPadStyle = cu.getStyle(EmptyForIteratorPadStyle.class);
+            }
+            return super.visit(tree, ctx);
         }
 
         @Override
@@ -92,7 +96,7 @@ public class NoWhitespaceBefore extends Recipe {
                 }
             }
             if (Boolean.TRUE.equals(noWhitespaceBeforeStyle.getComma())) {
-                m = (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visit(m, ctx);
+                m = (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(m, ctx);
             }
             return m;
         }
@@ -101,7 +105,7 @@ public class NoWhitespaceBefore extends Recipe {
         public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {
             J.ForLoop f = super.visitForLoop(forLoop, ctx);
             if (Boolean.TRUE.equals(noWhitespaceBeforeStyle.getSemi())) {
-                f = (J.ForLoop) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visit(f, ctx);
+                f = (J.ForLoop) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(f, ctx);
             }
             return f;
         }
@@ -130,7 +134,7 @@ public class NoWhitespaceBefore extends Recipe {
                 if (Boolean.FALSE.equals(noWhitespaceBeforeStyle.getAllowLineBreaks()) && u.getPadding().getOperator().getBefore().getWhitespace().contains("\n")) {
                     u = u.getPadding().withOperator(u.getPadding().getOperator().withBefore(u.getPadding().getOperator().getBefore().withWhitespace("")));
                 }
-                u = (J.Unary) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visit(u, ctx);
+                u = (J.Unary) new SpacesVisitor<>(spacesStyle, emptyForInitializerPadStyle, emptyForIteratorPadStyle).visitNonNull(u, ctx);
             }
             return u;
         }

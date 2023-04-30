@@ -24,12 +24,12 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JLeftPadded;
 
 public class SimplifyCompoundVisitor<P> extends JavaVisitor<P> {
-    @Nullable
     @Override
     public J visitAssignmentOperation(J.AssignmentOperation assignOp, P p) {
         Expression cleanedUpAssignment = cleanupBooleanExpression(assignOp.getAssignment(), p);
         if (assignOp.getOperator() == J.AssignmentOperation.Type.BitAnd) {
             if (isLiteralTrue(cleanedUpAssignment)) {
+                //noinspection DataFlowIssue
                 return null;
             } else if (isLiteralFalse(cleanedUpAssignment)) {
                 return maybeAutoFormat(
@@ -47,6 +47,7 @@ public class SimplifyCompoundVisitor<P> extends JavaVisitor<P> {
             }
         } else if (assignOp.getOperator() == J.AssignmentOperation.Type.BitOr) {
             if (isLiteralFalse(cleanedUpAssignment)) {
+                //noinspection DataFlowIssue
                 return null;
             } else if (isLiteralTrue(cleanedUpAssignment)) {
                 return maybeAutoFormat(
@@ -67,16 +68,11 @@ public class SimplifyCompoundVisitor<P> extends JavaVisitor<P> {
     }
 
     @SuppressWarnings("unchecked")
-    private <E extends Expression> E cleanupBooleanExpression(
-            E expression, P context
-    ) {
-        final E ex1 =
-                (E) new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses())
-                        .visitNonNull(expression, context, getCursor().getParentOrThrow());
-        final E ex2 =
-                (E) new SimplifyBooleanExpressionVisitor<>()
-                        .visitNonNull(ex1, context, getCursor().getParentOrThrow());
-        return ex2;
+    private <E extends Expression> E cleanupBooleanExpression(E expression, P context) {
+        E ex1 = (E) new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses())
+                .visitNonNull(expression, context, getCursor().getParentOrThrow());
+        return (E) new SimplifyBooleanExpressionVisitor<>()
+                .visitNonNull(ex1, context, getCursor().getParentOrThrow());
     }
 
     private static boolean isLiteralTrue(@Nullable Expression expression) {

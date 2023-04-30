@@ -15,18 +15,19 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.RenameVariable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.Statement;
 
 import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static java.util.Objects.requireNonNull;
 
 public class RenameExceptionInEmptyCatch extends Recipe {
 
@@ -50,57 +51,61 @@ public class RenameExceptionInEmptyCatch extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
 
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                Map<Cursor, Set<String>> variableScopes = new LinkedHashMap<>();
-                executionContext.putMessage("VARIABLES_KEY", variableScopes);
-                return super.visitJavaSourceFile(cu, executionContext);
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    Map<Cursor, Set<String>> variableScopes = new LinkedHashMap<>();
+                    getCursor().putMessage("VARIABLES_KEY", variableScopes);
+                }
+                return super.visit(tree, ctx);
             }
 
             @Override
-            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
-                Map<Cursor, Set<String>> variableScope = executionContext.getMessage("VARIABLES_KEY");
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+                Map<Cursor, Set<String>> variableScope = getCursor().getNearestMessage("VARIABLES_KEY");
                 if (variableScope != null) {
                     // Collect class fields first since the name space is available anywhere in the class.
-                    classDecl.getBody().getStatements().forEach(o -> {
+                    for (Statement o : classDecl.getBody().getStatements()) {
                         if (o instanceof J.VariableDeclarations) {
                             J.VariableDeclarations variableDeclarations = (J.VariableDeclarations) o;
-                            variableDeclarations.getVariables().forEach(v ->
-                                    variableScope.computeIfAbsent(getCursor(), k -> new HashSet<>()).add(v.getSimpleName()));
+                            for (J.VariableDeclarations.NamedVariable v : variableDeclarations.getVariables()) {
+                                variableScope.computeIfAbsent(getCursor(), k -> new HashSet<>()).add(v.getSimpleName());
+                            }
                         }
-                    });
+                    }
                 }
-                return super.visitClassDeclaration(classDecl, executionContext);
+                return super.visitClassDeclaration(classDecl, ctx);
             }
 
             @Override
-            public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
+            public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
                 if (validIdentifier()) {
                     Cursor parentScope = getCursorToParentScope();
                     if (!(parentScope.getValue() instanceof J.ClassDeclaration)) {
-                        Map<Cursor, Set<String>> variableScope = executionContext.getMessage("VARIABLES_KEY");
+                        Map<Cursor, Set<String>> variableScope = getCursor().getNearestMessage("VARIABLES_KEY");
                         if (variableScope != null) {
                             Set<String> namesInScope = variableScope.computeIfAbsent(parentScope, k -> new HashSet<>());
                             namesInScope.add(identifier.getSimpleName());
                         }
                     }
                 }
-                return super.visitIdentifier(identifier, executionContext);
+                return super.visitIdentifier(identifier, ctx);
             }
 
             @Override
-            public J.Try.Catch visitCatch(J.Try.Catch _catch, ExecutionContext executionContext) {
+            public J.Try.Catch visitCatch(J.Try.Catch aCatch, ExecutionContext ctx) {
                 // Only visit empty catch blocks.
-                if (_catch.getBody().getStatements().isEmpty() && _catch.getBody().getEnd().getComments().isEmpty()) {
-                    return super.visitCatch(_catch, executionContext);
+                if (aCatch.getBody().getStatements().isEmpty() && aCatch.getBody().getEnd().getComments().isEmpty()) {
+                    return super.visitCatch(aCatch, ctx);
                 }
-                return _catch;
+                return aCatch;
             }
 
             @Override
-            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                 Cursor parentScope = getCursorToParentScope();
                 if (parentScope.getValue() instanceof J.Try.Catch) {
-                    Map<Cursor, Set<String>> variableScopes = executionContext.getMessage("VARIABLES_KEY");
+                    Map<Cursor, Set<String>> variableScopes = getCursor().getNearestMessage("VARIABLES_KEY");
                     if (variableScopes != null) {
                         Set<String> namesInScope = variableScopes.computeIfAbsent(parentScope, k -> new HashSet<>());
                         namesInScope.addAll(
@@ -130,43 +135,43 @@ public class RenameExceptionInEmptyCatch extends Recipe {
                         }
                     }
                 }
-                return super.visitVariableDeclarations(multiVariable, executionContext);
+                return super.visitVariableDeclarations(multiVariable, ctx);
             }
 
             // Aggregates the names from parent scopes that are visible in child scopes.
             private void aggregateNameScopes(Map<Cursor, Set<String>> variableScopes) {
                 List<Cursor> parentScopes = new ArrayList<>(variableScopes.keySet());
-                parentScopes.forEach(parentScope -> {
+                for (Cursor parentScope : parentScopes) {
                     for (Cursor maybeInScope : parentScopes) {
                         if (parentScope.isScopeInPath(maybeInScope.getValue())) {
                             variableScopes.get(parentScope).addAll(variableScopes.get(maybeInScope));
                         }
                     }
-                });
+                }
             }
 
             // Filter out class names and method names.
             private boolean validIdentifier() {
                 Cursor parent = getCursor().getParent();
                 return parent != null &&
-                        !(parent.getValue() instanceof J.ClassDeclaration) &&
-                        !(parent.getValue() instanceof J.MethodDeclaration) &&
-                        !(parent.getValue() instanceof J.MethodInvocation);
+                       !(parent.getValue() instanceof J.ClassDeclaration) &&
+                       !(parent.getValue() instanceof J.MethodDeclaration) &&
+                       !(parent.getValue() instanceof J.MethodInvocation);
             }
 
             // Sets structure for cursor positions to aggregate namespaces.
             private Cursor getCursorToParentScope() {
                 return getCursor().dropParentUntil(is ->
                         is instanceof J.CompilationUnit ||
-                                is instanceof J.ClassDeclaration ||
-                                is instanceof J.Block ||
-                                is instanceof J.MethodDeclaration ||
-                                is instanceof J.ForLoop ||
-                                is instanceof J.Case ||
-                                is instanceof J.Try ||
-                                is instanceof J.Try.Catch ||
-                                is instanceof J.MultiCatch ||
-                                is instanceof J.Lambda
+                        is instanceof J.ClassDeclaration ||
+                        is instanceof J.Block ||
+                        is instanceof J.MethodDeclaration ||
+                        is instanceof J.ForLoop ||
+                        is instanceof J.Case ||
+                        is instanceof J.Try ||
+                        is instanceof J.Try.Catch ||
+                        is instanceof J.MultiCatch ||
+                        is instanceof J.Lambda
                 );
             }
         };

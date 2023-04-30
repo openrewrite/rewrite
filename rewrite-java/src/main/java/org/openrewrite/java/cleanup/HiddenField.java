@@ -16,14 +16,18 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.HiddenFieldStyle;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
+
+import static java.util.Objects.requireNonNull;
 
 @Incubating(since = "7.6.0")
 public class HiddenField extends Recipe {
@@ -54,13 +58,16 @@ public class HiddenField extends Recipe {
 
     private static class HiddenFieldFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-            HiddenFieldStyle style = ((SourceFile)cu).getStyle(HiddenFieldStyle.class);
-            if (style == null) {
-                style = Checkstyle.hiddenFieldStyle();
+        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof JavaSourceFile) {
+                JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                HiddenFieldStyle style = ((SourceFile) cu).getStyle(HiddenFieldStyle.class);
+                if (style == null) {
+                    style = Checkstyle.hiddenFieldStyle();
+                }
+                return new HiddenFieldVisitor<>(style).visit(cu, ctx);
             }
-            doAfterVisit(new HiddenFieldVisitor<>(style));
-            return cu;
+            return (J) tree;
         }
     }
 }

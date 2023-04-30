@@ -27,6 +27,8 @@ import org.openrewrite.marker.SearchResult;
 
 import java.nio.file.Paths;
 
+import static java.util.Objects.requireNonNull;
+
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class FindGradleProject extends Recipe {
@@ -53,11 +55,14 @@ public class FindGradleProject extends Recipe {
         if (searchCriteria == SearchCriteria.Marker) {
             return new JavaVisitor<ExecutionContext>() {
                 @Override
-                public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                    if (cu.getMarkers().findFirst(GradleProject.class).isPresent()) {
-                        return SearchResult.found(cu);
+                public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    if (tree instanceof JavaSourceFile) {
+                        JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                        if (cu.getMarkers().findFirst(GradleProject.class).isPresent()) {
+                            return SearchResult.found(cu);
+                        }
                     }
-                    return cu;
+                    return super.visit(tree, ctx);
                 }
             };
         }

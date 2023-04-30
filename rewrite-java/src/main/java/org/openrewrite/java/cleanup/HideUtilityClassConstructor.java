@@ -16,14 +16,18 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.HideUtilityClassConstructorStyle;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
+
+import static java.util.Objects.requireNonNull;
 
 @Incubating(since = "7.0.0")
 public class HideUtilityClassConstructor extends Recipe {
@@ -55,13 +59,16 @@ public class HideUtilityClassConstructor extends Recipe {
 
     private static class HideUtilityClassConstructorFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-            HideUtilityClassConstructorStyle style = ((SourceFile)cu).getStyle(HideUtilityClassConstructorStyle.class);
-            if (style == null) {
-                style = Checkstyle.hideUtilityClassConstructorStyle();
+        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof JavaSourceFile) {
+                JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                HideUtilityClassConstructorStyle style = ((SourceFile) cu).getStyle(HideUtilityClassConstructorStyle.class);
+                if (style == null) {
+                    style = Checkstyle.hideUtilityClassConstructorStyle();
+                }
+                return new HideUtilityClassConstructorVisitor<>(style).visit(cu, ctx);
             }
-            doAfterVisit(new HideUtilityClassConstructorVisitor<>(style));
-            return cu;
+            return (J) tree;
         }
     }
 }

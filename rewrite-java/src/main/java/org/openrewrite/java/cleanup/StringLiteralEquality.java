@@ -53,78 +53,74 @@ public class StringLiteralEquality extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new UsesType<>("java.lang.String", false), new StringLiteralEqualityVisitor());
-    }
+        return Preconditions.check(new UsesType<>("java.lang.String", false), new JavaVisitor<ExecutionContext>() {
+            private final JavaType.FullyQualified TYPE_STRING = TypeUtils.asFullyQualified(JavaType.buildType("java.lang.String"));
+            private final JavaType TYPE_OBJECT = JavaType.buildType("java.lang.Object");
 
-    private static class StringLiteralEqualityVisitor extends JavaVisitor<ExecutionContext> {
-        private static final JavaType.FullyQualified TYPE_STRING = TypeUtils.asFullyQualified(JavaType.buildType("java.lang.String"));
-        private static final JavaType TYPE_OBJECT = JavaType.buildType("java.lang.Object");
-
-        private static boolean isStringLiteral(Expression expression) {
-            return expression instanceof J.Literal && TypeUtils.isString(((J.Literal) expression).getType());
-        }
-
-        /**
-         * Transform a binary expression into a method invocation on String.equals. For example,
-         * <p>
-         * {@code "foo" == "bar"} into {@code "foo".equals("bar")}
-         */
-        private static J.MethodInvocation asEqualsMethodInvocation(J.Binary binary) {
-            return new J.MethodInvocation(
-                    Tree.randomId(),
-                    binary.getPrefix(),
-                    Markers.EMPTY,
-                    new JRightPadded<>(binary.getLeft().withPrefix(Space.EMPTY), Space.EMPTY, Markers.EMPTY),
-                    null,
-                    new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, "equals", JavaType.Primitive.Boolean, null),
-                    JContainer.build(singletonList(new JRightPadded<>(binary.getRight().withPrefix(Space.EMPTY), Space.EMPTY, Markers.EMPTY))),
-                    new JavaType.Method(
-                            null,
-                            Flag.Public.getBitMask(),
-                            TYPE_STRING,
-                            "equals",
-                            JavaType.Primitive.Boolean,
-                            singletonList("o"),
-                            singletonList(TYPE_OBJECT),
-                            null, null, null
-                    )
-            );
-        }
-
-        /**
-         * Wrap a method invocation within a negated unary expression. For example,
-         * <p>
-         * {@code "foo".equals("bar")} into {@code !"foo".equals("bar")}
-         */
-        private static J.Unary asNegatedUnary(J.MethodInvocation mi) {
-            return new J.Unary(
-                    Tree.randomId(),
-                    Space.EMPTY,
-                    Markers.EMPTY,
-                    new JLeftPadded<>(Space.EMPTY, J.Unary.Type.Not, Markers.EMPTY),
-                    mi,
-                    JavaType.Primitive.Boolean
-            );
-        }
-
-        @Override
-        public J visitBinary(J.Binary binary, ExecutionContext ctx) {
-            if (isStringLiteral(binary.getLeft()) || isStringLiteral(binary.getRight())) {
-                J after = null;
-                if (binary.getOperator() == J.Binary.Type.Equal) {
-                    after = asEqualsMethodInvocation(binary);
-                } else if (binary.getOperator() == J.Binary.Type.NotEqual) {
-                    J.MethodInvocation mi = asEqualsMethodInvocation(binary);
-                    after = asNegatedUnary(mi);
-                }
-                if (after != null) {
-                    doAfterVisit(new EqualsAvoidsNull());
-                    return after;
-                }
+            private boolean isStringLiteral(Expression expression) {
+                return expression instanceof J.Literal && TypeUtils.isString(((J.Literal) expression).getType());
             }
-            return super.visitBinary(binary, ctx);
-        }
 
+            /**
+             * Transform a binary expression into a method invocation on String.equals. For example,
+             * <p>
+             * {@code "foo" == "bar"} into {@code "foo".equals("bar")}
+             */
+            private J.MethodInvocation asEqualsMethodInvocation(J.Binary binary) {
+                return new J.MethodInvocation(
+                        Tree.randomId(),
+                        binary.getPrefix(),
+                        Markers.EMPTY,
+                        new JRightPadded<>(binary.getLeft().withPrefix(Space.EMPTY), Space.EMPTY, Markers.EMPTY),
+                        null,
+                        new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, "equals", JavaType.Primitive.Boolean, null),
+                        JContainer.build(singletonList(new JRightPadded<>(binary.getRight().withPrefix(Space.EMPTY), Space.EMPTY, Markers.EMPTY))),
+                        new JavaType.Method(
+                                null,
+                                Flag.Public.getBitMask(),
+                                TYPE_STRING,
+                                "equals",
+                                JavaType.Primitive.Boolean,
+                                singletonList("o"),
+                                singletonList(TYPE_OBJECT),
+                                null, null, null
+                        )
+                );
+            }
+
+            /**
+             * Wrap a method invocation within a negated unary expression. For example,
+             * <p>
+             * {@code "foo".equals("bar")} into {@code !"foo".equals("bar")}
+             */
+            private J.Unary asNegatedUnary(J.MethodInvocation mi) {
+                return new J.Unary(
+                        Tree.randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        new JLeftPadded<>(Space.EMPTY, J.Unary.Type.Not, Markers.EMPTY),
+                        mi,
+                        JavaType.Primitive.Boolean
+                );
+            }
+
+            @Override
+            public J visitBinary(J.Binary binary, ExecutionContext ctx) {
+                if (isStringLiteral(binary.getLeft()) || isStringLiteral(binary.getRight())) {
+                    J after = null;
+                    if (binary.getOperator() == J.Binary.Type.Equal) {
+                        after = asEqualsMethodInvocation(binary);
+                    } else if (binary.getOperator() == J.Binary.Type.NotEqual) {
+                        J.MethodInvocation mi = asEqualsMethodInvocation(binary);
+                        after = asNegatedUnary(mi);
+                    }
+                    if (after != null) {
+                        doAfterVisit(new EqualsAvoidsNull());
+                        return after;
+                    }
+                }
+                return super.visitBinary(binary, ctx);
+            }
+        });
     }
-
 }

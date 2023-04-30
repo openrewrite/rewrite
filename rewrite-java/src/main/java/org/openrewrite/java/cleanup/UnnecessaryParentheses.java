@@ -15,19 +15,20 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
+
+import static java.util.Objects.requireNonNull;
 
 public class UnnecessaryParentheses extends Recipe {
 
@@ -55,13 +56,16 @@ public class UnnecessaryParentheses extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                UnnecessaryParenthesesStyle style = ((SourceFile) cu).getStyle(UnnecessaryParenthesesStyle.class);
-                if (style == null) {
-                    style = Checkstyle.unnecessaryParentheses();
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    UnnecessaryParenthesesStyle style = ((SourceFile) cu).getStyle(UnnecessaryParenthesesStyle.class);
+                    if (style == null) {
+                        style = Checkstyle.unnecessaryParentheses();
+                    }
+                    return new UnnecessaryParenthesesVisitor<>(style).visit(cu, ctx);
                 }
-                doAfterVisit(new UnnecessaryParenthesesVisitor<>(style));
-                return cu;
+                return (J) tree;
             }
         };
     }

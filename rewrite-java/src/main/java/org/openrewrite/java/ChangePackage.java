@@ -28,6 +28,8 @@ import java.nio.file.Paths;
 import java.util.IdentityHashMap;
 import java.util.Map;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * A recipe that will rename a package name in package statements, imports, and fully-qualified types (see: NOTE).
  * <p>
@@ -71,31 +73,35 @@ public class ChangePackage extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JavaIsoVisitor<ExecutionContext> condition = new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                if (cu.getPackageDeclaration() != null) {
-                    String original = cu.getPackageDeclaration().getExpression()
-                            .printTrimmed(getCursor()).replaceAll("\\s", "");
-                    if (original.startsWith(oldPackageName)) {
-                        return SearchResult.found(cu);
-                    }
-                }
-                boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
-                String recursivePackageNamePrefix = oldPackageName + ".";
-                for (J.Import anImport : cu.getImports()) {
-                    String importedPackage = anImport.getPackageName();
-                    if (importedPackage.equals(oldPackageName) || recursive && importedPackage.startsWith(recursivePackageNamePrefix)) {
-                        return SearchResult.found(cu);
-                    }
-                }
-                for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
-                    if (type instanceof JavaType.FullyQualified) {
-                        String packageName = ((JavaType.FullyQualified) type).getPackageName();
-                        if (packageName.equals(oldPackageName) || recursive && packageName.startsWith(recursivePackageNamePrefix)) {
+            public @Nullable J preVisit(J tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    if (cu.getPackageDeclaration() != null) {
+                        String original = cu.getPackageDeclaration().getExpression()
+                                .printTrimmed(getCursor()).replaceAll("\\s", "");
+                        if (original.startsWith(oldPackageName)) {
                             return SearchResult.found(cu);
                         }
                     }
+                    boolean recursive = Boolean.TRUE.equals(ChangePackage.this.recursive);
+                    String recursivePackageNamePrefix = oldPackageName + ".";
+                    for (J.Import anImport : cu.getImports()) {
+                        String importedPackage = anImport.getPackageName();
+                        if (importedPackage.equals(oldPackageName) || recursive && importedPackage.startsWith(recursivePackageNamePrefix)) {
+                            return SearchResult.found(cu);
+                        }
+                    }
+                    for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
+                        if (type instanceof JavaType.FullyQualified) {
+                            String packageName = ((JavaType.FullyQualified) type).getPackageName();
+                            if (packageName.equals(oldPackageName) || recursive && packageName.startsWith(recursivePackageNamePrefix)) {
+                                return SearchResult.found(cu);
+                            }
+                        }
+                    }
+                    stopAfterPreVisit();
                 }
-                return cu;
+                return super.preVisit(tree, ctx);
             }
         };
 

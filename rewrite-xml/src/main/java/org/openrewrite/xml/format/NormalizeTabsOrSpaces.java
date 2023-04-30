@@ -46,7 +46,7 @@ public class NormalizeTabsOrSpaces extends Recipe {
             if (style == null) {
                 style = TabsAndIndentsStyle.DEFAULT;
             }
-            doAfterVisit(new NormalizeTabsOrSpacesVisitor<>(style));
+            return new NormalizeTabsOrSpacesVisitor<>(style).visit(cu, ctx);
             return document;
         }
     }

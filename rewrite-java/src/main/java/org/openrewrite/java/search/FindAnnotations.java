@@ -21,7 +21,6 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
@@ -31,6 +30,7 @@ import org.openrewrite.marker.SearchResult;
 import java.util.HashSet;
 import java.util.Set;
 
+import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toSet;
 
 @EqualsAndHashCode(callSuper = true)
@@ -67,13 +67,16 @@ public class FindAnnotations extends Recipe {
         return Preconditions.check(
                 new JavaIsoVisitor<ExecutionContext>() {
                     @Override
-                    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext o) {
-                        for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
-                            if (annotationMatcher.matchesAnnotationOrMetaAnnotation(TypeUtils.asFullyQualified(type))) {
-                                return SearchResult.found(cu);
+                    public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        if (tree instanceof JavaSourceFile) {
+                            JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                            for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
+                                if (annotationMatcher.matchesAnnotationOrMetaAnnotation(TypeUtils.asFullyQualified(type))) {
+                                    return SearchResult.found(cu);
+                                }
                             }
                         }
-                        return cu;
+                        return super.visit(tree, ctx);
                     }
 
                     @Override

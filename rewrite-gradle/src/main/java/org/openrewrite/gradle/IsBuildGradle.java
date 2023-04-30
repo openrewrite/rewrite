@@ -15,19 +15,29 @@
  */
 package org.openrewrite.gradle;
 
+import org.gradle.internal.impldep.com.thoughtworks.qdox.model.JavaSource;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
 import java.nio.file.Path;
 
+import static java.util.Objects.requireNonNull;
+
 public class IsBuildGradle<P> extends JavaIsoVisitor<P> {
     @Override
-    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        if (matches(cu.getSourcePath())) {
-            return SearchResult.found(cu);
+    public J visit(@Nullable Tree tree, P p) {
+        if (tree instanceof JavaSourceFile) {
+            JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+            if (matches(cu.getSourcePath())) {
+                return SearchResult.found(cu);
+            }
         }
-        return super.visitJavaSourceFile(cu, p);
+        return super.visit(tree, p);
     }
 
     public static boolean matches(Path sourcePath) {

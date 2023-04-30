@@ -179,16 +179,16 @@ class MethodNameCasingTest implements RewriteTest {
           srcTestJava(
             java(
               """
-                    class Test {
-                        void MyMethod_with_über() {
-                        }
+                class Test {
+                    void MyMethod_with_über() {
                     }
+                }
                 """,
               """
-                    class Test {
-                        void myMethodWithUber() {
-                        }
+                class Test {
+                    void myMethodWithUber() {
                     }
+                }
                 """
             )
           )

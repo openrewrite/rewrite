@@ -17,8 +17,10 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -29,6 +31,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
 public class UseCollectionInterfaces extends Recipe {
@@ -90,14 +93,17 @@ public class UseCollectionInterfaces extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
-                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type);
-                    if (fq != null && rspecRulesReplaceTypeMap.containsKey(fq.getFullyQualifiedName())) {
-                        return super.visitJavaSourceFile(cu, executionContext);
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
+                        JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type);
+                        if (fq != null && rspecRulesReplaceTypeMap.containsKey(fq.getFullyQualifiedName())) {
+                            return super.visit(cu, ctx);
+                        }
                     }
                 }
-                return cu;
+                return super.visit(tree, ctx);
             }
 
             @Override

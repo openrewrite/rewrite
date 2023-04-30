@@ -23,6 +23,8 @@ import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.*;
 
+import static java.util.Objects.requireNonNull;
+
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeMethodName extends Recipe {
@@ -69,16 +71,20 @@ public class ChangeMethodName extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JavaIsoVisitor<ExecutionContext> condition = new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                if (Boolean.TRUE.equals(ignoreDefinition)) {
-                    J j = new DeclaresMethod<>(methodPattern, matchOverrides).visitNonNull(cu, executionContext);
-                    if (cu != j) {
-                        return cu;
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    if (Boolean.TRUE.equals(ignoreDefinition)) {
+                        J j = new DeclaresMethod<>(methodPattern, matchOverrides).visitNonNull(cu, ctx);
+                        if (cu != j) {
+                            return cu;
+                        }
                     }
+                    cu = (JavaSourceFile) new UsesMethod<>(methodPattern, matchOverrides).visitNonNull(cu, ctx);
+                    cu = (JavaSourceFile) new DeclaresMethod<>(methodPattern, matchOverrides).visitNonNull(cu, ctx);
+                    return cu;
                 }
-                doAfterVisit(new UsesMethod<>(methodPattern, matchOverrides));
-                doAfterVisit(new DeclaresMethod<>(methodPattern, matchOverrides));
-                return cu;
+                return super.visit(tree, ctx);
             }
         };
 

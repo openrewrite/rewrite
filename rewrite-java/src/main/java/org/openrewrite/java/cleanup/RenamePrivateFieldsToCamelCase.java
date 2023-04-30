@@ -19,14 +19,13 @@ import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.RenameVariable;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 import static org.openrewrite.internal.NameCaseConvention.LOWER_CAMEL;
 
@@ -50,12 +49,12 @@ public class RenamePrivateFieldsToCamelCase extends Recipe {
     @Override
     public String getDescription() {
         return "Reformat private field names to camelCase to comply with Java naming convention. " +
-                "The recipe will not rename fields with default, protected or public access modifiers." +
-                "The recipe will not rename private constants." +
-                "The first character is set to lower case and existing capital letters are preserved. " +
-                "Special characters that are allowed in java field names `$` and `_` are removed. " +
-                "If a special character is removed the next valid alphanumeric will be capitalized. " +
-                "The recipe will not rename a field if the result already exists in the class, conflicts with a java reserved keyword, or the result is blank.";
+               "The recipe will not rename fields with default, protected or public access modifiers." +
+               "The recipe will not rename private constants." +
+               "The first character is set to lower case and existing capital letters are preserved. " +
+               "Special characters that are allowed in java field names `$` and `_` are removed. " +
+               "If a special character is removed the next valid alphanumeric will be capitalized. " +
+               "The recipe will not rename a field if the result already exists in the class, conflicts with a java reserved keyword, or the result is blank.";
     }
 
     @Override
@@ -70,66 +69,50 @@ public class RenamePrivateFieldsToCamelCase extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RenameNonCompliantNames();
-    }
-
-    private static class RenameNonCompliantNames extends JavaIsoVisitor<ExecutionContext> {
-        @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-            Map<J.VariableDeclarations.NamedVariable, String> renameVariablesMap = new LinkedHashMap<>();
-            Set<String> hasNameSet = new HashSet<>();
-
-            getCursor().putMessage("RENAME_VARIABLES_KEY", renameVariablesMap);
-            getCursor().putMessage("HAS_NAME_KEY", hasNameSet);
-            super.visitJavaSourceFile(cu, ctx);
-
-            renameVariablesMap.forEach((key, value) -> {
-                if (!hasNameSet.contains(value) && !hasNameSet.contains(key.getSimpleName())) {
-                    doAfterVisit(new RenameVariable<>(key, value));
-                    hasNameSet.add(value);
-                }
-            });
-            return cu;
-        }
-
-        @SuppressWarnings("all")
-        @Override
-        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
-            Cursor parentScope = getCursorToParentScope(getCursor());
-
-            // Does support renaming fields in a J.ClassDeclaration.
-            // We must have a variable type to make safe changes.
-            // Only make changes to private fields that are not constants.
-            // Does not apply for instance variables of inner classes
-            // Only make a change if the variable does not conform to lower camelcase format.
-            if (parentScope.getParent() != null
-                    && parentScope.getParent().getValue() instanceof J.ClassDeclaration
-                    && !(parentScope.getValue() instanceof J.ClassDeclaration)
-                    && variable.getVariableType() != null
-                    && variable.getVariableType().hasFlags(Flag.Private)
-                    && !(variable.getVariableType().hasFlags(Flag.Static, Flag.Final))
-                    && !((J.ClassDeclaration) parentScope.getParent().getValue()).getType().getFullyQualifiedName().contains("$")
-                    && !LOWER_CAMEL.matches(variable.getSimpleName())) {
-
-                String toName = LOWER_CAMEL.format(variable.getSimpleName());
-                ((Map<J.VariableDeclarations.NamedVariable, String>) getCursor().getNearestMessage("RENAME_VARIABLES_KEY")).put(variable, toName);
-            } else {
-                ((Set<String>) getCursor().getNearestMessage("HAS_NAME_KEY")).add(variable.getSimpleName());
+        return new RenameToCamelCase() {
+            @Override
+            protected boolean shouldRename(Set<String> hasNameKey, J.VariableDeclarations.NamedVariable variable, String toName) {
+                return !hasNameKey.contains(toName) && !hasNameKey.contains(variable.getSimpleName());
             }
 
-            return super.visitVariable(variable, ctx);
-        }
+            @SuppressWarnings("all")
+            @Override
+            public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+                Cursor parentScope = getCursorToParentScope(getCursor());
 
-        /**
-         * Returns either the current block or a J.Type that may create a reference to a variable.
-         * I.E. for(int target = 0; target < N; target++) creates a new name scope for `target`.
-         * The name scope in the next J.Block `{}` cannot create new variables with the name `target`.
-         * <p>
-         * J.* types that may only reference an existing name and do not create a new name scope are excluded.
-         */
-        private static Cursor getCursorToParentScope(Cursor cursor) {
-            return cursor.dropParentUntil(is -> is instanceof J.ClassDeclaration || is instanceof J.Block);
-        }
+                // Does support renaming fields in a J.ClassDeclaration.
+                // We must have a variable type to make safe changes.
+                // Only make changes to private fields that are not constants.
+                // Does not apply for instance variables of inner classes
+                // Only make a change if the variable does not conform to lower camelcase format.
+                if (parentScope.getParent() != null &&
+                    parentScope.getParent().getValue() instanceof J.ClassDeclaration &&
+                    !(parentScope.getValue() instanceof J.ClassDeclaration) &&
+                    variable.getVariableType() != null &&
+                    variable.getVariableType().hasFlags(Flag.Private) &&
+                    !(variable.getVariableType().hasFlags(Flag.Static, Flag.Final)) &&
+                    !((J.ClassDeclaration) parentScope.getParent().getValue()).getType().getFullyQualifiedName().contains("$") &&
+                    !LOWER_CAMEL.matches(variable.getSimpleName())) {
+
+                    String toName = LOWER_CAMEL.format(variable.getSimpleName());
+                    renameVariable(variable, toName);
+                } else {
+                    hasNameKey(variable.getSimpleName());
+                }
+
+                return super.visitVariable(variable, ctx);
+            }
+
+            /**
+             * Returns either the current block or a J.Type that may create a reference to a variable.
+             * I.E. for(int target = 0; target < N; target++) creates a new name scope for `target`.
+             * The name scope in the next J.Block `{}` cannot create new variables with the name `target`.
+             * <p>
+             * J.* types that may only reference an existing name and do not create a new name scope are excluded.
+             */
+            private Cursor getCursorToParentScope(Cursor cursor) {
+                return cursor.dropParentUntil(is -> is instanceof J.ClassDeclaration || is instanceof J.Block);
+            }
+        };
     }
-
 }

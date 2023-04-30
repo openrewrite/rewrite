@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Statement;
 
 /**
@@ -32,11 +31,6 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     @Override
     public Expression visitExpression(Expression expression, P p) {
         return (Expression) super.visitExpression(expression, p);
-    }
-
-    @Override
-    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        return (JavaSourceFile) super.visitJavaSourceFile(cu, p);
     }
 
     @Override

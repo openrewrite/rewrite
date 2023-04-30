@@ -19,27 +19,25 @@ import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.RenameVariable;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.Collections;
+import java.util.Set;
 
 import static org.openrewrite.internal.NameCaseConvention.LOWER_CAMEL;
 
 /**
  * This recipe converts local variables and method parameters to camel case convention.
  * The recipe will not rename variables declared in for loop controls or catches with a single character.
- *
+ * <br/>
  * The first character is set to lower case and existing capital letters are preserved.
  * Special characters that are allowed in java field names `$` and `_` are removed.
- * If a special character is removed the next valid alpha-numeric will be capitalized.
- *
+ * If a special character is removed the next valid alphanumeric will be capitalized.
+ * <br/>
  * Currently, unsupported:
- *  - The recipe will not rename variables declared in a class.
- *  - The recipe will not rename variables if the result already exists in a class or the result will be a java reserved keyword.
+ * - The recipe will not rename variables declared in a class.
+ * - The recipe will not rename variables if the result already exists in a class or the result will be a java reserved keyword.
  */
 public class RenameLocalVariablesToCamelCase extends Recipe {
 
@@ -54,7 +52,7 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
                "The recipe will not rename variables declared in for loop controls or catches with a single character. " +
                "The first character is set to lower case and existing capital letters are preserved. " +
                "Special characters that are allowed in java field names `$` and `_` are removed. " +
-               "If a special character is removed the next valid alpha-numeric will be capitalized. " +
+               "If a special character is removed the next valid alphanumeric will be capitalized. " +
                "Currently, does not support renaming members of classes. " +
                "The recipe will not rename a variable if the result already exists in the class, conflicts with a java reserved keyword, or the result is blank.";
     }
@@ -71,37 +69,21 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RenameNonCompliantNames();
-    }
+        return new RenameToCamelCase() {
+            @Override
+            protected boolean shouldRename(Set<String> hasNameKey, J.VariableDeclarations.NamedVariable variable, String toName) {
+                return !hasNameKey.contains(toName);
+            }
 
-    private static class RenameNonCompliantNames extends JavaIsoVisitor<ExecutionContext> {
-        @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-            Map<J.VariableDeclarations.NamedVariable, String> renameVariablesMap = new LinkedHashMap<>();
-            Set<String> hasNameSet = new HashSet<>();
+            @SuppressWarnings("all")
+            @Override
+            public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+                Cursor parentScope = getCursorToParentScope(getCursor());
 
-            getCursor().putMessage("RENAME_VARIABLES_KEY", renameVariablesMap);
-            getCursor().putMessage("HAS_NAME_KEY", hasNameSet);
-            super.visitJavaSourceFile(cu, ctx);
-
-            renameVariablesMap.forEach((key, value) -> {
-                if (!hasNameSet.contains(value)) {
-                    doAfterVisit(new RenameVariable<>(key, value));
-                    hasNameSet.add(value);
-                }
-            });
-            return cu;
-        }
-
-        @SuppressWarnings("all")
-        @Override
-        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
-            Cursor parentScope = getCursorToParentScope(getCursor());
-
-            // Does not currently support renaming fields in a J.ClassDeclaration.
-            if (!(parentScope.getParent() != null && (parentScope.getParent().getValue() instanceof J.ClassDeclaration ||
-                    // Detect java records
-                    parentScope.getValue() instanceof J.ClassDeclaration)) &&
+                // Does not currently support renaming fields in a J.ClassDeclaration.
+                if (!(parentScope.getParent() != null && (parentScope.getParent().getValue() instanceof J.ClassDeclaration ||
+                                                          // Detect java records
+                                                          parentScope.getValue() instanceof J.ClassDeclaration)) &&
                     // Does not apply for instance variables of anonymous inner classes
                     !(parentScope.getParent().getValue() instanceof J.NewClass) &&
                     // Does not apply to for loop controls.
@@ -109,47 +91,46 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
                     // Does not apply to catches with 1 character.
                     !((parentScope.getValue() instanceof J.Try.Catch || parentScope.getValue() instanceof J.MultiCatch) && variable.getSimpleName().length() == 1)) {
 
-                if (!LOWER_CAMEL.matches(variable.getSimpleName())) {
-                    String toName = LOWER_CAMEL.format(variable.getSimpleName());
-                    ((Map<J.VariableDeclarations.NamedVariable, String>) getCursor().getNearestMessage("RENAME_VARIABLES_KEY")).put(variable, toName);
-                } else {
-                    ((Set<String>) getCursor().getNearestMessage("HAS_NAME_KEY")).add(variable.getSimpleName());
+                    if (!LOWER_CAMEL.matches(variable.getSimpleName())) {
+                        String toName = LOWER_CAMEL.format(variable.getSimpleName());
+                        renameVariable(variable, toName);
+                    } else {
+                        hasNameKey(variable.getSimpleName());
+                    }
                 }
+
+                return variable;
             }
 
-            return variable;
-        }
+            @SuppressWarnings("all")
+            @Override
+            public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                hasNameKey(identifier.getSimpleName());
+                return identifier;
+            }
 
-        @SuppressWarnings("all")
-        @Override
-        public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
-            ((Set<String>) getCursor().getNearestMessage("HAS_NAME_KEY")).add(identifier.getSimpleName());
-
-            return identifier;
-        }
-
-        /**
-         * Returns either the current block or a J.Type that may create a reference to a variable.
-         * I.E. for(int target = 0; target < N; target++) creates a new name scope for `target`.
-         * The name scope in the next J.Block `{}` cannot create new variables with the name `target`.
-         * <p>
-         * J.* types that may only reference an existing name and do not create a new name scope are excluded.
-         */
-        private static Cursor getCursorToParentScope(Cursor cursor) {
-            return cursor.dropParentUntil(is ->
-                    is instanceof J.ClassDeclaration ||
-                            is instanceof J.Block ||
-                            is instanceof J.MethodDeclaration ||
-                            is instanceof J.ForLoop ||
-                            is instanceof J.ForEachLoop ||
-                            is instanceof J.ForLoop.Control ||
-                            is instanceof J.Case ||
-                            is instanceof J.Try ||
-                            is instanceof J.Try.Catch ||
-                            is instanceof J.MultiCatch ||
-                            is instanceof J.Lambda
-            );
-        }
+            /**
+             * Returns either the current block or a J.Type that may create a reference to a variable.
+             * I.E. for(int target = 0; target < N; target++) creates a new name scope for `target`.
+             * The name scope in the next J.Block `{}` cannot create new variables with the name `target`.
+             * <p>
+             * J.* types that may only reference an existing name and do not create a new name scope are excluded.
+             */
+            private Cursor getCursorToParentScope(Cursor cursor) {
+                return cursor.dropParentUntil(is ->
+                        is instanceof J.ClassDeclaration ||
+                        is instanceof J.Block ||
+                        is instanceof J.MethodDeclaration ||
+                        is instanceof J.ForLoop ||
+                        is instanceof J.ForEachLoop ||
+                        is instanceof J.ForLoop.Control ||
+                        is instanceof J.Case ||
+                        is instanceof J.Try ||
+                        is instanceof J.Try.Catch ||
+                        is instanceof J.MultiCatch ||
+                        is instanceof J.Lambda
+                );
+            }
+        };
     }
-
 }

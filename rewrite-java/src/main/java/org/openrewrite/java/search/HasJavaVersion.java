@@ -21,6 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaVersion;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.semver.Semver;
@@ -70,14 +71,18 @@ public class HasJavaVersion extends Recipe {
         VersionComparator versionComparator = requireNonNull(Semver.validate(version, null).getValue());
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                return cu.getMarkers().findFirst(JavaVersion.class)
-                        .filter(version -> versionComparator.isValid(null, Integer.toString(
-                                Boolean.TRUE.equals(checkTargetCompatibility) ?
-                                        version.getMajorReleaseVersion() :
-                                        version.getMajorVersion())))
-                        .map(version -> SearchResult.found(cu))
-                        .orElse(cu);
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    return cu.getMarkers().findFirst(JavaVersion.class)
+                            .filter(version -> versionComparator.isValid(null, Integer.toString(
+                                    Boolean.TRUE.equals(checkTargetCompatibility) ?
+                                            version.getMajorReleaseVersion() :
+                                            version.getMajorVersion())))
+                            .map(version -> SearchResult.found(cu))
+                            .orElse(cu);
+                }
+                return (J) tree;
             }
         };
     }

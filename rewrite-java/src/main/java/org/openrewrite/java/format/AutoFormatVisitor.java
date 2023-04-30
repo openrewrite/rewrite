@@ -27,6 +27,7 @@ import org.openrewrite.style.GeneralFormatStyle;
 
 import java.util.Optional;
 
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 
 public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
@@ -84,39 +85,43 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        // Avoid reformatting entire Groovy source files, or other J-derived ASTs
-        // Java AutoFormat does OK for a snippet of Groovy, But whole-file reformatting is inadvisable and there is
-        // currently no easy way to customize or fine-tune for Groovy
-        if(!(cu instanceof J.CompilationUnit)) {
-            return cu;
+    public J visit(@Nullable Tree tree, P p) {
+        if (tree instanceof JavaSourceFile) {
+            JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+            // Avoid reformatting entire Groovy source files, or other J-derived ASTs
+            // Java AutoFormat does OK for a snippet of Groovy, But whole-file reformatting is inadvisable and there is
+            // currently no easy way to customize or fine-tune for Groovy
+            if (!(cu instanceof J.CompilationUnit)) {
+                return cu;
+            }
+            JavaSourceFile t = (JavaSourceFile) new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(cu, p);
+
+            t = (JavaSourceFile) new BlankLinesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(BlankLinesStyle.class))
+                    .orElse(IntelliJ.blankLines()), stopAfter)
+                    .visit(t, p);
+
+            t = (JavaSourceFile) new SpacesVisitor<P>(Optional.ofNullable(
+                    ((SourceFile) cu).getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces()),
+                    ((SourceFile) cu).getStyle(EmptyForInitializerPadStyle.class),
+                    ((SourceFile) cu).getStyle(EmptyForIteratorPadStyle.class),
+                    stopAfter)
+                    .visit(t, p);
+
+            t = (JavaSourceFile) new WrappingAndBracesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(WrappingAndBracesStyle.class))
+                    .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
+                    .visit(t, p);
+
+            t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
+                    .orElse(IntelliJ.tabsAndIndents()), stopAfter)
+                    .visit(t, p);
+
+            t = (JavaSourceFile) new TabsAndIndentsVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
+                    .orElse(IntelliJ.tabsAndIndents()), stopAfter)
+                    .visit(t, p);
+
+            assert t != null;
+            return t;
         }
-        JavaSourceFile t = (JavaSourceFile) new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(cu, p);
-
-        t = (JavaSourceFile) new BlankLinesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(BlankLinesStyle.class))
-                .orElse(IntelliJ.blankLines()), stopAfter)
-                .visit(t, p);
-
-        t = (JavaSourceFile) new SpacesVisitor<P>(Optional.ofNullable(
-                ((SourceFile) cu).getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces()),
-                ((SourceFile) cu).getStyle(EmptyForInitializerPadStyle.class),
-                ((SourceFile) cu).getStyle(EmptyForIteratorPadStyle.class),
-                stopAfter)
-                .visit(t, p);
-
-        t = (JavaSourceFile) new WrappingAndBracesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(WrappingAndBracesStyle.class))
-                .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
-                .visit(t, p);
-
-        t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
-                .orElse(IntelliJ.tabsAndIndents()), stopAfter)
-                .visit(t, p);
-
-        t = (JavaSourceFile) new TabsAndIndentsVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
-                .orElse(IntelliJ.tabsAndIndents()), stopAfter)
-                .visit(t, p);
-
-        assert t != null;
-        return t;
+        return (J) tree;
     }
 }

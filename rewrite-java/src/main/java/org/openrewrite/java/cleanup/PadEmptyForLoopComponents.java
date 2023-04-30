@@ -29,6 +29,7 @@ import org.openrewrite.marker.SearchResult;
 import java.util.List;
 
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
 public class PadEmptyForLoopComponents extends Recipe {
@@ -47,12 +48,15 @@ public class PadEmptyForLoopComponents extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext executionContext) {
-                SourceFile cu = (SourceFile) javaSourceFile;
-                if (cu.getStyle(EmptyForIteratorPadStyle.class) != null || cu.getStyle(EmptyForInitializerPadStyle.class) != null) {
-                    return cu.withMarkers(cu.getMarkers().add(new SearchResult(randomId(), null)));
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    SourceFile cu = (SourceFile) requireNonNull(tree);
+                    if (cu.getStyle(EmptyForIteratorPadStyle.class) != null || cu.getStyle(EmptyForInitializerPadStyle.class) != null) {
+                        return cu.withMarkers(cu.getMarkers().add(new SearchResult(randomId(), null)));
+                    }
+                    return (JavaSourceFile) cu;
                 }
-                return (JavaSourceFile) cu;
+                return (J) tree;
             }
         }, new JavaIsoVisitor<ExecutionContext>() {
             @Nullable
@@ -62,11 +66,13 @@ public class PadEmptyForLoopComponents extends Recipe {
             EmptyForInitializerPadStyle emptyForInitializerPadStyle;
 
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext executionContext) {
-                SourceFile cu = (SourceFile) javaSourceFile;
-                emptyForInitializerPadStyle = cu.getStyle(EmptyForInitializerPadStyle.class);
-                emptyForIteratorPadStyle = cu.getStyle(EmptyForIteratorPadStyle.class);
-                return super.visitJavaSourceFile((JavaSourceFile) cu, executionContext);
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    SourceFile cu = (SourceFile) requireNonNull(tree);
+                    emptyForInitializerPadStyle = cu.getStyle(EmptyForInitializerPadStyle.class);
+                    emptyForIteratorPadStyle = cu.getStyle(EmptyForIteratorPadStyle.class);
+                }
+                return super.visit(tree, ctx);
             }
 
             @Override
