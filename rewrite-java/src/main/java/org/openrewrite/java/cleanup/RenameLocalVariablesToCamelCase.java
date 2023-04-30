@@ -15,10 +15,8 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.RenameVariable;
 import org.openrewrite.java.tree.J;
@@ -27,16 +25,17 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import java.time.Duration;
 import java.util.*;
 
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.NameCaseConvention.LOWER_CAMEL;
 
 /**
  * This recipe converts local variables and method parameters to camel case convention.
  * The recipe will not rename variables declared in for loop controls or catches with a single character.
- *
+ * <br/>
  * The first character is set to lower case and existing capital letters are preserved.
  * Special characters that are allowed in java field names `$` and `_` are removed.
- * If a special character is removed the next valid alpha-numeric will be capitalized.
- *
+ * If a special character is removed the next valid alphanumeric will be capitalized.
+ * <br/>
  * Currently, unsupported:
  *  - The recipe will not rename variables declared in a class.
  *  - The recipe will not rename variables if the result already exists in a class or the result will be a java reserved keyword.
@@ -54,7 +53,7 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
                "The recipe will not rename variables declared in for loop controls or catches with a single character. " +
                "The first character is set to lower case and existing capital letters are preserved. " +
                "Special characters that are allowed in java field names `$` and `_` are removed. " +
-               "If a special character is removed the next valid alpha-numeric will be capitalized. " +
+               "If a special character is removed the next valid alphanumeric will be capitalized. " +
                "Currently, does not support renaming members of classes. " +
                "The recipe will not rename a variable if the result already exists in the class, conflicts with a java reserved keyword, or the result is blank.";
     }
@@ -76,21 +75,28 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
 
     private static class RenameNonCompliantNames extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-            Map<J.VariableDeclarations.NamedVariable, String> renameVariablesMap = new LinkedHashMap<>();
-            Set<String> hasNameSet = new HashSet<>();
+        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof JavaSourceFile) {
+                JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                Map<J.VariableDeclarations.NamedVariable, String> renameVariablesMap = new LinkedHashMap<>();
+                Set<String> hasNameSet = new HashSet<>();
 
-            getCursor().putMessage("RENAME_VARIABLES_KEY", renameVariablesMap);
-            getCursor().putMessage("HAS_NAME_KEY", hasNameSet);
-            super.visitJavaSourceFile(cu, ctx);
+                getCursor().putMessage("RENAME_VARIABLES_KEY", renameVariablesMap);
+                getCursor().putMessage("HAS_NAME_KEY", hasNameSet);
+                super.visit(cu, ctx);
 
-            renameVariablesMap.forEach((key, value) -> {
-                if (!hasNameSet.contains(value)) {
-                    doAfterVisit(new RenameVariable<>(key, value));
-                    hasNameSet.add(value);
+                for (Map.Entry<J.VariableDeclarations.NamedVariable, String> entry : renameVariablesMap.entrySet()) {
+                    J.VariableDeclarations.NamedVariable key = entry.getKey();
+                    String value = entry.getValue();
+                    if (!hasNameSet.contains(value)) {
+                        doAfterVisit(new RenameVariable<>(key, value));
+                        hasNameSet.add(value);
+                    }
                 }
-            });
-            return cu;
+
+                return cu;
+            }
+            return super.visit(tree, ctx);
         }
 
         @SuppressWarnings("all")
@@ -151,5 +157,4 @@ public class RenameLocalVariablesToCamelCase extends Recipe {
             );
         }
     }
-
 }

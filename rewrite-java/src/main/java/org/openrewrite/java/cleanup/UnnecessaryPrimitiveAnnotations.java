@@ -15,11 +15,9 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.search.UsesType;
@@ -62,13 +60,16 @@ public class UnnecessaryPrimitiveAnnotations extends Recipe {
                 Preconditions.or(new UsesType<>("javax.annotation.CheckForNull", false), new UsesType<>("javax.annotation.Nullable", false)),
                 new JavaIsoVisitor<ExecutionContext>() {
                     @Override
-                    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                        JavaSourceFile c = super.visitJavaSourceFile(cu, executionContext);
-                        if (cu != c) {
-                            maybeRemoveImport("javax.annotation.CheckForNull");
-                            maybeRemoveImport("javax.annotation.Nullable");
+                    public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        if (tree instanceof JavaSourceFile) {
+                            JavaSourceFile c = (JavaSourceFile) super.visitNonNull(tree, ctx);
+                            if (tree != c) {
+                                maybeRemoveImport("javax.annotation.CheckForNull");
+                                maybeRemoveImport("javax.annotation.Nullable");
+                            }
+                            return c;
                         }
-                        return c;
+                        return super.visit(tree, ctx);
                     }
 
                     @Override

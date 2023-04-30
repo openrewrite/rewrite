@@ -30,6 +30,8 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.util.Objects.requireNonNull;
+
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeType extends Recipe {
@@ -70,11 +72,15 @@ public class ChangeType extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JavaIsoVisitor<ExecutionContext> condition = new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                if (!Boolean.TRUE.equals(ignoreDefinition) && containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
-                    return SearchResult.found(cu);
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    if (!Boolean.TRUE.equals(ignoreDefinition) && containsClassDefinition(cu, oldFullyQualifiedTypeName)) {
+                        return SearchResult.found(cu);
+                    }
+                    return new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
                 }
-                return (JavaSourceFile) new UsesType<>(oldFullyQualifiedTypeName, true).visitNonNull(cu, ctx);
+                return (J) tree;
             }
         };
 
@@ -98,16 +104,19 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-            JavaSourceFile c = cu;
-            if (!Boolean.TRUE.equals(ignoreDefinition)) {
-                JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
-                if (fq != null) {
-                    ChangeClassDefinition changeClassDefinition = new ChangeClassDefinition(originalType.getFullyQualifiedName(), fq.getFullyQualifiedName());
-                    c = (JavaSourceFile) changeClassDefinition.visitNonNull(c, ctx);
+        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof JavaSourceFile) {
+                JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                if (!Boolean.TRUE.equals(ignoreDefinition)) {
+                    JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
+                    if (fq != null) {
+                        ChangeClassDefinition changeClassDefinition = new ChangeClassDefinition(originalType.getFullyQualifiedName(), fq.getFullyQualifiedName());
+                        cu = (JavaSourceFile) changeClassDefinition.visitNonNull(cu, ctx);
+                    }
                 }
+                return super.visit(cu, ctx);
             }
-            return super.visitJavaSourceFile(c, ctx);
+            return super.visit(tree, ctx);
         }
 
         @Override
@@ -442,17 +451,21 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile sf, ExecutionContext ctx) {
-            String oldPath = ((SourceFile) sf).getSourcePath().toString().replace('\\', '/');
-            // The old FQN must exist in the path.
-            String oldFqn = fqnToPath(originalType.getFullyQualifiedName());
-            String newFqn = fqnToPath(targetType.getFullyQualifiedName());
+        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof JavaSourceFile) {
+                JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                String oldPath = cu.getSourcePath().toString().replace('\\', '/');
+                // The old FQN must exist in the path.
+                String oldFqn = fqnToPath(originalType.getFullyQualifiedName());
+                String newFqn = fqnToPath(targetType.getFullyQualifiedName());
 
-            Path newPath = Paths.get(oldPath.replaceFirst(oldFqn, newFqn));
-            if (updatePath(sf, oldPath, newPath.toString())) {
-                sf = ((SourceFile) sf).withSourcePath(newPath);
+                Path newPath = Paths.get(oldPath.replaceFirst(oldFqn, newFqn));
+                if (updatePath(cu, oldPath, newPath.toString())) {
+                    cu = (JavaSourceFile) cu.withSourcePath(newPath);
+                }
+                return super.visit(cu, ctx);
             }
-            return super.visitJavaSourceFile(sf, ctx);
+            return super.visit(tree, ctx);
         }
 
         private String fqnToPath(String fullyQualifiedName) {

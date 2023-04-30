@@ -15,10 +15,8 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.ScanningRecipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
@@ -28,6 +26,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
+
+import static java.util.Objects.requireNonNull;
 
 public class LowercasePackage extends ScanningRecipe<Map<String, String>> {
     @Override
@@ -55,16 +55,19 @@ public class LowercasePackage extends ScanningRecipe<Map<String, String>> {
     public TreeVisitor<?, ExecutionContext> getScanner(Map<String, String> acc) {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                J.Package pkg = cu.getPackageDeclaration();
-                if (pkg != null) {
-                    String packageText = getPackageText(getCursor(), pkg);
-                    String lowerCase = packageText.toLowerCase();
-                    if (!packageText.equals(lowerCase)) {
-                        acc.put(packageText, lowerCase);
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    J.Package pkg = cu.getPackageDeclaration();
+                    if (pkg != null) {
+                        String packageText = getPackageText(getCursor(), pkg);
+                        String lowerCase = packageText.toLowerCase();
+                        if (!packageText.equals(lowerCase)) {
+                            acc.put(packageText, lowerCase);
+                        }
                     }
                 }
-                return cu;
+                return (J) tree;
             }
         };
     }
@@ -73,18 +76,21 @@ public class LowercasePackage extends ScanningRecipe<Map<String, String>> {
     public TreeVisitor<?, ExecutionContext> getVisitor(Map<String, String> acc) {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                J.Package pkg = cu.getPackageDeclaration();
-                if (pkg != null) {
-                    String packageText = getPackageText(getCursor(), pkg);
-                    if (acc.containsKey(packageText)) {
-                        return (JavaSourceFile) new ChangePackage(packageText, acc.get(packageText), true)
-                                .getVisitor().visitNonNull(cu, ctx);
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    J.Package pkg = cu.getPackageDeclaration();
+                    if (pkg != null) {
+                        String packageText = getPackageText(getCursor(), pkg);
+                        if (acc.containsKey(packageText)) {
+                            return (JavaSourceFile) new ChangePackage(packageText, acc.get(packageText), true)
+                                    .getVisitor().visitNonNull(cu, ctx);
+                        }
                     }
+                    return cu;
                 }
-                return cu;
+                return super.visit(tree, ctx);
             }
-
         };
     }
 

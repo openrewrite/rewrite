@@ -179,7 +179,7 @@ public interface G extends J {
 
         @Override
         public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
-            return v.visitJavaSourceFile(this, p);
+            return v.visitCompilationUnit(this, p);
         }
 
         @Override

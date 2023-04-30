@@ -24,6 +24,8 @@ import org.openrewrite.marker.SearchResult;
 
 import java.util.regex.Pattern;
 
+import static java.util.Objects.requireNonNull;
+
 public class UsesType<P> extends JavaIsoVisitor<P> {
     private final Pattern typePattern;
 
@@ -36,46 +38,48 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        JavaSourceFile c = cu;
+    public J visit(@Nullable Tree tree, P p) {
+        if (tree instanceof JavaSourceFile) {
+            JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+            JavaSourceFile c = cu;
 
-        for (JavaType.Method method : c.getTypesInUse().getUsedMethods()) {
-            if (Boolean.TRUE.equals(includeImplicit) || method.hasFlags(Flag.Static)) {
-                if ((c = maybeMark(c, method.getDeclaringType())) != cu) {
-                    return c;
-                }
-            }
-            if (Boolean.TRUE.equals(includeImplicit)) {
-                if ((c = maybeMark(c, method.getReturnType())) != cu) {
-                    return c;
-                }
-
-                for (JavaType parameterType : method.getParameterTypes()) {
-                    if ((c = maybeMark(c, parameterType)) != cu) {
+            for (JavaType.Method method : c.getTypesInUse().getUsedMethods()) {
+                if (Boolean.TRUE.equals(includeImplicit) || method.hasFlags(Flag.Static)) {
+                    if ((c = maybeMark(c, method.getDeclaringType())) != cu) {
                         return c;
                     }
                 }
-            }
-        }
+                if (Boolean.TRUE.equals(includeImplicit)) {
+                    if ((c = maybeMark(c, method.getReturnType())) != cu) {
+                        return c;
+                    }
 
-        for (JavaType type : c.getTypesInUse().getTypesInUse()) {
-            JavaType checkType = type instanceof JavaType.Primitive ? type : TypeUtils.asFullyQualified(type);
-            if ((c = maybeMark(c, checkType)) != cu) {
-                return c;
+                    for (JavaType parameterType : method.getParameterTypes()) {
+                        if ((c = maybeMark(c, parameterType)) != cu) {
+                            return c;
+                        }
+                    }
+                }
             }
-        }
 
-        for (J.Import anImport : c.getImports()) {
-            if (anImport.isStatic()) {
-                if ((c = maybeMark(c, TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType()))) != cu) {
+            for (JavaType type : c.getTypesInUse().getTypesInUse()) {
+                JavaType checkType = type instanceof JavaType.Primitive ? type : TypeUtils.asFullyQualified(type);
+                if ((c = maybeMark(c, checkType)) != cu) {
                     return c;
                 }
-            } else if ((c = maybeMark(c, TypeUtils.asFullyQualified(anImport.getQualid().getType()))) != cu) {
-                return c;
+            }
+
+            for (J.Import anImport : c.getImports()) {
+                if (anImport.isStatic()) {
+                    if ((c = maybeMark(c, TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType()))) != cu) {
+                        return c;
+                    }
+                } else if ((c = maybeMark(c, TypeUtils.asFullyQualified(anImport.getQualid().getType()))) != cu) {
+                    return c;
+                }
             }
         }
-
-        return c;
+        return (J) tree;
     }
 
     private JavaSourceFile maybeMark(JavaSourceFile c, @Nullable JavaType type) {

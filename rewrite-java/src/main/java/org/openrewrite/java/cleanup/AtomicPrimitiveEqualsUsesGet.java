@@ -20,13 +20,11 @@ import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -52,15 +50,11 @@ public class AtomicPrimitiveEqualsUsesGet extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                doAfterVisit(new UsesType<>("java.util.concurrent.atomic.AtomicBoolean", true));
-                doAfterVisit(new UsesType<>("java.util.concurrent.atomic.AtomicInteger", true));
-                doAfterVisit(new UsesType<>("java.util.concurrent.atomic.AtomicLong", true));
-                return cu;
-            }
-        }, new JavaVisitor<ExecutionContext>() {
+        return Preconditions.check(Preconditions.or(
+                new UsesType<>("java.util.concurrent.atomic.AtomicBoolean", true),
+                new UsesType<>("java.util.concurrent.atomic.AtomicInteger", true),
+                new UsesType<>("java.util.concurrent.atomic.AtomicLong", true)
+        ), new JavaVisitor<ExecutionContext>() {
             private final MethodMatcher aiMethodMatcher = new MethodMatcher("java.lang.Object equals(java.lang.Object)");
 
             @Override

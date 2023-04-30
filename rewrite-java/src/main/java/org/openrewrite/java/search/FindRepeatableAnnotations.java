@@ -15,10 +15,7 @@
  */
 package org.openrewrite.java.search;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
@@ -26,6 +23,8 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
+
+import static java.util.Objects.requireNonNull;
 
 public class FindRepeatableAnnotations extends Recipe {
 
@@ -43,13 +42,17 @@ public class FindRepeatableAnnotations extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new JavaVisitor<ExecutionContext>() {
             @Override
-            public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
-                    if (isRepeatable(javaType)) {
-                        return SearchResult.found(cu);
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    for (JavaType javaType : cu.getTypesInUse().getTypesInUse()) {
+                        if (isRepeatable(javaType)) {
+                            return SearchResult.found(cu);
+                        }
                     }
+                    return cu;
                 }
-                return cu;
+                return (J) tree;
             }
         }, new JavaVisitor<ExecutionContext>() {
             @Override

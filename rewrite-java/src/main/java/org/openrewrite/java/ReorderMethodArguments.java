@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static java.util.Arrays.asList;
+import static java.util.Objects.requireNonNull;
 
 /**
  * This recipe finds method invocations matching the given method pattern and reorders the arguments based on the ordered
@@ -90,14 +91,18 @@ public class ReorderMethodArguments extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new JavaVisitor<ExecutionContext>() {
             @Override
-            public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                if (Boolean.TRUE.equals(ignoreDefinition)) {
-                    J j = new DeclaresMethod<>(methodPattern, true).visitNonNull(cu, ctx);
-                    if (cu != j) {
-                        return cu;
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    if (Boolean.TRUE.equals(ignoreDefinition)) {
+                        J j = new DeclaresMethod<>(methodPattern, true).visitNonNull(cu, ctx);
+                        if (cu != j) {
+                            return cu;
+                        }
                     }
+                    return new UsesMethod<>(methodPattern).visitNonNull(cu, ctx);
                 }
-                return new UsesMethod<>(methodPattern).visitNonNull(cu, ctx);
+                return super.visit(tree, ctx);
             }
         }, new ReorderMethodArgumentsVisitor(new MethodMatcher(methodPattern)));
     }

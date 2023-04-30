@@ -20,7 +20,6 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -30,6 +29,8 @@ import org.openrewrite.marker.SearchResult;
 
 import java.util.Iterator;
 import java.util.List;
+
+import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -63,17 +64,20 @@ public class FindDeprecatedFields extends Recipe {
 
         return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
-                    if (typeMatcher == null || typeMatcher.matches(variable.getOwner())) {
-                        for (JavaType.FullyQualified annotation : variable.getAnnotations()) {
-                            if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
-                                return SearchResult.found(cu);
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
+                        if (typeMatcher == null || typeMatcher.matches(variable.getOwner())) {
+                            for (JavaType.FullyQualified annotation : variable.getAnnotations()) {
+                                if (TypeUtils.isOfClassType(annotation, "java.lang.Deprecated")) {
+                                    return SearchResult.found(cu);
+                                }
                             }
                         }
                     }
                 }
-                return cu;
+                return (J) tree;
             }
         }, new JavaIsoVisitor<ExecutionContext>() {
             @Override

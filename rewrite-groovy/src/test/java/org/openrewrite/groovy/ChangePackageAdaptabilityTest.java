@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.groovy.cleanup;
+package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.PathUtils;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.java.ChangePackage;
+import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -26,7 +27,10 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
-public class ChangePackageTest implements RewriteTest {
+/**
+ * Prove that {@link ChangePackage}, written for Java, can adapt to working on Groovy code.
+ */
+public class ChangePackageAdaptabilityTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -40,29 +44,29 @@ public class ChangePackageTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-            package a.b
-            class Original {}
-            """,
+              package a.b
+              class Original {}
+              """,
             """
-            package x.y
-            class Original {}
-            """
+              package x.y
+              class Original {}
+              """
           ),
           groovy(
             """
-            import a.b.Original
-            
-            class A {
-                Original type
-            }
-            """,
+              import a.b.Original
+                          
+              class A {
+                  Original type
+              }
+              """,
             """
-            import x.y.Original
-            
-            class A {
-                Original type
-            }
-            """
+              import x.y.Original
+                          
+              class A {
+                  Original type
+              }
+              """
           )
         );
     }
@@ -73,25 +77,25 @@ public class ChangePackageTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-            package a.b
-            class Original {}
-            """,
+              package a.b
+              class Original {}
+              """,
             """
-            package x.y
-            class Original {}
-            """
+              package x.y
+              class Original {}
+              """
           ),
           groovy(
             """
-            class A {
-                a.b.Original type
-            }
-            """,
+              class A {
+                  a.b.Original type
+              }
+              """,
             """
-            class A {
-                x.y.Original type
-            }
-            """
+              class A {
+                  x.y.Original type
+              }
+              """
           )
         );
     }
@@ -127,18 +131,18 @@ public class ChangePackageTest implements RewriteTest {
           spec -> spec.recipe(new ChangePackage("org.foo", "x.y.z", false)),
           groovy(
             """
-            package org.foo
-            class Test {
-            }
-            """,
+              package org.foo
+              class Test {
+              }
+              """,
             """
-            package x.y.z
-            class Test {
-            }
-            """,
+              package x.y.z
+              class Test {
+              }
+              """,
             spec -> spec.path("org/foo/Test.groovy").afterRecipe(cu -> {
-              assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("x/y/z/Test.groovy");
-              assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.z.Test")).isTrue();
+                assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("x/y/z/Test.groovy");
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.z.Test")).isTrue();
             })
           )
         );

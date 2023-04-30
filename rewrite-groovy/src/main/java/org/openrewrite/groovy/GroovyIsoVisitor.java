@@ -18,7 +18,6 @@ package org.openrewrite.groovy;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Statement;
 
 public class GroovyIsoVisitor<P> extends GroovyVisitor<P> {
@@ -50,11 +49,6 @@ public class GroovyIsoVisitor<P> extends GroovyVisitor<P> {
     @Override
     public Expression visitExpression(Expression expression, P p) {
         return (Expression) super.visitExpression(expression, p);
-    }
-
-    @Override
-    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        return (JavaSourceFile) super.visitJavaSourceFile(cu, p);
     }
 
     @Override

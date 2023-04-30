@@ -45,10 +45,7 @@ dependencies {
 
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
     testRuntimeOnly(project(":rewrite-java-17"))
-    testRuntimeOnly("org.rocksdb:rocksdbjni:latest.release") {
-        // 8.1.1 is broken on windows. See: https://github.com/facebook/rocksdb/issues/11420
-        versionConstraint.rejectedVersions.add("8.1.1")
-    }
+    testRuntimeOnly("org.rocksdb:rocksdbjni:latest.release")
 }
 
 tasks.register<JavaExec>("generateAntlrSources") {

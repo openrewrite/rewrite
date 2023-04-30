@@ -15,10 +15,8 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.format.SpacesVisitor;
 import org.openrewrite.java.style.Checkstyle;
@@ -30,6 +28,8 @@ import org.openrewrite.java.tree.JavaSourceFile;
 
 import java.util.Optional;
 
+import static java.util.Objects.requireNonNull;
+
 public class MethodParamPad extends Recipe {
     @Override
     public String getDisplayName() {
@@ -39,7 +39,7 @@ public class MethodParamPad extends Recipe {
     @Override
     public String getDescription() {
         return "Fixes whitespace padding between the identifier of a method definition or method invocation and the left parenthesis of the parameter list. " +
-                "For example, when configured to remove spacing, `someMethodInvocation (x);` becomes `someMethodInvocation(x)`.";
+               "For example, when configured to remove spacing, `someMethodInvocation (x);` becomes `someMethodInvocation(x)`.";
     }
 
     @Override
@@ -52,17 +52,20 @@ public class MethodParamPad extends Recipe {
         MethodParamPadStyle methodParamPadStyle;
 
         @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile javaSourceFile, ExecutionContext ctx) {
-            SourceFile cu = (SourceFile)javaSourceFile;
-            spacesStyle = Optional.ofNullable(cu.getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces());
-            methodParamPadStyle = Optional.ofNullable(cu.getStyle(MethodParamPadStyle.class)).orElse(Checkstyle.methodParamPadStyle());
+        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof JavaSourceFile) {
+                SourceFile cu = (SourceFile) requireNonNull(tree);
+                spacesStyle = Optional.ofNullable(cu.getStyle(SpacesStyle.class)).orElse(IntelliJ.spaces());
+                methodParamPadStyle = Optional.ofNullable(cu.getStyle(MethodParamPadStyle.class)).orElse(Checkstyle.methodParamPadStyle());
 
-            spacesStyle = spacesStyle.withBeforeParentheses(
-                    spacesStyle.getBeforeParentheses()
-                            .withMethodDeclaration(methodParamPadStyle.getSpace())
-                            .withMethodCall(methodParamPadStyle.getSpace())
-            );
-            return super.visitJavaSourceFile((JavaSourceFile) cu, ctx);
+                spacesStyle = spacesStyle.withBeforeParentheses(
+                        spacesStyle.getBeforeParentheses()
+                                .withMethodDeclaration(methodParamPadStyle.getSpace())
+                                .withMethodCall(methodParamPadStyle.getSpace())
+                );
+                return super.visit(cu, ctx);
+            }
+            return super.visit(tree, ctx);
         }
 
         @Override
@@ -92,7 +95,7 @@ public class MethodParamPad extends Recipe {
                         )
                 );
             }
-            mi = (J.MethodInvocation)new SpacesVisitor<>(spacesStyle, null, null, mi)
+            mi = (J.MethodInvocation) new SpacesVisitor<>(spacesStyle, null, null, mi)
                     .visitNonNull(mi, ctx, getCursor().getParentTreeCursor().fork());
             return mi;
         }
@@ -110,7 +113,7 @@ public class MethodParamPad extends Recipe {
                     );
                 }
             }
-            nc = (J.NewClass)new SpacesVisitor<>(spacesStyle, null, null, nc)
+            nc = (J.NewClass) new SpacesVisitor<>(spacesStyle, null, null, nc)
                     .visitNonNull(nc, ctx, getCursor().getParentTreeCursor().fork());
             return nc;
         }

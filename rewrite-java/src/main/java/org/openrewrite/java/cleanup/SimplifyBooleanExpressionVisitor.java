@@ -17,6 +17,7 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -32,12 +33,15 @@ public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
     private static final String MAYBE_AUTO_FORMAT_ME = "MAYBE_AUTO_FORMAT_ME";
 
     @Override
-    public J visitJavaSourceFile(JavaSourceFile cu, P p) {
-        JavaSourceFile c = visitAndCast(cu, p, super::visitJavaSourceFile);
-        if (c != cu) {
-            doAfterVisit(new SimplifyBooleanExpressionVisitor<>());
+    public J visit(@Nullable Tree tree, P p) {
+        if (tree instanceof JavaSourceFile) {
+            JavaSourceFile cu = (JavaSourceFile) super.visitNonNull(tree, p);
+            if (tree != cu) {
+                // recursive simplification
+                doAfterVisit(new SimplifyBooleanExpressionVisitor<>());
+            }
         }
-        return c;
+        return super.visit(tree, p);
     }
 
     @Override

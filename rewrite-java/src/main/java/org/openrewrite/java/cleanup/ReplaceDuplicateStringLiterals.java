@@ -31,6 +31,7 @@ import java.util.*;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -67,16 +68,20 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesType<>("java.lang.String", false), new JavaVisitor<ExecutionContext>() {
             @Override
-            public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
-                if (Boolean.TRUE.equals(includeTestSources) || (sourceSet.isPresent() && "main".equals(sourceSet.get().getName()))) {
-                    return super.visitJavaSourceFile(cu, executionContext);
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
+                    if (Boolean.TRUE.equals(includeTestSources) || (sourceSet.isPresent() && "main".equals(sourceSet.get().getName()))) {
+                        return super.visit(cu, ctx);
+                    }
+                    return cu;
                 }
-                return cu;
+                return super.visit(tree, ctx);
             }
 
             @Override
-            public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
+            public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 if (classDecl.getType() == null) {
                     return classDecl;
                 }
@@ -151,7 +156,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                                                 emptyList(),
                                                 JLeftPadded.build(literal).withBefore(singleSpace),
                                                 null)))
-                                ), executionContext, new Cursor(getCursor(), classDecl.getBody()));
+                                ), ctx, new Cursor(getCursor(), classDecl.getBody()));
 
                                 // Insert the new statement after the EnumValueSet.
                                 List<Statement> statements = new ArrayList<>(classDecl.getBody().getStatements().size() + 1);
@@ -322,7 +327,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
         }
 
         @Override
-        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Map<String, String> stringStringMap) {
+        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Map<String, String> valueToVariable) {
             Cursor parentScope = getCursor().dropParentUntil(is -> is instanceof J.ClassDeclaration ||
                                                                    // Prevent checks on most of the literals.
                                                                    is instanceof J.MethodDeclaration);
@@ -332,7 +337,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
                 variable.getInitializer() instanceof J.Literal &&
                 ((J.Literal) variable.getInitializer()).getValue() instanceof String) {
                 String value = (String) (((J.Literal) variable.getInitializer()).getValue());
-                stringStringMap.putIfAbsent(value, variable.getSimpleName());
+                valueToVariable.putIfAbsent(value, variable.getSimpleName());
             }
             return variable;
         }
@@ -353,7 +358,7 @@ public class ReplaceDuplicateStringLiterals extends Recipe {
         }
 
         @Override
-        public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
+        public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
             if (literals.contains(literal)) {
                 assert isClass.getType() != null;
                 return new J.Identifier(

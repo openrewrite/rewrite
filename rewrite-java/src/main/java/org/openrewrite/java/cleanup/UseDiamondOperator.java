@@ -15,10 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -32,6 +29,7 @@ import java.util.List;
 import java.util.Set;
 
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
 public class UseDiamondOperator extends Recipe {
@@ -63,8 +61,13 @@ public class UseDiamondOperator extends Recipe {
 
     private static class UseDiamondOperatorVisitor extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-            return cu instanceof J.CompilationUnit ? visitCompilationUnit((J.CompilationUnit) cu, ctx) : cu;
+        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof JavaSourceFile) {
+                JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                // don't try to do this for Groovy or Kotlin sources
+                return cu instanceof J.CompilationUnit ? visitCompilationUnit((J.CompilationUnit) cu, ctx) : cu;
+            }
+            return super.visit(tree, ctx);
         }
 
         @Override
@@ -72,7 +75,7 @@ public class UseDiamondOperator extends Recipe {
             J.VariableDeclarations varDecls = super.visitVariableDeclarations(multiVariable, executionContext);
             final TypedTree varDeclsTypeExpression = varDecls.getTypeExpression();
             if (varDecls.getVariables().size() == 1 && varDecls.getVariables().get(0).getInitializer() != null
-                    && varDecls.getTypeExpression() instanceof J.ParameterizedType) {
+                && varDecls.getTypeExpression() instanceof J.ParameterizedType) {
                 varDecls = varDecls.withVariables(ListUtils.map(varDecls.getVariables(), nv -> {
                     if (nv.getInitializer() instanceof J.NewClass) {
                         nv = nv.withInitializer(maybeRemoveParams(parameterizedTypes((J.ParameterizedType) varDeclsTypeExpression), (J.NewClass) nv.getInitializer()));
@@ -122,8 +125,8 @@ public class UseDiamondOperator extends Recipe {
         }
 
         private JavaType getMethodParamType(JavaType.Method methodType, int paramIndex) {
-            if (methodType.hasFlags(Flag.Varargs) && paramIndex >= methodType.getParameterTypes().size()-1){
-                return ((JavaType.Array)methodType.getParameterTypes().get(methodType.getParameterTypes().size()-1)).getElemType();
+            if (methodType.hasFlags(Flag.Varargs) && paramIndex >= methodType.getParameterTypes().size() - 1) {
+                return ((JavaType.Array) methodType.getParameterTypes().get(methodType.getParameterTypes().size() - 1)).getElemType();
             } else {
                 return methodType.getParameterTypes().get(paramIndex);
             }
@@ -132,7 +135,7 @@ public class UseDiamondOperator extends Recipe {
         @Override
         public J.Return visitReturn(J.Return _return, ExecutionContext executionContext) {
             J.Return rtn = super.visitReturn(_return, executionContext);
-            J.NewClass returnExpNewClass = rtn.getExpression() instanceof J.NewClass ? (J.NewClass)rtn.getExpression() : null;
+            J.NewClass returnExpNewClass = rtn.getExpression() instanceof J.NewClass ? (J.NewClass) rtn.getExpression() : null;
             if (returnExpNewClass != null && returnExpNewClass.getBody() == null && returnExpNewClass.getClazz() instanceof J.ParameterizedType) {
                 J parentBlock = getCursor().dropParentUntil(v -> v instanceof J.MethodDeclaration || v instanceof J.Lambda).getValue();
                 if (parentBlock instanceof J.MethodDeclaration) {
@@ -162,7 +165,7 @@ public class UseDiamondOperator extends Recipe {
         private J.NewClass maybeRemoveParams(@Nullable List<JavaType> paramTypes, J.NewClass newClass) {
             if (paramTypes != null && newClass.getBody() == null && newClass.getClazz() instanceof J.ParameterizedType) {
                 J.ParameterizedType newClassType = (J.ParameterizedType) newClass.getClazz();
-                if (newClassType.getTypeParameters() != null){
+                if (newClassType.getTypeParameters() != null) {
                     if (paramTypes.size() != newClassType.getTypeParameters().size()) {
                         return newClass;
                     } else {

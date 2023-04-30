@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.search;
 
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -22,6 +24,8 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
+
+import static java.util.Objects.requireNonNull;
 
 public class UsesMethod<P> extends JavaIsoVisitor<P> {
     private final MethodMatcher methodMatcher;
@@ -43,13 +47,16 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        for (JavaType.Method type : cu.getTypesInUse().getUsedMethods()) {
-            if (methodMatcher.matches(type)) {
-                return SearchResult.found(cu);
+    public J visit(@Nullable Tree tree, P p) {
+        if (tree instanceof JavaSourceFile) {
+            JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+            for (JavaType.Method type : cu.getTypesInUse().getUsedMethods()) {
+                if (methodMatcher.matches(type)) {
+                    return SearchResult.found(cu);
+                }
             }
         }
-        return cu;
+        return super.visit(tree, p);
     }
 
     @Override

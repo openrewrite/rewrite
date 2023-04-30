@@ -35,6 +35,8 @@ import java.time.Duration;
 import java.util.*;
 import java.util.regex.Pattern;
 
+import static java.util.Objects.requireNonNull;
+
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class MethodNameCasing extends ScanningRecipe<List<ChangeMethodName>> {
@@ -83,16 +85,19 @@ public class MethodNameCasing extends ScanningRecipe<List<ChangeMethodName>> {
         return new JavaIsoVisitor<ExecutionContext>() {
 
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
-                if (sourceSet.isPresent() && (Boolean.TRUE.equals(includeTestSources) || "main".equals(sourceSet.get().getName()))) {
-                    return super.visitJavaSourceFile(cu, executionContext);
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
+                    if (sourceSet.isPresent() && (Boolean.TRUE.equals(includeTestSources) || "main".equals(sourceSet.get().getName()))) {
+                        return super.visit(cu, ctx);
+                    }
                 }
-                return cu;
+                return (J) tree;
             }
 
             @Override
-            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                 J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
                 if (enclosingClass == null || enclosingClass.getKind() != J.ClassDeclaration.Kind.Type.Class) {
                     return method;
@@ -142,7 +147,7 @@ public class MethodNameCasing extends ScanningRecipe<List<ChangeMethodName>> {
                     }
                 }
 
-                return super.visitMethodDeclaration(method, executionContext);
+                return super.visitMethodDeclaration(method, ctx);
             }
 
             private boolean containsValidModifiers(J.MethodDeclaration method) {
@@ -159,11 +164,14 @@ public class MethodNameCasing extends ScanningRecipe<List<ChangeMethodName>> {
     public TreeVisitor<?, ExecutionContext> getVisitor(List<ChangeMethodName> acc) {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                for (ChangeMethodName changeMethodName : acc) {
-                    doAfterVisit(changeMethodName);
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    for (ChangeMethodName changeMethodName : acc) {
+                        doAfterVisit(changeMethodName);
+                    }
                 }
-                return cu;
+                return (J) tree;
             }
         };
     }

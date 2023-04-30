@@ -57,15 +57,11 @@ public class NoDoubleBraceInitialization extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(
-                new JavaIsoVisitor<ExecutionContext>() {
-                    @Override
-                    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                        doAfterVisit(new UsesType<>("java.util.Map", false));
-                        doAfterVisit(new UsesType<>("java.util.List", false));
-                        doAfterVisit(new UsesType<>("java.util.Set", false));
-                        return cu;
-                    }
-                },
+                Preconditions.or(
+                        new UsesType<>("java.util.Map", false),
+                        new UsesType<>("java.util.List", false),
+                        new UsesType<>("java.util.Set", false)
+                ),
                 new NoDoubleBraceInitializationVisitor()
         );
     }

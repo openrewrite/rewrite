@@ -19,10 +19,13 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.dataflow.analysis.SinkFlow;
 import org.openrewrite.java.dataflow.analysis.SinkFlowSummary;
 import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
@@ -37,27 +40,31 @@ public class FindLocalFlowPaths<P> extends JavaIsoVisitor<P> {
     private final LocalFlowSpec<?, ?> spec;
 
     @Override
-    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        getCursor().putMessage(FLOW_GRAPHS, new ArrayList<>());
-        JavaSourceFile c = super.visitJavaSourceFile(cu, p);
+    public J visit(@Nullable Tree tree, P p) {
+        if (tree instanceof JavaSourceFile) {
+            JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+            getCursor().putMessage(FLOW_GRAPHS, new ArrayList<>());
+            JavaSourceFile c = (JavaSourceFile) super.visitNonNull(cu, p);
 
-        Set<Expression> flowSteps = Collections.newSetFromMap(new IdentityHashMap<>());
-        List<SinkFlowSummary<?, ?>> sinkFlows = getCursor().getMessage(FLOW_GRAPHS);
-        for (SinkFlowSummary<?, ?> flowGraphSummary : requireNonNull(sinkFlows)) {
-            flowSteps.addAll(flowGraphSummary.getFlowParticipants());
-        }
+            Set<Expression> flowSteps = Collections.newSetFromMap(new IdentityHashMap<>());
+            List<SinkFlowSummary<?, ?>> sinkFlows = getCursor().getMessage(FLOW_GRAPHS);
+            for (SinkFlowSummary<?, ?> flowGraphSummary : requireNonNull(sinkFlows)) {
+                flowSteps.addAll(flowGraphSummary.getFlowParticipants());
+            }
 
-        if (!flowSteps.isEmpty()) {
-            doAfterVisit(new JavaIsoVisitor<P>() {
-                @Override
-                public Expression visitExpression(Expression expression, P p) {
-                    return flowSteps.contains(expression) ?
-                            SearchResult.found(expression) :
-                            expression;
-                }
-            });
+            if (!flowSteps.isEmpty()) {
+                doAfterVisit(new JavaIsoVisitor<P>() {
+                    @Override
+                    public Expression visitExpression(Expression expression, P p) {
+                        return flowSteps.contains(expression) ?
+                                SearchResult.found(expression) :
+                                expression;
+                    }
+                });
+            }
+            return c;
         }
-        return c;
+        return super.visit(tree, p);
     }
 
     @Override

@@ -1527,7 +1527,7 @@ public interface J extends Tree {
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
-            return v.visitJavaSourceFile(this, p);
+            return v.visitCompilationUnit(this, p);
         }
 
         public Set<NameTree> findType(String clazz) {

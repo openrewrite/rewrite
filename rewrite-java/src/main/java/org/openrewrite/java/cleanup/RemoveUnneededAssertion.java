@@ -57,26 +57,24 @@ public class RemoveUnneededAssertion extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                doAfterVisit(new UsesMethod<>(JUNIT_JUPITER_ASSERT_TRUE_MATCHER));
-                doAfterVisit(new UsesMethod<>(JUNIT_JUPITER_ASSERT_FALSE_MATCHER));
-                doAfterVisit(new UsesMethod<>(JUNIT_ASSERT_TRUE_MATCHER));
-                doAfterVisit(new UsesMethod<>(JUNIT_ASSERT_FALSE_MATCHER));
-                doAfterVisit(new UsesMethod<>(JUNIT_ASSERT_MESSAGE_TRUE_MATCHER));
-                doAfterVisit(new UsesMethod<>(JUNIT_ASSERT_MESSAGE_FALSE_MATCHER));
-                return super.visitJavaSourceFile(cu, executionContext);
-            }
-
-            @Override
-            public J.Assert visitAssert(J.Assert _assert, ExecutionContext executionContext) {
-                if (J.Literal.isLiteralValue(_assert.getCondition(), true)) {
-                    return SearchResult.found(_assert);
-                }
-                return _assert;
-            }
-        }, new RemoveUnneededAssertionVisitor());
+        return Preconditions.check(
+                Preconditions.or(
+                        new UsesMethod<>(JUNIT_JUPITER_ASSERT_TRUE_MATCHER),
+                        new UsesMethod<>(JUNIT_JUPITER_ASSERT_FALSE_MATCHER),
+                        new UsesMethod<>(JUNIT_ASSERT_TRUE_MATCHER),
+                        new UsesMethod<>(JUNIT_ASSERT_FALSE_MATCHER),
+                        new UsesMethod<>(JUNIT_ASSERT_MESSAGE_TRUE_MATCHER),
+                        new UsesMethod<>(JUNIT_ASSERT_MESSAGE_FALSE_MATCHER),
+                        new JavaIsoVisitor<ExecutionContext>() {
+                            @Override
+                            public J.Assert visitAssert(J.Assert _assert, ExecutionContext executionContext) {
+                                if (J.Literal.isLiteralValue(_assert.getCondition(), true)) {
+                                    return SearchResult.found(_assert);
+                                }
+                                return _assert;
+                            }
+                        }
+                ), new RemoveUnneededAssertionVisitor());
     }
 
     private static class RemoveUnneededAssertionVisitor extends JavaIsoVisitor<ExecutionContext> {

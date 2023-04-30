@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.groovy.cleanup;
+package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
@@ -28,7 +28,10 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.groovy.Assertions.groovy;
 
-public class ChangeTypeTest implements RewriteTest {
+/**
+ * Prove that {@link ChangeType}, written for Java, can adapt to working on Groovy code.
+ */
+public class ChangeTypeAdaptabilityTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -41,24 +44,25 @@ public class ChangeTypeTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-            package a.b
-            class Original {}
-            """),
+              package a.b
+              class Original {}
+              """
+          ),
           groovy(
             """
-            import a.b.Original
-            
-            class A {
-                Original type
-            }
-            """,
+              import a.b.Original
+                          
+              class A {
+                  Original type
+              }
+              """,
             """
-            import x.y.Target
-            
-            class A {
-                Target type
-            }
-            """
+              import x.y.Target
+                          
+              class A {
+                  Target type
+              }
+              """
           )
         );
     }
@@ -69,20 +73,21 @@ public class ChangeTypeTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-            package a.b
-            class Original {}
-            """),
+              package a.b
+              class Original {}
+              """
+          ),
           groovy(
             """
-            class A {
-                a.b.Original type
-            }
-            """,
+              class A {
+                  a.b.Original type
+              }
+              """,
             """
-            class A {
-                x.y.Target type
-            }
-            """
+              class A {
+                  x.y.Target type
+              }
+              """
           )
         );
     }
@@ -94,16 +99,16 @@ public class ChangeTypeTest implements RewriteTest {
           spec -> spec.recipe(new ChangeType("file", "newFile", false)),
           groovy(
             """
-            class file {
-            }
-            """,
+              class file {
+              }
+              """,
             """
-            class newFile {
-            }
-            """,
+              class newFile {
+              }
+              """,
             spec -> spec.path("file.groovy").afterRecipe(cu -> {
-              assertThat("newFile.groovy").isEqualTo(cu.getSourcePath().toString());
-              assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "newFile")).isTrue();
+                assertThat("newFile.groovy").isEqualTo(cu.getSourcePath().toString());
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "newFile")).isTrue();
             })
           )
         );
@@ -118,12 +123,12 @@ public class ChangeTypeTest implements RewriteTest {
           spec -> spec.recipe(new ChangeType("java.util.List", "java.util.ArrayList", false)),
           groovy(
             """
-            import java.util.Collections
-              
-            class Test {
-                int zero = Collections.emptyList().size()
-            }
-            """,
+              import java.util.Collections
+                
+              class Test {
+                  int zero = Collections.emptyList().size()
+              }
+              """,
             spec -> spec.afterRecipe(cu -> {
                 J.VariableDeclarations varDecl = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
                 J.MethodInvocation sizeMi = (J.MethodInvocation) varDecl.getVariables().get(0).getInitializer();

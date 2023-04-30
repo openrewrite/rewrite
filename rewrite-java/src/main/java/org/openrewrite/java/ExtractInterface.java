@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -31,6 +32,7 @@ import java.util.Comparator;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
 public class ExtractInterface {
@@ -41,29 +43,32 @@ public class ExtractInterface {
         String fullyQualifiedInterfaceName;
 
         @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-            String pkg = cu.getPackageDeclaration() == null ? "" :
-                    Arrays.stream(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()).split("\\."))
-                            .map(subpackage -> "..")
-                            .collect(Collectors.joining("/", "../", "/"));
+        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof JavaSourceFile) {
+                JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                String pkg = cu.getPackageDeclaration() == null ? "" :
+                        Arrays.stream(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()).split("\\."))
+                                .map(subpackage -> "..")
+                                .collect(Collectors.joining("/", "../", "/"));
 
-            JavaSourceFile c = super.visitJavaSourceFile(cu, ctx)
-                    .withId(Tree.randomId());
+                JavaSourceFile c = super.visitNonNull(cu, ctx).withId(Tree.randomId());
 
-            String interfacePkg = JavaType.ShallowClass.build(fullyQualifiedInterfaceName).getPackageName();
-            if (!interfacePkg.isEmpty()) {
-                c = c.withPackageDeclaration(new J.Package(randomId(),
-                        cu.getPackageDeclaration() == null ? Space.EMPTY : cu.getPackageDeclaration().getPrefix(),
-                        Markers.EMPTY,
-                        TypeTree.build(interfacePkg).withPrefix(Space.format(" ")),
-                        cu.getPackageDeclaration() == null ? emptyList() : cu.getPackageDeclaration().getAnnotations()));
+                String interfacePkg = JavaType.ShallowClass.build(fullyQualifiedInterfaceName).getPackageName();
+                if (!interfacePkg.isEmpty()) {
+                    c = c.withPackageDeclaration(new J.Package(randomId(),
+                            cu.getPackageDeclaration() == null ? Space.EMPTY : cu.getPackageDeclaration().getPrefix(),
+                            Markers.EMPTY,
+                            TypeTree.build(interfacePkg).withPrefix(Space.format(" ")),
+                            cu.getPackageDeclaration() == null ? emptyList() : cu.getPackageDeclaration().getAnnotations()));
+                }
+
+                c = (JavaSourceFile) c.withSourcePath(cu.getSourcePath()
+                        .resolve(pkg + fullyQualifiedInterfaceName.replace('.', '/') + ".java")
+                        .normalize());
+
+                return c;
             }
-
-            c = (JavaSourceFile) c.withSourcePath(cu.getSourcePath()
-                    .resolve(pkg + fullyQualifiedInterfaceName.replace('.', '/') + ".java")
-                    .normalize());
-
-            return c;
+            return super.visit(tree, ctx);
         }
 
         @Override

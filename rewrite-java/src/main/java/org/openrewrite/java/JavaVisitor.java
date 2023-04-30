@@ -15,7 +15,10 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.*;
+import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.format.AutoFormatVisitor;
@@ -454,12 +457,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         c = c.withBody(visitAndCast(c.getBody(), p));
         c = c.withType(visitType(c.getType(), p));
         return c;
-    }
-
-    public J visitJavaSourceFile(JavaSourceFile cu, P p) {
-        return cu instanceof J.CompilationUnit ?
-                visitCompilationUnit((J.CompilationUnit) cu, p) :
-                cu;
     }
 
     public J visitCompilationUnit(J.CompilationUnit cu, P p) {

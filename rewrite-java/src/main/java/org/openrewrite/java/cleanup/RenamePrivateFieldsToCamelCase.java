@@ -15,10 +15,8 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.RenameVariable;
 import org.openrewrite.java.tree.Flag;
@@ -28,6 +26,7 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import java.time.Duration;
 import java.util.*;
 
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.internal.NameCaseConvention.LOWER_CAMEL;
 
 /**
@@ -75,21 +74,27 @@ public class RenamePrivateFieldsToCamelCase extends Recipe {
 
     private static class RenameNonCompliantNames extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-            Map<J.VariableDeclarations.NamedVariable, String> renameVariablesMap = new LinkedHashMap<>();
-            Set<String> hasNameSet = new HashSet<>();
+        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof JavaSourceFile) {
+                JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                Map<J.VariableDeclarations.NamedVariable, String> renameVariablesMap = new LinkedHashMap<>();
+                Set<String> hasNameSet = new HashSet<>();
 
-            getCursor().putMessage("RENAME_VARIABLES_KEY", renameVariablesMap);
-            getCursor().putMessage("HAS_NAME_KEY", hasNameSet);
-            super.visitJavaSourceFile(cu, ctx);
+                getCursor().putMessage("RENAME_VARIABLES_KEY", renameVariablesMap);
+                getCursor().putMessage("HAS_NAME_KEY", hasNameSet);
+                super.visit(cu, ctx);
 
-            renameVariablesMap.forEach((key, value) -> {
-                if (!hasNameSet.contains(value) && !hasNameSet.contains(key.getSimpleName())) {
-                    doAfterVisit(new RenameVariable<>(key, value));
-                    hasNameSet.add(value);
+                for (Map.Entry<J.VariableDeclarations.NamedVariable, String> entry : renameVariablesMap.entrySet()) {
+                    J.VariableDeclarations.NamedVariable key = entry.getKey();
+                    String value = entry.getValue();
+                    if (!hasNameSet.contains(value) && !hasNameSet.contains(key.getSimpleName())) {
+                        doAfterVisit(new RenameVariable<>(key, value));
+                        hasNameSet.add(value);
+                    }
                 }
-            });
-            return cu;
+                return cu;
+            }
+            return super.visit(tree, ctx);
         }
 
         @SuppressWarnings("all")
@@ -131,5 +136,4 @@ public class RenamePrivateFieldsToCamelCase extends Recipe {
             return cursor.dropParentUntil(is -> is instanceof J.ClassDeclaration || is instanceof J.Block);
         }
     }
-
 }
