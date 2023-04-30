@@ -23,9 +23,12 @@ import org.openrewrite.internal.lang.Nullable;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 @Incubating(since = "7.12.0")
@@ -61,7 +64,7 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
 
     @Override
     public AtomicBoolean getInitialValue() {
-        return new AtomicBoolean();
+        return new AtomicBoolean(true);
     }
 
     @Override
@@ -72,10 +75,7 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 if (path.toString().equals(sourceFile.getSourcePath().toString())) {
-                    if (Boolean.TRUE.equals(overwriteExisting) || !(sourceFile instanceof PlainText) ||
-                        !((PlainText) sourceFile).getText().equals(fileContents)) {
-                        shouldCreate.set(true);
-                    }
+                    shouldCreate.set(false);
                 }
                 return sourceFile;
             }
@@ -83,19 +83,31 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
     }
 
     @Override
-    public Collection<SourceFile> generate(AtomicBoolean acc, ExecutionContext ctx) {
-        return new PlainTextParser().parse("")
-                .map(brandNewFile -> brandNewFile.withSourcePath(Paths.get(relativeFileName)))
-                .collect(Collectors.toList());
+    public Collection<SourceFile> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
+        if(shouldCreate.get()) {
+            return new PlainTextParser().parse(fileContents)
+                    .map(brandNewFile -> brandNewFile.withSourcePath(Paths.get(relativeFileName)))
+                    .collect(Collectors.toList());
+        }
+        return emptyList();
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean acc) {
+    public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean created) {
         Path path = Paths.get(relativeFileName);
         return new PlainTextVisitor<ExecutionContext>() {
+
+            @Override
+            public @Nullable PlainText visit(@Nullable Tree tree, ExecutionContext executionContext) {
+                if(created.get()) {
+                    return (PlainText) tree;
+                }
+                return super.visit(tree, executionContext);
+            }
+
             @Override
             public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                if (path.toString().equals(text.getSourcePath().toString())) {
+                if (path.toString().equals(text.getSourcePath().toString()) && Boolean.TRUE.equals(overwriteExisting)) {
                     return text.withText(fileContents);
                 }
                 return text;
