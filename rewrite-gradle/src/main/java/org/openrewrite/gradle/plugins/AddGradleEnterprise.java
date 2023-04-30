@@ -148,7 +148,7 @@ public class AddGradleEnterprise extends Recipe {
             return cu;
         }
         String newVersion = maybeNewVersion.get();
-        cu = (G.CompilationUnit) new AddSettingsPlugin(pluginId, newVersion, null).getVisitor()
+        cu = (G.CompilationUnit) new AddPluginVisitor(pluginId, newVersion, null)
                 .visitNonNull(cu, ctx);
         cu = (G.CompilationUnit) new UpgradePluginVersion(pluginId, newVersion, null).getVisitor()
                 .visitNonNull(cu, ctx);
