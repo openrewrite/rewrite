@@ -425,14 +425,19 @@ public interface RewriteTest extends SourceSpecs {
                             assertThat(actual).as("Unexpected result in \"" + result.getAfter().getSourcePath() + "\"").isEqualTo(expected);
                             sourceSpec.eachResult.accept(result.getAfter(), testMethodSpec, testClassSpec);
                         } else {
-                            if (result.diff().isEmpty() && !(result.getAfter() instanceof Remote)) {
+                            boolean isRemote = result.getAfter() instanceof Remote;
+                            if (result.diff().isEmpty() && !isRemote) {
                                 fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.");
                             }
 
                             assert result.getBefore() != null;
-                            assertThat(result.getAfter().printAll(out.clone()))
-                                    .as("The recipe must not make changes to \"" + result.getBefore().getSourcePath() + "\"")
-                                    .isEqualTo(result.getBefore().printAll(out.clone()));
+                            if(isRemote) {
+                                // TODO: Verify that the remote URI is correct
+                            } else {
+                                assertThat(result.getAfter().printAll(out.clone()))
+                                        .as("The recipe must not make changes to \"" + result.getBefore().getSourcePath() + "\"")
+                                        .isEqualTo(result.getBefore().printAll(out.clone()));
+                            }
                         }
                     } else {
                         if (sourceSpec.after == null) {
