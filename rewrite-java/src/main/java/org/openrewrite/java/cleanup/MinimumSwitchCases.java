@@ -106,6 +106,11 @@ public class MinimumSwitchCases extends Recipe {
                                                                               "}").build();
 
             @Override
+            public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
+                return super.visitJavaSourceFile(cu, executionContext);
+            }
+
+            @Override
             public J visitBlock(J.Block block, ExecutionContext executionContext) {
                 // Handle the edge case of the extra-pointless switch statement which contains _only_ the default case
                 return block.withStatements(ListUtils.flatMap(block.getStatements(), (statement) -> {

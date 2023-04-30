@@ -21,10 +21,7 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.Contributor;
-import org.openrewrite.Maintainer;
-import org.openrewrite.Recipe;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.net.URI;
@@ -35,7 +32,7 @@ import static java.util.Collections.emptyList;
 import static org.openrewrite.Validated.invalid;
 
 @RequiredArgsConstructor
-public class DeclarativeRecipe extends Recipe {
+public class DeclarativeRecipe extends ScanningRecipe<Map<Recipe, Object>> {
     @Getter
     private final String name;
 
@@ -66,6 +63,8 @@ public class DeclarativeRecipe extends Recipe {
     @Getter
     private final List<Maintainer> maintainers;
 
+    private final List<Recipe> uninitializedApplicabilityTests = new ArrayList<>();
+    private final List<Recipe> applicabilityTests = new ArrayList<>();
     private final List<Recipe> uninitializedRecipes = new ArrayList<>();
     private final List<Recipe> recipeList = new ArrayList<>();
 
@@ -81,14 +80,23 @@ public class DeclarativeRecipe extends Recipe {
     }
 
     public void initialize(Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
-        for (int i = 0; i < uninitializedRecipes.size(); i++) {
-            Recipe recipe = uninitializedRecipes.get(i);
+        initialize(availableRecipes, recipeToContributors, uninitializedApplicabilityTests, applicabilityTests);
+        initialize(availableRecipes, recipeToContributors, uninitializedRecipes, recipeList);
+    }
+
+    private void initialize(
+            Collection<Recipe> availableRecipes,
+            Map<String, List<Contributor>> recipeToContributors,
+            List<Recipe> uninitialized,
+            List<Recipe> initialized) {
+        for (int i = 0; i < uninitialized.size(); i++) {
+            Recipe recipe = uninitialized.get(i);
             if (recipe instanceof LazyLoadedRecipe) {
                 String recipeFqn = ((LazyLoadedRecipe) recipe).getRecipeFqn();
                 Optional<Recipe> next = availableRecipes.stream()
                         .filter(r -> r.getName().equals(recipeFqn)).findAny();
                 if (next.isPresent()) {
-                    recipeList.add(next.get());
+                    initialized.add(next.get());
                 } else {
                     validation = validation.and(
                             invalid(name + ".recipeList" +
@@ -99,15 +107,10 @@ public class DeclarativeRecipe extends Recipe {
                 }
             } else {
                 recipe.setContributors(recipeToContributors.getOrDefault(recipe.getName(), emptyList()));
-                recipeList.add(recipe);
+                initialized.add(recipe);
             }
         }
-        uninitializedRecipes.clear();
-    }
-
-    @Override
-    public List<Recipe> getRecipeList() {
-        return recipeList;
+        uninitialized.clear();
     }
 
     public void addUninitialized(Recipe recipe) {
@@ -131,6 +134,78 @@ public class DeclarativeRecipe extends Recipe {
     @Override
     public Validated validate() {
         return validation;
+    }
+
+    @Override
+    public Map<Recipe, Object> getInitialValue() {
+        HashMap<Recipe, Object> acc = new HashMap<>();
+        initialValues(acc, applicabilityTests);
+        initialValues(acc, recipeList);
+        return acc;
+    }
+    private static void initialValues(Map<Recipe, Object> acc, List<Recipe> recipes) {
+        for (Recipe recipe : recipes) {
+            if (recipe instanceof ScanningRecipe) {
+                acc.put(recipe, ((ScanningRecipe<?>) recipe).getInitialValue());
+            }
+        }
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Map<Recipe, Object> acc) {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+                for(Recipe applicabilityTest : recipeList) {
+                    if(!(applicabilityTest instanceof ScanningRecipe)) {
+                        continue;
+                    }
+                    Object testAcc = acc.get(applicabilityTest);
+                    if(testAcc == null) {
+                        continue;
+                    }
+                    //noinspection unchecked,rawtypes
+                    ((ScanningRecipe) applicabilityTest).getScanner(testAcc).visit(tree, executionContext);
+                }
+                return tree;
+            }
+        };
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Map<Recipe, Object> acc) {
+        TreeVisitor<?, ExecutionContext> visitor = new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                Tree t = tree;
+                for(Recipe recipe : recipeList) {
+                    if(recipe instanceof ScanningRecipe) {
+                        //noinspection unchecked,rawtypes
+                        t = ((ScanningRecipe)recipe).getVisitor(acc.get(recipe)).visit(t, ctx);
+                    } else {
+                        t = recipe.getVisitor().visit(t, ctx);
+                    }
+                }
+                return t;
+            }
+        };
+        if(applicabilityTests.isEmpty()) {
+            return visitor;
+        }
+        List<TreeVisitor<?, ExecutionContext>> tests = new ArrayList<>(applicabilityTests.size());
+        for (Recipe applicabilityTest : applicabilityTests) {
+            if(applicabilityTest instanceof ScanningRecipe) {
+                //noinspection unchecked,rawtypes
+                tests.add(((ScanningRecipe)applicabilityTest).getVisitor(acc.get(applicabilityTest)));
+            } else {
+                tests.add(applicabilityTest.getVisitor());
+            }
+        }
+        //noinspection unchecked
+        TreeVisitor<?, ExecutionContext>[] applicabilityTestArr = tests.toArray(new TreeVisitor[0]);
+        TreeVisitor<?, ExecutionContext> check = Preconditions.and(applicabilityTestArr);
+
+        return Preconditions.check(check, visitor);
     }
 
     @Value
