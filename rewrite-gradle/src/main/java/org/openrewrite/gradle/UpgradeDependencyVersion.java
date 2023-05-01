@@ -17,7 +17,6 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.gradle.api.tasks.Exec;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
@@ -36,7 +35,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.Markup;
-import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -94,10 +92,10 @@ public class UpgradeDependencyVersion extends Recipe {
     public String getDescription() {
         //language=markdown
         return "Upgrade the version of a dependency in a build.gradle file. " +
-                "Supports updating dependency declarations of various forms:\n" +
-                "* `String` notation:  `implementation \"group:artifact:version\"` \n" +
-                "* `Map` notation: `implementation group: 'group', name: 'artifact', version: 'version'`\n" +
-                "Can update version numbers which are defined earlier in the same file in variable declarations.";
+               "Supports updating dependency declarations of various forms:\n" +
+               "* `String` notation:  `implementation \"group:artifact:version\"` \n" +
+               "* `Map` notation: `implementation group: 'group', name: 'artifact', version: 'version'`\n" +
+               "Can update version numbers which are defined earlier in the same file in variable declarations.";
     }
 
     @Override
@@ -109,18 +107,14 @@ public class UpgradeDependencyVersion extends Recipe {
         return validated;
     }
 
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor();
-    }
-
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
         VersionComparator versionComparator = requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
-        return new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker), new GroovyVisitor<ExecutionContext>() {
 
             @Override
-            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            public J postVisit(J tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
                     String variableName = getCursor().getMessage(VERSION_VARIABLE_KEY);
@@ -146,8 +140,10 @@ public class UpgradeDependencyVersion extends Recipe {
                         }
                         cu = cu.withMarkers(cu.getMarkers().removeByType(GradleProject.class).add(newGp));
                     }
+
+                    return cu;
                 }
-                return super.visit(tree, ctx);
+                return tree;
             }
 
             @Override
@@ -155,33 +151,33 @@ public class UpgradeDependencyVersion extends Recipe {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (dependencyDsl.matches(m)) {
                     List<Expression> depArgs = m.getArguments();
-                    if(depArgs.get(0) instanceof G.GString) {
+                    if (depArgs.get(0) instanceof G.GString) {
                         G.GString gString = (G.GString) depArgs.get(0);
                         List<J> strings = gString.getStrings();
-                        if(strings.size() != 2 || !(strings.get(0) instanceof J.Literal) || !(strings.get(1) instanceof G.GString.Value)) {
+                        if (strings.size() != 2 || !(strings.get(0) instanceof J.Literal) || !(strings.get(1) instanceof G.GString.Value)) {
                             return m;
                         }
                         J.Literal groupArtifact = (J.Literal) strings.get(0);
                         G.GString.Value versionValue = (G.GString.Value) strings.get(1);
-                        if(!(versionValue.getTree() instanceof J.Identifier) || !(groupArtifact.getValue() instanceof String)) {
+                        if (!(versionValue.getTree() instanceof J.Identifier) || !(groupArtifact.getValue() instanceof String)) {
                             return m;
                         }
                         Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
-                        if(StringUtils.matchesGlob(dep.getGroupId(), groupId)
-                           && StringUtils.matchesGlob(dep.getArtifactId(), artifactId)) {
+                        if (StringUtils.matchesGlob(dep.getGroupId(), groupId)
+                            && StringUtils.matchesGlob(dep.getArtifactId(), artifactId)) {
                             String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
                             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, VERSION_VARIABLE_KEY, versionVariableName);
                         }
                     } else if (depArgs.get(0) instanceof J.Literal) {
                         String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
-                        if(gav == null) {
+                        if (gav == null) {
                             return Markup.warn(m, new IllegalStateException("Unable to update version"));
                         }
                         Dependency dep = DependencyStringNotationConverter.parse(gav);
-                        if(StringUtils.matchesGlob(dep.getGroupId(), groupId)
-                           && StringUtils.matchesGlob(dep.getArtifactId(), artifactId)
-                           && dep.getVersion() != null
-                           && !dep.getVersion().startsWith("$")) {
+                        if (StringUtils.matchesGlob(dep.getGroupId(), groupId)
+                            && StringUtils.matchesGlob(dep.getArtifactId(), artifactId)
+                            && dep.getVersion() != null
+                            && !dep.getVersion().startsWith("$")) {
                             GradleProject gradleProject = getCursor().firstEnclosingOrThrow(JavaSourceFile.class)
                                     .getMarkers()
                                     .findFirst(GradleProject.class)
@@ -211,28 +207,28 @@ public class UpgradeDependencyVersion extends Recipe {
                             }
                         }
                     } else if (depArgs.size() >= 3 && depArgs.get(0) instanceof G.MapEntry
-                            && depArgs.get(1) instanceof G.MapEntry
-                            && depArgs.get(2) instanceof G.MapEntry) {
+                               && depArgs.get(1) instanceof G.MapEntry
+                               && depArgs.get(2) instanceof G.MapEntry) {
                         Expression groupValue = ((G.MapEntry) depArgs.get(0)).getValue();
                         Expression artifactValue = ((G.MapEntry) depArgs.get(1)).getValue();
-                        if(!(groupValue instanceof J.Literal) || !(artifactValue instanceof J.Literal)) {
+                        if (!(groupValue instanceof J.Literal) || !(artifactValue instanceof J.Literal)) {
                             return m;
                         }
                         J.Literal groupLiteral = (J.Literal) groupValue;
                         J.Literal artifactLiteral = (J.Literal) artifactValue;
-                        if(!groupId.equals(groupLiteral.getValue()) || !artifactId.equals(artifactLiteral.getValue())) {
+                        if (!groupId.equals(groupLiteral.getValue()) || !artifactId.equals(artifactLiteral.getValue())) {
                             return m;
                         }
                         G.MapEntry versionEntry = (G.MapEntry) depArgs.get(2);
                         Expression versionExp = versionEntry.getValue();
-                        if(versionExp instanceof J.Literal && ((J.Literal) versionExp).getValue() instanceof String) {
+                        if (versionExp instanceof J.Literal && ((J.Literal) versionExp).getValue() instanceof String) {
                             GradleProject gradleProject = getCursor().firstEnclosingOrThrow(JavaSourceFile.class)
                                     .getMarkers()
                                     .findFirst(GradleProject.class)
                                     .orElseThrow(() -> new IllegalArgumentException("Gradle files are expected to have a GradleProject marker."));
                             J.Literal versionLiteral = (J.Literal) versionExp;
                             String version = (String) versionLiteral.getValue();
-                            if(version.startsWith("$")) {
+                            if (version.startsWith("$")) {
                                 return m;
                             }
                             String newVersion;
@@ -255,7 +251,7 @@ public class UpgradeDependencyVersion extends Recipe {
                             newArgs.addAll(depArgs.subList(3, depArgs.size()));
 
                             return m.withArguments(newArgs);
-                        } else if(versionExp instanceof J.Identifier) {
+                        } else if (versionExp instanceof J.Identifier) {
                             String versionVariableName = ((J.Identifier) versionExp).getSimpleName();
                             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, VERSION_VARIABLE_KEY, versionVariableName);
                         }
@@ -263,7 +259,7 @@ public class UpgradeDependencyVersion extends Recipe {
                 }
                 return m;
             }
-        };
+        });
     }
 
     @Value
@@ -272,27 +268,28 @@ public class UpgradeDependencyVersion extends Recipe {
         String versionVariableName;
         VersionComparator versionComparator;
         GradleProject gradleProject;
+
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
             J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
-            if(!versionVariableName.equals((v.getSimpleName()))) {
+            if (!versionVariableName.equals((v.getSimpleName()))) {
                 return v;
             }
-            if(!(v.getInitializer() instanceof J.Literal)) {
+            if (!(v.getInitializer() instanceof J.Literal)) {
                 return v;
             }
             J.Literal initializer = (J.Literal) v.getInitializer();
-            if(initializer.getType() != JavaType.Primitive.String) {
+            if (initializer.getType() != JavaType.Primitive.String) {
                 return v;
             }
             String version = (String) initializer.getValue();
-            if(version == null) {
+            if (version == null) {
                 return v;
             }
 
             try {
                 String newVersion = findNewerVersion(groupId, artifactId, version, versionComparator, gradleProject, ctx);
-                if(newVersion == null) {
+                if (newVersion == null) {
                     return v;
                 }
                 getCursor().dropParentUntil(p -> p instanceof SourceFile)
@@ -341,7 +338,7 @@ public class UpgradeDependencyVersion extends Recipe {
 
     static GradleProject replaceVersion(GradleProject gp, ExecutionContext ctx, GroupArtifactVersion gav) {
         try {
-            if(gav.getGroupId() == null || gav.getArtifactId() == null) {
+            if (gav.getGroupId() == null || gav.getArtifactId() == null) {
                 return gp;
             }
             MavenPomDownloader mpd = new MavenPomDownloader(emptyMap(), ctx, null, null);
@@ -370,10 +367,10 @@ public class UpgradeDependencyVersion extends Recipe {
                 anyChanged |= newGdc != gdc;
                 newNameToConfiguration.put(newGdc.getName(), newGdc);
             }
-            if(anyChanged) {
+            if (anyChanged) {
                 gp = gp.withNameToConfiguration(newNameToConfiguration);
             }
-        } catch (MavenDownloadingException | MavenDownloadingExceptions  e) {
+        } catch (MavenDownloadingException | MavenDownloadingExceptions e) {
             return gp;
         }
         return gp;
