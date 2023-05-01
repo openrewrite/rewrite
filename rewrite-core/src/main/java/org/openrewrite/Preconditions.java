@@ -30,6 +30,11 @@ public class Preconditions {
     public static TreeVisitor<?, ExecutionContext> check(TreeVisitor<?, ExecutionContext> check, TreeVisitor<?, ExecutionContext> v) {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return check.isAcceptable(sourceFile, ctx) && v.isAcceptable(sourceFile, ctx);
+            }
+
+            @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 // if tree isn't an instanceof SourceFile, then a precondition visitor may
                 // not be able to do its work because it may assume we are starting from the root level

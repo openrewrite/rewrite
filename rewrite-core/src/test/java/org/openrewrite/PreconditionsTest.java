@@ -16,12 +16,14 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
+import static org.openrewrite.test.SourceSpecs.other;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class PreconditionsTest implements RewriteTest {
@@ -78,6 +80,31 @@ class PreconditionsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(recipe(Preconditions.and(contains("h"), contains("z")))),
           text("hello")
+        );
+    }
+
+    @Test
+    void checkApplicabilityAgainstOtherSourceTypes() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new Recipe() {
+                @Override
+                public String getDisplayName() {
+                    return "Say goodbye";
+                }
+
+                @Override
+                public TreeVisitor<?, ExecutionContext> getVisitor() {
+                    return Preconditions.check(new PlainTextVisitor<>() {
+                        @Override
+                        public @Nullable PlainText visit(@Nullable Tree tree, ExecutionContext ctx) {
+                            return super.visit(tree, ctx);
+                        }
+                    }, new PlainTextVisitor<>());
+                }
+            }
+          ),
+          other("hello")
         );
     }
 
