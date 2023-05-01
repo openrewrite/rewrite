@@ -35,23 +35,6 @@ public class GradleParser implements Parser<G.CompilationUnit> {
     private final GroovyParser buildParser;
     private final GroovyParser settingsParser;
 
-    @Deprecated//(since = "7.37.0", forRemoval = true)
-    public GradleParser(GroovyParser.Builder groovyParser) {
-        GroovyParser.Builder base = groovyParser;
-        this.buildParser = GroovyParser.builder(base)
-                .compilerCustomizers(
-                        new DefaultImportsCustomizer(),
-                        config -> config.setScriptBaseClass("RewriteGradleProject")
-                )
-                .build();
-        this.settingsParser = GroovyParser.builder(base)
-                .compilerCustomizers(
-                        new DefaultImportsCustomizer(),
-                        config -> config.setScriptBaseClass("RewriteSettings")
-                )
-                .build();
-    }
-
     private GradleParser(Builder builder) {
         GroovyParser.Builder base = builder.groovyParser;
         this.buildParser = GroovyParser.builder(base)
@@ -111,19 +94,6 @@ public class GradleParser implements Parser<G.CompilationUnit> {
         public Builder groovyParser(GroovyParser.Builder groovyParser) {
             this.groovyParser = groovyParser;
             return this;
-        }
-
-        /**
-         * @deprecated Use {@code groovyParser(GroovyParser.Builder)} instead.
-         */
-        @Deprecated//(since = "7.37.0", forRemoval = true)
-        public Builder setGroovyParser(GroovyParser.Builder groovyParser) {
-            return groovyParser(groovyParser);
-        }
-
-        @Deprecated//(since = "7.37.0", forRemoval = true)
-        public GroovyParser.Builder getGroovyParser() {
-            return groovyParser;
         }
 
         public Builder buildscriptClasspath(Collection<Path> classpath) {
