@@ -13,17 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java;
+package org.openrewrite.java.format;
 
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
-import org.openrewrite.Tree;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.java.cleanup.NoWhitespaceBefore;
-import org.openrewrite.java.format.AutoFormatVisitor;
+import org.openrewrite.Tree;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.NoWhitespaceBeforeStyle;
 import org.openrewrite.java.tree.J;

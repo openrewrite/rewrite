@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java;
+package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Tree;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.java.cleanup.PadEmptyForLoopComponents;
-import org.openrewrite.java.format.SpacesVisitor;
+import org.openrewrite.Tree;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.EmptyForInitializerPadStyle;
 import org.openrewrite.java.style.EmptyForIteratorPadStyle;
 import org.openrewrite.java.style.IntelliJ;

@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.java.cleanup.IndexOfReplaceableByContains;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RewriteTest;
 
@@ -916,35 +915,6 @@ class JavaTemplateTest implements RewriteTest {
               class Test {
                   void doSomething(Collection<Object> c) {
                       assert !c.isEmpty();
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @SuppressWarnings({"IndexOfReplaceableByContains", "InfiniteLoopStatement"})
-    @Issue("https://github.com/openrewrite/rewrite/issues/2565")
-    @Test
-    void noBlockControlFlow() {
-        rewriteRun(
-          spec -> spec.recipe(new IndexOfReplaceableByContains()),
-          java(
-            """
-              class Test {
-                  void test(String str) {
-                      for (;;)
-                          if ("".indexOf(str) >= 0)
-                              System.out.println("help");
-                  }
-              }
-              """,
-            """
-              class Test {
-                  void test(String str) {
-                      for (;;)
-                          if ("".contains(str))
-                              System.out.println("help");
                   }
               }
               """

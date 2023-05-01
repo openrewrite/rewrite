@@ -18,9 +18,6 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.java.cleanup.IsEmptyCallOnCollections;
-import org.openrewrite.java.cleanup.UseLambdaForFunctionalInterface;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
@@ -150,80 +147,6 @@ class JavaTemplateTest7Test implements RewriteTest {
                   void foo() {
                       int i;
                       i = 1;
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @SuppressWarnings({"Convert2Lambda", "TrivialFunctionalExpressionUsage", "CodeBlock2Expr"})
-    @Test
-    void nestedAnonymousRunnables() {
-        rewriteRun(
-          spec -> spec.recipe(new UseLambdaForFunctionalInterface()),
-          java(
-            """
-              class Test {
-                  public void test(int n) {
-                      new Runnable() {
-                          public void run() {
-                              Runnable r = new Runnable() {
-                                  public void run() {
-                                      System.out.println("Hello world!");
-                                  }
-                              };
-                          }
-                      }.run();
-                  }
-              }
-              """,
-            """
-              class Test {
-                  public void test(int n) {
-                      new Runnable() {
-                          public void run() {
-                              Runnable r = () -> {
-                                  System.out.println("Hello world!");
-                              };
-                          }
-                      }.run();
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void doWhileLoopCondition() {
-        rewriteRun(
-          spec -> spec.recipe(new IsEmptyCallOnCollections()),
-          java(
-            """
-              import java.util.List;
-
-              class Test {
-                  void method(List<String> l) {
-                      int i = l.size() - 1;
-                        do {
-                            l.remove(i);
-                            i--;
-                        } while (l.size() > 0);
-                  }
-              }
-              """,
-            """
-              import java.util.List;
-
-              class Test {
-                  void method(List<String> l) {
-                      int i = l.size() - 1;
-                        do {
-                            l.remove(i);
-                            i--;
-                        } while (!l.isEmpty());
                   }
               }
               """
