@@ -94,8 +94,9 @@ public class ChangeMethodTargetToStatic extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new UsesMethod<>(methodPattern, matchOverrides), new ChangeMethodTargetToStaticVisitor(new MethodMatcher(methodPattern, matchOverrides),
-                Boolean.TRUE.equals(matchUnknownTypes)));
+        boolean matchUnknown = Boolean.TRUE.equals(matchUnknownTypes);
+        ChangeMethodTargetToStaticVisitor visitor = new ChangeMethodTargetToStaticVisitor(new MethodMatcher(methodPattern, matchOverrides), matchUnknown);
+        return matchUnknown ? visitor : Preconditions.check(new UsesMethod<>(methodPattern, matchOverrides), visitor);
     }
 
     private class ChangeMethodTargetToStaticVisitor extends JavaIsoVisitor<ExecutionContext> {
