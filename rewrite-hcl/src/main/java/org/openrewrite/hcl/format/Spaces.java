@@ -46,8 +46,7 @@ public class Spaces extends Recipe {
             if (style == null) {
                 style = SpacesStyle.DEFAULT;
             }
-            return new SpacesVisitor<>(style).visit(cu, ctx);
-            return super.visitConfigFile(cf, ctx);
+            return (Hcl.ConfigFile) new SpacesVisitor<>(style).visitNonNull(cf, ctx);
         }
     }
 }

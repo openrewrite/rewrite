@@ -23,6 +23,7 @@ import org.openrewrite.hcl.style.TabsAndIndentsStyle;
 import org.openrewrite.hcl.tree.Hcl;
 
 public class TabsAndIndents extends Recipe {
+
     @Override
     public String getDisplayName() {
         return "Tabs and indents";
@@ -45,8 +46,7 @@ public class TabsAndIndents extends Recipe {
             if (style == null) {
                 style = TabsAndIndentsStyle.DEFAULT;
             }
-            return new TabsAndIndentsVisitor<>(style).visit(cu, ctx);
-            return cf;
+            return (Hcl.ConfigFile) new TabsAndIndentsVisitor<>(style).visitNonNull(cf, ctx);
         }
     }
 }

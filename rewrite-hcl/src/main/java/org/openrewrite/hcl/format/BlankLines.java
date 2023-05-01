@@ -20,6 +20,7 @@ import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.tree.Hcl;
 
 public class BlankLines extends Recipe {
+
     @Override
     public String getDisplayName() {
         return "Blank lines";
@@ -42,8 +43,7 @@ public class BlankLines extends Recipe {
             if (style == null) {
                 style = BlankLinesStyle.DEFAULT;
             }
-            return new BlankLinesVisitor<>(style).visit(cu, ctx);
-            return configFile;
+            return (Hcl.ConfigFile) new BlankLinesVisitor<>(style).visitNonNull(configFile, ctx);
         }
     }
 
