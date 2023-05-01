@@ -90,15 +90,6 @@ public class Result {
     }
 
     /**
-     * @return The list of recipe instances that made changes.
-     * @deprecated Use {@link #getRecipeDescriptorsThatMadeChanges()} instead.
-     */
-    @Deprecated
-    public Set<Recipe> getRecipesThatMadeChanges() {
-        return recipes.stream().map(Stack::peek).collect(Collectors.toSet());
-    }
-
-    /**
      * Return a list of recipes that have made changes as a hierarchy of descriptors.
      * The method transforms the flat, stack-based representation into descriptors where children are grouped under their common parents.
      */

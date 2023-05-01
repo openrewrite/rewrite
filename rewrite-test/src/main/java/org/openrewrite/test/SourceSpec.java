@@ -18,7 +18,6 @@ package org.openrewrite.test;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.Setter;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
@@ -80,11 +79,6 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
         this.customizeExecutionContext = (ctx) -> {
         };
     }
-
-    @Setter
-    @Nullable
-    @Deprecated//(since = "7.40.0", forRemoval = true)
-    protected String sourceSetName;
 
     protected Path dir = Paths.get("");
 

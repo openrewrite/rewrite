@@ -139,14 +139,6 @@ public class RecipeSpec {
         return recipe(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)), activeRecipes);
     }
 
-    /**
-     * @deprecated Use {@link #recipeFromResource(String, String...)} instead.
-     */
-    @Deprecated
-    public RecipeSpec recipe(String yamlResource, String... activeRecipes) {
-        return recipeFromResource(yamlResource, activeRecipes);
-    }
-
     public RecipeSpec recipeFromResource(String yamlResource, String... activeRecipes) {
         return recipe(Objects.requireNonNull(RecipeSpec.class.getResourceAsStream(yamlResource)), activeRecipes);
     }

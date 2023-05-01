@@ -289,20 +289,6 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
      */
     void setClasspath(Collection<Path> classpath);
 
-    /**
-     * Changes the source set on the parser. Intended for use in multiple pass parsing, where we want to keep the
-     * compiler symbol table intact for type attribution on later parses, i.e. for maven multi-module projects.
-     *
-     * @deprecated
-     * @param sourceSet source set used to set {@link org.openrewrite.java.marker.JavaSourceSet} markers on
-     *                  subsequently parsed {@link J.CompilationUnit}
-     */
-    @Deprecated//(since = "7.40.0", forRemoval = true)
-    void setSourceSet(String sourceSet);
-
-    @Deprecated//(since = "7.40.0", forRemoval = true)
-    JavaSourceSet getSourceSet(ExecutionContext ctx);
-
     @SuppressWarnings("unchecked")
     abstract class Builder<P extends JavaParser, B extends Builder<P, B>> extends Parser.Builder {
         protected Collection<Path> classpath = Collections.emptyList();

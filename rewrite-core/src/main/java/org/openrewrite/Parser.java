@@ -190,15 +190,6 @@ public interface Parser<S extends SourceFile> {
             return relativeTo == null ? path : relativeTo.relativize(path);
         }
 
-        /**
-         * @deprecated Use {@link #getSource(ExecutionContext)} instead which
-         * incorporates overrides of charset.
-         */
-        @Deprecated
-        public EncodingDetectingInputStream getSource() {
-            return getSource(new InMemoryExecutionContext());
-        }
-
         public EncodingDetectingInputStream getSource(ExecutionContext ctx) {
             return new EncodingDetectingInputStream(source.get(), ParsingExecutionContextView.view(ctx).getCharset());
         }

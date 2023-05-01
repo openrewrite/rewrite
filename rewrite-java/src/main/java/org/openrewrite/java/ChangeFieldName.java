@@ -15,26 +15,19 @@
  */
 package org.openrewrite.java;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
 import static org.openrewrite.Tree.randomId;
 
+@Value
+@EqualsAndHashCode(callSuper = false)
 public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
-    private final String classType;
-    private final String hasName;
-    private final String toName;
-
-    @Deprecated
-    public ChangeFieldName(JavaType.Class classType, String hasName, String toName) {
-        this(classType.getFullyQualifiedName(), hasName, toName);
-    }
-
-    public ChangeFieldName(String classType, String hasName, String toName) {
-        this.classType = classType;
-        this.hasName = hasName;
-        this.toName = toName;
-    }
+    String classType;
+    String hasName;
+    String toName;
 
     @Override
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {

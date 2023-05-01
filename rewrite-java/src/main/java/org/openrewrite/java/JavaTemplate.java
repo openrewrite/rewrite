@@ -190,28 +190,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             return true;
         }
 
-        /**
-         * A bridge for backwards compatibility of {@link #javaParser(Supplier)}.
-         */
-        private static class SupplierJavaParserBuilder extends JavaParser.Builder<JavaParser, SupplierJavaParserBuilder> {
-            private final Supplier<JavaParser> supplier;
-
-            SupplierJavaParserBuilder(Supplier<JavaParser> supplier) {
-                this.supplier = supplier;
-            }
-
-            @Override
-            public JavaParser build() {
-                return supplier.get();
-            }
-        }
-
-        @Deprecated
-        public Builder javaParser(Supplier<JavaParser> javaParser) {
-            this.javaParser = new SupplierJavaParserBuilder(javaParser);
-            return this;
-        }
-
         public Builder javaParser(JavaParser.Builder<?, ?> javaParser) {
             this.javaParser = javaParser;
             return this;
