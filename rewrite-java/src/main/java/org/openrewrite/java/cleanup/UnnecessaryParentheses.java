@@ -27,8 +27,6 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import static java.util.Objects.requireNonNull;
-
 public class UnnecessaryParentheses extends Recipe {
 
     @Override
@@ -53,23 +51,20 @@ public class UnnecessaryParentheses extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        //noinspection NotNullFieldNotInitialized
         return new JavaVisitor<ExecutionContext>() {
             private static final String UNNECESSARY_PARENTHESES_MESSAGE = "unnecessaryParenthesesUnwrapTarget";
 
-            UnnecessaryParenthesesStyle style;
+            transient UnnecessaryParenthesesStyle style;
 
-            @Override
-            public J preVisit(J tree, ExecutionContext executionContext) {
-                if (tree instanceof JavaSourceFile) {
-                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                    //noinspection DataFlowIssue
+            private UnnecessaryParenthesesStyle getStyle() {
+                if (style == null) {
+                    JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
                     style = ((SourceFile) cu).getStyle(UnnecessaryParenthesesStyle.class);
                     if (style == null) {
                         style = Checkstyle.unnecessaryParentheses();
                     }
                 }
-                return tree;
+                return style;
             }
 
             @Override
@@ -92,7 +87,7 @@ public class UnnecessaryParentheses extends Recipe {
             @Override
             public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
                 J.Identifier i = (J.Identifier) super.visitIdentifier(ident, ctx);
-                if (style.getIdent() && getCursor().getParentTreeCursor().getValue() instanceof J.Parentheses) {
+                if (getStyle().getIdent() && getCursor().getParentTreeCursor().getValue() instanceof J.Parentheses) {
                     getCursor().putMessageOnFirstEnclosing(J.Parentheses.class, UNNECESSARY_PARENTHESES_MESSAGE, getCursor());
                 }
                 return i;
@@ -102,14 +97,14 @@ public class UnnecessaryParentheses extends Recipe {
             public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
                 J.Literal l = (J.Literal) super.visitLiteral(literal, ctx);
                 JavaType.Primitive type = l.getType();
-                if ((style.getNumInt() && type == JavaType.Primitive.Int) ||
-                    (style.getNumDouble() && type == JavaType.Primitive.Double) ||
-                    (style.getNumLong() && type == JavaType.Primitive.Long) ||
-                    (style.getNumFloat() && type == JavaType.Primitive.Float) ||
-                    (style.getStringLiteral() && type == JavaType.Primitive.String) ||
-                    (style.getLiteralNull() && type == JavaType.Primitive.Null) ||
-                    (style.getLiteralFalse() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(false)) ||
-                    (style.getLiteralTrue() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(true))) {
+                if ((getStyle().getNumInt() && type == JavaType.Primitive.Int) ||
+                    (getStyle().getNumDouble() && type == JavaType.Primitive.Double) ||
+                    (getStyle().getNumLong() && type == JavaType.Primitive.Long) ||
+                    (getStyle().getNumFloat() && type == JavaType.Primitive.Float) ||
+                    (getStyle().getStringLiteral() && type == JavaType.Primitive.String) ||
+                    (getStyle().getLiteralNull() && type == JavaType.Primitive.Null) ||
+                    (getStyle().getLiteralFalse() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(false)) ||
+                    (getStyle().getLiteralTrue() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(true))) {
                     if (getCursor().getParentTreeCursor().getValue() instanceof J.Parentheses) {
                         getCursor().putMessageOnFirstEnclosing(J.Parentheses.class, UNNECESSARY_PARENTHESES_MESSAGE, getCursor());
                     }
@@ -121,17 +116,17 @@ public class UnnecessaryParentheses extends Recipe {
             public J visitAssignmentOperation(J.AssignmentOperation assignOp, ExecutionContext ctx) {
                 J.AssignmentOperation a = (J.AssignmentOperation) super.visitAssignmentOperation(assignOp, ctx);
                 J.AssignmentOperation.Type op = a.getOperator();
-                if (a.getAssignment() instanceof J.Parentheses && ((style.getBitAndAssign() && op == J.AssignmentOperation.Type.BitAnd) ||
-                                                                   (style.getBitOrAssign() && op == J.AssignmentOperation.Type.BitOr) ||
-                                                                   (style.getBitShiftRightAssign() && op == J.AssignmentOperation.Type.UnsignedRightShift) ||
-                                                                   (style.getBitXorAssign() && op == J.AssignmentOperation.Type.BitXor) ||
-                                                                   (style.getShiftRightAssign() && op == J.AssignmentOperation.Type.RightShift) ||
-                                                                   (style.getShiftLeftAssign() && op == J.AssignmentOperation.Type.LeftShift) ||
-                                                                   (style.getMinusAssign() && op == J.AssignmentOperation.Type.Subtraction) ||
-                                                                   (style.getDivAssign() && op == J.AssignmentOperation.Type.Division) ||
-                                                                   (style.getPlusAssign() && op == J.AssignmentOperation.Type.Addition) ||
-                                                                   (style.getStarAssign() && op == J.AssignmentOperation.Type.Multiplication) ||
-                                                                   (style.getModAssign() && op == J.AssignmentOperation.Type.Modulo))) {
+                if (a.getAssignment() instanceof J.Parentheses && ((getStyle().getBitAndAssign() && op == J.AssignmentOperation.Type.BitAnd) ||
+                                                                   (getStyle().getBitOrAssign() && op == J.AssignmentOperation.Type.BitOr) ||
+                                                                   (getStyle().getBitShiftRightAssign() && op == J.AssignmentOperation.Type.UnsignedRightShift) ||
+                                                                   (getStyle().getBitXorAssign() && op == J.AssignmentOperation.Type.BitXor) ||
+                                                                   (getStyle().getShiftRightAssign() && op == J.AssignmentOperation.Type.RightShift) ||
+                                                                   (getStyle().getShiftLeftAssign() && op == J.AssignmentOperation.Type.LeftShift) ||
+                                                                   (getStyle().getMinusAssign() && op == J.AssignmentOperation.Type.Subtraction) ||
+                                                                   (getStyle().getDivAssign() && op == J.AssignmentOperation.Type.Division) ||
+                                                                   (getStyle().getPlusAssign() && op == J.AssignmentOperation.Type.Addition) ||
+                                                                   (getStyle().getStarAssign() && op == J.AssignmentOperation.Type.Multiplication) ||
+                                                                   (getStyle().getModAssign() && op == J.AssignmentOperation.Type.Modulo))) {
                     a = (J.AssignmentOperation) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visitNonNull(a, ctx, getCursor().getParentOrThrow());
                 }
                 return a;
@@ -140,7 +135,7 @@ public class UnnecessaryParentheses extends Recipe {
             @Override
             public J visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
                 J.Assignment a = visitAndCast(assignment, ctx, super::visitAssignment);
-                if (style.getAssign() && a.getAssignment() instanceof J.Parentheses) {
+                if (getStyle().getAssign() && a.getAssignment() instanceof J.Parentheses) {
                     a = (J.Assignment) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visitNonNull(a, ctx, getCursor().getParentOrThrow());
                 }
                 return a;
@@ -149,7 +144,7 @@ public class UnnecessaryParentheses extends Recipe {
             @Override
             public J visitReturn(J.Return retrn, ExecutionContext ctx) {
                 J.Return rtn = (J.Return) super.visitReturn(retrn, ctx);
-                if (style.getExpr() && rtn.getExpression() instanceof J.Parentheses) {
+                if (getStyle().getExpr() && rtn.getExpression() instanceof J.Parentheses) {
                     rtn = (J.Return) new UnwrapParentheses<>((J.Parentheses<?>) rtn.getExpression()).visitNonNull(rtn, ctx, getCursor().getParentOrThrow());
                 }
                 return rtn;
@@ -158,7 +153,7 @@ public class UnnecessaryParentheses extends Recipe {
             @Override
             public J visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
                 J.VariableDeclarations.NamedVariable v = (J.VariableDeclarations.NamedVariable) super.visitVariable(variable, ctx);
-                if (style.getAssign() && v.getInitializer() != null && v.getInitializer() instanceof J.Parentheses) {
+                if (getStyle().getAssign() && v.getInitializer() != null && v.getInitializer() instanceof J.Parentheses) {
                     v = (J.VariableDeclarations.NamedVariable) new UnwrapParentheses<>((J.Parentheses<?>) v.getInitializer()).visitNonNull(v, ctx, getCursor().getParentOrThrow());
                 }
                 return v;

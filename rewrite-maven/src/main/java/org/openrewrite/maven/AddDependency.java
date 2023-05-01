@@ -23,6 +23,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
@@ -169,16 +170,19 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
-                acc.usingType |= new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx) != sourceFile;
-                sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
-                        sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
-                            if (sourceFile != new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx)) {
-                                acc.scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
-                                        scope /* a `compile` scope dependency will also be available in test source set */ :
-                                        "test".equals(sourceSet.getName()) ? "test" : "compile"
-                                );
-                            }
-                        }));
+                if (tree instanceof JavaSourceFile) {
+                    boolean sourceFileUsesType = sourceFile != new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx);
+                    acc.usingType |= sourceFileUsesType;
+                    sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
+                            sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
+                                if (sourceFileUsesType) {
+                                    acc.scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
+                                            scope /* a `compile` scope dependency will also be available in test source set */ :
+                                            "test".equals(sourceSet.getName()) ? "test" : "compile"
+                                    );
+                                }
+                            }));
+                }
                 return sourceFile;
             }
         };
