@@ -275,4 +275,17 @@ class XmlParserTest implements RewriteTest {
               """)
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3175")
+    @Test
+    void linkWithQuestionMark() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="ISO-8859-1"?>
+              <?xml-stylesheet type="text/xsl" href="/name/other?link"?>
+              <blah></blah>
+              """)
+        );
+    }
 }
