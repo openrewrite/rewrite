@@ -41,13 +41,12 @@ public class NormalizeTabsOrSpaces extends Recipe {
 
     private static class TabsAndIndentsFromCompilationUnitStyle extends XmlIsoVisitor<ExecutionContext> {
         @Override
-        public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
+        public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
             TabsAndIndentsStyle style = document.getStyle(TabsAndIndentsStyle.class);
             if (style == null) {
                 style = TabsAndIndentsStyle.DEFAULT;
             }
-            return new NormalizeTabsOrSpacesVisitor<>(style).visit(cu, ctx);
-            return document;
+            return (Xml.Document) new NormalizeTabsOrSpacesVisitor<>(style).visitNonNull(document, ctx);
         }
     }
 }

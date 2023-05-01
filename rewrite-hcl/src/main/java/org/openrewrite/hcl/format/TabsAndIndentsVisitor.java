@@ -101,7 +101,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
         IndentType indentType = getCursor().getParentOrThrow().getNearestMessage("indentType", IndentType.ALIGN);
 
         // block spaces are always aligned to their parent
-        boolean alignBlockToParent = loc.equals(Space.Location.BLOCK_CLOSE)|| loc.equals(Space.Location.OBJECT_VALUE_ATTRIBUTE_SUFFIX);
+        boolean alignBlockToParent = loc.equals(Space.Location.BLOCK_CLOSE) || loc.equals(Space.Location.OBJECT_VALUE_ATTRIBUTE_SUFFIX);
 
         if (alignBlockToParent) {
             indentType = IndentType.ALIGN;
@@ -138,7 +138,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
         if (right.getElement() instanceof Hcl) {
             Hcl elem = (Hcl) right.getElement();
             if ((right.getAfter().getLastWhitespace().contains("\n") ||
-                    elem.getPrefix().getLastWhitespace().contains("\n"))) {
+                 elem.getPrefix().getLastWhitespace().contains("\n"))) {
                 switch (loc) {
                     case FUNCTION_CALL_ARGUMENT:
                     case PARENTHESES: {
@@ -231,7 +231,7 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
     public Hcl.Attribute visitAttribute(final Hcl.Attribute attribute, final P p) {
         Hcl.Attribute a = attribute;
         if (attribute.getComma() != null) {
-            a =  attribute.withComma(attribute.getComma().withPrefix(Space.EMPTY));
+            a = attribute.withComma(attribute.getComma().withPrefix(Space.EMPTY));
         }
         return super.visitAttribute(a, p);
     }
@@ -249,10 +249,10 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
             }
         } else {
             if (!StringUtils.isNullOrEmpty(space.getWhitespace()) &&
-                    // Preserve whitespace of trailing line comments.
-                    (Comment.Style.INLINE.equals(space.getComments().get(0).getStyle()) ||
-                            (!Comment.Style.INLINE.equals(space.getComments().get(0).getStyle()) &&
-                                    (space.getWhitespace().contains("\n") || space.getWhitespace().contains("\r"))))) {
+                // Preserve whitespace of trailing line comments.
+                (Comment.Style.INLINE.equals(space.getComments().get(0).getStyle()) ||
+                 (!Comment.Style.INLINE.equals(space.getComments().get(0).getStyle()) &&
+                  (space.getWhitespace().contains("\n") || space.getWhitespace().contains("\r"))))) {
                 if (style.getUseTabCharacter()) {
                     space = space.withWhitespace(space.getWhitespace().replaceAll(" ", ""));
                 } else {
