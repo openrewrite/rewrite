@@ -16,9 +16,9 @@
 package org.openrewrite.text;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
-import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 

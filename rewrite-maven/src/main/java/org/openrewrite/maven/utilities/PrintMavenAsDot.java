@@ -21,7 +21,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.DotResult;
 import org.openrewrite.maven.MavenIsoVisitor;
-import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;

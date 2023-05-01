@@ -16,8 +16,10 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.*;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.J;

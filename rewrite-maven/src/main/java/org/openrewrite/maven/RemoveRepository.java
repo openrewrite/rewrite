@@ -26,8 +26,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Objects;
-
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class RemoveRepository extends Recipe {

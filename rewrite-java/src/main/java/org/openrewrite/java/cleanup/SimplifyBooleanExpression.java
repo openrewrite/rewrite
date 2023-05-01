@@ -32,7 +32,6 @@ import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
 
-@Incubating(since = "7.0.0")
 public class SimplifyBooleanExpression extends Recipe {
 
     @Override

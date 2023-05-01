@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Contributor;
 import org.openrewrite.Maintainer;
 import org.openrewrite.Recipe;
-import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
@@ -30,7 +29,6 @@ import java.util.Optional;
 import java.util.Properties;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.test.SourceSpecs.text;
 
 class YamlResourceLoaderTest implements RewriteTest {
 

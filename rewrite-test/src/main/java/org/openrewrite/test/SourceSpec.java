@@ -30,7 +30,9 @@ import org.openrewrite.test.internal.ThrowingUnaryOperator;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.Iterator;
+import java.util.List;
+import java.util.UUID;
 import java.util.function.UnaryOperator;
 
 @RequiredArgsConstructor

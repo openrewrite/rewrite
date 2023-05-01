@@ -17,17 +17,20 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.openrewrite.Tree.randomId;
 
-@Incubating(since = "7.24.0")
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class AddCommentToMavenDependency extends Recipe {

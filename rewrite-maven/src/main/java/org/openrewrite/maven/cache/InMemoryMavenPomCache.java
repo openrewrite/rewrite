@@ -21,7 +21,6 @@ import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.binder.cache.CaffeineCacheMetrics;
 import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.*;
 
 import java.net.URI;

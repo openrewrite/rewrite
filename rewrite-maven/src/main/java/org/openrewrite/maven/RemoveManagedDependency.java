@@ -15,19 +15,14 @@
  */
 package org.openrewrite.maven;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
-
-import lombok.EqualsAndHashCode;
-import lombok.Value;
 
 @Value
 @EqualsAndHashCode(callSuper = true)

@@ -15,7 +15,10 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.*;
+import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.DeleteStatement;
 import org.openrewrite.java.JavaTemplate;
@@ -32,7 +35,6 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
-@Incubating(since = "7.0.0")
 public class SimplifyBooleanReturn extends Recipe {
 
     @Override

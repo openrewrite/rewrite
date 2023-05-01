@@ -15,15 +15,7 @@
  */
 package org.openrewrite.maven.search;
 
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.maven.AddProperty;
 import org.openrewrite.test.RewriteTest;
-
-import static org.openrewrite.maven.Assertions.pomXml;
 
 class DoesNotIncludeDependencyTest implements RewriteTest {
 //    @Nested

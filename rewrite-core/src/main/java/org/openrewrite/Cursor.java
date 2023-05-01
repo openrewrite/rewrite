@@ -204,7 +204,6 @@ public class Cursor {
         return cursor;
     }
 
-    @Incubating(since = "7.0.0")
     @Nullable
     public Cursor getParent(int levels) {
         Cursor cursor = this;
@@ -219,7 +218,6 @@ public class Cursor {
         return getParent(1);
     }
 
-    @Incubating(since = "7.0.0")
     public Cursor getParentOrThrow(int levels) {
         Cursor parent = getParent(levels);
         if (parent == null) {

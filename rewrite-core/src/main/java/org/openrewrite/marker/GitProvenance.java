@@ -25,7 +25,9 @@ import org.eclipse.jgit.transport.RemoteConfig;
 import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.ci.*;
+import org.openrewrite.marker.ci.BuildEnvironment;
+import org.openrewrite.marker.ci.IncompleteGitConfigException;
+import org.openrewrite.marker.ci.JenkinsBuildEnvironment;
 
 import java.io.File;
 import java.io.IOException;

@@ -22,7 +22,8 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.openrewrite.Tree.randomId;
 

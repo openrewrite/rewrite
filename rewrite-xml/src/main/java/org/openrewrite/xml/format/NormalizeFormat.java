@@ -17,7 +17,6 @@ package org.openrewrite.xml.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
 
 /**
  * Ensures that whitespace is on the outermost AST element possible.

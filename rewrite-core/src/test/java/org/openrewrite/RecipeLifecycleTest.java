@@ -17,13 +17,13 @@ package org.openrewrite;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.InMemoryLargeIterable;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.test.*;
-import org.openrewrite.text.*;
+import org.openrewrite.test.RewriteTest;
+import org.openrewrite.text.PlainText;
+import org.openrewrite.text.PlainTextVisitor;
 
 import java.nio.charset.Charset;
 import java.nio.file.Path;

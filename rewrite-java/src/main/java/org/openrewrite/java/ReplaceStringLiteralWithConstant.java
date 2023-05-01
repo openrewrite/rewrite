@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.experimental.NonFinal;
-
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;

@@ -23,15 +23,12 @@ import org.openrewrite.internal.lang.Nullable;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
-@Incubating(since = "7.12.0")
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {

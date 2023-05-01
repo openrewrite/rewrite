@@ -17,7 +17,10 @@ package org.openrewrite.properties;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -50,7 +53,6 @@ public class ChangePropertyValue extends Recipe {
     @Nullable
     Boolean regex;
 
-    @Incubating(since = "7.17.0")
     @Option(displayName = "Use relaxed binding",
             description = "Whether to match the `propertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
                     "rules. Default is `true`. Set to `false`  to use exact matching.",

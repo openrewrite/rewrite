@@ -30,7 +30,6 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.dataformat.xml.deser.FromXmlParser;
 import com.fasterxml.jackson.module.jaxb.JaxbAnnotationModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
-import org.openrewrite.RecipeSerializer;
 
 import javax.xml.stream.XMLInputFactory;
 import java.io.IOException;

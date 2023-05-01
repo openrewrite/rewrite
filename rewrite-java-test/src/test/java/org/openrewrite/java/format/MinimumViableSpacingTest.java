@@ -16,9 +16,9 @@
 package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
-import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.test.RecipeSpec;

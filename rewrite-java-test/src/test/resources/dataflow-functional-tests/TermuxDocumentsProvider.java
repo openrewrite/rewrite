@@ -25,7 +25,6 @@ import android.provider.DocumentsContract.Document;
 import android.provider.DocumentsContract.Root;
 import android.provider.DocumentsProvider;
 import android.webkit.MimeTypeMap;
-
 import com.termux.R;
 import com.termux.shared.termux.TermuxConstants;
 

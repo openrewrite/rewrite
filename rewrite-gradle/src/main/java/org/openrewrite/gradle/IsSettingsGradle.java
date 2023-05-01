@@ -22,8 +22,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
-import java.nio.file.Path;
-
 import static java.util.Objects.requireNonNull;
 
 public class IsSettingsGradle<P> extends JavaIsoVisitor<P> {

@@ -16,13 +16,11 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.text.PlainText;
 
 import java.nio.file.Paths;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.Tree.randomId;
 
 class CursorTest {
     @Test

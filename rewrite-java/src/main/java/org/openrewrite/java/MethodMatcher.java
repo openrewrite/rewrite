@@ -26,11 +26,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
 import org.openrewrite.java.internal.grammar.MethodSignatureParser;
 import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
 import java.util.List;

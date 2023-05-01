@@ -16,7 +16,6 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;

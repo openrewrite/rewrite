@@ -34,7 +34,8 @@ import org.openrewrite.marker.Markers;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
-import static org.openrewrite.java.tree.JavaCoordinates.Mode.*;
+import static org.openrewrite.java.tree.JavaCoordinates.Mode.AFTER;
+import static org.openrewrite.java.tree.JavaCoordinates.Mode.REPLACEMENT;
 
 /**
  * Generates a stub containing enough variable, method, and class scope

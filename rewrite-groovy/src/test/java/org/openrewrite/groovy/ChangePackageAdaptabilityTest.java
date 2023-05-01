@@ -16,10 +16,9 @@
 package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.PathUtils;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.PathUtils;
 import org.openrewrite.java.ChangePackage;
-import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;

@@ -16,8 +16,8 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Validated;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Validated;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;

@@ -17,9 +17,6 @@ package org.openrewrite.remote;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.openrewrite.Tree;
-import org.openrewrite.marker.Markers;
-import org.openrewrite.quark.Quark;
 import org.openrewrite.test.MockHttpSender;
 
 import java.io.ByteArrayOutputStream;

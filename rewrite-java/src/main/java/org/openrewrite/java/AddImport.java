@@ -29,7 +29,10 @@ import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.openrewrite.Tree.randomId;

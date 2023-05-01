@@ -15,7 +15,9 @@
  */
 package org.openrewrite.properties.tree;
 
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.EqualsAndHashCode;
+import lombok.With;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;

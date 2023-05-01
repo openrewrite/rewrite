@@ -17,9 +17,7 @@ package org.openrewrite;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import lombok.EqualsAndHashCode;
 import lombok.Setter;
-import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.config.OptionDescriptor;
@@ -99,33 +97,6 @@ public abstract class Recipe implements Cloneable {
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return NOOP;
-        }
-    }
-
-    @Value
-    @EqualsAndHashCode(callSuper = true)
-    private static class AdHocRecipe extends Recipe {
-        @Language("markdown")
-        String displayName;
-
-        @Language("markdown")
-        String description;
-
-        TreeVisitor<?, ExecutionContext> visitor;
-
-        @Override
-        public String getDisplayName() {
-            return displayName;
-        }
-
-        @Override
-        public String getDescription() {
-            return description;
-        }
-
-        @Override
-        public TreeVisitor<?, ExecutionContext> getVisitor() {
-            return visitor;
         }
     }
 
@@ -279,7 +250,6 @@ public abstract class Recipe implements Cloneable {
      * the recipe will still run on another cycle if any other recipe causes another cycle to run. But if every recipe reports no need to run
      * another cycle (or if there are no changes made in a cycle), then another will not run.
      */
-    @Incubating(since = "7.3.0")
     public boolean causesAnotherCycle() {
         for (Recipe recipe : getRecipeList()) {
             if (recipe.causesAnotherCycle()) {
@@ -357,12 +327,6 @@ public abstract class Recipe implements Cloneable {
             validated = validated.and(recipe.validate());
         }
         return validated;
-    }
-
-    @SuppressWarnings("unused")
-    @Incubating(since = "7.0.0")
-    public final Collection<Validated> validateAll(ExecutionContext ctx) {
-        return validateAll(ctx, new ArrayList<>());
     }
 
     public final Collection<Validated> validateAll() {

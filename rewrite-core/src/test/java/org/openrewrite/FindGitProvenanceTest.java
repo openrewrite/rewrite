@@ -16,16 +16,15 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.DocumentExample;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.table.DistinctGitProvenance;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.marker.GitProvenance.AutoCRLF.False;
 import static org.openrewrite.marker.GitProvenance.EOL.Native;
 import static org.openrewrite.test.SourceSpecs.text;
-import static org.assertj.core.api.Assertions.assertThat;
 
 class FindGitProvenanceTest implements RewriteTest {
 

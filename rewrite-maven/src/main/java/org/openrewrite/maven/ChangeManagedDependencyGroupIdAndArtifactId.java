@@ -15,9 +15,9 @@
  */
 package org.openrewrite.maven;
 
-import java.util.*;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.table.MavenMetadataFailures;
@@ -27,8 +27,7 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
+import java.util.*;
 
 @Value
 @EqualsAndHashCode(callSuper = true)

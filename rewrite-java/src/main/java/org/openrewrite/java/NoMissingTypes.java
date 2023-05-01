@@ -23,8 +23,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
-import static java.util.Objects.requireNonNull;
-
 /**
  * Puts a search result marker on a JavaSourceFile if there is no missing type information according to FindMissingTypes.
  * So when there _are_ missing types, no changes are made. The intended purpose is as a {@link org.openrewrite.Preconditions}

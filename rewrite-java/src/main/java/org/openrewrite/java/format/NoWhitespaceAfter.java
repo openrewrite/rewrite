@@ -25,7 +25,6 @@ import org.openrewrite.java.tree.JavaSourceFile;
 
 import static java.util.Objects.requireNonNull;
 
-@Incubating(since = "7.12.0")
 public class NoWhitespaceAfter extends Recipe {
     @Override
     public String getDisplayName() {

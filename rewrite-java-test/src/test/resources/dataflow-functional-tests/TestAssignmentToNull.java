@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import java.util.List;
-import java.util.ArrayList;
+
 import java.io.File;
 import java.io.FileFilter;
+import java.util.ArrayList;
+import java.util.List;
 
 class TestAssignmentToNull {
     void test2(File srcDir, File destDir, FileFilter filter) {

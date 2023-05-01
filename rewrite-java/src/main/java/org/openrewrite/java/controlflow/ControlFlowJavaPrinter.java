@@ -23,7 +23,6 @@ import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.Collections;
 import java.util.List;
 
 @AllArgsConstructor

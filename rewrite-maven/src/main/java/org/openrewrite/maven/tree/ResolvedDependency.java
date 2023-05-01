@@ -23,7 +23,6 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.Serializable;
-import java.util.Collections;
 import java.util.List;
 
 import static java.util.Collections.emptyList;

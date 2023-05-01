@@ -15,8 +15,6 @@
  */
 package org.openrewrite.gradle;
 
-import org.gradle.internal.impldep.com.thoughtworks.qdox.model.JavaSource;
-import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;

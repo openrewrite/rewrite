@@ -362,7 +362,6 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> this.visitMarker(marker, p)));
     }
 
-    @Incubating(since = "7.2.0")
     public <M extends Marker> M visitMarker(Marker marker, P p) {
         //noinspection unchecked
         return (M) marker;

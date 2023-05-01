@@ -38,7 +38,6 @@ import static java.util.Objects.requireNonNull;
  * <a href="https://github.com/npm/node-semver#advanced-range-syntax">advanced range selectors</a>, allowing
  * more precise control over version updates to patch or minor releases.
  */
-@Incubating(since = "7.7.0")
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class UpgradePluginVersion extends Recipe {

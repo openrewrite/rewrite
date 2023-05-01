@@ -17,7 +17,6 @@ package org.openrewrite.quark;
 
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.ListUtils;
 
 public class QuarkVisitor<P> extends TreeVisitor<Quark, P> {
 

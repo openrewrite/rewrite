@@ -22,7 +22,10 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.tree.Expression;
 
-import java.util.*;
+import java.util.LinkedHashSet;
+import java.util.LinkedList;
+import java.util.Queue;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 

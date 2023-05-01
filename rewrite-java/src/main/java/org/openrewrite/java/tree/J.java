@@ -86,7 +86,6 @@ public interface J extends Tree {
         return withPrefix(getPrefix().withComments(comments));
     }
 
-    @Incubating(since = "7.0.0")
     default <J2 extends J> J2 withTemplate(SourceTemplate<J, JavaCoordinates> template, JavaCoordinates coordinates, Object... parameters) {
         return template.withTemplate(this, coordinates, parameters);
     }

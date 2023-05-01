@@ -15,7 +15,10 @@
  */
 package org.openrewrite.java.marker;
 
-import io.github.classgraph.*;
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ClassInfo;
+import io.github.classgraph.ClassInfoList;
+import io.github.classgraph.ScanResult;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;

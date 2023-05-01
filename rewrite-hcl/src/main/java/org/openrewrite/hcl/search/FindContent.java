@@ -22,7 +22,6 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.hcl.HclIsoVisitor;
-import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.JsonPathMatcher;
 import org.openrewrite.hcl.tree.BodyContent;
 import org.openrewrite.marker.SearchResult;

@@ -36,7 +36,6 @@ import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;
 
-@Incubating(since = "7.20.0")
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Scanned> {
