@@ -74,17 +74,17 @@ public class UnnecessaryParentheses extends Recipe {
 
             @Override
             public <T extends J> J visitParentheses(J.Parentheses<T> parens, ExecutionContext ctx) {
-                //noinspection unchecked
-                J.Parentheses<T> par = (J.Parentheses<T>) super.visitParentheses(parens, ctx);
+                J par = super.visitParentheses(parens, ctx);
                 Cursor c = getCursor().pollNearestMessage(UNNECESSARY_PARENTHESES_MESSAGE);
                 if (c != null && (c.getValue() instanceof J.Literal || c.getValue() instanceof J.Identifier)) {
-                    //noinspection unchecked
-                    par = (J.Parentheses<T>) new UnwrapParentheses<>(par).visit(par, ctx, getCursor().getParentOrThrow());
+                    par = new UnwrapParentheses<>((J.Parentheses<?>) par).visit(par, ctx, getCursor().getParentOrThrow());
                 }
 
                 assert par != null;
-                if (getCursor().getParentTreeCursor().getValue() instanceof J.Parentheses) {
-                    return ((J.Parentheses<?>) par).getTree().withPrefix(Space.EMPTY);
+                if (par instanceof J.Parentheses) {
+                    if (getCursor().getParentTreeCursor().getValue() instanceof J.Parentheses) {
+                        return ((J.Parentheses<?>) par).getTree().withPrefix(Space.EMPTY);
+                    }
                 }
                 return par;
             }

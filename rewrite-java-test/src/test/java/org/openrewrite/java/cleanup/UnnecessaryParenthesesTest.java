@@ -21,7 +21,6 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.cleanup.UnnecessaryParentheses;
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
