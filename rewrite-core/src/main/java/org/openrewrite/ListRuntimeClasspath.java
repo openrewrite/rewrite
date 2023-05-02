@@ -52,7 +52,7 @@ public class ListRuntimeClasspath extends ScanningRecipe<Void> {
     }
 
     @Override
-    public Collection<SourceFile> generate(Void acc, ExecutionContext ctx) {
+    public Collection<? extends SourceFile> generate(Void acc, ExecutionContext ctx) {
         try (ScanResult result = new ClassGraph().scan()) {
             ResourceList resources = result.getResourcesWithExtension(".jar");
             Map<String, List<Resource>> classpathEntriesWithJarResources = resources.stream()

@@ -98,7 +98,7 @@ public class MoveContentToFile extends ScanningRecipe<MoveContentToFile.Scanned>
     }
 
     @Override
-    public Collection<SourceFile> generate(Scanned acc, ExecutionContext ctx) {
+    public Collection<Hcl.ConfigFile> generate(Scanned acc, ExecutionContext ctx) {
         if (acc.destinationExists || acc.toMove == null) {
             return Collections.emptyList();
         }

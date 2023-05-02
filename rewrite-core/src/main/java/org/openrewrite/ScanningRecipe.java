@@ -58,7 +58,7 @@ public abstract class ScanningRecipe<T> extends Recipe {
      * @param acc The accumulated scanning data.
      * @return A list of new source files.
      */
-    public Collection<SourceFile> generate(T acc, ExecutionContext ctx) {
+    public Collection<? extends SourceFile> generate(T acc, ExecutionContext ctx) {
         return Collections.emptyList();
     }
 

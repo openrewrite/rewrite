@@ -80,7 +80,7 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
     }
 
     @Override
-    public Collection<SourceFile> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
+    public Collection<PlainText> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
         if(shouldCreate.get()) {
             return new PlainTextParser().parse(fileContents)
                     .map(brandNewFile -> brandNewFile.withSourcePath(Paths.get(relativeFileName)))

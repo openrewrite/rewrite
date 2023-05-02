@@ -97,7 +97,7 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
     }
 
     @Override
-    public Collection<SourceFile> generate(AtomicBoolean fileExists, ExecutionContext ctx) {
+    public Collection<PlainText> generate(AtomicBoolean fileExists, ExecutionContext ctx) {
         String maybeNewline = !Boolean.FALSE.equals(appendNewline) ? "\n" : "";
         String content = this.content + maybeNewline;
         String preamble = this.preamble != null ? this.preamble + maybeNewline : "";

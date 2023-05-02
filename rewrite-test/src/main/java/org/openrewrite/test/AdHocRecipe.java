@@ -92,7 +92,7 @@ public class AdHocRecipe extends ScanningRecipe<Void> {
     }
 
     @Override
-    public Collection<SourceFile> generate(Void acc, ExecutionContext ctx) {
+    public Collection<? extends SourceFile> generate(Void acc, ExecutionContext ctx) {
         return generator == null ? Collections.emptyList() : generator.get();
     }
 

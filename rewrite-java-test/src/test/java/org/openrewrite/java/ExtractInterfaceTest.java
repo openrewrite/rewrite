@@ -56,7 +56,7 @@ class ExtractInterfaceTest implements RewriteTest {
         }
 
         @Override
-        public Collection<SourceFile> generate(AtomicReference<J.CompilationUnit> acc, ExecutionContext ctx) {
+        public Collection<? extends SourceFile> generate(AtomicReference<J.CompilationUnit> acc, ExecutionContext ctx) {
             return List.of((SourceFile) new ExtractInterface.CreateInterface("org.openrewrite.interfaces.ITest")
               .visitNonNull(acc.get(), ctx));
         }

@@ -21,6 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.ChangePropertyValue;
 import org.openrewrite.properties.PropertiesParser;
+import org.openrewrite.properties.tree.Properties;
 
 import java.nio.file.Paths;
 import java.util.Collection;
@@ -86,7 +87,7 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
     }
 
     @Override
-    public Collection<SourceFile> generate(NeedsProperty acc, ExecutionContext ctx) {
+    public Collection<Properties.File> generate(NeedsProperty acc, ExecutionContext ctx) {
         if (!acc.hasGradleProperties) {
             return PropertiesParser.builder().build()
                     .parseInputs(singletonList(Parser.Input.fromString(Paths.get("gradle.properties"),
