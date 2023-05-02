@@ -86,6 +86,7 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/105")
     void fullyQualifiedCustomAnnotation() {
         rewriteRun(
           java(
@@ -120,6 +121,7 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/105")
     void fullyQualifieJavaLangAnnotation() {
         rewriteRun(
           // Works, Deprecated is defined in java.lang package so no import needed
@@ -141,6 +143,7 @@ class AnnotationTest implements RewriteTest {
 
     // Despite being recognized as an annotation, it is not removed (but it works fine with annotations from java.lang package)
     @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/105")
     void customAnnotationIsNotRemoved() {
         rewriteRun(
           spec -> spec.recipe(new RemoveAnnotation("@com.example.annotations.JavaAnnotationToRemove")),
@@ -172,6 +175,7 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/105")
     void arrayArgumentRemoval() {
         rewriteRun(
           spec -> spec.recipe(new RemoveAnnotation("@com.example.Test")),
