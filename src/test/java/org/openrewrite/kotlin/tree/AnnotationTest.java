@@ -195,9 +195,6 @@ class AnnotationTest implements RewriteTest {
               val a = 42
               """,
             """
-              
-              
-              
               val a = 42
               """
           )
