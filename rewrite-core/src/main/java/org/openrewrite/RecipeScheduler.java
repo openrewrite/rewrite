@@ -156,7 +156,7 @@ class RecipeRunCycle {
             if (recipe instanceof ScanningRecipe) {
                 //noinspection unchecked
                 ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
-                Collection<SourceFile> generated = scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor), ctx);
+                Collection<? extends SourceFile> generated = scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor), ctx);
                 for (SourceFile g : generated) {
                     addRecipesThatMadeChanges(recipeStack, g);
                     results.add(new Result(null, g, singletonList(recipeStack)));
