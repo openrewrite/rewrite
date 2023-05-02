@@ -19,6 +19,8 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.List;
+
 @EqualsAndHashCode(callSuper = false)
 @Data
 public class RecipeExample {
@@ -28,6 +30,7 @@ public class RecipeExample {
     @Nullable
     String description;
 
+    List<String> parameters;
     String before;
     String after;
     String language;
