@@ -17,8 +17,10 @@ package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.RemoveAnnotation;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
 
 class AnnotationTest implements RewriteTest {
@@ -79,6 +81,125 @@ class AnnotationTest implements RewriteTest {
             val count : Int ?
                 get ( ) = 1
             """
+          )
+        );
+    }
+
+    @Test
+    void fullyQualifiedCustomAnnotation() {
+        rewriteRun(
+          java(
+            """
+              package com.example.annotations;
+                            
+              import java.lang.annotation.Target;
+              import static java.lang.annotation.ElementType.*;
+                            
+              @Target({TYPE, FIELD, METHOD, PARAMETER, CONSTRUCTOR, LOCAL_VARIABLE})
+              public @interface JavaAnnotationToRemove {
+              }
+              """
+          ),
+          // Works
+          kotlin(
+            """
+              import com.example.annotations.JavaAnnotationToRemove
+
+              @JavaAnnotationToRemove
+              class A {
+              }
+              """),
+          // Fails, despite being valid Kotlin code
+          kotlin(
+            """
+              @com.example.annotations.JavaAnnotationToRemove
+              class A {
+              }
+              """)
+        );
+    }
+
+    @Test
+    void fullyQualifieJavaLangAnnotation() {
+        rewriteRun(
+          // Works, Deprecated is defined in java.lang package so no import needed
+          kotlin(
+            """
+              @Deprecated
+              class A {
+              }
+              """),
+          // Fails, despite being valid Kotlin code
+          kotlin(
+            """
+              @java.lang.Deprecated
+              class A {
+              }
+              """)
+        );
+    }
+
+    // Despite being recognized as an annotation, it is not removed (but it works fine with annotations from java.lang package)
+    @Test
+    void customAnnotationIsNotRemoved() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@com.example.annotations.JavaAnnotationToRemove")),
+          java(
+            """
+              package com.example.annotations;
+                            
+              import java.lang.annotation.Target;
+              import static java.lang.annotation.ElementType.*;
+                            
+              @Target({TYPE, FIELD, METHOD, PARAMETER, CONSTRUCTOR, LOCAL_VARIABLE})
+              public @interface JavaAnnotationToRemove {
+              }
+              """
+          ),
+          kotlin(
+            """
+              import com.example.annotations.JavaAnnotationToRemove
+                          
+              @JavaAnnotationToRemove
+              class A {
+              }
+              """
+            , """
+              class A {
+              }
+              """)
+        );
+    }
+
+    // Somehow, this one works? Maybe because of the parameters?
+    // Mind the required empty lines after refactor though...
+    @Test
+    void arrayArgumentRemoval() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@com.example.Test")),
+          kotlin(
+            """
+              package com.example
+                          
+              @Target ( AnnotationTarget . LOCAL_VARIABLE )
+              @Retention ( AnnotationRetention . SOURCE )
+              annotation class Test ( val values : Array < String > ) {
+              }
+              """
+          ),
+          kotlin(
+            """
+              import com.example.Test
+                          
+              @Test( values = [ "a" , "b" , "c" ] )
+              val a = 42
+              """,
+            """
+              
+              
+              
+              val a = 42
+              """
           )
         );
     }
