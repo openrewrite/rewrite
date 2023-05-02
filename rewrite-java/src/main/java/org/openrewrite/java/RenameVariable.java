@@ -87,7 +87,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                     if (fieldAccessTargetsVariable(parent.getValue())) {
                         return ident.withSimpleName(newName);
                     }
-                } else if (currentNameScope.size() == 1 && !isMethodName(parent.getValue(), ident)) {
+                } else if (currentNameScope.size() == 1 && isVariableName(parent.getValue(), ident)) {
                     if (parent.getValue() instanceof J.VariableDeclarations.NamedVariable) {
                         J variableDeclaration = parent.getParentTreeCursor().getValue();
                         J maybeParameter = getCursor().dropParentUntil(is -> is instanceof JavaSourceFile || is instanceof J.ClassDeclaration || is instanceof J.MethodDeclaration).getValue();
@@ -108,12 +108,23 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             return super.visitIdentifier(ident, p);
         }
 
-        private boolean isMethodName(Object value, J.Identifier ident) {
+        private boolean isVariableName(Object value, J.Identifier ident) {
             if (value instanceof J.MethodInvocation) {
                 J.MethodInvocation m = (J.MethodInvocation) value;
-                return m.getName() == ident;
+                return m.getName() != ident;
+            } else if(value instanceof J.NewClass) {
+                J.NewClass m = (J.NewClass) value;
+                return m.getClazz() != ident;
+            } else if(value instanceof J.NewArray) {
+                J.NewArray a = (J.NewArray) value;
+                return a.getTypeExpression() != ident;
+            } else if(value instanceof J.VariableDeclarations) {
+                J.VariableDeclarations v = (J.VariableDeclarations) value;
+                return ident != v.getTypeExpression();
+            } else if(value instanceof J.ParameterizedType) {
+                return false;
             }
-            return false;
+            return true;
         }
 
         /**

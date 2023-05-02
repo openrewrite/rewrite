@@ -873,4 +873,48 @@ class RenameVariableTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doNotRenameNewClass() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("FooBarBaz", "fooBarBaz", true)),
+          java(
+            """
+              class FooBarBaz {}
+              class A {
+                  FooBarBaz FooBarBaz = new FooBarBaz();
+              }
+              """,
+            """
+              class FooBarBaz {}
+              class A {
+                  FooBarBaz fooBarBaz = new FooBarBaz();
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNotRenameTypeParameter() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("FooBarBaz", "fooBarBaz", true)),
+          java(
+            """
+              import java.util.ArrayList;
+              class FooBarBaz {}
+              class A {
+                  ArrayList<FooBarBaz> FooBarBaz = new ArrayList<FooBarBaz>();
+              }
+              """,
+            """
+              import java.util.ArrayList;
+              class FooBarBaz {}
+              class A {
+                  ArrayList<FooBarBaz> fooBarBaz = new ArrayList<FooBarBaz>();
+              }
+              """
+          )
+        );
+    }
 }
