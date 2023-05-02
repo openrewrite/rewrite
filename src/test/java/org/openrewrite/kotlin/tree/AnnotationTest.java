@@ -171,8 +171,6 @@ class AnnotationTest implements RewriteTest {
         );
     }
 
-    // Somehow, this one works? Maybe because of the parameters?
-    // Mind the required empty lines after refactor though...
     @Test
     void arrayArgumentRemoval() {
         rewriteRun(
