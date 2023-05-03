@@ -2247,7 +2247,7 @@ public class GroovyParserVisitor {
     }
 
     /*
-       Visit the value filled in to a parameterized type, such as in a variable declaration.
+       Visit the value filled into a parameterized type, such as in a variable declaration.
        Not to be confused with the declaration of a type parameter on a class or method.
 
        Can contain a J.Identifier, as is the case in a typical variable declaration:
