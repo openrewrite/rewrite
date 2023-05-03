@@ -150,7 +150,7 @@ public class FindRepository extends Recipe {
                     }
                 } else if (statement instanceof J.MethodInvocation || (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation)) {
                     J.MethodInvocation m1 = (J.MethodInvocation) (statement instanceof J.Return ? ((J.Return) statement).getExpression() : statement);
-                    if (m1.getSimpleName().equals("setUrl")) {
+                    if (m1.getSimpleName().equals("setUrl") || m1.getSimpleName().equals("url")) {
                         if (m1.getArguments().get(0) instanceof J.Literal
                                 && url.equals(((J.Literal) m1.getArguments().get(0)).getValue())) {
                             return true;

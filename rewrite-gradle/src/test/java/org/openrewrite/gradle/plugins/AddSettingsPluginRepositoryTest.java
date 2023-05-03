@@ -58,7 +58,7 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
                       }
                   }
               }
-              
+
               rootProject.name = "demo"
               """
           )
@@ -128,6 +128,22 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
                           url = "https://repo.example.com/snapshots"
                       }
                       mavenLocal()
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void existingRepositoryUsingMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("maven", "https://repo.example.com/snapshots")),
+          settingsGradle(
+            """
+              pluginManagement {
+                  repositories {
+                      maven { url "https://repo.example.com/snapshots" }
                   }
               }
               """
