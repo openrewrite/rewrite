@@ -15,23 +15,35 @@
  */
 package org.openrewrite.config;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import org.openrewrite.internal.lang.Nullable;
+import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @EqualsAndHashCode(callSuper = false)
 @Data
+@NoArgsConstructor
 public class RecipeExample {
-    @Nullable
-    String name;
+    String description = "";
+    List<String> parameters = new ArrayList<>();
+    List<Source> sources = new ArrayList<>();
 
-    @Nullable
-    String description;
+    public void setParameters(List<String> parameters) {
+        this.parameters = parameters;
+    }
 
-    List<String> parameters;
-    String before;
-    String after;
-    String language;
+    public void setSources(List<Source> sources) {
+        this.sources = sources;
+    }
+
+    @Data
+    @AllArgsConstructor
+    static class Source {
+        String before;
+        String after;
+        String language;
+    }
 }

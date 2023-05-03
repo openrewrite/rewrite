@@ -299,23 +299,31 @@ class YamlResourceLoaderTest implements RewriteTest {
               recipeName: test.ChangeTextToHello
               examples:
                 - description: "Change World to Hello in a text file"
-                  before: "World"
-                  after: "Hello!"
-                  language: "text"
+                  sources:
+                    - before: "World"
+                      after: "Hello!"
+                      language: "text"
+                    - before: "World 2"
+                      after: "Hello 2!"
+                      language: "text"
                 - description: "Change World to Hello in a java file"
-                  before: |
-                    public class A {
-                        void method() {
-                            System.out.println("World");
+                  parameters:
+                    - arg0
+                    - arg1
+                  sources:
+                    - before: |
+                        public class A {
+                            void method() {
+                                System.out.println("World");
+                            }
                         }
-                    }
-                  after: |
-                    public class A {
-                        void method() {
-                            System.out.println("Hello!");
+                      after: |
+                        public class A {
+                            void method() {
+                                System.out.println("Hello!");
+                            }
                         }
-                    }
-                  language: "java"
+                      language: "java"
               """.getBytes()
           ), URI.create("attribution/test.ChangeTextToHello.yml"), new Properties()))
           .build();
@@ -325,27 +333,41 @@ class YamlResourceLoaderTest implements RewriteTest {
             assertThat(r.getExamples()).hasSize(2);
             assertThat(r.getExamples()).first().satisfies(e -> {
                 assertThat(e.getDescription()).isEqualTo("Change World to Hello in a text file");
-                assertThat(e.getBefore()).isEqualTo("World");
-                assertThat(e.getAfter()).isEqualTo("Hello!");
-                assertThat(e.getLanguage()).isEqualTo("text");
+                assertThat(e.getSources()).hasSize(2);
+                assertThat(e.getSources()).first().satisfies( s -> {
+                    assertThat(s.before).isEqualTo("World");
+                    assertThat(s.after).isEqualTo("Hello!");
+                    assertThat(s.language).isEqualTo("text");
+                  }
+                );
+
+                assertThat(e.getSources().get(1)).satisfies( s -> {
+                      assertThat(s.before).isEqualTo("World 2");
+                      assertThat(s.after).isEqualTo("Hello 2!");
+                      assertThat(s.language).isEqualTo("text");
+                  }
+                );
             });
             assertThat(r.getExamples().get(1)).satisfies(e -> {
                 assertThat(e.getDescription()).isEqualTo("Change World to Hello in a java file");
-                assertThat(e.getBefore()).isEqualTo("""
-                  public class A {
-                      void method() {
-                          System.out.println("World");
+                assertThat(e.getSources()).hasSize(1);
+                assertThat(e.getSources()).first().satisfies( s -> {
+                    assertThat(s.before).isEqualTo("""
+                      public class A {
+                          void method() {
+                              System.out.println("World");
+                          }
                       }
-                  }
-                  """);
-                assertThat(e.getAfter()).isEqualTo("""
-                  public class A {
-                      void method() {
-                          System.out.println("Hello!");
+                      """);
+                    assertThat(s.after).isEqualTo("""
+                      public class A {
+                          void method() {
+                              System.out.println("Hello!");
+                          }
                       }
-                  }
-                  """);
-                assertThat(e.getLanguage()).isEqualTo("java");
+                      """);
+                    assertThat(s.language).isEqualTo("java");
+                });
             });
         });
 

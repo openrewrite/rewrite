@@ -447,16 +447,26 @@ public class YamlResourceLoader implements ResourceLoader {
             String recipeName = (String) examplesMap.get("recipeName");
             recipeNameToExamples.computeIfAbsent(recipeName, key -> new ArrayList<>());
 
-
             List<Map<String, Object>> examples = (List<Map<String, Object>>) examplesMap.get("examples");
 
             List<RecipeExample> newExamples = examples.stream().map(exam -> {
                     RecipeExample recipeExample = new RecipeExample();
-                    recipeExample.setName((String) exam.get("name"));
                     recipeExample.setDescription((String) exam.get("description"));
-                    recipeExample.setBefore((String) exam.get("before"));
-                    recipeExample.setAfter((String) exam.get("after"));
-                    recipeExample.setLanguage((String) exam.get("language"));
+                    recipeExample.setParameters((List<String>) exam.get("parameters"));
+
+                    List<RecipeExample.Source> sources = new ArrayList<>();
+                    List<Object> ss = (List<Object>) exam.get("sources");
+                    if (ss != null) {
+                        for (Object s : ss) {
+                            String before = (String)((HashMap)s).get("before");
+                            String after = (String)((HashMap)s).get("after");
+                            String language = (String)((HashMap)s).get("language");
+                            RecipeExample.Source source = new RecipeExample.Source(before, after, language);
+                            sources.add(source);
+                        }
+                    }
+
+                    recipeExample.setSources(sources);
                     return recipeExample;
                 }
             ).collect(toList());
