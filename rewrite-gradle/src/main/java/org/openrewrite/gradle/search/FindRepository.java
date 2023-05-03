@@ -159,6 +159,11 @@ public class FindRepository extends Recipe {
                                 && ((J.MethodInvocation) m1.getArguments().get(0)).getArguments().get(0) instanceof J.Literal
                                 && url.equals(((J.Literal) ((J.MethodInvocation) m1.getArguments().get(0)).getArguments().get(0)).getValue())) {
                             return true;
+                        } else if (m1.getArguments().get(0) instanceof G.GString) {
+                            G.GString value = (G.GString) m1.getArguments().get(0);
+                            String valueSource = value.withPrefix(Space.EMPTY).printTrimmed(new GroovyPrinter<>());
+                            String testSource = value.getDelimiter() + url + value.getDelimiter();
+                            return testSource.equals(valueSource);
                         }
                     }
                 }

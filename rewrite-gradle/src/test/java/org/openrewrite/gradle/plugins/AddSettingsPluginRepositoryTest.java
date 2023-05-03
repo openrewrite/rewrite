@@ -150,4 +150,20 @@ class AddSettingsPluginRepositoryTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void existingRepositoryUsingMethodAndGroovyString() {
+        rewriteRun(
+          spec -> spec.recipe(new AddSettingsPluginRepository("maven", "${NEXUS_URL}/snapshots")),
+          settingsGradle(
+            """
+              pluginManagement {
+                  repositories {
+                      maven { url "${NEXUS_URL}/snapshots" }
+                  }
+              }
+              """
+          )
+        );
+    }
 }
