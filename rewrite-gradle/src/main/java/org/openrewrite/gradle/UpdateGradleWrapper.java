@@ -27,6 +27,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.LoathingOfOthers;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.BuildTool;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.properties.PropertiesVisitor;
@@ -38,6 +39,7 @@ import org.openrewrite.text.PlainText;
 import java.nio.charset.StandardCharsets;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
@@ -124,7 +126,24 @@ public class UpdateGradleWrapper extends Recipe {
         GradleWrapper gradleWrapper = validate(ctx).getValue();
         assert gradleWrapper != null;
 
-        List<SourceFile> sourceFileList = ListUtils.map(before, sourceFile -> {
+        Optional<BuildTool> currentMarker = before.stream()
+                .map(it -> it.getMarkers().findFirst(BuildTool.class))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .findAny();
+
+        if (!currentMarker.isPresent() || currentMarker.get().getVersion().equals(gradleWrapper.getVersion())) {
+            return before;
+        }
+
+        BuildTool updatedMarker = currentMarker.get()
+                .withVersion(gradleWrapper.getVersion());
+
+        List<SourceFile> sourceFileList = ListUtils.map(before, s -> {
+            SourceFile sourceFile = s.getMarkers().findFirst(BuildTool.class)
+                    .map(buildTool -> (SourceFile) s.withMarkers(s.getMarkers().computeByType(buildTool, (b, acc) -> updatedMarker)))
+                    .orElse(s);
+
             if (sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
                 PlainText gradlew = (PlainText) setExecutable(sourceFile);
                 String gradlewText = StringUtils.readFully(requireNonNull(UpdateGradleWrapper.class.getResourceAsStream("/gradlew")),
@@ -148,7 +167,6 @@ public class UpdateGradleWrapper extends Recipe {
             }
             if (sourceFile instanceof Quark && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_JAR_LOCATION)) {
                 return gradleWrapper.asRemote().withId(sourceFile.getId()).withMarkers(sourceFile.getMarkers());
-
             }
             return sourceFile;
         });

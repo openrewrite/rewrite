@@ -18,12 +18,9 @@ package org.openrewrite.gradle;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.openrewrite.PathUtils;
-import org.openrewrite.RecipeRun;
-import org.openrewrite.Result;
-import org.openrewrite.SourceFile;
-import org.openrewrite.DocumentExample;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.BuildTool;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -60,7 +57,8 @@ class UpdateGradleWrapperTest implements RewriteTest {
     @ValueSource(strings = {"gradle\\wrapper\\gradle-wrapper.properties", "gradle/wrapper/gradle-wrapper.properties"})
     void updateVersionAndDistribution(String osPath) {
         rewriteRun(
-          spec -> spec.afterRecipe(run -> {
+          spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
+            .afterRecipe(run -> {
               var gradleSh = result(run, PlainText.class, "gradlew");
               assertThat(gradleSh.getText()).isNotBlank();
 
@@ -99,7 +97,8 @@ class UpdateGradleWrapperTest implements RewriteTest {
     @Test
     void updateChecksumAlreadySet() {
         rewriteRun(
-          spec -> spec.afterRecipe(run -> {
+          spec -> spec.allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
+            .afterRecipe(run -> {
               var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
               assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
               assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"));
