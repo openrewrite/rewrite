@@ -87,7 +87,7 @@ public class Assertions {
                     }
 
                     if (version != null) {
-                        GradleWrapper gradleWrapper = requireNonNull(GradleWrapper.validate(new InMemoryExecutionContext(), version, distribution, null, null).getValue());
+                        GradleWrapper gradleWrapper = requireNonNull(GradleWrapper.validate(new InMemoryExecutionContext(), version, distribution, null).getValue());
                         Files.createDirectories(projectDir.resolve("gradle/wrapper/"));
                         Files.write(projectDir.resolve(GradleWrapper.WRAPPER_PROPERTIES_LOCATION), ("distributionBase=GRADLE_USER_HOME\n" +
                                 "distributionPath=wrapper/dists\n" +

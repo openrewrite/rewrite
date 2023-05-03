@@ -82,13 +82,20 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     final String repositoryUrl;
 
     @NonFinal
-    transient Validated gradleWrapperValidation;
+    transient Validated<GradleWrapper> gradleWrapperValidation;
+
+    Validated<GradleWrapper> createValidatedGradleWrapperValidation(ExecutionContext ctx) {
+        return GradleWrapper.validate(
+                ctx,
+                isBlank(version) ? "latest.release" : version,
+                distribution,
+                repositoryUrl
+        );
+    }
 
     @Override
-    public Validated validate(ExecutionContext ctx) {
-        gradleWrapperValidation = GradleWrapper.validate(ctx,
-                isBlank(version) ? "latest.release" : version,
-                distribution, gradleWrapperValidation, repositoryUrl);
+    public Validated<Object> validate(ExecutionContext ctx) {
+        gradleWrapperValidation = createValidatedGradleWrapperValidation(ctx);
         return super.validate(ctx).and(gradleWrapperValidation);
     }
 
@@ -117,7 +124,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             acc.needsGradleWrapperProperties = false;
                             Optional<BuildTool> buildTool = sourceFile.getMarkers().findFirst(BuildTool.class);
                             if (buildTool.isPresent()) {
-                                GradleWrapper gradleWrapper = requireNonNull(validate(ctx).getValue());
+                                GradleWrapper gradleWrapper = requireNonNull(createValidatedGradleWrapperValidation(ctx).getValue());
                                 if (!buildTool.get().getVersion().equals(gradleWrapper.getVersion())) {
                                     acc.updatedMarker = buildTool.get().withVersion(gradleWrapper.getVersion());
                                 }
@@ -133,7 +140,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             return entry;
                         }
 
-                        GradleWrapper gradleWrapper = requireNonNull(validate(ctx).getValue());
+                        GradleWrapper gradleWrapper = requireNonNull(createValidatedGradleWrapperValidation(ctx).getValue());
 
                         // Typical example: https://services.gradle.org/distributions/gradle-7.4-all.zip
                         String currentDistributionUrl = entry.getValue().getText();

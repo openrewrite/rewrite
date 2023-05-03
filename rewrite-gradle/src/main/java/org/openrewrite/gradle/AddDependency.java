@@ -124,8 +124,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     }
 
     @Override
-    public Validated validate() {
-        Validated validated = super.validate();
+    public Validated<Object> validate() {
+        Validated<Object> validated = super.validate();
         if (version != null) {
             validated = validated.and(Semver.validate(version, versionPattern));
         }
