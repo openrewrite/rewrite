@@ -66,7 +66,7 @@ public class AddGradleEnterpriseMavenExtension extends Recipe {
 
     @Option(displayName = "Server URL",
         description = "The URL of the Gradle Enterprise server.",
-        example = "https://ge.openrewrite.org/")
+        example = "https://scans.gradle.com/")
     String server;
 
     @Option(displayName = "Allow untrusted server",
