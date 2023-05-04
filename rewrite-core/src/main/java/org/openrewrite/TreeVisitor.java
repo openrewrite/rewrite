@@ -315,6 +315,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
                 sample.stop(Timer.builder("rewrite.visitor.visit.cumulative").tag("visitor.class", getClass().getName()).register(Metrics.globalRegistry));
                 afterVisit = null;
+                visitCount = 0;
             }
         } catch (Throwable e) {
             if (e instanceof RecipeRunException) {

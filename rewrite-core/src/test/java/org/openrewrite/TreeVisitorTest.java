@@ -21,7 +21,7 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
 
 import java.nio.file.Paths;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -30,23 +30,28 @@ public class TreeVisitorTest {
 
     @Test
     void scheduleAfterOnVisitWithCursor() {
-        AtomicBoolean visited = new AtomicBoolean(false);
+        AtomicInteger visited = new AtomicInteger(0);
         TreeVisitor<Tree, Integer> scheduled = new TreeVisitor<>() {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, Integer i) {
-                visited.set(true);
+                visited.incrementAndGet();
                 return tree;
             }
         };
-        new TreeVisitor<Tree, Integer>() {
+        TreeVisitor<Tree, Integer> visitor = new TreeVisitor<>() {
             @Override
             public Tree preVisit(Tree tree, Integer i) {
                 stopAfterPreVisit();
                 doAfterVisit(scheduled);
                 return tree;
             }
-        }.visit(new Quark(Tree.randomId(), Paths.get("quark"), Markers.EMPTY, null, null),
-          0, new Cursor(new Cursor(null, Cursor.ROOT_VALUE), "foo"));
-        assertThat(visited).isTrue();
+        };
+        Quark quark = new Quark(Tree.randomId(), Paths.get("quark"), Markers.EMPTY, null, null);
+
+        visitor.visit(quark, 0, new Cursor(new Cursor(null, Cursor.ROOT_VALUE), "foo"));
+        assertThat(visited).hasValue(1);
+
+        visitor.visit(quark, 0, new Cursor(new Cursor(null, Cursor.ROOT_VALUE), "foo"));
+        assertThat(visited).hasValue(2);
     }
 }
