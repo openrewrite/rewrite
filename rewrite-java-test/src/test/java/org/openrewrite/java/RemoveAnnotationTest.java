@@ -71,6 +71,76 @@ class RemoveAnnotationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void removeFullyQualifiedJavaLangAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
+          java(
+            """
+              import java.util.List;
+
+              @java.lang.Deprecated
+              public class Test {
+                  @java.lang.Deprecated
+                  void test() {
+                      @java.lang.Deprecated int n;
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              public class Test {
+                  void test() {
+                      int n;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeFullyQualifiedCustomAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@org.b.ThirdAnnotation")),
+          java(
+            """
+              package org.b;
+                          
+              import java.lang.annotation.Target;
+              import static java.lang.annotation.ElementType.*;
+                          
+              @Target({TYPE, FIELD, METHOD, PARAMETER, CONSTRUCTOR, LOCAL_VARIABLE})
+              public @interface ThirdAnnotation {
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.List;
+
+              @org.b.ThirdAnnotation
+              public class Test {
+                  @org.b.ThirdAnnotation
+                  void test() {
+                      @org.b.ThirdAnnotation int n;
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              public class Test {
+                  void test() {
+                      int n;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/697")
     @Test
     void preserveWhitespaceOnModifiers() {
