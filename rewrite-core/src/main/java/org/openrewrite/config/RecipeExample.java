@@ -32,17 +32,9 @@ public class RecipeExample {
     List<String> parameters = new ArrayList<>();
     List<Source> sources = new ArrayList<>();
 
-    public void setParameters(List<String> parameters) {
-        this.parameters = parameters;
-    }
-
-    public void setSources(List<Source> sources) {
-        this.sources = sources;
-    }
-
     @Data
     @AllArgsConstructor
-    static class Source {
+    public static class Source {
         String before;
 
         @Nullable
