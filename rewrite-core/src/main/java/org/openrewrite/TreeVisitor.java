@@ -255,9 +255,8 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
         Timer.Sample sample = null;
         boolean topLevel = false;
-        if (cursor.getParent() == null) {
+        if (visitCount == 0) {
             topLevel = true;
-            visitCount = 0;
             sample = Timer.start();
         }
 
