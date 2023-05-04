@@ -91,7 +91,6 @@ class AddGradleWrapperTest implements RewriteTest {
                       assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
 
                       assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create(expectedUrl));
-
                   }),
 
               buildGradle(""),

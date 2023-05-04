@@ -20,6 +20,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.test.RecipeSpec;
@@ -27,7 +28,12 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.text.PlainText;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
+import java.nio.file.*;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.function.UnaryOperator;
 
@@ -68,6 +74,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
               var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
               assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
               assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"));
+              assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
           }),
           properties(
             """
@@ -102,6 +109,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
               var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
               assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
               assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"));
+              assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
           }),
           properties(
             """
@@ -133,5 +141,19 @@ class UpdateGradleWrapperTest implements RewriteTest {
           .findFirst()
           .map(clazz::cast)
           .orElseThrow();
+    }
+
+    private boolean isValidWrapperJar(Remote gradleWrapperJar) {
+        try {
+            Path testWrapperJar = Files.createTempFile("gradle-wrapper", "jar");
+            try (InputStream is = gradleWrapperJar.getInputStream(new HttpUrlConnectionSender(Duration.ofSeconds(5), Duration.ofSeconds(5)))) {
+                Files.copy(is, testWrapperJar, StandardCopyOption.REPLACE_EXISTING);
+                try (FileSystem fs = FileSystems.newFileSystem(testWrapperJar)) {
+                    return Files.exists(fs.getPath("org/gradle/cli/CommandLineParser.class"));
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 }
