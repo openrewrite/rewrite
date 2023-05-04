@@ -22,6 +22,7 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.ci.*;
@@ -30,6 +31,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -95,21 +97,20 @@ public class GitProvenance implements Marker {
         if (origin == null) {
             return null;
         }
-        String path;
-        if (origin.startsWith("git") || origin.startsWith("org-")) {
-            path = origin.substring(origin.indexOf(':') + 1);
-        } else {
-            path = URI.create(origin).getPath().substring(1);
-        }
-        int firstSlashPos = path.lastIndexOf('/');
-        int secondSlashPos = path.lastIndexOf('/', firstSlashPos - 1);
-
-        if (secondSlashPos > -1) {
-            return path.substring(secondSlashPos + 1, firstSlashPos);
-        } else if (firstSlashPos > -1) {
-            return path.substring(0, firstSlashPos);
-        } else {
-            return "";
+        try {
+            URIish gituri = new URIish(origin);
+            String path = gituri.getPath();
+            if (path.startsWith("/")) {
+                path = path.substring(1);
+            }
+            int firstIndexOfSlash = path.indexOf('/');
+            int lastIndexOfSlash = path.lastIndexOf('/');
+            if (firstIndexOfSlash != lastIndexOfSlash) {
+                return path.substring(firstIndexOfSlash + 1, lastIndexOfSlash);
+            }
+            return path.substring(0, lastIndexOfSlash);
+        } catch (URISyntaxException e) {
+            return null;
         }
     }
 
@@ -118,11 +119,15 @@ public class GitProvenance implements Marker {
         if (origin == null) {
             return null;
         }
-        if (origin.startsWith("git") || origin.startsWith("org-")) {
-            return origin.substring(origin.lastIndexOf('/') + 1).replaceAll("\\.git$", "");
-        } else {
-            String path = URI.create(origin).getPath();
+        try {
+            URIish gituri = new URIish(origin);
+            String path = gituri.getPath();
+            if (path.startsWith("/")) {
+                path = path.substring(1);
+            }
             return path.substring(path.lastIndexOf('/') + 1).replaceAll("\\.git$", "");
+        } catch (URISyntaxException e) {
+            return null;
         }
     }
 
