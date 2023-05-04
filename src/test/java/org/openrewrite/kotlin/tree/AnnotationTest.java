@@ -122,9 +122,9 @@ class AnnotationTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/105")
-    void fullyQualifieJavaLangAnnotation() {
+    void fullyQualifieKotlinAnnotation() {
         rewriteRun(
-          // Works, Deprecated is defined in java.lang package so no import needed
+          // Works, Deprecated is defined in kotlin package so no import needed
           kotlin(
             """
               @Deprecated
@@ -134,7 +134,7 @@ class AnnotationTest implements RewriteTest {
           // Fails, despite being valid Kotlin code
           kotlin(
             """
-              @java.lang.Deprecated
+              @kotlin.Deprecated
               class A {
               }
               """)
