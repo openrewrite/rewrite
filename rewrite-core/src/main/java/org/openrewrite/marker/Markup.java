@@ -50,10 +50,18 @@ public interface Markup extends Marker {
     }
 
     static <T extends Tree> T error(T t, Throwable throwable) {
+        if (ExceptionUtils.containsCircularReferences(throwable)) {
+            throwable = new Exception(throwable.getMessage());
+            throwable.setStackTrace(throwable.getStackTrace());
+        }
         return markup(t, new Markup.Error(randomId(), throwable));
     }
 
     static <T extends Tree> T warn(T t, Throwable throwable) {
+        if (ExceptionUtils.containsCircularReferences(throwable)) {
+            throwable = new Exception(throwable.getMessage());
+            throwable.setStackTrace(throwable.getStackTrace());
+        }
         return markup(t, new Markup.Warn(randomId(), throwable));
     }
 
@@ -76,6 +84,7 @@ public interface Markup extends Marker {
     static <T extends Tree> T markup(T t, Markup markup) {
         return t.withMarkers(t.getMarkers().compute(markup, (s1, s2) -> s1 == null ? s2 : s1));
     }
+
 
     @Value
     @With
