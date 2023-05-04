@@ -74,6 +74,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
     @Override
     public @Nullable J preVisit(J tree, P p) {
+        stopAfterPreVisit();
         J j = tree;
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) tree;
