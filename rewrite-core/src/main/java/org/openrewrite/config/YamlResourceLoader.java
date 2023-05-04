@@ -458,10 +458,13 @@ public class YamlResourceLoader implements ResourceLoader {
                     List<Object> ss = (List<Object>) exam.get("sources");
                     if (ss != null) {
                         for (Object s : ss) {
-                            String before = (String)((HashMap)s).get("before");
-                            String after = (String)((HashMap)s).get("after");
+                            HashMap sMap = (HashMap)s;
+                            String before = (String) sMap.get("before");
+                            String after = (String) sMap.get("after");
+                            String path = (String) sMap.get("path");
                             String language = (String)((HashMap)s).get("language");
-                            RecipeExample.Source source = new RecipeExample.Source(before, after, language);
+
+                            RecipeExample.Source source = new RecipeExample.Source(before, after, path, language);
                             sources.add(source);
                         }
                     }

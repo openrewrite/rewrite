@@ -302,9 +302,11 @@ class YamlResourceLoaderTest implements RewriteTest {
                   sources:
                     - before: "World"
                       after: "Hello!"
+                      path: "1.txt"
                       language: "text"
                     - before: "World 2"
                       after: "Hello 2!"
+                      path: "2.txt"
                       language: "text"
                 - description: "Change World to Hello in a java file"
                   parameters:
@@ -335,16 +337,18 @@ class YamlResourceLoaderTest implements RewriteTest {
                 assertThat(e.getDescription()).isEqualTo("Change World to Hello in a text file");
                 assertThat(e.getSources()).hasSize(2);
                 assertThat(e.getSources()).first().satisfies( s -> {
-                    assertThat(s.before).isEqualTo("World");
-                    assertThat(s.after).isEqualTo("Hello!");
-                    assertThat(s.language).isEqualTo("text");
+                    assertThat(s.getBefore()).isEqualTo("World");
+                    assertThat(s.getAfter()).isEqualTo("Hello!");
+                    assertThat(s.getPath()).isEqualTo("1.txt");
+                    assertThat(s.getLanguage()).isEqualTo("text");
                   }
                 );
 
                 assertThat(e.getSources().get(1)).satisfies( s -> {
-                      assertThat(s.before).isEqualTo("World 2");
-                      assertThat(s.after).isEqualTo("Hello 2!");
-                      assertThat(s.language).isEqualTo("text");
+                      assertThat(s.getBefore()).isEqualTo("World 2");
+                      assertThat(s.getAfter()).isEqualTo("Hello 2!");
+                      assertThat(s.getPath()).isEqualTo("2.txt");
+                      assertThat(s.getLanguage()).isEqualTo("text");
                   }
                 );
             });
@@ -352,21 +356,22 @@ class YamlResourceLoaderTest implements RewriteTest {
                 assertThat(e.getDescription()).isEqualTo("Change World to Hello in a java file");
                 assertThat(e.getSources()).hasSize(1);
                 assertThat(e.getSources()).first().satisfies( s -> {
-                    assertThat(s.before).isEqualTo("""
+                    assertThat(s.getBefore()).isEqualTo("""
                       public class A {
                           void method() {
                               System.out.println("World");
                           }
                       }
                       """);
-                    assertThat(s.after).isEqualTo("""
+                    assertThat(s.getAfter()).isEqualTo("""
                       public class A {
                           void method() {
                               System.out.println("Hello!");
                           }
                       }
                       """);
-                    assertThat(s.language).isEqualTo("java");
+                    assertThat(s.getPath()).isNull();
+                    assertThat(s.getLanguage()).isEqualTo("java");
                 });
             });
         });

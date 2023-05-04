@@ -19,6 +19,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,7 +44,13 @@ public class RecipeExample {
     @AllArgsConstructor
     static class Source {
         String before;
+
+        @Nullable
         String after;
+
+        @Nullable
+        String path;
+
         String language;
     }
 }
