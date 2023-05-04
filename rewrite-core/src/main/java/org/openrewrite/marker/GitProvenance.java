@@ -96,7 +96,7 @@ public class GitProvenance implements Marker {
             return null;
         }
         String path;
-        if (origin.startsWith("git")) {
+        if (origin.startsWith("git") || origin.startsWith("org-")) {
             path = origin.substring(origin.indexOf(':') + 1);
         } else {
             path = URI.create(origin).getPath().substring(1);
@@ -118,7 +118,7 @@ public class GitProvenance implements Marker {
         if (origin == null) {
             return null;
         }
-        if (origin.startsWith("git")) {
+        if (origin.startsWith("git") || origin.startsWith("org-")) {
             return origin.substring(origin.lastIndexOf('/') + 1).replaceAll("\\.git$", "");
         } else {
             String path = URI.create(origin).getPath();
