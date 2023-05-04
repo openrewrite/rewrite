@@ -57,7 +57,7 @@ class GitProvenanceTest {
           "https://github.com/openrewrite/rewrite.git",
           "file:///openrewrite/rewrite.git",
           "http://localhost:7990/scm/openrewrite/rewrite.git",
-          //TODO "http://localhost:7990/scm/some/openrewrite/rewrite.git",
+          "http://localhost:7990/scm/some/openrewrite/rewrite.git",
           "git@github.com:openrewrite/rewrite.git",
           "org-12345678@github.com:openrewrite/rewrite.git"
         );

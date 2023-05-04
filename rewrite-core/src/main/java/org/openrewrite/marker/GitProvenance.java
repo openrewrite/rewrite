@@ -103,12 +103,10 @@ public class GitProvenance implements Marker {
             if (path.startsWith("/")) {
                 path = path.substring(1);
             }
-            int firstIndexOfSlash = path.indexOf('/');
-            int lastIndexOfSlash = path.lastIndexOf('/');
-            if (firstIndexOfSlash != lastIndexOfSlash) {
-                return path.substring(firstIndexOfSlash + 1, lastIndexOfSlash);
-            }
-            return path.substring(0, lastIndexOfSlash);
+            // Strip off any trailing repository name
+            path = path.substring(0, path.lastIndexOf('/'));
+            // Strip off any leading sub organization names
+            return path.substring(path.lastIndexOf('/') + 1);
         } catch (URISyntaxException e) {
             return null;
         }
