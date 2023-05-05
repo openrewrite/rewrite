@@ -3133,7 +3133,7 @@ public interface J extends Tree {
         /**
          * Checks if the given {@link Expression} is a {@link Literal} with the given value.
          *
-         * @param maybeLiteral An expresssion that may be an {@link Literal}.
+         * @param maybeLiteral An expression that may be an {@link Literal}.
          * @param value        The value to compare against.
          * @return {@code true} if the given {@link Expression} is a {@link Literal} with the given value.
          */
