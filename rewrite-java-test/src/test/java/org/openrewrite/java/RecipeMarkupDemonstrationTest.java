@@ -15,21 +15,16 @@
  */
 package org.openrewrite.java;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.List;
-
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class RecipeMarkupDemonstrationTest implements RewriteTest {
 
@@ -52,10 +47,22 @@ class RecipeMarkupDemonstrationTest implements RewriteTest {
     }
 
     @Test
-    void exceptionsWithoutCicularReferences() {
-        Recipe testRecipe = new TestRecipe();
+    void exceptionsWithoutCircularReferences() {
         rewriteRun(
-          spec -> spec.recipe(testRecipe),
+          spec -> spec
+            .recipe(toRecipe(r -> new JavaIsoVisitor<>() {
+                @Override
+                public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext p) {
+                    Exception exception = new RuntimeException("this the parent of a circular exception");
+                    Exception exception2 = new RuntimeException("this the child of a circular exception", exception);
+                    exception.initCause(exception2);
+                    JavaSourceFile sf = Markup.error(cu, exception);
+                    Markup.Error marker = sf.getMarkers().findFirst(Markup.Error.class).get();
+                    assert marker.getException().getCause() == null;
+                    //Otherwise, there is an error if the exception is serialized.
+                    return sf;
+                }
+            })),
           java(
             """
               class Test {
@@ -67,29 +74,4 @@ class RecipeMarkupDemonstrationTest implements RewriteTest {
               """)
         );
     }
-    @EqualsAndHashCode(callSuper = false)
-    static class TestRecipe extends Recipe {
-        @Override
-        public String getDisplayName() {
-            return "test recipe that produces an error";
-        }
-        @Override
-        public String getDescription() {
-            return "test recipe that produces an error using a circular exception cause.";
-        }
-        @Override
-        protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-            return ListUtils.mapFirst(before, sourceFile -> {
-                Exception exception = new RuntimeException("this the parent of a circular exception");
-                Exception exception2 = new RuntimeException("this the child of a circular exception", exception);
-                exception.initCause(exception2);
-                SourceFile sf = Markup.error(sourceFile, exception);
-                Markup.Error marker = sf.getMarkers().findFirst(Markup.Error.class).get();
-                assert marker.getException().getCause() == null;
-                //Otherwise, there is an error if the exception is serialized.
-                return sf;
-            });
-        }
-    };
-
 }

@@ -15,10 +15,7 @@
  */
 package org.openrewrite.internal;
 
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Optional;
-import java.util.StringJoiner;
+import java.util.*;
 
 public class ExceptionUtils {
     /**
@@ -48,18 +45,17 @@ public class ExceptionUtils {
     }
 
     public static boolean containsCircularReferences(Throwable exception) {
-        List<Throwable> causes = new LinkedList<Throwable>();
+        Set<Throwable> causes = Collections.newSetFromMap(new IdentityHashMap<>());
         causes.add(exception);
         boolean containsACircularReference = false;
         while (exception != null && exception.getCause() != null) {
             Throwable exceptionToFind = exception.getCause();
             if (exceptionToFind != null) {
-                Optional<Throwable> duplicate = causes.stream().filter(e -> e == exceptionToFind).findFirst();
-                if (duplicate.isPresent()) {
+
+                if (!causes.add(exceptionToFind)) {
                     containsACircularReference = true;
-                    exception = null;
+                    break;
                 } else {
-                    causes.add(exceptionToFind);
                     exception = exceptionToFind;
                 }
             } else {
