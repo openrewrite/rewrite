@@ -823,7 +823,7 @@ class JavaTemplateTest implements RewriteTest {
     @SuppressWarnings("ALL")
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2375")
-    void multiDimentionalArrayInitializer() {
+    void multiDimensionalArrayInitializer() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               final MethodMatcher mm = new MethodMatcher("java.util.stream.IntStream sum()");
