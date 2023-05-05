@@ -325,7 +325,7 @@ class YamlResourceLoaderTest implements RewriteTest {
                                 System.out.println("Hello!");
                             }
                         }
-                      language: "java"
+                      language: java
               """.getBytes()
           ), URI.create("attribution/test.ChangeTextToHello.yml"), new Properties()))
           .build();
