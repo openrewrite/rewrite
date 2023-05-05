@@ -121,7 +121,7 @@ public class JavaRecipeLifecycleTest {
     class FromRecipeObjectsSourceSetFilteringTest implements SourceSetFilteringTest {
 
         private static FindMethods createFindMethods() {
-            return new FindMethods("java.io.PrintStream println(..)", true, "none");
+            return new FindMethods("java.io.PrintStream println(..)", true);
         }
 
         @Override
