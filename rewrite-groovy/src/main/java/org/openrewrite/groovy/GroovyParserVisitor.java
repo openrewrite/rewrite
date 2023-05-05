@@ -1620,13 +1620,13 @@ public class GroovyParserVisitor {
         }
 
         @Override
-        public void visitReturnStatement(ReturnStatement retn) {
+        public void visitReturnStatement(ReturnStatement return_) {
             Space fmt = sourceBefore("return");
-            if (retn.getExpression() instanceof ConstantExpression && isSynthetic(retn.getExpression()) &&
-                (((ConstantExpression) retn.getExpression()).getValue() == null)) {
+            if (return_.getExpression() instanceof ConstantExpression && isSynthetic(return_.getExpression()) &&
+                (((ConstantExpression) return_.getExpression()).getValue() == null)) {
                 queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, null));
             } else {
-                queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, visit(retn.getExpression())));
+                queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, visit(return_.getExpression())));
             }
         }
 

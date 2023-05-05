@@ -1004,8 +1004,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return pr;
     }
 
-    public J visitReturn(J.Return retrn, P p) {
-        J.Return r = retrn;
+    public J visitReturn(J.Return return_, P p) {
+        J.Return r = return_;
         r = r.withPrefix(visitSpace(r.getPrefix(), Space.Location.RETURN_PREFIX, p));
         r = r.withMarkers(visitMarkers(r.getMarkers(), p));
         Statement temp = (Statement) visitStatement(r, p);
