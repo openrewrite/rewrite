@@ -15,7 +15,7 @@
  */
 package org.openrewrite.internal;
 
-import java.util.StringJoiner;
+import java.util.*;
 
 public class ExceptionUtils {
     /**
@@ -42,5 +42,26 @@ public class ExceptionUtils {
             sanitized.add("  " + stackTraceElement);
         }
         return sanitized.toString();
+    }
+
+    public static boolean containsCircularReferences(Throwable exception) {
+        Set<Throwable> causes = Collections.newSetFromMap(new IdentityHashMap<>());
+        causes.add(exception);
+        boolean containsACircularReference = false;
+        while (exception != null && exception.getCause() != null) {
+            Throwable exceptionToFind = exception.getCause();
+            if (exceptionToFind != null) {
+
+                if (!causes.add(exceptionToFind)) {
+                    containsACircularReference = true;
+                    break;
+                } else {
+                    exception = exceptionToFind;
+                }
+            } else {
+                exception = null;
+            }
+        }
+        return containsACircularReference;
     }
 }
