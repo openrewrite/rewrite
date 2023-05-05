@@ -43,7 +43,7 @@ class JavaReflectionTypeMappingTest implements JavaTypeMappingTest {
 
     // Tests for enum supertypes are disabled in JavaReflection, because through reflection the supertype will be based on the byte code.
     // In byte code, the supertype of an `enum` instanceof Java.lang.Enum<E extends java.lang.Enum<E>>.
-    // However, the Javac compiler will type attribute the generic type of `E`, which is more accurated.
+    // However, the Javac compiler will type attribute the generic type of `E`, which is more accurate.
     // I.E. From the Javac compiler, the JavaTypeGoat$EnumTypeA will have a supertype of `java.lang.Enum<org.openrewrite.java.JavaTypeGoat$EnumTypeA>`.
     @Disabled
     @Test
