@@ -478,7 +478,7 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
                 } else if ("rpm".equals(archiveExt)) {
                     rin = new RpmInputStream(fis);
                     //return of getTag is not used - but the call is a
-                    //necassary step in reading from the stream
+                    //necessary step in reading from the stream
                     rin.getPayloadHeader().getTag(RpmTag.NAME);
                     cain = new CpioArchiveInputStream(rin);
                     extractArchive(cain, destination, engine);
