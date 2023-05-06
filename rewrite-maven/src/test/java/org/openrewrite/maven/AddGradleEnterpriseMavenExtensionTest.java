@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
@@ -39,10 +40,19 @@ class AddGradleEnterpriseMavenExtensionTest implements RewriteTest {
         """
     );
 
+    @DocumentExample
     @Test
     void addGradleEnterpriseMavenExtensionToExistingExtensionsXmlFile() {
         rewriteRun(
-          POM_XML_SOURCE_SPEC,
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+              </project>
+              """
+          ),
           xml(
             """
               <?xml version="1.0" encoding="UTF-8"?>

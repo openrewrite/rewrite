@@ -311,7 +311,7 @@ class YamlResourceLoaderTest implements RewriteTest {
                 - description: "Change World to Hello in a java file"
                   parameters:
                     - arg0
-                    - arg1
+                    - 1
                   sources:
                     - before: |
                         public class A {
@@ -354,6 +354,11 @@ class YamlResourceLoaderTest implements RewriteTest {
             });
             assertThat(r.getExamples().get(1)).satisfies(e -> {
                 assertThat(e.getDescription()).isEqualTo("Change World to Hello in a java file");
+
+                assertThat(e.getParameters()).hasSize(2);
+                assertThat(e.getParameters().get(0)).isEqualTo("arg0");
+                assertThat(e.getParameters().get(1)).isEqualTo("1");
+
                 assertThat(e.getSources()).hasSize(1);
                 assertThat(e.getSources()).first().satisfies( s -> {
                     assertThat(s.getBefore()).isEqualTo("""

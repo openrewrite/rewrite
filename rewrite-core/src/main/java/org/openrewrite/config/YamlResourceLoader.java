@@ -452,7 +452,11 @@ public class YamlResourceLoader implements ResourceLoader {
             List<RecipeExample> newExamples = examples.stream().map(exam -> {
                     RecipeExample recipeExample = new RecipeExample();
                     recipeExample.setDescription((String) exam.get("description"));
-                    recipeExample.setParameters((List<String>) exam.get("parameters"));
+
+                    if (exam.get("parameters") != null) {
+                        recipeExample.setParameters(((List<Object>) exam.get("parameters")).stream()
+                            .map(Object::toString).collect(toList()));
+                    }
 
                     List<RecipeExample.Source> sources = new ArrayList<>();
                     List<Object> ss = (List<Object>) exam.get("sources");
