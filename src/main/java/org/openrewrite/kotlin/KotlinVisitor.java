@@ -37,11 +37,6 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return "kotlin";
     }
 
-    @Override
-    public J visitJavaSourceFile(JavaSourceFile cu, P p) {
-        return cu instanceof K.CompilationUnit ? visitCompilationUnit((K.CompilationUnit) cu, p) : cu;
-    }
-
     public J visitCompilationUnit(K.CompilationUnit cu, P p) {
         K.CompilationUnit c = cu;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));

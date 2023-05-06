@@ -37,7 +37,6 @@ import org.jetbrains.kotlin.cli.jvm.compiler.VfsBasedProjectEnvironment;
 import org.jetbrains.kotlin.cli.jvm.compiler.pipeline.ModuleCompilerAnalyzedOutput;
 import org.jetbrains.kotlin.cli.jvm.compiler.pipeline.ModuleCompilerEnvironment;
 import org.jetbrains.kotlin.cli.jvm.compiler.pipeline.ModuleCompilerInput;
-import org.jetbrains.kotlin.com.intellij.core.CoreApplicationEnvironment;
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
 import org.jetbrains.kotlin.com.intellij.openapi.project.Project;
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
@@ -81,6 +80,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
@@ -115,7 +115,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
     private final String moduleName;
 
     @Override
-    public List<K.CompilationUnit> parse(@Language("kotlin") String... sources) {
+    public Stream<K.CompilationUnit> parse(@Language("kotlin") String... sources) {
         Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
         Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
 
@@ -147,7 +147,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
     }
 
     @Override
-    public List<K.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<K.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         ParsingEventListener parsingListener = pctx.getParsingListener();
 
@@ -158,35 +158,34 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         } catch (Exception e) {
             // TODO: associate the compiler exception to a specific source file.
             // https://github.com/openrewrite/rewrite-kotlin/issues/24
-            return emptyList();
+            return Stream.empty();
         }
 
         FirSession firSession = (FirSession) firSessionToCus.keySet().toArray()[0];
         List<CompiledKotlinSource> compilerCus = firSessionToCus.get(firSession);
-        List<K.CompilationUnit> mappedCus = new ArrayList<>(firSessionToCus.get(firSession).size());
-
-        for (CompiledKotlinSource compiled : compilerCus) {
-            try {
-                KotlinParserVisitor mappingVisitor = new KotlinParserVisitor(
-                        compiled.getInput().getRelativePath(relativeTo),
-                        compiled.getInput().getFileAttributes(),
-                        compiled.getInput().getSource(ctx),
-                        typeCache,
-                        firSession,
-                        ctx
-                );
-
-                K.CompilationUnit kcu = (K.CompilationUnit) mappingVisitor.visitFile(compiled.getFirFile(), new InMemoryExecutionContext());
-                mappedCus.add(kcu);
-                parsingListener.parsed(compiled.getInput(), kcu);
-            } catch (Throwable t) {
-                pctx.parseFailure(compiled.getInput(), relativeTo, this, t);
-                ctx.getOnError().accept(t);
-            }
-        }
-
         Disposer.dispose(disposable);
-        return mappedCus;
+        return compilerCus.stream()
+                .map(compiled -> {
+                    try {
+                        KotlinParserVisitor mappingVisitor = new KotlinParserVisitor(
+                                compiled.getInput().getRelativePath(relativeTo),
+                                compiled.getInput().getFileAttributes(),
+                                compiled.getInput().getSource(ctx),
+                                typeCache,
+                                firSession,
+                                ctx
+                        );
+
+                        K.CompilationUnit kcu = (K.CompilationUnit) mappingVisitor.visitFile(compiled.getFirFile(), new InMemoryExecutionContext());
+
+                        parsingListener.parsed(compiled.getInput(), kcu);
+                        return kcu;
+                    } catch (Throwable t) {
+                        pctx.parseFailure(compiled.getInput(), relativeTo, this, t);
+                        ctx.getOnError().accept(t);
+                    }
+                    return null;
+                });
     }
 
     /**
@@ -386,6 +385,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
         return new Builder();
     }
 
+    @SuppressWarnings("unused")
     public static class Builder extends Parser.Builder {
         @Nullable
         private Collection<Path> classpath = JavaParser.runtimeClasspath();

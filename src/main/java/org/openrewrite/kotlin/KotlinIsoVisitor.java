@@ -75,11 +75,6 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
-    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        return (JavaSourceFile) super.visitJavaSourceFile(cu, p);
-    }
-
-    @Override
     public Statement visitStatement(Statement statement, P p) {
         return (Statement) super.visitStatement(statement, p);
     }
