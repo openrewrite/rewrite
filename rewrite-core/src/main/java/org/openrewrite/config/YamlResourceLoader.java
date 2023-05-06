@@ -455,6 +455,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
                     if (exam.get("parameters") != null) {
                         recipeExample.setParameters(((List<Object>) exam.get("parameters")).stream()
+                            .filter(Objects::nonNull)
                             .map(Object::toString).collect(toList()));
                     }
 
