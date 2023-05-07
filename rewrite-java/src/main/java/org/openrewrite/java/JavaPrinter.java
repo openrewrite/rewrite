@@ -184,13 +184,13 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitAssert(Assert azzert, PrintOutputCapture<P> p) {
-        beforeSyntax(azzert, Space.Location.ASSERT_PREFIX, p);
+    public J visitAssert(Assert assert_, PrintOutputCapture<P> p) {
+        beforeSyntax(assert_, Space.Location.ASSERT_PREFIX, p);
         p.append("assert");
-        visit(azzert.getCondition(), p);
-        visitLeftPadded(":", azzert.getDetail(), JLeftPadded.Location.ASSERT_DETAIL, p);
-        afterSyntax(azzert, p);
-        return azzert;
+        visit(assert_.getCondition(), p);
+        visitLeftPadded(":", assert_.getDetail(), JLeftPadded.Location.ASSERT_DETAIL, p);
+        afterSyntax(assert_, p);
+        return assert_;
     }
 
     @Override

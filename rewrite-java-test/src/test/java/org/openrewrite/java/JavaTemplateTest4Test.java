@@ -239,7 +239,7 @@ class JavaTemplateTest4Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
-              public J visitAssert(J.Assert anAssert, ExecutionContext p) {
+              public J visitAssert(J.Assert assert_, ExecutionContext p) {
                   return JavaTemplate.builder(
                       """
                         if(n != 1) {
@@ -248,7 +248,7 @@ class JavaTemplateTest4Test implements RewriteTest {
                     )
                     .contextSensitive()
                     .build()
-                    .apply(getCursor(), anAssert.getCoordinates().replace());
+                    .apply(getCursor(), assert_.getCoordinates().replace());
               }
           })),
           java(

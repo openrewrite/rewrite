@@ -274,8 +274,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return a;
     }
 
-    public J visitAssert(J.Assert azzert, P p) {
-        J.Assert a = azzert;
+    public J visitAssert(J.Assert assert_, P p) {
+        J.Assert a = assert_;
         a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.ASSERT_PREFIX, p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
         Statement temp = (Statement) visitStatement(a, p);
