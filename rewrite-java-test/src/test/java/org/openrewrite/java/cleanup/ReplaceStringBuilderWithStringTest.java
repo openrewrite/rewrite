@@ -207,4 +207,32 @@ class ReplaceStringBuilderWithStringTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void withMethods() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  void method() {
+                      String key0 = new StringBuilder().append("test".toUpperCase()).append(3).append(Localization.lang("A backup file for '%0' was found at [%1]",originalPath.getFileName().toString(),backupFilename)).toString();         
+                  }
+                  int count() {
+                      return 10;
+                  }
+              }
+              """,
+            """
+              class A {
+                  void method() {
+                      String key0 = "test".toUpperCase() + 3 + Localization.lang("A backup file for '%0' was found at [%1]",originalPath.getFileName().toString(),backupFilename);
+                  }
+                  int count() {
+                      return 10;
+                  }
+              }
+              """
+          )
+        );
+    }
 }
