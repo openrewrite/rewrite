@@ -852,7 +852,7 @@ public abstract class FS {
 	/**
 	 * Whether FileStore attributes should be determined asynchronously
 	 *
-	 * @param asynch
+	 * @param async
 	 *            whether FileStore attributes should be determined
 	 *            asynchronously. If false access to cached attributes may block
 	 *            for some seconds for the first call per FileStore
@@ -860,8 +860,8 @@ public abstract class FS {
 	 * @deprecated Use {@link FileStoreAttributes#setBackground} instead
 	 */
 	@Deprecated
-	public static void setAsyncFileStoreAttributes(boolean asynch) {
-		FileStoreAttributes.setBackground(asynch);
+	public static void setAsyncFileStoreAttributes(boolean async) {
+		FileStoreAttributes.setBackground(async);
 	}
 
 	/**
