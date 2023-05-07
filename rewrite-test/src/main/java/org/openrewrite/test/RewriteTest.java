@@ -423,7 +423,11 @@ public interface RewriteTest extends SourceSpecs {
                             String expected = sourceSpec.noTrim ?
                                     expectedAfter :
                                     trimIndentPreserveCRLF(expectedAfter);
-                            assertThat(actual).as("Unexpected result in \"" + result.getAfter().getSourcePath() + "\"").isEqualTo(expected);
+                            assertThat(actual)
+                                    .as(() -> String.format("Unexpected result in \"%s\"%s",
+                                            result.getAfter().getSourcePath(),
+                                            result.diff().isEmpty() ? "" : "\n" + result.diff()))
+                                    .isEqualTo(expected);
                             sourceSpec.eachResult.accept(result.getAfter(), testMethodSpec, testClassSpec);
                         } else {
                             if (result.diff().isEmpty() && !(result.getAfter() instanceof Remote)) {
