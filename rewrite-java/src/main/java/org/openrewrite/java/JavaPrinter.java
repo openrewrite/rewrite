@@ -530,12 +530,12 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitElse(If.Else elze, PrintOutputCapture<P> p) {
-        beforeSyntax(elze, Space.Location.ELSE_PREFIX, p);
+    public J visitElse(If.Else else_, PrintOutputCapture<P> p) {
+        beforeSyntax(else_, Space.Location.ELSE_PREFIX, p);
         p.append("else");
-        visitStatement(elze.getPadding().getBody(), JRightPadded.Location.IF_ELSE, p);
-        afterSyntax(elze, p);
-        return elze;
+        visitStatement(else_.getPadding().getBody(), JRightPadded.Location.IF_ELSE, p);
+        afterSyntax(else_, p);
+        return else_;
     }
 
     public J visitEmpty(J.Empty empty, PrintOutputCapture<P> p) {

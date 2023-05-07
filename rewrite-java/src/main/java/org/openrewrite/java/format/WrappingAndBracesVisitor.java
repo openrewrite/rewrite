@@ -117,8 +117,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.If.Else visitElse(J.If.Else elze, P p) {
-        J.If.Else e = super.visitElse(elze, p);
+    public J.If.Else visitElse(J.If.Else else_, P p) {
+        J.If.Else e = super.visitElse(else_, p);
         boolean hasBody = e.getBody() instanceof J.Block || e.getBody() instanceof J.If;
         if (hasBody) {
             if (style.getIfStatement().getElseOnNewLine() && !e.getPrefix().getWhitespace().contains("\n")) {

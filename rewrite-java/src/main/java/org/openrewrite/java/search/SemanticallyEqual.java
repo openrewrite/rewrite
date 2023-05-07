@@ -502,17 +502,17 @@ public class SemanticallyEqual {
         }
 
         @Override
-        public J.If.Else visitElse(J.If.Else elze, J j) {
+        public J.If.Else visitElse(J.If.Else else_, J j) {
             if (isEqual.get()) {
                 if (!(j instanceof J.If.Else)) {
                     isEqual.set(false);
-                    return elze;
+                    return else_;
                 }
 
                 J.If.Else compareTo = (J.If.Else) j;
-                visit(elze.getBody(), compareTo.getBody());
+                visit(else_.getBody(), compareTo.getBody());
             }
-            return elze;
+            return else_;
         }
 
         @Override

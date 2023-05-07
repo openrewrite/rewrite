@@ -644,8 +644,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return i;
     }
 
-    public J visitElse(J.If.Else elze, P p) {
-        J.If.Else e = elze;
+    public J visitElse(J.If.Else else_, P p) {
+        J.If.Else e = else_;
         e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.ELSE_PREFIX, p));
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
         e = e.getPadding().withBody(visitRightPadded(e.getPadding().getBody(), JRightPadded.Location.IF_ELSE, p));

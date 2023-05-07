@@ -1286,10 +1286,10 @@ public class GroovyParserVisitor {
             J.ControlParentheses<Expression> ifCondition = new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
                     JRightPadded.build((Expression) visit(ifElse.getBooleanExpression().getExpression())).withAfter(sourceBefore(")")));
             JRightPadded<Statement> then = maybeSemicolon(visit(ifElse.getIfBlock()));
-            J.If.Else elze = ifElse.getElseBlock() instanceof EmptyStatement ? null :
+            J.If.Else else_ = ifElse.getElseBlock() instanceof EmptyStatement ? null :
                     new J.If.Else(randomId(), sourceBefore("else"), Markers.EMPTY,
                             maybeSemicolon(visit(ifElse.getElseBlock())));
-            queue.add(new J.If(randomId(), fmt, Markers.EMPTY, ifCondition, then, elze));
+            queue.add(new J.If(randomId(), fmt, Markers.EMPTY, ifCondition, then, else_));
         }
 
         @Override

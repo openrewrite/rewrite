@@ -169,13 +169,13 @@ public class SimplifyBooleanReturn extends Recipe {
                     return Optional.empty();
                 }
 
-                Statement elze = iff2.getElsePart().getBody();
-                if (elze instanceof J.Return) {
-                    return Optional.ofNullable(((J.Return) elze).getExpression());
+                Statement else_ = iff2.getElsePart().getBody();
+                if (else_ instanceof J.Return) {
+                    return Optional.ofNullable(((J.Return) else_).getExpression());
                 }
 
-                if (elze instanceof J.Block) {
-                    List<Statement> statements = ((J.Block) elze).getStatements();
+                if (else_ instanceof J.Block) {
+                    List<Statement> statements = ((J.Block) else_).getStatements();
                     if (statements.size() == 1) {
                         J statement = statements.get(0);
                         if (statement instanceof J.Return) {
