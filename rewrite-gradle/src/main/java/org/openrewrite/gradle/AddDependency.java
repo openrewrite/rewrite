@@ -53,7 +53,8 @@ public class AddDependency extends Recipe {
 
     @Option(displayName = "Version",
             description = "An exact version number or node-style semver selector used to select the version number.",
-            example = "29.X")
+            example = "29.X",
+            required = false)
     String version;
 
     @Option(displayName = "Version pattern",

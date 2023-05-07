@@ -133,6 +133,50 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void addDependencyWithoutVersion() {
+        AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", null, null, "implementation", "com.google.common.math.IntMath", null, null, null);
+        rewriteRun(
+          spec -> spec.recipe(addDep),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              "",
+              """
+                dependencies {
+                    implementation "io.netty:netty-tcnative-boringssl-static"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyWithoutVersionWithClassifier() {
+        // Without a version, classifier must not be present in the result
+        AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", null, null, "implementation", "com.google.common.math.IntMath", "linux-x86_64", null, null);
+        rewriteRun(
+          spec -> spec.recipe(addDep),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              "",
+              """
+                dependencies {
+                    implementation "io.netty:netty-tcnative-boringssl-static"
+                }
+                """
+            )
+          )
+        );
+    }
+
+
+    @Test
     void notUsingType() {
         rewriteRun(
           spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.collect.ImmutableMap")),
@@ -375,6 +419,54 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
+    void addDependenciesWithoutVersionToExistingGrouping() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcTestJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+                                
+                repositories {
+                    mavenCentral()
+                }
+                                
+                dependencies {
+                    implementation group: "commons-lang", name: "commons-lang", version: "1.0"
+
+                    def junitVersion = "4.12"
+                    testImplementation group: "junit", name: "junit", version: junitVersion
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+                                
+                repositories {
+                    mavenCentral()
+                }
+                                
+                dependencies {
+                    implementation group: "commons-lang", name: "commons-lang", version: "1.0"
+
+                    testImplementation group: "com.google.guava", name: "guava"
+                    def junitVersion = "4.12"
+                    testImplementation group: "junit", name: "junit", version: junitVersion
+                }
+                """
+            )
+          )
+        );
+    }
+
+
+    @Test
     void matchesDependencyDeclarationStyle() {
         rewriteRun(
           spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath")),
@@ -544,7 +636,7 @@ class AddDependencyTest implements RewriteTest {
     private AddDependency addDependency(String gav, String onlyIfUsing, @Nullable String configuration) {
         String[] gavParts = gav.split(":");
         return new AddDependency(
-          gavParts[0], gavParts[1], gavParts[2], null, configuration, onlyIfUsing,
+          gavParts[0], gavParts[1], (gavParts.length < 3) ? null : gavParts[2], null, configuration, onlyIfUsing,
           null, null, null
         );
     }

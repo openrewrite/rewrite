@@ -72,9 +72,11 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
             }
         }
 
-        Validated versionValidation = Semver.validate(version, versionPattern);
-        if (versionValidation.isValid()) {
-            @Nullable VersionComparator versionComparator = versionValidation.getValue();
+        if (null != version) {
+            Validated versionValidation = Semver.validate(version, versionPattern);
+            if (versionValidation.isValid()) {
+                @Nullable VersionComparator versionComparator = versionValidation.getValue();
+            }
         }
 
         if (dependenciesBlockMissing) {
@@ -113,12 +115,12 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
             DependencyStyle style = autodetectDependencyStyle(body.getStatements());
             if (style == DependencyStyle.String) {
                 codeTemplate = "dependencies {\n" +
-                               configuration + " \"" + groupId + ":" + artifactId + ":" + version + (classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\"" +
-                               "\n}";
+                        configuration + " \"" + groupId + ":" + artifactId + (version == null ? "" : ":" + version) + (version == null || classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\"" +
+                        "\n}";
             } else {
                 codeTemplate = "dependencies {\n" +
-                               configuration + " group: \"" + groupId + "\", name: \"" + artifactId + "\", version: \"" + version + "\"" + (classifier == null ? "" : ", classifier: \"" + classifier + "\"") + (extension == null ? "" : ", ext: \"" + extension + "\"") +
-                               "\n}";
+                        configuration + " group: \"" + groupId + "\", name: \"" + artifactId + "\"" + (version == null ? "" :  ", version: \"" + version + "\"") + (version == null || classifier == null ? "" : ", classifier: \"" + classifier + "\"") + (extension == null ? "" : ", ext: \"" + extension + "\"") +
+                        "\n}";
             }
             J.MethodInvocation addDependencyInvocation = requireNonNull((J.MethodInvocation) ((J.Return) (((J.Block) ((J.Lambda) ((J.MethodInvocation) GRADLE_PARSER.parse(codeTemplate)
                     .get(0).getStatements().get(0)).getArguments().get(0)).getBody()).getStatements().get(0))).getExpression());
