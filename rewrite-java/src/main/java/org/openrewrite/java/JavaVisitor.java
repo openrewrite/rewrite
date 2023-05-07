@@ -400,8 +400,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return c;
     }
 
-    public J visitCatch(J.Try.Catch catzh, P p) {
-        J.Try.Catch c = catzh;
+    public J visitCatch(J.Try.Catch catch_, P p) {
+        J.Try.Catch c = catch_;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.CATCH_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
         c = c.withParameter(visitAndCast(c.getParameter(), p));

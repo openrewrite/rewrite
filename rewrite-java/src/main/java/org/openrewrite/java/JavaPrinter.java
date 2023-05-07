@@ -436,13 +436,13 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitCatch(Try.Catch catzh, PrintOutputCapture<P> p) {
-        beforeSyntax(catzh, Space.Location.CATCH_PREFIX, p);
+    public J visitCatch(Try.Catch catch_, PrintOutputCapture<P> p) {
+        beforeSyntax(catch_, Space.Location.CATCH_PREFIX, p);
         p.append("catch");
-        visit(catzh.getParameter(), p);
-        visit(catzh.getBody(), p);
-        afterSyntax(catzh, p);
-        return catzh;
+        visit(catch_.getParameter(), p);
+        visit(catch_.getBody(), p);
+        afterSyntax(catch_, p);
+        return catch_;
     }
 
     @Override
