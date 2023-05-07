@@ -959,7 +959,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
                 JContainer.build(paramFmt, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"),
                         Markers.EMPTY), EMPTY)), Markers.EMPTY);
 
-        JContainer<NameTree> throwss = node.getThrows().isEmpty() ? null :
+        JContainer<NameTree> throws_ = node.getThrows().isEmpty() ? null :
                 JContainer.build(sourceBefore("throws"), convertAll(node.getThrows(), commaDelim, noDelim),
                         Markers.EMPTY);
 
@@ -971,7 +971,7 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
         return new J.MethodDeclaration(randomId(), fmt, Markers.EMPTY,
                 modifierResults.getLeadingAnnotations(),
                 modifierResults.getModifiers(), typeParams,
-                returnType, name, params, throwss, body, defaultValue,
+                returnType, name, params, throws_, body, defaultValue,
                 typeMapping.methodDeclarationType(jcMethod.sym, null));
     }
 

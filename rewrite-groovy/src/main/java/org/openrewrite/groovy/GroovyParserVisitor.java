@@ -502,7 +502,7 @@ public class GroovyParserVisitor {
                 params.add(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY)));
             }
 
-            JContainer<NameTree> throwz = method.getExceptions().length == 0 ? null : JContainer.build(
+            JContainer<NameTree> throws_ = method.getExceptions().length == 0 ? null : JContainer.build(
                     sourceBefore("throws"),
                     bodyVisitor.visitRightPadded(method.getExceptions(), null),
                     Markers.EMPTY
@@ -519,7 +519,7 @@ public class GroovyParserVisitor {
                     returnType,
                     new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
                     JContainer.build(beforeParen, params, Markers.EMPTY),
-                    throwz,
+                    throws_,
                     body,
                     null,
                     typeMapping.methodType(method)

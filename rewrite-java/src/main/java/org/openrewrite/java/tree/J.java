@@ -3388,15 +3388,15 @@ public interface J extends Tree {
         }
 
         @Nullable
-        JContainer<NameTree> throwz;
+        JContainer<NameTree> throws_;
 
         @Nullable
         public List<NameTree> getThrows() {
-            return throwz == null ? null : throwz.getElements();
+            return throws_ == null ? null : throws_.getElements();
         }
 
-        public MethodDeclaration withThrows(@Nullable List<NameTree> throwz) {
-            return getPadding().withThrows(JContainer.withElementsNullable(this.throwz, throwz));
+        public MethodDeclaration withThrows(@Nullable List<NameTree> throws_) {
+            return getPadding().withThrows(JContainer.withElementsNullable(this.throws_, throws_));
         }
 
         /**
@@ -3430,7 +3430,7 @@ public interface J extends Tree {
             if (type == this.methodType) {
                 return this;
             }
-            return new MethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression, name, parameters, throwz, body, defaultValue, type);
+            return new MethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression, name, parameters, throws_, body, defaultValue, type);
         }
 
         public JavaType getType() {
@@ -3530,16 +3530,16 @@ public interface J extends Tree {
             }
 
             public MethodDeclaration withParameters(JContainer<Statement> parameters) {
-                return t.parameters == parameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, parameters, t.throwz, t.body, t.defaultValue, t.methodType);
+                return t.parameters == parameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, parameters, t.throws_, t.body, t.defaultValue, t.methodType);
             }
 
             @Nullable
             public JContainer<NameTree> getThrows() {
-                return t.throwz;
+                return t.throws_;
             }
 
-            public MethodDeclaration withThrows(@Nullable JContainer<NameTree> throwz) {
-                return t.throwz == throwz ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, throwz, t.body, t.defaultValue, t.methodType);
+            public MethodDeclaration withThrows(@Nullable JContainer<NameTree> throws_) {
+                return t.throws_ == throws_ ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, throws_, t.body, t.defaultValue, t.methodType);
             }
 
             @Nullable
@@ -3548,7 +3548,7 @@ public interface J extends Tree {
             }
 
             public MethodDeclaration withDefaultValue(@Nullable JLeftPadded<Expression> defaultValue) {
-                return t.defaultValue == defaultValue ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, defaultValue, t.methodType);
+                return t.defaultValue == defaultValue ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throws_, t.body, defaultValue, t.methodType);
             }
 
             @Nullable
@@ -3557,7 +3557,7 @@ public interface J extends Tree {
             }
 
             public MethodDeclaration withTypeParameters(@Nullable TypeParameters typeParameters) {
-                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, t.defaultValue, t.methodType);
+                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throws_, t.body, t.defaultValue, t.methodType);
             }
         }
 
@@ -3586,7 +3586,7 @@ public interface J extends Tree {
             }
 
             public MethodDeclaration withTypeParameters(@Nullable TypeParameters typeParameters) {
-                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, t.defaultValue, t.methodType);
+                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throws_, t.body, t.defaultValue, t.methodType);
             }
 
             public IdentifierWithAnnotations getName() {
@@ -3594,7 +3594,7 @@ public interface J extends Tree {
             }
 
             public MethodDeclaration withName(IdentifierWithAnnotations name) {
-                return t.name == name ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, name, t.parameters, t.throwz, t.body, t.defaultValue, t.methodType);
+                return t.name == name ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, name, t.parameters, t.throws_, t.body, t.defaultValue, t.methodType);
             }
         }
     }
