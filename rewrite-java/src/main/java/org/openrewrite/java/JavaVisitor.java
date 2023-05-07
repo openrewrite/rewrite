@@ -1018,8 +1018,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return r;
     }
 
-    public J visitSwitch(J.Switch switzh, P p) {
-        J.Switch s = switzh;
+    public J visitSwitch(J.Switch switch_, P p) {
+        J.Switch s = switch_;
         s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.SWITCH_PREFIX, p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
         Statement temp = (Statement) visitStatement(s, p);
@@ -1033,8 +1033,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return s;
     }
 
-    public J visitSwitchExpression(J.SwitchExpression switzh, P p) {
-        J.SwitchExpression s = switzh;
+    public J visitSwitchExpression(J.SwitchExpression switch_, P p) {
+        J.SwitchExpression s = switch_;
         s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.SWITCH_EXPRESSION_PREFIX, p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
         Expression temp = (Expression) visitExpression(s, p);

@@ -916,23 +916,23 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitSwitch(Switch switzh, PrintOutputCapture<P> p) {
-        beforeSyntax(switzh, Space.Location.SWITCH_PREFIX, p);
+    public J visitSwitch(Switch switch_, PrintOutputCapture<P> p) {
+        beforeSyntax(switch_, Space.Location.SWITCH_PREFIX, p);
         p.append("switch");
-        visit(switzh.getSelector(), p);
-        visit(switzh.getCases(), p);
-        afterSyntax(switzh, p);
-        return switzh;
+        visit(switch_.getSelector(), p);
+        visit(switch_.getCases(), p);
+        afterSyntax(switch_, p);
+        return switch_;
     }
 
     @Override
-    public J visitSwitchExpression(SwitchExpression switzh, PrintOutputCapture<P> p) {
-        beforeSyntax(switzh, Space.Location.SWITCH_EXPRESSION_PREFIX, p);
+    public J visitSwitchExpression(SwitchExpression switch_, PrintOutputCapture<P> p) {
+        beforeSyntax(switch_, Space.Location.SWITCH_EXPRESSION_PREFIX, p);
         p.append("switch");
-        visit(switzh.getSelector(), p);
-        visit(switzh.getCases(), p);
-        afterSyntax(switzh, p);
-        return switzh;
+        visit(switch_.getSelector(), p);
+        visit(switch_.getCases(), p);
+        afterSyntax(switch_, p);
+        return switch_;
     }
 
     @Override
