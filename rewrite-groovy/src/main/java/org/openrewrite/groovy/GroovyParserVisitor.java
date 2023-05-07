@@ -1758,11 +1758,11 @@ public class GroovyParserVisitor {
 
             // Strangely, groovy parses the finally's block as a BlockStatement which contains another BlockStatement
             // The true contents of the block are within the first statement of this apparently pointless enclosing BlockStatement
-            JLeftPadded<J.Block> finallyy = !(node.getFinallyStatement() instanceof BlockStatement) ? null :
+            JLeftPadded<J.Block> finally_ = !(node.getFinallyStatement() instanceof BlockStatement) ? null :
                     padLeft(sourceBefore("finally"), visit(((BlockStatement) node.getFinallyStatement()).getStatements().get(0)));
 
             //noinspection ConstantConditions
-            queue.add(new J.Try(randomId(), prefix, Markers.EMPTY, resources, body, catches, finallyy));
+            queue.add(new J.Try(randomId(), prefix, Markers.EMPTY, resources, body, catches, finally_));
 
         }
 

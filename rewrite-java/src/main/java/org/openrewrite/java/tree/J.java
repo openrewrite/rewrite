@@ -4971,15 +4971,15 @@ public interface J extends Tree {
         List<Catch> catches;
 
         @Nullable
-        JLeftPadded<Block> finallie;
+        JLeftPadded<Block> finally_;
 
         @Nullable
         public Block getFinally() {
-            return finallie == null ? null : finallie.getElement();
+            return finally_ == null ? null : finally_.getElement();
         }
 
-        public Try withFinally(@Nullable Block finallie) {
-            return getPadding().withFinally(JLeftPadded.withElement(this.finallie, finallie));
+        public Try withFinally(@Nullable Block finally_) {
+            return getPadding().withFinally(JLeftPadded.withElement(this.finally_, finally_));
         }
 
         @Override
@@ -5078,16 +5078,16 @@ public interface J extends Tree {
             }
 
             public Try withResources(@Nullable JContainer<Resource> resources) {
-                return t.resources == resources ? t : new Try(t.id, t.prefix, t.markers, resources, t.body, t.catches, t.finallie);
+                return t.resources == resources ? t : new Try(t.id, t.prefix, t.markers, resources, t.body, t.catches, t.finally_);
             }
 
             @Nullable
             public JLeftPadded<Block> getFinally() {
-                return t.finallie;
+                return t.finally_;
             }
 
-            public Try withFinally(@Nullable JLeftPadded<Block> finallie) {
-                return t.finallie == finallie ? t : new Try(t.id, t.prefix, t.markers, t.resources, t.body, t.catches, finallie);
+            public Try withFinally(@Nullable JLeftPadded<Block> finally_) {
+                return t.finally_ == finally_ ? t : new Try(t.id, t.prefix, t.markers, t.resources, t.body, t.catches, finally_);
             }
         }
     }
