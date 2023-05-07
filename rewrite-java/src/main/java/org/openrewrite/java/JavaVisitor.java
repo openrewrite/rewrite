@@ -384,8 +384,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return b;
     }
 
-    public J visitCase(J.Case caze, P p) {
-        J.Case c = caze;
+    public J visitCase(J.Case case_, P p) {
+        J.Case c = case_;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.CASE_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
         Statement temp = (Statement) visitStatement(c, p);

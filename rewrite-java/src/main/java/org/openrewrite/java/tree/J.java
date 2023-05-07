@@ -4730,8 +4730,8 @@ public interface J extends Tree {
                 @Override
                 public J visitBlock(Block block, AtomicReference<JavaType> javaType) {
                     if (!block.getStatements().isEmpty()) {
-                        Case caze = (Case) block.getStatements().get(0);
-                        javaType.set(caze.getExpressions().get(0).getType());
+                        Case case_ = (Case) block.getStatements().get(0);
+                        javaType.set(case_.getExpressions().get(0).getType());
                     }
                     return block;
                 }

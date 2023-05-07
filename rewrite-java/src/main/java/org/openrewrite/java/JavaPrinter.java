@@ -413,26 +413,26 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitCase(Case caze, PrintOutputCapture<P> p) {
-        beforeSyntax(caze, Space.Location.CASE_PREFIX, p);
-        Expression elem = caze.getExpressions().get(0);
+    public J visitCase(Case case_, PrintOutputCapture<P> p) {
+        beforeSyntax(case_, Space.Location.CASE_PREFIX, p);
+        Expression elem = case_.getExpressions().get(0);
         if (!(elem instanceof Identifier) || !((Identifier) elem).getSimpleName().equals("default")) {
             p.append("case");
         }
-        visitContainer("", caze.getPadding().getExpressions(), JContainer.Location.CASE_EXPRESSION, ",", "", p);
-        visitSpace(caze.getPadding().getStatements().getBefore(), Space.Location.CASE, p);
-        p.append(caze.getType() == Case.Type.Statement ? ":" : "->");
-        visitStatements(caze.getPadding().getStatements().getPadding()
+        visitContainer("", case_.getPadding().getExpressions(), JContainer.Location.CASE_EXPRESSION, ",", "", p);
+        visitSpace(case_.getPadding().getStatements().getBefore(), Space.Location.CASE, p);
+        p.append(case_.getType() == Case.Type.Statement ? ":" : "->");
+        visitStatements(case_.getPadding().getStatements().getPadding()
                 .getElements(), JRightPadded.Location.CASE, p);
-        if (caze.getBody() instanceof Statement) {
+        if (case_.getBody() instanceof Statement) {
             //noinspection unchecked
-            visitStatement((JRightPadded<Statement>) (JRightPadded<?>) caze.getPadding().getBody(),
+            visitStatement((JRightPadded<Statement>) (JRightPadded<?>) case_.getPadding().getBody(),
                     JRightPadded.Location.CASE_BODY, p);
         } else {
-            visitRightPadded(caze.getPadding().getBody(), JRightPadded.Location.CASE_BODY, ";", p);
+            visitRightPadded(case_.getPadding().getBody(), JRightPadded.Location.CASE_BODY, ";", p);
         }
-        afterSyntax(caze, p);
-        return caze;
+        afterSyntax(case_, p);
+        return case_;
     }
 
     @Override
