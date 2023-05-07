@@ -95,8 +95,8 @@ public class TypesInUse {
         }
 
         @Override
-        public J.Import visitImport(J.Import impoort, Integer p) {
-            return impoort;
+        public J.Import visitImport(J.Import import_, Integer p) {
+            return import_;
         }
 
         @Override

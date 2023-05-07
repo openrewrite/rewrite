@@ -668,8 +668,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return i;
     }
 
-    public J visitImport(J.Import impoort, P p) {
-        J.Import i = impoort;
+    public J visitImport(J.Import import_, P p) {
+        J.Import i = import_;
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.IMPORT_PREFIX, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
         i = i.getPadding().withStatic(visitLeftPadded(i.getPadding().getStatic(), JLeftPadded.Location.STATIC_IMPORT, p));

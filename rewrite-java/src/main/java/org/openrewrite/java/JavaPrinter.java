@@ -634,16 +634,16 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitImport(J.Import impoort, PrintOutputCapture<P> p) {
-        beforeSyntax(impoort, Space.Location.IMPORT_PREFIX, p);
+    public J visitImport(J.Import import_, PrintOutputCapture<P> p) {
+        beforeSyntax(import_, Space.Location.IMPORT_PREFIX, p);
         p.append("import");
-        if (impoort.isStatic()) {
-            visitSpace(impoort.getPadding().getStatic().getBefore(), Space.Location.STATIC_IMPORT, p);
+        if (import_.isStatic()) {
+            visitSpace(import_.getPadding().getStatic().getBefore(), Space.Location.STATIC_IMPORT, p);
             p.append("static");
         }
-        visit(impoort.getQualid(), p);
-        afterSyntax(impoort, p);
-        return impoort;
+        visit(import_.getQualid(), p);
+        afterSyntax(import_, p);
+        return import_;
     }
 
     @Override

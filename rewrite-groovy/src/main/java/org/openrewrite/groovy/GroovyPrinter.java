@@ -231,8 +231,8 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
-        public J visitImport(J.Import impoort, PrintOutputCapture<P> p) {
-            J.Import i = (J.Import) super.visitImport(impoort, p);
+        public J visitImport(J.Import import_, PrintOutputCapture<P> p) {
+            J.Import i = (J.Import) super.visitImport(import_, p);
             JLeftPadded<J.Identifier> alias = i.getPadding().getAlias();
             if (alias == null) {
                 return i;

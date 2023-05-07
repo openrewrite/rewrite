@@ -129,11 +129,11 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public J visitImport(J.Import impoort, ExecutionContext executionContext) {
+        public J visitImport(J.Import import_, ExecutionContext executionContext) {
             // visitCompilationUnit() handles changing the imports.
             // If we call super.visitImport() then visitFieldAccess() will change the imports before AddImport/RemoveImport see them.
             // visitFieldAccess() doesn't have the import-specific formatting logic that AddImport/RemoveImport do.
-            return impoort;
+            return import_;
         }
 
         @Override
