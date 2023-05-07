@@ -533,8 +533,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return e;
     }
 
-    public J visitEnumValue(J.EnumValue enoom, P p) {
-        J.EnumValue e = enoom;
+    public J visitEnumValue(J.EnumValue enum_, P p) {
+        J.EnumValue e = enum_;
         e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.ENUM_VALUE_PREFIX, p));
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
         e = e.withAnnotations(ListUtils.map(e.getAnnotations(), a -> visitAndCast(a, p)));

@@ -545,12 +545,12 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitEnumValue(EnumValue enoom, PrintOutputCapture<P> p) {
-        beforeSyntax(enoom, Space.Location.ENUM_VALUE_PREFIX, p);
-        visit(enoom.getAnnotations(), p);
-        visit(enoom.getName(), p);
-        NewClass initializer = enoom.getInitializer();
-        if (enoom.getInitializer() != null) {
+    public J visitEnumValue(EnumValue enum_, PrintOutputCapture<P> p) {
+        beforeSyntax(enum_, Space.Location.ENUM_VALUE_PREFIX, p);
+        visit(enum_.getAnnotations(), p);
+        visit(enum_.getName(), p);
+        NewClass initializer = enum_.getInitializer();
+        if (enum_.getInitializer() != null) {
             visitSpace(initializer.getPrefix(), Space.Location.NEW_CLASS_PREFIX, p);
             visitSpace(initializer.getNew(), Space.Location.NEW_PREFIX, p);
             if (!initializer.getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class).isPresent()) {
@@ -558,8 +558,8 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             }
             visit(initializer.getBody(), p);
         }
-        afterSyntax(enoom, p);
-        return enoom;
+        afterSyntax(enum_, p);
+        return enum_;
     }
 
     @Override
