@@ -60,6 +60,7 @@ public class MavenPomDownloader {
     private static final RetryConfig retryConfig = RetryConfig.custom()
             .retryOnException(throwable -> throwable instanceof SocketTimeoutException ||
                                            throwable instanceof TimeoutException)
+            .maxAttempts(5) // what should we set?
             .build();
 
     private static final RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
