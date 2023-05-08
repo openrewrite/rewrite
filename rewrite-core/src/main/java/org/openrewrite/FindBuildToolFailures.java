@@ -44,7 +44,7 @@ public class FindBuildToolFailures extends Recipe {
 
     @Override
     public String getDescription() {
-        return "This recipe explores build tool failures after an AST is produced for classifying the types of " +
+        return "This recipe explores build tool failures after an LST is produced for classifying the types of " +
                "failures that can occur and prioritizing fixes according to the most common problems.";
     }
 
