@@ -35,7 +35,7 @@ public class UpdateSourcePositions extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Calculate start position and length for every AST element.";
+        return "Calculate start position and length for every LST element.";
     }
 
     @Override
