@@ -15,6 +15,8 @@
  */
 package org.openrewrite.test;
 
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.Delegate;
 import org.assertj.core.api.SoftAssertions;
 import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
@@ -424,9 +426,13 @@ public interface RewriteTest extends SourceSpecs {
                                     expectedAfter :
                                     trimIndentPreserveCRLF(expectedAfter);
                             assertThat(actual)
-                                    .as(() -> String.format("Unexpected result in \"%s\"%s",
-                                            result.getAfter().getSourcePath(),
-                                            result.diff().isEmpty() ? "" : "\n" + result.diff()))
+                                    .as(() -> {
+                                        SourceFile expectedSourceFile = new DelegateSourceFileForDiff(result.getAfter(), expected);
+                                        String diff = new Result(expectedSourceFile, result.getAfter(), Collections.emptyList()).diff();
+                                        return String.format("Unexpected result in \"%s\"%s",
+                                                result.getAfter().getSourcePath(),
+                                                diff.isEmpty() ? "" : "\n" + diff);
+                                    })
                                     .isEqualTo(expected);
                             sourceSpec.eachResult.accept(result.getAfter(), testMethodSpec, testClassSpec);
                         } else {
@@ -569,5 +575,22 @@ class RewriteTestUtils {
             }
         }
         return false;
+    }
+}
+
+@RequiredArgsConstructor
+class DelegateSourceFileForDiff implements SourceFile {
+    @Delegate(excludes = PrintAll.class)
+    private final SourceFile delegate;
+    private final String expected;
+
+    @Override
+    public <P> String printAll(PrintOutputCapture<P> out) {
+        out.append(expected);
+        return out.getOut();
+    }
+
+    interface PrintAll {
+        <P> String printAll(PrintOutputCapture<P> out);
     }
 }
