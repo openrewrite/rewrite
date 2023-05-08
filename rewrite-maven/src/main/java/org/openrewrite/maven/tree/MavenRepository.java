@@ -23,6 +23,7 @@ import lombok.*;
 import lombok.experimental.Accessors;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.jetbrains.annotations.VisibleForTesting;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.File;
@@ -95,6 +96,7 @@ public class MavenRepository implements Serializable {
         this.deriveMetadataIfMissing = deriveMetadataIfMissing;
     }
 
+
     public static Builder builder() {
         return new Builder();
     }
@@ -116,6 +118,15 @@ public class MavenRepository implements Serializable {
         private Builder() {
         }
 
+        @VisibleForTesting
+        @Nullable
+        public static String getEnvironmentPropertyName(@Nullable String rawProperty) {
+            if (rawProperty == null){
+                return null;
+            }
+            return rawProperty.replace("${env.", "").replace("}", "");
+        }
+
         public MavenRepository build() {
             return new MavenRepository(id, uri, releases, snapshots, knownToExist, username, password, deriveMetadataIfMissing);
         }
@@ -130,6 +141,28 @@ public class MavenRepository implements Serializable {
         }
         public Builder snapshots(boolean snapshots) {
             this.snapshots = Boolean.toString(snapshots);
+            return this;
+        }
+
+        public Builder username(String username) {
+
+            if (username.startsWith("${env.")){
+                this.username = System.getenv(getEnvironmentPropertyName(username));
+                return this;
+            }
+
+            this.username =  username;
+            return this;
+        }
+
+        public Builder password(String password) {
+
+            if (password.startsWith("${env.")){
+                this.password = System.getenv(getEnvironmentPropertyName(username));
+                return this;
+            }
+
+            this.password =  password;
             return this;
         }
 
