@@ -418,7 +418,7 @@ class AppendToSequenceTest implements RewriteTest {
     }
 
     @Test
-    @Issue("https://rewriteoss.slack.com/archives/C049LUZ7Y93/p1683434453509149")
+    @Issue("https://github.com/openrewrite/rewrite/issues/3215")
     void appendTwice() {
         rewriteRun(
           spec -> spec.recipeFromYaml("""
