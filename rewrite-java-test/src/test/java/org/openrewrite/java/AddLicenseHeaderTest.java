@@ -80,6 +80,7 @@ class AddLicenseHeaderTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3198");
     void dontChangeJavadoc() {
         rewriteRun(
           java(
