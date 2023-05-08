@@ -96,7 +96,7 @@ public class DeleteMethodArgument extends Recipe {
             return (J.NewClass) visitMethodCall(n);
         }
 
-        private MethodCall visitMethodCall(J.MethodCall methodCall) {
+        private J.MethodCall visitMethodCall(J.MethodCall methodCall) {
             J.MethodCall m = methodCall;
             List<Expression> originalArgs = m.getArguments();
             if (methodMatcher.matches(m) && originalArgs.stream()
