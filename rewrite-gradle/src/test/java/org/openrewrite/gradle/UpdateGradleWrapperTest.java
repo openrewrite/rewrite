@@ -22,6 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.BuildTool;
+import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.remote.Remote;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -110,6 +111,11 @@ class UpdateGradleWrapperTest implements RewriteTest {
               assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
               assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-7.4.2-bin.zip"));
               assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
+              var gradleWrapperProperties = result(run, Properties.File.class, "gradle-wrapper.properties");
+              assertThat(gradleWrapperProperties.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool -> {
+                  assertThat(buildTool.getType()).isEqualTo(BuildTool.Type.Gradle);
+                  assertThat(buildTool.getVersion()).isEqualTo("7.4.2");
+              });
           }),
           properties(
             """

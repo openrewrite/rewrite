@@ -41,6 +41,7 @@ import java.util.*;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
+import static org.openrewrite.internal.StringUtils.isBlank;
 
 @RequiredArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -93,6 +94,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
     static class GradleWrapperState {
         boolean needsWrapperUpdate = true;
+        BuildTool updatedMarker;
         boolean needsGradleWrapperProperties = true;
         boolean needsGradleWrapperJar = true;
         boolean needsGradleShellScript = true;
@@ -109,10 +111,17 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         return Preconditions.firstAcceptable(
                 new PropertiesVisitor<ExecutionContext>() {
                     @Override
-                    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
-                        if (super.isAcceptable(sourceFile, executionContext) &&
+                    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                        if (super.isAcceptable(sourceFile, ctx) &&
                             equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_PROPERTIES_LOCATION)) {
                             acc.needsGradleWrapperProperties = false;
+                            Optional<BuildTool> buildTool = sourceFile.getMarkers().findFirst(BuildTool.class);
+                            if (buildTool.isPresent()) {
+                                GradleWrapper gradleWrapper = requireNonNull(validate(ctx).getValue());
+                                if (!buildTool.get().getVersion().equals(gradleWrapper.getVersion())) {
+                                    acc.updatedMarker = buildTool.get().withVersion(gradleWrapper.getVersion());
+                                }
+                            }
                             return true;
                         }
                         return false;
@@ -193,12 +202,22 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         if (!acc.needsWrapperUpdate) {
             return TreeVisitor.noop();
         }
+
         return new TreeVisitor<Tree, ExecutionContext>() {
             final GradleWrapper gradleWrapper = requireNonNull(gradleWrapperValidation.getValue());
 
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (!(tree instanceof SourceFile)) {
+                    return tree;
+                }
+
                 SourceFile sourceFile = (SourceFile) tree;
+                if (acc.updatedMarker != null) {
+                    sourceFile = sourceFile.getMarkers().findFirst(BuildTool.class)
+                            .map(buildTool -> (SourceFile) tree.withMarkers(tree.getMarkers().computeByType(buildTool, (b, a) -> acc.updatedMarker)))
+                            .orElse(sourceFile);
+                }
 
                 if (sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
                     PlainText gradlew = (PlainText) setExecutable(sourceFile);

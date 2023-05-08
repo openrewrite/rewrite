@@ -17,6 +17,7 @@ package org.openrewrite.config;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Contributor;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Maintainer;
 import org.openrewrite.Recipe;
 import org.openrewrite.test.RewriteTest;
@@ -41,11 +42,6 @@ class YamlResourceLoaderTest implements RewriteTest {
               type: specs.openrewrite.org/v1beta/recipe
               name: test.ChangeTextToHello
               displayName: Change text to hello
-              description: Say hello.
-              applicability:
-                  singleSource:
-                      - org.openrewrite.FindSourceFiles:
-                          filePattern: '**/hello.txt'
               recipeList:
                   - org.openrewrite.text.ChangeText:
                       toText: Hello!
@@ -101,7 +97,6 @@ class YamlResourceLoaderTest implements RewriteTest {
               type: specs.openrewrite.org/v1beta/recipe
               name: test.ChangeTextToHello
               displayName: Change text to hello
-              description: Say hello.
               recipeList:
                   - org.openrewrite.text.ChangeText:
                       toText: Hello!
@@ -166,7 +161,6 @@ class YamlResourceLoaderTest implements RewriteTest {
               type: specs.openrewrite.org/v1beta/recipe
               name: test.ChangeTextToHello
               displayName: Change text to hello
-              description: Say hello.
               recipeList:
                   - org.openrewrite.text.ChangeText:
                       toText: Hello!
@@ -181,6 +175,7 @@ class YamlResourceLoaderTest implements RewriteTest {
     }
 
     @Test
+    @DocumentExample
     void recipeExamples() {
         Environment env = Environment.builder()
           .load(new YamlResourceLoader(new ByteArrayInputStream(
@@ -189,7 +184,6 @@ class YamlResourceLoaderTest implements RewriteTest {
               type: specs.openrewrite.org/v1beta/recipe
               name: test.ChangeTextToHello
               displayName: Change text to hello
-              description: Say hello.
               recipeList:
                   - org.openrewrite.text.ChangeText:
                       toText: Hello!
@@ -238,9 +232,22 @@ class YamlResourceLoaderTest implements RewriteTest {
             assertThat(r.getExamples()).hasSize(2);
             assertThat(r.getExamples()).first().satisfies(e -> {
                 assertThat(e.getDescription()).isEqualTo("Change World to Hello in a text file");
-                assertThat(e.getBefore()).isEqualTo("World");
-                assertThat(e.getAfter()).isEqualTo("Hello!");
-                assertThat(e.getLanguage()).isEqualTo("text");
+                assertThat(e.getSources()).hasSize(2);
+                assertThat(e.getSources()).first().satisfies( s -> {
+                    assertThat(s.getBefore()).isEqualTo("World");
+                    assertThat(s.getAfter()).isEqualTo("Hello!");
+                    assertThat(s.getPath()).isEqualTo("1.txt");
+                    assertThat(s.getLanguage()).isEqualTo("text");
+                  }
+                );
+
+                assertThat(e.getSources().get(1)).satisfies( s -> {
+                      assertThat(s.getBefore()).isEqualTo("World 2");
+                      assertThat(s.getAfter()).isEqualTo("Hello 2!");
+                      assertThat(s.getPath()).isEqualTo("2.txt");
+                      assertThat(s.getLanguage()).isEqualTo("text");
+                  }
+                );
             });
             assertThat(r.getExamples().get(1)).satisfies(e -> {
                 assertThat(e.getDescription()).isEqualTo("Change World to Hello in a java file");
