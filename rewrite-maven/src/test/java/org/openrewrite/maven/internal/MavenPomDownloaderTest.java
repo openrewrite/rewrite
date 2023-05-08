@@ -87,6 +87,18 @@ class MavenPomDownloaderTest {
     }
 
     @ParameterizedTest
+    @Issue("https://github.com/openrewrite/rewrite/issues/3141")
+    @ValueSource(strings = {"http://0.0.0.0","https://0.0.0.0","0.0.0.0:443"})
+    void skipBlockedRepository(String url) {
+        var downloader = new MavenPomDownloader(emptyMap(), ctx);
+        MavenRepository oss = downloader.normalizeRepository(
+          MavenRepository.builder().id("myRepo").uri(url).build(),
+          null);
+
+        assertThat(oss).isNull();
+    }
+
+    @ParameterizedTest
     @ValueSource(ints = {500, 400})
     void normalizeAcceptErrorStatuses(Integer status) {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);

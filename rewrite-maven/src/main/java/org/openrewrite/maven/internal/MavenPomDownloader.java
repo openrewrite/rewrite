@@ -665,6 +665,11 @@ public class MavenPomDownloader {
             if (repository.getUri().contains("${")) {
                 return null;
             }
+            // Skip blocked repositories
+            // See https://github.com/openrewrite/rewrite/issues/3141
+            else if (repository.getUri().contains("0.0.0.0")) {
+                return null;
+            }
 
             String originalUrl = repository.getUri();
             if ("file".equals(URI.create(originalUrl).getScheme())) {
