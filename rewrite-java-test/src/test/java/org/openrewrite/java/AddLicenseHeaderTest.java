@@ -16,6 +16,8 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -80,7 +82,8 @@ class AddLicenseHeaderTest implements RewriteTest {
     }
 
     @Test
-    @Issue("https://github.com/openrewrite/rewrite/issues/3198");
+    @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite/issues/3198")
     void dontChangeJavadoc() {
         rewriteRun(
           java(
@@ -90,7 +93,7 @@ class AddLicenseHeaderTest implements RewriteTest {
                */
               package com.sample;
               /**
-               * Foo {@link Value[] values} bar.
+               * Foo {@link int[] values} bar.
                */
               class Test {
               }
