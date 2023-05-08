@@ -78,4 +78,23 @@ class AddLicenseHeaderTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dontChangeJavadoc() {
+        rewriteRun(
+          java(
+            """
+              /*
+               * My license header
+               */
+              package com.sample;
+              /**
+               * Foo {@link Value[] values} bar.
+               */
+              class Test {
+              }
+              """
+          )
+        );
+    }
 }
