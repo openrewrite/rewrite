@@ -119,7 +119,7 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                         "\n}";
             } else {
                 codeTemplate = "dependencies {\n" +
-                        configuration + " group: \"" + groupId + "\", name: \"" + artifactId + "\"" + (version == null ? "" :  ", version: \"" + version + "\"") + (version == null || classifier == null ? "" : ", classifier: \"" + classifier + "\"") + (extension == null ? "" : ", ext: \"" + extension + "\"") +
+                        configuration + " group: \"" + groupId + "\", name: \"" + artifactId + "\"" + (version == null ? "" :  ", version: \"" + version + "\"") + (classifier == null ? "" : ", classifier: \"" + classifier + "\"") + (extension == null ? "" : ", ext: \"" + extension + "\"") +
                         "\n}";
             }
             J.MethodInvocation addDependencyInvocation = requireNonNull((J.MethodInvocation) ((J.Return) (((J.Block) ((J.Lambda) ((J.MethodInvocation) GRADLE_PARSER.parse(codeTemplate)

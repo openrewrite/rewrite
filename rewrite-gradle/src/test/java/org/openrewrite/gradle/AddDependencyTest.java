@@ -465,6 +465,100 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void addDependenciesWithClassifierToExistingGrouping() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre:test", "com.google.common.math.IntMath")),
+          mavenProject("project",
+            srcTestJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+                                
+                repositories {
+                    mavenCentral()
+                }
+                                
+                dependencies {
+                    implementation group: "commons-lang", name: "commons-lang", version: "1.0"
+
+                    def junitVersion = "4.12"
+                    testImplementation group: "junit", name: "junit", version: junitVersion
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+                                
+                repositories {
+                    mavenCentral()
+                }
+                                
+                dependencies {
+                    implementation group: "commons-lang", name: "commons-lang", version: "1.0"
+
+                    testImplementation group: "com.google.guava", name: "guava", version: "29.0-jre", classifier: "test"
+                    def junitVersion = "4.12"
+                    testImplementation group: "junit", name: "junit", version: junitVersion
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependenciesWithoutVersionWithClassifierToExistingGrouping() {
+        AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", null, null, "testImplementation", "com.google.common.math.IntMath", "linux-x86_64", null, null);
+        rewriteRun(
+          spec -> spec.recipe(addDep),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+                                
+                repositories {
+                    mavenCentral()
+                }
+                                
+                dependencies {
+                    implementation group: "commons-lang", name: "commons-lang", version: "1.0"
+
+                    def junitVersion = "4.12"
+                    testImplementation group: "junit", name: "junit", version: junitVersion
+                }
+                """,
+              """
+                plugins {
+                    id 'java-library'
+                }
+                                
+                repositories {
+                    mavenCentral()
+                }
+                                
+                dependencies {
+                    implementation group: "commons-lang", name: "commons-lang", version: "1.0"
+
+                    testImplementation group: "io.netty", name: "netty-tcnative-boringssl-static", classifier: "linux-x86_64"
+                    def junitVersion = "4.12"
+                    testImplementation group: "junit", name: "junit", version: junitVersion
+                }
+                """
+            )
+          )
+        );
+    }
 
     @Test
     void matchesDependencyDeclarationStyle() {
@@ -637,7 +731,7 @@ class AddDependencyTest implements RewriteTest {
         String[] gavParts = gav.split(":");
         return new AddDependency(
           gavParts[0], gavParts[1], (gavParts.length < 3) ? null : gavParts[2], null, configuration, onlyIfUsing,
-          null, null, null
+          (gavParts.length < 4) ? null : gavParts[3], null, null
         );
     }
 }
