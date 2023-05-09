@@ -59,4 +59,23 @@ public class MinimumSwitchCasesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void twoCase() {
+        rewriteRun(
+          groovy(
+            """
+              def s = "prod"
+              switch(s) {
+                  case "prod":
+                      println("prod")
+                      break
+                  default:
+                      println("default")
+                      break
+              }
+              """
+          )
+        );
+    }
 }
