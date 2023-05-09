@@ -140,7 +140,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
     }
 
     private <S extends SourceFile> S result(RecipeRun run, Class<S> clazz, String endsWith) {
-        return run.getResults().stream()
+        return run.getChangeset().getAllResults().stream()
           .map(Result::getAfter)
           .filter(Objects::nonNull)
           .filter(r -> r.getSourcePath().endsWith(endsWith))

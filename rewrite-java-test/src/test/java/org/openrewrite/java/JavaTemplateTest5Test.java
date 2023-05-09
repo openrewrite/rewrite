@@ -149,7 +149,7 @@ class JavaTemplateTest5Test implements RewriteTest {
                   return method;
               }
           })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getResults().get(0).getAfter();
+              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
               J.MethodInvocation m = (J.MethodInvocation) ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(2)).getBody()
                 .getStatements().get(0);
               JavaType.Method type = m.getMethodType();

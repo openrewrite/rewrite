@@ -28,7 +28,7 @@ import static java.util.Collections.emptyList;
 public class RecipeRun {
 
     @With
-    List<Result> results;
+    Changeset changeset;
 
     @With
     Map<DataTable<?>, List<?>> dataTables;

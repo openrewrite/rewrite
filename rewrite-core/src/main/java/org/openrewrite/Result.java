@@ -26,11 +26,11 @@ import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.Markup;
+import org.openrewrite.marker.RecipesThatMadeChanges;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -56,17 +56,38 @@ public class Result {
     private final SourceFile after;
 
     @Getter
-    private final Collection<Stack<Recipe>> recipes;
+    private final Collection<List<Recipe>> recipes;
 
     @Getter
     @Nullable
     private final Duration timeSavings;
 
-    @Nullable
-    private transient WeakReference<String> diff;
+    public Result(@Nullable SourceFile before, @Nullable SourceFile after, Collection<List<Recipe>> recipes) {
+        this.before = before;
+        this.after = after;
+        this.recipes = recipes;
 
-    @Nullable
-    private Path relativeTo;
+        Duration timeSavings = null;
+        for (List<Recipe> recipesStack : recipes) {
+            if (recipesStack != null && !recipesStack.isEmpty()) {
+                Duration perOccurrence = recipesStack.get(0).getEstimatedEffortPerOccurrence();
+                if (perOccurrence != null) {
+                    timeSavings = perOccurrence;
+                    break;
+                }
+            }
+        }
+
+        this.timeSavings = timeSavings;
+    }
+
+    public Result(@Nullable SourceFile before, SourceFile after) {
+        this(before, after, after.getMarkers()
+                .findFirst(RecipesThatMadeChanges.class)
+                .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe " +
+                                                             "reported making a change"))
+                .getRecipes());
+    }
 
     public List<Throwable> getRecipeErrors() {
         List<Throwable> exceptions = new ArrayList<>();
@@ -96,7 +117,7 @@ public class Result {
     public List<RecipeDescriptor> getRecipeDescriptorsThatMadeChanges() {
         List<RecipeDescriptor> recipesToDisplay = new ArrayList<>();
 
-        for (Stack<Recipe> currentStack : recipes) {
+        for (List<Recipe> currentStack : recipes) {
             Recipe root;
             if (currentStack.size() > 1) {
                 // The first recipe is typically an Environment.CompositeRecipe and should not be included in the list of RecipeDescriptors
@@ -127,25 +148,6 @@ public class Result {
         return recipesToDisplay;
     }
 
-    public Result(@Nullable SourceFile before, @Nullable SourceFile after, Collection<Stack<Recipe>> recipes) {
-        this.before = before;
-        this.after = after;
-        this.recipes = recipes;
-
-        Duration timeSavings = null;
-        for (Stack<Recipe> recipesStack : recipes) {
-            if (recipesStack != null) {
-                Duration perOccurrence = recipesStack.peek().getEstimatedEffortPerOccurrence();
-                if (perOccurrence != null) {
-                    timeSavings = perOccurrence;
-                    break;
-                }
-            }
-        }
-
-        this.timeSavings = timeSavings;
-    }
-
     /**
      * @return Git-style patch diff representing the changes to this compilation unit.
      */
@@ -167,24 +169,6 @@ public class Result {
 
     @Incubating(since = "7.34.0")
     public String diff(@Nullable Path relativeTo, @Nullable PrintOutputCapture.MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace) {
-        String d;
-        if (this.diff == null) {
-            d = computeDiff(relativeTo, markerPrinter, ignoreAllWhitespace);
-            this.diff = new WeakReference<>(d);
-        } else {
-            d = this.diff.get();
-            if (d == null || !Objects.equals(this.relativeTo, relativeTo)) {
-                d = computeDiff(relativeTo, markerPrinter, ignoreAllWhitespace);
-                this.diff = new WeakReference<>(d);
-            }
-        }
-        return d;
-    }
-
-    private String computeDiff(@Nullable Path relativeTo,
-                               @Nullable PrintOutputCapture.MarkerPrinter markerPrinter,
-                               @Nullable Boolean ignoreAllWhitespace) {
-
         Path beforePath = before == null ? null : before.getSourcePath();
         Path afterPath = null;
         if (before == null && after == null) {
@@ -200,17 +184,23 @@ public class Result {
         FileMode beforeMode = before != null && before.getFileAttributes() != null && before.getFileAttributes().isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
         FileMode afterMode = after != null && after.getFileAttributes() != null && after.getFileAttributes().isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
 
+        Set<Recipe> recipeSet = new HashSet<>(recipes.size());
+        for (List<Recipe> rs : recipes) {
+            if (!rs.isEmpty()) {
+                recipeSet.add(rs.get(0));
+            }
+        }
+
         try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
                 beforePath,
                 afterPath,
                 relativeTo,
                 before == null ? "" : before.printAll(out),
                 after == null ? "" : after.printAll(out.clone()),
-                recipes.stream().map(Stack::peek).collect(Collectors.toSet()),
+                recipeSet,
                 beforeMode,
                 afterMode
         )) {
-            this.relativeTo = relativeTo;
             return diffEntry.getDiff(ignoreAllWhitespace);
         }
     }

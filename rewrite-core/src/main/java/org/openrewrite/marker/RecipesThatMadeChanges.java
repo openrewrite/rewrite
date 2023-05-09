@@ -30,10 +30,10 @@ public class RecipesThatMadeChanges implements Marker {
     @EqualsAndHashCode.Include
     UUID id;
 
-    Collection<Stack<Recipe>> recipes;
+    Collection<List<Recipe>> recipes;
 
-    public static RecipesThatMadeChanges create(Stack<Recipe> recipeStack) {
-        List<Stack<Recipe>> recipeStackList = new ArrayList<>(1);
+    public static RecipesThatMadeChanges create(List<Recipe> recipeStack) {
+        List<List<Recipe>> recipeStackList = new ArrayList<>(1);
         recipeStackList.add(recipeStack);
         return new RecipesThatMadeChanges(Tree.randomId(), recipeStackList);
     }

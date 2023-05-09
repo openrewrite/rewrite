@@ -87,7 +87,7 @@ class JavaVisitorTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .executionContext(new InMemoryExecutionContext())
-            .afterRecipe(run -> assertThat(run.getResults().get(0).getRecipeErrors())
+            .afterRecipe(run -> assertThat(run.getChangeset().getAllResults().get(0).getRecipeErrors())
               .singleElement()
               .satisfies(t -> assertThat(t.getMessage()).containsSubsequence("A.java", "A", "allTheThings"))
             )

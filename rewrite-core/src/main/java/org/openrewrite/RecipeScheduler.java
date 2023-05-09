@@ -18,7 +18,6 @@ package org.openrewrite;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.FindRecipeRunException;
 import org.openrewrite.internal.RecipeRunException;
@@ -28,7 +27,6 @@ import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SourcesFileErrors;
-import org.openrewrite.table.SourcesFileResults;
 
 import java.time.Duration;
 import java.util.*;
@@ -38,19 +36,18 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Recipe.PANIC;
-import static org.openrewrite.RecipeSchedulerUtils.addEditResults;
 import static org.openrewrite.RecipeSchedulerUtils.addRecipesThatMadeChanges;
 
 public interface RecipeScheduler {
 
-    default void afterCycle(LargeIterable<SourceFile> before, LargeIterable<SourceFile> after) {
+    default void afterCycle(SourceSet sourceSet) {
     }
 
     default RecipeRun scheduleRun(Recipe recipe,
-                                  LargeIterable<? extends SourceFile> before,
+                                  SourceSet sourceSet,
                                   ExecutionContext ctx,
                                   int maxCycles,
                                   int minCycles) {
@@ -60,9 +57,8 @@ public interface RecipeScheduler {
         RecipeRunStats recipeRunStats = new RecipeRunStats(Recipe.noop());
         SourcesFileErrors errorsTable = new SourcesFileErrors(Recipe.noop());
 
-        //noinspection unchecked
-        LargeIterable<SourceFile> acc = (LargeIterable<SourceFile>) before;
-        LargeIterable<SourceFile> after = acc;
+        SourceSet acc = sourceSet;
+        SourceSet after = acc;
 
         for (int i = 1; i <= maxCycles; i++) {
             // this root cursor is shared by all `TreeVisitor` instances used created from `getVisitor` and
@@ -71,7 +67,7 @@ public interface RecipeScheduler {
             Cursor rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
 
             RecipeRunCycle cycle = new RecipeRunCycle(this, recipe, rootCursor, ctxWithWatch,
-                    results, recipeRunStats, errorsTable);
+                    recipeRunStats, errorsTable);
 
             // pre-transformation scanning phase where there can only be modifications to capture exceptions
             // occurring during the scanning phase
@@ -86,13 +82,13 @@ public interface RecipeScheduler {
                 break;
             }
 
-            afterCycle(acc, after);
+            afterCycle(sourceSet);
             acc = after;
             ctxWithWatch.resetHasNewMessages();
         }
 
         return new RecipeRun(
-                addEditResults(before, after, results, ctx),
+                after.getChangeset(),
                 ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap())
         );
     }
@@ -107,14 +103,13 @@ class RecipeRunCycle {
     Recipe recipe;
     Cursor rootCursor;
     ExecutionContext ctx;
-    List<Result> results;
     RecipeRunStats recipeRunStats;
     SourcesFileErrors errorsTable;
 
     long cycleStartTime = System.nanoTime();
     AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean();
 
-    public LargeIterable<SourceFile> scanSources(LargeIterable<SourceFile> before, int cycle) {
+    public SourceSet scanSources(SourceSet before, int cycle) {
         return mapForRecipeRecursivelyIfAllSourceApplicable(before, (recipeStack, sourceFile) -> {
             Recipe recipe = recipeStack.peek();
             if (recipe.maxCycles() < cycle || !recipe.validate(ctx).isValid()) {
@@ -128,7 +123,7 @@ class RecipeRunCycle {
                     //noinspection unchecked
                     ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
                     Object acc = scanningRecipe.getAccumulator(rootCursor);
-                    after = recipeRunStats.recordScan(recipe, () -> {
+                    recipeRunStats.recordScan(recipe, () -> {
                         TreeVisitor<?, ExecutionContext> scanner = scanningRecipe.getScanner(acc);
                         if (scanner.isAcceptable(sourceFile, ctx)) {
                             scanner.visit(sourceFile, ctx);
@@ -143,9 +138,9 @@ class RecipeRunCycle {
         });
     }
 
-    public LargeIterable<SourceFile> generateSources(LargeIterable<SourceFile> before, int cycle) {
+    public SourceSet generateSources(SourceSet before, int cycle) {
         Stack<Stack<Recipe>> allRecipesStack = initRecipeStack();
-        LargeIterable<SourceFile> acc = before;
+        SourceSet acc = before;
         while (!allRecipesStack.isEmpty()) {
             Stack<Recipe> recipeStack = allRecipesStack.pop();
             Recipe recipe = recipeStack.peek();
@@ -159,7 +154,6 @@ class RecipeRunCycle {
                 Collection<? extends SourceFile> generated = scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor), ctx);
                 for (SourceFile g : generated) {
                     addRecipesThatMadeChanges(recipeStack, g);
-                    results.add(new Result(null, g, singletonList(recipeStack)));
                 }
                 acc = acc.concatAll(generated);
             }
@@ -169,7 +163,7 @@ class RecipeRunCycle {
         return acc;
     }
 
-    public LargeIterable<SourceFile> editSources(LargeIterable<SourceFile> before, int cycle) {
+    public SourceSet editSources(SourceSet before, int cycle) {
         return mapForRecipeRecursivelyIfAllSourceApplicable(before, (recipeStack, sourceFile) -> {
             Recipe recipe = recipeStack.peek();
             if (recipe.maxCycles() < cycle || !recipe.validate(ctx).isValid()) {
@@ -205,7 +199,7 @@ class RecipeRunCycle {
 
                 if (after == null) {
                     if (!sourceFile.getMarkers().findFirst(Generated.class).isPresent()) {
-                        results.add(new Result(sourceFile, null, singleton(recipeStack)));
+                        before.onDelete(sourceFile, recipeStack);
                     }
                 }
             } catch (Throwable t) {
@@ -239,7 +233,7 @@ class RecipeRunCycle {
         return after;
     }
 
-    private LargeIterable<SourceFile> mapForRecipeRecursivelyIfAllSourceApplicable(LargeIterable<SourceFile> before, BiFunction<Stack<Recipe>, SourceFile, SourceFile> mapFn) {
+    private SourceSet mapForRecipeRecursivelyIfAllSourceApplicable(SourceSet before, BiFunction<Stack<Recipe>, SourceFile, SourceFile> mapFn) {
         return mapAsync(before, sourceFile -> {
             Stack<Stack<Recipe>> allRecipesStack = initRecipeStack();
 
@@ -254,7 +248,7 @@ class RecipeRunCycle {
         });
     }
 
-    private LargeIterable<SourceFile> mapAsync(LargeIterable<SourceFile> before, UnaryOperator<SourceFile> mapFn) {
+    private SourceSet mapAsync(SourceSet before, UnaryOperator<SourceFile> mapFn) {
         List<CompletableFuture<? extends SourceFile>> futures = new ArrayList<>();
 
         for (SourceFile sourceFile : before) {
@@ -291,65 +285,7 @@ class RecipeRunCycle {
 }
 
 class RecipeSchedulerUtils {
-    static List<Result> addEditResults(LargeIterable<? extends SourceFile> before,
-                                       LargeIterable<SourceFile> after,
-                                       List<Result> results,
-                                       ExecutionContext ctx) {
-        Map<UUID, SourceFile> sourceFileIdentities = new HashMap<>();
-        for (SourceFile sourceFile : before) {
-            sourceFileIdentities.put(sourceFile.getId(), sourceFile);
-        }
-
-        // added or changed files
-        for (SourceFile s : after) {
-            SourceFile original = sourceFileIdentities.get(s.getId());
-            if (original != s) {
-                if (original != null) {
-                    if (original.getMarkers().findFirst(Generated.class).isPresent()) {
-                        continue;
-                    }
-
-                    results.add(new Result(
-                            original,
-                            s,
-                            s.getMarkers()
-                                    .findFirst(RecipesThatMadeChanges.class)
-                                    .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe " +
-                                                                                 "reported making a change"))
-                                    .getRecipes()
-                    ));
-                }
-            }
-        }
-
-        SourcesFileResults resultsTable = new SourcesFileResults(Recipe.noop());
-        for (Result result : results) {
-            Stack<RecipeDescriptor[]> recipeStack = new Stack<>();
-
-            for (RecipeDescriptor rd : result.getRecipeDescriptorsThatMadeChanges()) {
-                recipeStack.push(new RecipeDescriptor[]{null, rd});
-            }
-
-            while (!recipeStack.isEmpty()) {
-                RecipeDescriptor[] recipeThatMadeChange = recipeStack.pop();
-
-                resultsTable.insertRow(ctx, new SourcesFileResults.Row(
-                        result.getBefore() == null ? "" : result.getBefore().getSourcePath().toString(),
-                        result.getAfter() == null ? "" : result.getAfter().getSourcePath().toString(),
-                        recipeThatMadeChange[0] == null ? "" : recipeThatMadeChange[0].getName(),
-                        recipeThatMadeChange[1].getName(),
-                        result.getTimeSavings() == null ? 0 : result.getTimeSavings().getSeconds()
-                ));
-                for (int i = recipeThatMadeChange[1].getRecipeList().size() - 1; i >= 0; i--) {
-                    RecipeDescriptor rd = recipeThatMadeChange[1].getRecipeList().get(i);
-                    recipeStack.push(new RecipeDescriptor[]{recipeThatMadeChange[1], rd});
-                }
-            }
-        }
-        return results;
-    }
-
-    public static <S extends SourceFile> S addRecipesThatMadeChanges(Stack<Recipe> recipeStack, S afterFile) {
+    public static <S extends SourceFile> S addRecipesThatMadeChanges(List<Recipe> recipeStack, S afterFile) {
         return afterFile.withMarkers(afterFile.getMarkers().computeByType(
                 RecipesThatMadeChanges.create(recipeStack),
                 (r1, r2) -> {

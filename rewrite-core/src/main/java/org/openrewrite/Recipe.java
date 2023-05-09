@@ -43,7 +43,7 @@ import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
 
 /**
- * Provides a formalized link list data structure of {@link Recipe recipes} and a {@link Recipe#run(LargeIterable, ExecutionContext)} method which will
+ * Provides a formalized link list data structure of {@link Recipe recipes} and a {@link Recipe#run(SourceSet, ExecutionContext)} method which will
  * apply each recipes {@link TreeVisitor visitor} visit method to a list of {@link SourceFile sourceFiles}
  * <p>
  * Requires a name, {@link TreeVisitor visitor}.
@@ -281,15 +281,15 @@ public abstract class Recipe implements Cloneable {
         dataTables.add(dataTableDescriptorFromDataTable(dataTable));
     }
 
-    public final RecipeRun run(LargeIterable<? extends SourceFile> before, ExecutionContext ctx) {
+    public final RecipeRun run(SourceSet before, ExecutionContext ctx) {
         return run(before, ctx, 3);
     }
 
-    public final RecipeRun run(LargeIterable<? extends SourceFile> before, ExecutionContext ctx, int maxCycles) {
+    public final RecipeRun run(SourceSet before, ExecutionContext ctx, int maxCycles) {
         return run(before, ctx, ForkJoinScheduler.common(), maxCycles, 1);
     }
 
-    public final RecipeRun run(LargeIterable<? extends SourceFile> before,
+    public final RecipeRun run(SourceSet before,
                                ExecutionContext ctx,
                                RecipeScheduler recipeScheduler,
                                int maxCycles,

@@ -17,7 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
-import org.openrewrite.internal.InMemoryLargeIterable;
+import org.openrewrite.internal.InMemorySourceSet;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.Marker;
@@ -67,8 +67,8 @@ class UpdateSourcePositionsTest {
             }
             """
         ).collect(Collectors.toList());
-        Result res = new UpdateSourcePositions().run(new InMemoryLargeIterable<>(cus), new InMemoryExecutionContext()).getResults().get(0);
-        assertThat(printWithLines(res.getAfter())).isEqualTo(
+        Result result = new UpdateSourcePositions().run(new InMemorySourceSet(cus), new InMemoryExecutionContext()).getChangeset().getAllResults().get(0);
+        assertThat(printWithLines(result.getAfter())).isEqualTo(
           """
             package [(1, 8), (1, 11)]org.[(1, 12), (1, 16)]test;
                         
@@ -98,8 +98,8 @@ class UpdateSourcePositionsTest {
             }
             """
         ).collect(Collectors.toList());
-        Result res = new UpdateSourcePositions().run(new InMemoryLargeIterable<>(cus), new InMemoryExecutionContext()).getResults().get(0);
-        assertThat(printWithLines(res.getAfter())).isEqualTo(
+        Result result = new UpdateSourcePositions().run(new InMemorySourceSet(cus), new InMemoryExecutionContext()).getChangeset().getAllResults().get(0);
+        assertThat(printWithLines(result.getAfter())).isEqualTo(
           """
             class[(1, 6), (1, 10)] Test {
                 int [(2, 9), (2, 10)]n;

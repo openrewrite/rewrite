@@ -16,8 +16,8 @@
 package org.openrewrite.test;
 
 import lombok.RequiredArgsConstructor;
-import org.openrewrite.LargeIterable;
 import org.openrewrite.SourceFile;
+import org.openrewrite.SourceSet;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.scheduling.DirectScheduler;
 
@@ -32,17 +32,17 @@ class RecipeSchedulerCheckingExpectedCycles extends DirectScheduler {
     private int cyclesThatResultedInChanges = 0;
 
     @Override
-    public void afterCycle(LargeIterable<SourceFile> before, LargeIterable<SourceFile> after) {
-        if (after != before) {
+    public void afterCycle(SourceSet sourceSet) {
+        if (sourceSet != sourceSet.getInitialState()) {
             cyclesThatResultedInChanges++;
             if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges) {
 
-                Iterator<SourceFile> afterIter = after.iterator();
+                Iterator<SourceFile> afterIter = sourceSet.iterator();
                 if (!afterIter.hasNext()) {
                     return;
                 }
 
-                for (SourceFile b : before) {
+                for (SourceFile b : sourceSet.getInitialState()) {
                     SourceFile a = afterIter.next();
                     if (!(a instanceof Quark)) {
                         assertThat(a.printAllTrimmed())

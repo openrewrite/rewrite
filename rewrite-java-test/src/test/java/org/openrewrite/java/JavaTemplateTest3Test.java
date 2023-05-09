@@ -83,7 +83,7 @@ class JavaTemplateTest3Test implements RewriteTest {
                   return super.visitMethodDeclaration(method, p);
               }
           })).afterRecipe(run -> {
-              J.CompilationUnit cu = (J.CompilationUnit) run.getResults().get(0).getAfter();
+              J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
               var methodType = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
               assertThat(methodType.getReturnType()).isEqualTo(JavaType.Primitive.Int);
               assertThat(methodType.getParameterTypes()).containsExactly(JavaType.Primitive.Int);

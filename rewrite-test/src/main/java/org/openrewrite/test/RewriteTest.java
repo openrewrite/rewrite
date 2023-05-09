@@ -20,7 +20,7 @@ import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
-import org.openrewrite.internal.InMemoryLargeIterable;
+import org.openrewrite.internal.InMemorySourceSet;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
@@ -315,7 +315,7 @@ public interface RewriteTest extends SourceSpecs {
         }
 
         RecipeRun recipeRun = recipe.run(
-                new InMemoryLargeIterable<>(runnableSourceFiles),
+                new InMemorySourceSet(runnableSourceFiles),
                 recipeExecutionContext,
                 recipeSchedulerCheckingExpectedCycles,
                 cycles,
@@ -348,7 +348,7 @@ public interface RewriteTest extends SourceSpecs {
             if (sourceSpec.getSourcePath() != null) {
                 // If sourceSpec defines a source path, enforce there is a result that has the same source path and
                 // the contents match the expected value.
-                for (Result result : recipeRun.getResults()) {
+                for (Result result : recipeRun.getChangeset().getAllResults()) {
 
                     if (result.getAfter() != null && sourceSpec.getSourcePath().equals(result.getAfter().getSourcePath())) {
                         expectedNewSources.remove(sourceSpec);
@@ -370,7 +370,7 @@ public interface RewriteTest extends SourceSpecs {
 
             // If the source spec has not defined a source path, look for a result with the exact contents. This logic
             // first looks for non-remote results.
-            for (Result result : recipeRun.getResults()) {
+            for (Result result : recipeRun.getChangeset().getAllResults()) {
                 if (result.getAfter() != null && !(result.getAfter() instanceof Remote)) {
                     assertThat(sourceSpec.after).as("Either before or after must be specified in a SourceSpec").isNotNull();
                     String actual = result.getAfter().printAll(out.clone()).trim();
@@ -390,7 +390,7 @@ public interface RewriteTest extends SourceSpecs {
             }
 
             // we tried to avoid it, and now we'll try to match against remotes...
-            for (Result result : recipeRun.getResults()) {
+            for (Result result : recipeRun.getChangeset().getAllResults()) {
                 if (result.getAfter() instanceof Remote) {
                     assertThat(sourceSpec.after).as("Either before or after must be specified in a SourceSpec").isNotNull();
                     String actual = result.getAfter().printAll(out.clone());
@@ -412,7 +412,7 @@ public interface RewriteTest extends SourceSpecs {
         nextSourceFile:
         for (Map.Entry<SourceFile, SourceSpec<?>> specForSourceFile : specBySourceFile.entrySet()) {
             SourceSpec<?> sourceSpec = specForSourceFile.getValue();
-            for (Result result : recipeRun.getResults()) {
+            for (Result result : recipeRun.getChangeset().getAllResults()) {
                 if (result.getBefore() == specForSourceFile.getKey()) {
                     if (result.getAfter() != null) {
                         String expectedAfter = sourceSpec.after == null ? null :
@@ -431,7 +431,7 @@ public interface RewriteTest extends SourceSpecs {
                             }
 
                             assert result.getBefore() != null;
-                            if(isRemote) {
+                            if (isRemote) {
                                 // TODO: Verify that the remote URI is correct
                             } else {
                                 assertThat(result.getAfter().printAll(out.clone()))

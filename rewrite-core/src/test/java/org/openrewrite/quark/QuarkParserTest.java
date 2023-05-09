@@ -84,7 +84,7 @@ class QuarkParserTest implements RewriteTest {
               }))
               .afterRecipe(run -> {
                   try {
-                      for (Result result : run.getResults()) {
+                      for (Result result : run.getChangeset().getAllResults()) {
                           try (var git = Git.init().setDirectory(tempDir.toFile()).call()) {
                               git.apply().setPatch(new ByteArrayInputStream(result.diff().getBytes())).call();
                           }

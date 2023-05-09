@@ -410,7 +410,7 @@ class JavaTemplateTest implements RewriteTest {
                       assertThat(type.getTypeParameters().get(0)).isInstanceOf(JavaType.GenericTypeVariable.class);
                       return method;
                   }
-              }.visit(run.getResults().get(0).getAfter(), 0);
+              }.visit(run.getChangeset().getAllResults().get(0).getAfter(), 0);
           }),
           java(
             """
@@ -462,7 +462,7 @@ class JavaTemplateTest implements RewriteTest {
                         .get(0)).isInstanceOf(JavaType.GenericTypeVariable.class);
                       return method;
                   }
-              }.visit(run.getResults().get(0).getAfter(), 0);
+              }.visit(run.getChangeset().getAllResults().get(0).getAfter(), 0);
           }),
           java(
             """

@@ -46,7 +46,7 @@ import static org.openrewrite.test.SourceSpecs.other;
 class AddGradleWrapperTest implements RewriteTest {
 
     private <S extends SourceFile> S result(RecipeRun run, Class<S> clazz, String endsWith) {
-        return run.getResults().stream()
+        return run.getChangeset().getAllResults().stream()
           .map(Result::getAfter)
           .filter(Objects::nonNull)
           .filter(r -> r.getSourcePath().endsWith(endsWith))
@@ -195,7 +195,7 @@ class AddGradleWrapperTest implements RewriteTest {
                   ),
                   "org.openrewrite.test.AddGradleWrapper"
                 )
-                .afterRecipe(run -> assertThat(run.getResults()).isNotEmpty())
+                .afterRecipe(run -> assertThat(run.getChangeset().getAllResults()).isNotEmpty())
                 .expectedCyclesThatMakeChanges(1),
               other("pretend this is a kotlin build file", spec -> spec.path("build.gradle.kts"))
             );
@@ -205,7 +205,7 @@ class AddGradleWrapperTest implements RewriteTest {
     @Test
     void dontAddWrapperToMavenProject() {
         rewriteRun(
-          spec -> spec.afterRecipe(run -> assertThat(run.getResults()).isEmpty()),
+          spec -> spec.afterRecipe(run -> assertThat(run.getChangeset().getAllResults()).isEmpty()),
           pomXml(
             """
               <project>

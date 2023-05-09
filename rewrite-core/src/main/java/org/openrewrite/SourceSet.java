@@ -18,6 +18,7 @@ package org.openrewrite;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 
@@ -27,10 +28,12 @@ import java.util.function.UnaryOperator;
  * filtering and mapping that are optimized for large data sets.
  * <br/>
  * Ordering is not guaranteed.
- *
- * @param <T> The type of the elements in the iterable.
+ * <br/>
+ * A large iterable must always track of its initial state to be
+ * able to produce {@link #getChangeset()} from that initial state
+ * through any number of transformations to some end state.
  */
-public interface LargeIterable<T> extends Iterable<T> {
+public interface SourceSet extends Iterable<SourceFile> {
 
     /**
      * Execute a transformation on all items. This causes the iterable to be iterated and a new
@@ -39,18 +42,7 @@ public interface LargeIterable<T> extends Iterable<T> {
      * @param map A transformation on T
      * @return A new iterable if the map function results in any changes, otherwise this iterable is returned.
      */
-    LargeIterable<T> map(BiFunction<Integer, T, T> map);
-
-    /**
-     * Execute a transformation on all items. This causes the iterable to be iterated and a new
-     * iterable returned if any changes are made.
-     *
-     * @param map A transformation on T
-     * @return A new iterable if the map function results in any changes, otherwise this iterable is returned.
-     */
-    default LargeIterable<T> map(UnaryOperator<T> map) {
-        return map((i, t) -> map.apply(t));
-    }
+    SourceSet map(UnaryOperator<SourceFile> map);
 
     /**
      * Execute a transformation on all items. This causes the iterable to be iterated and a new
@@ -59,23 +51,42 @@ public interface LargeIterable<T> extends Iterable<T> {
      * @param flatMap A transformation on T that may return [0..N] items for each original item in the iterable.
      * @return A new iterable if the map function results in any changes, otherwise this iterable is returned.
      */
-    LargeIterable<T> flatMap(BiFunction<Integer, T, Object> flatMap);
+    SourceSet flatMap(BiFunction<Integer, SourceFile, Object> flatMap);
 
     /**
      * Concatenate a new item. Where possible, implementations should not iterate the entire iterable in order
-     * to accomplish this, since the ordering of a {@link LargeIterable} is not significant.
+     * to accomplish this, since the ordering of a {@link SourceSet} is not significant.
      *
      * @param t The new item to insert
      * @return A new iterable with the new item inserted.
      */
-    LargeIterable<T> concat(@Nullable T t);
+    SourceSet concat(@Nullable SourceFile sourceFile);
 
     /**
      * Concatenate new items. Where possible, implementations should not iterate the entire iterable in order
-     * to accomplish this, since the ordering of a {@link LargeIterable} is not significant.
+     * to accomplish this, since the ordering of a {@link SourceFile} is not significant.
      *
      * @param ls The new item to insert
      * @return A new iterable with the new item inserted.
      */
-    LargeIterable<T> concatAll(@Nullable Collection<? extends T> ls);
+    SourceSet concatAll(@Nullable Collection<? extends SourceFile> ls);
+
+    /**
+     * @return The initial state of the first incarnation of this large iterable.
+     * It may have passed through one or several transformations in the meantime.
+     */
+    SourceSet getInitialState();
+
+    /**
+     * @return The set of changes (encompassing adds, edits, and deletions)
+     * to the initial state.
+     */
+    Changeset getChangeset();
+
+    /**
+     * Called when a source file is deleted from the source set.
+     *
+     * @param sourceFile The source file that is deleted.
+     */
+    void onDelete(SourceFile sourceFile, List<Recipe> recipeStack);
 }

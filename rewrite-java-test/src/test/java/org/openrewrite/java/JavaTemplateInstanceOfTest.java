@@ -66,7 +66,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
           }))
           // custom missing type validation
           .typeValidationOptions(TypeValidation.none())
-          .afterRecipe(run -> run.getResults().forEach(r -> assertTypeAttribution((J) r.getAfter())));
+          .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> assertTypeAttribution((J) r.getAfter())));
     }
 
     @SuppressWarnings({"PointlessBooleanExpression", "IfStatementWithIdenticalBranches"})

@@ -18,7 +18,7 @@ package org.openrewrite;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.config.RecipeDescriptor;
-import org.openrewrite.internal.InMemoryLargeIterable;
+import org.openrewrite.internal.InMemorySourceSet;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RewriteTest;
@@ -65,7 +65,7 @@ class RecipeLifecycleTest implements RewriteTest {
               .withGenerator(() -> List.of(PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build()))
               .withName("test.GeneratingRecipe")
             )
-            .afterRecipe(run -> assertThat(run.getResults().stream()
+            .afterRecipe(run -> assertThat(run.getChangeset().getAllResults().stream()
               .map(r -> r.getRecipeDescriptorsThatMadeChanges().get(0).getName()))
               .containsOnly("test.GeneratingRecipe"))
             .cycles(1).expectedCyclesThatMakeChanges(1),
@@ -75,7 +75,7 @@ class RecipeLifecycleTest implements RewriteTest {
 
     @Test
     void deleteFile() {
-        var results = new Recipe() {
+        var changes = new Recipe() {
             @Override
             public String getName() {
                 return "test.DeletingRecipe";
@@ -96,11 +96,11 @@ class RecipeLifecycleTest implements RewriteTest {
                 };
             }
         }.run(
-          new InMemoryLargeIterable<>(List.of(PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build())),
+          new InMemorySourceSet(List.of(PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build())),
           new InMemoryExecutionContext()
-        ).getResults();
+        ).getChangeset().getAllResults();
 
-        assertThat(results.stream().map(r -> r.getRecipeDescriptorsThatMadeChanges().get(0).getName()))
+        assertThat(changes.stream().map(r -> r.getRecipeDescriptorsThatMadeChanges().get(0).getName()))
           .containsExactly("test.DeletingRecipe");
     }
 
@@ -239,9 +239,9 @@ class RecipeLifecycleTest implements RewriteTest {
             .recipes(testRecipe("Change1"), noop(), testRecipe("Change2"))
             .validateRecipeSerialization(false)
             .afterRecipe(run -> {
-                var results = run.getResults();
-                assertThat(results).hasSize(1);
-                assertThat(results.get(0).getRecipeDescriptorsThatMadeChanges().stream().map(RecipeDescriptor::getName))
+                var changes = run.getChangeset().getAllResults();
+                assertThat(changes).hasSize(1);
+                assertThat(changes.get(0).getRecipeDescriptorsThatMadeChanges().stream().map(RecipeDescriptor::getName))
                   .containsExactlyInAnyOrder("Change1", "Change2");
             })
             .cycles(1).expectedCyclesThatMakeChanges(1),
