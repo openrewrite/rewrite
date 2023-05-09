@@ -180,7 +180,7 @@ public class YamlResourceLoader implements ResourceLoader {
                 }
             }
         } catch (Exception e) {
-            logger.error("Loading yaml {} type failed, yaml source: {}", resourceType, yamlSource);
+            logger.error("Loading yaml {} type failed, yaml source: {}", resourceType, yamlSource, e);
         }
         return resources;
     }
