@@ -54,7 +54,6 @@ import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescrip
  * <p>
  * returns a list of {@link Result results} for each modified {@link SourceFile}
  */
-@PolyglotExport(typeScript = "Recipe", llvm = "Recipe")
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 public abstract class Recipe implements Cloneable {
     public static final String PANIC = "__AHHH_PANIC!!!__";

@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 @NonNullApi
-package org.openrewrite.quark;
+@NonNullFields
+package org.openrewrite.yaml.style;
 
 import org.openrewrite.internal.lang.NonNullApi;
+import org.openrewrite.internal.lang.NonNullFields;
