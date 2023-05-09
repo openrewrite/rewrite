@@ -68,13 +68,10 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
 
     @Override
     public LargeSourceSet concatAll(@Nullable Collection<? extends SourceFile> t) {
-        if (ls == null && t == null) {
-            //noinspection ConstantConditions
-            return null;
-        } else if (t == null || t.isEmpty()) {
+        if (t == null || t.isEmpty()) {
             //noinspection ConstantConditions
             return this;
-        } else if (ls == null || ls.isEmpty()) {
+        } else if (ls.isEmpty()) {
             //noinspection unchecked
             return new InMemoryLargeSourceSet(initialState, deletions, (List<SourceFile>) t);
         }
