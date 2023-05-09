@@ -17,7 +17,7 @@ package org.openrewrite.config;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
-import org.openrewrite.internal.InMemorySourceSet;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 
@@ -90,7 +90,7 @@ class EnvironmentTest implements RewriteTest {
         var recipe = env.activateRecipes("test.ChangeTextToHello");
         assertThat(recipe.validateAll()).allMatch(Validated::isValid);
 
-        var changes = recipe.run(new InMemorySourceSet(List.of(
+        var changes = recipe.run(new InMemoryLargeSourceSet(List.of(
             PlainText.builder()
               .sourcePath(Paths.get("test.txt"))
               .text("hello")
@@ -156,7 +156,7 @@ class EnvironmentTest implements RewriteTest {
         var recipe = env.activateRecipes("test.TextMigration");
         assertThat(recipe.validateAll()).allMatch(Validated::isValid);
 
-        var changes = recipe.run(new InMemorySourceSet(List.of(
+        var changes = recipe.run(new InMemoryLargeSourceSet(List.of(
             PlainText.builder()
               .sourcePath(Paths.get("test.txt"))
               .text("hello")
@@ -205,7 +205,7 @@ class EnvironmentTest implements RewriteTest {
         var recipe = env.activateRecipes("test.TextMigration");
         assertThat(recipe.validateAll()).allMatch(Validated::isValid);
 
-        var changes = recipe.run(new InMemorySourceSet(List.of(
+        var changes = recipe.run(new InMemoryLargeSourceSet(List.of(
             PlainText.builder()
               .sourcePath(Paths.get("test.txt"))
               .text("hello")

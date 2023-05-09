@@ -22,7 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
-import org.openrewrite.internal.InMemorySourceSet;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
@@ -317,7 +317,7 @@ public interface RewriteTest extends SourceSpecs {
         }
 
         RecipeRun recipeRun = recipe.run(
-                new InMemorySourceSet(runnableSourceFiles),
+                new InMemoryLargeSourceSet(runnableSourceFiles),
                 recipeExecutionContext,
                 recipeSchedulerCheckingExpectedCycles,
                 cycles,

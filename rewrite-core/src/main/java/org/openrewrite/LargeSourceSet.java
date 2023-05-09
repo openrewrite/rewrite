@@ -23,59 +23,58 @@ import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 
 /**
- * A large iterable is an iterable that may be too large
- * to be materialized in memory. It contains operations for
- * filtering and mapping that are optimized for large data sets.
+ * A source set that may be too large to be materialized in memory.
+ * It contains operations for filtering and mapping that are optimized
+ * for large repositories, though the same operations work on small repositories.
  * <br/>
  * Ordering is not guaranteed.
  * <br/>
- * A large iterable must always track of its initial state to be
+ * A large source set must always track of its initial state to be
  * able to produce {@link #getChangeset()} from that initial state
  * through any number of transformations to some end state.
  */
-public interface SourceSet extends Iterable<SourceFile> {
+public interface LargeSourceSet extends Iterable<SourceFile> {
 
     /**
      * Execute a transformation on all items. This causes the iterable to be iterated and a new
      * iterable returned if any changes are made.
      *
      * @param map A transformation on T
-     * @return A new iterable if the map function results in any changes, otherwise this iterable is returned.
+     * @return A new source set if the map function results in any changes, otherwise this source set is returned.
      */
-    SourceSet map(UnaryOperator<SourceFile> map);
+    LargeSourceSet map(UnaryOperator<SourceFile> map);
 
     /**
      * Execute a transformation on all items. This causes the iterable to be iterated and a new
      * iterable returned if any changes are made.
      *
      * @param flatMap A transformation on T that may return [0..N] items for each original item in the iterable.
-     * @return A new iterable if the map function results in any changes, otherwise this iterable is returned.
+     * @return A new source set if the map function results in any changes, otherwise this source set is returned.
      */
-    SourceSet flatMap(BiFunction<Integer, SourceFile, Object> flatMap);
+    LargeSourceSet flatMap(BiFunction<Integer, SourceFile, Object> flatMap);
 
     /**
      * Concatenate a new item. Where possible, implementations should not iterate the entire iterable in order
-     * to accomplish this, since the ordering of a {@link SourceSet} is not significant.
+     * to accomplish this, since the ordering of a {@link LargeSourceSet} is not significant.
      *
-     * @param t The new item to insert
-     * @return A new iterable with the new item inserted.
+     * @return A new source set with the new item inserted.
      */
-    SourceSet concat(@Nullable SourceFile sourceFile);
+    LargeSourceSet concat(@Nullable SourceFile sourceFile);
 
     /**
      * Concatenate new items. Where possible, implementations should not iterate the entire iterable in order
      * to accomplish this, since the ordering of a {@link SourceFile} is not significant.
      *
      * @param ls The new item to insert
-     * @return A new iterable with the new item inserted.
+     * @return A new source set with the new item inserted.
      */
-    SourceSet concatAll(@Nullable Collection<? extends SourceFile> ls);
+    LargeSourceSet concatAll(@Nullable Collection<? extends SourceFile> ls);
 
     /**
      * @return The initial state of the first incarnation of this large iterable.
      * It may have passed through one or several transformations in the meantime.
      */
-    SourceSet getInitialState();
+    LargeSourceSet getInitialState();
 
     /**
      * @return The set of changes (encompassing adds, edits, and deletions)

@@ -18,7 +18,7 @@ package org.openrewrite;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.config.RecipeDescriptor;
-import org.openrewrite.internal.InMemorySourceSet;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RewriteTest;
@@ -96,7 +96,7 @@ class RecipeLifecycleTest implements RewriteTest {
                 };
             }
         }.run(
-          new InMemorySourceSet(List.of(PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build())),
+          new InMemoryLargeSourceSet(List.of(PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build())),
           new InMemoryExecutionContext()
         ).getChangeset().getAllResults();
 

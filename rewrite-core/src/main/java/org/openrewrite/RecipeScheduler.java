@@ -43,11 +43,11 @@ import static org.openrewrite.RecipeSchedulerUtils.addRecipesThatMadeChanges;
 
 public interface RecipeScheduler {
 
-    default void afterCycle(SourceSet sourceSet) {
+    default void afterCycle(LargeSourceSet sourceSet) {
     }
 
     default RecipeRun scheduleRun(Recipe recipe,
-                                  SourceSet sourceSet,
+                                  LargeSourceSet sourceSet,
                                   ExecutionContext ctx,
                                   int maxCycles,
                                   int minCycles) {
@@ -57,8 +57,8 @@ public interface RecipeScheduler {
         RecipeRunStats recipeRunStats = new RecipeRunStats(Recipe.noop());
         SourcesFileErrors errorsTable = new SourcesFileErrors(Recipe.noop());
 
-        SourceSet acc = sourceSet;
-        SourceSet after = acc;
+        LargeSourceSet acc = sourceSet;
+        LargeSourceSet after = acc;
 
         for (int i = 1; i <= maxCycles; i++) {
             // this root cursor is shared by all `TreeVisitor` instances used created from `getVisitor` and
@@ -109,7 +109,7 @@ class RecipeRunCycle {
     long cycleStartTime = System.nanoTime();
     AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean();
 
-    public SourceSet scanSources(SourceSet before, int cycle) {
+    public LargeSourceSet scanSources(LargeSourceSet before, int cycle) {
         return mapForRecipeRecursivelyIfAllSourceApplicable(before, (recipeStack, sourceFile) -> {
             Recipe recipe = recipeStack.peek();
             if (recipe.maxCycles() < cycle || !recipe.validate(ctx).isValid()) {
@@ -138,9 +138,9 @@ class RecipeRunCycle {
         });
     }
 
-    public SourceSet generateSources(SourceSet before, int cycle) {
+    public LargeSourceSet generateSources(LargeSourceSet before, int cycle) {
         Stack<Stack<Recipe>> allRecipesStack = initRecipeStack();
-        SourceSet acc = before;
+        LargeSourceSet acc = before;
         while (!allRecipesStack.isEmpty()) {
             Stack<Recipe> recipeStack = allRecipesStack.pop();
             Recipe recipe = recipeStack.peek();
@@ -163,7 +163,7 @@ class RecipeRunCycle {
         return acc;
     }
 
-    public SourceSet editSources(SourceSet before, int cycle) {
+    public LargeSourceSet editSources(LargeSourceSet before, int cycle) {
         return mapForRecipeRecursivelyIfAllSourceApplicable(before, (recipeStack, sourceFile) -> {
             Recipe recipe = recipeStack.peek();
             if (recipe.maxCycles() < cycle || !recipe.validate(ctx).isValid()) {
@@ -233,7 +233,7 @@ class RecipeRunCycle {
         return after;
     }
 
-    private SourceSet mapForRecipeRecursivelyIfAllSourceApplicable(SourceSet before, BiFunction<Stack<Recipe>, SourceFile, SourceFile> mapFn) {
+    private LargeSourceSet mapForRecipeRecursivelyIfAllSourceApplicable(LargeSourceSet before, BiFunction<Stack<Recipe>, SourceFile, SourceFile> mapFn) {
         return mapAsync(before, sourceFile -> {
             Stack<Stack<Recipe>> allRecipesStack = initRecipeStack();
 
@@ -248,7 +248,7 @@ class RecipeRunCycle {
         });
     }
 
-    private SourceSet mapAsync(SourceSet before, UnaryOperator<SourceFile> mapFn) {
+    private LargeSourceSet mapAsync(LargeSourceSet before, UnaryOperator<SourceFile> mapFn) {
         List<CompletableFuture<? extends SourceFile>> futures = new ArrayList<>();
 
         for (SourceFile sourceFile : before) {

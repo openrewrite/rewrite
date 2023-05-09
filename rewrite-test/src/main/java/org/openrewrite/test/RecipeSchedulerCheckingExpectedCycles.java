@@ -17,7 +17,7 @@ package org.openrewrite.test;
 
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.SourceFile;
-import org.openrewrite.SourceSet;
+import org.openrewrite.LargeSourceSet;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.scheduling.DirectScheduler;
 
@@ -32,7 +32,7 @@ class RecipeSchedulerCheckingExpectedCycles extends DirectScheduler {
     private int cyclesThatResultedInChanges = 0;
 
     @Override
-    public void afterCycle(SourceSet sourceSet) {
+    public void afterCycle(LargeSourceSet sourceSet) {
         if (sourceSet != sourceSet.getInitialState()) {
             cyclesThatResultedInChanges++;
             if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges) {

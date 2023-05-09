@@ -24,50 +24,50 @@ import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 
-public class InMemorySourceSet implements SourceSet {
+public class InMemoryLargeSourceSet implements LargeSourceSet {
     /**
      * If null, then the initial state is this instance.
      */
     @Nullable
-    private final InMemorySourceSet initialState;
+    private final InMemoryLargeSourceSet initialState;
 
     private final List<SourceFile> ls;
 
     @Nullable
     private Map<SourceFile, List<Recipe>> deletions;
 
-    public InMemorySourceSet(List<SourceFile> ls) {
+    public InMemoryLargeSourceSet(List<SourceFile> ls) {
         this(null, null, ls);
     }
 
-    private InMemorySourceSet(@Nullable InMemorySourceSet initialState,
-                              @Nullable Map<SourceFile, List<Recipe>> deletions,
-                              List<SourceFile> ls) {
+    private InMemoryLargeSourceSet(@Nullable InMemoryLargeSourceSet initialState,
+                                   @Nullable Map<SourceFile, List<Recipe>> deletions,
+                                   List<SourceFile> ls) {
         this.initialState = initialState;
         this.ls = ls;
         this.deletions = deletions;
     }
 
     @Override
-    public SourceSet map(UnaryOperator<SourceFile> map) {
+    public LargeSourceSet map(UnaryOperator<SourceFile> map) {
         List<SourceFile> mapped = ListUtils.map(ls, map);
-        return mapped != ls ? new InMemorySourceSet(initialState, deletions, mapped) : this;
+        return mapped != ls ? new InMemoryLargeSourceSet(initialState, deletions, mapped) : this;
     }
 
     @Override
-    public SourceSet flatMap(BiFunction<Integer, SourceFile, Object> flatMap) {
+    public LargeSourceSet flatMap(BiFunction<Integer, SourceFile, Object> flatMap) {
         List<SourceFile> mapped = ListUtils.flatMap(ls, flatMap);
-        return mapped != ls ? new InMemorySourceSet(initialState, deletions, mapped) : this;
+        return mapped != ls ? new InMemoryLargeSourceSet(initialState, deletions, mapped) : this;
     }
 
     @Override
-    public SourceSet concat(@Nullable SourceFile sourceFile) {
+    public LargeSourceSet concat(@Nullable SourceFile sourceFile) {
         List<SourceFile> mapped = ListUtils.concat(ls, sourceFile);
-        return mapped != ls ? new InMemorySourceSet(initialState, deletions, mapped) : this;
+        return mapped != ls ? new InMemoryLargeSourceSet(initialState, deletions, mapped) : this;
     }
 
     @Override
-    public SourceSet concatAll(@Nullable Collection<? extends SourceFile> t) {
+    public LargeSourceSet concatAll(@Nullable Collection<? extends SourceFile> t) {
         if (ls == null && t == null) {
             //noinspection ConstantConditions
             return null;
@@ -76,12 +76,12 @@ public class InMemorySourceSet implements SourceSet {
             return this;
         } else if (ls == null || ls.isEmpty()) {
             //noinspection unchecked
-            return new InMemorySourceSet(initialState, deletions, (List<SourceFile>) t);
+            return new InMemoryLargeSourceSet(initialState, deletions, (List<SourceFile>) t);
         }
 
         List<SourceFile> newLs = new ArrayList<>(ls);
         newLs.addAll(t);
-        return new InMemorySourceSet(initialState, deletions, newLs);
+        return new InMemoryLargeSourceSet(initialState, deletions, newLs);
     }
 
     @Override
@@ -90,7 +90,7 @@ public class InMemorySourceSet implements SourceSet {
     }
 
     @Override
-    public InMemorySourceSet getInitialState() {
+    public InMemoryLargeSourceSet getInitialState() {
         return initialState == null ? this : initialState;
     }
 
