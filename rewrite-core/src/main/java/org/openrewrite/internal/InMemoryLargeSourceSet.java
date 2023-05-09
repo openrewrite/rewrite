@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Generated;
+import org.openrewrite.marker.RecipesThatMadeChanges;
 
 import java.util.*;
 import java.util.function.BiFunction;
@@ -51,19 +52,19 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
     @Override
     public LargeSourceSet map(UnaryOperator<SourceFile> map) {
         List<SourceFile> mapped = ListUtils.map(ls, map);
-        return mapped != ls ? new InMemoryLargeSourceSet(initialState, deletions, mapped) : this;
+        return mapped != ls ? new InMemoryLargeSourceSet(getInitialState(), deletions, mapped) : this;
     }
 
     @Override
     public LargeSourceSet flatMap(BiFunction<Integer, SourceFile, Object> flatMap) {
         List<SourceFile> mapped = ListUtils.flatMap(ls, flatMap);
-        return mapped != ls ? new InMemoryLargeSourceSet(initialState, deletions, mapped) : this;
+        return mapped != ls ? new InMemoryLargeSourceSet(getInitialState(), deletions, mapped) : this;
     }
 
     @Override
     public LargeSourceSet concat(@Nullable SourceFile sourceFile) {
         List<SourceFile> mapped = ListUtils.concat(ls, sourceFile);
-        return mapped != ls ? new InMemoryLargeSourceSet(initialState, deletions, mapped) : this;
+        return mapped != ls ? new InMemoryLargeSourceSet(getInitialState(), deletions, mapped) : this;
     }
 
     @Override
@@ -73,12 +74,12 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
             return this;
         } else if (ls.isEmpty()) {
             //noinspection unchecked
-            return new InMemoryLargeSourceSet(initialState, deletions, (List<SourceFile>) t);
+            return new InMemoryLargeSourceSet(getInitialState(), deletions, (List<SourceFile>) t);
         }
 
         List<SourceFile> newLs = new ArrayList<>(ls);
         newLs.addAll(t);
-        return new InMemoryLargeSourceSet(initialState, deletions, newLs);
+        return new InMemoryLargeSourceSet(getInitialState(), deletions, newLs);
     }
 
     @Override
@@ -109,7 +110,16 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
                         continue;
                     }
                     changes.add(new Result(original, s));
+                } else {
+                    Collection<List<Recipe>> recipes = s.getMarkers().findFirst(RecipesThatMadeChanges.class).map(RecipesThatMadeChanges::getRecipes).orElse(Collections.emptyList());
+                    changes.add(new Result(null, s, recipes));
                 }
+            }
+        }
+
+        if (deletions != null) {
+            for (Map.Entry<SourceFile, List<Recipe>> entry : deletions.entrySet()) {
+                changes.add(new Result(entry.getKey(), null, Collections.singleton(entry.getValue())));
             }
         }
 

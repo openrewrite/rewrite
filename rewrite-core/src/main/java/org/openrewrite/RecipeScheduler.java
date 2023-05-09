@@ -82,7 +82,7 @@ public interface RecipeScheduler {
                 break;
             }
 
-            afterCycle(sourceSet);
+            afterCycle(after);
             acc = after;
             ctxWithWatch.resetHasNewMessages();
         }
@@ -151,10 +151,8 @@ class RecipeRunCycle {
             if (recipe instanceof ScanningRecipe) {
                 //noinspection unchecked
                 ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
-                Collection<? extends SourceFile> generated = scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor), ctx);
-                for (SourceFile g : generated) {
-                    addRecipesThatMadeChanges(recipeStack, g);
-                }
+                List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor), ctx));
+                generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
                 acc = acc.concatAll(generated);
             }
             recurseRecipeList(allRecipesStack, recipeStack);
