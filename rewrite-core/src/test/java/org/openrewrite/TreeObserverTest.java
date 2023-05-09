@@ -29,7 +29,7 @@ import static org.openrewrite.test.SourceSpecs.text;
 
 class TreeObserverTest implements RewriteTest {
 
-    @DocumentExample
+    @DocumentExample("Observer Property Change in a tree.")
     @Test
     void observePropertyChange() {
         var observed = new AtomicInteger(0);
