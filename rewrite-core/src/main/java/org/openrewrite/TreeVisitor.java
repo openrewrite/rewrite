@@ -427,7 +427,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
     /**
      * Can be used in {@link TreeVisitor#preVisit(Tree, Object)} to prevent a call
      * to {@link TreeVisitor#visit(Tree, Object)} and {@link TreeVisitor#postVisit(Tree, Object)}, therefore
-     * stopping further navigation down the tree.
+     * stopping further navigation deeper down the tree.
      */
     @Incubating(since = "8.0.0")
     public void stopAfterPreVisit() {
