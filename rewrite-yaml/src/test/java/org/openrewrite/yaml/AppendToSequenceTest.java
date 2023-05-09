@@ -16,7 +16,9 @@
 package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
@@ -391,5 +393,54 @@ class AppendToSequenceTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite/issues/3215")
+    void appendTwice() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            type: specs.openrewrite.org/v1beta/recipe
+            name: "com.demo.migration-not-working"
+            displayName: "this recipe only add first entry"
+            description: "blabla"
+            recipeList:
+              - org.openrewrite.yaml.AppendToSequence:
+                  sequencePath: $.envs
+                  value: "name: \\"env-var-2\\"\\n    value: \\"value-2\\""
+                  fileMatcher: devops/deploy/dev-vars.yaml
+              - org.openrewrite.yaml.AppendToSequence:
+                  sequencePath: $.envs
+                  value: "name: \\"env-var-3\\"\\n    value: \\"value-3\\""
+                  fileMatcher: devops/deploy/dev-vars.yaml
+            """, "com.demo.migration-not-working"),
+          yaml("""
+              name_squad: "squad1"
+              azure_keyvault: "yupiyouh2"
+              replicas_plan:
+                min_replicas: 1
+                max_replicas: 2
+              envs:
+                - name: "env-var-1"
+                  value: "value-1"
+              other_attribute: "yesyupiyou"
+              """,
+            """
+              name_squad: "squad1"
+              azure_keyvault: "yupiyouh2"
+              replicas_plan:
+                min_replicas: 1
+                max_replicas: 2
+              envs:
+                - name: "env-var-1"
+                  value: "value-1"
+                - name: "env-var-2"
+                  value: "value-2"
+                - name: "env-var-3"
+                  value: "value-3"
+              other_attribute: "yesyupiyou"
+              """,
+            sourceSpec -> sourceSpec.path("devops/deploy/dev-vars.yaml")));
     }
 }

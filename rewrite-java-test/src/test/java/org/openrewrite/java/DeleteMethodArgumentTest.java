@@ -29,6 +29,8 @@ class DeleteMethodArgumentTest implements RewriteTest {
          public static void foo(int n) {}
          public static void foo(int n1, int n2) {}
          public static void foo(int n1, int n2, int n3) {}
+         public B() {}
+         public B(int n) {}
       }
       """;
 
@@ -89,6 +91,19 @@ class DeleteMethodArgumentTest implements RewriteTest {
           java(
             "public class A {{ B.foo(1); }}",
             "public class A {{ B.foo(); }}"
+          )
+        );
+    }
+
+    @Test
+    void deleteConstructorArgument() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteMethodArgument("B <constructor>(int)", 0))
+            .cycles(1).expectedCyclesThatMakeChanges(1),
+          java(b),
+          java(
+            "public class A { B b = new B(0); }",
+            "public class A { B b = new B(); }"
           )
         );
     }

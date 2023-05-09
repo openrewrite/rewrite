@@ -29,7 +29,7 @@ public class NormalizeFormat extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Move whitespace to the outermost AST element possible.";
+        return "Move whitespace to the outermost LST element possible.";
     }
 
     @Override

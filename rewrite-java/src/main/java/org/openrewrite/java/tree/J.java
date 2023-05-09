@@ -3674,10 +3674,12 @@ public interface J extends Tree {
 
         JContainer<Expression> arguments;
 
+        @Override
         public List<Expression> getArguments() {
             return arguments.getElements();
         }
 
+        @Override
         public MethodInvocation withArguments(List<Expression> arguments) {
             return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
         }
@@ -3686,6 +3688,7 @@ public interface J extends Tree {
         @Getter
         JavaType.Method methodType;
 
+        @Override
         public MethodInvocation withMethodType(@Nullable JavaType.Method type) {
             if (type == this.methodType) {
                 return this;
@@ -4143,10 +4146,12 @@ public interface J extends Tree {
 
         JContainer<Expression> arguments;
 
+        @Override
         public List<Expression> getArguments() {
             return arguments.getElements();
         }
 
+        @Override
         public NewClass withArguments(List<Expression> arguments) {
             return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
         }
@@ -4183,6 +4188,7 @@ public interface J extends Tree {
          * @param methodType The constructor type.
          * @return An instance with the new constructor type.
          */
+        @Override
         public NewClass withMethodType(@Nullable JavaType.Method methodType) {
             return withConstructorType(methodType);
         }
