@@ -16,13 +16,10 @@
 package org.openrewrite.java.migrate;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -87,7 +84,7 @@ class MigrateToRewrite8Test implements RewriteTest {
                   }
 
                   @Override
-                  protected TreeVisitor<?, ExecutionContext> getVisitor() {
+                  protected JavaIsoVisitor<ExecutionContext> getVisitor() {
                       return new JavaIsoVisitor<ExecutionContext>() {
                           @Override
                           public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {

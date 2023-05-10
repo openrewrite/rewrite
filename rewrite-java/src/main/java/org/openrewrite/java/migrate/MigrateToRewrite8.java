@@ -43,6 +43,7 @@ public class MigrateToRewrite8 extends Recipe {
     private static final MethodMatcher GET_VISITOR_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Recipe getVisitor()", true);
     private static final MethodMatcher VISIT_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Recipe visit(..)", true);
     private static final AnnotationMatcher OVERRIDE_ANNOTATION_MATCHER = new AnnotationMatcher("@java.lang.Override");
+    private static J.ParameterizedType GET_VISITOR_RETURN_TYPE = null;
 
     @Override
     public String getDisplayName() {
@@ -112,6 +113,11 @@ public class MigrateToRewrite8 extends Recipe {
                         method = method.withModifiers(ListUtils.map(method.getModifiers(), mod ->
                             mod.getType() == Protected ? mod.withType(Public) : mod));
                     }
+
+                    // Change return type to `TreeVisitor<?, ExecutionContext>`
+                    method = method.withReturnTypeExpression(getGetVisitorReturnType());
+                    // method = method.withReturnTypeExpression(null);
+
 
                     if (hasSingleSourceApplicableTest && !singleSourceApplicableTestMethodStatements.isEmpty()) {
                         maybeAddImport("org.openrewrite.Preconditions", false);
@@ -203,4 +209,15 @@ public class MigrateToRewrite8 extends Recipe {
         }
     }
 
+    private static J.ParameterizedType getGetVisitorReturnType() {
+        if (GET_VISITOR_RETURN_TYPE == null) {
+            GET_VISITOR_RETURN_TYPE = PartProvider.buildPart("import org.openrewrite.ExecutionContext;\n" +
+                                                             "import org.openrewrite.TreeVisitor;\n" +
+                                                             "\n" +
+                                                             "public class A {\n" +
+                                                             "    TreeVisitor<?, ExecutionContext> type;\n" +
+                                                             "}", J.ParameterizedType.class, JavaParser.runtimeClasspath());
+        }
+        return GET_VISITOR_RETURN_TYPE;
+    }
 }
