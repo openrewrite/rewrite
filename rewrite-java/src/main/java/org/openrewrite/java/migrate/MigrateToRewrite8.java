@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.migrate;
 
-import io.micrometer.core.instrument.search.Search;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.ExecutionContext;
@@ -23,7 +22,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.*;
-import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
@@ -99,8 +97,8 @@ public class MigrateToRewrite8 extends Recipe {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method,
                                                               ExecutionContext ctx) {
-
                 if (GET_SINGLE_SOURCE_APPLICABLE_TEST_METHOD_MATCHER.matches(method.getMethodType())) {
+                    // remove `org.openrewrite.Recipe getSingleSourceApplicableTest()` method
                     return null;
                 }
 
@@ -116,38 +114,50 @@ public class MigrateToRewrite8 extends Recipe {
                     }
 
                     if (hasSingleSourceApplicableTest && !singleSourceApplicableTestMethodStatements.isEmpty()) {
+                        maybeAddImport("org.openrewrite.Preconditions", false);
 
                         // merge statements
-                        List<Statement> statements = method.getBody().getStatements();
-
+                        List<Statement> getVisitorStatements = method.getBody().getStatements();
+                        Statement getVisitorReturnStatements = null;
+                        Statement singleSourceApplicableTestReturnStatement = null;
                         List<Statement> mergedStatements = new ArrayList<>();
 
-                        maybeAddImport("org.openrewrite.Preconditions", false);
-                        //
+                        for (int i = 0; i < singleSourceApplicableTestMethodStatements.size(); i++) {
+                            if (i != singleSourceApplicableTestMethodStatements.size() - 1) {
+                                mergedStatements.add(singleSourceApplicableTestMethodStatements.get(i));
+                            } else {
+                                singleSourceApplicableTestReturnStatement = singleSourceApplicableTestMethodStatements.get(i);
+                            }
+                        }
 
+                        // Statement getVisitorReturnStatements = null;
+                        for (int i = 0; i < getVisitorStatements.size(); i++) {
+                            if (i != getVisitorStatements.size() - 1) {
+                                mergedStatements.add(getVisitorStatements.get(i));
+                            } else {
+                                getVisitorReturnStatements = getVisitorStatements.get(i);
+                            }
+                        }
 
                         JavaTemplate preconditionsCheckTemplate = JavaTemplate.builder(this::getCursor,
                                 "return Preconditions.check(#{any()}, #{any()});")
+                            .javaParser(JavaParser.fromJavaVersion()
+                                .classpath(JavaParser.runtimeClasspath()))
+                            .imports("org.openrewrite.Preconditions")
                             .build();
 
-                        Statement lastStatement = statements.get(statements.size() - 1);
-                        Statement theSingleSourceApplicableTest = singleSourceApplicableTestMethodStatements.get(singleSourceApplicableTestMethodStatements.size() - 1);
-
-                        lastStatement = lastStatement.withTemplate(
-                            preconditionsCheckTemplate, lastStatement.getCoordinates().replace(),
-                            ((J.Return) theSingleSourceApplicableTest).getExpression(),
-                            ((J.Return) lastStatement).getExpression()
-
+                        getVisitorReturnStatements = getVisitorReturnStatements.withTemplate(
+                            preconditionsCheckTemplate, getVisitorReturnStatements.getCoordinates().replace(),
+                            ((J.Return) singleSourceApplicableTestReturnStatement).getExpression(),
+                            ((J.Return) getVisitorReturnStatements).getExpression()
                         );
 
-                        mergedStatements.add(lastStatement);
+                        mergedStatements.add(getVisitorReturnStatements);
                         return MigratedTo8.withMarker( autoFormat(method.withBody(method.getBody().withStatements(mergedStatements)), ctx));
                     }
 
-
                     return method;
                 }
-
 
                 return super.visitMethodDeclaration(method, ctx);
             }
@@ -192,6 +202,5 @@ public class MigrateToRewrite8 extends Recipe {
             return j.getMarkers().findFirst(MigratedTo8.class).isPresent();
         }
     }
-
 
 }

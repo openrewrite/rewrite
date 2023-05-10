@@ -30,16 +30,9 @@ class MigrateToRewrite8Test implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        List<String> paths = JavaParser.runtimeClasspath().stream().map(path -> path.toString()).collect(Collectors.toList());
-        for (int i = 0; i < paths.size(); i++) {
-            System.out.println(i + " : " + paths.get(i));
-        }
-
-
-
         spec.recipe(new MigrateToRewrite8())
           .parser(JavaParser.fromJavaVersion()
-            .classpathFromResources(new InMemoryExecutionContext(), "rewrite-core-7.41.0-SNAPSHOT")
+            // .classpathFromResources(new InMemoryExecutionContext(), "rewrite-core-7.41.0-SNAPSHOT")
             .classpath(JavaParser.runtimeClasspath())
           );
     }
