@@ -45,7 +45,8 @@ class AppendToTextFileTest implements RewriteTest {
 
     @Test
     void createsFileIfNeededWithMultipleInstances() {
-        Supplier<Recipe> r = () -> new AppendToTextFile("file.txt", "content", "preamble", true, "leave");
+        Supplier<Recipe> r = () -> new AppendToTextFile("file.txt", "content",
+          "preamble", true, "leave");
         rewriteRun(
           spec -> spec.recipes(r.get(), r.get()),
           text(
@@ -54,7 +55,7 @@ class AppendToTextFileTest implements RewriteTest {
               preamble
               content
               """,
-            SourceSpec::noTrim
+            spec -> spec.path("file.txt")
           )
         );
     }

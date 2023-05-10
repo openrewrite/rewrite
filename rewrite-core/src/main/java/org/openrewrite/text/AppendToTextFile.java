@@ -97,12 +97,22 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
     }
 
     @Override
-    public Collection<PlainText> generate(AtomicBoolean fileExists, ExecutionContext ctx) {
+    public Collection<PlainText> generate(AtomicBoolean fileExists, Collection<SourceFile> generatedInThisCycle, ExecutionContext ctx) {
         String maybeNewline = !Boolean.FALSE.equals(appendNewline) ? "\n" : "";
         String content = this.content + maybeNewline;
         String preamble = this.preamble != null ? this.preamble + maybeNewline : "";
 
-        return fileExists.get() ?
+        boolean exists = fileExists.get();
+        if(!exists) {
+            for (SourceFile generated : generatedInThisCycle) {
+                if(generated.getSourcePath().toString().equals(Paths.get(relativeFileName).toString())) {
+                    exists = true;
+                    break;
+                }
+            }
+        }
+
+        return exists ?
                 Collections.emptyList() :
                 Collections.singletonList(PlainText.builder()
                         .text(preamble + content)
@@ -112,7 +122,6 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean fileExists) {
-
         return Preconditions.check(fileExists.get(), new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {

@@ -71,7 +71,7 @@ public interface RecipeScheduler {
 
             // pre-transformation scanning phase where there can only be modifications to capture exceptions
             // occurring during the scanning phase
-            after = cycle.scanSources(acc, i);
+            after = cycle.scanSources(after, i);
 
             // transformation phases
             after = cycle.generateSources(after, i);
@@ -139,6 +139,8 @@ class RecipeRunCycle {
     }
 
     public LargeSourceSet generateSources(LargeSourceSet before, int cycle) {
+        List<SourceFile> generatedInThisCycle = new ArrayList<>();
+
         Stack<Stack<Recipe>> allRecipesStack = initRecipeStack();
         LargeSourceSet acc = before;
         while (!allRecipesStack.isEmpty()) {
@@ -151,7 +153,8 @@ class RecipeRunCycle {
             if (recipe instanceof ScanningRecipe) {
                 //noinspection unchecked
                 ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
-                List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor), ctx));
+                List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor), generatedInThisCycle, ctx));
+                generatedInThisCycle.addAll(generated);
                 generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
                 acc = acc.concatAll(generated);
             }

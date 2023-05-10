@@ -77,8 +77,15 @@ public class PlainText implements SourceFile, Tree {
     Checksum checksum;
 
     @Builder.Default
-    @With
     String text = "";
+
+    public PlainText withText(String text) {
+        if (!text.equals(this.text)) {
+            return new PlainText(this.id, this.sourcePath, this.markers, this.charsetName, this.charsetBomMarked,
+                    this.fileAttributes, this.checksum, this.text, this.snippets);
+        }
+        return this;
+    }
 
     List<Snippet> snippets;
 
@@ -86,6 +93,7 @@ public class PlainText implements SourceFile, Tree {
     public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
         return v.isAdaptableTo(PlainTextVisitor.class);
     }
+
 
     @SuppressWarnings("unchecked")
     @Override
@@ -104,7 +112,7 @@ public class PlainText implements SourceFile, Tree {
     }
 
     public List<Snippet> getSnippets() {
-        if(snippets == null) {
+        if (snippets == null) {
             return emptyList();
         }
         return snippets;
@@ -112,7 +120,7 @@ public class PlainText implements SourceFile, Tree {
 
     public PlainText withSnippets(@Nullable List<Snippet> snippets) {
         snippets = nullIfEmpty(snippets);
-        if(this.snippets == snippets) {
+        if (this.snippets == snippets) {
             return this;
         }
         return new PlainText(id, sourcePath, markers, charsetName, charsetBomMarked, fileAttributes, checksum, text, snippets);
