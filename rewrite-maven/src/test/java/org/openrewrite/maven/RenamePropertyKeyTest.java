@@ -177,7 +177,6 @@ class RenamePropertyKeyTest implements RewriteTest {
 
     @Test
     void renamePropertyAndValue() {
-        @Language("yaml")
         String yamlRecipe = """
           ---
           type: specs.openrewrite.org/v1beta/recipe
