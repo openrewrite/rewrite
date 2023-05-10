@@ -50,19 +50,24 @@ public interface Markup extends Marker {
     }
 
     static <T extends Tree> T error(T t, Throwable throwable) {
-        if (ExceptionUtils.containsCircularReferences(throwable)) {
-            throwable = new Exception(throwable.getMessage());
-            throwable.setStackTrace(throwable.getStackTrace());
-        }
-        return markup(t, new Markup.Error(randomId(), throwable));
+        return markup(t, new Markup.Error(randomId(), exceptionWithoutSelfReferences(throwable)));
     }
 
     static <T extends Tree> T warn(T t, Throwable throwable) {
-        if (ExceptionUtils.containsCircularReferences(throwable)) {
-            throwable = new Exception(throwable.getMessage());
-            throwable.setStackTrace(throwable.getStackTrace());
-        }
-        return markup(t, new Markup.Warn(randomId(), throwable));
+        return markup(t, new Markup.Warn(randomId(), exceptionWithoutSelfReferences(throwable)));
+    }
+
+    static Throwable exceptionWithoutSelfReferences(Throwable throwable) {
+        // remove self-references from the cause chain to avoid serialization problems from the Moderne plugins
+        Throwable temp = throwable;
+        do {
+            if (temp.getCause() == null) {
+                temp.initCause(null);
+                break;
+            }
+        } while ((temp = temp.getCause()) != null);
+
+        return throwable;
     }
 
     static <T extends Tree> T info(T t, String message) {

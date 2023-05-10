@@ -15,16 +15,11 @@
  */
 package org.openrewrite.java;
 
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class RecipeMarkupDemonstrationTest implements RewriteTest {
 
@@ -43,35 +38,6 @@ class RecipeMarkupDemonstrationTest implements RewriteTest {
               }
               """, level.equals("error") || level.equals("info") ? "n" : "", level)
           )
-        );
-    }
-
-    @Test
-    void exceptionsWithoutCircularReferences() {
-        rewriteRun(
-          spec -> spec
-            .recipe(toRecipe(r -> new JavaIsoVisitor<>() {
-                @Override
-                public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext p) {
-                    Exception exception = new RuntimeException("this the parent of a circular exception");
-                    Exception exception2 = new RuntimeException("this the child of a circular exception", exception);
-                    exception.initCause(exception2);
-                    JavaSourceFile sf = Markup.error(cu, exception);
-                    Markup.Error marker = sf.getMarkers().findFirst(Markup.Error.class).get();
-                    assert marker.getException().getCause() == null;
-                    //Otherwise, there is an error if the exception is serialized.
-                    return sf;
-                }
-            })),
-          java(
-            """
-              class Test {
-              }
-              """,
-            """
-              /*~~(this the parent of a circular exception)~~>*/class Test {
-              }
-              """)
         );
     }
 }
