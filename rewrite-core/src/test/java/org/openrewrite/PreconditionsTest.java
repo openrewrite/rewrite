@@ -117,7 +117,7 @@ class PreconditionsTest implements RewriteTest {
 
             @Override
             public TreeVisitor<?, ExecutionContext> getVisitor() {
-                return Preconditions.check(applicability, new PlainTextVisitor<ExecutionContext>() {
+                return Preconditions.check(applicability, new PlainTextVisitor<>() {
                     @Override
                     public PlainText visitText(PlainText text, ExecutionContext executionContext) {
                         return text.withText("goodbye");

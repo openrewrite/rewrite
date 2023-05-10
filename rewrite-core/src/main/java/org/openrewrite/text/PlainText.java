@@ -82,7 +82,7 @@ public class PlainText implements SourceFile, Tree {
     public PlainText withText(String text) {
         if (!text.equals(this.text)) {
             return new PlainText(this.id, this.sourcePath, this.markers, this.charsetName, this.charsetBomMarked,
-                    this.fileAttributes, this.checksum, this.text, this.snippets);
+                    this.fileAttributes, this.checksum, text, this.snippets);
         }
         return this;
     }
