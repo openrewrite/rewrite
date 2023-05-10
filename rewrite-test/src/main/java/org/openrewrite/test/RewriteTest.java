@@ -343,6 +343,8 @@ public interface RewriteTest extends SourceSpecs {
         // to prevent a CME inside the next loop
         expectedNewSources = new CopyOnWriteArrayList<>(expectedNewSources);
 
+        List<Result> allResults = recipeRun.getChangeset().getAllResults();
+
         nextSourceSpec:
         for (SourceSpec<?> sourceSpec : expectedNewSources) {
             assertThat(sourceSpec.after).as("Either before or after must be specified in a SourceSpec").isNotNull();
@@ -350,7 +352,7 @@ public interface RewriteTest extends SourceSpecs {
             if (sourceSpec.getSourcePath() != null) {
                 // If sourceSpec defines a source path, enforce there is a result that has the same source path and
                 // the contents match the expected value.
-                for (Result result : recipeRun.getChangeset().getAllResults()) {
+                for (Result result : allResults) {
 
                     if (result.getAfter() != null && sourceSpec.getSourcePath().equals(result.getAfter().getSourcePath())) {
                         expectedNewSources.remove(sourceSpec);
@@ -372,7 +374,7 @@ public interface RewriteTest extends SourceSpecs {
 
             // If the source spec has not defined a source path, look for a result with the exact contents. This logic
             // first looks for non-remote results.
-            for (Result result : recipeRun.getChangeset().getAllResults()) {
+            for (Result result : allResults) {
                 if (result.getAfter() != null && !(result.getAfter() instanceof Remote)) {
                     assertThat(sourceSpec.after).as("Either before or after must be specified in a SourceSpec").isNotNull();
                     String actual = result.getAfter().printAll(out.clone()).trim();
@@ -392,7 +394,7 @@ public interface RewriteTest extends SourceSpecs {
             }
 
             // we tried to avoid it, and now we'll try to match against remotes...
-            for (Result result : recipeRun.getChangeset().getAllResults()) {
+            for (Result result : allResults) {
                 if (result.getAfter() instanceof Remote) {
                     assertThat(sourceSpec.after).as("Either before or after must be specified in a SourceSpec").isNotNull();
                     String actual = result.getAfter().printAll(out.clone());
@@ -414,7 +416,7 @@ public interface RewriteTest extends SourceSpecs {
         nextSourceFile:
         for (Map.Entry<SourceFile, SourceSpec<?>> specForSourceFile : specBySourceFile.entrySet()) {
             SourceSpec<?> sourceSpec = specForSourceFile.getValue();
-            for (Result result : recipeRun.getChangeset().getAllResults()) {
+            for (Result result : allResults) {
                 if (result.getBefore() == specForSourceFile.getKey()) {
                     if (result.getAfter() != null) {
                         String expectedAfter = sourceSpec.after == null ? null :
@@ -475,15 +477,6 @@ public interface RewriteTest extends SourceSpecs {
                     }
 
                     continue nextSourceFile;
-                } else if (result.getBefore() == null
-                           && !(result.getAfter() instanceof Remote)
-                           && !expectedNewResults.contains(result)
-                           && testMethodSpec.afterRecipes.isEmpty()
-                ) {
-                    assertThat(result.getAfter()).isNotNull();
-                    // falsely added files detected.
-                    fail("The recipe added a source file \"" + result.getAfter().getSourcePath()
-                         + "\" that was not expected.");
                 }
             }
 
@@ -508,6 +501,7 @@ public interface RewriteTest extends SourceSpecs {
             //noinspection unchecked
             ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(specForSourceFile.getKey());
         }
+
         SoftAssertions newFilesGenerated = new SoftAssertions();
         for (SourceSpec<?> expectedNewSource : expectedNewSources) {
             newFilesGenerated.assertThat(expectedNewSource.after == null ? null : expectedNewSource.after.apply(null))
@@ -515,6 +509,19 @@ public interface RewriteTest extends SourceSpecs {
                     .isEmpty();
         }
         newFilesGenerated.assertAll();
+
+        for (Result result : allResults) {
+            if (result.getBefore() == null
+                && !(result.getAfter() instanceof Remote)
+                && !expectedNewResults.contains(result)
+                && testMethodSpec.afterRecipes.isEmpty()
+            ) {
+                assertThat(result.getAfter()).isNotNull();
+                // falsely added files detected.
+                fail("The recipe added a source file \"" + result.getAfter().getSourcePath()
+                     + "\" that was not expected.");
+            }
+        }
 
         recipeSchedulerCheckingExpectedCycles.verify();
     }
