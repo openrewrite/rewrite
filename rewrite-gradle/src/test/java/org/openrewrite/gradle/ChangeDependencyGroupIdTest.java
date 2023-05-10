@@ -301,4 +301,42 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3227")
+    @Test
+    void worksWithPlatform() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupId("org.optaplanner", "*", "ai.timefold.solver", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+                            
+              dependencies {
+                  implementation platform("org.optaplanner:optaplanner-bom:9.37.0.Final")
+                  implementation "org.optaplanner:optaplanner-core"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+                
+              repositories {
+                  mavenCentral()
+              }
+                            
+              dependencies {
+                  implementation platform("ai.timefold.solver:optaplanner-bom:9.37.0.Final")
+                  implementation "ai.timefold.solver:optaplanner-core"
+              }
+              """
+          )
+        );
+    }
 }
