@@ -62,7 +62,11 @@ public interface Markup extends Marker {
         Throwable temp = throwable;
         do {
             if (temp.getCause() == null) {
-                temp.initCause(null);
+                try {
+                    temp.initCause(null);
+                } catch (IllegalStateException ignored) {
+                    //ignore, the cause was already initialized to null
+                }
                 break;
             }
         } while ((temp = temp.getCause()) != null);
