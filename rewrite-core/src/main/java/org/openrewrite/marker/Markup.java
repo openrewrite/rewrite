@@ -58,6 +58,7 @@ public interface Markup extends Marker {
     }
 
     static Throwable exceptionWithoutSelfReferences(Throwable throwable) {
+        // remove self-references from the cause chain to avoid serialization problems from the Moderne plugins
         Throwable temp = throwable;
         do {
             if (temp.getCause() == null) {
