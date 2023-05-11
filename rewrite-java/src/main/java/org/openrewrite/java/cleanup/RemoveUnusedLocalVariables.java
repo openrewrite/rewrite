@@ -20,11 +20,7 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.DeleteStatement;
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.dataflow.internal.InvocationMatcher;
+import org.openrewrite.java.*;
 import org.openrewrite.java.tree.*;
 
 import java.time.Duration;
@@ -67,7 +63,7 @@ public class RemoveUnusedLocalVariables extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         // All methods that start with 'get' matching this InvocationMatcher will be considered non-side effecting.
-        InvocationMatcher SAFE_GETTER_METHODS = InvocationMatcher.fromMethodMatcher(
+        InvocationMatcher SAFE_GETTER_METHODS = InvocationMatcher.fromInvocationMatchers(
                 new MethodMatcher("java.io.File get*(..)")
         );
 

@@ -23,9 +23,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.dataflow.FindLocalFlowPaths;
-import org.openrewrite.java.dataflow.LocalFlowSpec;
-import org.openrewrite.java.dataflow.LocalTaintFlowSpec;
 import org.openrewrite.java.table.MethodCalls;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -59,14 +56,6 @@ public class FindMethods extends Recipe {
     @Nullable
     Boolean matchOverrides;
 
-    @Option(displayName = "Show flow",
-            description = "When enabled, show the data or taint flow of the method invocation.",
-            valid = {"none", "data", "taint"},
-            required = false
-    )
-    @Nullable
-    String flow;
-
     @Override
     public String getDisplayName() {
         return "Find method usages";
@@ -86,24 +75,19 @@ public class FindMethods extends Recipe {
     @SuppressWarnings("ConstantConditions")
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
-        boolean flowEnabled = !StringUtils.isBlank(flow) && !"none".equals(flow);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(method)) {
-                    if (!flowEnabled) {
-                        JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                        if(javaSourceFile != null) {
-                            methodCalls.insertRow(ctx, new MethodCalls.Row(
-                                    javaSourceFile.getSourcePath().toString(),
-                                    method.printTrimmed(getCursor())
-                            ));
-                        }
-                        m = SearchResult.found(m);
-                    } else {
-                        doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(method)));
+                    JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                    if(javaSourceFile != null) {
+                        methodCalls.insertRow(ctx, new MethodCalls.Row(
+                                javaSourceFile.getSourcePath().toString(),
+                                method.printTrimmed(getCursor())
+                        ));
                     }
+                    m = SearchResult.found(m);
                 }
                 return m;
             }
@@ -112,18 +96,14 @@ public class FindMethods extends Recipe {
             public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
                 J.MemberReference m = super.visitMemberReference(memberRef, ctx);
                 if (methodMatcher.matches(m.getMethodType())) {
-                    if (!flowEnabled) {
-                        JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                        if(javaSourceFile != null) {
-                            methodCalls.insertRow(ctx, new MethodCalls.Row(
-                                    javaSourceFile.getSourcePath().toString(),
-                                    memberRef.printTrimmed(getCursor())
-                            ));
-                        }
-                        m = m.withReference(SearchResult.found(m.getReference()));
-                    } else {
-                        doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(memberRef)));
+                    JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                    if(javaSourceFile != null) {
+                        methodCalls.insertRow(ctx, new MethodCalls.Row(
+                                javaSourceFile.getSourcePath().toString(),
+                                memberRef.printTrimmed(getCursor())
+                        ));
                     }
+                    m = m.withReference(SearchResult.found(m.getReference()));
                 }
                 return m;
             }
@@ -132,51 +112,16 @@ public class FindMethods extends Recipe {
             public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
                 J.NewClass n = super.visitNewClass(newClass, ctx);
                 if (methodMatcher.matches(newClass)) {
-                    if (!flowEnabled) {
-                        JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                        if(javaSourceFile != null) {
-                            methodCalls.insertRow(ctx, new MethodCalls.Row(
-                                    javaSourceFile.getSourcePath().toString(),
-                                    newClass.printTrimmed(getCursor())
-                            ));
-                        }
-                        n = SearchResult.found(n);
-                    } else {
-                        doAfterVisit(new FindLocalFlowPaths<>(getFlowSpec(newClass)));
+                    JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
+                    if(javaSourceFile != null) {
+                        methodCalls.insertRow(ctx, new MethodCalls.Row(
+                                javaSourceFile.getSourcePath().toString(),
+                                newClass.printTrimmed(getCursor())
+                        ));
                     }
+                    n = SearchResult.found(n);
                 }
                 return n;
-            }
-
-            private LocalFlowSpec<Expression, Expression> getFlowSpec(Expression source) {
-                switch (flow) {
-                    case "data":
-                        return new LocalFlowSpec<Expression, Expression>() {
-                            @Override
-                            public boolean isSource(Expression expression, Cursor cursor) {
-                                return expression == source;
-                            }
-
-                            @Override
-                            public boolean isSink(Expression expression, Cursor cursor) {
-                                return true;
-                            }
-                        };
-                    case "taint":
-                        return new LocalTaintFlowSpec<Expression, Expression>() {
-                            @Override
-                            public boolean isSource(Expression expression, Cursor cursor) {
-                                return expression == source;
-                            }
-
-                            @Override
-                            public boolean isSink(Expression expression, Cursor cursor) {
-                                return true;
-                            }
-                        };
-                    default:
-                        throw new IllegalStateException("Unknown flow: " + flow);
-                }
             }
         };
     }
@@ -192,7 +137,7 @@ public class FindMethods extends Recipe {
      * @return A set of {@link J.MethodInvocation}, {@link J.MemberReference}, and {@link J.NewClass} representing calls to this method.
      */
     public static Set<J> find(J j, String methodPattern, boolean matchOverrides) {
-        FindMethods findMethods = new FindMethods(methodPattern, matchOverrides, null);
+        FindMethods findMethods = new FindMethods(methodPattern, matchOverrides);
         findMethods.methodCalls.setEnabled(false);
         return TreeVisitor.collect(
                         findMethods.getVisitor(),
