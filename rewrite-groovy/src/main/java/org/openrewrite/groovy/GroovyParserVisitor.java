@@ -573,6 +573,12 @@ public class GroovyParserVisitor {
             return ts;
         }
 
+        private void visitParenthesized(ASTNode node, Space fmt) {
+            skip("(");
+            queue.add(new J.Parentheses<Expression>(randomId(), fmt, Markers.EMPTY,
+                    convert(node, t -> sourceBefore(")"))));
+        }
+
         @Override
         public void visitArgumentlistExpression(ArgumentListExpression expression) {
             List<JRightPadded<Expression>> args = new ArrayList<>(expression.getExpressions().size());
@@ -677,144 +683,149 @@ public class GroovyParserVisitor {
         @Override
         public void visitBinaryExpression(BinaryExpression binary) {
             Space fmt = whitespace();
-            Expression left = visit(binary.getLeftExpression());
 
-            Space opPrefix = whitespace();
-            boolean assignment = false;
-            J.AssignmentOperation.Type assignOp = null;
-            J.Binary.Type binaryOp = null;
-            G.Binary.Type gBinaryOp = null;
-            switch (binary.getOperation().getText()) {
-                case "+":
-                    binaryOp = J.Binary.Type.Addition;
-                    break;
-                case "&&":
-                    binaryOp = J.Binary.Type.And;
-                    break;
-                case "&":
-                    binaryOp = J.Binary.Type.BitAnd;
-                    break;
-                case "|":
-                    binaryOp = J.Binary.Type.BitOr;
-                    break;
-                case "^":
-                    binaryOp = J.Binary.Type.BitXor;
-                    break;
-                case "/":
-                    binaryOp = J.Binary.Type.Division;
-                    break;
-                case "==":
-                    binaryOp = J.Binary.Type.Equal;
-                    break;
-                case ">":
-                    binaryOp = J.Binary.Type.GreaterThan;
-                    break;
-                case ">=":
-                    binaryOp = J.Binary.Type.GreaterThanOrEqual;
-                    break;
-                case "<<":
-                    binaryOp = J.Binary.Type.LeftShift;
-                    break;
-                case "<":
-                    binaryOp = J.Binary.Type.LessThan;
-                    break;
-                case "<=":
-                    binaryOp = J.Binary.Type.LessThanOrEqual;
-                    break;
-                case "%":
-                    binaryOp = J.Binary.Type.Modulo;
-                    break;
-                case "*":
-                    binaryOp = J.Binary.Type.Multiplication;
-                    break;
-                case "!=":
-                    binaryOp = J.Binary.Type.NotEqual;
-                    break;
-                case "||":
-                    binaryOp = J.Binary.Type.Or;
-                    break;
-                case ">>":
-                    binaryOp = J.Binary.Type.RightShift;
-                    break;
-                case "-":
-                    binaryOp = J.Binary.Type.Subtraction;
-                    break;
-                case ">>>":
-                    binaryOp = J.Binary.Type.UnsignedRightShift;
-                    break;
-                case "=":
-                    assignment = true;
-                    break;
-                case "+=":
-                    assignOp = J.AssignmentOperation.Type.Addition;
-                    break;
-                case "-=":
-                    assignOp = J.AssignmentOperation.Type.Subtraction;
-                    break;
-                case "&=":
-                    assignOp = J.AssignmentOperation.Type.BitAnd;
-                    break;
-                case "|=":
-                    assignOp = J.AssignmentOperation.Type.BitOr;
-                    break;
-                case "^=":
-                    assignOp = J.AssignmentOperation.Type.BitXor;
-                    break;
-                case "/=":
-                    assignOp = J.AssignmentOperation.Type.Division;
-                    break;
-                case "<<=":
-                    assignOp = J.AssignmentOperation.Type.LeftShift;
-                    break;
-                case "%=":
-                    assignOp = J.AssignmentOperation.Type.Modulo;
-                    break;
-                case "*=":
-                    assignOp = J.AssignmentOperation.Type.Multiplication;
-                    break;
-                case ">>=":
-                    assignOp = J.AssignmentOperation.Type.RightShift;
-                    break;
-                case ">>>=":
-                    assignOp = J.AssignmentOperation.Type.UnsignedRightShift;
-                    break;
-                case "=~":
-                    gBinaryOp = G.Binary.Type.Find;
-                    break;
-                case "==~":
-                    gBinaryOp = G.Binary.Type.Match;
-                    break;
-                case "[":
-                    gBinaryOp = G.Binary.Type.Access;
-                    break;
-                case "in":
-                    gBinaryOp = G.Binary.Type.In;
-                    break;
-            }
+            if (source.charAt(cursor) == '(') {
+                visitParenthesized(binary, fmt);
+            } else {
+                Expression left = visit(binary.getLeftExpression());
 
-            cursor += binary.getOperation().getText().length();
-            Expression right = visit(binary.getRightExpression());
-
-            if (assignment) {
-                queue.add(new J.Assignment(randomId(), fmt, Markers.EMPTY,
-                        left, JLeftPadded.build(right).withBefore(opPrefix),
-                        typeMapping.type(binary.getType())));
-            } else if (assignOp != null) {
-                queue.add(new J.AssignmentOperation(randomId(), fmt, Markers.EMPTY,
-                        left, JLeftPadded.build(assignOp).withBefore(opPrefix),
-                        right, typeMapping.type(binary.getType())));
-            } else if (binaryOp != null) {
-                queue.add(new J.Binary(randomId(), fmt, Markers.EMPTY,
-                        left, JLeftPadded.build(binaryOp).withBefore(opPrefix),
-                        right, typeMapping.type(binary.getType())));
-            } else if (gBinaryOp != null) {
-                Space after = EMPTY;
-                if (gBinaryOp == G.Binary.Type.Access) {
-                    after = sourceBefore("]");
+                Space opPrefix = whitespace();
+                boolean assignment = false;
+                J.AssignmentOperation.Type assignOp = null;
+                J.Binary.Type binaryOp = null;
+                G.Binary.Type gBinaryOp = null;
+                switch (binary.getOperation().getText()) {
+                    case "+":
+                        binaryOp = J.Binary.Type.Addition;
+                        break;
+                    case "&&":
+                        binaryOp = J.Binary.Type.And;
+                        break;
+                    case "&":
+                        binaryOp = J.Binary.Type.BitAnd;
+                        break;
+                    case "|":
+                        binaryOp = J.Binary.Type.BitOr;
+                        break;
+                    case "^":
+                        binaryOp = J.Binary.Type.BitXor;
+                        break;
+                    case "/":
+                        binaryOp = J.Binary.Type.Division;
+                        break;
+                    case "==":
+                        binaryOp = J.Binary.Type.Equal;
+                        break;
+                    case ">":
+                        binaryOp = J.Binary.Type.GreaterThan;
+                        break;
+                    case ">=":
+                        binaryOp = J.Binary.Type.GreaterThanOrEqual;
+                        break;
+                    case "<<":
+                        binaryOp = J.Binary.Type.LeftShift;
+                        break;
+                    case "<":
+                        binaryOp = J.Binary.Type.LessThan;
+                        break;
+                    case "<=":
+                        binaryOp = J.Binary.Type.LessThanOrEqual;
+                        break;
+                    case "%":
+                        binaryOp = J.Binary.Type.Modulo;
+                        break;
+                    case "*":
+                        binaryOp = J.Binary.Type.Multiplication;
+                        break;
+                    case "!=":
+                        binaryOp = J.Binary.Type.NotEqual;
+                        break;
+                    case "||":
+                        binaryOp = J.Binary.Type.Or;
+                        break;
+                    case ">>":
+                        binaryOp = J.Binary.Type.RightShift;
+                        break;
+                    case "-":
+                        binaryOp = J.Binary.Type.Subtraction;
+                        break;
+                    case ">>>":
+                        binaryOp = J.Binary.Type.UnsignedRightShift;
+                        break;
+                    case "=":
+                        assignment = true;
+                        break;
+                    case "+=":
+                        assignOp = J.AssignmentOperation.Type.Addition;
+                        break;
+                    case "-=":
+                        assignOp = J.AssignmentOperation.Type.Subtraction;
+                        break;
+                    case "&=":
+                        assignOp = J.AssignmentOperation.Type.BitAnd;
+                        break;
+                    case "|=":
+                        assignOp = J.AssignmentOperation.Type.BitOr;
+                        break;
+                    case "^=":
+                        assignOp = J.AssignmentOperation.Type.BitXor;
+                        break;
+                    case "/=":
+                        assignOp = J.AssignmentOperation.Type.Division;
+                        break;
+                    case "<<=":
+                        assignOp = J.AssignmentOperation.Type.LeftShift;
+                        break;
+                    case "%=":
+                        assignOp = J.AssignmentOperation.Type.Modulo;
+                        break;
+                    case "*=":
+                        assignOp = J.AssignmentOperation.Type.Multiplication;
+                        break;
+                    case ">>=":
+                        assignOp = J.AssignmentOperation.Type.RightShift;
+                        break;
+                    case ">>>=":
+                        assignOp = J.AssignmentOperation.Type.UnsignedRightShift;
+                        break;
+                    case "=~":
+                        gBinaryOp = G.Binary.Type.Find;
+                        break;
+                    case "==~":
+                        gBinaryOp = G.Binary.Type.Match;
+                        break;
+                    case "[":
+                        gBinaryOp = G.Binary.Type.Access;
+                        break;
+                    case "in":
+                        gBinaryOp = G.Binary.Type.In;
+                        break;
                 }
-                queue.add(new G.Binary(randomId(), fmt, Markers.EMPTY,
-                        left, JLeftPadded.build(gBinaryOp).withBefore(opPrefix),
-                        right, after, typeMapping.type(binary.getType())));
+
+                cursor += binary.getOperation().getText().length();
+                Expression right = visit(binary.getRightExpression());
+
+                if (assignment) {
+                    queue.add(new J.Assignment(randomId(), fmt, Markers.EMPTY,
+                            left, JLeftPadded.build(right).withBefore(opPrefix),
+                            typeMapping.type(binary.getType())));
+                } else if (assignOp != null) {
+                    queue.add(new J.AssignmentOperation(randomId(), fmt, Markers.EMPTY,
+                            left, JLeftPadded.build(assignOp).withBefore(opPrefix),
+                            right, typeMapping.type(binary.getType())));
+                } else if (binaryOp != null) {
+                    queue.add(new J.Binary(randomId(), fmt, Markers.EMPTY,
+                            left, JLeftPadded.build(binaryOp).withBefore(opPrefix),
+                            right, typeMapping.type(binary.getType())));
+                } else if (gBinaryOp != null) {
+                    Space after = EMPTY;
+                    if (gBinaryOp == G.Binary.Type.Access) {
+                        after = sourceBefore("]");
+                    }
+                    queue.add(new G.Binary(randomId(), fmt, Markers.EMPTY,
+                            left, JLeftPadded.build(gBinaryOp).withBefore(opPrefix),
+                            right, after, typeMapping.type(binary.getType())));
+                }
             }
         }
 
@@ -1097,14 +1108,18 @@ public class GroovyParserVisitor {
                 return;
             }
 
-            if (source.charAt(cursor) == '+' && !text.startsWith("+")) {
-                // A unaryPlus operator is implied on numerics and needs to be manually detected / added via the source.
-                text = "+" + text;
-            }
-            cursor += text.length();
+            if (source.charAt(cursor) == '(') {
+                visitParenthesized(expression, prefix);
+            } else {
+                if (source.charAt(cursor) == '+' && !text.startsWith("+")) {
+                    // A unaryPlus operator is implied on numerics and needs to be manually detected / added via the source.
+                    text = "+" + text;
+                }
+                cursor += text.length();
 
-            queue.add(new J.Literal(randomId(), prefix, Markers.EMPTY, value, text,
-                    null, jType));
+                queue.add(new J.Literal(randomId(), prefix, Markers.EMPTY, value, text,
+                        null, jType));
+            }
         }
 
         @Override
@@ -1660,11 +1675,17 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitTernaryExpression(TernaryExpression ternary) {
-            queue.add(new J.Ternary(randomId(), whitespace(), Markers.EMPTY,
-                    visit(ternary.getBooleanExpression()),
-                    padLeft(sourceBefore("?"), visit(ternary.getTrueExpression())),
-                    padLeft(sourceBefore(":"), visit(ternary.getFalseExpression())),
-                    typeMapping.type(ternary.getType())));
+            Space prefix = whitespace();
+
+            if (source.charAt(cursor) == '(') {
+                visitParenthesized(ternary, prefix);
+            } else {
+                queue.add(new J.Ternary(randomId(), prefix, Markers.EMPTY,
+                        visit(ternary.getBooleanExpression()),
+                        padLeft(sourceBefore("?"), visit(ternary.getTrueExpression())),
+                        padLeft(sourceBefore(":"), visit(ternary.getFalseExpression())),
+                        typeMapping.type(ternary.getType())));
+            }
         }
 
         @Override
