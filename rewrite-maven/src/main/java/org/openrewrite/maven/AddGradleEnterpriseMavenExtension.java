@@ -15,12 +15,18 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.internal.MavenXmlMapper;
 import org.openrewrite.xml.*;
 import org.openrewrite.xml.tree.Xml;
 
@@ -56,23 +62,6 @@ public class AddGradleEnterpriseMavenExtension extends Recipe {
                                                        "  <artifactId>gradle-enterprise-maven-extension</artifactId>\n" +
                                                        "</extension>";
 
-    @Language("xml")
-    private static final String GRADLE_ENTERPRISE_XML_FORMAT = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\" ?>\n" +
-                                         "<gradleEnterprise\n" +
-                                         "    xmlns=\"https://www.gradle.com/gradle-enterprise-maven\" " +
-                                         "xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\n" +
-                                         "    xsi:schemaLocation=\"https://www.gradle.com/gradle-enterprise-maven" +
-                                         " https://www.gradle.com/schema/gradle-enterprise-maven.xsd\">\n" +
-                                         "  <server>\n" +
-                                         "    <url>%s</url>\n" +
-                                         "    <allowUntrusted>%b</allowUntrusted>\n" +
-                                         "  </server>\n" +
-                                         "  <buildScan>\n" +
-                                         "    <backgroundBuildScanUpload>false</backgroundBuildScanUpload>\n" +
-                                         "    <publish>ALWAYS</publish>\n" +
-                                         "  </buildScan>\n" +
-                                         "</gradleEnterprise>";
-
     @Option(displayName = "Plugin version",
         description = "An exact version number or node-style semver selector used to select the gradle-enterprise-maven-extension version.",
         example = "1.x")
@@ -85,12 +74,49 @@ public class AddGradleEnterpriseMavenExtension extends Recipe {
     String server;
 
     @Option(displayName = "Allow untrusted server",
-        description = "When set to `true` the plugin will be configured to allow unencrypted http connections with the server. " +
-                      "If set to `false` or omitted, the plugin will refuse to communicate without transport layer security enabled.",
+        description = "When set to `true` the extension will be configured to allow unencrypted http connections with the server. " +
+                      "If set to `false` or omitted, the extension will refuse to communicate without transport layer security enabled.",
         required = false,
         example = "true")
     @Nullable
     Boolean allowUntrustedServer;
+
+    @Option(displayName = "Capture goal input files",
+            description = "When set to `true` the extension will capture additional information about the inputs to Maven goals. " +
+                    "This increases the size of build scans, but is useful for diagnosing issues with goal caching. ",
+            required = false,
+            example = "true")
+    @Nullable
+    Boolean captureGoalInputFiles;
+
+    @Option(displayName = "Upload in background",
+            description = "When set to `false` the extension will not upload build scan in the background. " +
+                    "By default, build scans are uploaded in the background after the build has finished to avoid blocking the build process.",
+            required = false,
+            example = "false")
+    @Nullable
+    Boolean uploadInBackground;
+
+    @Option(displayName = "Publish Criteria",
+            description = "When set to `always` the extension will publish build scans of every single build. " +
+                    "This is the default behavior when omitted." +
+                    "When set to `failure` the extension will only publish build scans when the build fails. " +
+                    "When set to `demand` the extension will only publish build scans when explicitly requested.",
+            required = false,
+            valid = {"always", "failure", "demand"},
+            example = "true")
+    @Nullable
+    PublishCriteria publishCriteria;
+    public enum PublishCriteria {
+        Always("ALWAYS"),
+        Failure("ON_FAILURE"),
+        Demand("ON_DEMAND");
+
+        private final String xmlName;
+        PublishCriteria(String xmlName) {
+            this.xmlName = xmlName;
+        }
+    }
 
     @Override
     public String getDisplayName() {
@@ -132,8 +158,7 @@ public class AddGradleEnterpriseMavenExtension extends Recipe {
             return before;
         }
 
-        Xml.Document gradleEnterpriseXml = createNewXml(GRADLE_ENTERPRISE_XML_PATH,
-            String.format(GRADLE_ENTERPRISE_XML_FORMAT, server, allowUntrustedServer != null ? allowUntrustedServer : Boolean.FALSE));
+        Xml.Document gradleEnterpriseXml = createNewXml(GRADLE_ENTERPRISE_XML_PATH, gradleEnterpriseConfiguration());
 
         if (matchingExtensionsXmlFile.get() != null) {
             if (!(matchingExtensionsXmlFile.get() instanceof Xml.Document)) {
@@ -156,6 +181,59 @@ public class AddGradleEnterpriseMavenExtension extends Recipe {
         Xml.Document extensionsXml = createNewXml(EXTENSIONS_XML_PATH, EXTENSIONS_XML_FORMAT);
         extensionsXml = addEnterpriseExtension(extensionsXml, ctx);
         return ListUtils.concat(ListUtils.concat(before, extensionsXml), gradleEnterpriseXml);
+    }
+
+    @JacksonXmlRootElement(localName = "gradleEnterprise")
+    @Value
+    private static class GradleEnterpriseConfiguration {
+        ServerConfiguration server;
+        @Nullable
+        BuildScanConfiguration buildScan;
+    }
+
+    @Value
+    private static class ServerConfiguration {
+        String url;
+        @Nullable
+        Boolean allowUntrusted;
+    }
+
+    @Value
+    private static class BuildScanConfiguration {
+        @Nullable
+        Boolean backgroundBuildScanUpload;
+        @Nullable
+        String publish;
+        @Nullable
+        Capture capture;
+    }
+
+    @Value
+    private static class Capture {
+        Boolean goalInputFiles;
+    }
+
+    private String gradleEnterpriseConfiguration() {
+        BuildScanConfiguration buildScanConfiguration = buildScanConfiguration();
+        ServerConfiguration serverConfiguration = new ServerConfiguration(server, allowUntrustedServer);
+        try {
+            ObjectMapper objectMapper = MavenXmlMapper.writeMapper();
+            objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
+            objectMapper.setSerializationInclusion(JsonInclude.Include.NON_ABSENT);
+            return objectMapper.writeValueAsString(new GradleEnterpriseConfiguration(serverConfiguration, buildScanConfiguration));
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Nullable
+    private BuildScanConfiguration buildScanConfiguration() {
+        if (uploadInBackground != null || publishCriteria != null || captureGoalInputFiles != null) {
+            return new BuildScanConfiguration(uploadInBackground,
+                    publishCriteria != null ? publishCriteria.xmlName : null,
+                    captureGoalInputFiles != null ? new Capture(captureGoalInputFiles) : null);
+        }
+        return null;
     }
 
     private static Xml.Document createNewXml(String filePath, String fileContents) {
