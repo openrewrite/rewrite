@@ -34,15 +34,16 @@ class MigrateToRewrite8Test implements RewriteTest {
           );
     }
 
+
     @Test
     void deprecateVisitJavaSourceFile() {
+        // language=java
         rewriteRun(
           java(
             """
               package org.openrewrite.staticanalysis;
 
               import org.openrewrite.*;
-              import org.openrewrite.internal.lang.Nullable;
               import org.openrewrite.java.JavaIsoVisitor;
               import org.openrewrite.java.RenameVariable;
               import org.openrewrite.java.tree.Flag;
@@ -146,6 +147,7 @@ class MigrateToRewrite8Test implements RewriteTest {
 
     @Test
     void getSingleSourceApplicableTestToPreconditions() {
+        // language=java
         rewriteRun(
           java(
             """
@@ -236,6 +238,192 @@ class MigrateToRewrite8Test implements RewriteTest {
                                       return m;
                                   }
                               });
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void visitAndCast() {
+        // language=java
+        rewriteRun(
+          spec -> spec.expectedCyclesThatMakeChanges(2),
+          java(
+            """
+              package org.openrewrite.java.cleanup;
+
+              import org.openrewrite.Cursor;
+              import org.openrewrite.Incubating;
+              import org.openrewrite.internal.lang.Nullable;
+              import org.openrewrite.java.JavaIsoVisitor;
+              import org.openrewrite.java.JavaVisitor;
+              import org.openrewrite.java.UnwrapParentheses;
+              import org.openrewrite.java.format.AutoFormatVisitor;
+              import org.openrewrite.java.tree.Expression;
+              import org.openrewrite.java.tree.J;
+              import org.openrewrite.java.tree.JavaSourceFile;
+              import org.openrewrite.java.tree.Space;
+
+              @Incubating(since = "7.0.0")
+              public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
+                  private static final String MAYBE_AUTO_FORMAT_ME = "MAYBE_AUTO_FORMAT_ME";
+
+                  @Override
+                  public J visitJavaSourceFile(JavaSourceFile cu, P p) {
+                      JavaSourceFile c = visitAndCast(cu, p, super::visitJavaSourceFile);
+                      if (c != cu) {
+                          doAfterVisit(new SimplifyBooleanExpressionVisitor<>());
+                      }
+                      return c;
+                  }
+              }
+              """,
+            """
+              package org.openrewrite.java.cleanup;
+
+              import org.openrewrite.Cursor;
+              import org.openrewrite.Incubating;
+              import org.openrewrite.Tree;
+              import org.openrewrite.internal.lang.Nullable;
+              import org.openrewrite.java.JavaIsoVisitor;
+              import org.openrewrite.java.JavaVisitor;
+              import org.openrewrite.java.UnwrapParentheses;
+              import org.openrewrite.java.format.AutoFormatVisitor;
+              import org.openrewrite.java.tree.Expression;
+              import org.openrewrite.java.tree.J;
+              import org.openrewrite.java.tree.JavaSourceFile;
+              import org.openrewrite.java.tree.Space;
+
+              @Incubating(since = "7.0.0")
+              public class SimplifyBooleanExpressionVisitor<P> extends JavaVisitor<P> {
+                  private static final String MAYBE_AUTO_FORMAT_ME = "MAYBE_AUTO_FORMAT_ME";
+
+                  @Override
+                  public  @Nullable J visit(@Nullable Tree tree, P p) {
+                      if (tree instanceof JavaSourceFile) {
+                          JavaSourceFile cu = (JavaSourceFile) tree;
+                          JavaSourceFile c = visitAndCast(cu, p, super::visit);
+                          if (c != cu) {
+                              doAfterVisit(new SimplifyBooleanExpressionVisitor<>());
+                          }
+                      }
+                      return super.visit(tree, p);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void castReturnTypeForSuperVisit() {
+        rewriteRun(
+          java(
+            """
+              package org.openrewrite.java.cleanup;
+
+              import org.openrewrite.ExecutionContext;
+              import org.openrewrite.Recipe;
+              import org.openrewrite.internal.ListUtils;
+              import org.openrewrite.java.AnnotationMatcher;
+              import org.openrewrite.java.JavaIsoVisitor;
+              import org.openrewrite.java.search.UsesType;
+              import org.openrewrite.java.tree.J;
+              import org.openrewrite.java.tree.JavaSourceFile;
+              import org.openrewrite.java.tree.JavaType;
+
+              import java.time.Duration;
+              import java.util.Collections;
+              import java.util.List;
+              import java.util.Set;
+
+              public class UnnecessaryPrimitiveAnnotations extends Recipe {
+                  private static final AnnotationMatcher CHECK_FOR_NULL_ANNOTATION_MATCHER = new AnnotationMatcher("@javax.annotation.CheckForNull");
+                  private static final AnnotationMatcher NULLABLE_ANNOTATION_MATCHER = new AnnotationMatcher("@javax.annotation.Nullable");
+
+                  @Override
+                  public String getDisplayName() {
+                      return "Remove Nullable and CheckForNull annotations from primitives";
+                  }
+
+                  @Override
+                  protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
+                      return new JavaIsoVisitor<ExecutionContext>() {
+                          @Override
+                          public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
+                              doAfterVisit(new UsesType<>("javax.annotation.CheckForNull", false));
+                              doAfterVisit(new UsesType<>("javax.annotation.Nullable", false));
+                              return cu;
+                          }
+                      };
+                  }
+
+                  @Override
+                  public JavaIsoVisitor<ExecutionContext> getVisitor() {
+
+                      return new JavaIsoVisitor<ExecutionContext>() {
+                          @Override
+                          public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
+                              JavaSourceFile c = super.visitJavaSourceFile(cu, executionContext);
+                              // do something
+                              return c;
+                          }
+                      };
+                  }
+              }
+              """,
+            """
+              package org.openrewrite.java.cleanup;
+
+              import org.openrewrite.*;
+              import org.openrewrite.internal.ListUtils;
+              import org.openrewrite.internal.lang.Nullable;
+              import org.openrewrite.java.AnnotationMatcher;
+              import org.openrewrite.java.JavaIsoVisitor;
+              import org.openrewrite.java.search.UsesType;
+              import org.openrewrite.java.tree.J;
+              import org.openrewrite.java.tree.JavaSourceFile;
+              import org.openrewrite.java.tree.JavaType;
+
+              import java.time.Duration;
+              import java.util.Collections;
+              import java.util.List;
+              import java.util.Set;
+
+              public class UnnecessaryPrimitiveAnnotations extends Recipe {
+                  private static final AnnotationMatcher CHECK_FOR_NULL_ANNOTATION_MATCHER = new AnnotationMatcher("@javax.annotation.CheckForNull");
+                  private static final AnnotationMatcher NULLABLE_ANNOTATION_MATCHER = new AnnotationMatcher("@javax.annotation.Nullable");
+
+                  @Override
+                  public String getDisplayName() {
+                      return "Remove Nullable and CheckForNull annotations from primitives";
+                  }
+
+                  @Override
+                  public TreeVisitor<?, ExecutionContext> getVisitor() {
+
+                      return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {
+                          @Override
+                          public  @Nullable J visit(@Nullable Tree tree, ExecutionContext executionContext) {
+                              if (tree instanceof JavaSourceFile) {
+                                  JavaSourceFile cu = (JavaSourceFile) tree;
+                                  doAfterVisit(new UsesType<>("javax.annotation.CheckForNull", false));
+                                  doAfterVisit(new UsesType<>("javax.annotation.Nullable", false));
+                              }
+                              return super.visit(tree, executionContext);
+                          }
+                      }, new JavaIsoVisitor<ExecutionContext>() {
+                          @Override
+                          public  @Nullable J visit(@Nullable Tree tree, ExecutionContext executionContext) {
+                              if (tree instanceof JavaSourceFile) {
+                                  JavaSourceFile cu = (JavaSourceFile) tree;
+                                  JavaSourceFile c = (JavaSourceFile) super.visit(cu, executionContext);
+                              }
+                              return super.visit(tree, executionContext);
+                          }
+                      });
                   }
               }
               """
