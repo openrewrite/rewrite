@@ -1328,10 +1328,7 @@ public class GroovyParserVisitor {
                     if (inCurlies) {
                         cursor++;
                     }
-                    strings.add(new G.GString.Value(randomId(), Markers.EMPTY, visit(e), inCurlies));
-                    if (inCurlies) {
-                        cursor++;
-                    }
+                    strings.add(new G.GString.Value(randomId(), Markers.EMPTY, visit(e),  inCurlies ? sourceBefore("}") : Space.EMPTY, inCurlies));
                 } else if (e instanceof ConstantExpression) {
                     ConstantExpression cs = (ConstantExpression) e;
                     // The sub-strings within a GString have no delimiters of their own, confusing visitConstantExpression()
