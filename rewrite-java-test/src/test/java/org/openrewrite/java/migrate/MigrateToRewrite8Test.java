@@ -35,6 +35,116 @@ class MigrateToRewrite8Test implements RewriteTest {
     }
 
     @Test
+    void deprecateVisitJavaSourceFile() {
+        rewriteRun(
+          java(
+            """
+              package org.openrewrite.staticanalysis;
+
+              import org.openrewrite.*;
+              import org.openrewrite.internal.lang.Nullable;
+              import org.openrewrite.java.JavaIsoVisitor;
+              import org.openrewrite.java.RenameVariable;
+              import org.openrewrite.java.tree.Flag;
+              import org.openrewrite.java.tree.J;
+              import org.openrewrite.java.tree.JavaSourceFile;
+
+              import java.time.Duration;
+              import java.util.*;
+
+              import static org.openrewrite.internal.NameCaseConvention.LOWER_CAMEL;
+
+              public class RenamePrivateFieldsToCamelCase extends Recipe {
+
+                  @Override
+                  public String getDisplayName() {
+                      return "Reformat private field names to camelCase";
+                  }
+
+                  @Override
+                  public TreeVisitor<?, ExecutionContext> getVisitor() {
+                      return new RenameNonCompliantNames();
+                  }
+
+                  private static class RenameNonCompliantNames extends JavaIsoVisitor<ExecutionContext> {
+                      @Override
+                      public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
+                          Map<J.VariableDeclarations.NamedVariable, String> renameVariablesMap = new LinkedHashMap<>();
+                          Set<String> hasNameSet = new HashSet<>();
+
+                          getCursor().putMessage("RENAME_VARIABLES_KEY", renameVariablesMap);
+                          getCursor().putMessage("HAS_NAME_KEY", hasNameSet);
+                          super.visitJavaSourceFile(cu, ctx);
+
+                          renameVariablesMap.forEach((key, value) -> {
+                              if (!hasNameSet.contains(value) && !hasNameSet.contains(key.getSimpleName())) {
+                                  doAfterVisit(new RenameVariable<>(key, value));
+                                  hasNameSet.add(value);
+                              }
+                          });
+                          return cu;
+                      }
+                  }
+              }
+              """,
+            """
+              package org.openrewrite.staticanalysis;
+
+              import org.openrewrite.*;
+              import org.openrewrite.internal.lang.Nullable;
+              import org.openrewrite.java.JavaIsoVisitor;
+              import org.openrewrite.java.RenameVariable;
+              import org.openrewrite.java.tree.Flag;
+              import org.openrewrite.java.tree.J;
+              import org.openrewrite.java.tree.JavaSourceFile;
+
+              import java.time.Duration;
+              import java.util.*;
+
+              import static org.openrewrite.internal.NameCaseConvention.LOWER_CAMEL;
+
+              public class RenamePrivateFieldsToCamelCase extends Recipe {
+
+                  @Override
+                  public String getDisplayName() {
+                      return "Reformat private field names to camelCase";
+                  }
+
+                  @Override
+                  public TreeVisitor<?, ExecutionContext> getVisitor() {
+                      return new RenameNonCompliantNames();
+                  }
+
+                  private static class RenameNonCompliantNames extends JavaIsoVisitor<ExecutionContext> {
+
+                      @Override
+                      public  @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                          if (tree instanceof JavaSourceFile) {
+                              JavaSourceFile cu = (JavaSourceFile) tree;
+                              Map<J.VariableDeclarations.NamedVariable, String> renameVariablesMap = new LinkedHashMap<>();
+                              Set<String> hasNameSet = new HashSet<>();
+            
+                              getCursor().putMessage("RENAME_VARIABLES_KEY", renameVariablesMap);
+                              getCursor().putMessage("HAS_NAME_KEY", hasNameSet);
+                              super.visit(cu, ctx);
+
+                              renameVariablesMap.forEach((key, value) -> {
+                                  if (!hasNameSet.contains(value) && !hasNameSet.contains(key.getSimpleName())) {
+                                      doAfterVisit(new RenameVariable<>(key, value));
+                                      hasNameSet.add(value);
+                                  }
+                              });
+                          }
+                          return super.visit(tree, ctx);
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void getSingleSourceApplicableTestToPreconditions() {
         rewriteRun(
           java(
@@ -62,20 +172,9 @@ class MigrateToRewrite8Test implements RewriteTest {
                   private static final MethodMatcher STRING_BUILDER_APPEND = new MethodMatcher("java.lang.StringBuilder append(String)");
                   private static J.Binary additiveBinaryTemplate = null;
 
-
                   @Override
                   public String getDisplayName() {
                       return "Chain `StringBuilder.append()` calls";
-                  }
-
-                  @Override
-                  public String getDescription() {
-                      return "String concatenation within calls to `StringBuilder.append()` causes unnecessary memory allocation. Except for concatenations of String literals, which are joined together at compile time. Replaces inefficient concatenations with chained calls to `StringBuilder.append()`.";
-                  }
-
-                  @Override
-                  public @Nullable Duration getEstimatedEffortPerOccurrence() {
-                      return Duration.ofMinutes(2);
                   }
 
                   @Override
@@ -89,132 +188,10 @@ class MigrateToRewrite8Test implements RewriteTest {
                           @Override
                           public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                               J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-
-                              if (STRING_BUILDER_APPEND.matches(m)) {
-                                  List<Expression> arguments = m.getArguments();
-                                  if (arguments.size() != 1) {
-                                      return m;
-                                  }
-
-                                  List<Expression> flattenExpressions = new ArrayList<>();
-                                  boolean flattenable = flatAdditiveExpressions(arguments.get(0).unwrap(), flattenExpressions);
-                                  if (!flattenable) {
-                                      return m;
-                                  }
-
-                                  if (flattenExpressions.stream().allMatch(exp -> exp instanceof J.Literal)) {
-                                      return m;
-                                  }
-
-                                  // group expressions
-                                  List<Expression> groups = new ArrayList<>();
-                                  List<Expression> group = new ArrayList<>();
-                                  boolean appendToString = false;
-                                  for (Expression exp : flattenExpressions) {
-                                      if (appendToString) {
-                                          if (exp instanceof J.Literal
-                                              && (((J.Literal) exp).getType() == JavaType.Primitive.String)
-                                          ) {
-                                              group.add(exp);
-                                          } else {
-                                              addToGroups(group, groups);
-                                              groups.add(exp);
-                                          }
-                                      } else {
-                                          if (exp instanceof J.Literal
-                                              && (((J.Literal) exp).getType() == JavaType.Primitive.String)) {
-                                              addToGroups(group, groups);
-                                              appendToString = true;
-                                          }  else if ((exp instanceof J.Identifier || exp instanceof J.MethodInvocation) && exp.getType() != null) {
-                                              JavaType.FullyQualified fullyQualified = TypeUtils.asFullyQualified(exp.getType());
-                                              if (fullyQualified != null && fullyQualified.getFullyQualifiedName().equals("java.lang.String")) {
-                                                  addToGroups(group, groups);
-                                                  appendToString = true;
-                                              }
-                                          }
-                                          group.add(exp);
-
-                                      }
-                                  }
-                                  addToGroups(group, groups);
-
-                                  J.MethodInvocation chainedMethods = m.withArguments(singletonList(groups.get(0)));
-                                  for (int i = 1; i < groups.size(); i++) {
-                                      chainedMethods = chainedMethods.withSelect(chainedMethods)
-                                          .withArguments(singletonList(groups.get(i).unwrap()))
-                                          .withPrefix(Space.EMPTY);
-                                  }
-
-                                  return chainedMethods;
-                              }
-
+                              // do something
                               return m;
                           }
                       };
-                  }
-
-                  /**
-                   * Concat two literals to an expression with '+' and surrounded with single space.
-                   */
-                  public static J.Binary concatAdditionBinary(Expression left, Expression right) {
-                      J.Binary b = getAdditiveBinaryTemplate();
-                      return b.withPrefix(b.getLeft().getPrefix())
-                          .withLeft(left)
-                          .withRight(right.withPrefix(Space.build(" " + right.getPrefix().getWhitespace(), emptyList())));
-                  }
-
-                  /**
-                   * Concat expressions to an expression with '+' connected.
-                   */
-                  public static Expression additiveExpression(Expression... expressions) {
-                      Expression expression = null;
-                      for (Expression element : expressions) {
-                          if (element != null) {
-                              expression = (expression == null) ? element : concatAdditionBinary(expression, element);
-                          }
-                      }
-                      return expression;
-                  }
-
-                  public static Expression additiveExpression(List<Expression> expressions) {
-                      return additiveExpression(expressions.toArray(new Expression[0]));
-                  }
-
-                  public static J.Binary getAdditiveBinaryTemplate() {
-                      if (additiveBinaryTemplate == null) {
-                          additiveBinaryTemplate = PartProvider.buildPart("class A { void foo() {String s = \\"A\\" + \\"B\\";}}", J.Binary.class);
-                      }
-                      return additiveBinaryTemplate;
-                  }
-
-                  /**
-                   * Concat an additive expression in a group and add to groups
-                   */
-                  private static void addToGroups(List<Expression> group, List<Expression> groups) {
-                      if (!group.isEmpty()) {
-                          groups.add(additiveExpression(group));
-                          group.clear();
-                      }
-                  }
-
-                  public static boolean flatAdditiveExpressions(Expression expression, List<Expression> expressionList) {
-                      if (expression instanceof J.Binary) {
-                          J.Binary b = (J.Binary) expression;
-                          if (b.getOperator() != J.Binary.Type.Addition) {
-                              return false;
-                          }
-
-                          return flatAdditiveExpressions(b.getLeft(), expressionList)
-                              && flatAdditiveExpressions(b.getRight(), expressionList);
-                      } else if (expression instanceof J.Literal ||
-                                 expression instanceof J.Identifier ||
-                                 expression instanceof J.MethodInvocation ||
-                                 expression instanceof J.Parentheses) {
-                          expressionList.add(expression.withPrefix(Space.EMPTY));
-                          return true;
-                      }
-
-                      return false;
                   }
               }
               """,
@@ -243,20 +220,9 @@ class MigrateToRewrite8Test implements RewriteTest {
                   private static final MethodMatcher STRING_BUILDER_APPEND = new MethodMatcher("java.lang.StringBuilder append(String)");
                   private static J.Binary additiveBinaryTemplate = null;
 
-
                   @Override
                   public String getDisplayName() {
                       return "Chain `StringBuilder.append()` calls";
-                  }
-
-                  @Override
-                  public String getDescription() {
-                      return "String concatenation within calls to `StringBuilder.append()` causes unnecessary memory allocation. Except for concatenations of String literals, which are joined together at compile time. Replaces inefficient concatenations with chained calls to `StringBuilder.append()`.";
-                  }
-
-                  @Override
-                  public @Nullable Duration getEstimatedEffortPerOccurrence() {
-                      return Duration.ofMinutes(2);
                   }
 
                   @Override
@@ -265,132 +231,10 @@ class MigrateToRewrite8Test implements RewriteTest {
                           @Override
                           public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                               J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-
-                              if (STRING_BUILDER_APPEND.matches(m)) {
-                                  List<Expression> arguments = m.getArguments();
-                                  if (arguments.size() != 1) {
-                                      return m;
-                                  }
-
-                                  List<Expression> flattenExpressions = new ArrayList<>();
-                                  boolean flattenable = flatAdditiveExpressions(arguments.get(0).unwrap(), flattenExpressions);
-                                  if (!flattenable) {
-                                      return m;
-                                  }
-
-                                  if (flattenExpressions.stream().allMatch(exp -> exp instanceof J.Literal)) {
-                                      return m;
-                                  }
-
-                                  // group expressions
-                                  List<Expression> groups = new ArrayList<>();
-                                  List<Expression> group = new ArrayList<>();
-                                  boolean appendToString = false;
-                                  for (Expression exp : flattenExpressions) {
-                                      if (appendToString) {
-                                          if (exp instanceof J.Literal
-                                                  && (((J.Literal) exp).getType() == JavaType.Primitive.String)
-                                          ) {
-                                              group.add(exp);
-                                          } else {
-                                              addToGroups(group, groups);
-                                              groups.add(exp);
-                                          }
-                                      } else {
-                                          if (exp instanceof J.Literal
-                                                  && (((J.Literal) exp).getType() == JavaType.Primitive.String)) {
-                                              addToGroups(group, groups);
-                                              appendToString = true;
-                                          } else if ((exp instanceof J.Identifier || exp instanceof J.MethodInvocation) && exp.getType() != null) {
-                                              JavaType.FullyQualified fullyQualified = TypeUtils.asFullyQualified(exp.getType());
-                                              if (fullyQualified != null && fullyQualified.getFullyQualifiedName().equals("java.lang.String")) {
-                                                  addToGroups(group, groups);
-                                                  appendToString = true;
-                                              }
-                                          }
-                                          group.add(exp);
-
-                                      }
-                                  }
-                                  addToGroups(group, groups);
-
-                                  J.MethodInvocation chainedMethods = m.withArguments(singletonList(groups.get(0)));
-                                  for (int i = 1; i < groups.size(); i++) {
-                                      chainedMethods = chainedMethods.withSelect(chainedMethods)
-                                              .withArguments(singletonList(groups.get(i).unwrap()))
-                                              .withPrefix(Space.EMPTY);
-                                  }
-
-                                  return chainedMethods;
-                              }
-
+                              // do something
                               return m;
                           }
                       });
-                  }
-
-                  /**
-                   * Concat two literals to an expression with '+' and surrounded with single space.
-                   */
-                  public static J.Binary concatAdditionBinary(Expression left, Expression right) {
-                      J.Binary b = getAdditiveBinaryTemplate();
-                      return b.withPrefix(b.getLeft().getPrefix())
-                          .withLeft(left)
-                          .withRight(right.withPrefix(Space.build(" " + right.getPrefix().getWhitespace(), emptyList())));
-                  }
-
-                  /**
-                   * Concat expressions to an expression with '+' connected.
-                   */
-                  public static Expression additiveExpression(Expression... expressions) {
-                      Expression expression = null;
-                      for (Expression element : expressions) {
-                          if (element != null) {
-                              expression = (expression == null) ? element : concatAdditionBinary(expression, element);
-                          }
-                      }
-                      return expression;
-                  }
-
-                  public static Expression additiveExpression(List<Expression> expressions) {
-                      return additiveExpression(expressions.toArray(new Expression[0]));
-                  }
-
-                  public static J.Binary getAdditiveBinaryTemplate() {
-                      if (additiveBinaryTemplate == null) {
-                          additiveBinaryTemplate = PartProvider.buildPart("class A { void foo() {String s = \\"A\\" + \\"B\\";}}", J.Binary.class);
-                      }
-                      return additiveBinaryTemplate;
-                  }
-
-                  /**
-                   * Concat an additive expression in a group and add to groups
-                   */
-                  private static void addToGroups(List<Expression> group, List<Expression> groups) {
-                      if (!group.isEmpty()) {
-                          groups.add(additiveExpression(group));
-                          group.clear();
-                      }
-                  }
-
-                  public static boolean flatAdditiveExpressions(Expression expression, List<Expression> expressionList) {
-                      if (expression instanceof J.Binary) {
-                          J.Binary b = (J.Binary) expression;
-                          if (b.getOperator() != J.Binary.Type.Addition) {
-                              return false;
-                          }
-
-                          return flatAdditiveExpressions(b.getLeft(), expressionList)
-                              && flatAdditiveExpressions(b.getRight(), expressionList);
-                      } else if (expression instanceof J.Literal ||
-                                 expression instanceof J.Identifier ||
-                                 expression instanceof J.MethodInvocation ||
-                                 expression instanceof J.Parentheses) {
-                          expressionList.add(expression.withPrefix(Space.EMPTY));
-                          return true;
-                      }
-
-                      return false;
                   }
               }
               """
