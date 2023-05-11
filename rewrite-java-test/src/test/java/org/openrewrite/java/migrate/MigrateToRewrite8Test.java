@@ -151,6 +151,7 @@ class MigrateToRewrite8Test implements RewriteTest {
             """
               package org.openrewrite.java.cleanup;
 
+              import org.openrewrite.Applicability;
               import org.openrewrite.ExecutionContext;
               import org.openrewrite.Recipe;
               import org.openrewrite.TreeVisitor;
@@ -179,7 +180,8 @@ class MigrateToRewrite8Test implements RewriteTest {
 
                   @Override
                   protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-                      return new UsesMethod<>(STRING_BUILDER_APPEND);
+                      return Applicability.or(new UsesMethod<>(STRING_BUILDER_APPEND),
+                          new UsesMethod<>(STRING_BUILDER_APPEND));
                   }
 
                   @Override
@@ -198,10 +200,7 @@ class MigrateToRewrite8Test implements RewriteTest {
             """
               package org.openrewrite.java.cleanup;
 
-              import org.openrewrite.ExecutionContext;
-              import org.openrewrite.Preconditions;
-              import org.openrewrite.Recipe;
-              import org.openrewrite.TreeVisitor;
+              import org.openrewrite.*;
               import org.openrewrite.internal.lang.Nullable;
               import org.openrewrite.java.JavaIsoVisitor;
               import org.openrewrite.java.MethodMatcher;
@@ -227,19 +226,20 @@ class MigrateToRewrite8Test implements RewriteTest {
 
                   @Override
                   public TreeVisitor<?, ExecutionContext> getVisitor() {
-                      return Preconditions.check(new UsesMethod<>(STRING_BUILDER_APPEND), new JavaIsoVisitor<ExecutionContext>() {
-                          @Override
-                          public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                              J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                              // do something
-                              return m;
-                          }
-                      });
+                      return Preconditions.check(
+                              Preconditions.or(new UsesMethod<>(STRING_BUILDER_APPEND),
+                                      new UsesMethod<>(STRING_BUILDER_APPEND)), new JavaIsoVisitor<ExecutionContext>() {
+                                  @Override
+                                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                                      J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                                      // do something
+                                      return m;
+                                  }
+                              });
                   }
               }
               """
           )
         );
     }
-
 }

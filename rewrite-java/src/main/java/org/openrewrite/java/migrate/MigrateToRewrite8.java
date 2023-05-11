@@ -45,10 +45,16 @@ public class MigrateToRewrite8 extends Recipe {
     private static final AnnotationMatcher OVERRIDE_ANNOTATION_MATCHER = new AnnotationMatcher("@java.lang.Override");
     private static final MethodMatcher VISIT_JAVA_SOURCE_FILE_METHOD_MATCHER = new MethodMatcher("org.openrewrite.java.JavaVisitor visitJavaSourceFile(..)", true);
     private static final MethodMatcher TREE_VISITOR_VISIT_METHOD_MATCHER = new MethodMatcher("org.openrewrite.TreeVisitor visit(..)", true);
+    private static final MethodMatcher APPLICABILITY_AND_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Applicability and(..)");
+    private static final MethodMatcher APPLICABILITY_OR_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Applicability or(..)");
+    private static final MethodMatcher APPLICABILITY_NOT_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Applicability not(..)");
 
-    private static J.ParameterizedType GET_VISITOR_RETURN_TYPE_TEMPLATE = null;
-    private static J.MethodDeclaration VISIT_TREE_METHOD_TEMPLATE = null;
-    private static J.MethodInvocation VISIT_TREE_METHOD_INVOCATION_TEMPLATE = null;
+    private static J.ParameterizedType getVisitorReturnTypeTemplate = null;
+    private static J.MethodDeclaration visitTreeMethodDeclarationTemplate = null;
+    private static J.MethodInvocation visitTreeMethodInvocationTemplate = null;
+    private static J.MethodInvocation preconditionAndTemplate = null;
+    private static J.MethodInvocation preconditionOrTemplate = null;
+    private static J.MethodInvocation preconditionNotTemplate = null;
 
     private static String VISIT_TREE_METHOD_TEMPLATE_CODE = "import org.openrewrite.Tree;\n" +
         "import org.openrewrite.internal.lang.Nullable;\n" +
@@ -162,7 +168,6 @@ public class MigrateToRewrite8 extends Recipe {
                             }
                         }
 
-                        // Statement getVisitorReturnStatements = null;
                         for (int i = 0; i < getVisitorStatements.size(); i++) {
                             if (i != getVisitorStatements.size() - 1) {
                                 mergedStatements.add(getVisitorStatements.get(i));
@@ -185,7 +190,12 @@ public class MigrateToRewrite8 extends Recipe {
                         );
 
                         mergedStatements.add(getVisitorReturnStatements);
-                        return MigratedTo8.withMarker( autoFormat(method.withBody(method.getBody().withStatements(mergedStatements)), ctx));
+                        method = method.withBody(method.getBody().withStatements(mergedStatements));
+                        method = (J.MethodDeclaration) replaceApplicabilityMethods(method, ctx);
+                        // APPLICABILITY_AND_METHOD_MATCHER  ->
+
+
+                        return MigratedTo8.withMarker( autoFormat(method, ctx));
                     }
 
                     return method;
@@ -259,6 +269,24 @@ public class MigrateToRewrite8 extends Recipe {
             .orElse(null);
     }
 
+    private static J replaceApplicabilityMethods(J tree, ExecutionContext ctx) {
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method,
+                                                            ExecutionContext executionContext) {
+                method = super.visitMethodInvocation(method, executionContext);
+                if (APPLICABILITY_AND_METHOD_MATCHER.matches(method.getMethodType())) {
+                    method = getPreconditionsAndTemplate().withArguments(method.getArguments());
+                } else if (APPLICABILITY_OR_METHOD_MATCHER.matches(method.getMethodType())) {
+                    method = getPreconditionsOrTemplate().withArguments(method.getArguments());
+                } else if (APPLICABILITY_NOT_METHOD_MATCHER.matches(method.getMethodType())) {
+                    method = getPreconditionsNotTemplate().withArguments(method.getArguments());
+                }
+                return method;
+            }
+        }.visit(tree, ctx);
+    }
+
     @Value
     @With
     private static class MigratedTo8 implements Marker {
@@ -275,28 +303,28 @@ public class MigrateToRewrite8 extends Recipe {
     }
 
     private static J.ParameterizedType getGetVisitorReturnType() {
-        if (GET_VISITOR_RETURN_TYPE_TEMPLATE == null) {
-            GET_VISITOR_RETURN_TYPE_TEMPLATE = PartProvider.buildPart("import org.openrewrite.ExecutionContext;\n" +
+        if (getVisitorReturnTypeTemplate == null) {
+            getVisitorReturnTypeTemplate = PartProvider.buildPart("import org.openrewrite.ExecutionContext;\n" +
                                                              "import org.openrewrite.TreeVisitor;\n" +
                                                              "\n" +
                                                              "public class A {\n" +
                                                              "    TreeVisitor<?, ExecutionContext> type;\n" +
                                                              "}", J.ParameterizedType.class, JavaParser.runtimeClasspath());
         }
-        return GET_VISITOR_RETURN_TYPE_TEMPLATE;
+        return getVisitorReturnTypeTemplate;
     }
 
     private static J.MethodDeclaration getVisitTreeMethodTemplate() {
-        if (VISIT_TREE_METHOD_TEMPLATE == null) {
-            VISIT_TREE_METHOD_TEMPLATE = PartProvider.buildPart(VISIT_TREE_METHOD_TEMPLATE_CODE,
+        if (visitTreeMethodDeclarationTemplate == null) {
+            visitTreeMethodDeclarationTemplate = PartProvider.buildPart(VISIT_TREE_METHOD_TEMPLATE_CODE,
                 J.MethodDeclaration.class, JavaParser.runtimeClasspath());
         }
-        return VISIT_TREE_METHOD_TEMPLATE;
+        return visitTreeMethodDeclarationTemplate;
     }
 
     private static J.MethodInvocation getVisitMethodInvocationTemplate() {
-        if (VISIT_TREE_METHOD_INVOCATION_TEMPLATE == null) {
-            VISIT_TREE_METHOD_INVOCATION_TEMPLATE = PartProvider.buildPart("import org.openrewrite.Tree;\n" +
+        if (visitTreeMethodInvocationTemplate == null) {
+            visitTreeMethodInvocationTemplate = PartProvider.buildPart("import org.openrewrite.Tree;\n" +
                                    "import org.openrewrite.TreeVisitor;\n" +
                                    "import org.openrewrite.internal.lang.Nullable;\n" +
                                    "\n" +
@@ -308,7 +336,46 @@ public class MigrateToRewrite8 extends Recipe {
                                    "}", J.MethodInvocation.class, JavaParser.runtimeClasspath()
                 );
         }
-        return VISIT_TREE_METHOD_INVOCATION_TEMPLATE;
+        return visitTreeMethodInvocationTemplate;
+    }
+
+    private static J.MethodInvocation getPreconditionsAndTemplate() {
+        if (preconditionAndTemplate == null) {
+            preconditionAndTemplate = PartProvider.buildPart("import org.openrewrite.Preconditions;\n" +
+                                                                "public class A {\n" +
+                                                                "    void method() {\n" +
+                                                                "         Preconditions.and(null);\n" +
+                                                                "    }\n" +
+                                                                "}", J.MethodInvocation.class, JavaParser.runtimeClasspath()
+            );
+        }
+        return preconditionAndTemplate;
+    }
+
+    private static J.MethodInvocation getPreconditionsOrTemplate() {
+        if (preconditionOrTemplate == null) {
+            preconditionOrTemplate = PartProvider.buildPart("import org.openrewrite.Preconditions;\n" +
+                                                                "public class A {\n" +
+                                                                "    void method() {\n" +
+                                                                "         Preconditions.or(null);\n" +
+                                                                "    }\n" +
+                                                                "}", J.MethodInvocation.class, JavaParser.runtimeClasspath()
+            );
+        }
+        return preconditionOrTemplate;
+    }
+
+    private static J.MethodInvocation getPreconditionsNotTemplate() {
+        if (preconditionNotTemplate == null) {
+            preconditionNotTemplate = PartProvider.buildPart("import org.openrewrite.Preconditions;\n" +
+                                                                "public class A {\n" +
+                                                                "    void method() {\n" +
+                                                                "         Preconditions.not(null);\n" +
+                                                                "    }\n" +
+                                                                "}", J.MethodInvocation.class, JavaParser.runtimeClasspath()
+            );
+        }
+        return preconditionNotTemplate;
     }
 
     private static J.MethodDeclaration buildVisitMethod(List<Statement> visitJavaSourceFileMethodParameters) {
