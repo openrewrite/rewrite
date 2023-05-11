@@ -637,6 +637,7 @@ public interface G extends J {
             UUID id;
             Markers markers;
             J tree;
+            Space after;
             boolean enclosedInBraces;
 
             @Override
