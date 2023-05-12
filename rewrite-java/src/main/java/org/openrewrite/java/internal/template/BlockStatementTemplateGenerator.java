@@ -64,6 +64,7 @@ public class BlockStatementTemplateGenerator {
                                                           "}";
 
     private final Set<String> imports;
+    private final boolean requiresContext;
 
     public String template(Cursor cursor, String template, Space.Location location, JavaCoordinates.Mode mode) {
         //noinspection ConstantConditions
@@ -210,14 +211,18 @@ public class BlockStatementTemplateGenerator {
     }
 
     private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
-        if(cursor.getValue() == Cursor.ROOT_VALUE) {
-            contextFreeTemplate(prior, before, after, insertionPoint, mode);
-        } else {
+        if (requiresContext) {
             contextTemplate(cursor, prior, before, after, insertionPoint, mode);
+        } else {
+            contextFreeTemplate(prior, before, after, insertionPoint, mode);
         }
     }
 
     private void contextFreeTemplate(J j, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
+        before.insert(0, EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
+        for (String anImport : imports) {
+            before.insert(0, anImport);
+        }
         if (j instanceof J.ClassDeclaration) {
             // While not impossible to handle, reaching this point is likely to be a mistake.
             // Without context a class declaration can include no imports, package, or outer class.
@@ -226,20 +231,19 @@ public class BlockStatementTemplateGenerator {
             // incorrect, and it would not be obvious to the recipe author why.
             throw new IllegalArgumentException(
                     "Templating a class declaration requires a cursor from which package declaration and imports may be reached. " +
-                    "Pass a cursor pointing to the class declaration's parent to JavaTemplate.Builder.context()");
-        } else if(j instanceof Expression) {
+                            "Pass a cursor pointing to the class declaration's parent to JavaTemplate.Builder.context()");
+        } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
             before.append("class Template {{\n");
-            if(j instanceof J.Assignment) {
-                before.append("Object");
-                after.append(";");
-            }else if(j instanceof J.Lambda) {
+            if (j instanceof J.Lambda) {
+                //TODO
+            } else if (j instanceof J.MemberReference) {
                 //TODO
             } else {
                 before.append("Object o = ");
                 after.append(";");
             }
             after.append("\n}}");
-        } else if(j instanceof J.MethodDeclaration || !(j instanceof J.Import) && !(j instanceof J.Package)) {
+        } else if (j instanceof J.MethodDeclaration || !(j instanceof J.Import) && !(j instanceof J.Package)) {
             before.append("class Template {\n");
             after.insert(0, "\n}");
         }

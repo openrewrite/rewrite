@@ -38,20 +38,21 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
-    @Nullable
     private final Supplier<Cursor> parentScopeGetter;
     private final String code;
+    private final boolean requiresContext;
     private final int parameterCount;
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
-    private JavaTemplate(@Nullable Supplier<Cursor> parentScopeGetter, JavaParser.Builder<?, ?> javaParser, String code, Set<String> imports,
-                         Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
+    private JavaTemplate(Supplier<Cursor> parentScopeGetter, JavaParser.Builder<?, ?> javaParser, String code, Set<String> imports,
+                         boolean requiresContext, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         this.parentScopeGetter = parentScopeGetter;
         this.code = code;
+        this.requiresContext = requiresContext;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.parameterCount = StringUtils.countOccurrences(code, "#{");
-        this.templateParser = new JavaTemplateParser(javaParser, onAfterVariableSubstitution, onBeforeParseTemplate, imports);
+        this.templateParser = new JavaTemplateParser(javaParser, onAfterVariableSubstitution, onBeforeParseTemplate, imports, requiresContext);
     }
 
     public String getCode() {
@@ -69,11 +70,11 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
 
-        if(parentScopeGetter == null) {
+        if (!requiresContext) {
             //noinspection ConstantConditions
             return (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
                     .getMixin()
-                    .visit(changing, 0);
+                    .visit(changing, 0, parentScopeGetter.get());
         }
 
         AtomicReference<Cursor> parentCursorRef = new AtomicReference<>();
@@ -147,23 +148,18 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
     }
 
-    @Deprecated
     public static Builder builder(Supplier<Cursor> parentScope, String code) {
         return new Builder(parentScope, code);
-    }
-
-    public static Builder builder(String code) {
-        return new Builder(code);
     }
 
     @SuppressWarnings("unused")
     public static class Builder {
 
-        @Nullable
         private Supplier<Cursor> context;
         private final String code;
         private final Set<String> imports = new HashSet<>();
 
+        private boolean requiresContext = true;
         private JavaParser.Builder<?, ?> javaParser = JavaParser.fromJavaVersion();
 
         private Consumer<String> onAfterVariableSubstitution = s -> {
@@ -171,18 +167,13 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         private Consumer<String> onBeforeParseTemplate = s -> {
         };
 
-        @Deprecated
         Builder(Supplier<Cursor> parentScope, String code) {
             this.context = parentScope;
             this.code = code.trim();
         }
 
-        Builder(String code) {
-            this.code = code.trim();
-        }
-
-        public Builder context(Supplier<Cursor> context) {
-            this.context = context;
+        public Builder requiresContext(boolean requiresContext) {
+            this.requiresContext = requiresContext;
             return this;
         }
 
@@ -231,7 +222,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
 
         public JavaTemplate build() {
-            return new JavaTemplate(context, javaParser, code, imports,
+            return new JavaTemplate(context, javaParser, code, imports, requiresContext,
                     onAfterVariableSubstitution, onBeforeParseTemplate);
         }
     }

@@ -60,16 +60,18 @@ public class JavaTemplateParser {
     private final Consumer<String> onAfterVariableSubstitution;
     private final Consumer<String> onBeforeParseTemplate;
     private final Set<String> imports;
+    private final boolean requiresContext;
     private final BlockStatementTemplateGenerator statementTemplateGenerator;
     private final AnnotationTemplateGenerator annotationTemplateGenerator;
 
     public JavaTemplateParser(JavaParser.Builder<?, ?> parser, Consumer<String> onAfterVariableSubstitution,
-                              Consumer<String> onBeforeParseTemplate, Set<String> imports) {
+                              Consumer<String> onBeforeParseTemplate, Set<String> imports, boolean requiresContext) {
         this.parser = parser;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.onBeforeParseTemplate = onBeforeParseTemplate;
         this.imports = imports;
-        this.statementTemplateGenerator = new BlockStatementTemplateGenerator(imports);
+        this.requiresContext = requiresContext;
+        this.statementTemplateGenerator = new BlockStatementTemplateGenerator(imports, requiresContext);
         this.annotationTemplateGenerator = new AnnotationTemplateGenerator(imports);
     }
 
@@ -99,9 +101,11 @@ public class JavaTemplateParser {
 
     public J parseExpression(Cursor cursor, String template, Space.Location location) {
         @Language("java") String stub = statementTemplateGenerator.template(cursor, template, location, JavaCoordinates.Mode.REPLACEMENT);
-        onBeforeParseTemplate.accept(stub);
-        JavaSourceFile cu = compileTemplate(stub);
-        return statementTemplateGenerator.listTemplatedTrees(cu, Expression.class).get(0);
+        return cacheIfContextFree(cursor, stub, () -> {
+            onBeforeParseTemplate.accept(stub);
+            JavaSourceFile cu = compileTemplate(stub);
+            return statementTemplateGenerator.listTemplatedTrees(cu, Expression.class);
+        }).get(0);
     }
 
     public TypeTree parseExtends(String template) {
@@ -258,11 +262,11 @@ public class JavaTemplateParser {
      * @return result of parsing the stub into LST elements
      */
     private <J2 extends J> List<J2> cacheIfContextFree(Cursor cursor, String stub, Supplier<List<? extends J>> supplier) {
-        if(cursor.getParent() == null) {
+        if (cursor.getParent() == null) {
             throw new IllegalArgumentException("Expecting the `cursor` to have a parent element");
         }
         // If the parent is the root, then the stub required no external context to be parsed and can therefore be cached
-        if(cursor.getParent().getValue() == Cursor.ROOT_VALUE) {
+        if (!requiresContext) {
             return cache(stub, supplier);
         }
         return (List<J2>) supplier.get();
