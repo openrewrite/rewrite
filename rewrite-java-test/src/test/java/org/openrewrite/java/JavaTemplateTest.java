@@ -41,7 +41,9 @@ class JavaTemplateTest implements RewriteTest {
               public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext p) {
                   if ((assignment.getAssignment() instanceof J.Literal) && ((J.Literal) assignment.getAssignment()).getValue().equals(1)) {
                       return assignment.withTemplate(
-                        JavaTemplate.builder("value = 0").build(),
+                        JavaTemplate.builder("value = 0")
+                          .context(this::getCursor)
+                          .build(),
                         assignment.getCoordinates().replace()
                       );
                   }
@@ -75,7 +77,7 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.Assert visitAssert(J.Assert _assert, ExecutionContext ctx) {
-                  _assert.getCondition().withTemplate(JavaTemplate.builder(this::getCursor, "null").build(), _assert.getCondition().getCoordinates().replace());
+                  _assert.getCondition().withTemplate(JavaTemplate.builder("null").build(), _assert.getCondition().getCoordinates().replace());
                   return super.visitAssert(_assert, ctx);
               }
           })),

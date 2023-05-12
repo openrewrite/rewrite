@@ -209,6 +209,14 @@ public class BlockStatementTemplateGenerator {
         return js;
     }
 
+    private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
+        if(cursor.getValue() == Cursor.ROOT_VALUE) {
+            contextFreeTemplate(prior, before, after, insertionPoint, mode);
+        } else {
+            contextTemplate(cursor, prior, before, after, insertionPoint, mode);
+        }
+    }
+
     private void contextFreeTemplate(J j, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
         if (j instanceof J.ClassDeclaration) {
             // While not impossible to handle, reaching this point is likely to be a mistake.
@@ -220,7 +228,7 @@ public class BlockStatementTemplateGenerator {
                     "Templating a class declaration requires a cursor from which package declaration and imports may be reached. " +
                     "Pass a cursor pointing to the class declaration's parent to JavaTemplate.Builder.context()");
         } else if(j instanceof Expression) {
-            before.append(EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
+            before.append("class Template {{\n");
             if(j instanceof J.Assignment) {
                 before.append("Object");
                 after.append(";");
@@ -234,14 +242,6 @@ public class BlockStatementTemplateGenerator {
         } else if(j instanceof J.MethodDeclaration || !(j instanceof J.Import) && !(j instanceof J.Package)) {
             before.append("class Template {\n");
             after.insert(0, "\n}");
-        }
-    }
-
-    private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
-        if(cursor.getValue() == Cursor.ROOT_VALUE) {
-            contextFreeTemplate(prior, before, after, insertionPoint, mode);
-        } else {
-            contextTemplate(cursor, prior, before, after, insertionPoint, mode);
         }
     }
 
