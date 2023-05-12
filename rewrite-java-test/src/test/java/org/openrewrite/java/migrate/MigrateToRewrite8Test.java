@@ -248,7 +248,6 @@ class MigrateToRewrite8Test implements RewriteTest {
     void visitAndCast() {
         // language=java
         rewriteRun(
-          spec -> spec.expectedCyclesThatMakeChanges(2),
           java(
             """
               package org.openrewrite.java.cleanup;
@@ -424,6 +423,142 @@ class MigrateToRewrite8Test implements RewriteTest {
                               return super.visit(tree, executionContext);
                           }
                       });
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doNextToDoAfterVisit() {
+        rewriteRun(
+          java(
+            """
+              package org.openrewrite.staticanalysis;
+
+              import org.openrewrite.ExecutionContext;
+              import org.openrewrite.Recipe;
+              import org.openrewrite.internal.lang.Nullable;
+              import org.openrewrite.java.ChangePackage;
+              import org.openrewrite.java.JavaIsoVisitor;
+              import org.openrewrite.java.tree.J;
+
+              import java.time.Duration;
+              import java.util.Collections;
+              import java.util.Set;
+
+              public class LowercasePackage extends Recipe {
+                  @Override
+                  public String getDisplayName() {
+                      return "Rename packages to lowercase";
+                  }
+
+                  @Override
+                  public JavaIsoVisitor<ExecutionContext> getVisitor() {
+                      return new JavaIsoVisitor<ExecutionContext>() {
+                          @Override
+                          public J.Package visitPackage(J.Package pkg, ExecutionContext executionContext) {
+                              String packageText = pkg.getExpression().print(getCursor()).replaceAll("\\\\s", "");
+                              String lowerCase = packageText.toLowerCase();
+                              if(!packageText.equals(lowerCase)) {
+                                  doNext(new ChangePackage(packageText, lowerCase, true));
+                              }
+                              return pkg;
+                          }
+                      };
+                  }
+              }
+              """,
+            """
+              package org.openrewrite.staticanalysis;
+
+              import org.openrewrite.ExecutionContext;
+              import org.openrewrite.Recipe;
+              import org.openrewrite.TreeVisitor;
+              import org.openrewrite.internal.lang.Nullable;
+              import org.openrewrite.java.ChangePackage;
+              import org.openrewrite.java.JavaIsoVisitor;
+              import org.openrewrite.java.tree.J;
+
+              import java.time.Duration;
+              import java.util.Collections;
+              import java.util.Set;
+
+              public class LowercasePackage extends Recipe {
+                  @Override
+                  public String getDisplayName() {
+                      return "Rename packages to lowercase";
+                  }
+
+                  @Override
+                  public TreeVisitor<?, ExecutionContext> getVisitor() {
+                      return new JavaIsoVisitor<ExecutionContext>() {
+                          @Override
+                          public J.Package visitPackage(J.Package pkg, ExecutionContext executionContext) {
+                              String packageText = pkg.getExpression().print(getCursor()).replaceAll("\\\\s", "");
+                              String lowerCase = packageText.toLowerCase();
+                              if(!packageText.equals(lowerCase)) {
+                                  doAfterVisit(new ChangePackage(packageText, lowerCase, true));
+                              }
+                              return pkg;
+                          }
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addCommentToMigrateScanningRecipeManually() {
+        rewriteRun(
+          java(
+            """
+              package org.openrewrite.java.cleanup;
+
+              import lombok.EqualsAndHashCode;
+              import lombok.Value;
+              import org.openrewrite.*;
+              import java.util.*;
+
+              @Value
+              @EqualsAndHashCode(callSuper = true)
+              public class FixSerializableFields extends Recipe {
+
+                  @Override
+                  public String getDisplayName() {
+                      return "Fields in a `Serializable` class should either be transient or serializable";
+                  }
+
+                  @Override
+                  protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
+                      return before;
+                  }
+              }
+              """,
+            """
+              package org.openrewrite.java.cleanup;
+
+              import lombok.EqualsAndHashCode;
+              import lombok.Value;
+              import org.openrewrite.*;
+              import java.util.*;
+
+              // *** This recipe uses the visit multiple sources method `visit(List<SourceFile> before, P p)`, needs to be migrated to use new introduced scanning recipe, please follow the migration guide here : (guide URL: to be written)
+              @Value
+              @EqualsAndHashCode(callSuper = true)
+              public class FixSerializableFields extends Recipe {
+
+                  @Override
+                  public String getDisplayName() {
+                      return "Fields in a `Serializable` class should either be transient or serializable";
+                  }
+
+                  @Override
+                  protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
+                      return before;
                   }
               }
               """

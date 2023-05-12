@@ -24,7 +24,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.*;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.SearchResult;
+import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +40,7 @@ public class MigrateToRewrite8 extends Recipe {
     private static final String JAVA_ISO_VISITOR_FQN = "org.openrewrite.java.JavaIsoVisitor";
     private static final String JAVA_VISITOR_FQN = "org.openrewrite.java.JavaVisitor";
     private static final MethodMatcher GET_SINGLE_SOURCE_APPLICABLE_TEST_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Recipe getSingleSourceApplicableTest()", true);
+    private static final MethodMatcher GET_APPLICABLE_TEST_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Recipe getApplicableTest()", true);
     private static final MethodMatcher GET_VISITOR_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Recipe getVisitor()", true);
     private static final MethodMatcher VISIT_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Recipe visit(..)", true);
     private static final AnnotationMatcher OVERRIDE_ANNOTATION_MATCHER = new AnnotationMatcher("@java.lang.Override");
@@ -48,6 +49,7 @@ public class MigrateToRewrite8 extends Recipe {
     private static final MethodMatcher APPLICABILITY_AND_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Applicability and(..)");
     private static final MethodMatcher APPLICABILITY_OR_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Applicability or(..)");
     private static final MethodMatcher APPLICABILITY_NOT_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Applicability not(..)");
+    private static final MethodMatcher DO_NEXT_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Recipe doNext(..)");
 
     private static J.ParameterizedType getVisitorReturnTypeTemplate = null;
     private static J.MethodDeclaration visitTreeMethodDeclarationTemplate = null;
@@ -57,6 +59,7 @@ public class MigrateToRewrite8 extends Recipe {
     private static J.MethodInvocation preconditionOrTemplate = null;
     private static J.MethodInvocation preconditionNotTemplate = null;
     private static J.MemberReference visitMemberReferenceTemplate = null;
+    private static J.MethodInvocation doAfterVisitTemplate = null;
 
     private static String VISIT_TREE_METHOD_TEMPLATE_CODE = "import org.openrewrite.Tree;\n" +
         "import org.openrewrite.internal.lang.Nullable;\n" +
@@ -88,8 +91,8 @@ public class MigrateToRewrite8 extends Recipe {
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
-            boolean hasSingleSourceApplicableTest = false;
-            List<Statement> singleSourceApplicableTestMethodStatements = new ArrayList<>();
+            boolean hasApplicableTest = false;
+            List<Statement> applicableTestMethodStatements = new ArrayList<>();
 
             @Override
             public J.MemberReference visitMemberReference(J.MemberReference memberRef,
@@ -102,31 +105,62 @@ public class MigrateToRewrite8 extends Recipe {
             }
 
             @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method,
+                                                            ExecutionContext ctx) {
+                method = super.visitMethodInvocation(method, ctx);
+                if (DO_NEXT_METHOD_MATCHER.matches(method.getMethodType())) {
+                    return autoFormat(getDoAfterVisitTemplate().withSelect(method.getSelect()).withArguments(method.getArguments()), ctx) ;
+                }
+                return method;
+            }
+
+            @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl,
                                                             ExecutionContext ctx) {
+                if (MigratedTo8.hasMarker(classDecl)) {
+                    return classDecl;
+                }
+
                 if (classDecl.getExtends() != null) {
                     JavaType extendsType = classDecl.getExtends().getType();
-
                     if (!TypeUtils.isOfClassType(extendsType, REWRITE_RECIPE_FQN) &&
                         !TypeUtils.isOfClassType(extendsType, JAVA_ISO_VISITOR_FQN) &&
                         !TypeUtils.isOfClassType(extendsType, JAVA_VISITOR_FQN)
                         ) {
                         return classDecl;
                     }
+                } else {
+                    return classDecl;
                 }
 
                 // find `getSingleSourceApplicableTest` method
                 J.MethodDeclaration singleSourceApplicableTestMethod = findSingleSourceApplicableTest(classDecl);
+                J.MethodDeclaration applicableTestMethod = findApplicableTest(classDecl);
                 if (singleSourceApplicableTestMethod != null) {
-                    hasSingleSourceApplicableTest = true;
+                    hasApplicableTest = true;
                     List<Statement> statements = singleSourceApplicableTestMethod.getBody().getStatements();
-                    singleSourceApplicableTestMethodStatements.addAll(statements);
+                    applicableTestMethodStatements.addAll(statements);
+                } else if (applicableTestMethod != null) {
+                    hasApplicableTest = true;
+                    List<Statement> statements = applicableTestMethod.getBody().getStatements();
+                    applicableTestMethodStatements.addAll(statements);
                 }
 
                 // find `visit` method
                 J.MethodDeclaration visitMethod = findVisitMethod(classDecl);
                 if (visitMethod != null) {
-                    return SearchResult.found(classDecl, "This recipe overrides the `visit(List<SourceFile> before, *)` method, which need to be manually migrated.");
+                    classDecl = MigratedTo8.withMarker(classDecl);
+                    Space prefix = classDecl.getPrefix();
+                    if (prefix == null) {
+                        prefix = Space.build("", new ArrayList<>());
+                    }
+
+                    String commentContent = " *** This recipe uses the visit multiple sources method `visit(List<SourceFile> before, P p)`, " +
+                    "needs to be migrated to use new introduced scanning recipe, please follow the migration guide here : (guide URL: to be written)";
+                    Comment comment = new TextComment(false, commentContent, "\n", Markers.EMPTY);
+                                        List<Comment> comments = ListUtils.concat(prefix.getComments(), comment);
+                    prefix = prefix.withComments(comments);
+                    return classDecl.withPrefix(prefix);
                 }
 
                 return super.visitClassDeclaration(classDecl, ctx);
@@ -135,16 +169,18 @@ public class MigrateToRewrite8 extends Recipe {
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method,
                                                               ExecutionContext ctx) {
-                if (GET_SINGLE_SOURCE_APPLICABLE_TEST_METHOD_MATCHER.matches(method.getMethodType())) {
+                if (MigratedTo8.hasMarker(method)) {
+                    return method;
+                }
+
+                if (GET_SINGLE_SOURCE_APPLICABLE_TEST_METHOD_MATCHER.matches(method.getMethodType()) ||
+                    GET_APPLICABLE_TEST_METHOD_MATCHER.matches(method.getMethodType())
+                    ) {
                     // remove `org.openrewrite.Recipe getSingleSourceApplicableTest()` method
                     return null;
                 }
 
                 if (GET_VISITOR_METHOD_MATCHER.matches(method.getMethodType())) {
-                    if (MigratedTo8.hasMarker(method)) {
-                        return method;
-                    }
-
                     // make the `Recipe#getVisitor()` methods public
                     if (J.Modifier.hasModifier(method.getModifiers(), Protected)) {
                         method = method.withModifiers(ListUtils.map(method.getModifiers(), mod ->
@@ -157,20 +193,20 @@ public class MigrateToRewrite8 extends Recipe {
                         method = method.withReturnTypeExpression(getGetVisitorReturnType().withPrefix(Space.SINGLE_SPACE));
                     }
 
-                    if (hasSingleSourceApplicableTest && !singleSourceApplicableTestMethodStatements.isEmpty()) {
+                    if (hasApplicableTest && !applicableTestMethodStatements.isEmpty()) {
                         maybeAddImport("org.openrewrite.Preconditions", false);
 
                         // merge statements
                         List<Statement> getVisitorStatements = method.getBody().getStatements();
                         Statement getVisitorReturnStatements = null;
-                        Statement singleSourceApplicableTestReturnStatement = null;
+                        Statement applicableTestReturnStatement = null;
                         List<Statement> mergedStatements = new ArrayList<>();
 
-                        for (int i = 0; i < singleSourceApplicableTestMethodStatements.size(); i++) {
-                            if (i != singleSourceApplicableTestMethodStatements.size() - 1) {
-                                mergedStatements.add(singleSourceApplicableTestMethodStatements.get(i));
+                        for (int i = 0; i < applicableTestMethodStatements.size(); i++) {
+                            if (i != applicableTestMethodStatements.size() - 1) {
+                                mergedStatements.add(applicableTestMethodStatements.get(i));
                             } else {
-                                singleSourceApplicableTestReturnStatement = singleSourceApplicableTestMethodStatements.get(i);
+                                applicableTestReturnStatement = applicableTestMethodStatements.get(i);
                             }
                         }
 
@@ -191,15 +227,13 @@ public class MigrateToRewrite8 extends Recipe {
 
                         getVisitorReturnStatements = getVisitorReturnStatements.withTemplate(
                             preconditionsCheckTemplate, getVisitorReturnStatements.getCoordinates().replace(),
-                            ((J.Return) singleSourceApplicableTestReturnStatement).getExpression(),
+                            ((J.Return) applicableTestReturnStatement).getExpression(),
                             ((J.Return) getVisitorReturnStatements).getExpression()
                         );
 
                         mergedStatements.add(getVisitorReturnStatements);
                         method = method.withBody(method.getBody().withStatements(mergedStatements));
                         method = (J.MethodDeclaration) replaceApplicabilityMethods(method, ctx);
-                        // APPLICABILITY_AND_METHOD_MATCHER  ->
-
 
                         return MigratedTo8.withMarker( autoFormat(super.visitMethodDeclaration(method, ctx), ctx));
                     }
@@ -245,6 +279,16 @@ public class MigrateToRewrite8 extends Recipe {
                             }
                             return super.visitMethodInvocation(method, executionContext);
                         }
+
+                        @Override
+                        public J.MemberReference visitMemberReference(J.MemberReference memberRef,
+                                                                      ExecutionContext executionContext) {
+                            if (VISIT_JAVA_SOURCE_FILE_METHOD_MATCHER.matches(memberRef.getMethodType())) {
+                                maybeAddImport("org.openrewrite.TreeVisitor");
+                                return getVisitMemberReferenceTemplate();
+                            }
+                            return memberRef;
+                        }
                     }.visit(visitMethod, ctx);
 
                     maybeAddImport("org.openrewrite.internal.lang.Nullable");
@@ -264,8 +308,18 @@ public class MigrateToRewrite8 extends Recipe {
             .stream()
             .filter(statement -> statement instanceof J.MethodDeclaration)
             .map(J.MethodDeclaration.class::cast)
-            // .filter(m -> m.getName().getSimpleName().equals("getSingleSourceApplicableTest"))
             .filter(m -> GET_SINGLE_SOURCE_APPLICABLE_TEST_METHOD_MATCHER.matches(m.getMethodType()))
+            .findFirst()
+            .orElse(null);
+    }
+
+    private static J.MethodDeclaration findApplicableTest(J.ClassDeclaration classDecl) {
+        return classDecl.getBody()
+            .getStatements()
+            .stream()
+            .filter(statement -> statement instanceof J.MethodDeclaration)
+            .map(J.MethodDeclaration.class::cast)
+            .filter(m -> GET_APPLICABLE_TEST_METHOD_MATCHER.matches(m.getMethodType()))
             .findFirst()
             .orElse(null);
     }
@@ -298,6 +352,37 @@ public class MigrateToRewrite8 extends Recipe {
                 return method;
             }
         }.visit(tree, ctx);
+    }
+
+    private static J.MethodDeclaration buildVisitMethod(List<Statement> visitJavaSourceFileMethodParameters) {
+        J.MethodDeclaration visitMethodTemplate = getVisitTreeMethodTemplate();
+
+        J.Identifier javaSourceFiledId = ((J.VariableDeclarations)(visitJavaSourceFileMethodParameters.get(0))).getVariables().get(0).getName();
+        J.Identifier secondParameter = ((J.VariableDeclarations) visitJavaSourceFileMethodParameters.get(1)).getVariables().get(0).getName();
+        J.MethodDeclaration visitMethod = visitMethodTemplate.withParameters(
+            ListUtils.mapLast(visitMethodTemplate.getParameters(), a -> visitJavaSourceFileMethodParameters.get(1))
+        );
+        return (J.MethodDeclaration) new JavaIsoVisitor<J.Identifier>(){
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, J.Identifier replacement) {
+                if (TREE_VISITOR_VISIT_METHOD_MATCHER.matches(method.getMethodType())) {
+                    return method.withArguments(ListUtils.mapLast(method.getArguments(),
+                        a -> replacement.withPrefix(Space.SINGLE_SPACE)));
+                }
+                return method;
+            }
+
+            @Override
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable,
+                                                                    J.Identifier identifier) {
+                if (TypeUtils.isOfClassType(multiVariable.getType(), "org.openrewrite.java.tree.JavaSourceFile")) {
+                    List<J.VariableDeclarations.NamedVariable> variables = multiVariable.getVariables();
+                    variables = ListUtils.mapLast(variables, a -> a.withName(javaSourceFiledId));
+                    return multiVariable.withVariables(variables);
+                }
+                return multiVariable;
+            }
+        }.visit(visitMethod, secondParameter);
     }
 
     @Value
@@ -430,34 +515,21 @@ public class MigrateToRewrite8 extends Recipe {
         return visitMemberReferenceTemplate;
     }
 
-    private static J.MethodDeclaration buildVisitMethod(List<Statement> visitJavaSourceFileMethodParameters) {
-        J.MethodDeclaration visitMethodTemplate = getVisitTreeMethodTemplate();
-
-        J.Identifier javaSourceFiledId = ((J.VariableDeclarations)(visitJavaSourceFileMethodParameters.get(0))).getVariables().get(0).getName();
-        J.Identifier secondParameter = ((J.VariableDeclarations) visitJavaSourceFileMethodParameters.get(1)).getVariables().get(0).getName();
-        J.MethodDeclaration visitMethod = visitMethodTemplate.withParameters(
-            ListUtils.mapLast(visitMethodTemplate.getParameters(), a -> visitJavaSourceFileMethodParameters.get(1))
-        );
-        return (J.MethodDeclaration) new JavaIsoVisitor<J.Identifier>(){
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, J.Identifier replacement) {
-                if (TREE_VISITOR_VISIT_METHOD_MATCHER.matches(method.getMethodType())) {
-                    return method.withArguments(ListUtils.mapLast(method.getArguments(),
-                        a -> replacement.withPrefix(Space.SINGLE_SPACE)));
-                }
-                return method;
-            }
-
-            @Override
-            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable,
-                                                                    J.Identifier identifier) {
-                if (TypeUtils.isOfClassType(multiVariable.getType(), "org.openrewrite.java.tree.JavaSourceFile")) {
-                    List<J.VariableDeclarations.NamedVariable> variables = multiVariable.getVariables();
-                    variables = ListUtils.mapLast(variables, a -> a.withName(javaSourceFiledId));
-                    return multiVariable.withVariables(variables);
-                }
-                return multiVariable;
-            }
-        }.visit(visitMethod, secondParameter);
+    private static J.MethodInvocation getDoAfterVisitTemplate() {
+        if (doAfterVisitTemplate == null) {
+            doAfterVisitTemplate = PartProvider.buildPart(
+                "import org.openrewrite.TreeVisitor;\n" +
+                "import org.openrewrite.java.JavaIsoVisitor;\n" +
+                "\n" +
+                "public class A extends TreeVisitor {\n" +
+                "    void method() {\n" +
+                "        doAfterVisit(new JavaIsoVisitor<>());\n" +
+                "    }\n" +
+                "}", J.MethodInvocation.class,
+                JavaParser.runtimeClasspath()
+            );
+        }
+        return doAfterVisitTemplate;
     }
+
 }
