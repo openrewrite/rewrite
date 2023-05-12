@@ -25,6 +25,7 @@ import org.openrewrite.java.*;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.Markup;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -109,7 +110,9 @@ public class MigrateToRewrite8 extends Recipe {
                                                             ExecutionContext ctx) {
                 method = super.visitMethodInvocation(method, ctx);
                 if (DO_NEXT_METHOD_MATCHER.matches(method.getMethodType())) {
-                    return autoFormat(getDoAfterVisitTemplate().withSelect(method.getSelect()).withArguments(method.getArguments()), ctx) ;
+                    String comment = "Method `Recipe.doNext(..)` is removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor::doAfterVisit`, \n" +
+                                     "please follow the migrate migration here, (URL to be rewritten)\n";
+                    return Markup.info(method, comment);
                 }
                 return method;
             }
@@ -150,17 +153,24 @@ public class MigrateToRewrite8 extends Recipe {
                 J.MethodDeclaration visitMethod = findVisitMethod(classDecl);
                 if (visitMethod != null) {
                     classDecl = MigratedTo8.withMarker(classDecl);
-                    Space prefix = classDecl.getPrefix();
-                    if (prefix == null) {
-                        prefix = Space.build("", new ArrayList<>());
-                    }
 
-                    String commentContent = " *** This recipe uses the visit multiple sources method `visit(List<SourceFile> before, P p)`, " +
-                    "needs to be migrated to use new introduced scanning recipe, please follow the migration guide here : (guide URL: to be written)";
-                    Comment comment = new TextComment(false, commentContent, "\n", Markers.EMPTY);
-                                        List<Comment> comments = ListUtils.concat(prefix.getComments(), comment);
-                    prefix = prefix.withComments(comments);
-                    return classDecl.withPrefix(prefix);
+                    return (J.ClassDeclaration) new JavaIsoVisitor<ExecutionContext>() {
+                        @Override
+                        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method,
+                                                                          ExecutionContext executionContext) {
+                            if (VISIT_METHOD_MATCHER.matches(method.getMethodType())) {
+
+                                String commentContent = " *** This recipe uses the visit multiple sources method " +
+                                                        "`visit(List<SourceFile> before, P p)`, " +
+                                                        "needs to be migrated to use new introduced scanning recipe, \n" +
+                                                        "please follow the migration guide here : (guide URL: to be " +
+                                                        "written)\n";
+
+                                return Markup.info(method, commentContent);
+                            }
+                            return super.visitMethodDeclaration(method, executionContext);
+                        }
+                    }.visit(classDecl, ctx);
                 }
 
                 return super.visitClassDeclaration(classDecl, ctx);

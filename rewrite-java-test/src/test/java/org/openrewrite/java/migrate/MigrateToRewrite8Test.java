@@ -499,7 +499,9 @@ class MigrateToRewrite8Test implements RewriteTest {
                               String packageText = pkg.getExpression().print(getCursor()).replaceAll("\\\\s", "");
                               String lowerCase = packageText.toLowerCase();
                               if(!packageText.equals(lowerCase)) {
-                                  doAfterVisit(new ChangePackage(packageText, lowerCase, true));
+                                  /*~~(Method `Recipe.doNext(..)` is removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor::doAfterVisit`,\s
+              please follow the migrate migration here, (URL to be rewritten)
+              )~~>*/doNext(new ChangePackage(packageText, lowerCase, true));
                               }
                               return pkg;
                           }
@@ -546,7 +548,6 @@ class MigrateToRewrite8Test implements RewriteTest {
               import org.openrewrite.*;
               import java.util.*;
 
-              // *** This recipe uses the visit multiple sources method `visit(List<SourceFile> before, P p)`, needs to be migrated to use new introduced scanning recipe, please follow the migration guide here : (guide URL: to be written)
               @Value
               @EqualsAndHashCode(callSuper = true)
               public class FixSerializableFields extends Recipe {
@@ -556,7 +557,9 @@ class MigrateToRewrite8Test implements RewriteTest {
                       return "Fields in a `Serializable` class should either be transient or serializable";
                   }
 
-                  @Override
+                  /*~~( *** This recipe uses the visit multiple sources method `visit(List<SourceFile> before, P p)`, needs to be migrated to use new introduced scanning recipe,\s
+              please follow the migration guide here : (guide URL: to be written)
+              )~~>*/@Override
                   protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
                       return before;
                   }
