@@ -38,13 +38,14 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
+    @Nullable
     private final Supplier<Cursor> parentScopeGetter;
     private final String code;
     private final int parameterCount;
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
-    private JavaTemplate(Supplier<Cursor> parentScopeGetter, JavaParser.Builder<?, ?> javaParser, String code, Set<String> imports,
+    private JavaTemplate(@Nullable Supplier<Cursor> parentScopeGetter, JavaParser.Builder<?, ?> javaParser, String code, Set<String> imports,
                          Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         this.parentScopeGetter = parentScopeGetter;
         this.code = code;
@@ -67,6 +68,13 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         Substitutions substitutions = new Substitutions(code, parameters);
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
+
+        if(parentScopeGetter == null) {
+            //noinspection ConstantConditions
+            return (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
+                    .getMixin()
+                    .visit(changing, 0);
+        }
 
         AtomicReference<Cursor> parentCursorRef = new AtomicReference<>();
 
@@ -103,7 +111,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         Cursor parentCursor = parentCursorRef.get();
 
         //noinspection ConstantConditions
-        return (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates, parentCursorRef, parentScope)
+        return (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
                 .getMixin()
                 .visit(changing, 0, parentCursor);
     }
@@ -139,13 +147,20 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
     }
 
+    @Deprecated
     public static Builder builder(Supplier<Cursor> parentScope, String code) {
         return new Builder(parentScope, code);
     }
 
+    public static Builder builder(String code) {
+        return new Builder(code);
+    }
+
     @SuppressWarnings("unused")
     public static class Builder {
-        private final Supplier<Cursor> parentScope;
+
+        @Nullable
+        private Supplier<Cursor> context;
         private final String code;
         private final Set<String> imports = new HashSet<>();
 
@@ -156,9 +171,19 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         private Consumer<String> onBeforeParseTemplate = s -> {
         };
 
+        @Deprecated
         Builder(Supplier<Cursor> parentScope, String code) {
-            this.parentScope = parentScope;
+            this.context = parentScope;
             this.code = code.trim();
+        }
+
+        Builder(String code) {
+            this.code = code.trim();
+        }
+
+        public Builder context(Supplier<Cursor> context) {
+            this.context = context;
+            return this;
         }
 
         public Builder imports(String... fullyQualifiedTypeNames) {
@@ -206,7 +231,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
 
         public JavaTemplate build() {
-            return new JavaTemplate(parentScope, javaParser, code, imports,
+            return new JavaTemplate(context, javaParser, code, imports,
                     onAfterVariableSubstitution, onBeforeParseTemplate);
         }
     }

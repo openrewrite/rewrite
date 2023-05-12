@@ -41,7 +41,7 @@ class JavaTemplateTest implements RewriteTest {
               public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext p) {
                   if ((assignment.getAssignment() instanceof J.Literal) && ((J.Literal) assignment.getAssignment()).getValue().equals(1)) {
                       return assignment.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "value = 0").build(),
+                        JavaTemplate.builder("value = 0").build(),
                         assignment.getCoordinates().replace()
                       );
                   }

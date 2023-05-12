@@ -18,6 +18,7 @@ package org.openrewrite.java.internal.template;
 import org.openrewrite.Cursor;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -48,10 +49,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             emptyList(), Space.format(" "));
 
     public JavaTemplateJavaExtension(JavaTemplateParser templateParser, Substitutions substitutions,
-                                     String substitutedTemplate, JavaCoordinates coordinates,
-                                     AtomicReference<Cursor> parentCursorRef,
-                                     Cursor parentScope) {
-        super(templateParser, substitutions, substitutedTemplate, coordinates, parentCursorRef, parentScope);
+                                     String substitutedTemplate, JavaCoordinates coordinates) {
+        super(templateParser, substitutions, substitutedTemplate, coordinates);
     }
 
     @Override
