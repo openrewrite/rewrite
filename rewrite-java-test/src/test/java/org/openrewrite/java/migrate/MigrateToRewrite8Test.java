@@ -34,7 +34,6 @@ class MigrateToRewrite8Test implements RewriteTest {
           );
     }
 
-
     @Test
     void deprecateVisitJavaSourceFile() {
         // language=java
@@ -367,7 +366,7 @@ class MigrateToRewrite8Test implements RewriteTest {
                           @Override
                           public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
                               JavaSourceFile c = super.visitJavaSourceFile(cu, executionContext);
-                              // do something
+                              super.visitJavaSourceFile(cu, executionContext);
                               return c;
                           }
                       };
@@ -420,6 +419,7 @@ class MigrateToRewrite8Test implements RewriteTest {
                               if (tree instanceof JavaSourceFile) {
                                   JavaSourceFile cu = (JavaSourceFile) tree;
                                   JavaSourceFile c = (JavaSourceFile) super.visit(cu, executionContext);
+                                  super.visit(cu, executionContext);
                               }
                               return super.visit(tree, executionContext);
                           }

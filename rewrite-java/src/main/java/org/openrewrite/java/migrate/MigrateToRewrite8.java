@@ -209,11 +209,6 @@ public class MigrateToRewrite8 extends Recipe {
 
                 if (VISIT_JAVA_SOURCE_FILE_METHOD_MATCHER.matches(method.getMethodType())) {
                     // replace with `visit` method
-                    J.MethodDeclaration visitMethodTemplate = getVisitTreeMethodTemplate();
-                    List<Statement> visitJavaSourceFileMethodParameters = method.getParameters();
-                    J.Identifier javaSourceFileId = ((J.VariableDeclarations)(visitJavaSourceFileMethodParameters.get(0))).getVariables().get(0).getName();
-
-
                     List<Statement> visitJavaSourceFileMethodStatements = method.getBody().getStatements();
                     visitJavaSourceFileMethodStatements.remove(visitJavaSourceFileMethodStatements.size() - 1);
                     J.MethodDeclaration visitMethod = buildVisitMethod(method.getParameters());
@@ -234,10 +229,19 @@ public class MigrateToRewrite8 extends Recipe {
                         @Override
                         public J visitMethodInvocation(J.MethodInvocation method,
                                                                         ExecutionContext executionContext) {
+
                             if (VISIT_JAVA_SOURCE_FILE_METHOD_MATCHER.matches(method.getMethodType())) {
-                                J.TypeCast typeCast = getVisitMethodInvocationTypeCastTemplate();
-                                J.MethodInvocation exp = ((J.MethodInvocation) typeCast.getExpression()).withSelect(method.getSelect()).withArguments(method.getArguments());
-                                return typeCast.withExpression(exp);
+                                boolean isVariableDeclaration = getCursor().dropParentUntil(p -> p instanceof J.VariableDeclarations ||
+                                    p instanceof J.Block || p instanceof J.MethodDeclaration
+                                ).getValue() instanceof J.VariableDeclarations;
+
+                                if (isVariableDeclaration) {
+                                    J.TypeCast typeCast = getVisitMethodInvocationTypeCastTemplate();
+                                    J.MethodInvocation exp = ((J.MethodInvocation) typeCast.getExpression()).withSelect(method.getSelect()).withArguments(method.getArguments());
+                                    return typeCast.withExpression(exp);
+                                } else {
+                                    return getVisitMethodInvocationTemplate().withSelect(method.getSelect()).withArguments(method.getArguments());
+                                }
                             }
                             return super.visitMethodInvocation(method, executionContext);
                         }
