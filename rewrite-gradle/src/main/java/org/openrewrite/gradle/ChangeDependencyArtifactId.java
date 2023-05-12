@@ -105,6 +105,21 @@ public class ChangeDependencyArtifactId extends Recipe {
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));
                         }
                     }
+                } else if (depArgs.get(0) instanceof G.GString) {
+                    List<J> strings = ((G.GString) depArgs.get(0)).getStrings();
+                    if (strings.size() >= 2 &&
+                      strings.get(0) instanceof J.Literal) {
+                        Dependency dependency = DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
+                        if (!newArtifactId.equals(dependency.getArtifactId())
+                          && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                            dependency = dependency.withArtifactId(newArtifactId);
+                            String replacement = dependency.toStringNotation();
+                            m = m.withArguments(ListUtils.mapFirst(depArgs, arg -> {
+                                G.GString gString = (G.GString) arg;
+                                return gString.withStrings(ListUtils.mapFirst(gString.getStrings(), l -> ((J.Literal) l).withValue(replacement).withValueSource(replacement)));
+                            }));
+                        }
+                    }
                 } else if (depArgs.get(0) instanceof G.MapEntry) {
                     G.MapEntry artifactEntry = null;
                     String groupId = null;

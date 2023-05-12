@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
@@ -35,11 +36,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+                            
               repositories {
                   mavenCentral()
               }
-              
+                            
               dependencies {
                   implementation 'org.springframework.boot:spring-boot-starter:2.5.4'
               }
@@ -48,11 +49,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-              
+                            
               repositories {
                   mavenCentral()
               }
-              
+                            
               dependencies {
                   implementation 'org.springframework.boot:new-starter:2.5.4'
               }
@@ -75,7 +76,7 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+                            
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release'
                   api "org.openrewrite:rewrite-core:latest.release"
@@ -89,7 +90,7 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+                            
               dependencies {
                   api 'org.openrewrite:dewrite-core:latest.release'
                   api "org.openrewrite:dewrite-core:latest.release"
@@ -113,7 +114,7 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+                            
               dependencies {
                   api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release"
@@ -127,7 +128,7 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+                            
               dependencies {
                   api group: 'org.openrewrite', name: 'dewrite-core', version: 'latest.release'
                   api group: "org.openrewrite", name: "dewrite-core", version: "latest.release"
@@ -138,7 +139,7 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @CsvSource(value ={"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
     void worksWithoutVersion(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyArtifactId(group, artifact, "dewrite-core", null)),
@@ -151,7 +152,7 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+                            
               dependencies {
                   api 'org.openrewrite:rewrite-core'
                   api "org.openrewrite:rewrite-core"
@@ -167,7 +168,7 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+                            
               dependencies {
                   api 'org.openrewrite:dewrite-core'
                   api "org.openrewrite:dewrite-core"
@@ -180,7 +181,7 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @CsvSource(value ={"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
+    @CsvSource(value = {"org.openrewrite:rewrite-core", "*:*"}, delimiterString = ":")
     void worksWithClassifier(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyArtifactId(group, artifact, "dewrite-core", null)),
@@ -193,7 +194,7 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+                            
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release:tests'
                   api "org.openrewrite:rewrite-core:latest.release:tests"
@@ -209,7 +210,7 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+                            
               dependencies {
                   api 'org.openrewrite:dewrite-core:latest.release:tests'
                   api "org.openrewrite:dewrite-core:latest.release:tests"
@@ -222,7 +223,7 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
     }
 
     @ParameterizedTest
-    @CsvSource(value ={"org.eclipse.jetty:jetty-servlet", "*:*"}, delimiterString = ":")
+    @CsvSource(value = {"org.eclipse.jetty:jetty-servlet", "*:*"}, delimiterString = ":")
     void worksWithExt(String group, String artifact) {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependencyArtifactId(group, artifact, "jetty-servlet-tests", null)),
@@ -235,7 +236,7 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+                            
               dependencies {
                   api 'org.eclipse.jetty:jetty-servlet@jar'
                   api "org.eclipse.jetty:jetty-servlet@jar"
@@ -259,7 +260,7 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               repositories {
                   mavenCentral()
               }
-              
+                            
               dependencies {
                   api 'org.eclipse.jetty:jetty-servlet-tests@jar'
                   api "org.eclipse.jetty:jetty-servlet-tests@jar"
@@ -273,6 +274,28 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
                   api group: "org.eclipse.jetty", name: "jetty-servlet-tests", version: "9.4.50.v20221201", ext: "jar"
                   api group: 'org.eclipse.jetty', name: 'jetty-servlet-tests', version: '9.4.50.v20221201', classifier: 'tests', ext: 'jar'
                   api group: "org.eclipse.jetty", name: "jetty-servlet-tests", version: "9.4.50.v20221201", classifier: "tests", ext: "jar"
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3240")
+    @Test
+    void worksWithGString() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyArtifactId("javax.validation", "validation-api", "jakarta.validation-api", null)),
+          buildGradle(
+            """
+              dependencies {
+                  def jakartaVersion = "2.0.1.Final"
+                  implementation "javax.validation:validation-api:${jakartaVersion}"
+              }
+              """,
+            """
+              dependencies {
+                  def jakartaVersion = "2.0.1.Final"
+                  implementation "javax.validation:jakarta.validation-api:${jakartaVersion}"
               }
               """
           )
