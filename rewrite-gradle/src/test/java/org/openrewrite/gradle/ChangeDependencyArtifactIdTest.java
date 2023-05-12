@@ -306,7 +306,7 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
     @Test
     void worksWithPlatform() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependencyArtifactId("org.optaplanner", "optaplanner-bom", "timefold-bom", null)),
+          spec -> spec.recipe(new ChangeDependencyArtifactId("org.optaplanner", "optaplanner-bom", "timefold-solver-bom", null)),
           buildGradle(
             """
               plugins {
