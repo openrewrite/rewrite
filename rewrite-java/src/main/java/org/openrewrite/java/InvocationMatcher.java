@@ -13,15 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.dataflow.internal;
+package org.openrewrite.java;
 
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
-import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -31,20 +32,16 @@ import java.util.stream.Stream;
 /**
  * Matcher for finding {@link J.NewClass} and {@link J.MethodInvocation} {@link Expression}s.
  */
-@Incubating(since = "7.25.0")
+@Incubating(since = "8.0.0")
 @FunctionalInterface
 public interface InvocationMatcher {
-    boolean matches(Expression expression);
+    boolean matches(@Nullable Expression expression);
 
     default AdvancedInvocationMatcher advanced() {
         return new AdvancedInvocationMatcher(this);
     }
 
-    static InvocationMatcher fromMethodMatcher(MethodMatcher methodMatcher) {
-        return methodMatcher::matches;
-    }
-
-    static InvocationMatcher fromInvocationMatchers(Collection<InvocationMatcher> matchers) {
+    static InvocationMatcher fromInvocationMatchers(Collection<? extends InvocationMatcher> matchers) {
         if (matchers.isEmpty()) {
             return expression -> false;
         }
@@ -54,17 +51,13 @@ public interface InvocationMatcher {
         return expression -> matchers.stream().anyMatch(matcher -> matcher.matches(expression));
     }
 
-    static InvocationMatcher fromMethodMatchers(MethodMatcher... methodMatchers) {
-        return fromInvocationMatchers(Stream.of(methodMatchers).map(InvocationMatcher::fromMethodMatcher).collect(Collectors.toList()));
-    }
-
-    static InvocationMatcher fromMethodMatchers(Collection<MethodMatcher> matchers) {
-        return fromInvocationMatchers(matchers.stream().map(InvocationMatcher::fromMethodMatcher).collect(Collectors.toList()));
+    static InvocationMatcher fromInvocationMatchers(InvocationMatcher... invocationMatchers) {
+        return fromInvocationMatchers(Arrays.asList(invocationMatchers));
     }
 
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class AdvancedInvocationMatcher {
-        InvocationMatcher matcher;
+        private InvocationMatcher matcher;
 
         public boolean isSelect(Cursor cursor) {
             Expression expression = ensureCursorIsExpression(cursor);

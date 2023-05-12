@@ -96,6 +96,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             p.append("$");
         }
         visit(value.getTree(), p);
+        visitSpace(value.getAfter(), GSpace.Location.GSTRING, p);
         if (value.isEnclosedInBraces()) {
             p.append('}');
         }

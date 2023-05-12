@@ -279,4 +279,39 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void worksForProjectDependencies() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyConfiguration("*", "*", "implementation", null)),
+          buildGradle(
+            """
+              dependencies {
+                  compile project(":a")
+                  compile "org.openrewrite:rewrite-core:7.40.0"
+                  compile "org.openrewrite:rewrite-core:7.40.0", {
+                    exclude name: "foo"
+                  }
+                  compile group: "org.openrewrite", name: "rewrite-core", version: "7.40.0"
+                  compile group: "org.openrewrite", name: "rewrite-core", version: "7.40.0", {
+                    exclude name: "foo"
+                  }
+              }
+              """,
+            """
+              dependencies {
+                  implementation project(":a")
+                  implementation "org.openrewrite:rewrite-core:7.40.0"
+                  implementation "org.openrewrite:rewrite-core:7.40.0", {
+                    exclude name: "foo"
+                  }
+                  implementation group: "org.openrewrite", name: "rewrite-core", version: "7.40.0"
+                  implementation group: "org.openrewrite", name: "rewrite-core", version: "7.40.0", {
+                    exclude name: "foo"
+                  }
+              }
+              """
+          )
+        );
+    }
 }

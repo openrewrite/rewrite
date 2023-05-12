@@ -131,6 +131,17 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void gStringWithSpace() {
+        rewriteRun(
+          groovy(
+            """
+              String s = "${ ARTIFACTORY_URL }"
+              """
+          )
+        );
+    }
+
+    @Test
     void mapLiteral() {
         rewriteRun(
           groovy(
