@@ -36,11 +36,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                            
+
               repositories {
                   mavenCentral()
               }
-                            
+
               dependencies {
                   implementation 'org.springframework.boot:spring-boot-starter:2.5.4'
               }
@@ -49,11 +49,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                            
+
               repositories {
                   mavenCentral()
               }
-                            
+
               dependencies {
                   implementation 'org.springframework.boot:new-starter:2.5.4'
               }
@@ -72,11 +72,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-                            
+
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release'
                   api "org.openrewrite:rewrite-core:latest.release"
@@ -86,11 +86,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-                            
+
               dependencies {
                   api 'org.openrewrite:dewrite-core:latest.release'
                   api "org.openrewrite:dewrite-core:latest.release"
@@ -110,11 +110,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-                            
+
               dependencies {
                   api group: 'org.openrewrite', name: 'rewrite-core', version: 'latest.release'
                   api group: "org.openrewrite", name: "rewrite-core", version: "latest.release"
@@ -124,11 +124,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-                            
+
               dependencies {
                   api group: 'org.openrewrite', name: 'dewrite-core', version: 'latest.release'
                   api group: "org.openrewrite", name: "dewrite-core", version: "latest.release"
@@ -148,11 +148,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-                            
+
               dependencies {
                   api 'org.openrewrite:rewrite-core'
                   api "org.openrewrite:rewrite-core"
@@ -164,11 +164,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-                            
+
               dependencies {
                   api 'org.openrewrite:dewrite-core'
                   api "org.openrewrite:dewrite-core"
@@ -190,11 +190,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-                            
+
               dependencies {
                   api 'org.openrewrite:rewrite-core:latest.release:tests'
                   api "org.openrewrite:rewrite-core:latest.release:tests"
@@ -206,11 +206,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-                            
+
               dependencies {
                   api 'org.openrewrite:dewrite-core:latest.release:tests'
                   api "org.openrewrite:dewrite-core:latest.release:tests"
@@ -232,11 +232,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-                            
+
               dependencies {
                   api 'org.eclipse.jetty:jetty-servlet@jar'
                   api "org.eclipse.jetty:jetty-servlet@jar"
@@ -256,11 +256,11 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
               plugins {
                   id 'java-library'
               }
-                
+
               repositories {
                   mavenCentral()
               }
-                            
+
               dependencies {
                   api 'org.eclipse.jetty:jetty-servlet-tests@jar'
                   api "org.eclipse.jetty:jetty-servlet-tests@jar"
