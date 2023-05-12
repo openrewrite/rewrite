@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
@@ -273,6 +274,28 @@ class ChangeDependencyGroupIdTest implements RewriteTest {
                   api group: "org.dewrite", name: "rewrite-core", version: "latest.release", ext: "ext"
                   api group: 'org.dewrite', name: 'rewrite-core', version: 'latest.release', classifier: 'classifier', ext: 'ext'
                   api group: "org.dewrite", name: "rewrite-core", version: "latest.release", classifier: "classifier", ext: "ext"
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3239")
+    @Test
+    void worksWithGString() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyGroupId("javax.validation", "validation-api", "jakarta.validation", null)),
+          buildGradle(
+            """
+              dependencies {
+                  def jakartaVersion = "2.0.1.Final"
+                  implementation "javax.validation:validation-api:${jakartaVersion}"
+              }
+              """,
+            """
+              dependencies {
+                  def jakartaVersion = "2.0.1.Final"
+                  implementation "jakarta.validation:validation-api:${jakartaVersion}"
               }
               """
           )
