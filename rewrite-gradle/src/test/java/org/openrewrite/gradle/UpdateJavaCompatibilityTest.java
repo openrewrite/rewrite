@@ -15,426 +15,169 @@
  */
 package org.openrewrite.gradle;
 
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
-class ChangeJavaCompatibilityTest implements RewriteTest {
-    @Nested
-    @DisplayName("When requested version is an integer")
-    class NewInteger extends BaseTest {
-        NewInteger() {
-            super("8");
-        }
-    }
-
-    @Nested
-    @DisplayName("When requested version is a double")
-    class NewDouble extends BaseTest {
-        NewDouble() {
-            super("1.8");
-        }
-    }
-
-    @Nested
-    @DisplayName("When requested version is a string (double quotes)")
-    class NewStringDoubleQuoted extends BaseTest {
-        NewStringDoubleQuoted() {
-            super("\"1.8\"");
-        }
-    }
-
-    @Nested
-    @DisplayName("When requested version is a string (single quotes -tmp)")
-    class NewStringSingleQuoted extends BaseTest {
-        NewStringSingleQuoted() {
-            super("'1.8'");
-        }
-    }
-
-    @Nested
-    @DisplayName("When requested version is an enum (shorthand)")
-    class NewEnumShorthand extends BaseTest {
-        NewEnumShorthand() {
-            super("VERSION_1_8");
-        }
-    }
-
-    @Nested
-    @DisplayName("When requested version is an enum")
-    class NewEnum extends BaseTest {
-        NewEnum() {
-            super("JavaVersion.VERSION_1_8");
-        }
-    }
-}
-
-@SuppressWarnings("GroovyUnusedAssignment")
-abstract class BaseTest implements RewriteTest {
-    private final String newVersion;
-
-    BaseTest(String newVersion) {
-        this.newVersion = newVersion;
-    }
-
+class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
-    void changeSourceCompatibility() {
+    void sourceAndTarget() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "source")),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null)),
           buildGradle(
             """
               plugins {
-                  id 'java'
+                  id "java"
               }
-              
-              sourceCompatibility = 7
+
+              sourceCompatibility = 1.8
+              targetCompatibility = 1.8
               """,
             """
               plugins {
-                  id 'java'
+                  id "java"
               }
-              
-              sourceCompatibility = %s
-              """.formatted(coerce(newVersion))
+
+              sourceCompatibility = 11
+              targetCompatibility = 11
+              """
           )
         );
     }
 
     @Test
-    void changeTargetCompatibility() {
+    void sourceOnly() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "target")),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.Source, null)),
           buildGradle(
             """
               plugins {
-                  id 'java'
+                  id "java"
               }
-              
-              targetCompatibility = '7'
+
+              sourceCompatibility = 1.8
+              targetCompatibility = 1.8
               """,
             """
               plugins {
-                  id 'java'
+                  id "java"
               }
-              
-              targetCompatibility = %s
-              """.formatted(coerce(newVersion))
+
+              sourceCompatibility = 11
+              targetCompatibility = 1.8
+              """
           )
         );
     }
 
     @Test
-    void changeSetSourceCompatibility() {
+    void targetOnly() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "source")),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.Target, null)),
           buildGradle(
             """
               plugins {
-                  id 'java'
+                  id "java"
               }
-              
-              setSourceCompatibility "7"
+
+              sourceCompatibility = 1.8
+              targetCompatibility = 1.8
               """,
             """
               plugins {
-                  id 'java'
+                  id "java"
               }
-              
-              setSourceCompatibility %s
-              """.formatted(coerce(newVersion))
+
+              sourceCompatibility = 1.8
+              targetCompatibility = 11
+              """
           )
         );
     }
 
     @Test
-    void changeSetTargetCompatibility() {
+    void styleChange() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "target")),
+          spec -> spec.recipe(new UpdateJavaCompatibility(8, null, UpdateJavaCompatibility.DeclarationStyle.Enum)),
           buildGradle(
             """
               plugins {
-                  id 'java'
+                  id "java"
               }
-              
-              setTargetCompatibility 1.7
+
+              sourceCompatibility = 1.8
+              targetCompatibility = 1.8
               """,
             """
               plugins {
-                  id 'java'
+                  id "java"
               }
-              
-              setTargetCompatibility %s
-              """.formatted(coerce(newVersion))
+
+              sourceCompatibility = JavaVersion.VERSION_1_8
+              targetCompatibility = JavaVersion.VERSION_1_8
+              """
           )
         );
     }
 
     @Test
-    void changeSourceCompatibilityJavaPluginExtension() {
+    void handlesJavaExtension() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "source")),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null)),
           buildGradle(
             """
               plugins {
-                  id 'java'
+                  id "java"
               }
-              
+
               java {
-                  sourceCompatibility = "1.7"
+                  sourceCompatibility = 1.8
+                  targetCompatibility = 1.8
               }
               """,
             """
               plugins {
-                  id 'java'
+                  id "java"
               }
-              
+
               java {
-                  sourceCompatibility = %s
+                  sourceCompatibility = 11
+                  targetCompatibility = 11
               }
-              """.formatted(coerce(newVersion))
+              """
           )
         );
     }
 
     @Test
-    void changeTargetCompatibilityJavaPluginExtension() {
+    void handlesJavaToolchains() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "target")),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null)),
           buildGradle(
             """
               plugins {
-                  id 'java'
+                  id "java"
               }
-              
+
               java {
-                  targetCompatibility = '1.7'
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(8)
+                  }
               }
               """,
             """
               plugins {
-                  id 'java'
+                  id "java"
               }
-              
+
               java {
-                  targetCompatibility = %s
+                  toolchain {
+                      languageVersion = JavaLanguageVersion.of(11)
+                  }
               }
-              """.formatted(coerce(newVersion))
+              """
           )
         );
-    }
-
-    @Test
-    void changeSourceCompatibilityCompileJava() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "source")),
-          buildGradle(
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              compileJava {
-                  sourceCompatibility = JavaVersion.VERSION_1_7
-              }
-              """,
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              compileJava {
-                  sourceCompatibility = %s
-              }
-              """.formatted(coerce(newVersion))
-          )
-        );
-    }
-
-    @Test
-    void changeTargetCompatibilityCompileJava() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "target")),
-          buildGradle(
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              compileJava {
-                  targetCompatibility = "1.7"
-              }
-              """,
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              compileJava {
-                  targetCompatibility = %s
-              }
-              """.formatted(coerce(newVersion))
-          )
-        );
-    }
-
-    @Test
-    void changeSourceCompatibilityTasksNamedCompileJava() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "source")),
-          buildGradle(
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              tasks.named("compileJava") {
-                  sourceCompatibility = "1.7"
-              }
-              """,
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              tasks.named("compileJava") {
-                  sourceCompatibility = %s
-              }
-              """.formatted(coerce(newVersion))
-          )
-        );
-    }
-
-    @Test
-    void changeTargetCompatibilityTasksNamedCompileJava() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "target")),
-          buildGradle(
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              tasks.named("compileJava") {
-                  targetCompatibility = "1.7"
-              }
-              """,
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              tasks.named("compileJava") {
-                  targetCompatibility = %s
-              }
-              """.formatted(coerce(newVersion))
-          )
-        );
-    }
-
-    @Test
-    void changeSourceCompatibilityTasksWithTypeJavaCompile() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "source")),
-          buildGradle(
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              tasks.withType(JavaCompile).configureEach {
-                  sourceCompatibility = "1.7"
-              }
-              """,
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              tasks.withType(JavaCompile).configureEach {
-                  sourceCompatibility = %s
-              }
-              """.formatted(coerce(newVersion))
-          )
-        );
-    }
-
-    @Test
-    void changeTargetCompatibilityTasksWithTypeJavaCompile() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "target")),
-          buildGradle(
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              tasks.withType(JavaCompile).configureEach {
-                  targetCompatibility = "1.7"
-              }
-              """,
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              tasks.withType(JavaCompile).configureEach {
-                  targetCompatibility = %s
-              }
-              """.formatted(coerce(newVersion))
-          )
-        );
-    }
-
-    @Test
-    void changeSourceCompatibilityJavaPluginExtensionFieldAccess() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "source")),
-          buildGradle(
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              java.sourceCompatibility = "1.7"
-              """,
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              java.sourceCompatibility = %s
-              """.formatted(coerce(newVersion))
-          )
-        );
-    }
-
-    @Test
-    void changeTargetCompatibilityJavaPluginExtensionFieldAccess() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeJavaCompatibility(newVersion, "target")),
-          buildGradle(
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              java.targetCompatibility = "1.7"
-              """,
-            """
-              plugins {
-                  id 'java'
-              }
-              
-              java.targetCompatibility = %s
-              """.formatted(coerce(newVersion))
-          )
-        );
-    }
-
-    private String coerce(String version) {
-        return version.startsWith("VERSION_") ? "JavaVersion." + version : version;
     }
 }
