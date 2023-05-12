@@ -109,7 +109,7 @@ public class Markers {
     }
 
     public <M extends Marker> Markers setByType(M m) {
-        return computeByType(m, (replacement, existing) -> replacement);
+        return computeByType(m, (existing, replacement) -> replacement);
     }
 
     /**
