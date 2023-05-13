@@ -59,7 +59,14 @@ public class MigrateRecipeToRewrite8 extends Recipe {
     private static J.MethodInvocation preconditionOrTemplate = null;
     private static J.MethodInvocation preconditionNotTemplate = null;
     private static J.MemberReference visitMemberReferenceTemplate = null;
-    private static J.MethodInvocation doAfterVisitTemplate = null;
+
+    private static final String MIGRATION_GUIDE_URL = "https://to-be-written";
+    private static final String VISIT_SOURCE_FILES_COMMENT = " [Rewrite8 migration] This recipe uses the visit multiple sources method " +
+                         "`visit(List<SourceFile> before, P p)`, " +
+                         "needs to be migrated to use new introduced scanning recipe, " +
+                         "please follow the migration guide here : " + MIGRATION_GUIDE_URL;
+    private static final String DO_NEXT_COMMENT = " [Rewrite8 migration] Method `Recipe.doNext(..)` is removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor::doAfterVisit`, " +
+                         "please follow the migrate migration here: " + MIGRATION_GUIDE_URL;
 
     private static String VISIT_TREE_METHOD_TEMPLATE_CODE = "import org.openrewrite.Tree;\n" +
         "import org.openrewrite.internal.lang.Nullable;\n" +
@@ -113,9 +120,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
 
                 method = super.visitMethodInvocation(method, ctx);
                 if (DO_NEXT_METHOD_MATCHER.matches(method.getMethodType())) {
-                    String commentText = " *** Method `Recipe.doNext(..)` is removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor::doAfterVisit`, " +
-                                     "please follow the migrate migration here, (URL to be rewritten)";
-                    return MigratedTo8.withMarker( (J.MethodInvocation)commentOf(method, commentText));
+                    return MigratedTo8.withMarker( (J.MethodInvocation)commentOf(method, DO_NEXT_COMMENT));
                 }
                 return method;
             }
@@ -162,13 +167,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method,
                                                                           ExecutionContext executionContext) {
                             if (VISIT_METHOD_MATCHER.matches(method.getMethodType())) {
-                                String commentText = " *** This recipe uses the visit multiple sources method " +
-                                                        "`visit(List<SourceFile> before, P p)`, " +
-                                                        "needs to be migrated to use new introduced scanning recipe, " +
-                                                        "please follow the migration guide here : (guide URL: to be " +
-                                                        "written)";
-
-                                return (J.MethodDeclaration)commentOf(method, commentText);
+                                return (J.MethodDeclaration)commentOf(method, VISIT_SOURCE_FILES_COMMENT);
                             }
                             return super.visitMethodDeclaration(method, executionContext);
                         }
@@ -537,22 +536,5 @@ public class MigrateRecipeToRewrite8 extends Recipe {
         }
 
         return visitMemberReferenceTemplate;
-    }
-
-    private static J.MethodInvocation getDoAfterVisitTemplate() {
-        if (doAfterVisitTemplate == null) {
-            doAfterVisitTemplate = PartProvider.buildPart(
-                "import org.openrewrite.TreeVisitor;\n" +
-                "import org.openrewrite.java.JavaIsoVisitor;\n" +
-                "\n" +
-                "public class A extends TreeVisitor {\n" +
-                "    void method() {\n" +
-                "        doAfterVisit(new JavaIsoVisitor<>());\n" +
-                "    }\n" +
-                "}", J.MethodInvocation.class,
-                JavaParser.runtimeClasspath()
-            );
-        }
-        return doAfterVisitTemplate;
     }
 }
