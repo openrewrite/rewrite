@@ -64,7 +64,7 @@ public class BlockStatementTemplateGenerator {
                                                           "}";
 
     private final Set<String> imports;
-    private final boolean requiresContext;
+    private final boolean contextFree;
 
     public String template(Cursor cursor, String template, Space.Location location, JavaCoordinates.Mode mode) {
         //noinspection ConstantConditions
@@ -211,10 +211,10 @@ public class BlockStatementTemplateGenerator {
     }
 
     private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
-        if (requiresContext) {
-            contextTemplate(cursor, prior, before, after, insertionPoint, mode);
-        } else {
+        if (contextFree) {
             contextFreeTemplate(prior, before, after, insertionPoint, mode);
+        } else {
+            contextTemplate(cursor, prior, before, after, insertionPoint, mode);
         }
     }
 

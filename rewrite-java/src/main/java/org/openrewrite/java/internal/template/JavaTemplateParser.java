@@ -60,18 +60,18 @@ public class JavaTemplateParser {
     private final Consumer<String> onAfterVariableSubstitution;
     private final Consumer<String> onBeforeParseTemplate;
     private final Set<String> imports;
-    private final boolean requiresContext;
+    private final boolean contextFree;
     private final BlockStatementTemplateGenerator statementTemplateGenerator;
     private final AnnotationTemplateGenerator annotationTemplateGenerator;
 
     public JavaTemplateParser(JavaParser.Builder<?, ?> parser, Consumer<String> onAfterVariableSubstitution,
-                              Consumer<String> onBeforeParseTemplate, Set<String> imports, boolean requiresContext) {
+                              Consumer<String> onBeforeParseTemplate, Set<String> imports, boolean contextFree) {
         this.parser = parser;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.onBeforeParseTemplate = onBeforeParseTemplate;
         this.imports = imports;
-        this.requiresContext = requiresContext;
-        this.statementTemplateGenerator = new BlockStatementTemplateGenerator(imports, requiresContext);
+        this.contextFree = contextFree;
+        this.statementTemplateGenerator = new BlockStatementTemplateGenerator(imports, contextFree);
         this.annotationTemplateGenerator = new AnnotationTemplateGenerator(imports);
     }
 
@@ -265,8 +265,7 @@ public class JavaTemplateParser {
         if (cursor.getParent() == null) {
             throw new IllegalArgumentException("Expecting the `cursor` to have a parent element");
         }
-        // If the parent is the root, then the stub required no external context to be parsed and can therefore be cached
-        if (!requiresContext) {
+        if (contextFree) {
             return cache(stub, supplier);
         }
         return (List<J2>) supplier.get();

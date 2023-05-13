@@ -20,6 +20,7 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.template.JavaTemplateJavaExtension;
@@ -51,7 +52,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         this.code = code;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.parameterCount = StringUtils.countOccurrences(code, "#{");
-        this.templateParser = new JavaTemplateParser(javaParser, onAfterVariableSubstitution, onBeforeParseTemplate, imports, parentScopeGetter != null);
+        this.templateParser = new JavaTemplateParser(javaParser, onAfterVariableSubstitution, onBeforeParseTemplate, imports, parentScopeGetter == null);
     }
 
     public String getCode() {
@@ -69,11 +70,13 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
 
-        if (parentScopeGetter == null && parentScope == null) {
+        if (parentScopeGetter == null) {
+            TreeVisitor<? extends J, Integer> visitor = new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
+                    .getMixin();
             //noinspection ConstantConditions
-            return (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
-                    .getMixin()
-                    .visit(changing, 0);
+            return parentScope != null
+                    ? (J2) visitor.visit(changing, 0, parentScope)
+                    : (J2) visitor.visit(changing, 0);
         }
 
         AtomicReference<Cursor> parentCursorRef = new AtomicReference<>();
