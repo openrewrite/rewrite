@@ -41,8 +41,10 @@ class JavaTemplateTest implements RewriteTest {
               public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext p) {
                   if ((assignment.getAssignment() instanceof J.Literal) && ((J.Literal) assignment.getAssignment()).getValue().equals(1)) {
                       return assignment.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "value = 0")
+                        JavaTemplate.builder("value = 0")
+                          .context(this::getCursor)
                           .build(),
+                        getCursor(),
                         assignment.getCoordinates().replace()
                       );
                   }
@@ -108,7 +110,7 @@ class JavaTemplateTest implements RewriteTest {
                   if (a.getAssignment() instanceof J.MethodInvocation) {
                       J.MethodInvocation mi = (J.MethodInvocation) a.getAssignment();
                       a = a.withAssignment(mi.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "1").build(), mi.getCoordinates().replace()
+                        JavaTemplate.builder("1").context(this::getCursor).build(), getCursor(), mi.getCoordinates().replace()
                       ));
                   }
                   return a;
@@ -153,7 +155,8 @@ class JavaTemplateTest implements RewriteTest {
                   if (mv.getVariables().get(0).getInitializer() == null && TypeUtils.isOfType(mv.getTypeExpression()
                     .getType(), JavaType.Primitive.String)) {
                       mv = multiVariable.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "Object #{}").build(),
+                        JavaTemplate.builder("Object #{}").context(this::getCursor).build(),
+                        getCursor(),
                         multiVariable.getCoordinates().replace(),
                         multiVariable.getVariables().get(0).getSimpleName()
                       );
@@ -190,11 +193,12 @@ class JavaTemplateTest implements RewriteTest {
               public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, ExecutionContext executionContext) {
                   control = super.visitForEachControl(control, executionContext);
                   Expression iterable = control.getIterable();
-                  if ( !TypeUtils.isOfClassType(iterable.getType(), "java.lang.String"))
+                  if (!TypeUtils.isOfClassType(iterable.getType(), "java.lang.String"))
                       return control;
                   iterable = iterable.withTemplate(
-                    JavaTemplate.builder(this::getCursor, "new Object[0]")
+                    JavaTemplate.builder("new Object[0]").context(this::getCursor)
                       .build(),
+                    getCursor(),
                     iterable.getCoordinates().replace()
                   );
                   return control.withIterable(iterable);
@@ -228,8 +232,9 @@ class JavaTemplateTest implements RewriteTest {
                   binary = super.visitBinary(binary, executionContext);
                   if (binary.getLeft() instanceof J.Literal lit && lit.getValue().equals(42)) {
                       lit = lit.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "43")
+                        JavaTemplate.builder("43").context(this::getCursor)
                           .build(),
+                        getCursor(),
                         lit.getCoordinates().replace()
                       );
                       return binary.withLeft(lit);
@@ -265,8 +270,10 @@ class JavaTemplateTest implements RewriteTest {
               public J visitNewClass(J.NewClass newClass, ExecutionContext p) {
                   var nc = super.visitNewClass(newClass, p);
                   if (TypeUtils.isOfClassType(newClass.getType(), "java.util.ArrayList")) {
-                      nc = nc.withTemplate(JavaTemplate.builder(this::getCursor, "Collections.emptyList()")
+                      nc = nc.withTemplate(JavaTemplate.builder("Collections.emptyList()")
+                          .context(this::getCursor)
                           .imports("java.util.Collections").build(),
+                        getCursor(),
                         newClass.getCoordinates().replace());
                   }
                   return nc;
@@ -308,11 +315,12 @@ class JavaTemplateTest implements RewriteTest {
                   if (classDecl.getBody().getStatements().size() > 1) {
                       return classDecl;
                   }
-                  return classDecl.withTemplate(JavaTemplate.builder(this::getCursor, """
+                  return classDecl.withTemplate(JavaTemplate.builder("""
                       void m2() {
                       	  #{any()}
                       }
-                      """).build(),
+                      """).context(this::getCursor).build(),
+                    getCursor(),
                     classDecl.getBody().getStatements().get(0).getCoordinates().after(),
                     ((J.MethodDeclaration) classDecl.getBody().getStatements().get(0)).getBody().getStatements().get(0));
               }
@@ -348,8 +356,10 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                   if (method.getSimpleName().equals("asList")) {
-                      method = method.withTemplate(JavaTemplate.builder(this::getCursor, "Collections.singletonList(#{any()})")
+                      method = method.withTemplate(JavaTemplate.builder("Collections.singletonList(#{any()})")
+                          .context(this::getCursor)
                           .imports("java.util.Collections").build(),
+                        getCursor(),
                         method.getCoordinates().replace(), method.getArguments().get(0));
                       maybeAddImport("java.util.Collections");
                       maybeRemoveImport("java.util.Arrays");
@@ -394,8 +404,10 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                   if (method.getSimpleName().equals("asList")) {
-                      method = method.withTemplate(JavaTemplate.builder(this::getCursor, "Collections.singletonList(#{any()})")
+                      method = method.withTemplate(JavaTemplate.builder("Collections.singletonList(#{any()})")
+                          .context(this::getCursor)
                           .imports("java.util.Collections").build(),
+                        getCursor(),
                         method.getCoordinates().replace(), method.getArguments().get(0));
                       maybeAddImport("java.util.Collections");
                       maybeRemoveImport("java.util.Arrays");
@@ -444,8 +456,10 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                   if (method.getSimpleName().equals("asList")) {
-                      method = method.withTemplate(JavaTemplate.builder(this::getCursor, "Collections.singletonList(#{any()})")
+                      method = method.withTemplate(JavaTemplate.builder("Collections.singletonList(#{any()})")
+                          .context(this::getCursor)
                           .imports("java.util.Collections").build(),
+                        getCursor(),
                         method.getCoordinates().replace(), method.getArguments().get(0));
                       maybeAddImport("java.util.Collections");
                       maybeRemoveImport("java.util.Arrays");
@@ -499,9 +513,11 @@ class JavaTemplateTest implements RewriteTest {
               public J visitBinary(J.Binary binary, ExecutionContext p) {
                   if (binary.getLeft() instanceof J.MethodInvocation) {
                       J.MethodInvocation mi = (J.MethodInvocation) binary.getLeft();
-                      return binary.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "!#{any(java.util.List)}.isEmpty()")
-                          .build(), mi.getCoordinates().replace(), mi.getSelect()
+                      return binary.withTemplate(JavaTemplate.builder("!#{any(java.util.List)}.isEmpty()")
+                          .context(this::getCursor)
+                          .build(),
+                        getCursor(),
+                        mi.getCoordinates().replace(), mi.getSelect()
                       );
                   } else if (binary.getLeft() instanceof J.Unary) {
                       return binary.getLeft();
@@ -536,7 +552,7 @@ class JavaTemplateTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               final MethodMatcher bigDecimalSetScale = new MethodMatcher("java.math.BigDecimal setScale(int, int)");
-              final JavaTemplate twoArgScale = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "#{any(int)}, #{}")
+              final JavaTemplate twoArgScale = JavaTemplate.builder("#{any(int)}, #{}").context(() -> getCursor().getParentOrThrow())
                 .imports("java.math.RoundingMode").build();
 
               @Override
@@ -545,6 +561,7 @@ class JavaTemplateTest implements RewriteTest {
                   if (bigDecimalSetScale.matches(mi)) {
                       mi = mi.withTemplate(
                         twoArgScale,
+                        getCursor(),
                         mi.getCoordinates().replaceArguments(),
                         mi.getArguments().get(0), "RoundingMode.HALF_UP"
                       );
@@ -587,7 +604,8 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J visitUnary(J.Unary unary, ExecutionContext p) {
                   return unary.withTemplate(
-                    JavaTemplate.builder(this::getCursor, "#{any()}++").build(),
+                    JavaTemplate.builder("#{any()}++").context(this::getCursor).build(),
+                    getCursor(),
                     unary.getCoordinates().replace(),
                     unary.getExpression()
                   );
@@ -619,15 +637,15 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMemberReference(J.MemberReference memberRef, ExecutionContext executionContext) {
-                      return memberRef.withTemplate(
-                        JavaTemplate
-                          .builder(this::getCursor, "() -> new ArrayList<>(1)")
-                          .imports("java.util.ArrayList")
-                          .build(),
-                        memberRef.getCoordinates().replace()
-                      );
-                  }
-              })).expectedCyclesThatMakeChanges(1).cycles(1),
+                  return memberRef.withTemplate(
+                    JavaTemplate.builder("() -> new ArrayList<>(1)").context(this::getCursor)
+                      .imports("java.util.ArrayList")
+                      .build(),
+                    getCursor(),
+                    memberRef.getCoordinates().replace()
+                  );
+              }
+          })).expectedCyclesThatMakeChanges(1).cycles(1),
           java(
             """
               import java.util.ArrayList;
@@ -667,7 +685,8 @@ class JavaTemplateTest implements RewriteTest {
               public J visitFieldAccess(J.FieldAccess fa, ExecutionContext p) {
                   if (fa.getSimpleName().equals("f")) {
                       return fa.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "#{any(java.io.File)}.getCanonicalFile().toPath()").build(),
+                        JavaTemplate.builder("#{any(java.io.File)}.getCanonicalFile().toPath()").context(this::getCursor).build(),
+                        getCursor(),
                         fa.getCoordinates().replace(),
                         fa
                       );
@@ -708,7 +727,8 @@ class JavaTemplateTest implements RewriteTest {
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   if (method.getSimpleName().equals("clear")) {
                       return method.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "words.add(\"jon\");").build(),
+                        JavaTemplate.builder("words.add(\"jon\");").context(this::getCursor).build(),
+                        getCursor(),
                         method.getCoordinates().replace()
                       );
                   }
@@ -742,7 +762,7 @@ class JavaTemplateTest implements RewriteTest {
     void innerEnumWithStaticMethod() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "new A()")
+              final JavaTemplate t = JavaTemplate.builder("new A()").context(() -> getCursor().getParentOrThrow())
                 .build();
 
               @Override
@@ -750,7 +770,7 @@ class JavaTemplateTest implements RewriteTest {
                   if (newClass.getArguments().get(0) instanceof J.Empty) {
                       return newClass;
                   }
-                  return newClass.withTemplate(t, newClass.getCoordinates().replace());
+                  return newClass.withTemplate(t, getCursor(), newClass.getCoordinates().replace());
               }
           })),
           java(
@@ -816,8 +836,9 @@ class JavaTemplateTest implements RewriteTest {
                   var mi = super.visitMethodInvocation(method, p);
                   if (mm.matches(mi)) {
                       mi = mi.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "Arrays.asList(#{any(java.lang.Integer)}, #{any(java.lang.Integer)}, #{any(java.lang.Integer)})")
+                        JavaTemplate.builder("Arrays.asList(#{any(java.lang.Integer)}, #{any(java.lang.Integer)}, #{any(java.lang.Integer)})").context(this::getCursor)
                           .imports("java.util.Arrays").build(),
+                        getCursor(),
                         mi.getCoordinates().replace(), mi.getArguments().get(0), mi.getArguments().get(1), mi.getArguments().get(2)
                       );
                   }
@@ -870,9 +891,8 @@ class JavaTemplateTest implements RewriteTest {
               public J visitNewClass(J.NewClass newClass, ExecutionContext p) {
                   J.NewClass nc = (J.NewClass) super.visitNewClass(newClass, p);
                   return nc.withTemplate(
-                    JavaTemplate.builder(this::getCursor, "Integer.valueOf(#{any(java.lang.Integer)}")
-                      .build(), nc.getCoordinates().replace(), nc.getArguments().get(0)
-                  );
+                    JavaTemplate.builder("Integer.valueOf(#{any(java.lang.Integer)}").context(this::getCursor)
+                      .build(), getCursor(), nc.getCoordinates().replace(), nc.getArguments().get(0));
               }
           })),
           java(
@@ -898,8 +918,8 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext p) {
                   J.MethodInvocation sizeCall = (J.MethodInvocation) binary.getLeft();
-                  return sizeCall.withTemplate(JavaTemplate.builder(this::getCursor, "!#{any(java.util.Collection)}.isEmpty()").build(),
-                      sizeCall.getCoordinates().replace(), sizeCall.getSelect()).
+                  return sizeCall.withTemplate(JavaTemplate.builder("!#{any(java.util.Collection)}.isEmpty()").context(this::getCursor).build(),
+                      getCursor(), sizeCall.getCoordinates().replace(), sizeCall.getSelect()).
                     withPrefix(binary.getPrefix());
               }
           })),
@@ -932,8 +952,9 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext p) {
-                  return binary.withTemplate(JavaTemplate.builder(this::getCursor, "\"ab\"").build(),
-                      binary.getCoordinates().replace());
+                  return binary.withTemplate(JavaTemplate.builder("\"ab\"").context(this::getCursor).build(),
+                    getCursor(),
+                    binary.getCoordinates().replace());
               }
           })),
           java(
@@ -978,7 +999,8 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J visitBlock(J.Block block, ExecutionContext ctx) {
                   if (block.getStatements().size() == 1) {
-                      return block.withTemplate(JavaTemplate.builder(this::getCursor, "String x = s;").build(),
+                      return block.withTemplate(JavaTemplate.builder("String x = s;").context(this::getCursor).build(),
+                        getCursor(),
                         block.getCoordinates().firstStatement());
                   }
                   return super.visitBlock(block, ctx);
@@ -1007,8 +1029,9 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J visitBlock(J.Block block, ExecutionContext ctx) {
                   if (block.getStatements().size() == 1) {
-                      return block.withTemplate(JavaTemplate.builder(this::getCursor, "String x = s;").build(),
-                      block.getStatements().get(0).getCoordinates().after());
+                      return block.withTemplate(JavaTemplate.builder("String x = s;").context(this::getCursor).build(),
+                        getCursor(),
+                        block.getStatements().get(0).getCoordinates().after());
                   }
                   return super.visitBlock(block, ctx);
               }

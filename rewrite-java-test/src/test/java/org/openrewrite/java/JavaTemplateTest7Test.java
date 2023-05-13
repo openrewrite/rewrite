@@ -37,12 +37,12 @@ class JavaTemplateTest7Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               final MethodMatcher matcher = new MethodMatcher("Integer valueOf(..)");
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "new Integer(#{any()})").build();
+              final JavaTemplate t = JavaTemplate.builder("new Integer(#{any()})").context(() -> getCursor().getParentOrThrow()).build();
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
                   if (matcher.matches(method)) {
-                      return method.withTemplate(t, method.getCoordinates().replace(), method.getArguments().get(0));
+                      return method.withTemplate(t, getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
                   }
                   return super.visitMethodInvocation(method, p);
               }
@@ -75,7 +75,7 @@ class JavaTemplateTest7Test implements RewriteTest {
                   if (cd.getBody().getStatements().isEmpty()) {
                       cd = cd.withBody(
                         cd.getBody().withTemplate(
-                          JavaTemplate.builder(() -> getCursor().getParentOrThrow(),
+                          JavaTemplate.builder(
                               //language=groovy
                               """
                                 /**
@@ -85,7 +85,9 @@ class JavaTemplateTest7Test implements RewriteTest {
                                 }
                                 """
                             )
+                            .context(() -> getCursor().getParentOrThrow())
                             .build(),
+                          getCursor().getParentOrThrow(),
                           cd.getBody().getCoordinates().firstStatement()
                         )
                       );
@@ -125,8 +127,10 @@ class JavaTemplateTest7Test implements RewriteTest {
                   if (a.getAssignment() instanceof J.MethodInvocation) {
                       J.MethodInvocation mi = (J.MethodInvocation) a.getAssignment();
                       a = a.withAssignment(mi.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "1")
+                        JavaTemplate.builder("1")
+                          .context(this::getCursor)
                           .build(),
+                        getCursor(),
                         mi.getCoordinates().replace()
                       ));
                   }

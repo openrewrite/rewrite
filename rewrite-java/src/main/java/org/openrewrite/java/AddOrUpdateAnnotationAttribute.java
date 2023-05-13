@@ -79,14 +79,18 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 if (currentArgs == null || currentArgs.isEmpty()) {
                     if (attributeName == null || "value".equals(attributeName)) {
                         return a.withTemplate(
-                                JavaTemplate.builder(this::getCursor, "#{}")
+                                JavaTemplate.builder("#{}")
+                                        .context(this::getCursor)
                                         .build(),
+                                getCursor(),
                                 a.getCoordinates().replaceArguments(),
                                 newAttributeValue);
                     } else {
                         return a.withTemplate(
-                                JavaTemplate.builder(this::getCursor, attributeName + " = #{}")
+                                JavaTemplate.builder(attributeName + " = #{}")
+                                        .context(this::getCursor)
                                         .build(),
+                                getCursor(),
                                 a.getCoordinates().replaceArguments(),
                                 newAttributeValue);
                     }
@@ -119,8 +123,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                             } else {
                                 //noinspection ConstantConditions
                                 return ((J.Annotation) (finalA.withTemplate(
-                                        JavaTemplate.builder(this::getCursor, "value = #{}")
+                                        JavaTemplate.builder("value = #{}")
+                                                .context(this::getCursor)
                                                 .build(),
+                                        getCursor(),
                                         finalA.getCoordinates().replaceArguments(),
                                         it))).getArguments().get(0);
                             }
@@ -134,8 +140,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     String effectiveName = (attributeName == null) ? "value" : attributeName;
                     //noinspection ConstantConditions
                     J.Assignment as = (J.Assignment) ((J.Annotation) a.withTemplate(
-                            JavaTemplate.builder(this::getCursor, effectiveName + " = #{}")
+                            JavaTemplate.builder(effectiveName + " = #{}")
+                                    .context(this::getCursor)
                                     .build(),
+                            getCursor(),
                             a.getCoordinates().replaceArguments(),
                             newAttributeValue)).getArguments().get(0);
                     List<Expression> newArguments = ListUtils.concat(as, a.getArguments());

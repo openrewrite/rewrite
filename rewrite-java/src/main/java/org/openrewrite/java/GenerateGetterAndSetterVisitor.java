@@ -29,9 +29,9 @@ public class GenerateGetterAndSetterVisitor<P> extends JavaIsoVisitor<P> {
     private final String fieldName;
     private final String capitalizedFieldName;
     private final JavaTemplate getter = JavaTemplate
-            .builder(() -> getCursor().getParentOrThrow(), "" + "public #{} #{}() {return #{any()};}").build();
+            .builder("" + "public #{} #{}() {return #{any()};}").context(() -> getCursor().getParentOrThrow()).build();
     private final JavaTemplate setter = JavaTemplate
-            .builder(() -> getCursor().getParentOrThrow(), "" + "public void set#{}(#{} #{}) {this.#{} = #{};}").build();
+            .builder("" + "public void set#{}(#{} #{}) {this.#{} = #{};}").context(() -> getCursor().getParentOrThrow()).build();
 
     public GenerateGetterAndSetterVisitor(String fieldName) {
         this.fieldName = fieldName;
@@ -79,13 +79,13 @@ public class GenerateGetterAndSetterVisitor<P> extends JavaIsoVisitor<P> {
             }
             if (getCursor().pollMessage("getter-exists") == null) {
                 Statement getterStatement = maybeAutoFormat(c, c.withBody(c.getBody().withStatements(Collections.emptyList()))
-                        .withTemplate(getter, c.getBody().getCoordinates().lastStatement(), fieldType,
+                        .withTemplate(getter, getCursor(), c.getBody().getCoordinates().lastStatement(), fieldType,
                                 getterPrefix + capitalizedFieldName, var.getName()), p).getBody().getStatements().get(0);
                 c = c.withBody(c.getBody().withStatements(ListUtils.concat(c.getBody().getStatements(), getterStatement)));
             }
             if (getCursor().pollMessage("setter-exists") == null) {
                 Statement setterStatement = maybeAutoFormat(c, c.withBody(c.getBody().withStatements(Collections.emptyList()))
-                        .withTemplate(setter, c.getBody().getCoordinates().lastStatement(), capitalizedFieldName, fieldType,
+                        .withTemplate(setter, getCursor(), c.getBody().getCoordinates().lastStatement(), capitalizedFieldName, fieldType,
                                 var.getSimpleName(), var.getSimpleName(), var.getSimpleName()), p).getBody().getStatements().get(0);
                 c = c.withBody(c.getBody().withStatements(ListUtils.concat(c.getBody().getStatements(), setterStatement)));
             }

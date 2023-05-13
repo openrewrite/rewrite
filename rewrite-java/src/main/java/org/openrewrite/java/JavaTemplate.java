@@ -86,7 +86,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         //      J visitClassDeclaration(J.ClassDeclaration c, Integer p) {
         //            c.getBody().withTemplate(template, c.getBody().coordinates.lastStatement());
         //      }
-        if (parentScope == null) {
+        if (parentScopeGetter != null) {
             parentScope = parentScopeGetter.get();
         }
         if (!(parentScope.getValue() instanceof J)) {
@@ -151,11 +151,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
     public static Builder builder(String code) {
         return new Builder(code);
-    }
-
-    @Deprecated
-    public static Builder builder(Supplier<Cursor> parentScope, String code) {
-        return new Builder(code).context(parentScope);
     }
 
     @SuppressWarnings("unused")

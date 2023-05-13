@@ -36,19 +36,19 @@ class JavaTemplateTest4Test implements RewriteTest {
     void replaceMethodParameters() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "int m, java.util.List<String> n")
+              final JavaTemplate t = JavaTemplate.builder("int m, java.util.List<String> n").context(() -> getCursor().getParentOrThrow())
                 .build();
 
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getSimpleName().equals("test") && method.getParameters().size() == 1) {
                       // insert in outer method
-                      J.MethodDeclaration m = method.withTemplate(t, method.getCoordinates().replaceParameters());
+                      J.MethodDeclaration m = method.withTemplate(t, getCursor(), method.getCoordinates().replaceParameters());
                       J.NewClass newRunnable = (J.NewClass) method.getBody().getStatements().get(0);
 
                       // insert in inner method
                       J.MethodDeclaration innerMethod = (J.MethodDeclaration) newRunnable.getBody().getStatements().get(0);
-                      return m.withTemplate(t, innerMethod.getCoordinates().replaceParameters());
+                      return m.withTemplate(t, getCursor(), innerMethod.getCoordinates().replaceParameters());
                   }
                   return super.visitMethodDeclaration(method, p);
               }
@@ -63,9 +63,9 @@ class JavaTemplateTest4Test implements RewriteTest {
                 .isEqualTo(JavaType.Primitive.Int);
               assertThat(type.getParameterTypes().get(1))
                 .matches(jt -> jt instanceof JavaType.Parameterized
-                               && ((JavaType.Parameterized) jt).getType().getFullyQualifiedName().equals("java.util.List")
-                               && ((JavaType.Parameterized) jt).getTypeParameters().size() == 1
-                               && TypeUtils.asFullyQualified(((JavaType.Parameterized) jt).getTypeParameters().get(0)).getFullyQualifiedName().equals("java.lang.String"),
+                    && ((JavaType.Parameterized) jt).getType().getFullyQualifiedName().equals("java.util.List")
+                    && ((JavaType.Parameterized) jt).getTypeParameters().size() == 1
+                    && TypeUtils.asFullyQualified(((JavaType.Parameterized) jt).getTypeParameters().get(0)).getFullyQualifiedName().equals("java.lang.String"),
                   "Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'"
                 );
           }),
@@ -102,19 +102,19 @@ class JavaTemplateTest4Test implements RewriteTest {
     void replaceMethodParametersVariadicArray() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "Object[]... values")
+              final JavaTemplate t = JavaTemplate.builder("Object[]... values").context(() -> getCursor().getParentOrThrow())
                 .build();
 
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getSimpleName().equals("test") && method.getParameters().get(0) instanceof J.Empty) {
                       // insert in outer method
-                      J.MethodDeclaration m = method.withTemplate(t, method.getCoordinates().replaceParameters());
+                      J.MethodDeclaration m = method.withTemplate(t, getCursor(), method.getCoordinates().replaceParameters());
                       J.NewClass newRunnable = (J.NewClass) method.getBody().getStatements().get(0);
 
                       // insert in inner method
                       J.MethodDeclaration innerMethod = (J.MethodDeclaration) newRunnable.getBody().getStatements().get(0);
-                      return m.withTemplate(t, innerMethod.getCoordinates().replaceParameters());
+                      return m.withTemplate(t, getCursor(), innerMethod.getCoordinates().replaceParameters());
                   }
                   return super.visitMethodDeclaration(method, p);
               }
@@ -162,7 +162,7 @@ class JavaTemplateTest4Test implements RewriteTest {
     void replaceAndInterpolateMethodParameters() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "int n, #{}").build();
+              final JavaTemplate t = JavaTemplate.builder("int n, #{}").context(() -> getCursor().getParentOrThrow()).build();
 
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
@@ -170,6 +170,7 @@ class JavaTemplateTest4Test implements RewriteTest {
                       if (method.getSimpleName().equals("test") && method.getParameters().size() == 1) {
                           return method.withTemplate(
                             t,
+                            getCursor(),
                             method.getCoordinates().replaceParameters(),
                             method.getParameters().get(0)
                           );
@@ -212,12 +213,12 @@ class JavaTemplateTest4Test implements RewriteTest {
     void replaceLambdaParameters() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "int m, int n").build();
+              final JavaTemplate t = JavaTemplate.builder("int m, int n").context(() -> getCursor().getParentOrThrow()).build();
 
               @Override
               public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext p) {
                   if (lambda.getParameters().getParameters().size() == 1) {
-                      return lambda.withTemplate(t, lambda.getParameters().getCoordinates().replace());
+                      return lambda.withTemplate(t, getCursor(), lambda.getParameters().getCoordinates().replace());
                   }
                   return super.visitLambda(lambda, p);
               }
@@ -245,17 +246,18 @@ class JavaTemplateTest4Test implements RewriteTest {
     void replaceSingleStatement() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(),
+              final JavaTemplate t = JavaTemplate.builder(
                   """
                     if(n != 1) {
                       n++;
                     }"""
                 )
+                .context(() -> getCursor().getParentOrThrow())
                 .build();
 
               @Override
               public J visitAssert(J.Assert azzert, ExecutionContext p) {
-                  return azzert.withTemplate(t, azzert.getCoordinates().replace());
+                  return azzert.withTemplate(t, getCursor(), azzert.getCoordinates().replace());
               }
           })),
           java(
@@ -286,13 +288,13 @@ class JavaTemplateTest4Test implements RewriteTest {
     void replaceStatementInBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "n = 2;\nn = 3;").build();
+              final JavaTemplate t = JavaTemplate.builder("n = 2;\nn = 3;").context(() -> getCursor().getParentOrThrow()).build();
 
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   var statement = method.getBody().getStatements().get(1);
                   if (statement instanceof J.Unary) {
-                      return method.withTemplate(t, statement.getCoordinates().replace());
+                      return method.withTemplate(t, getCursor(), statement.getCoordinates().replace());
                   }
                   return method;
               }
@@ -325,13 +327,13 @@ class JavaTemplateTest4Test implements RewriteTest {
     void beforeStatementInBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "assert n == 0;").build();
+              final JavaTemplate t = JavaTemplate.builder("assert n == 0;").context(() -> getCursor().getParentOrThrow()).build();
 
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   var statement = method.getBody().getStatements().get(0);
                   if (statement instanceof J.Assignment) {
-                      return method.withTemplate(t, statement.getCoordinates().before());
+                      return method.withTemplate(t, getCursor(), statement.getCoordinates().before());
                   }
                   return method;
               }
@@ -362,12 +364,12 @@ class JavaTemplateTest4Test implements RewriteTest {
     void afterStatementInBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "n = 1;").build();
+              final JavaTemplate t = JavaTemplate.builder("n = 1;").context(() -> getCursor().getParentOrThrow()).build();
 
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getBody().getStatements().size() == 1) {
-                      return method.withTemplate(t, method.getBody().getStatements().get(0).getCoordinates().after());
+                      return method.withTemplate(t, getCursor(), method.getBody().getStatements().get(0).getCoordinates().after());
                   }
                   return method;
               }
@@ -399,12 +401,12 @@ class JavaTemplateTest4Test implements RewriteTest {
     void firstStatementInClassBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "int m;").build();
+              final JavaTemplate t = JavaTemplate.builder("int m;").context(() -> getCursor().getParentOrThrow()).build();
 
               @Override
               public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
                   if (classDecl.getBody().getStatements().size() == 1) {
-                      return classDecl.withTemplate(t, classDecl.getBody().getCoordinates().firstStatement());
+                      return classDecl.withTemplate(t, getCursor(), classDecl.getBody().getCoordinates().firstStatement());
                   }
                   return classDecl;
               }
@@ -432,12 +434,12 @@ class JavaTemplateTest4Test implements RewriteTest {
     void firstStatementInMethodBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "int m = 0;").build();
+              final JavaTemplate t = JavaTemplate.builder("int m = 0;").context(() -> getCursor().getParentOrThrow()).build();
 
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getBody().getStatements().size() == 1) {
-                      return method.withTemplate(t, method.getBody().getCoordinates().firstStatement());
+                      return method.withTemplate(t, getCursor(), method.getBody().getCoordinates().firstStatement());
                   }
                   return method;
               }

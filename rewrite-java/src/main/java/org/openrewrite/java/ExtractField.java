@@ -77,7 +77,8 @@ public class ExtractField<P> extends JavaVisitor<P> {
 
             String fieldType = requireNonNull(multiVariable.getTypeAsFullyQualified()).getFullyQualifiedName();
             J.Assignment assignment = multiVariable.withTemplate(
-                    JavaTemplate.builder(this::getCursor, "this.#{} = #{any(" + fieldType + ")}").build(),
+                    JavaTemplate.builder("this.#{} = #{any(" + fieldType + ")}").context(this::getCursor).build(),
+                    getCursor(),
                     multiVariable.getCoordinates().replace(),
                     multiVariable.getVariables().get(0).getSimpleName(),
                     multiVariable.getVariables().get(0).getInitializer()

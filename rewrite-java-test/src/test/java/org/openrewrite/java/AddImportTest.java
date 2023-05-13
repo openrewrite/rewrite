@@ -390,12 +390,12 @@ class AddImportTest implements RewriteTest {
                 public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                     J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
                     J.Block b = c.getBody();
-                    JavaTemplate t = JavaTemplate.builder(this::getCursor,
-                        "BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
+                    JavaTemplate t = JavaTemplate.builder(
+                        "BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);").context(this::getCursor)
                       .imports("java.math.BigDecimal", "java.math.RoundingMode")
                       .build();
 
-                    b = b.withTemplate(t, b.getCoordinates().lastStatement());
+                    b = b.withTemplate(t, getCursor(), b.getCoordinates().lastStatement());
                     maybeAddImport("java.math.BigDecimal");
                     maybeAddImport("java.math.RoundingMode");
                     return c.withBody(b);
@@ -670,10 +670,11 @@ class AddImportTest implements RewriteTest {
                         return cd;
                     }
                     cd = cd.withTemplate(
-                      JavaTemplate.builder(this::getCursor, "ChronoUnit unit = MILLIS;")
+                      JavaTemplate.builder("ChronoUnit unit = MILLIS;").context(this::getCursor)
                         .imports("java.time.temporal.ChronoUnit")
                         .staticImports("java.time.temporal.ChronoUnit.MILLIS")
                         .build(),
+                      getCursor(),
                       cd.getBody().getCoordinates().lastStatement()
                     );
                     maybeAddImport("java.time.temporal.ChronoUnit");

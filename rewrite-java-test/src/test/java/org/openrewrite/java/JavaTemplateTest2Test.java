@@ -32,13 +32,13 @@ class JavaTemplateTest2Test implements RewriteTest {
 
     private final Recipe replaceToStringWithLiteralRecipe = toRecipe(() -> new JavaVisitor<>() {
         private final MethodMatcher toString = new MethodMatcher("java.lang.String toString()");
-        private final JavaTemplate t = JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}").build();
+        private final JavaTemplate t = JavaTemplate.builder("#{any(java.lang.String)}").context(this::getCursor).build();
 
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J mi = super.visitMethodInvocation(method, ctx);
             if (mi instanceof J.MethodInvocation && toString.matches((J.MethodInvocation) mi)) {
-                return mi.withTemplate(t, ((J.MethodInvocation) mi).getCoordinates().replace(),
+                return mi.withTemplate(t, getCursor(), ((J.MethodInvocation) mi).getCoordinates().replace(),
                   ((J.MethodInvocation) mi).getSelect());
             }
             return mi;
@@ -187,12 +187,9 @@ class JavaTemplateTest2Test implements RewriteTest {
                       return nc;
                   }
                   if (newClass.getType() != null &&
-                      TypeUtils.asFullyQualified(newClass.getType()).getFullyQualifiedName().equals("java.io.ByteArrayInputStream") &&
-                      !newClass.getArguments().isEmpty()) {
-                      nc = nc.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "createBis(#{anyArray()})").build(),
-                        newClass.getCoordinates().replace(), newClass.getArguments().get(0)
-                      );
+                    TypeUtils.asFullyQualified(newClass.getType()).getFullyQualifiedName().equals("java.io.ByteArrayInputStream") &&
+                    !newClass.getArguments().isEmpty()) {
+                      nc = nc.withTemplate(JavaTemplate.builder("createBis(#{anyArray()})").context(this::getCursor).build(), getCursor(), newClass.getCoordinates().replace(), newClass.getArguments().get(0));
                   }
                   return nc;
               }
@@ -254,7 +251,8 @@ class JavaTemplateTest2Test implements RewriteTest {
               public J visitIdentifier(J.Identifier identifier, ExecutionContext p) {
                   if (identifier.getSimpleName().equals("f")) {
                       return identifier.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "#{any(java.io.File)}.getCanonicalFile().toPath()").build(),
+                        JavaTemplate.builder("#{any(java.io.File)}.getCanonicalFile().toPath()").context(this::getCursor).build(),
+                        getCursor(),
                         identifier.getCoordinates().replace(),
                         identifier
                       );

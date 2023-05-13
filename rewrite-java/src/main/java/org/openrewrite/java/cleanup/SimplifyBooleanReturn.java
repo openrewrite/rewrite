@@ -60,7 +60,8 @@ public class SimplifyBooleanReturn extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
-            private final JavaTemplate notIfConditionReturn = JavaTemplate.builder(this::getCursor, "return !(#{any(boolean)});")
+            private final JavaTemplate notIfConditionReturn = JavaTemplate.builder("return !(#{any(boolean)});")
+                    .context(this::getCursor)
                     .build();
 
             @Override
@@ -111,7 +112,7 @@ public class SimplifyBooleanReturn extends Recipe {
 
                             if (returnThenPart) {
                                 // we need to NOT the expression inside the if condition
-                                return i.withTemplate(notIfConditionReturn, i.getCoordinates().replace(), ifCondition);
+                                return i.withTemplate(notIfConditionReturn, getCursor(), i.getCoordinates().replace(), ifCondition);
                             }
                         }
                     }

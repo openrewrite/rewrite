@@ -110,7 +110,7 @@ public class ChangeStaticFieldToMethod extends Recipe {
                 Cursor statementCursor = getCursor().dropParentUntil(Statement.class::isInstance);
                 Statement statement = statementCursor.getValue();
                 JavaTemplate template = makeNewMethod(newClass, statementCursor);
-                J.Block block = statement.withTemplate(template, statement.getCoordinates().replace());
+                J.Block block = statement.withTemplate(template, statementCursor, statement.getCoordinates().replace());
                 J.MethodInvocation method = block.getStatements().get(0).withPrefix(tree.getPrefix());
 
                 if (method.getMethodType() == null) {
@@ -142,7 +142,7 @@ public class ChangeStaticFieldToMethod extends Recipe {
                                  " public class " + simpleClassName + " {public static Target " + newTarget + ";}";
                 }
                 return JavaTemplate
-                        .builder(() -> statementCursor, methodInvocationTemplate)
+                        .builder(methodInvocationTemplate).context(() -> statementCursor)
                         .javaParser(JavaParser.fromJavaVersion().dependsOn(methodStub))
                         .imports(newClass)
                         .build();
