@@ -301,4 +301,42 @@ class ChangeDependencyArtifactIdTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3227")
+    @Test
+    void worksWithPlatform() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyArtifactId("org.optaplanner", "optaplanner-bom", "timefold-solver-bom", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform("org.optaplanner:optaplanner-bom:9.37.0.Final")
+                  implementation "org.optaplanner:optaplanner-core"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              dependencies {
+                  implementation platform("org.optaplanner:timefold-solver-bom:9.37.0.Final")
+                  implementation "org.optaplanner:optaplanner-core"
+              }
+              """
+          )
+        );
+    }
 }

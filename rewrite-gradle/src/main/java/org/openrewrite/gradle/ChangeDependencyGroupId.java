@@ -94,6 +94,19 @@ public class ChangeDependencyGroupId extends Recipe {
                 }
 
                 List<Expression> depArgs = m.getArguments();
+                if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
+                    m = updateDependency(m);
+                } else if (depArgs.get(0) instanceof J.MethodInvocation &&
+                        (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
+                                ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                    m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform)));
+                }
+
+                return m;
+            }
+
+            private J.MethodInvocation updateDependency(J.MethodInvocation m) {
+                List<Expression> depArgs = m.getArguments();
                 if (depArgs.get(0) instanceof J.Literal) {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
