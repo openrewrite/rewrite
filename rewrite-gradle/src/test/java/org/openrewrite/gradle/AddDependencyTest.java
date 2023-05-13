@@ -19,6 +19,7 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.Issue;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
@@ -716,6 +717,31 @@ class AddDependencyTest implements RewriteTest {
               """
                 dependencies {
                     implementation "org.openrewrite:rewrite-core:1.0.0"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3209")
+    @Test
+    void addDependencyWithVariable() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:${guavaVersion}", "com.google.common.math.IntMath", "implementation")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                def gauvaVersion = "29.0-jre"
+                """,
+              """
+                def gauvaVersion = "29.0-jre"
+
+                dependencies {
+                    implementation "com.google.guava:guava:${guavaVersion}"
                 }
                 """
             )
