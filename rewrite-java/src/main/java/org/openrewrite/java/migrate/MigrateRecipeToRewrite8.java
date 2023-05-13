@@ -24,10 +24,9 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.*;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markup;
+import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -108,11 +107,15 @@ public class MigrateRecipeToRewrite8 extends Recipe {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method,
                                                             ExecutionContext ctx) {
+                if (MigratedTo8.hasMarker(method)) {
+                    return method;
+                }
+
                 method = super.visitMethodInvocation(method, ctx);
                 if (DO_NEXT_METHOD_MATCHER.matches(method.getMethodType())) {
-                    String comment = "Method `Recipe.doNext(..)` is removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor::doAfterVisit`, \n" +
-                                     "please follow the migrate migration here, (URL to be rewritten)\n";
-                    return Markup.info(method, comment);
+                    String commentText = " *** Method `Recipe.doNext(..)` is removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor::doAfterVisit`, " +
+                                     "please follow the migrate migration here, (URL to be rewritten)";
+                    return MigratedTo8.withMarker( (J.MethodInvocation)commentOf(method, commentText));
                 }
                 return method;
             }
@@ -159,14 +162,13 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method,
                                                                           ExecutionContext executionContext) {
                             if (VISIT_METHOD_MATCHER.matches(method.getMethodType())) {
-
-                                String commentContent = " *** This recipe uses the visit multiple sources method " +
+                                String commentText = " *** This recipe uses the visit multiple sources method " +
                                                         "`visit(List<SourceFile> before, P p)`, " +
-                                                        "needs to be migrated to use new introduced scanning recipe, \n" +
+                                                        "needs to be migrated to use new introduced scanning recipe, " +
                                                         "please follow the migration guide here : (guide URL: to be " +
-                                                        "written)\n";
+                                                        "written)";
 
-                                return Markup.info(method, commentContent);
+                                return (J.MethodDeclaration)commentOf(method, commentText);
                             }
                             return super.visitMethodDeclaration(method, executionContext);
                         }
@@ -395,6 +397,18 @@ public class MigrateRecipeToRewrite8 extends Recipe {
         }.visit(visitMethod, secondParameter);
     }
 
+    private static J commentOf(J j, String commentText) {
+        Comment comment = new TextComment(false, commentText,
+            "\n" + j.getPrefix().getWhitespace().replace("\n", ""), Markers.EMPTY);
+        Space prefix = j.getPrefix();
+        if (prefix == null) {
+            prefix = Space.build("", new ArrayList<>());
+        }
+        List<Comment> comments = ListUtils.concat(prefix.getComments(), comment);
+        prefix = prefix.withComments(comments);
+        return j.withPrefix(prefix);
+    }
+
     @Value
     @With
     private static class MigratedTo8 implements Marker {
@@ -541,5 +555,4 @@ public class MigrateRecipeToRewrite8 extends Recipe {
         }
         return doAfterVisitTemplate;
     }
-
 }
