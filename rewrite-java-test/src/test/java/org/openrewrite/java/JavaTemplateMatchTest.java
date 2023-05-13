@@ -35,7 +35,7 @@ class JavaTemplateMatchTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               // matches manually written class JavaTemplateMatchTest$1_Equals1 below
-              private final JavaTemplate template = JavaTemplate.compile(this, "Equals1", (Integer i) -> 1 == i).requiresContext(false).build();
+              private final JavaTemplate template = JavaTemplate.compile(this, "Equals1", (Integer i) -> 1 == i).build();
 
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
@@ -67,7 +67,7 @@ class JavaTemplateMatchTest implements RewriteTest {
     void matchBinary() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              private final JavaTemplate template = JavaTemplate.builder(this::getCursor, "1 == #{any(int)}").requiresContext(false).build();
+              private final JavaTemplate template = JavaTemplate.builder("1 == #{any(int)}").build();
 
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
@@ -99,10 +99,9 @@ class JavaTemplateMatchTest implements RewriteTest {
     void extractParameterUsingMatcher() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate template = JavaTemplate.builder(this::getCursor, "1 == #{any(int)}").requiresContext(false).build();
-              final JavaTemplate replacement = JavaTemplate.builder(this::getCursor, "Objects.equals(#{any()}, 1)")
+              final JavaTemplate template = JavaTemplate.builder("1 == #{any(int)}").build();
+              final JavaTemplate replacement = JavaTemplate.builder("Objects.equals(#{any()}, 1)")
                 .imports("java.util.Objects")
-                .requiresContext(false)
                 .build();
 
               @Override
@@ -110,7 +109,7 @@ class JavaTemplateMatchTest implements RewriteTest {
                   JavaTemplate.Matcher matcher = template.matcher(binary);
                   if (matcher.find()) {
                       maybeAddImport("java.util.Objects");
-                      return binary.withTemplate(replacement, binary.getCoordinates().replace(), matcher.parameter(0));
+                      return binary.withTemplate(replacement, getCursor(), binary.getCoordinates().replace(), matcher.parameter(0));
                   }
                   return super.visitBinary(binary, ctx);
               }
@@ -142,8 +141,8 @@ class JavaTemplateMatchTest implements RewriteTest {
     void matchAgainstQualifiedReference() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              private final JavaTemplate miTemplate = JavaTemplate.builder(this::getCursor, "java.util.Objects.requireNonNull(#{any(String)})").requiresContext(false).build();
-              private final JavaTemplate faTemplate = JavaTemplate.builder(this::getCursor, "java.util.regex.Pattern.UNIX_LINES").requiresContext(false).build();
+              private final JavaTemplate miTemplate = JavaTemplate.builder("java.util.Objects.requireNonNull(#{any(String)})").build();
+              private final JavaTemplate faTemplate = JavaTemplate.builder("java.util.regex.Pattern.UNIX_LINES").build();
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -209,10 +208,10 @@ class JavaTemplateMatchTest implements RewriteTest {
     void matchAgainstUnqualifiedReference() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              private final JavaTemplate miTemplate = JavaTemplate.builder(this::getCursor, "Objects.requireNonNull(#{any(String)})")
-                .imports("java.util.Objects").requiresContext(false).build();
-              private final JavaTemplate faTemplate = JavaTemplate.builder(this::getCursor, "Pattern.UNIX_LINES")
-                .imports("java.util.regex.Pattern").requiresContext(false).build();
+              private final JavaTemplate miTemplate = JavaTemplate.builder("Objects.requireNonNull(#{any(String)})")
+                .imports("java.util.Objects").build();
+              private final JavaTemplate faTemplate = JavaTemplate.builder("Pattern.UNIX_LINES")
+                .imports("java.util.regex.Pattern").build();
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -278,10 +277,10 @@ class JavaTemplateMatchTest implements RewriteTest {
     void matchAgainstStaticallyImportedReference() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              private final JavaTemplate miTemplate = JavaTemplate.builder(this::getCursor, "requireNonNull(#{any(String)})")
-                .staticImports("java.util.Objects.requireNonNull").requiresContext(false).build();
-              private final JavaTemplate faTemplate = JavaTemplate.builder(this::getCursor, "UNIX_LINES")
-                .staticImports("java.util.regex.Pattern.UNIX_LINES").requiresContext(false).build();
+              private final JavaTemplate miTemplate = JavaTemplate.builder("requireNonNull(#{any(String)})")
+                .staticImports("java.util.Objects.requireNonNull").build();
+              private final JavaTemplate faTemplate = JavaTemplate.builder("UNIX_LINES")
+                .staticImports("java.util.regex.Pattern.UNIX_LINES").build();
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -347,7 +346,7 @@ class JavaTemplateMatchTest implements RewriteTest {
     void matchCompatibleTypes() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              private final JavaTemplate template = JavaTemplate.builder(this::getCursor, "#{any(long)}").requiresContext(false).build();
+              private final JavaTemplate template = JavaTemplate.builder("#{any(long)}").build();
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -390,9 +389,8 @@ class JavaTemplateMatchTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               private final JavaTemplate template = JavaTemplate.builder(
-                this::getCursor,
                 "#{any(java.sql.Statement)}.executeUpdate(#{any(java.lang.String)})"
-              ).requiresContext(false).build();
+              ).build();
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -434,9 +432,8 @@ class JavaTemplateMatchTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               private final JavaTemplate template = JavaTemplate.builder(
-                this::getCursor,
                 "1 + 1"
-              ).requiresContext(false).build();
+              ).build();
 
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
@@ -471,9 +468,8 @@ class JavaTemplateMatchTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               private final JavaTemplate template = JavaTemplate.builder(
-                this::getCursor,
                 "\"a\" + \"b\""
-              ).requiresContext(false).build();
+              ).build();
 
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
@@ -511,9 +507,8 @@ class JavaTemplateMatchTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               private final JavaTemplate template = JavaTemplate.builder(
-                this::getCursor,
                 "\"a\" + \"b\""
-              ).requiresContext(false).build();
+              ).build();
 
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
@@ -542,7 +537,7 @@ class JavaTemplateMatchTest implements RewriteTest {
 @SuppressWarnings("unused")
 class JavaTemplateMatchTest$1_Equals1 {
     static JavaTemplate.Builder getTemplate(JavaVisitor<?> visitor) {
-        return JavaTemplate.builder(visitor::getCursor, "1 == #{any(int)}");
+        return JavaTemplate.builder("1 == #{any(int)}");
     }
 
 }

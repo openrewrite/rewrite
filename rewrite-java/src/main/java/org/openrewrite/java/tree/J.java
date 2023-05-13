@@ -86,8 +86,13 @@ public interface J extends Tree {
         return withPrefix(getPrefix().withComments(comments));
     }
 
+    @Deprecated
     default <J2 extends J> J2 withTemplate(SourceTemplate<J, JavaCoordinates> template, JavaCoordinates coordinates, Object... parameters) {
-        return template.withTemplate(this, coordinates, parameters);
+        return template.withTemplate(this, null, coordinates, parameters);
+    }
+
+    default <J2 extends J> J2 withTemplate(SourceTemplate<J, JavaCoordinates> template, Cursor parentScope, JavaCoordinates coordinates, Object... parameters) {
+        return template.withTemplate(this, parentScope, coordinates, parameters);
     }
 
     /**

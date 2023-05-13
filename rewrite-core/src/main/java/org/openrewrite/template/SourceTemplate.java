@@ -15,8 +15,9 @@
  */
 package org.openrewrite.template;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 
 public interface SourceTemplate<T extends Tree, C extends Coordinates> {
-    <T2 extends T> T2 withTemplate(Tree changing, C coordinates, Object[] parameters);
+    <T2 extends T> T2 withTemplate(Tree changing, Cursor parentScope, C coordinates, Object[] parameters);
 }

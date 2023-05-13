@@ -76,7 +76,7 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.Assert visitAssert(J.Assert _assert, ExecutionContext ctx) {
-                  _assert.getCondition().withTemplate(JavaTemplate.builder(this::getCursor, "null").requiresContext(false).build(), _assert.getCondition().getCoordinates().replace());
+                  _assert.getCondition().withTemplate(JavaTemplate.builder("null").build(), getCursor(), _assert.getCondition().getCoordinates().replace());
                   return super.visitAssert(_assert, ctx);
               }
           })),

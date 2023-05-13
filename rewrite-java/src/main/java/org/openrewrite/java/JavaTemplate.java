@@ -38,21 +38,20 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
+    @Nullable
     private final Supplier<Cursor> parentScopeGetter;
     private final String code;
-    private final boolean requiresContext;
     private final int parameterCount;
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
-    private JavaTemplate(Supplier<Cursor> parentScopeGetter, JavaParser.Builder<?, ?> javaParser, String code, Set<String> imports,
-                         boolean requiresContext, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
+    private JavaTemplate(@Nullable Supplier<Cursor> parentScopeGetter, JavaParser.Builder<?, ?> javaParser, String code, Set<String> imports,
+                         Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         this.parentScopeGetter = parentScopeGetter;
         this.code = code;
-        this.requiresContext = requiresContext;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.parameterCount = StringUtils.countOccurrences(code, "#{");
-        this.templateParser = new JavaTemplateParser(javaParser, onAfterVariableSubstitution, onBeforeParseTemplate, imports, requiresContext);
+        this.templateParser = new JavaTemplateParser(javaParser, onAfterVariableSubstitution, onBeforeParseTemplate, imports, parentScopeGetter != null);
     }
 
     public String getCode() {
@@ -61,7 +60,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
     @Override
     @SuppressWarnings("unchecked")
-    public <J2 extends J> J2 withTemplate(Tree changing, JavaCoordinates coordinates, Object[] parameters) {
+    public <J2 extends J> J2 withTemplate(Tree changing, @Nullable Cursor parentScope, JavaCoordinates coordinates, Object[] parameters) {
         if (parameters.length != parameterCount) {
             throw new IllegalArgumentException("This template requires " + parameterCount + " parameters.");
         }
@@ -70,11 +69,11 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
 
-        if (!requiresContext) {
+        if (parentScopeGetter == null && parentScope == null) {
             //noinspection ConstantConditions
             return (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
                     .getMixin()
-                    .visit(changing, 0, parentScopeGetter.get());
+                    .visit(changing, 0);
         }
 
         AtomicReference<Cursor> parentCursorRef = new AtomicReference<>();
@@ -87,7 +86,9 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         //      J visitClassDeclaration(J.ClassDeclaration c, Integer p) {
         //            c.getBody().withTemplate(template, c.getBody().coordinates.lastStatement());
         //      }
-        Cursor parentScope = parentScopeGetter.get();
+        if (parentScope == null) {
+            parentScope = parentScopeGetter.get();
+        }
         if (!(parentScope.getValue() instanceof J)) {
             // Handle the provided parent cursor pointing to a JRightPadded or similar
             parentScope = parentScope.getParentTreeCursor();
@@ -148,18 +149,23 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
     }
 
+    public static Builder builder(String code) {
+        return new Builder(code);
+    }
+
+    @Deprecated
     public static Builder builder(Supplier<Cursor> parentScope, String code) {
-        return new Builder(parentScope, code);
+        return new Builder(code).context(parentScope);
     }
 
     @SuppressWarnings("unused")
     public static class Builder {
 
+        @Nullable
         private Supplier<Cursor> context;
         private final String code;
         private final Set<String> imports = new HashSet<>();
 
-        private boolean requiresContext = true;
         private JavaParser.Builder<?, ?> javaParser = JavaParser.fromJavaVersion();
 
         private Consumer<String> onAfterVariableSubstitution = s -> {
@@ -167,13 +173,12 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         private Consumer<String> onBeforeParseTemplate = s -> {
         };
 
-        Builder(Supplier<Cursor> parentScope, String code) {
-            this.context = parentScope;
+        Builder(String code) {
             this.code = code.trim();
         }
 
-        public Builder requiresContext(boolean requiresContext) {
-            this.requiresContext = requiresContext;
+        public Builder context(@Nullable Supplier<Cursor> context) {
+            this.context = context;
             return this;
         }
 
@@ -222,7 +227,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
 
         public JavaTemplate build() {
-            return new JavaTemplate(context, javaParser, code, imports, requiresContext,
+            return new JavaTemplate(context, javaParser, code, imports,
                     onAfterVariableSubstitution, onBeforeParseTemplate);
         }
     }
