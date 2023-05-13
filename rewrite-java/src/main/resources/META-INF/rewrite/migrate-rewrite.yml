@@ -1,0 +1,26 @@
+#
+# Copyright 2023 the original author or authors.
+# <p>
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# <p>
+# https://www.apache.org/licenses/LICENSE-2.0
+# <p>
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.java.migrate.MigrateToRewrite8
+displayName: Migrate rewrite from 7 to 8
+description: |
+  Migrate rewrite recipe and test from version 7 to version 8.
+  While most parts can be automatically migrated, there are some complex and open-ended scenarios that require manual attention.
+  In those cases, this recipe will add a comment to the code and request a human to review and handle it manually..
+recipeList:
+  - org.openrewrite.java.migrate.MigrateRecipeToRewrite8
+  - org.openrewrite.java.migrate.MigrateTestToRewrite8

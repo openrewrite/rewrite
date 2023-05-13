@@ -24,10 +24,10 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.*;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.Markup;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -35,7 +35,7 @@ import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.J.Modifier.Type.Protected;
 import static org.openrewrite.java.tree.J.Modifier.Type.Public;
 
-public class MigrateToRewrite8 extends Recipe {
+public class MigrateRecipeToRewrite8 extends Recipe {
 
     private static final String REWRITE_RECIPE_FQN = "org.openrewrite.Recipe";
     private static final String JAVA_ISO_VISITOR_FQN = "org.openrewrite.java.JavaIsoVisitor";

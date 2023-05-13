@@ -23,13 +23,12 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-class MigrateToRewrite8Test implements RewriteTest {
+class MigrateRecipeToRewrite8Test implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new MigrateToRewrite8())
+        spec.recipe(new MigrateRecipeToRewrite8())
           .parser(JavaParser.fromJavaVersion()
-            // .classpathFromResources(new InMemoryExecutionContext(), "rewrite-core-7.41.0-SNAPSHOT")
             .classpath(JavaParser.runtimeClasspath())
           );
     }
