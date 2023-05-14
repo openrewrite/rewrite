@@ -66,20 +66,32 @@ class HasSourcePathTest implements RewriteTest {
         );
     }
 
-    private static class ChangeTextWhenSourcePath extends ChangeText {
+    private static class ChangeTextWhenSourcePath extends Recipe {
+        private final String toText;
         private final String syntax;
         private final String filePattern;
 
         @JsonCreator
         public ChangeTextWhenSourcePath(String toText, String syntax, String filePattern) {
-            super(toText);
+            this.toText = toText;
             this.syntax = syntax;
             this.filePattern = filePattern;
         }
 
         @Override
+        public String getDisplayName() {
+            return "Change text";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Required description.";
+        }
+
+        @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
-            return Preconditions.check(new HasSourcePath<>(syntax, filePattern), super.getVisitor());
+            return Preconditions.check(new HasSourcePath<>(syntax, filePattern),
+              new ChangeText(toText).getVisitor());
         }
     }
 }

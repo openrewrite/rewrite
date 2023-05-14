@@ -15,10 +15,7 @@
  */
 package org.openrewrite.text;
 
-import lombok.AccessLevel;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
@@ -28,9 +25,7 @@ import org.openrewrite.TreeVisitor;
 import java.util.Collections;
 import java.util.Set;
 
-@Getter
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@RequiredArgsConstructor
+@Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangeText extends Recipe {
 

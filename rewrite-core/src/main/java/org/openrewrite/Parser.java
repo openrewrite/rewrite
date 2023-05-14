@@ -42,13 +42,12 @@ public interface Parser<S extends SourceFile> {
         return parseInputs(StreamSupport
                         .stream(sourceFiles.spliterator(), false)
                         .map(sourceFile -> new Input(sourceFile, () -> {
-                                    try {
-                                        return new BufferedInputStream(Files.newInputStream(sourceFile));
-                                    } catch (IOException e) {
-                                        throw new UncheckedIOException(e);
-                                    }
-                                })
-                        )
+                            try {
+                                return new BufferedInputStream(Files.newInputStream(sourceFile));
+                            } catch (IOException e) {
+                                throw new UncheckedIOException(e);
+                            }
+                        }))
                         .collect(toList()),
                 relativeTo,
                 ctx
