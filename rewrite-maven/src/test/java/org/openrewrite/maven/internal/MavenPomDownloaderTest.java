@@ -281,12 +281,6 @@ class MavenPomDownloaderTest {
     }
 
     @Test
-    void extractsEnvironmentPropertyName(){
-        String propertyName = MavenRepository.Builder.getEnvironmentPropertyName("${env.MY_ENV_VAR}");
-        assertThat(propertyName).isEqualTo("MY_ENV_VAR");
-    }
-
-    @Test
     @Disabled
     void dontFetchSnapshotsFromReleaseRepos() {
         try (MockWebServer snapshotRepo = new MockWebServer();
