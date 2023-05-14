@@ -34,6 +34,7 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.semver.Semver;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -174,10 +175,13 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             } else if (m.getArguments().get(0) instanceof G.GString) {
                                 List<J> strings = ((G.GString) m.getArguments().get(0)).getStrings();
                                 if (strings.size() >= 2 &&
-                                        strings.get(0) instanceof J.Literal) {
-                                    Dependency dependency = DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
-                                    if (groupId.equals(dependency.getGroupId()) && artifactId.equals(dependency.getArtifactId())) {
-                                        getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, DEPENDENCY_PRESENT, true);
+                                    strings.get(0) instanceof J.Literal) {
+                                    String dep = (String) ((J.Literal) strings.get(0)).getValue();
+                                    if (dep != null) {
+                                        Dependency dependency = DependencyStringNotationConverter.parse(dep);
+                                        if (groupId.equals(dependency.getGroupId()) && artifactId.equals(dependency.getArtifactId())) {
+                                            getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, DEPENDENCY_PRESENT, true);
+                                        }
                                     }
                                 }
                             } else if (m.getArguments().get(0) instanceof G.MapEntry) {
