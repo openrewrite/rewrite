@@ -15,6 +15,8 @@
  */
 package org.openrewrite.test;
 
+import lombok.RequiredArgsConstructor;
+import lombok.experimental.Delegate;
 import org.assertj.core.api.SoftAssertions;
 import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
@@ -224,7 +226,7 @@ public interface RewriteTest extends SourceSpecs {
             sourceSpecsByParser.computeIfAbsent(sourceSpec.getParser().clone(), p -> new ArrayList<>()).add(sourceSpec);
         }
 
-        Map<SourceFile, SourceSpec<?>> specBySourceFile = new HashMap<>(sourceSpecs.length);
+        Map<SourceFile, SourceSpec<?>> specBySourceFile = new LinkedHashMap<>(sourceSpecs.length);
         for (Map.Entry<Parser.Builder, List<SourceSpec<?>>> sourceSpecsForParser : sourceSpecsByParser.entrySet()) {
             Map<SourceSpec<?>, Parser.Input> inputs = new LinkedHashMap<>(sourceSpecsForParser.getValue().size());
             Parser<?> parser = sourceSpecsForParser.getKey().build();
@@ -423,7 +425,15 @@ public interface RewriteTest extends SourceSpecs {
                             String expected = sourceSpec.noTrim ?
                                     expectedAfter :
                                     trimIndentPreserveCRLF(expectedAfter);
-                            assertThat(actual).as("Unexpected result in \"" + result.getAfter().getSourcePath() + "\"").isEqualTo(expected);
+                            assertThat(actual)
+                                    .as(() -> {
+                                        SourceFile expectedSourceFile = new DelegateSourceFileForDiff(result.getAfter(), expected);
+                                        String diff = new Result(expectedSourceFile, result.getAfter(), Collections.emptyList()).diff();
+                                        return String.format("Unexpected result in \"%s\"%s",
+                                                result.getAfter().getSourcePath(),
+                                                diff.isEmpty() ? "" : "\n" + diff);
+                                    })
+                                    .isEqualTo(expected);
                             sourceSpec.eachResult.accept(result.getAfter(), testMethodSpec, testClassSpec);
                         } else {
                             if (result.diff().isEmpty() && !(result.getAfter() instanceof Remote)) {
@@ -565,5 +575,22 @@ class RewriteTestUtils {
             }
         }
         return false;
+    }
+}
+
+@RequiredArgsConstructor
+class DelegateSourceFileForDiff implements SourceFile {
+    @Delegate(excludes = PrintAll.class)
+    private final SourceFile delegate;
+    private final String expected;
+
+    @Override
+    public <P> String printAll(PrintOutputCapture<P> out) {
+        out.append(expected);
+        return out.getOut();
+    }
+
+    interface PrintAll {
+        <P> String printAll(PrintOutputCapture<P> out);
     }
 }
