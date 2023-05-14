@@ -34,4 +34,9 @@ public class RecipeAcceptingParameters extends Recipe {
     public String getDisplayName() {
         return "Recipe accepting parameters";
     }
+
+    @Override
+    public String getDescription() {
+        return "A recipe with parameters, used in EnvironmentTest";
+    }
 }

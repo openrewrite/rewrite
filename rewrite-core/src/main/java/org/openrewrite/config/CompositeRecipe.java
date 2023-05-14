@@ -36,6 +36,11 @@ public class CompositeRecipe extends Recipe {
     }
 
     @Override
+    public String getDescription() {
+        return "A recipe that consists of a list of other recipes.";
+    }
+
+    @Override
     public Duration getEstimatedEffortPerOccurrence() {
         return null;
     }

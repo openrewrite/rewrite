@@ -142,6 +142,11 @@ public class DeclarativeRecipe extends Recipe {
         public String getDisplayName() {
             return "Lazy loaded recipe";
         }
+
+        @Override
+        public String getDescription() {
+            return "Recipe that is loaded lazily.";
+        }
     }
 
     @Override

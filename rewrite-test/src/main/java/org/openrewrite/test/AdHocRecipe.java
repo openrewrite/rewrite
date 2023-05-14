@@ -63,6 +63,11 @@ public class AdHocRecipe extends ScanningRecipe<Void> {
         return StringUtils.isBlank(displayName) ? "Ad hoc recipe" : displayName;
     }
 
+    @Override
+    public String getDescription() {
+        return "An ad hoc recipe used in RewriteTest.";
+    }
+
     public String getName() {
         return StringUtils.isBlank(name) ? super.getName() : name;
     }

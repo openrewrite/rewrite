@@ -26,4 +26,9 @@ public class RecipeNoParameters extends Recipe {
     public String getDisplayName() {
         return "Recipe with no parameters";
     }
+
+    @Override
+    public String getDescription() {
+        return "A recipe with no parameters, used in EnvironmentTest";
+    }
 }

@@ -131,9 +131,7 @@ public abstract class Recipe implements Cloneable {
      * @return The display name.
      */
     @Language("markdown")
-    public String getDescription() {
-        return "";
-    }
+    public abstract String getDescription();
 
     /**
      * A set of strings used for categorizing related recipes. For example

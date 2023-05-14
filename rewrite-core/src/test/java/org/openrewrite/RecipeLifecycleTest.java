@@ -18,7 +18,6 @@ package org.openrewrite;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.config.RecipeDescriptor;
-import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RewriteTest;
@@ -75,33 +74,20 @@ class RecipeLifecycleTest implements RewriteTest {
 
     @Test
     void deleteFile() {
-        var changes = new Recipe() {
-            @Override
-            public String getName() {
-                return "test.DeletingRecipe";
-            }
-
-            @Override
-            public String getDisplayName() {
-                return getName();
-            }
-
-            @Override
-            public TreeVisitor<?, ExecutionContext> getVisitor() {
-                return new TreeVisitor<>() {
-                    @Override
-                    public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
-                        return null;
-                    }
-                };
-            }
-        }.run(
-          new InMemoryLargeSourceSet(List.of(PlainText.builder().sourcePath(Paths.get("test.txt")).text("test").build())),
-          new InMemoryExecutionContext()
-        ).getChangeset().getAllResults();
-
-        assertThat(changes.stream().map(r -> r.getRecipeDescriptorsThatMadeChanges().get(0).getName()))
-          .containsExactly("test.DeletingRecipe");
+        rewriteRun(
+          spec -> spec
+            .recipe(toRecipe(() -> new TreeVisitor<>() {
+                  @Override
+                  public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                      return null;
+                  }
+              }).withName("test.DeletingRecipe")
+            )
+            .afterRecipe(run -> assertThat(run.getChangeset().getAllResults().stream()
+              .map(r -> r.getRecipeDescriptorsThatMadeChanges().get(0).getName()))
+              .containsOnly("test.DeletingRecipe")),
+          text("test", null, spec -> spec.path("test.txt"))
+        );
     }
 
     @Test

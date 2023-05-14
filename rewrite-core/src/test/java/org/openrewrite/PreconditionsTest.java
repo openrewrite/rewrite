@@ -23,6 +23,7 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.other;
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -86,45 +87,26 @@ class PreconditionsTest implements RewriteTest {
     @Test
     void checkApplicabilityAgainstOtherSourceTypes() {
         rewriteRun(
-          spec -> spec.recipe(
-            new Recipe() {
+          spec -> spec.recipe(toRecipe(() -> Preconditions.check(
+            new PlainTextVisitor<>() {
                 @Override
-                public String getDisplayName() {
-                    return "Say goodbye";
+                public @Nullable PlainText visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    return super.visit(tree, ctx);
                 }
-
-                @Override
-                public TreeVisitor<?, ExecutionContext> getVisitor() {
-                    return Preconditions.check(new PlainTextVisitor<>() {
-                        @Override
-                        public @Nullable PlainText visit(@Nullable Tree tree, ExecutionContext ctx) {
-                            return super.visit(tree, ctx);
-                        }
-                    }, new PlainTextVisitor<>());
-                }
-            }
-          ),
+            },
+            new PlainTextVisitor<>()
+          ))),
           other("hello")
         );
     }
 
     Recipe recipe(TreeVisitor<?, ExecutionContext> applicability) {
-        return new Recipe() {
+        return toRecipe(() -> Preconditions.check(applicability, new PlainTextVisitor<>() {
             @Override
-            public String getDisplayName() {
-                return "Say goodbye";
+            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+                return text.withText("goodbye");
             }
-
-            @Override
-            public TreeVisitor<?, ExecutionContext> getVisitor() {
-                return Preconditions.check(applicability, new PlainTextVisitor<>() {
-                    @Override
-                    public PlainText visitText(PlainText text, ExecutionContext executionContext) {
-                        return text.withText("goodbye");
-                    }
-                });
-            }
-        };
+        }));
     }
 
     PlainTextVisitor<ExecutionContext> contains(String s) {
