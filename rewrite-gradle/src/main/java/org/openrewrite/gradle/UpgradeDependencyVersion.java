@@ -92,10 +92,10 @@ public class UpgradeDependencyVersion extends Recipe {
     public String getDescription() {
         //language=markdown
         return "Upgrade the version of a dependency in a build.gradle file. " +
-               "Supports updating dependency declarations of various forms:\n" +
-               "* `String` notation:  `implementation \"group:artifact:version\"` \n" +
-               "* `Map` notation: `implementation group: 'group', name: 'artifact', version: 'version'`\n" +
-               "Can update version numbers which are defined earlier in the same file in variable declarations.";
+                "Supports updating dependency declarations of various forms:\n" +
+                "* `String` notation: `\"group:artifact:version\"` \n" +
+                "* `Map` notation: `group: 'group', name: 'artifact', version: 'version'`\n" +
+                "Can update version numbers which are defined earlier in the same file in variable declarations.";
     }
 
     @Override
@@ -151,112 +151,125 @@ public class UpgradeDependencyVersion extends Recipe {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (dependencyDsl.matches(m)) {
                     List<Expression> depArgs = m.getArguments();
-                    if (depArgs.get(0) instanceof G.GString) {
-                        G.GString gString = (G.GString) depArgs.get(0);
-                        List<J> strings = gString.getStrings();
-                        if (strings.size() != 2 || !(strings.get(0) instanceof J.Literal) || !(strings.get(1) instanceof G.GString.Value)) {
-                            return m;
-                        }
-                        J.Literal groupArtifact = (J.Literal) strings.get(0);
-                        G.GString.Value versionValue = (G.GString.Value) strings.get(1);
-                        if (!(versionValue.getTree() instanceof J.Identifier) || !(groupArtifact.getValue() instanceof String)) {
-                            return m;
-                        }
-                        Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
-                        if (StringUtils.matchesGlob(dep.getGroupId(), groupId)
+                    if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
+                        m = updateDependency(m, ctx);
+                    } else if (depArgs.get(0) instanceof J.MethodInvocation &&
+                            (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
+                                    ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                        m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform, ctx)));
+                    }
+                }
+                return m;
+            }
+
+            private J.MethodInvocation updateDependency(J.MethodInvocation m, ExecutionContext ctx) {
+                List<Expression> depArgs = m.getArguments();
+                if (depArgs.get(0) instanceof G.GString) {
+                    G.GString gString = (G.GString) depArgs.get(0);
+                    List<J> strings = gString.getStrings();
+                    if (strings.size() != 2 || !(strings.get(0) instanceof J.Literal) || !(strings.get(1) instanceof G.GString.Value)) {
+                        return m;
+                    }
+                    J.Literal groupArtifact = (J.Literal) strings.get(0);
+                    G.GString.Value versionValue = (G.GString.Value) strings.get(1);
+                    if (!(versionValue.getTree() instanceof J.Identifier) || !(groupArtifact.getValue() instanceof String)) {
+                        return m;
+                    }
+                    Dependency dep = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
+                    if (StringUtils.matchesGlob(dep.getGroupId(), groupId)
                             && StringUtils.matchesGlob(dep.getArtifactId(), artifactId)) {
-                            String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
-                            getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, VERSION_VARIABLE_KEY, versionVariableName);
-                        }
-                    } else if (depArgs.get(0) instanceof J.Literal) {
-                        String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
-                        if (gav == null) {
-                            return Markup.warn(m, new IllegalStateException("Unable to update version"));
-                        }
-                        Dependency dep = DependencyStringNotationConverter.parse(gav);
-                        if (StringUtils.matchesGlob(dep.getGroupId(), groupId)
+                        String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
+                        getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, VERSION_VARIABLE_KEY, versionVariableName);
+                    }
+                } else if (depArgs.get(0) instanceof J.Literal) {
+                    String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
+                    if (gav == null) {
+                        return Markup.warn(m, new IllegalStateException("Unable to update version"));
+                    }
+                    Dependency dep = DependencyStringNotationConverter.parse(gav);
+                    if(StringUtils.matchesGlob(dep.getGroupId(), groupId)
                             && StringUtils.matchesGlob(dep.getArtifactId(), artifactId)
                             && dep.getVersion() != null
                             && !dep.getVersion().startsWith("$")) {
-                            GradleProject gradleProject = getCursor().firstEnclosingOrThrow(JavaSourceFile.class)
-                                    .getMarkers()
-                                    .findFirst(GradleProject.class)
-                                    .orElseThrow(() -> new IllegalArgumentException("Gradle files are expected to have a GradleProject marker."));
-                            String version = dep.getVersion();
-                            try {
-                                String newVersion = findNewerVersion(groupId, artifactId, version, versionComparator,
-                                        gradleProject, ctx);
-                                if (newVersion == null || version.equals(newVersion)) {
-                                    return m;
-                                }
-                                getCursor().dropParentUntil(p -> p instanceof SourceFile)
-                                        .computeMessageIfAbsent(NEW_VERSION_KEY, it -> new LinkedHashSet<GroupArtifactVersion>())
-                                        .add(new GroupArtifactVersion(groupId, artifactId, newVersion));
-
-                                return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
-                                    J.Literal literal = (J.Literal) arg;
-                                    String newGav = dep
-                                            .withVersion(newVersion)
-                                            .toStringNotation();
-                                    return literal
-                                            .withValue(newGav)
-                                            .withValueSource(requireNonNull(literal.getValueSource()).replace(gav, newGav));
-                                }));
-                            } catch (MavenDownloadingException e) {
-                                return e.warn(m);
-                            }
-                        }
-                    } else if (depArgs.size() >= 3 && depArgs.get(0) instanceof G.MapEntry
-                               && depArgs.get(1) instanceof G.MapEntry
-                               && depArgs.get(2) instanceof G.MapEntry) {
-                        Expression groupValue = ((G.MapEntry) depArgs.get(0)).getValue();
-                        Expression artifactValue = ((G.MapEntry) depArgs.get(1)).getValue();
-                        if (!(groupValue instanceof J.Literal) || !(artifactValue instanceof J.Literal)) {
-                            return m;
-                        }
-                        J.Literal groupLiteral = (J.Literal) groupValue;
-                        J.Literal artifactLiteral = (J.Literal) artifactValue;
-                        if (!groupId.equals(groupLiteral.getValue()) || !artifactId.equals(artifactLiteral.getValue())) {
-                            return m;
-                        }
-                        G.MapEntry versionEntry = (G.MapEntry) depArgs.get(2);
-                        Expression versionExp = versionEntry.getValue();
-                        if (versionExp instanceof J.Literal && ((J.Literal) versionExp).getValue() instanceof String) {
-                            GradleProject gradleProject = getCursor().firstEnclosingOrThrow(JavaSourceFile.class)
-                                    .getMarkers()
-                                    .findFirst(GradleProject.class)
-                                    .orElseThrow(() -> new IllegalArgumentException("Gradle files are expected to have a GradleProject marker."));
-                            J.Literal versionLiteral = (J.Literal) versionExp;
-                            String version = (String) versionLiteral.getValue();
-                            if (version.startsWith("$")) {
-                                return m;
-                            }
-                            String newVersion;
-                            try {
-                                newVersion = findNewerVersion(groupId, artifactId, version, versionComparator,
-                                        gradleProject, ctx);
-                            } catch (MavenDownloadingException e) {
-                                return e.warn(m);
-                            }
+                        GradleProject gradleProject = getCursor().firstEnclosingOrThrow(JavaSourceFile.class)
+                                .getMarkers()
+                                .findFirst(GradleProject.class)
+                                .orElseThrow(() -> new IllegalArgumentException("Gradle files are expected to have a GradleProject marker."));
+                        String version = dep.getVersion();
+                        try {
+                            String newVersion = findNewerVersion(groupId, artifactId, version, versionComparator,
+                                    gradleProject, ctx);
                             if (newVersion == null || version.equals(newVersion)) {
                                 return m;
                             }
-                            List<Expression> newArgs = new ArrayList<>(3);
-                            newArgs.add(depArgs.get(0));
-                            newArgs.add(depArgs.get(1));
-                            newArgs.add(versionEntry.withValue(
-                                    versionLiteral
-                                            .withValueSource(requireNonNull(versionLiteral.getValueSource()).replace(version, newVersion))
-                                            .withValue(newVersion)));
-                            newArgs.addAll(depArgs.subList(3, depArgs.size()));
+                            getCursor().dropParentUntil(p -> p instanceof SourceFile)
+                                    .computeMessageIfAbsent(NEW_VERSION_KEY, it -> new LinkedHashSet<GroupArtifactVersion>())
+                                    .add(new GroupArtifactVersion(groupId, artifactId, newVersion));
 
-                            return m.withArguments(newArgs);
-                        } else if (versionExp instanceof J.Identifier) {
-                            String versionVariableName = ((J.Identifier) versionExp).getSimpleName();
-                            getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, VERSION_VARIABLE_KEY, versionVariableName);
+                            return m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> {
+                                J.Literal literal = (J.Literal) arg;
+                                String newGav = dep
+                                        .withVersion(newVersion)
+                                        .toStringNotation();
+                                return literal
+                                        .withValue(newGav)
+                                        .withValueSource(requireNonNull(literal.getValueSource()).replace(gav, newGav));
+                            }));
+                        } catch (MavenDownloadingException e) {
+                            return e.warn(m);
                         }
                     }
+                } else if (depArgs.size() >= 3 && depArgs.get(0) instanceof G.MapEntry
+                        && depArgs.get(1) instanceof G.MapEntry
+                        && depArgs.get(2) instanceof G.MapEntry) {
+                    Expression groupValue = ((G.MapEntry) depArgs.get(0)).getValue();
+                    Expression artifactValue = ((G.MapEntry) depArgs.get(1)).getValue();
+                    if (!(groupValue instanceof J.Literal) || !(artifactValue instanceof J.Literal)) {
+                        return m;
+                    }
+                    J.Literal groupLiteral = (J.Literal) groupValue;
+                    J.Literal artifactLiteral = (J.Literal) artifactValue;
+                    if (!groupId.equals(groupLiteral.getValue()) || !artifactId.equals(artifactLiteral.getValue())) {
+                        return m;
+                    }
+                    G.MapEntry versionEntry = (G.MapEntry) depArgs.get(2);
+                    Expression versionExp = versionEntry.getValue();
+                    if (versionExp instanceof J.Literal && ((J.Literal) versionExp).getValue() instanceof String) {
+                        GradleProject gradleProject = getCursor().firstEnclosingOrThrow(JavaSourceFile.class)
+                                .getMarkers()
+                                .findFirst(GradleProject.class)
+                                .orElseThrow(() -> new IllegalArgumentException("Gradle files are expected to have a GradleProject marker."));
+                        J.Literal versionLiteral = (J.Literal) versionExp;
+                        String version = (String) versionLiteral.getValue();
+                        if (version.startsWith("$")) {
+                            return m;
+                        }
+                        String newVersion;
+                        try {
+                            newVersion = findNewerVersion(groupId, artifactId, version, versionComparator,
+                                    gradleProject, ctx);
+                        } catch (MavenDownloadingException e) {
+                            return e.warn(m);
+                        }
+                        if (newVersion == null || version.equals(newVersion)) {
+                            return m;
+                        }
+                        List<Expression> newArgs = new ArrayList<>(3);
+                        newArgs.add(depArgs.get(0));
+                        newArgs.add(depArgs.get(1));
+                        newArgs.add(versionEntry.withValue(
+                                versionLiteral
+                                        .withValueSource(requireNonNull(versionLiteral.getValueSource()).replace(version, newVersion))
+                                        .withValue(newVersion)));
+                        newArgs.addAll(depArgs.subList(3, depArgs.size()));
+
+                        return m.withArguments(newArgs);
+                    } else if (versionExp instanceof J.Identifier) {
+                        String versionVariableName = ((J.Identifier) versionExp).getSimpleName();
+                        getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, VERSION_VARIABLE_KEY, versionVariableName);
+                    }
                 }
+
                 return m;
             }
         });
