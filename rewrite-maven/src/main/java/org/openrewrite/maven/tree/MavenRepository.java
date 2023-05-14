@@ -142,7 +142,7 @@ public class MavenRepository implements Serializable {
 
         public Builder username(String username) {
             if (username.startsWith("${env.")) {
-                this.username = resolveEnvironmentPropertyName(username);
+                this.username = resolveEnvironmentProperty(username);
                 return this;
             }
 
@@ -152,7 +152,7 @@ public class MavenRepository implements Serializable {
 
         public Builder password(String password) {
             if (password.startsWith("${env.")) {
-                this.password = resolveEnvironmentPropertyName(username);
+                this.password = resolveEnvironmentProperty(password);
                 return this;
             }
 
@@ -161,7 +161,7 @@ public class MavenRepository implements Serializable {
         }
 
         @Nullable
-        private static String resolveEnvironmentPropertyName(@Nullable String rawProperty) {
+        private static String resolveEnvironmentProperty(@Nullable String rawProperty) {
             if (rawProperty == null) {
                 return null;
             }
