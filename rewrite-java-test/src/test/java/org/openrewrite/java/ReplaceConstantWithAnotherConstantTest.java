@@ -73,35 +73,29 @@ public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
     @Test
     void replaceConstant() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("com.google.common.base.Charsets.UTF_8", "com.constant.B.UTF_8")),
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("com.google.common.base.Charsets.UTF_8", "java.io.File.separator")),
           java(
             """
-              package com.constant;
-              public class B {
-                  public static final String UTF_8 = "UTF_8";
-                  void method() {
-                      String VAR = "";
-                  }
-              }
-              """
-          ),
-          java(
-            """
+              import com.google.common.base.Charsets;
+
               import static com.google.common.base.Charsets.UTF_8;
+
               class Test {
-                  Object o = UTF_8;
+                  Object o = Charsets.UTF_8;
                   void foo() {
                       System.out.println(UTF_8);
                   }
               }
               """,
             """
-              import com.constant.B;
+              import java.io.File;
+
+              import static java.io.File.separator;
 
               class Test {
-                  Object o = B.UTF_8;
+                  Object o = File.separator;
                   void foo() {
-                      System.out.println(B.UTF_8);
+                      System.out.println(separator);
                   }
               }
               """

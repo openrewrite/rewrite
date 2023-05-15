@@ -56,13 +56,13 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
         private final String existingOwningType;
         private final String constantName;
         private final String owningType;
-        private final String template;
+        private final String newConstantName;
 
         public ReplaceConstantWithAnotherConstantVisitor(String existingFullyQualifiedConstantName, String fullyQualifiedConstantName) {
             this.existingOwningType = existingFullyQualifiedConstantName.substring(0, existingFullyQualifiedConstantName.lastIndexOf('.'));
             this.constantName = existingFullyQualifiedConstantName.substring(existingFullyQualifiedConstantName.lastIndexOf('.') + 1);
             this.owningType = fullyQualifiedConstantName.substring(0, fullyQualifiedConstantName.lastIndexOf('.'));
-            this.template = fullyQualifiedConstantName.substring(owningType.lastIndexOf('.') + 1);
+            this.newConstantName = fullyQualifiedConstantName.substring(fullyQualifiedConstantName.lastIndexOf('.') + 1);
         }
 
         @Override
@@ -89,9 +89,19 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                 maybeRemoveImport(((JavaType.FullyQualified) owner).getFullyQualifiedName());
                 owner = ((JavaType.FullyQualified) owner).getOwningClass();
             }
-            maybeAddImport(owningType, false);
+
+            JavaTemplate.Builder templateBuilder;
+            if (fieldAccess instanceof J.Identifier) {
+                maybeAddImport(owningType, newConstantName, false);
+                templateBuilder = JavaTemplate.builder(newConstantName)
+                        .staticImports(owningType + '.' + newConstantName);
+            } else {
+                maybeAddImport(owningType, false);
+                templateBuilder = JavaTemplate.builder(owningType.substring(owningType.lastIndexOf('.') + 1) + '.' + newConstantName)
+                        .imports(owningType);
+            }
             return fieldAccess.withTemplate(
-                            JavaTemplate.builder(template).context(this::getCursor).imports(owningType).build(),
+                            templateBuilder.context(this::getCursor).build(),
                             getCursor(),
                             fieldAccess.getCoordinates().replace())
                     .withPrefix(fieldAccess.getPrefix());
@@ -99,7 +109,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
 
         private boolean isConstant(@Nullable JavaType.Variable varType) {
             return varType != null && TypeUtils.isOfClassType(varType.getOwner(), existingOwningType) &&
-                   varType.getName().equals(constantName);
+                    varType.getName().equals(constantName);
         }
 
         private boolean isVariableDeclaration() {
@@ -118,7 +128,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             }
 
             return constantName.equals(((J.VariableDeclarations) maybeVariable.getValue()).getVariables().get(0).getSimpleName()) &&
-                   existingOwningType.equals(ownerFqn.getFullyQualifiedName());
+                    existingOwningType.equals(ownerFqn.getFullyQualifiedName());
         }
     }
 }

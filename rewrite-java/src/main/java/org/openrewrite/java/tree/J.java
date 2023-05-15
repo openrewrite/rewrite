@@ -4714,7 +4714,7 @@ public interface J extends Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    final class SwitchExpression implements J, Expression {
+    final class SwitchExpression implements J, Expression, TypedTree {
         @With
         @EqualsAndHashCode.Include
         UUID id;
@@ -5104,7 +5104,7 @@ public interface J extends Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    final class TypeCast implements J, Expression {
+    final class TypeCast implements J, Expression, TypedTree {
         @With
         @EqualsAndHashCode.Include
         UUID id;

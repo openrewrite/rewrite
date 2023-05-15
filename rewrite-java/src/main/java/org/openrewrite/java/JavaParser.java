@@ -206,7 +206,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
      */
     static JavaParser.Builder<? extends JavaParser, ?> fromJavaVersion() {
         JavaParser.Builder<? extends JavaParser, ?> javaParser;
-        String[] versionParts = System.getProperty("java.version").split("\\.");
+        String[] versionParts = System.getProperty("java.version").split("[.-]");
         int version = Integer.parseInt(versionParts[0]);
         if (version == 1) {
             version = 8;

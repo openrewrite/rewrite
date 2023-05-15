@@ -73,6 +73,7 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         G.GString.Value v = value;
         v = v.withMarkers(visitMarkers(v.getMarkers(), p));
         v = v.withTree(visit(v.getTree(), p));
+        v = v.withAfter(visitSpace(v.getAfter(), GSpace.Location.GSTRING, p));
         return v;
     }
 
