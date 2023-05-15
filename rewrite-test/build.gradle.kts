@@ -13,8 +13,7 @@ dependencies {
     implementation("org.slf4j:slf4j-api:1.7.36")
 
     if (System.getProperty("idea.active") != null &&
-        System.getProperty("idea.sync.active") != null
-    ) {
+        System.getProperty("idea.sync.active") != null) {
         // because the shaded jgit will not be available on the classpath
         // for the IntelliJ runner
         runtimeOnly("org.eclipse.jgit:org.eclipse.jgit:5.13.+")

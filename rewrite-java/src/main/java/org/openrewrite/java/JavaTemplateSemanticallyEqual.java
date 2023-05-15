@@ -93,7 +93,7 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                         String fqn;
 
                         if (params.size() == 1) {
-                            if(params.get(0).Identifier() != null) {
+                            if (params.get(0).Identifier() != null) {
                                 fqn = params.get(0).Identifier().getText();
                             } else {
                                 fqn = params.get(0).FullyQualifiedName().getText();
@@ -141,22 +141,31 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
     private static class JavaTemplateSemanticallyEqualVisitor extends SemanticallyEqualVisitor {
 
         final List<J> matchedParameters = new ArrayList<>();
+
         public JavaTemplateSemanticallyEqualVisitor() {
             super(true);
         }
 
         private boolean matchTemplateParameterPlaceholder(J.Empty empty, J j) {
-            return empty.getMarkers().findFirst(TemplateParameter.class)
-                    .map(m -> "java.lang.Object".equals(m.typeName)
-                              || j instanceof TypedTree
-                                 && TypeUtils.isAssignableTo(m.typeName, ((TypedTree) j).getType()))
-                    .orElse(false) && matchedParameters.add(j);
+            if (j instanceof TypedTree && !(j instanceof J.Primitive)) {
+                TemplateParameter marker = (TemplateParameter) empty.getMarkers().getMarkers().get(0);
+                if ("java.lang.Object".equals(marker.typeName)
+                        || TypeUtils.isAssignableTo(marker.typeName, ((TypedTree) j).getType())) {
+                    return registerMatch(j);
+                }
+            }
+            return false;
+        }
+
+        private boolean registerMatch(J j) {
+            return matchedParameters.add(j);
         }
 
         @Override
         public J.Empty visitEmpty(J.Empty empty, J j) {
             if (isEqual.get()) {
-                if (matchTemplateParameterPlaceholder(empty, j)) {
+                if (isTemplateParameterPlaceholder(empty)) {
+                    isEqual.set(matchTemplateParameterPlaceholder(empty, j));
                     return empty;
                 }
                 if (!(j instanceof J.Empty)) {
@@ -171,6 +180,11 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                 }
             }
             return empty;
+        }
+
+        private static boolean isTemplateParameterPlaceholder(J.Empty empty) {
+            Markers markers = empty.getMarkers();
+            return markers.getMarkers().size() == 1 && markers.getMarkers().get(0) instanceof TemplateParameter;
         }
     }
 }
