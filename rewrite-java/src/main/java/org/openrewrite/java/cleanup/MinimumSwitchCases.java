@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
@@ -155,75 +156,80 @@ public class MinimumSwitchCases extends Recipe {
                         return super.visitSwitch(switzh, ctx);
                     }
 
-                    Expression tree = sortedSwitch.getSelector().getTree();
-                    J.If generatedIf;
-                    if (TypeUtils.isString(tree.getType())) {
-                        if (cases[1] == null) {
-                            if (isDefault(cases[0])) {
-                                return switzh.withMarkers(switzh.getMarkers().add(new DefaultOnly()));
-                            } else {
-                                generatedIf = switzh.withTemplate(ifString, switzh.getCoordinates().replace(),
+                    try {
+                        Expression tree = sortedSwitch.getSelector().getTree();
+                        J.If generatedIf;
+                        if (TypeUtils.isString(tree.getType())) {
+                            if (cases[1] == null) {
+                                if (isDefault(cases[0])) {
+                                    return switzh.withMarkers(switzh.getMarkers().add(new DefaultOnly()));
+                                } else {
+                                    generatedIf = switzh.withTemplate(ifString, switzh.getCoordinates().replace(),
+                                            cases[0].getPattern(), tree);
+                                }
+                            } else if (isDefault(cases[1])) {
+                                generatedIf = switzh.withTemplate(ifElseString, switzh.getCoordinates().replace(),
                                         cases[0].getPattern(), tree);
-                            }
-                        } else if (isDefault(cases[1])) {
-                            generatedIf = switzh.withTemplate(ifElseString, switzh.getCoordinates().replace(),
-                                    cases[0].getPattern(), tree);
-                        } else {
-                            generatedIf = switzh.withTemplate(ifElseIfString, switzh.getCoordinates().replace(),
-                                    cases[0].getPattern(), tree, cases[1].getPattern(), tree);
-                        }
-                    } else if (switchesOnEnum(switzh)) {
-                        if (cases[1] == null) {
-                            if (isDefault(cases[0])) {
-                                return switzh.withMarkers(switzh.getMarkers().add(new DefaultOnly()));
                             } else {
-                                generatedIf = switzh.withTemplate(ifEnum, switzh.getCoordinates().replace(),
+                                generatedIf = switzh.withTemplate(ifElseIfString, switzh.getCoordinates().replace(),
+                                        cases[0].getPattern(), tree, cases[1].getPattern(), tree);
+                            }
+                        } else if (switchesOnEnum(switzh)) {
+                            if (cases[1] == null) {
+                                if (isDefault(cases[0])) {
+                                    return switzh.withMarkers(switzh.getMarkers().add(new DefaultOnly()));
+                                } else {
+                                    generatedIf = switzh.withTemplate(ifEnum, switzh.getCoordinates().replace(),
+                                            tree, enumIdentToFieldAccessString(cases[0].getPattern()));
+                                }
+                            } else if (isDefault(cases[1])) {
+                                generatedIf = switzh.withTemplate(ifElseEnum, switzh.getCoordinates().replace(),
                                         tree, enumIdentToFieldAccessString(cases[0].getPattern()));
-                            }
-                        } else if (isDefault(cases[1])) {
-                            generatedIf = switzh.withTemplate(ifElseEnum, switzh.getCoordinates().replace(),
-                                    tree, enumIdentToFieldAccessString(cases[0].getPattern()));
-                        } else {
-                            generatedIf = switzh.withTemplate(ifElseIfEnum, switzh.getCoordinates().replace(),
-                                    tree, enumIdentToFieldAccessString(cases[0].getPattern()), tree, enumIdentToFieldAccessString(cases[1].getPattern()));
-                        }
-                    } else {
-                        if (cases[1] == null) {
-                            if (isDefault(cases[0])) {
-                                return switzh.withMarkers(switzh.getMarkers().add(new DefaultOnly()));
                             } else {
-                                generatedIf = switzh.withTemplate(ifPrimitive, switzh.getCoordinates().replace(),
-                                        tree, cases[0].getPattern());
+                                generatedIf = switzh.withTemplate(ifElseIfEnum, switzh.getCoordinates().replace(),
+                                        tree, enumIdentToFieldAccessString(cases[0].getPattern()), tree, enumIdentToFieldAccessString(cases[1].getPattern()));
                             }
-                        } else if (isDefault(cases[1])) {
-                            generatedIf = switzh.withTemplate(ifElsePrimitive, switzh.getCoordinates().replace(),
-                                    tree, cases[0].getPattern());
                         } else {
-                            generatedIf = switzh.withTemplate(ifElseIfPrimitive, switzh.getCoordinates().replace(),
-                                    tree, cases[0].getPattern(), tree, cases[1].getPattern());
+                            if (cases[1] == null) {
+                                if (isDefault(cases[0])) {
+                                    return switzh.withMarkers(switzh.getMarkers().add(new DefaultOnly()));
+                                } else {
+                                    generatedIf = switzh.withTemplate(ifPrimitive, switzh.getCoordinates().replace(),
+                                            tree, cases[0].getPattern());
+                                }
+                            } else if (isDefault(cases[1])) {
+                                generatedIf = switzh.withTemplate(ifElsePrimitive, switzh.getCoordinates().replace(),
+                                        tree, cases[0].getPattern());
+                            } else {
+                                generatedIf = switzh.withTemplate(ifElseIfPrimitive, switzh.getCoordinates().replace(),
+                                        tree, cases[0].getPattern(), tree, cases[1].getPattern());
+                            }
                         }
-                    }
 
-                    // move first case to "if"
-                    List<Statement> thenStatements = getStatements(cases[0]);
+                        // move first case to "if"
+                        List<Statement> thenStatements = getStatements(cases[0]);
 
-                    generatedIf = generatedIf.withThenPart(((J.Block) generatedIf.getThenPart()).withStatements(ListUtils.map(thenStatements,
-                            s -> s instanceof J.Break ? null : s)));
+                        generatedIf = generatedIf.withThenPart(((J.Block) generatedIf.getThenPart()).withStatements(ListUtils.map(thenStatements,
+                                s -> s instanceof J.Break ? null : s)));
 
-                    // move second case to "else"
-                    if (cases[1] != null) {
-                        assert generatedIf.getElsePart() != null;
-                        if (isDefault(cases[1])) {
-                            generatedIf = generatedIf.withElsePart(generatedIf.getElsePart().withBody(((J.Block) generatedIf.getElsePart().getBody()).withStatements(ListUtils.map(getStatements(cases[1]),
-                                    s -> s instanceof J.Break ? null : s))));
-                        } else {
-                            J.If elseIf = (J.If) generatedIf.getElsePart().getBody();
-                            generatedIf = generatedIf.withElsePart(generatedIf.getElsePart().withBody(elseIf.withThenPart(((J.Block) elseIf.getThenPart()).withStatements(ListUtils.map(getStatements(cases[1]),
-                                    s -> s instanceof J.Break ? null : s)))));
+                        // move second case to "else"
+                        if (cases[1] != null) {
+                            assert generatedIf.getElsePart() != null;
+                            if (isDefault(cases[1])) {
+                                generatedIf = generatedIf.withElsePart(generatedIf.getElsePart().withBody(((J.Block) generatedIf.getElsePart().getBody()).withStatements(ListUtils.map(getStatements(cases[1]),
+                                        s -> s instanceof J.Break ? null : s))));
+                            } else {
+                                J.If elseIf = (J.If) generatedIf.getElsePart().getBody();
+                                generatedIf = generatedIf.withElsePart(generatedIf.getElsePart().withBody(elseIf.withThenPart(((J.Block) elseIf.getThenPart()).withStatements(ListUtils.map(getStatements(cases[1]),
+                                        s -> s instanceof J.Break ? null : s)))));
+                            }
                         }
-                    }
 
-                    return autoFormat(generatedIf, ctx);
+                        return autoFormat(generatedIf, ctx);
+                    } catch (RecipeRunException e) {
+                        // JavaTemplate has problems on some Groovy files, don't currently have a way to adapt it appropriately
+                        return switzh;
+                    }
                 }
 
                 return super.visitSwitch(switzh, ctx);

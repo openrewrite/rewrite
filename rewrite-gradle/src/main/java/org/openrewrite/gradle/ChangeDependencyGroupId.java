@@ -94,6 +94,19 @@ public class ChangeDependencyGroupId extends Recipe {
                 }
 
                 List<Expression> depArgs = m.getArguments();
+                if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
+                    m = updateDependency(m);
+                } else if (depArgs.get(0) instanceof J.MethodInvocation &&
+                        (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
+                                ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                    m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform)));
+                }
+
+                return m;
+            }
+
+            private J.MethodInvocation updateDependency(J.MethodInvocation m) {
+                List<Expression> depArgs = m.getArguments();
                 if (depArgs.get(0) instanceof J.Literal) {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
@@ -103,6 +116,21 @@ public class ChangeDependencyGroupId extends Recipe {
                                         (dependency.getVersion() != null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())))) {
                             Dependency newDependency = dependency.withGroupId(newGroupId);
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));
+                        }
+                    }
+                } else if (depArgs.get(0) instanceof G.GString) {
+                    List<J> strings = ((G.GString) depArgs.get(0)).getStrings();
+                    if (strings.size() >= 2 &&
+                            strings.get(0) instanceof J.Literal) {
+                        Dependency dependency = DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
+                        if (!newGroupId.equals(dependency.getGroupId())
+                                && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                            dependency = dependency.withGroupId(newGroupId);
+                            String replacement = dependency.toStringNotation();
+                            m = m.withArguments(ListUtils.mapFirst(depArgs, arg -> {
+                                G.GString gString = (G.GString) arg;
+                                return gString.withStrings(ListUtils.mapFirst(gString.getStrings(), l -> ((J.Literal) l).withValue(replacement).withValueSource(replacement)));
+                            }));
                         }
                     }
                 } else if (depArgs.get(0) instanceof G.MapEntry) {

@@ -485,4 +485,19 @@ class WrappingAndBracesTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3191")
+    @Test
+    void emptyLineBeforeEnumConstants() {
+        rewriteRun(
+          java(
+            """
+              public enum Status {
+                  NOT_STARTED,
+                  STARTED
+              }
+              """
+          )
+        );
+    }
 }

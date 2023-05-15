@@ -170,9 +170,15 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
             }
             if (body.getStatements().size() == i) {
                 if (!body.getStatements().isEmpty()) {
-                    J.Return lastStatement = (J.Return) statements.remove(i - 1);
-                    statements.add(requireNonNull(lastStatement.getExpression()).withPrefix(lastStatement.getPrefix()));
-                    if (lastStatement.getExpression() instanceof J.MethodInvocation && !((J.MethodInvocation) lastStatement.getExpression()).getSimpleName().equals(addDependencyInvocation.getSimpleName())) {
+                    Statement lastStatement;
+                    if (statements.get(i - 1) instanceof J.Return) {
+                        J.Return r = (J.Return) statements.remove(i - 1);
+                        lastStatement = requireNonNull(r.getExpression()).withPrefix(r.getPrefix());
+                        statements.add(lastStatement);
+                    } else {
+                        lastStatement = statements.get(i - 1);
+                    }
+                    if (lastStatement instanceof J.MethodInvocation && !((J.MethodInvocation) lastStatement).getSimpleName().equals(addDependencyInvocation.getSimpleName())) {
                         addDependencyInvocation = addDependencyInvocation.withPrefix(Space.format("\n\n" + addDependencyInvocation.getPrefix().getIndent()));
                     }
                 }
