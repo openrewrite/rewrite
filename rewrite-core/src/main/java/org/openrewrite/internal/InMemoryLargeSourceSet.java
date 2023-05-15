@@ -22,7 +22,6 @@ import org.openrewrite.marker.Generated;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 
 import java.util.*;
-import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 
 public class InMemoryLargeSourceSet implements LargeSourceSet {
@@ -75,8 +74,7 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
         return ls.iterator();
     }
 
-    @Override
-    public InMemoryLargeSourceSet getInitialState() {
+    private InMemoryLargeSourceSet getInitialState() {
         return initialState == null ? this : initialState;
     }
 

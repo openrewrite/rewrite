@@ -16,12 +16,11 @@
 package org.openrewrite.test;
 
 import lombok.RequiredArgsConstructor;
-import org.openrewrite.SourceFile;
 import org.openrewrite.LargeSourceSet;
+import org.openrewrite.Result;
+import org.openrewrite.SourceFile;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.scheduling.DirectScheduler;
-
-import java.util.Iterator;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
@@ -33,24 +32,20 @@ class RecipeSchedulerCheckingExpectedCycles extends DirectScheduler {
 
     @Override
     public void afterCycle(LargeSourceSet sourceSet) {
-        if (sourceSet != sourceSet.getInitialState()) {
+        if (sourceSet.getChangeset().size() > 0) {
             cyclesThatResultedInChanges++;
             if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges) {
 
-                Iterator<SourceFile> afterIter = sourceSet.iterator();
-                if (!afterIter.hasNext()) {
-                    return;
-                }
-
-                for (SourceFile b : sourceSet.getInitialState()) {
-                    SourceFile a = afterIter.next();
-                    if (!(a instanceof Quark)) {
-                        assertThat(a.printAllTrimmed())
+                for (Result result : sourceSet.getChangeset().getAllResults()) {
+                    SourceFile before = result.getBefore();
+                    SourceFile after = result.getAfter();
+                    if (before != null && after != null && !(after instanceof Quark)) {
+                        assertThat(after.printAllTrimmed())
                                 .as(
                                         "Expected recipe to complete in " + expectedCyclesThatMakeChanges + " cycle" + (expectedCyclesThatMakeChanges == 1 ? "" : "s") + ", " +
-                                        "but took at least one more cycle. Between the last two executed cycles there were changes to \"" + b.getSourcePath() + "\""
+                                        "but took at least one more cycle. Between the last two executed cycles there were changes to \"" + before.getSourcePath() + "\""
                                 )
-                                .isEqualTo(b.printAllTrimmed());
+                                .isEqualTo(before.printAllTrimmed());
                     }
                 }
             }

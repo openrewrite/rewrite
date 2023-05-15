@@ -53,12 +53,6 @@ public interface LargeSourceSet extends Iterable<SourceFile> {
     LargeSourceSet concatAll(@Nullable Collection<? extends SourceFile> ls);
 
     /**
-     * @return The initial state of the first incarnation of this large iterable.
-     * It may have passed through one or several transformations in the meantime.
-     */
-    LargeSourceSet getInitialState();
-
-    /**
      * @return The set of changes (encompassing adds, edits, and deletions)
      * to the initial state.
      */
