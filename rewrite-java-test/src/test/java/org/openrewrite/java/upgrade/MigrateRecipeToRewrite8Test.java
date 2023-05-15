@@ -498,7 +498,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
                               String packageText = pkg.getExpression().print(getCursor()).replaceAll("\\\\s", "");
                               String lowerCase = packageText.toLowerCase();
                               if(!packageText.equals(lowerCase)) {
-                                  // [Rewrite8 migration] Method `Recipe.doNext(..)` is removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor::doAfterVisit`, please follow the migrate migration here: https://to-be-written
+                                  // [Rewrite8 migration] Method `Recipe#doNext(..)` is removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor#doAfterVisit`, please follow the migrate migration here: https://to-be-written
                                   doNext(new ChangePackage(packageText, lowerCase, true));
                               }
                               return pkg;
