@@ -42,7 +42,7 @@ public class UpdateJavaCompatibility extends Recipe {
 
     @Option(displayName = "Compatibility Type",
             description = "The compatibility type to change",
-            valid = {"Source", "Target"},
+            valid = {"source", "target"},
             required = false)
     @Nullable
     CompatibilityType compatibilityType;
