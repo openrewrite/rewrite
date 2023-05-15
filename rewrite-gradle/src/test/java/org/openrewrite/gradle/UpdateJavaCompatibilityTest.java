@@ -59,7 +59,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void sourceOnly() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.Source, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.source, null)),
           buildGradle(
             """
               plugins {
@@ -84,7 +84,7 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @Test
     void targetOnly() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.Target, null)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.target, null)),
           buildGradle(
             """
               plugins {
@@ -203,12 +203,12 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
 
     @ParameterizedTest
     @CsvSource(textBlock = """
-      Source,Enum,JavaVersion.VERSION_11,1.8
-      Source,Number,11,1.8
-      Source,String,'11',1.8
-      Target,Enum,1.8,JavaVersion.VERSION_11
-      Target,Number,1.8,11
-      Target,String,1.8,'11'
+      source,Enum,JavaVersion.VERSION_11,1.8
+      source,Number,11,1.8
+      source,String,'11',1.8
+      target,Enum,1.8,JavaVersion.VERSION_11
+      target,Number,1.8,11
+      target,String,1.8,'11'
       """, quoteCharacter = '`')
     void allOptions(String compatibilityType, String declarationStyle, String expectedSourceCompatibility, String expectedTargetCompatibility) {
         rewriteRun(

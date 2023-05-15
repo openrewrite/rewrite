@@ -139,8 +139,8 @@ public class UpdateJavaCompatibility extends Recipe {
 
                 if (sourceCompatibilityDsl.matches(m) || targetCompatibilityDsl.matches(m)) {
                     if (compatibilityType != null && (
-                            (compatibilityType == CompatibilityType.Source && !sourceCompatibilityDsl.matches(m)) ||
-                                    (compatibilityType == CompatibilityType.Target && !targetCompatibilityDsl.matches(m)))) {
+                            (compatibilityType == CompatibilityType.source && !sourceCompatibilityDsl.matches(m)) ||
+                                    (compatibilityType == CompatibilityType.target && !targetCompatibilityDsl.matches(m)))) {
                         return m;
                     }
 
@@ -281,7 +281,7 @@ public class UpdateJavaCompatibility extends Recipe {
     }
 
     public enum CompatibilityType {
-        Source, Target
+        source, target
     }
 
     public enum DeclarationStyle {
