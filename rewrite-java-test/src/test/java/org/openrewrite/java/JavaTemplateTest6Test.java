@@ -40,7 +40,7 @@ class JavaTemplateTest6Test implements RewriteTest {
     void addVariableAnnotationsToVariableNotAnnotated() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("@SuppressWarnings(\"ALL\")").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("@SuppressWarnings(\"ALL\")").build();
 
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext p) {
@@ -82,7 +82,7 @@ class JavaTemplateTest6Test implements RewriteTest {
     void addMethodAnnotations() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("@SuppressWarnings(\"other\")").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("@SuppressWarnings(\"other\")").build();
 
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
@@ -125,7 +125,7 @@ class JavaTemplateTest6Test implements RewriteTest {
     void addClassAnnotations() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("@SuppressWarnings(\"other\")").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("@SuppressWarnings(\"other\")").build();
 
               @Override
               public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
@@ -160,7 +160,7 @@ class JavaTemplateTest6Test implements RewriteTest {
     void replaceAnnotation() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("@Deprecated").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("@Deprecated").build();
 
               @Override
               public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext p) {
@@ -189,7 +189,7 @@ class JavaTemplateTest6Test implements RewriteTest {
     void replaceClassImplements() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("Serializable, Closeable").context(() -> getCursor().getParentOrThrow())
+              final JavaTemplate t = JavaTemplate.builder("Serializable, Closeable").context(this::getCursor)
                 .imports("java.io.*")
                 .build();
 
@@ -223,7 +223,7 @@ class JavaTemplateTest6Test implements RewriteTest {
     void replaceClassExtends() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("List<String>").context(() -> getCursor().getParentOrThrow())
+              final JavaTemplate t = JavaTemplate.builder("List<String>")
                 .imports("java.util.*")
                 .build();
 
@@ -256,7 +256,7 @@ class JavaTemplateTest6Test implements RewriteTest {
     void replaceThrows() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("Exception").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("Exception").context(this::getCursor).build();
 
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
@@ -291,9 +291,9 @@ class JavaTemplateTest6Test implements RewriteTest {
     void replaceMethodTypeParameters() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate typeParamsTemplate = JavaTemplate.builder("T, U").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate typeParamsTemplate = JavaTemplate.builder("T, U").build();
 
-              final JavaTemplate methodArgsTemplate = JavaTemplate.builder("List<T> t, U u").context(() -> getCursor().getParentOrThrow())
+              final JavaTemplate methodArgsTemplate = JavaTemplate.builder("List<T> t, U u")
                 .imports("java.util.List")
                 .build();
 
@@ -353,7 +353,7 @@ class JavaTemplateTest6Test implements RewriteTest {
     void replaceClassTypeParameters() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("T, U").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("T, U").build();
 
               @Override
               public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
@@ -380,7 +380,7 @@ class JavaTemplateTest6Test implements RewriteTest {
     void replaceBody() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("n = 1;").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("n = 1;").context(this::getCursor).build();
 
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
@@ -416,7 +416,7 @@ class JavaTemplateTest6Test implements RewriteTest {
     void replaceMissingBody() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("").build();
 
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
@@ -457,7 +457,7 @@ class JavaTemplateTest6Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               final MethodMatcher matcher = new MethodMatcher("Integer valueOf(..)");
-              final JavaTemplate t = JavaTemplate.builder("new Integer(#{any()})").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("new Integer(#{any()})").build();
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {

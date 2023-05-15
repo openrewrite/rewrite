@@ -136,7 +136,7 @@ public class SelectRecipeExamples extends Recipe {
                     return method;
                 }
 
-                JavaTemplate t = JavaTemplate.builder("@DocumentExample").context(() -> getCursor().getParentOrThrow())
+                JavaTemplate t = JavaTemplate.builder("@DocumentExample").context(getCursor())
                         .imports(DOCUMENT_EXAMPLE_ANNOTATION_FQN)
                         .javaParser(JavaParser.fromJavaVersion()
                                 .classpath(JavaParser.runtimeClasspath()))

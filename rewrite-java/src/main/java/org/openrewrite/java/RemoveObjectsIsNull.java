@@ -54,7 +54,7 @@ public class RemoveObjectsIsNull extends Recipe {
             }
 
             private Expression replace(ExecutionContext executionContext, J.MethodInvocation m, String pattern) {
-                JavaTemplate template = JavaTemplate.builder(pattern).context(this::getCursor).build();
+                JavaTemplate template = JavaTemplate.builder(pattern).build();
                 Expression e = m.getArguments().get(0);
                 Expression replaced = m.withTemplate(template, getCursor(), m.getCoordinates().replace(), e);
                 return (Expression) new UnnecessaryParentheses().getVisitor()

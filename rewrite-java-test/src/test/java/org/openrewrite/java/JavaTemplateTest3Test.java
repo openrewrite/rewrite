@@ -35,7 +35,7 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replacePackage() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("b").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("b").context(this::getCursor).build();
 
               @Override
               public J.Package visitPackage(J.Package pkg, ExecutionContext p) {
@@ -73,12 +73,12 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replaceMethod() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("int test2(int n) { return n; }").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("int test2(int n) { return n; }").build();
 
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getSimpleName().equals("test")) {
-                      return method.withTemplate(t, getCursor(), method.getCoordinates().replace());
+                      return method.withTemplate(t, getCursor().getParentOrThrow(), method.getCoordinates().replace());
                   }
                   return super.visitMethodDeclaration(method, p);
               }
@@ -112,7 +112,7 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replaceLambdaWithMethodReference() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("Object::toString").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("Object::toString").context(this::getCursor).build();
 
               @Override
               public J visitLambda(J.Lambda lambda, ExecutionContext p) {
@@ -144,7 +144,7 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replaceStatementInLambdaBodySingleStatementBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("return n == 1;").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("return n == 1;").context(this::getCursor).build();
 
               @Override
               public J visitReturn(J.Return retrn, ExecutionContext p) {
@@ -195,7 +195,7 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replaceStatementInLambdaBodyWithVariableDeclaredInBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("return n == 1;").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("return n == 1;").context(this::getCursor).build();
 
               @Override
               public J visitReturn(J.Return retrn, ExecutionContext p) {
@@ -242,7 +242,7 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replaceStatementInLambdaBodyMultiStatementBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("#{any(java.lang.String)}.toUpperCase()").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("#{any(java.lang.String)}.toUpperCase()").build();
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
@@ -289,7 +289,7 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replaceSingleExpressionInLambdaBody() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("#{any(java.lang.String)}.toUpperCase()").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("#{any(java.lang.String)}.toUpperCase()").build();
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
@@ -328,7 +328,7 @@ class JavaTemplateTest3Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               final MethodMatcher enumEquals = new MethodMatcher("java.lang.Enum equals(java.lang.Object)");
-              final JavaTemplate t = JavaTemplate.builder("#{any()} == #{any()}").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("#{any()} == #{any()}").build();
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
@@ -368,7 +368,7 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replaceMethodNameAndArgumentsSimultaneously() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("acceptString(#{any()}.toString())").context(() -> getCursor().getParentOrThrow())
+              final JavaTemplate t = JavaTemplate.builder("acceptString(#{any()}.toString())").context(this::getCursor)
                 .javaParser(JavaParser.fromJavaVersion()
                   .dependsOn(
                     """
@@ -433,7 +433,7 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replaceMethodInvocationWithArray() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("#{anyArray(int)}").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("#{anyArray(int)}").build();
 
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
@@ -483,7 +483,7 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replaceMethodInvocationWithMethodReference() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("Object::toString").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("Object::toString").context(this::getCursor).build();
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {

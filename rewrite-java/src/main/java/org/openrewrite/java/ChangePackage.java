@@ -151,7 +151,7 @@ public class ChangePackage extends Recipe {
             } else if (isTargetRecursivePackageName(original)) {
                 String changingTo = getNewPackageName(original);
                 getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, RENAME_TO_KEY, changingTo);
-                pkg = pkg.withTemplate(JavaTemplate.builder(changingTo).context(this::getCursor).build(), getCursor(), pkg.getCoordinates().replace());
+                pkg = pkg.withTemplate(JavaTemplate.builder(changingTo).context(getCursor()).build(), getCursor(), pkg.getCoordinates().replace());
             }
             //noinspection ConstantConditions
             return pkg;

@@ -36,8 +36,7 @@ class JavaTemplateTest4Test implements RewriteTest {
     void replaceMethodParameters() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("int m, java.util.List<String> n").context(() -> getCursor().getParentOrThrow())
-                .build();
+              final JavaTemplate t = JavaTemplate.builder("int m, java.util.List<String> n").build();
 
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
@@ -102,8 +101,7 @@ class JavaTemplateTest4Test implements RewriteTest {
     void replaceMethodParametersVariadicArray() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("Object[]... values").context(() -> getCursor().getParentOrThrow())
-                .build();
+              final JavaTemplate t = JavaTemplate.builder("Object[]... values").build();
 
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
@@ -162,7 +160,7 @@ class JavaTemplateTest4Test implements RewriteTest {
     void replaceAndInterpolateMethodParameters() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("int n, #{}").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("int n, #{}").context(this::getCursor).build();
 
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
@@ -213,7 +211,7 @@ class JavaTemplateTest4Test implements RewriteTest {
     void replaceLambdaParameters() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("int m, int n").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("int m, int n").build();
 
               @Override
               public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext p) {
@@ -252,7 +250,7 @@ class JavaTemplateTest4Test implements RewriteTest {
                       n++;
                     }"""
                 )
-                .context(() -> getCursor().getParentOrThrow())
+                .context(this::getCursor)
                 .build();
 
               @Override
@@ -288,7 +286,7 @@ class JavaTemplateTest4Test implements RewriteTest {
     void replaceStatementInBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("n = 2;\nn = 3;").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("n = 2;\nn = 3;").context(this::getCursor).build();
 
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
@@ -327,7 +325,7 @@ class JavaTemplateTest4Test implements RewriteTest {
     void beforeStatementInBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("assert n == 0;").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("assert n == 0;").context(this::getCursor).build();
 
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
@@ -364,7 +362,7 @@ class JavaTemplateTest4Test implements RewriteTest {
     void afterStatementInBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("n = 1;").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("n = 1;").context(this::getCursor).build();
 
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
@@ -401,7 +399,7 @@ class JavaTemplateTest4Test implements RewriteTest {
     void firstStatementInClassBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("int m;").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("int m;").build();
 
               @Override
               public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
@@ -434,7 +432,7 @@ class JavaTemplateTest4Test implements RewriteTest {
     void firstStatementInMethodBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("int m = 0;").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("int m = 0;").build();
 
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {

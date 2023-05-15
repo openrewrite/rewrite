@@ -70,15 +70,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
 
-        if (parentScopeGetter == null) {
-            TreeVisitor<? extends J, Integer> visitor = new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
-                    .getMixin();
-            //noinspection ConstantConditions
-            return parentScope != null
-                    ? (J2) visitor.visit(changing, 0, parentScope)
-                    : (J2) visitor.visit(changing, 0);
-        }
-
         AtomicReference<Cursor> parentCursorRef = new AtomicReference<>();
 
         // Find the parent cursor of the CHANGING element, which may not be the same as the cursor of
@@ -92,6 +83,15 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         if (parentScopeGetter != null) {
             parentScope = parentScopeGetter.get();
         }
+
+        if (parentScope == null) {
+            // this is the pattern matching use case where the template is parsed as context-free and no auto-format is applied
+            TreeVisitor<? extends J, Integer> visitor = new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
+                    .getMixin();
+            //noinspection ConstantConditions
+            return (J2) visitor.visit(changing, 0);
+        }
+
         if (!(parentScope.getValue() instanceof J)) {
             // Handle the provided parent cursor pointing to a JRightPadded or similar
             parentScope = parentScope.getParentTreeCursor();
@@ -113,12 +113,10 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             }
         }.visit(parentScope.getValue(), 0, parentScope.getParentOrThrow());
 
-        Cursor parentCursor = parentCursorRef.get();
-
         //noinspection ConstantConditions
         return (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
                 .getMixin()
-                .visit(changing, 0, parentCursor);
+                .visit(changing, 0, parentCursorRef.get());
     }
 
     @Incubating(since = "7.38.0")
@@ -175,7 +173,12 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             this.code = code.trim();
         }
 
-        public Builder context(@Nullable Supplier<Cursor> context) {
+        public Builder context(Cursor context) {
+            this.context = () -> context;
+            return this;
+        }
+
+        public Builder context(Supplier<Cursor> context) {
             this.context = context;
             return this;
         }

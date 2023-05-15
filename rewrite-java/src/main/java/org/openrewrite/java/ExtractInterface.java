@@ -123,7 +123,7 @@ public class ExtractInterface {
 
                                 if (FindAnnotations.find(methodDeclaration, "@java.lang.Override").isEmpty()) {
                                     return methodDeclaration.withTemplate(
-                                            JavaTemplate.builder("@Override").context(this::getCursor).build(),
+                                            JavaTemplate.builder("@Override").build(),
                                             getCursor(),
                                             methodDeclaration.getCoordinates().addAnnotation(
                                                     Comparator

@@ -493,7 +493,7 @@ public class ChangeType extends Recipe {
                         p = null;
                     } else {
                         String newPkg = targetType.getPackageName();
-                        p = p.withTemplate(JavaTemplate.builder(newPkg).context(this::getCursor).build(), getCursor(), p.getCoordinates().replace());
+                        p = p.withTemplate(JavaTemplate.builder(newPkg).context(getCursor()).build(), getCursor(), p.getCoordinates().replace());
                     }
                 }
             }

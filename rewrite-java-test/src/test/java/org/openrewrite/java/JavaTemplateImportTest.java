@@ -40,7 +40,7 @@ class JavaTemplateImportTest implements RewriteTest {
                   @Override
                   public J visitImport(J.Import impoort, ExecutionContext executionContext) {
                       impoort = impoort.withTemplate(
-                        JavaTemplate.builder("import #{}").context(this::getCursor).build(),
+                        JavaTemplate.builder("import #{}").context(getCursor()).build(),
                         getCursor(),
                         impoort.getCoordinates().replace(),
                         "java.util.Stack"

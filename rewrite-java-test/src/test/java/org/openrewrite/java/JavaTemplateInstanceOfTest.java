@@ -58,7 +58,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
               public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
                   return literal.getValue() == Integer.valueOf(42) ? literal.withTemplate(
                     JavaTemplate.builder("s.length()")
-                      .context(this::getCursor)
+                      .context(getCursor())
 //                          .doBeforeParseTemplate(System.out::println)
                       .build(),
                     getCursor(),
@@ -480,7 +480,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                     List<Expression> arguments = mi.getArguments();
                     mi = mi.withTemplate(
                       JavaTemplate.builder("#{any(java.lang.String)}.formatted(#{any()})")
-                        .context(this::getCursor)
+                        .context(getCursor())
                         .build(),
                       getCursor(),
                       mi.getCoordinates().replace(),

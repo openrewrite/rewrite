@@ -32,7 +32,7 @@ class JavaTemplateTest2Test implements RewriteTest {
 
     private final Recipe replaceToStringWithLiteralRecipe = toRecipe(() -> new JavaVisitor<>() {
         private final MethodMatcher toString = new MethodMatcher("java.lang.String toString()");
-        private final JavaTemplate t = JavaTemplate.builder("#{any(java.lang.String)}").context(this::getCursor).build();
+        private final JavaTemplate t = JavaTemplate.builder("#{any(java.lang.String)}").build();
 
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -251,7 +251,7 @@ class JavaTemplateTest2Test implements RewriteTest {
               public J visitIdentifier(J.Identifier identifier, ExecutionContext p) {
                   if (identifier.getSimpleName().equals("f")) {
                       return identifier.withTemplate(
-                        JavaTemplate.builder("#{any(java.io.File)}.getCanonicalFile().toPath()").context(this::getCursor).build(),
+                        JavaTemplate.builder("#{any(java.io.File)}.getCanonicalFile().toPath()").build(),
                         getCursor(),
                         identifier.getCoordinates().replace(),
                         identifier

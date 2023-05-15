@@ -391,7 +391,7 @@ class AddImportTest implements RewriteTest {
                     J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
                     J.Block b = c.getBody();
                     JavaTemplate t = JavaTemplate.builder(
-                        "BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);").context(this::getCursor)
+                        "BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
                       .imports("java.math.BigDecimal", "java.math.RoundingMode")
                       .build();
 

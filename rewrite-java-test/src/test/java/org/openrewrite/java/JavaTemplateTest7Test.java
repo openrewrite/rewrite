@@ -37,7 +37,7 @@ class JavaTemplateTest7Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               final MethodMatcher matcher = new MethodMatcher("Integer valueOf(..)");
-              final JavaTemplate t = JavaTemplate.builder("new Integer(#{any()})").context(() -> getCursor().getParentOrThrow()).build();
+              final JavaTemplate t = JavaTemplate.builder("new Integer(#{any()})").build();
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
@@ -85,9 +85,9 @@ class JavaTemplateTest7Test implements RewriteTest {
                                 }
                                 """
                             )
-                            .context(() -> getCursor().getParentOrThrow())
+                            .context(getCursor())
                             .build(),
-                          getCursor().getParentOrThrow(),
+                          getCursor(),
                           cd.getBody().getCoordinates().firstStatement()
                         )
                       );
@@ -127,9 +127,7 @@ class JavaTemplateTest7Test implements RewriteTest {
                   if (a.getAssignment() instanceof J.MethodInvocation) {
                       J.MethodInvocation mi = (J.MethodInvocation) a.getAssignment();
                       a = a.withAssignment(mi.withTemplate(
-                        JavaTemplate.builder("1")
-                          .context(this::getCursor)
-                          .build(),
+                        JavaTemplate.builder("1").build(),
                         getCursor(),
                         mi.getCoordinates().replace()
                       ));

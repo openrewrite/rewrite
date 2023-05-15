@@ -41,7 +41,7 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   public J visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
                       annotation = annotation.withTemplate(
                         JavaTemplate.builder("@Deprecated(since = \"#{}\", forRemoval = true)")
-                          .context(this::getCursor)
+                          .context(getCursor())
                           .build(),
                         getCursor(),
                         annotation.getCoordinates().replace(),
@@ -76,7 +76,6 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   public J visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
                       annotation = annotation.withTemplate(
                         JavaTemplate.builder("@Deprecated(since = \"#{any(java.lang.String)}\", forRemoval = true)")
-                          .context(this::getCursor)
                           .build(),
                         getCursor(),
                         annotation.getCoordinates().replace(),
