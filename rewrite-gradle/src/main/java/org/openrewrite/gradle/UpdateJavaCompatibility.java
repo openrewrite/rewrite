@@ -121,7 +121,7 @@ public class UpdateJavaCompatibility extends Recipe {
                     if (args.size() == 1 && args.get(0) instanceof J.Literal) {
                         J.Literal versionArg = (J.Literal) args.get(0);
                         if (versionArg.getValue() instanceof Integer) {
-                            Integer versionNumber = (Integer)  versionArg.getValue();
+                            Integer versionNumber = (Integer) versionArg.getValue();
                             if (!version.equals(versionNumber)) {
                                 return m.withArguments(
                                         Collections.singletonList(versionArg.withValue(version)
