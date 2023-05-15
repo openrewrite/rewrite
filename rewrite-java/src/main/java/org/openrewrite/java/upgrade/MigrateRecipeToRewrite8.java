@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.migrate;
+package org.openrewrite.java.upgrade;
 
 import lombok.Value;
 import lombok.With;
@@ -65,8 +65,13 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                          "`visit(List<SourceFile> before, P p)`, " +
                          "needs to be migrated to use new introduced scanning recipe, " +
                          "please follow the migration guide here : " + MIGRATION_GUIDE_URL;
-    private static final String DO_NEXT_COMMENT = " [Rewrite8 migration] Method `Recipe.doNext(..)` is removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor::doAfterVisit`, " +
-                         "please follow the migrate migration here: " + MIGRATION_GUIDE_URL;
+    private static final String DO_NEXT_COMMENT = " [Rewrite8 migration] Method `Recipe#doNext(..)` is removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor#doAfterVisit`, " +
+                                                  "please follow the migrate migration here: " + MIGRATION_GUIDE_URL;
+    private static final String APPLICABLE_TEST_COMMENT = " [Rewrite8 migration] Method `Recipe#getApplicableTest(..)" +
+                                                          "` is deprecated and needs to be converted to a " +
+                                                          "`ScanningRecipe`. Or you can use `Precondition#check()` if" +
+                                                          " it is meant to use a single-source applicability test. " +
+                                                          "please follow the migrate migration here: " + MIGRATION_GUIDE_URL;
 
     private static String VISIT_TREE_METHOD_TEMPLATE_CODE = "import org.openrewrite.Tree;\n" +
         "import org.openrewrite.internal.lang.Nullable;\n" +
@@ -146,14 +151,9 @@ public class MigrateRecipeToRewrite8 extends Recipe {
 
                 // find `getSingleSourceApplicableTest` method
                 J.MethodDeclaration singleSourceApplicableTestMethod = findSingleSourceApplicableTest(classDecl);
-                J.MethodDeclaration applicableTestMethod = findApplicableTest(classDecl);
                 if (singleSourceApplicableTestMethod != null) {
                     hasApplicableTest = true;
                     List<Statement> statements = singleSourceApplicableTestMethod.getBody().getStatements();
-                    applicableTestMethodStatements.addAll(statements);
-                } else if (applicableTestMethod != null) {
-                    hasApplicableTest = true;
-                    List<Statement> statements = applicableTestMethod.getBody().getStatements();
                     applicableTestMethodStatements.addAll(statements);
                 }
 
@@ -184,11 +184,14 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                     return method;
                 }
 
-                if (GET_SINGLE_SOURCE_APPLICABLE_TEST_METHOD_MATCHER.matches(method.getMethodType()) ||
-                    GET_APPLICABLE_TEST_METHOD_MATCHER.matches(method.getMethodType())
-                    ) {
+                if (GET_SINGLE_SOURCE_APPLICABLE_TEST_METHOD_MATCHER.matches(method.getMethodType())) {
                     // remove `org.openrewrite.Recipe getSingleSourceApplicableTest()` method
                     return null;
+                }
+
+                if (GET_APPLICABLE_TEST_METHOD_MATCHER.matches(method.getMethodType())) {
+                    // Add a comment with a link to the migration documentation to classes which use non-single source applicability tests
+                    return (J.MethodDeclaration) commentOf(method, APPLICABLE_TEST_COMMENT);
                 }
 
                 if (GET_VISITOR_METHOD_MATCHER.matches(method.getMethodType())) {
@@ -320,17 +323,6 @@ public class MigrateRecipeToRewrite8 extends Recipe {
             .filter(statement -> statement instanceof J.MethodDeclaration)
             .map(J.MethodDeclaration.class::cast)
             .filter(m -> GET_SINGLE_SOURCE_APPLICABLE_TEST_METHOD_MATCHER.matches(m.getMethodType()))
-            .findFirst()
-            .orElse(null);
-    }
-
-    private static J.MethodDeclaration findApplicableTest(J.ClassDeclaration classDecl) {
-        return classDecl.getBody()
-            .getStatements()
-            .stream()
-            .filter(statement -> statement instanceof J.MethodDeclaration)
-            .map(J.MethodDeclaration.class::cast)
-            .filter(m -> GET_APPLICABLE_TEST_METHOD_MATCHER.matches(m.getMethodType()))
             .findFirst()
             .orElse(null);
     }

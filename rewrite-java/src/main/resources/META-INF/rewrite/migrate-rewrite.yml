@@ -15,7 +15,7 @@
 #
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.java.migrate.MigrateToRewrite8
+name: org.openrewrite.java.upgrade.MigrateToRewrite8
 displayName: Migrate rewrite from 7 to 8
 description: |
   Migrate rewrite recipe and test from version 7 to version 8.
@@ -23,5 +23,5 @@ description: |
   In those cases, this recipe will add a comment to the code and request a human to review and handle it manually.
   Reference : Migration guide (URL to be written).
 recipeList:
-  - org.openrewrite.java.migrate.MigrateRecipeToRewrite8
-  - org.openrewrite.java.migrate.MigrateTestToRewrite8
+  - org.openrewrite.java.upgrade.MigrateRecipeToRewrite8
+  - org.openrewrite.java.upgrade.MigrateTestToRewrite8

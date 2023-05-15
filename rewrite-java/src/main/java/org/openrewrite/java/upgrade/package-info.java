@@ -14,6 +14,6 @@
  * limitations under the License.
  */
 @NonNullApi
-package org.openrewrite.java.migrate;
+package org.openrewrite.java.upgrade;
 
 import org.openrewrite.internal.lang.NonNullApi;
