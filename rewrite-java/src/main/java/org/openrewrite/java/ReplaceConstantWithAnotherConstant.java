@@ -93,22 +93,23 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             JavaTemplate.Builder templateBuilder;
             if (fieldAccess instanceof J.Identifier) {
                 maybeAddImport(owningType, newConstantName, false);
-                templateBuilder = JavaTemplate.builder(this::getCursor, newConstantName)
+                templateBuilder = JavaTemplate.builder(newConstantName)
                         .staticImports(owningType + '.' + newConstantName);
             } else {
                 maybeAddImport(owningType, false);
-                templateBuilder = JavaTemplate.builder(this::getCursor, owningType.substring(owningType.lastIndexOf('.') + 1) + '.' + newConstantName)
+                templateBuilder = JavaTemplate.builder(owningType.substring(owningType.lastIndexOf('.') + 1) + '.' + newConstantName)
                         .imports(owningType);
             }
             return fieldAccess.withTemplate(
-                            templateBuilder.build(),
+                            templateBuilder.context(getCursor()).build(),
+                            getCursor(),
                             fieldAccess.getCoordinates().replace())
                     .withPrefix(fieldAccess.getPrefix());
         }
 
         private boolean isConstant(@Nullable JavaType.Variable varType) {
             return varType != null && TypeUtils.isOfClassType(varType.getOwner(), existingOwningType) &&
-                   varType.getName().equals(constantName);
+                    varType.getName().equals(constantName);
         }
 
         private boolean isVariableDeclaration() {
@@ -127,7 +128,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             }
 
             return constantName.equals(((J.VariableDeclarations) maybeVariable.getValue()).getVariables().get(0).getSimpleName()) &&
-                   existingOwningType.equals(ownerFqn.getFullyQualifiedName());
+                    existingOwningType.equals(ownerFqn.getFullyQualifiedName());
         }
     }
 }

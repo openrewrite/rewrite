@@ -40,7 +40,7 @@ public class SetDefaultEstimatedEffortPerOccurrence extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Retrofit recipes with a deafult estimated effort per occurrence.";
+        return "Retrofit recipes with a default estimated effort per occurrence.";
     }
 
     @Override
@@ -51,10 +51,11 @@ public class SetDefaultEstimatedEffortPerOccurrence extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesType<>("org.openrewrite.Recipe", false), new JavaIsoVisitor<ExecutionContext>() {
-            final JavaTemplate addMethod = JavaTemplate.builder(this::getCursor,
+            final JavaTemplate addMethod = JavaTemplate.builder(
                             "@Override public Duration getEstimatedEffortPerOccurrence() {\n" +
-                            "return Duration.ofMinutes(5);\n" +
-                            "}")
+                                    "return Duration.ofMinutes(5);\n" +
+                                    "}")
+                    .context(this::getCursor)
                     .imports("java.time.Duration")
                     .build();
 
@@ -75,7 +76,7 @@ public class SetDefaultEstimatedEffortPerOccurrence extends Recipe {
                     maybeAddImport("java.time.Duration");
 
                     try {
-                        return classDecl.withTemplate(addMethod, classDecl.getBody().getCoordinates().addMethodDeclaration(Comparator.comparing(
+                        return classDecl.withTemplate(addMethod, getCursor(), classDecl.getBody().getCoordinates().addMethodDeclaration(Comparator.comparing(
                                 J.MethodDeclaration::getSimpleName,
                                 new RuleBasedCollator("< getDisplayName < getDescription < getEstimatedEffortPerOccurrence < getVisitor")
                         )));

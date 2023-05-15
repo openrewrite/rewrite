@@ -60,16 +60,18 @@ public class JavaTemplateParser {
     private final Consumer<String> onAfterVariableSubstitution;
     private final Consumer<String> onBeforeParseTemplate;
     private final Set<String> imports;
+    private final boolean contextFree;
     private final BlockStatementTemplateGenerator statementTemplateGenerator;
     private final AnnotationTemplateGenerator annotationTemplateGenerator;
 
     public JavaTemplateParser(JavaParser.Builder<?, ?> parser, Consumer<String> onAfterVariableSubstitution,
-                              Consumer<String> onBeforeParseTemplate, Set<String> imports) {
+                              Consumer<String> onBeforeParseTemplate, Set<String> imports, boolean contextFree) {
         this.parser = parser;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.onBeforeParseTemplate = onBeforeParseTemplate;
         this.imports = imports;
-        this.statementTemplateGenerator = new BlockStatementTemplateGenerator(imports);
+        this.contextFree = contextFree;
+        this.statementTemplateGenerator = new BlockStatementTemplateGenerator(imports, contextFree);
         this.annotationTemplateGenerator = new AnnotationTemplateGenerator(imports);
     }
 
@@ -99,9 +101,11 @@ public class JavaTemplateParser {
 
     public J parseExpression(Cursor cursor, String template, Space.Location location) {
         @Language("java") String stub = statementTemplateGenerator.template(cursor, template, location, JavaCoordinates.Mode.REPLACEMENT);
-        onBeforeParseTemplate.accept(stub);
-        JavaSourceFile cu = compileTemplate(stub);
-        return statementTemplateGenerator.listTemplatedTrees(cu, Expression.class).get(0);
+        return cacheIfContextFree(cursor, stub, () -> {
+            onBeforeParseTemplate.accept(stub);
+            JavaSourceFile cu = compileTemplate(stub);
+            return statementTemplateGenerator.listTemplatedTrees(cu, Expression.class);
+        }).get(0);
     }
 
     public TypeTree parseExtends(String template) {
@@ -154,13 +158,12 @@ public class JavaTemplateParser {
                                                         String template,
                                                         Space.Location location,
                                                         JavaCoordinates.Mode mode) {
-        // TODO: The stub string includes the scoped elements of each original AST, and therefore is not a good
-        //       cache key. There are virtual no cases where a stub key will result in re-use. If we can come up with
-        //       a safe, reusable key, we can consider using the cache for block statements.
         @Language("java") String stub = statementTemplateGenerator.template(cursor, template, location, mode);
-        onBeforeParseTemplate.accept(stub);
-        JavaSourceFile cu = compileTemplate(stub);
-        return statementTemplateGenerator.listTemplatedTrees(cu, expected);
+        return cacheIfContextFree(cursor, stub, () -> {
+            onBeforeParseTemplate.accept(stub);
+            JavaSourceFile cu = compileTemplate(stub);
+            return statementTemplateGenerator.listTemplatedTrees(cu, expected);
+        });
     }
 
     public J.MethodInvocation parseMethod(Cursor cursor, String template, Space.Location location) {
@@ -243,6 +246,29 @@ public class JavaTemplateParser {
                 jp.reset().parse(ctx, stub, SUBSTITUTED_ANNOTATION) :
                 jp.reset().parse(ctx, stub)
         ).findFirst().orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+    }
+
+    /**
+     * Return the result of parsing the stub.
+     * Cache the LST elements parsed from stub only if the stub is context free.
+     *
+     * For a stub to be context free nothing about its meaning can be changed by the context in which it is parsed.
+     * For example, the statement `int i = 0;` is context free because it will always be parsed as a variable
+     * The statement `i++;` cannot be context free because it cannot be parsed without a preceding declaration of i.
+     * The statement `class A{}` is typically not context free because it
+     *
+     * @param cursor indicates whether the stub is context free or not
+     * @param supplier supplies the LST elements produced from the stub
+     * @return result of parsing the stub into LST elements
+     */
+    private <J2 extends J> List<J2> cacheIfContextFree(Cursor cursor, String stub, Supplier<List<? extends J>> supplier) {
+        if (cursor.getParent() == null) {
+            throw new IllegalArgumentException("Expecting the `cursor` to have a parent element");
+        }
+        if (contextFree) {
+            return cache(stub, supplier);
+        }
+        return (List<J2>) supplier.get();
     }
 
     @SuppressWarnings("unchecked")

@@ -64,6 +64,7 @@ public class BlockStatementTemplateGenerator {
                                                           "}";
 
     private final Set<String> imports;
+    private final boolean contextFree;
 
     public String template(Cursor cursor, String template, Space.Location location, JavaCoordinates.Mode mode) {
         //noinspection ConstantConditions
@@ -84,7 +85,7 @@ public class BlockStatementTemplateGenerator {
 
                     template(next(cursor), cursor.getValue(), before, after, cursor.getValue(), mode);
 
-                    return before.toString().trim() + "\n/*" + TEMPLATE_COMMENT + "*/" + template + "/*" + STOP_COMMENT + "*/" + "\n" + after;
+                    return before.toString().trim() + "\n/*" + TEMPLATE_COMMENT + "*/" + template + "/*" + STOP_COMMENT + "*/" + "\n" + after.toString().trim();
                 });
     }
 
@@ -209,8 +210,47 @@ public class BlockStatementTemplateGenerator {
         return js;
     }
 
-    @SuppressWarnings("ConstantConditions")
     private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
+        if (contextFree) {
+            contextFreeTemplate(prior, before, after, insertionPoint, mode);
+        } else {
+            contextTemplate(cursor, prior, before, after, insertionPoint, mode);
+        }
+    }
+
+    private void contextFreeTemplate(J j, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
+        before.insert(0, EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
+        for (String anImport : imports) {
+            before.insert(0, anImport);
+        }
+        if (j instanceof J.ClassDeclaration) {
+            // While not impossible to handle, reaching this point is likely to be a mistake.
+            // Without context a class declaration can include no imports, package, or outer class.
+            // It is a rare class that is deliberately in the root package with no imports.
+            // In the more likely case omission of these things is unintentional, the resulting type metadata would be
+            // incorrect, and it would not be obvious to the recipe author why.
+            throw new IllegalArgumentException(
+                    "Templating a class declaration requires a cursor from which package declaration and imports may be reached. " +
+                            "Pass a cursor pointing to the class declaration's parent to JavaTemplate.Builder.context()");
+        } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
+            before.append("class Template {{\n");
+            if (j instanceof J.Lambda) {
+                //TODO
+            } else if (j instanceof J.MemberReference) {
+                //TODO
+            } else {
+                before.append("Object o = ");
+                after.append(";");
+            }
+            after.append("\n}}");
+        } else if (j instanceof J.MethodDeclaration || !(j instanceof J.Import) && !(j instanceof J.Package)) {
+            before.append("class Template {\n");
+            after.insert(0, "\n}");
+        }
+    }
+
+    @SuppressWarnings("ConstantConditions")
+    private void contextTemplate(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
         J j = cursor.getValue();
         if (j instanceof JavaSourceFile) {
             before.insert(0, EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
@@ -523,7 +563,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.EnumValueSet) {
             after.append(";");
         }
-        template(next(cursor), j, before, after, insertionPoint, REPLACEMENT);
+        contextTemplate(next(cursor), j, before, after, insertionPoint, REPLACEMENT);
     }
 
     private void addLeadingVariableDeclarations(Cursor cursor, J current, J.Block containingBlock, StringBuilder before, J insertionPoint) {

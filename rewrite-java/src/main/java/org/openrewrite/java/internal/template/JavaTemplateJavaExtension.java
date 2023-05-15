@@ -16,8 +16,10 @@
 package org.openrewrite.java.internal.template;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
@@ -28,7 +30,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -48,15 +49,26 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             emptyList(), Space.format(" "));
 
     public JavaTemplateJavaExtension(JavaTemplateParser templateParser, Substitutions substitutions,
-                                     String substitutedTemplate, JavaCoordinates coordinates,
-                                     AtomicReference<Cursor> parentCursorRef,
-                                     Cursor parentScope) {
-        super(templateParser, substitutions, substitutedTemplate, coordinates, parentCursorRef, parentScope);
+                                     String substitutedTemplate, JavaCoordinates coordinates) {
+        super(templateParser, substitutions, substitutedTemplate, coordinates);
     }
 
     @Override
     public TreeVisitor<? extends J, Integer> getMixin() {
         return new JavaVisitor<Integer>() {
+            boolean autoFormat;
+
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, Integer integer, Cursor parent) {
+                autoFormat = true;
+                return super.visit(tree, integer, parent);
+            }
+
+            @Override
+            public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, Integer integer, Cursor cursor) {
+                return autoFormat ? super.autoFormat(j, stopAfter, integer, cursor) : j;
+            }
+
             @Override
             public J visitAnnotation(J.Annotation annotation, Integer integer) {
                 if (loc.equals(ANNOTATION_PREFIX) && mode.equals(JavaCoordinates.Mode.REPLACEMENT) &&
@@ -469,6 +481,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                                                "statement to replace one statement, but generated " + gen.size() +
                                                                ". Template:\n" + substitutedTemplate);
                         }
+
                         return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p);
                     }
                     throw new IllegalArgumentException("Cannot insert a new statement before an existing statement and return both to a visit method that returns one statement.");
