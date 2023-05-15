@@ -26,11 +26,12 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @ParameterizedTest
     @CsvSource(textBlock = """
       1.8,1.8,11,11
+      '1.8','1.8','11','11'
       "1.8","1.8","11","11"
       JavaVersion.VERSION_1_8,JavaVersion.VERSION_1_8,JavaVersion.VERSION_11,JavaVersion.VERSION_11
       1.8,"1.8",11,"11"
-      JavaVersion.VERSION_1_8,"1.8",JavaVersion.VERSION_11,"11"
-      """)
+      JavaVersion.VERSION_1_8,"1.8",JavaVersion.VERSION_11,"11",
+      """, quoteCharacter = '`')
     void sourceAndTarget(String beforeSourceCompatibility, String beforeTargetCompatibility, String afterSourceCompatibility, String afterTargetCompatibility) {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null)),
@@ -105,27 +106,37 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
         );
     }
 
-    @Test
-    void styleChange() {
+    @ParameterizedTest
+    @CsvSource(textBlock = """
+      Enum,1.8,JavaVersion.VERSION_1_8
+      Enum,'1.8',JavaVersion.VERSION_1_8
+      Enum,"1.8",JavaVersion.VERSION_1_8
+      Number,'1.8',1.8
+      Number,"1.8",1.8
+      Number,JavaVersion.VERSION_1_8,1.8
+      String,1.8,'1.8'
+      String,JavaVersion.VERSION_1_8,'1.8'
+      """, quoteCharacter = '`')
+    void styleChange(String declarationStyle, String beforeCompatibility, String afterCompatibility) {
         rewriteRun(
-          spec -> spec.recipe(new UpdateJavaCompatibility(8, null, UpdateJavaCompatibility.DeclarationStyle.Enum)),
+          spec -> spec.recipe(new UpdateJavaCompatibility(8, null, UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle))),
           buildGradle(
             """
               plugins {
                   id "java"
               }
 
-              sourceCompatibility = 1.8
-              targetCompatibility = 1.8
-              """,
+              sourceCompatibility = %s
+              targetCompatibility = %s
+              """.formatted(beforeCompatibility, beforeCompatibility),
             """
               plugins {
                   id "java"
               }
 
-              sourceCompatibility = JavaVersion.VERSION_1_8
-              targetCompatibility = JavaVersion.VERSION_1_8
-              """
+              sourceCompatibility = %s
+              targetCompatibility = %s
+              """.formatted(afterCompatibility, afterCompatibility)
           )
         );
     }
@@ -194,11 +205,11 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
     @CsvSource(textBlock = """
       Source,Enum,JavaVersion.VERSION_11,1.8
       Source,Number,11,1.8
-      Source,String,"11",1.8
+      Source,String,'11',1.8
       Target,Enum,1.8,JavaVersion.VERSION_11
       Target,Number,1.8,11
-      Target,String,1.8,"11"
-      """)
+      Target,String,1.8,'11'
+      """, quoteCharacter = '`')
     void allOptions(String compatibilityType, String declarationStyle, String expectedSourceCompatibility, String expectedTargetCompatibility) {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.valueOf(compatibilityType), UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle))),

@@ -18,6 +18,7 @@ package org.openrewrite.gradle;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -232,8 +233,12 @@ public class UpdateJavaCompatibility extends Recipe {
                 if (expression instanceof J.Literal) {
                     J.Literal literal = (J.Literal) expression;
                     if (style == DeclarationStyle.String) {
-                        String newVersion = String.valueOf(version);
-                        expression = literal.withType(JavaType.Primitive.String).withValue(newVersion).withValueSource("\"" + newVersion + "\"");
+                        String newVersion = version <= 8 ? "1." + version : String.valueOf(version);
+                        if (literal.getType() == JavaType.Primitive.String) {
+                            expression = ChangeStringLiteral.withStringValue(literal, newVersion);
+                        } else {
+                            expression = literal.withType(JavaType.Primitive.String).withValue(newVersion).withValueSource("'" + newVersion + "'");
+                        }
                     } else if (style == DeclarationStyle.Enum) {
                         String name = version <= 8 ? "VERSION_1_" + version : "VERSION_" + version;
                         expression = new J.FieldAccess(
@@ -255,15 +260,15 @@ public class UpdateJavaCompatibility extends Recipe {
                 } else if (expression instanceof J.FieldAccess) {
                     J.FieldAccess fieldAccess = (J.FieldAccess) expression;
                     if (style == DeclarationStyle.String) {
-                        String newVersion = String.valueOf(version);
-                        expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), newVersion, "\"" + newVersion + "\"", Collections.emptyList(), JavaType.Primitive.String);
+                        String newVersion = version <= 8 ? "1." + version : String.valueOf(version);
+                        expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), newVersion, "'" + newVersion + "'", Collections.emptyList(), JavaType.Primitive.String);
                     } else if (style == DeclarationStyle.Enum) {
                         String name = version <= 8 ? "VERSION_1_" + version : "VERSION_" + version;
                         expression = fieldAccess.withName(fieldAccess.getName().withSimpleName(name));
                     } else if (style == DeclarationStyle.Number) {
                         if (version <= 8) {
                             double doubleValue = Double.parseDouble("1." + version);
-                            expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), doubleValue, String.valueOf(version), Collections.emptyList(), JavaType.Primitive.Double);
+                            expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), doubleValue, String.valueOf(doubleValue), Collections.emptyList(), JavaType.Primitive.Double);
                         } else {
                             expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), version, String.valueOf(version), Collections.emptyList(), JavaType.Primitive.Int);
                         }
