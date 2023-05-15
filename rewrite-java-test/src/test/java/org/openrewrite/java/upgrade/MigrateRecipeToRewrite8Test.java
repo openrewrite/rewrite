@@ -498,7 +498,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
                               String packageText = pkg.getExpression().print(getCursor()).replaceAll("\\\\s", "");
                               String lowerCase = packageText.toLowerCase();
                               if(!packageText.equals(lowerCase)) {
-                                  // [Rewrite8 migration] Method `Recipe#doNext(..)` is removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor#doAfterVisit`, please follow the migrate migration here: https://to-be-written
+                                  // [Rewrite8 migration] Method `Recipe#doNext(..)` is removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor#doAfterVisit`, please follow the migration guide here: https://to-be-written
                                   doNext(new ChangePackage(packageText, lowerCase, true));
                               }
                               return pkg;
@@ -559,6 +559,101 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
                   @Override
                   protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
                       return before;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleReturnsInGetSingleSourceApplicableTest() {
+        rewriteRun(
+          java(
+            """
+              package org.openrewrite.kubernetes.rbac;
+
+              import lombok.EqualsAndHashCode;
+              import lombok.Value;
+              import org.openrewrite.*;
+              import org.openrewrite.internal.lang.Nullable;
+              import org.openrewrite.kubernetes.KubernetesVisitor;
+
+              @Value
+              @EqualsAndHashCode(callSuper = true)
+              public class AddRuleToRole extends Recipe {
+
+                  @Option(displayName = "Optional file matcher",
+                          description = "Matching files will be modified. This is a glob expression.",
+                          required = false,
+                          example = "**/pod-*.yml")
+                  @Nullable
+                  String fileMatcher;
+
+                  public AddRuleToRole(@Nullable String fileMatcher) {
+                      this.fileMatcher = fileMatcher;
+                  }
+
+                  @Override
+                  public String getDisplayName() {
+                      return "Add RBAC rules";
+                  }
+                  @Override
+                  protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+                      if (fileMatcher != null) {
+                          return new HasSourcePath<>(fileMatcher);
+                      } else {
+                          return null;
+                      }
+                  }
+
+                  @Override
+                  protected TreeVisitor<?, ExecutionContext> getVisitor() {
+                      return null;
+                  }
+              }
+              """,
+            """
+              package org.openrewrite.kubernetes.rbac;
+
+              import lombok.EqualsAndHashCode;
+              import lombok.Value;
+              import org.openrewrite.*;
+              import org.openrewrite.internal.lang.Nullable;
+              import org.openrewrite.kubernetes.KubernetesVisitor;
+
+              @Value
+              @EqualsAndHashCode(callSuper = true)
+              public class AddRuleToRole extends Recipe {
+
+                  @Option(displayName = "Optional file matcher",
+                          description = "Matching files will be modified. This is a glob expression.",
+                          required = false,
+                          example = "**/pod-*.yml")
+                  @Nullable
+                  String fileMatcher;
+
+                  public AddRuleToRole(@Nullable String fileMatcher) {
+                      this.fileMatcher = fileMatcher;
+                  }
+
+                  @Override
+                  public String getDisplayName() {
+                      return "Add RBAC rules";
+                  }
+                  // [Rewrite8 migration] This getSingleSourceApplicableTest methods might have multiple returns, need manually migrate to use `Precondition#check()`, please follow the migration guide here: https://to-be-written
+                  @Override
+                  protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+                      if (fileMatcher != null) {
+                          return new HasSourcePath<>(fileMatcher);
+                      } else {
+                          return null;
+                      }
+                  }
+
+                  @Override
+                  public TreeVisitor<?, ExecutionContext> getVisitor() {
+                      return null;
                   }
               }
               """

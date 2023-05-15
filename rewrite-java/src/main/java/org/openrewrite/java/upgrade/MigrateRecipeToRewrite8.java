@@ -66,12 +66,14 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                          "needs to be migrated to use new introduced scanning recipe, " +
                          "please follow the migration guide here : " + MIGRATION_GUIDE_URL;
     private static final String DO_NEXT_COMMENT = " [Rewrite8 migration] Method `Recipe#doNext(..)` is removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor#doAfterVisit`, " +
-                                                  "please follow the migrate migration here: " + MIGRATION_GUIDE_URL;
+                                                  "please follow the migration guide here: " + MIGRATION_GUIDE_URL;
     private static final String APPLICABLE_TEST_COMMENT = " [Rewrite8 migration] Method `Recipe#getApplicableTest(..)" +
                                                           "` is deprecated and needs to be converted to a " +
                                                           "`ScanningRecipe`. Or you can use `Precondition#check()` if" +
                                                           " it is meant to use a single-source applicability test. " +
-                                                          "please follow the migrate migration here: " + MIGRATION_GUIDE_URL;
+                                                          "please follow the migration guide here: " + MIGRATION_GUIDE_URL;
+    private static final String COMPLEX_SINGLE_SOURCE_APPLICABLE_TEST_COMMENT = " [Rewrite8 migration] This getSingleSourceApplicableTest methods might have multiple returns, need manually migrate to use `Precondition#check()`, " +
+                                                                                "please follow the migration guide here: " + MIGRATION_GUIDE_URL;
 
     private static String VISIT_TREE_METHOD_TEMPLATE_CODE = "import org.openrewrite.Tree;\n" +
         "import org.openrewrite.internal.lang.Nullable;\n" +
@@ -105,6 +107,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             boolean hasApplicableTest = false;
             List<Statement> applicableTestMethodStatements = new ArrayList<>();
+            boolean applicableTestMethodHasMultipleReturns = false;
 
             @Override
             public J.MemberReference visitMemberReference(J.MemberReference memberRef,
@@ -154,7 +157,12 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                 if (singleSourceApplicableTestMethod != null) {
                     hasApplicableTest = true;
                     List<Statement> statements = singleSourceApplicableTestMethod.getBody().getStatements();
-                    applicableTestMethodStatements.addAll(statements);
+                    if (!statements.isEmpty() && statements.get(statements.size() - 1) instanceof J.Return) {
+                        applicableTestMethodHasMultipleReturns = false;
+                        applicableTestMethodStatements.addAll(statements);
+                    } else {
+                        applicableTestMethodHasMultipleReturns = true;
+                    }
                 }
 
                 // find `visit` method
@@ -185,8 +193,14 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                 }
 
                 if (GET_SINGLE_SOURCE_APPLICABLE_TEST_METHOD_MATCHER.matches(method.getMethodType())) {
-                    // remove `org.openrewrite.Recipe getSingleSourceApplicableTest()` method
-                    return null;
+                    if (!applicableTestMethodHasMultipleReturns) {
+                        // remove `org.openrewrite.Recipe getSingleSourceApplicableTest()` method
+                        return null;
+                    } else {
+                        method = (J.MethodDeclaration) commentOf(method, COMPLEX_SINGLE_SOURCE_APPLICABLE_TEST_COMMENT);
+                        method = MigratedTo8.withMarker(method);
+                        return method;
+                    }
                 }
 
                 if (GET_APPLICABLE_TEST_METHOD_MATCHER.matches(method.getMethodType())) {
@@ -199,6 +213,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                     if (J.Modifier.hasModifier(method.getModifiers(), Protected)) {
                         method = method.withModifiers(ListUtils.map(method.getModifiers(), mod ->
                             mod.getType() == Protected ? mod.withType(Public) : mod));
+                        MigratedTo8.withMarker(method);
                     }
 
                     // Change return type to `TreeVisitor<?, ExecutionContext>`
@@ -248,7 +263,6 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                         mergedStatements.add(getVisitorReturnStatements);
                         method = method.withBody(method.getBody().withStatements(mergedStatements));
                         method = (J.MethodDeclaration) replaceApplicabilityMethods(method, ctx);
-
                         return MigratedTo8.withMarker( autoFormat(super.visitMethodDeclaration(method, ctx), ctx));
                     }
 
