@@ -103,7 +103,7 @@ public class RecipeScheduler {
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean();
 
         public LargeSourceSet scanSources(LargeSourceSet before, int cycle) {
-            return mapForRecipeRecursivelyIfAllSourceApplicable(before, (recipeStack, sourceFile) -> {
+            return mapForRecipeRecursively(before, (recipeStack, sourceFile) -> {
                 Recipe recipe = recipeStack.peek();
                 if (recipe.maxCycles() < cycle || !recipe.validate(ctx).isValid()) {
                     return sourceFile;
@@ -158,7 +158,7 @@ public class RecipeScheduler {
         }
 
         public LargeSourceSet editSources(LargeSourceSet before, int cycle) {
-            return mapForRecipeRecursivelyIfAllSourceApplicable(before, (recipeStack, sourceFile) -> {
+            return mapForRecipeRecursively(before, (recipeStack, sourceFile) -> {
                 Recipe recipe = recipeStack.peek();
                 if (recipe.maxCycles() < cycle || !recipe.validate(ctx).isValid()) {
                     return sourceFile;
@@ -227,7 +227,7 @@ public class RecipeScheduler {
             return after;
         }
 
-        private LargeSourceSet mapForRecipeRecursivelyIfAllSourceApplicable(LargeSourceSet before, BiFunction<Stack<Recipe>, SourceFile, SourceFile> mapFn) {
+        private LargeSourceSet mapForRecipeRecursively(LargeSourceSet before, BiFunction<Stack<Recipe>, SourceFile, SourceFile> mapFn) {
             return before.map(sourceFile -> {
                 Stack<Stack<Recipe>> allRecipesStack = initRecipeStack();
 
