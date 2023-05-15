@@ -92,9 +92,24 @@ public abstract class ScanningRecipe<T> extends Recipe {
     @Override
     public final TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
+
+            private TreeVisitor<?, ExecutionContext> delegate;
+
+            private TreeVisitor<?, ExecutionContext> delegate() {
+                if (delegate == null) {
+                    delegate = getVisitor(getAccumulator(getCursor()));
+                }
+                return delegate;
+            }
+
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
+                return delegate().isAcceptable(sourceFile, executionContext);
+            }
+
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                return getVisitor(getAccumulator(getCursor())).visit(tree, ctx);
+                return delegate().visit(tree, ctx);
             }
         };
     }

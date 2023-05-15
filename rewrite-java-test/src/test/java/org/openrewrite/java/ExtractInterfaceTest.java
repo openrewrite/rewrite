@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.Assertions.java;
 
 class ExtractInterfaceTest implements RewriteTest {
@@ -49,7 +50,7 @@ class ExtractInterfaceTest implements RewriteTest {
             return new JavaIsoVisitor<>() {
                 @Override
                 public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-                    acc.set(cu);
+                    acc.set(cu.withId(randomId()));
                     return cu;
                 }
             };

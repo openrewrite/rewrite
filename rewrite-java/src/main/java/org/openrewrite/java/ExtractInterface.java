@@ -78,6 +78,8 @@ public class ExtractInterface {
             c = c.withName(c.getName().withSimpleName(fullyQualifiedInterfaceName.substring(
                     fullyQualifiedInterfaceName.lastIndexOf('.') + 1
             )));
+            c = c.withType(JavaType.ShallowClass.build(fullyQualifiedInterfaceName)
+                    .withKind(JavaType.FullyQualified.Kind.Interface));
 
             return autoFormat(super.visitClassDeclaration(c, ctx), ctx);
         }
@@ -106,6 +108,9 @@ public class ExtractInterface {
 
         @Override
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+            if (classDecl.getType() != null && classDecl.getType().getFullyQualifiedName().equals(fullyQualifiedInterfaceName)) {
+                return classDecl;
+            }
             maybeAddImport(fullyQualifiedInterfaceName);
             JavaType.ShallowClass type = JavaType.ShallowClass.build(fullyQualifiedInterfaceName);
 
