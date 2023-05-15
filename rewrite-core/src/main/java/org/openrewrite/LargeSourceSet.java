@@ -19,7 +19,6 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Collection;
 import java.util.List;
-import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 
 /**
@@ -43,23 +42,6 @@ public interface LargeSourceSet extends Iterable<SourceFile> {
      * @return A new source set if the map function results in any changes, otherwise this source set is returned.
      */
     LargeSourceSet map(UnaryOperator<SourceFile> map);
-
-    /**
-     * Execute a transformation on all items. This causes the iterable to be iterated and a new
-     * iterable returned if any changes are made.
-     *
-     * @param flatMap A transformation on T that may return [0..N] items for each original item in the iterable.
-     * @return A new source set if the map function results in any changes, otherwise this source set is returned.
-     */
-    LargeSourceSet flatMap(BiFunction<Integer, SourceFile, Object> flatMap);
-
-    /**
-     * Concatenate a new item. Where possible, implementations should not iterate the entire iterable in order
-     * to accomplish this, since the ordering of a {@link LargeSourceSet} is not significant.
-     *
-     * @return A new source set with the new item inserted.
-     */
-    LargeSourceSet concat(@Nullable SourceFile sourceFile);
 
     /**
      * Concatenate new items. Where possible, implementations should not iterate the entire iterable in order

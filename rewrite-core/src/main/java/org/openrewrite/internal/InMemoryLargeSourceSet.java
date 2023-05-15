@@ -56,18 +56,6 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
     }
 
     @Override
-    public LargeSourceSet flatMap(BiFunction<Integer, SourceFile, Object> flatMap) {
-        List<SourceFile> mapped = ListUtils.flatMap(ls, flatMap);
-        return mapped != ls ? new InMemoryLargeSourceSet(getInitialState(), deletions, mapped) : this;
-    }
-
-    @Override
-    public LargeSourceSet concat(@Nullable SourceFile sourceFile) {
-        List<SourceFile> mapped = ListUtils.concat(ls, sourceFile);
-        return mapped != ls ? new InMemoryLargeSourceSet(getInitialState(), deletions, mapped) : this;
-    }
-
-    @Override
     public LargeSourceSet concatAll(@Nullable Collection<? extends SourceFile> t) {
         if (t == null || t.isEmpty()) {
             //noinspection ConstantConditions
