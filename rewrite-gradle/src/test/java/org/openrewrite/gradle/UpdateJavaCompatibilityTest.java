@@ -16,13 +16,22 @@
 package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
 class UpdateJavaCompatibilityTest implements RewriteTest {
-    @Test
-    void sourceAndTarget() {
+    @ParameterizedTest
+    @CsvSource(textBlock = """
+      1.8,1.8,11,11
+      "1.8","1.8","11","11"
+      JavaVersion.VERSION_1_8,JavaVersion.VERSION_1_8,JavaVersion.VERSION_11,JavaVersion.VERSION_11
+      1.8,"1.8",11,"11"
+      JavaVersion.VERSION_1_8,"1.8",JavaVersion.VERSION_11,"11"
+      """)
+    void sourceAndTarget(String beforeSourceCompatibility, String beforeTargetCompatibility, String afterSourceCompatibility, String afterTargetCompatibility) {
         rewriteRun(
           spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null)),
           buildGradle(
@@ -31,17 +40,17 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
                   id "java"
               }
 
-              sourceCompatibility = 1.8
-              targetCompatibility = 1.8
-              """,
+              sourceCompatibility = %s
+              targetCompatibility = %s
+              """.formatted(beforeSourceCompatibility, beforeTargetCompatibility),
             """
               plugins {
                   id "java"
               }
 
-              sourceCompatibility = 11
-              targetCompatibility = 11
-              """
+              sourceCompatibility = %s
+              targetCompatibility = %s
+              """.formatted(afterSourceCompatibility, afterTargetCompatibility)
           )
         );
     }
@@ -177,6 +186,39 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource(textBlock = """
+      Source,Enum,JavaVersion.VERSION_11,1.8
+      Source,Number,11,1.8
+      Source,String,"11",1.8
+      Target,Enum,1.8,JavaVersion.VERSION_11
+      Target,Number,1.8,11
+      Target,String,1.8,"11"
+      """)
+    void allOptions(String compatibilityType, String declarationStyle, String expectedSourceCompatibility, String expectedTargetCompatibility) {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, UpdateJavaCompatibility.CompatibilityType.valueOf(compatibilityType), UpdateJavaCompatibility.DeclarationStyle.valueOf(declarationStyle))),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              sourceCompatibility = 1.8
+              targetCompatibility = 1.8
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              sourceCompatibility = %s
+              targetCompatibility = %s
+              """.formatted(expectedSourceCompatibility, expectedTargetCompatibility)
           )
         );
     }

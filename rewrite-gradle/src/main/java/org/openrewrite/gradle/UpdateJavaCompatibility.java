@@ -233,7 +233,7 @@ public class UpdateJavaCompatibility extends Recipe {
                     J.Literal literal = (J.Literal) expression;
                     if (style == DeclarationStyle.String) {
                         String newVersion = String.valueOf(version);
-                        expression = literal.withType(JavaType.Primitive.String).withValue(newVersion).withValueSource(newVersion);
+                        expression = literal.withType(JavaType.Primitive.String).withValue(newVersion).withValueSource("\"" + newVersion + "\"");
                     } else if (style == DeclarationStyle.Enum) {
                         String name = version <= 8 ? "VERSION_1_" + version : "VERSION_" + version;
                         expression = new J.FieldAccess(
@@ -256,7 +256,7 @@ public class UpdateJavaCompatibility extends Recipe {
                     J.FieldAccess fieldAccess = (J.FieldAccess) expression;
                     if (style == DeclarationStyle.String) {
                         String newVersion = String.valueOf(version);
-                        expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), newVersion, newVersion, Collections.emptyList(), JavaType.Primitive.String);
+                        expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), newVersion, "\"" + newVersion + "\"", Collections.emptyList(), JavaType.Primitive.String);
                     } else if (style == DeclarationStyle.Enum) {
                         String name = version <= 8 ? "VERSION_1_" + version : "VERSION_" + version;
                         expression = fieldAccess.withName(fieldAccess.getName().withSimpleName(name));
