@@ -32,7 +32,7 @@ import java.util.function.UnaryOperator;
  * able to produce {@link #getChangeset()} from that initial state
  * through any number of transformations to some end state.
  */
-public interface LargeSourceSet extends Iterable<SourceFile> {
+public interface LargeSourceSet {
 
     /**
      * Execute a transformation on all items. This causes the iterable to be iterated and a new
@@ -53,15 +53,15 @@ public interface LargeSourceSet extends Iterable<SourceFile> {
     LargeSourceSet concatAll(@Nullable Collection<? extends SourceFile> ls);
 
     /**
-     * @return The set of changes (encompassing adds, edits, and deletions)
-     * to the initial state.
-     */
-    Changeset getChangeset();
-
-    /**
      * Called when a source file is deleted from the source set.
      *
      * @param sourceFile The source file that is deleted.
      */
-    void onDelete(SourceFile sourceFile, List<Recipe> recipeStack);
+    void delete(SourceFile sourceFile, List<Recipe> recipeStack);
+
+    /**
+     * @return The set of changes (encompassing adds, edits, and deletions)
+     * to the initial state.
+     */
+    Changeset getChangeset();
 }

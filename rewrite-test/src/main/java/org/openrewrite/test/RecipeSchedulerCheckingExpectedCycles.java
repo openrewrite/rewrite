@@ -17,17 +17,17 @@ package org.openrewrite.test;
 
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.LargeSourceSet;
+import org.openrewrite.RecipeScheduler;
 import org.openrewrite.Result;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.quark.Quark;
-import org.openrewrite.scheduling.DirectScheduler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
 @RequiredArgsConstructor
-class RecipeSchedulerCheckingExpectedCycles extends DirectScheduler {
+class RecipeSchedulerCheckingExpectedCycles extends RecipeScheduler {
     private final int expectedCyclesThatMakeChanges;
     private int cyclesThatResultedInChanges = 0;
     @Nullable
@@ -38,7 +38,6 @@ class RecipeSchedulerCheckingExpectedCycles extends DirectScheduler {
         if (sourceSet != previousSourceSet && sourceSet.getChangeset().size() > 0) {
             cyclesThatResultedInChanges++;
             if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges) {
-
                 for (Result result : sourceSet.getChangeset().getAllResults()) {
                     SourceFile before = result.getBefore();
                     SourceFile after = result.getAfter();

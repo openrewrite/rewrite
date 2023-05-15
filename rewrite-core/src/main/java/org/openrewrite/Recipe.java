@@ -26,7 +26,6 @@ import org.openrewrite.config.RecipeExample;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.scheduling.ForkJoinScheduler;
 import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
@@ -224,7 +223,7 @@ public abstract class Recipe implements Cloneable {
     protected List<Contributor> contributors;
 
     public List<Contributor> getContributors() {
-        if(contributors == null) {
+        if (contributors == null) {
             return new ArrayList<>();
         }
         return contributors;
@@ -234,7 +233,7 @@ public abstract class Recipe implements Cloneable {
     protected transient List<RecipeExample> examples;
 
     public List<RecipeExample> getExamples() {
-        if(examples == null) {
+        if (examples == null) {
             return new ArrayList<>();
         }
         return examples;
@@ -283,7 +282,7 @@ public abstract class Recipe implements Cloneable {
     }
 
     public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx, int maxCycles) {
-        return run(before, ctx, ForkJoinScheduler.common(), maxCycles, 1);
+        return run(before, ctx, new RecipeScheduler(), maxCycles, 1);
     }
 
     public final RecipeRun run(LargeSourceSet before,

@@ -69,11 +69,6 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
         return new InMemoryLargeSourceSet(getInitialState(), deletions, newLs);
     }
 
-    @Override
-    public Iterator<SourceFile> iterator() {
-        return ls.iterator();
-    }
-
     private InMemoryLargeSourceSet getInitialState() {
         return initialState == null ? this : initialState;
     }
@@ -113,7 +108,7 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
     }
 
     @Override
-    public void onDelete(SourceFile sourceFile, List<Recipe> recipeStack) {
+    public void delete(SourceFile sourceFile, List<Recipe> recipeStack) {
         if (deletions == null) {
             deletions = new LinkedHashMap<>();
         }
