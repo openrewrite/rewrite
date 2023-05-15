@@ -28,7 +28,7 @@ class AddGradleEnterpriseMavenExtensionTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new AddGradleEnterpriseMavenExtension("1.17", "https://foo", null,
-                null, null, null));
+          null, null, null));
     }
 
     private static final SourceSpecs POM_XML_SOURCE_SPEC = pomXml(
@@ -171,41 +171,41 @@ class AddGradleEnterpriseMavenExtensionTest implements RewriteTest {
     @Test
     void allSettings() {
         rewriteRun(
-                spec -> spec.recipe(new AddGradleEnterpriseMavenExtension("1.17", "https://foo", true, true, false, AddGradleEnterpriseMavenExtension.PublishCriteria.Failure)),
-                POM_XML_SOURCE_SPEC,
-                xml(
-                        null,
-                        """
-                          <?xml version="1.0" encoding="UTF-8"?>
-                          <extensions>
-                            <extension>
-                              <groupId>com.gradle</groupId>
-                              <artifactId>gradle-enterprise-maven-extension</artifactId>
-                              <version>1.17</version>
-                            </extension>
-                          </extensions>
-                          """,
-                        spec -> spec.path(".mvn/extensions.xml")
-                ),
-                xml(
-                        null,
-                        """
-                          <gradleEnterprise>
-                            <server>
-                              <url>https://foo</url>
-                              <allowUntrusted>true</allowUntrusted>
-                            </server>
-                            <buildScan>
-                              <backgroundBuildScanUpload>false</backgroundBuildScanUpload>
-                              <publish>ON_FAILURE</publish> 
-                              <capture>
-                                <goalInputFiles>true</goalInputFiles>
-                              </capture>
-                            </buildScan>
-                          </gradleEnterprise>
-                          """,
-                        spec -> spec.path(".mvn/gradle-enterprise.xml")
-                )
+          spec -> spec.recipe(new AddGradleEnterpriseMavenExtension("1.17", "https://foo", true, true, false, AddGradleEnterpriseMavenExtension.PublishCriteria.Failure)),
+          POM_XML_SOURCE_SPEC,
+          xml(
+            null,
+            """
+              <?xml version="1.0" encoding="UTF-8"?>
+              <extensions>
+                <extension>
+                  <groupId>com.gradle</groupId>
+                  <artifactId>gradle-enterprise-maven-extension</artifactId>
+                  <version>1.17</version>
+                </extension>
+              </extensions>
+              """,
+            spec -> spec.path(".mvn/extensions.xml")
+          ),
+          xml(
+            null,
+            """
+              <gradleEnterprise>
+                <server>
+                  <url>https://foo</url>
+                  <allowUntrusted>true</allowUntrusted>
+                </server>
+                <buildScan>
+                  <backgroundBuildScanUpload>false</backgroundBuildScanUpload>
+                  <publish>ON_FAILURE</publish> 
+                  <capture>
+                    <goalInputFiles>true</goalInputFiles>
+                  </capture>
+                </buildScan>
+              </gradleEnterprise>
+              """,
+            spec -> spec.path(".mvn/gradle-enterprise.xml")
+          )
         );
     }
 

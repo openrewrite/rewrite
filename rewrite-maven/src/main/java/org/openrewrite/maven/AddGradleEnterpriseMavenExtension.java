@@ -46,38 +46,38 @@ public class AddGradleEnterpriseMavenExtension extends Recipe {
 
     @Language("xml")
     private static final String EXTENSIONS_XML_FORMAT = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
-                                                        "<extensions>\n" +
-                                                        "</extensions>";
+            "<extensions>\n" +
+            "</extensions>";
 
     @Language("xml")
     private static final String ENTERPRISE_TAG_FORMAT = "<extension>\n" +
-                                                       "  <groupId>com.gradle</groupId>\n" +
-                                                       "  <artifactId>gradle-enterprise-maven-extension</artifactId>\n" +
-                                                       "  <version>%s</version>\n" +
-                                                       "</extension>";
+            "  <groupId>com.gradle</groupId>\n" +
+            "  <artifactId>gradle-enterprise-maven-extension</artifactId>\n" +
+            "  <version>%s</version>\n" +
+            "</extension>";
 
     @Language("xml")
     private static final String ENTERPRISE_TAG_FORMAT_WITHOUT_VERSION = "<extension>\n" +
-                                                       "  <groupId>com.gradle</groupId>\n" +
-                                                       "  <artifactId>gradle-enterprise-maven-extension</artifactId>\n" +
-                                                       "</extension>";
+            "  <groupId>com.gradle</groupId>\n" +
+            "  <artifactId>gradle-enterprise-maven-extension</artifactId>\n" +
+            "</extension>";
 
     @Option(displayName = "Plugin version",
-        description = "An exact version number or node-style semver selector used to select the gradle-enterprise-maven-extension version.",
-        example = "1.x")
+            description = "An exact version number or node-style semver selector used to select the gradle-enterprise-maven-extension version.",
+            example = "1.x")
     @Nullable
     String version;
 
     @Option(displayName = "Server URL",
-        description = "The URL of the Gradle Enterprise server.",
-        example = "https://scans.gradle.com/")
+            description = "The URL of the Gradle Enterprise server.",
+            example = "https://scans.gradle.com/")
     String server;
 
     @Option(displayName = "Allow untrusted server",
-        description = "When set to `true` the extension will be configured to allow unencrypted http connections with the server. " +
-                      "If set to `false` or omitted, the extension will refuse to communicate without transport layer security enabled.",
-        required = false,
-        example = "true")
+            description = "When set to `true` the extension will be configured to allow unencrypted http connections with the server. " +
+                    "If set to `false` or omitted, the extension will refuse to communicate without transport layer security enabled.",
+            required = false,
+            example = "true")
     @Nullable
     Boolean allowUntrustedServer;
 
@@ -107,12 +107,14 @@ public class AddGradleEnterpriseMavenExtension extends Recipe {
             example = "true")
     @Nullable
     PublishCriteria publishCriteria;
+
     public enum PublishCriteria {
         Always("ALWAYS"),
         Failure("ON_FAILURE"),
         Demand("ON_DEMAND");
 
         private final String xmlName;
+
         PublishCriteria(String xmlName) {
             this.xmlName = xmlName;
         }
@@ -126,8 +128,8 @@ public class AddGradleEnterpriseMavenExtension extends Recipe {
     @Override
     public String getDescription() {
         return "To integrate gradle enterprise maven extension into maven projects, ensure that the " +
-               "`gradle-enterprise-maven-extension` is added to the `.mvn/extensions.xml` file if not already present. " +
-               "Additionally, configure the extension by adding the `.mvn/gradle-enterprise.xml` configuration file.";
+                "`gradle-enterprise-maven-extension` is added to the `.mvn/extensions.xml` file if not already present. " +
+                "Additionally, configure the extension by adding the `.mvn/gradle-enterprise.xml` configuration file.";
     }
 
     @Override
@@ -165,7 +167,7 @@ public class AddGradleEnterpriseMavenExtension extends Recipe {
                 throw new RuntimeException("The extensions.xml is not xml document type");
             }
 
-            Xml.Document extensionsXml = ( Xml.Document) matchingExtensionsXmlFile.get();
+            Xml.Document extensionsXml = (Xml.Document) matchingExtensionsXmlFile.get();
 
             // find `gradle-enterprise-maven-extension` extension, do nothing if it already exists,
             boolean hasEnterpriseExtension = findExistingEnterpriseExtension(extensionsXml);
@@ -273,8 +275,8 @@ public class AddGradleEnterpriseMavenExtension extends Recipe {
         @Language("xml")
         String tagSource = version != null ? String.format(ENTERPRISE_TAG_FORMAT, version) : ENTERPRISE_TAG_FORMAT_WITHOUT_VERSION;
         AddToTagVisitor<ExecutionContext> addToTagVisitor = new AddToTagVisitor<>(
-            extensionsXml.getRoot(),
-            Xml.Tag.build(tagSource));
+                extensionsXml.getRoot(),
+                Xml.Tag.build(tagSource));
         return (Xml.Document) addToTagVisitor.visit(extensionsXml, ctx);
     }
 }
