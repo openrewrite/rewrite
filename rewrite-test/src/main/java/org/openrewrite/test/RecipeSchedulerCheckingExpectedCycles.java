@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.LargeSourceSet;
 import org.openrewrite.Result;
 import org.openrewrite.SourceFile;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.scheduling.DirectScheduler;
 
@@ -29,10 +30,12 @@ import static org.assertj.core.api.Assertions.fail;
 class RecipeSchedulerCheckingExpectedCycles extends DirectScheduler {
     private final int expectedCyclesThatMakeChanges;
     private int cyclesThatResultedInChanges = 0;
+    @Nullable
+    private LargeSourceSet previousSourceSet;
 
     @Override
     public void afterCycle(LargeSourceSet sourceSet) {
-        if (sourceSet.getChangeset().size() > 0) {
+        if (sourceSet != previousSourceSet && sourceSet.getChangeset().size() > 0) {
             cyclesThatResultedInChanges++;
             if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges) {
 
@@ -50,6 +53,7 @@ class RecipeSchedulerCheckingExpectedCycles extends DirectScheduler {
                 }
             }
         }
+        previousSourceSet = sourceSet;
     }
 
     public void verify() {
