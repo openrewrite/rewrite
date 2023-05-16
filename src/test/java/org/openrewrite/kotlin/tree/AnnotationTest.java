@@ -125,7 +125,7 @@ class AnnotationTest implements RewriteTest {
     @Test
     @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/105")
-    void fullyQualifieKotlinAnnotation() {
+    void fullyQualifiedKotlinAnnotation() {
         rewriteRun(
           // Works, Deprecated is defined in kotlin package so no import needed
           kotlin(
