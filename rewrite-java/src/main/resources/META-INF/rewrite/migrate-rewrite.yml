@@ -25,3 +25,4 @@ description: |
 recipeList:
   - org.openrewrite.java.upgrade.MigrateRecipeToRewrite8
   - org.openrewrite.java.upgrade.MigrateTestToRewrite8
+  - org.openrewrite.java.upgrade.MigrateMarkersSearchResult

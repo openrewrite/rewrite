@@ -60,7 +60,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
     private static J.MethodInvocation preconditionNotTemplate = null;
     private static J.MemberReference visitMemberReferenceTemplate = null;
 
-    private static final String MIGRATION_GUIDE_URL = "https://to-be-written";
+    public static final String MIGRATION_GUIDE_URL = "https://to-be-written";
     private static final String VISIT_SOURCE_FILES_COMMENT = " [Rewrite8 migration] This recipe uses the visit multiple sources method " +
                          "`visit(List<SourceFile> before, P p)`, " +
                          "needs to be migrated to use new introduced scanning recipe, " +
@@ -402,7 +402,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
         }.visit(visitMethod, secondParameter);
     }
 
-    private static J commentOf(J j, String commentText) {
+    public static J commentOf(J j, String commentText) {
         Comment comment = new TextComment(false, commentText,
             "\n" + j.getPrefix().getWhitespace().replace("\n", ""), Markers.EMPTY);
         Space prefix = j.getPrefix();

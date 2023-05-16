@@ -18,7 +18,7 @@ dependencies {
     testRuntimeOnly("org.mapstruct:mapstruct:latest.release")
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
     testRuntimeOnly("org.apache.commons:commons-lang3:latest.release")
-
+    testRuntimeOnly(project(":rewrite-yaml"))
     testRuntimeOnly("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 }
 
