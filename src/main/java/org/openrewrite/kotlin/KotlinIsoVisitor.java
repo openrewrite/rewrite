@@ -176,8 +176,8 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
-    public J.If.Else visitElse(J.If.Else elze, P p) {
-        return (J.If.Else) super.visitElse(elze, p);
+    public J.If.Else visitElse(J.If.Else else_, P p) {
+        return (J.If.Else) super.visitElse(else_, p);
     }
 
     @Override
