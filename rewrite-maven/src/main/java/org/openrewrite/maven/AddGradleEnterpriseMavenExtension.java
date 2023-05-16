@@ -30,6 +30,8 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
+import static org.openrewrite.PathUtils.separatorsToUnix;
+
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -111,7 +113,7 @@ public class AddGradleEnterpriseMavenExtension extends Recipe {
         AtomicReference<SourceFile> matchingGradleEnterpriseXmlFile = new AtomicReference<>();
 
         for (SourceFile sourceFile : before) {
-            String sourcePath = sourceFile.getSourcePath().toString();
+            String sourcePath = separatorsToUnix(sourceFile.getSourcePath().toString());
             switch (sourcePath) {
                 case "pom.xml":
                     isMavenProject = true;
