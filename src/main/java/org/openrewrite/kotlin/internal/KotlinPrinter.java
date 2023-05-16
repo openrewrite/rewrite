@@ -63,8 +63,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visitSpace(pkg.getAfter(), Space.Location.PACKAGE_SUFFIX, p);
         }
 
-        for (JRightPadded<J.Import> imprt : cu.getPadding().getImports()) {
-            visitRightPadded(imprt, KRightPadded.Location.TOP_LEVEL_STATEMENT_SUFFIX, p);
+        for (JRightPadded<J.Import> import_ : cu.getPadding().getImports()) {
+            visitRightPadded(import_, KRightPadded.Location.TOP_LEVEL_STATEMENT_SUFFIX, p);
         }
 
         for (JRightPadded<Statement> statement : cu.getPadding().getStatements()) {
@@ -451,11 +451,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
-        public J visitImport(J.Import impoort, PrintOutputCapture<P> p) {
-            beforeSyntax(impoort, Space.Location.IMPORT_PREFIX, p);
+        public J visitImport(J.Import import_, PrintOutputCapture<P> p) {
+            beforeSyntax(import_, Space.Location.IMPORT_PREFIX, p);
             p.append("import");
-            if (impoort.isStatic()) {
-                J.FieldAccess qualid = impoort.getQualid();
+            if (import_.isStatic()) {
+                J.FieldAccess qualid = import_.getQualid();
                 visitSpace(qualid.getPrefix(), Space.Location.FIELD_ACCESS_PREFIX, p);
                 if (qualid.getTarget() instanceof J.FieldAccess) {
                     visit(((J.FieldAccess) qualid.getTarget()).getTarget(), p);
@@ -465,16 +465,16 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 }
                 visit(qualid.getName(), p);
             } else {
-                visit(impoort.getQualid(), p);
+                visit(import_.getQualid(), p);
             }
-            JLeftPadded<J.Identifier> alias = impoort.getPadding().getAlias();
+            JLeftPadded<J.Identifier> alias = import_.getPadding().getAlias();
             if(alias != null) {
                 visitSpace(alias.getBefore(), Space.Location.IMPORT_ALIAS_PREFIX, p);
                 p.append("as");
                 visit(alias.getElement(), p);
             }
-            afterSyntax(impoort, p);
-            return impoort;
+            afterSyntax(import_, p);
+            return import_;
         }
 
         @Override
