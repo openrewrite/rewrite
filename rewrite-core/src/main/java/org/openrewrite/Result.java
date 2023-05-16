@@ -70,7 +70,7 @@ public class Result {
         Duration timeSavings = null;
         for (List<Recipe> recipesStack : recipes) {
             if (recipesStack != null && !recipesStack.isEmpty()) {
-                Duration perOccurrence = recipesStack.get(0).getEstimatedEffortPerOccurrence();
+                Duration perOccurrence = recipesStack.get(recipesStack.size() - 1).getEstimatedEffortPerOccurrence();
                 if (perOccurrence != null) {
                     timeSavings = perOccurrence;
                     break;
