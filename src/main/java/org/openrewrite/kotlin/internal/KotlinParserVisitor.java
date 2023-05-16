@@ -1468,7 +1468,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitImport(FirImport firImport, ExecutionContext ctx) {
         Space prefix = sourceBefore("import");
-        JLeftPadded<Boolean> statik = padLeft(EMPTY, false);
+        JLeftPadded<Boolean> static_ = padLeft(EMPTY, false);
 
         Space space = whitespace();
         String packageName = firImport.getImportedFqName() == null ? "" : firImport.isAllUnder() ?
@@ -1491,7 +1491,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 randomId(),
                 prefix,
                 Markers.EMPTY,
-                statik,
+                static_,
                 qualid,
                 alias);
     }
@@ -2474,7 +2474,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             catches.add((J.Try.Catch) visitElement(aCatch, ctx));
         }
 
-        JLeftPadded<J.Block> finallyy = tryExpression.getFinallyBlock() == null ? null :
+        JLeftPadded<J.Block> finally_ = tryExpression.getFinallyBlock() == null ? null :
                 padLeft(sourceBefore("finally"), (J.Block) visitElement(tryExpression.getFinallyBlock(), ctx));
 
         return new J.Try(randomId(),
@@ -2483,7 +2483,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 resources,
                 block,
                 catches,
-                finallyy);
+                finally_);
     }
 
     @Override
