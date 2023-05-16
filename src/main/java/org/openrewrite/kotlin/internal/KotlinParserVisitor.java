@@ -872,8 +872,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 prefix,
                 Markers.EMPTY,
                 new J.Empty(randomId(), EMPTY, Markers.EMPTY),
-                padLeft(EMPTY, lhs instanceof Expression ? (Expression) lhs : new K.StatementExpression(randomId(), (Statement) lhs)),
-                padLeft(before, rhs instanceof Expression ? (Expression) rhs : new K.StatementExpression(randomId(), (Statement) rhs)),
+                padLeft(EMPTY, lhs instanceof Statement && !(lhs instanceof Expression) ? (Expression) lhs : new K.StatementExpression(randomId(), (Statement) lhs)),
+                padLeft(before, rhs instanceof Statement && !(rhs instanceof Expression) ? (Expression) rhs : new K.StatementExpression(randomId(), (Statement) rhs)),
                 typeMapping.type(elvisExpression));
     }
 
@@ -1142,7 +1142,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 for (int i = 0; i < flattenedExpressions.size(); i++) {
                     FirExpression expression = flattenedExpressions.get(i);
                     J j = convert(expression, ctx);
-                    Expression expr = !(j instanceof Expression) ? new K.StatementExpression(randomId(), (Statement) j) : (Expression) j;
+                    Expression expr = j instanceof Statement && !(j instanceof Expression) ? new K.StatementExpression(randomId(), (Statement) j) : (Expression) j;
                     if (isTrailingComma) {
                         expr = expr.withMarkers(expr.getMarkers().addIfAbsent(new TrailingLambdaArgument(randomId())));
                         expressions.add(padRight(expr, EMPTY));
@@ -1541,7 +1541,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J.Identifier name = createIdentifier(namedArgumentExpression.getName().toString());
         Space exprPrefix = sourceBefore("=");
         J j = visitElement(namedArgumentExpression.getExpression(), ctx);
-        Expression expr = j instanceof Expression ? (Expression) j : new K.StatementExpression(randomId(), (Statement) j);
+        Expression expr = j instanceof Statement && !(j instanceof Expression) ? new K.StatementExpression(randomId(), (Statement) j) : (Expression) j;
         return new J.Assignment(
                 randomId(),
                 prefix,
@@ -2681,7 +2681,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             } else {
                 Space exprPrefix = sourceBefore("=");
                 J j = convert(variableAssignment.getRValue(), ctx);
-                Expression expr = j instanceof Expression ? (Expression) j : new K.StatementExpression(randomId(), (Statement) j);
+                Expression expr = j instanceof Statement && !(j instanceof Expression) ? new K.StatementExpression(randomId(), (Statement) j) : (Expression) j;
                 return new J.Assignment(
                         randomId(),
                         prefix,
