@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
@@ -25,7 +24,6 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -131,7 +129,6 @@ class JavaParserTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3222")
-    @ExpectedToFail
     void parseFromByteArray() throws Exception {
         // Load classes from test resources folder
         Path start = Paths.get(getClass().getResource("/javaparser-byte-array-tests").getPath());

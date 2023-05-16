@@ -20,7 +20,6 @@ import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
-import com.sun.tools.javac.util.DiagnosticSource;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
 import io.micrometer.core.instrument.Metrics;
@@ -31,7 +30,6 @@ import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
@@ -41,7 +39,6 @@ import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParsingEventListener;
@@ -161,7 +158,7 @@ public class ReloadableJava17Parser implements JavaParser {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
 
-        List<J.CompilationUnit> mappedCus = cus.entrySet().stream()
+        return cus.entrySet().stream()
                 .map(cuByPath -> {
                     Timer.Sample sample = Timer.start();
                     Input input = cuByPath.getKey();
@@ -199,8 +196,6 @@ public class ReloadableJava17Parser implements JavaParser {
                 })
                 .filter(Objects::nonNull)
                 .collect(toList());
-
-        return mappedCus;
     }
 
     LinkedHashMap<Input, JCTree.JCCompilationUnit> parseInputsToCompilerAst(Iterable<Input> sourceFiles, ExecutionContext ctx) {
@@ -447,7 +442,7 @@ public class ReloadableJava17Parser implements JavaParser {
                                 .replace('/', '.'));
                         nameRef.set(name.substring(name.lastIndexOf('/') + 1));
                     } else {
-                        pkgRef.set(name);
+                        pkgRef.set("");
                         nameRef.set(name);
                     }
                 }
