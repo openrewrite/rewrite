@@ -3675,10 +3675,12 @@ public interface J extends Tree {
 
         JContainer<Expression> arguments;
 
+        @Override
         public List<Expression> getArguments() {
             return arguments.getElements();
         }
 
+        @Override
         public MethodInvocation withArguments(List<Expression> arguments) {
             return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
         }
@@ -3687,6 +3689,7 @@ public interface J extends Tree {
         @Getter
         JavaType.Method methodType;
 
+        @Override
         public MethodInvocation withMethodType(@Nullable JavaType.Method type) {
             if (type == this.methodType) {
                 return this;
@@ -4144,10 +4147,12 @@ public interface J extends Tree {
 
         JContainer<Expression> arguments;
 
+        @Override
         public List<Expression> getArguments() {
             return arguments.getElements();
         }
 
+        @Override
         public NewClass withArguments(List<Expression> arguments) {
             return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
         }
@@ -4184,6 +4189,7 @@ public interface J extends Tree {
          * @param methodType The constructor type.
          * @return An instance with the new constructor type.
          */
+        @Override
         public NewClass withMethodType(@Nullable JavaType.Method methodType) {
             return withConstructorType(methodType);
         }
@@ -4709,7 +4715,7 @@ public interface J extends Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    final class SwitchExpression implements J, Expression {
+    final class SwitchExpression implements J, Expression, TypedTree {
         @With
         @EqualsAndHashCode.Include
         UUID id;
@@ -5099,7 +5105,7 @@ public interface J extends Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    final class TypeCast implements J, Expression {
+    final class TypeCast implements J, Expression, TypedTree {
         @With
         @EqualsAndHashCode.Include
         UUID id;

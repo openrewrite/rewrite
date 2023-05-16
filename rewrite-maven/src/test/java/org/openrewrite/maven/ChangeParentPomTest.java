@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import com.google.common.collect.Lists;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.DocumentExample;
@@ -25,6 +26,7 @@ import org.openrewrite.test.RewriteTest;
 import java.util.Collections;
 import java.util.List;
 
+import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class ChangeParentPomTest implements RewriteTest {
@@ -551,50 +553,50 @@ class ChangeParentPomTest implements RewriteTest {
             rewriteRun(spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-config-dependencies", null, "3.1.4", null, null,
                 List.of("com.jcraft:jsch"))),
               pomXml("""
-            <?xml version="1.0" encoding="UTF-8"?>
-            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-              <modelVersion>4.0.0</modelVersion>
-              <groupId>org.sample</groupId>
-              <artifactId>sample</artifactId>
-              <version>1.0.0</version>
-              
-              <parent>
-                <groupId>org.springframework.cloud</groupId>
-                <artifactId>spring-cloud-config-dependencies</artifactId>
-                <version>3.1.2</version>
-              </parent>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>com.jcraft</groupId>
-                  <artifactId>jsch</artifactId>
-                  <version>0.1.55</version>
-                </dependency>
-              </dependencies>
-            </project>
-            """, """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-              <modelVersion>4.0.0</modelVersion>
-              <groupId>org.sample</groupId>
-              <artifactId>sample</artifactId>
-              <version>1.0.0</version>
-              
-              <parent>
-                <groupId>org.springframework.cloud</groupId>
-                <artifactId>spring-cloud-config-dependencies</artifactId>
-                <version>3.1.4</version>
-              </parent>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>com.jcraft</groupId>
-                  <artifactId>jsch</artifactId>
-                  <version>0.1.55</version>
-                </dependency>
-              </dependencies>
-            </project>
-            """));
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  
+                  <parent>
+                    <groupId>org.springframework.cloud</groupId>
+                    <artifactId>spring-cloud-config-dependencies</artifactId>
+                    <version>3.1.2</version>
+                  </parent>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.jcraft</groupId>
+                      <artifactId>jsch</artifactId>
+                      <version>0.1.55</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  
+                  <parent>
+                    <groupId>org.springframework.cloud</groupId>
+                    <artifactId>spring-cloud-config-dependencies</artifactId>
+                    <version>3.1.4</version>
+                  </parent>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.jcraft</groupId>
+                      <artifactId>jsch</artifactId>
+                      <version>0.1.55</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """));
         }
 
         @Test
@@ -602,49 +604,49 @@ class ChangeParentPomTest implements RewriteTest {
             rewriteRun(spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-config-dependencies", null, "3.1.4", null, null,
                 Collections.singletonList("com.jcraft:jsch"))),
               pomXml("""
-            <?xml version="1.0" encoding="UTF-8"?>
-            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-              <modelVersion>4.0.0</modelVersion>
-              <groupId>org.sample</groupId>
-              <artifactId>sample</artifactId>
-              <version>1.0.0</version>
-              
-              <parent>
-                <groupId>org.springframework.cloud</groupId>
-                <artifactId>spring-cloud-config-dependencies</artifactId>
-                <version>3.1.2</version>
-              </parent>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>com.jcraft</groupId>
-                  <artifactId>jsch</artifactId>
-                </dependency>
-              </dependencies>
-            </project>
-            """, """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-              <modelVersion>4.0.0</modelVersion>
-              <groupId>org.sample</groupId>
-              <artifactId>sample</artifactId>
-              <version>1.0.0</version>
-              
-              <parent>
-                <groupId>org.springframework.cloud</groupId>
-                <artifactId>spring-cloud-config-dependencies</artifactId>
-                <version>3.1.4</version>
-              </parent>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>com.jcraft</groupId>
-                  <artifactId>jsch</artifactId>
-                  <version>0.1.55</version>
-                </dependency>
-              </dependencies>
-            </project>
-            """));
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  
+                  <parent>
+                    <groupId>org.springframework.cloud</groupId>
+                    <artifactId>spring-cloud-config-dependencies</artifactId>
+                    <version>3.1.2</version>
+                  </parent>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.jcraft</groupId>
+                      <artifactId>jsch</artifactId>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  
+                  <parent>
+                    <groupId>org.springframework.cloud</groupId>
+                    <artifactId>spring-cloud-config-dependencies</artifactId>
+                    <version>3.1.4</version>
+                  </parent>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.jcraft</groupId>
+                      <artifactId>jsch</artifactId>
+                      <version>0.1.55</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """));
         }
 
         @Test
@@ -652,49 +654,49 @@ class ChangeParentPomTest implements RewriteTest {
             rewriteRun(spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-config-dependencies", null, "3.1.4", null, null,
                 Collections.singletonList("com.jcraft:jsch:0.1.50"))),
               pomXml("""
-            <?xml version="1.0" encoding="UTF-8"?>
-            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-              <modelVersion>4.0.0</modelVersion>
-              <groupId>org.sample</groupId>
-              <artifactId>sample</artifactId>
-              <version>1.0.0</version>
-              
-              <parent>
-                <groupId>org.springframework.cloud</groupId>
-                <artifactId>spring-cloud-config-dependencies</artifactId>
-                <version>3.1.2</version>
-              </parent>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>com.jcraft</groupId>
-                  <artifactId>jsch</artifactId>
-                </dependency>
-              </dependencies>
-            </project>
-            """, """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-              <modelVersion>4.0.0</modelVersion>
-              <groupId>org.sample</groupId>
-              <artifactId>sample</artifactId>
-              <version>1.0.0</version>
-              
-              <parent>
-                <groupId>org.springframework.cloud</groupId>
-                <artifactId>spring-cloud-config-dependencies</artifactId>
-                <version>3.1.4</version>
-              </parent>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>com.jcraft</groupId>
-                  <artifactId>jsch</artifactId>
-                  <version>0.1.50</version>
-                </dependency>
-              </dependencies>
-            </project>
-            """));
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  
+                  <parent>
+                    <groupId>org.springframework.cloud</groupId>
+                    <artifactId>spring-cloud-config-dependencies</artifactId>
+                    <version>3.1.2</version>
+                  </parent>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.jcraft</groupId>
+                      <artifactId>jsch</artifactId>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  
+                  <parent>
+                    <groupId>org.springframework.cloud</groupId>
+                    <artifactId>spring-cloud-config-dependencies</artifactId>
+                    <version>3.1.4</version>
+                  </parent>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.jcraft</groupId>
+                      <artifactId>jsch</artifactId>
+                      <version>0.1.50</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """));
         }
 
         @Test
@@ -856,5 +858,80 @@ class ChangeParentPomTest implements RewriteTest {
                 </project>
                 """));
         }
+    }
+
+    @RepeatedTest(10)
+    @Issue("https://github.com/openrewrite/rewrite/issues/1753")
+    void multiModule() {
+        ChangeParentPom recipe = new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.6.7", null, true, null);
+        rewriteRun(spec -> spec.recipe(recipe),
+          mavenProject("parent",
+            pomXml("""
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+                  
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.5.0</version>
+                  </parent>
+                  
+                  <modules>
+                    <module>module1</module>
+                    <module>module2</module>
+                  </modules>
+                </project>
+                """,
+              """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>org.sample</groupId>
+                  <artifactId>sample</artifactId>
+                  <version>1.0.0</version>
+
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.6.7</version>
+                  </parent>
+
+                  <modules>
+                    <module>module1</module>
+                    <module>module2</module>
+                  </modules>
+                </project>
+                """),
+            mavenProject("module1",
+              pomXml("""
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                    <groupId>org.sample</groupId>
+                    <artifactId>sample</artifactId>
+                    <version>1.0.0</version>
+                  </parent>
+                  <artifactId>module1</artifactId>
+                </project>
+                """)),
+            mavenProject("module2",
+              pomXml("""
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                  <modelVersion>4.0.0</modelVersion>
+                  <parent>
+                    <groupId>org.sample</groupId>
+                    <artifactId>sample</artifactId>
+                    <version>1.0.0</version>
+                  </parent>
+                  <artifactId>module2</artifactId>
+                </project>
+                """))
+          ));
     }
 }

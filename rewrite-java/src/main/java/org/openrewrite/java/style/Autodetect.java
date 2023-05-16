@@ -326,6 +326,17 @@ public class Autodetect extends NamedStyles {
     }
 
     private static class FindLineFormatJavaVisitor extends JavaIsoVisitor<GeneralFormatStatistics> {
+
+        @Override
+        public @Nullable J visit(@Nullable Tree tree, GeneralFormatStatistics generalFormatStatistics) {
+            try {
+                super.visit(tree, generalFormatStatistics);
+            } catch (Exception e) {
+                // Suppress errors. A malformed element should not fail parsing overall.
+            }
+            return (J) tree;
+        }
+
         @Override
         public Space visitSpace(Space space, Space.Location loc, GeneralFormatStatistics stats) {
             String prefix = space.getWhitespace();
@@ -346,6 +357,16 @@ public class Autodetect extends NamedStyles {
     }
 
     private static class FindIndentJavaVisitor extends JavaIsoVisitor<IndentStatistics> {
+
+        @Override
+        public @Nullable J visit(@Nullable Tree tree, IndentStatistics indentStatistics) {
+            try {
+                super.visit(tree, indentStatistics);
+            } catch (Exception e) {
+                // Suppress errors. A malformed element should not fail parsing overall.
+            }
+            return (J) tree;
+        }
 
         @Override
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration cd, IndentStatistics stats) {
@@ -881,6 +902,17 @@ public class Autodetect extends NamedStyles {
     }
 
     private static class FindImportLayout extends JavaIsoVisitor<ImportLayoutStatistics> {
+
+        @Override
+        public @Nullable J visit(@Nullable Tree tree, ImportLayoutStatistics importLayoutStatistics) {
+            try {
+                super.visit(tree, importLayoutStatistics);
+            } catch (Exception e) {
+                // Suppress errors. A malformed element should not fail parsing overall.
+            }
+            return (J) tree;
+        }
+
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ImportLayoutStatistics importLayoutStatistics) {
             Set<ImportLayoutStatistics.Block> blocks = new LinkedHashSet<>();
@@ -1063,6 +1095,17 @@ public class Autodetect extends NamedStyles {
     }
 
     private static class FindSpacesStyle extends JavaIsoVisitor<SpacesStatistics> {
+
+        @Override
+        public @Nullable J visit(@Nullable Tree tree, SpacesStatistics spacesStatistics) {
+            try {
+                super.visit(tree, spacesStatistics);
+            } catch (Exception e) {
+                // Suppress errors. A malformed element should not fail parsing overall.
+            }
+            return (J) tree;
+        }
+
         @Override
         public J.TypeCast visitTypeCast(J.TypeCast typeCast, SpacesStatistics stats) {
             stats.afterTypeCast += hasSpace(typeCast.getExpression().getPrefix());

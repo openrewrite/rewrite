@@ -73,6 +73,7 @@ public class RenamePropertyKey extends Recipe {
                 Xml.Tag t = super.visitTag(tag, ctx);
                 if (isPropertyTag() && oldKey.equals(t.getName())) {
                     t = t.withName(newKey);
+                    maybeUpdateModel();
                 }
                 if (t.getChildren().isEmpty()) {
                     Optional<String> value = t.getValue();

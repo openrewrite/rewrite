@@ -44,7 +44,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     public Statement visitStatement(Statement statement, P p) {
         Statement j = super.visitStatement(statement, p);
         J parentTree = getCursor().getParentTreeCursor().getValue();
-        if (parentTree instanceof J.Block) {
+        if (parentTree instanceof J.Block && !(j instanceof J.EnumValueSet)) {
+            // for `J.EnumValueSet` the prefix is on the enum constants
             if (!j.getPrefix().getWhitespace().contains("\n")) {
                 j = j.withPrefix(withNewline(j.getPrefix()));
             }

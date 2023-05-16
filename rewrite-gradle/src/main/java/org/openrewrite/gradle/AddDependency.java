@@ -53,7 +53,9 @@ public class AddDependency extends Recipe {
 
     @Option(displayName = "Version",
             description = "An exact version number or node-style semver selector used to select the version number.",
-            example = "29.X")
+            example = "29.X",
+            required = false)
+    @Nullable
     String version;
 
     @Option(displayName = "Version pattern",
@@ -162,6 +164,15 @@ public class AddDependency extends Recipe {
                                 Dependency dependency = DependencyStringNotationConverter.parse((String) ((J.Literal) m.getArguments().get(0)).getValue());
                                 if (groupId.equals(dependency.getGroupId()) && artifactId.equals(dependency.getArtifactId())) {
                                     getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, DEPENDENCY_PRESENT, true);
+                                }
+                            } else if (m.getArguments().get(0) instanceof G.GString) {
+                                List<J> strings = ((G.GString) m.getArguments().get(0)).getStrings();
+                                if (strings.size() >= 2 &&
+                                        strings.get(0) instanceof J.Literal) {
+                                    Dependency dependency = DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
+                                    if (groupId.equals(dependency.getGroupId()) && artifactId.equals(dependency.getArtifactId())) {
+                                        getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, DEPENDENCY_PRESENT, true);
+                                    }
                                 }
                             } else if (m.getArguments().get(0) instanceof G.MapEntry) {
                                 G.MapEntry groupEntry = null;

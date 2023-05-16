@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
@@ -349,8 +350,8 @@ class JavaTemplateMatchTest implements RewriteTest {
               private final JavaTemplate template = JavaTemplate.builder(this::getCursor, "#{any(long)}").build();
 
               @Override
-              public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  return method.getMarkers().findFirst(SearchResult.class).isEmpty() && template.matches(method) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+              public J visitExpression(Expression expression, ExecutionContext ctx) {
+                  return expression.getMarkers().findFirst(SearchResult.class).isEmpty() && template.matches(expression) ? SearchResult.found(expression) : super.visitExpression(expression, ctx);
               }
           })),
           java(
@@ -363,7 +364,8 @@ class JavaTemplateMatchTest implements RewriteTest {
                       System.out.println(String.valueOf(Long.parseLong("123")));
 
                       System.out.println(new Object());
-                      System.out.println(1L);
+                      System.out.println((1L));
+                      System.out.println((long) 1);
                   }
               }
               """,
@@ -371,12 +373,13 @@ class JavaTemplateMatchTest implements RewriteTest {
               class Test {
                   void m() {
                       System.out.println(/*~~>*/new Object().hashCode());
-                      System.out.println((int) /*~~>*/new Object().hashCode());
+                      System.out.println(/*~~>*/(int) /*~~>*/new Object().hashCode());
                       System.out.println(/*~~>*/Long.parseLong("123"));
                       System.out.println(String.valueOf(/*~~>*/Long.parseLong("123")));
 
                       System.out.println(new Object());
-                      System.out.println(1L);
+                      System.out.println(/*~~>*/(/*~~>*/1L));
+                      System.out.println(/*~~>*/(long) /*~~>*/1);
                   }
               }
               """)

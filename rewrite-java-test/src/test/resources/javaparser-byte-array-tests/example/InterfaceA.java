@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,19 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.dataflow;
-
-import org.openrewrite.Cursor;
-import org.openrewrite.Incubating;
-import org.openrewrite.java.tree.Expression;
-
-@Incubating(since = "7.25.0")
-@FunctionalInterface
-interface AdditionalFlowStepPredicate {
-    boolean isAdditionalFlowStep(
-            Expression srcExpression,
-            Cursor srcCursor,
-            Expression sinkExpression,
-            Cursor sinkCursor
-    );
+package example;
+public interface InterfaceA {
+	void methodA();
 }

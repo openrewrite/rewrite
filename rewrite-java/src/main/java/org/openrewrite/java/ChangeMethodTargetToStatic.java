@@ -64,7 +64,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
 
     @Option(displayName = "Match unknown types",
             description = "When enabled, include method invocations which appear to match if full type information is missing. " +
-            "Using matchUnknownTypes can improve recipe resiliency for an AST with missing type information, but " +
+            "Using matchUnknownTypes can improve recipe resiliency for an LST with missing type information, but " +
             "also increases the risk of false-positive matches on unrelated method invocations.",
             required = false)
     @Nullable

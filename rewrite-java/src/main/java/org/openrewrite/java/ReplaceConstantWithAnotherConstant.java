@@ -60,13 +60,13 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
         private final String existingOwningType;
         private final String constantName;
         private final String owningType;
-        private final String template;
+        private final String newConstantName;
 
         public ReplaceConstantWithAnotherConstantVisitor(String existingFullyQualifiedConstantName, String fullyQualifiedConstantName) {
             this.existingOwningType = existingFullyQualifiedConstantName.substring(0, existingFullyQualifiedConstantName.lastIndexOf('.'));
             this.constantName = existingFullyQualifiedConstantName.substring(existingFullyQualifiedConstantName.lastIndexOf('.') + 1);
             this.owningType = fullyQualifiedConstantName.substring(0, fullyQualifiedConstantName.lastIndexOf('.'));
-            this.template = fullyQualifiedConstantName.substring(owningType.lastIndexOf('.') + 1);
+            this.newConstantName = fullyQualifiedConstantName.substring(fullyQualifiedConstantName.lastIndexOf('.') + 1);
         }
 
         @Override
@@ -93,9 +93,19 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                 maybeRemoveImport(((JavaType.FullyQualified) owner).getFullyQualifiedName());
                 owner = ((JavaType.FullyQualified) owner).getOwningClass();
             }
-            maybeAddImport(owningType, false);
+
+            JavaTemplate.Builder templateBuilder;
+            if (fieldAccess instanceof J.Identifier) {
+                maybeAddImport(owningType, newConstantName, false);
+                templateBuilder = JavaTemplate.builder(this::getCursor, newConstantName)
+                        .staticImports(owningType + '.' + newConstantName);
+            } else {
+                maybeAddImport(owningType, false);
+                templateBuilder = JavaTemplate.builder(this::getCursor, owningType.substring(owningType.lastIndexOf('.') + 1) + '.' + newConstantName)
+                        .imports(owningType);
+            }
             return fieldAccess.withTemplate(
-                            JavaTemplate.builder(this::getCursor, template).imports(owningType).build(),
+                            templateBuilder.build(),
                             fieldAccess.getCoordinates().replace())
                     .withPrefix(fieldAccess.getPrefix());
         }
