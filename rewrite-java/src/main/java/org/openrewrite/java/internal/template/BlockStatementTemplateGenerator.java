@@ -219,10 +219,6 @@ public class BlockStatementTemplateGenerator {
     }
 
     private void contextFreeTemplate(J j, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
-        before.insert(0, EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
-        for (String anImport : imports) {
-            before.insert(0, anImport);
-        }
         if (j instanceof J.ClassDeclaration) {
             // While not impossible to handle, reaching this point is likely to be a mistake.
             // Without context a class declaration can include no imports, package, or outer class.
@@ -233,7 +229,7 @@ public class BlockStatementTemplateGenerator {
                     "Templating a class declaration requires a cursor from which package declaration and imports may be reached. " +
                             "Pass a cursor pointing to the class declaration's parent to JavaTemplate.Builder.context()");
         } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
-            before.append("class Template {{\n");
+            before.insert(0, "class Template {{\n");
             if (j instanceof J.Lambda) {
                 //TODO
             } else if (j instanceof J.MemberReference) {
@@ -244,8 +240,12 @@ public class BlockStatementTemplateGenerator {
             }
             after.append("\n}}");
         } else if (j instanceof J.MethodDeclaration || !(j instanceof J.Import) && !(j instanceof J.Package)) {
-            before.append("class Template {\n");
-            after.insert(0, "\n}");
+            before.insert(0, "class Template {\n");
+            after.append("\n}");
+        }
+        before.insert(0, EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
+        for (String anImport : imports) {
+            before.insert(0, anImport);
         }
     }
 
