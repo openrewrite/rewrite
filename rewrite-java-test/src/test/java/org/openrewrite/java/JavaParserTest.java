@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junitpioneer.jupiter.ExpectedToFail;
@@ -153,7 +154,7 @@ class JavaParserTest implements RewriteTest {
           .classpath(classes)
           .build();
 
-        //language=java
+        @Language("java")
         String source = """
           import example.InterfaceA;
           public class User implements InterfaceA, InterfaceB {
@@ -164,7 +165,7 @@ class JavaParserTest implements RewriteTest {
           	public void methodB() {}
           }
           """;
-        List<J.CompilationUnit> compilationUnits = parser.parse(new InMemoryExecutionContext(Throwable::printStackTrace), source);
+        List<J.CompilationUnit> compilationUnits = parser.parse(new InMemoryExecutionContext(Throwable::printStackTrace), source).collect(Collectors.toList());
         assertThat(compilationUnits).singleElement()
           .satisfies(cu -> assertThat(cu.getClasses()).singleElement()
             .satisfies(cd -> assertThat(cd.getImplements()).satisfiesExactly(
