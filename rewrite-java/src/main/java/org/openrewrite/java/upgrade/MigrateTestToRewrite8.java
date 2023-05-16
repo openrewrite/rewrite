@@ -31,19 +31,18 @@ import java.util.Collections;
 import java.util.List;
 
 public class MigrateTestToRewrite8 extends Recipe {
-
     private static final String REWRITE_TEST_FQN = "org.openrewrite.test.RewriteTest";
     private static final MethodMatcher RECIPE_METHOD_MATCHER = new MethodMatcher("org.openrewrite.test.RecipeSpec recipe(org.openrewrite.Recipe)");
     private static final MethodMatcher DO_NEXT_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Recipe doNext(org.openrewrite.Recipe)");
 
     @Override
     public String getDisplayName() {
-        return "Migrate rewrite unit test from version 7 to 8";
+        return "[Rewrite8 migration] Migrate rewrite unit test from version 7 to 8";
     }
 
     @Override
     public String getDescription() {
-        return "Since the method `Recipe::doNext(..)` is deprecated, For unit test, change usage of `RecipeSpec.recipe(X.doNext(Y))` to `RecipeSpec.recipes(X, Y)`.";
+        return "[Rewrite8 migration] Since the method `Recipe::doNext(..)` is deprecated, For unit test, change usage of `RecipeSpec.recipe(X.doNext(Y))` to `RecipeSpec.recipes(X, Y)`.";
     }
 
     @Override

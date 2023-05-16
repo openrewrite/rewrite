@@ -19,12 +19,12 @@ public class MigrateMarkersSearchResult extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Migrate deprecated `org.openrewrite.marker.Markers#SearchResult(..)`";
+        return "[Rewrite8 migration] Migrate deprecated `org.openrewrite.marker.Markers#SearchResult(..)`";
     }
 
     @Override
     public String getDescription() {
-        return "Methods of `org.openrewrite.marker.Markers#SearchResult(..)` are deprecated and removed in rewrite 8, use `SearchResult.found()` instead.";
+        return "[Rewrite8 migration] Methods of `org.openrewrite.marker.Markers#SearchResult(..)` are deprecated and removed in rewrite 8, use `SearchResult.found()` instead.";
     }
 
     @Override

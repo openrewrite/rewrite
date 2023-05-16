@@ -29,6 +29,7 @@ import org.openrewrite.marker.Markers;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.J.Modifier.Type.Protected;
@@ -92,12 +93,12 @@ public class MigrateRecipeToRewrite8 extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Migrate Rewrite recipes from version 7 to 8";
+        return "[Rewrite8 migration] Migrate Rewrite recipes from version 7 to 8";
     }
 
     @Override
     public String getDescription() {
-        return "Rewrite Recipe Migration to version 8. While most parts can be automatically migrated, there are some" +
+        return "[Rewrite8 migration] Rewrite Recipe Migration to version 8. While most parts can be automatically migrated, there are some" +
                " complex and open-ended scenarios that require manual attention. In those cases, this recipe will add" +
                " a comment to the code and request a human to review and handle it manually.";
     }
@@ -156,12 +157,17 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                 J.MethodDeclaration singleSourceApplicableTestMethod = findSingleSourceApplicableTest(classDecl);
                 if (singleSourceApplicableTestMethod != null) {
                     hasApplicableTest = true;
-                    List<Statement> statements = singleSourceApplicableTestMethod.getBody().getStatements();
-                    if (!statements.isEmpty() && statements.get(statements.size() - 1) instanceof J.Return) {
-                        applicableTestMethodHasMultipleReturns = false;
+                    applicableTestMethodHasMultipleReturns = new JavaIsoVisitor<AtomicInteger>() {
+                        @Override
+                        public J.Return visitReturn(J.Return _return, AtomicInteger returnsCount) {
+                            returnsCount.set(returnsCount.get() + 1);
+                            return _return;
+                        }
+                    }.reduce(singleSourceApplicableTestMethod, new AtomicInteger(0)).get() > 1;
+
+                    if (!applicableTestMethodHasMultipleReturns) {
+                        List<Statement> statements = singleSourceApplicableTestMethod.getBody().getStatements();
                         applicableTestMethodStatements.addAll(statements);
-                    } else {
-                        applicableTestMethodHasMultipleReturns = true;
                     }
                 }
 
