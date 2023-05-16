@@ -88,12 +88,12 @@ class MavenPomDownloaderTest {
 
     @ParameterizedTest
     @Issue("https://github.com/openrewrite/rewrite/issues/3141")
-    @ValueSource(strings = {"http://0.0.0.0","https://0.0.0.0","0.0.0.0:443"})
+    @ValueSource(strings = {"http://0.0.0.0", "https://0.0.0.0", "0.0.0.0:443"})
     void skipBlockedRepository(String url) {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
         MavenRepository oss = downloader.normalizeRepository(
           MavenRepository.builder().id("myRepo").uri(url).build(),
-          null);
+          null, null);
 
         assertThat(oss).isNull();
     }
@@ -196,12 +196,12 @@ class MavenPomDownloaderTest {
                       new MockResponse().setResponseCode(200).setBody(
                         //language=xml
                         """
-                        <project>
-                            <groupId>org.springframework.cloud</groupId>
-                            <artifactId>spring-cloud-dataflow-build</artifactId>
-                            <version>2.10.0-SNAPSHOT</version>
-                        </project>
-                        """);
+                          <project>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dataflow-build</artifactId>
+                              <version>2.10.0-SNAPSHOT</version>
+                          </project>
+                          """);
                 }
             });
             mockRepo.start();
@@ -230,12 +230,12 @@ class MavenPomDownloaderTest {
                       new MockResponse().setResponseCode(200).setBody(
                         //language=xml
                         """
-                        <project>
-                            <groupId>org.springframework.cloud</groupId>
-                            <artifactId>spring-cloud-dataflow-build</artifactId>
-                            <version>2.10.0-SNAPSHOT</version>
-                        </project>
-                        """) :
+                          <project>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dataflow-build</artifactId>
+                              <version>2.10.0-SNAPSHOT</version>
+                          </project>
+                          """) :
                       new MockResponse().setResponseCode(401).setBody("");
                 }
             });
@@ -376,7 +376,7 @@ class MavenPomDownloaderTest {
           .knownToExist(true)
           .deriveMetadataIfMissing(true)
           .build();
-        MavenMetadata metaData  = new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext())
+        MavenMetadata metaData = new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext())
           .downloadMetadata(new GroupArtifact("fred", "fred"), null, List.of(repository));
         assertThat(metaData.getVersioning().getVersions()).hasSize(3).containsAll(Arrays.asList("1.0.0", "1.1.0", "2.0.0"));
     }

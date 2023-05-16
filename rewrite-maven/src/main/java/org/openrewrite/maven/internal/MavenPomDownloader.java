@@ -60,7 +60,7 @@ public class MavenPomDownloader {
     private static final RetryConfig retryConfig = RetryConfig.custom()
             .retryOnException(throwable -> throwable instanceof SocketTimeoutException ||
                                            throwable instanceof TimeoutException)
-            .maxAttempts(5) // what should we set?
+            .maxAttempts(5)
             .build();
 
     private static final RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
@@ -666,9 +666,10 @@ public class MavenPomDownloader {
             if (repository.getUri().contains("${")) {
                 return null;
             }
+
             // Skip blocked repositories
-            // See https://github.com/openrewrite/rewrite/issues/3141
-            else if (repository.getUri().contains("0.0.0.0")) {
+            // https://github.com/openrewrite/rewrite/issues/3141
+            if (repository.getUri().contains("0.0.0.0")) {
                 return null;
             }
 
