@@ -708,15 +708,15 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
-        public J visitReturn(J.Return retrn, PrintOutputCapture<P> p) {
-            if (retrn.getMarkers().findFirst(ImplicitReturn.class).isPresent()) {
-                visitSpace(retrn.getPrefix(), Space.Location.RETURN_PREFIX, p);
-                visitMarkers(retrn.getMarkers(), p);
-                visit(retrn.getExpression(), p);
-                afterSyntax(retrn, p);
-                return retrn;
+        public J visitReturn(J.Return return_, PrintOutputCapture<P> p) {
+            if (return_.getMarkers().findFirst(ImplicitReturn.class).isPresent()) {
+                visitSpace(return_.getPrefix(), Space.Location.RETURN_PREFIX, p);
+                visitMarkers(return_.getMarkers(), p);
+                visit(return_.getExpression(), p);
+                afterSyntax(return_, p);
+                return return_;
             }
-            return super.visitReturn(retrn, p);
+            return super.visitReturn(return_, p);
         }
 
         @Override
