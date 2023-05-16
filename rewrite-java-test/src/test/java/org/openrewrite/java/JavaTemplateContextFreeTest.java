@@ -17,9 +17,16 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.Objects;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -52,6 +59,64 @@ class JavaTemplateContextFreeTest implements RewriteTest {
                   }
               }
               """
+          ));
+    }
+
+    @SuppressWarnings("UnusedAssignment")
+    @Test
+    void genericsAndAnyParameters() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              private final JavaTemplate template = JavaTemplate.builder("java.util.List.of(#{any()})").build();
+
+              @Override
+              public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
+                  if (literal.getMarkers().findFirst(SearchResult.class).isEmpty() &&
+                    (Objects.equals(literal.getValue(), 1) || Objects.requireNonNull(literal.getValue()).equals("s"))) {
+                      return literal.withTemplate(template, getCursor(), literal.getCoordinates().replace(), SearchResult.found(literal));
+                  }
+                  return super.visitLiteral(literal, executionContext);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void m() {
+                      Object o;
+                      o = 1;
+                      o = 2;
+                      o = "s";
+                      o = "s2";
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void m() {
+                      Object o;
+                      o = java.util.List.of(/*~~>*/1);
+                      o = 2;
+                      o = java.util.List.of(/*~~>*/"s");
+                      o = "s2";
+                  }
+              }
+              """,
+            sourceSpecs -> sourceSpecs.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @SuppressWarnings("DataFlowIssue")
+                @Override
+                public <M extends Marker> M visitMarker(Marker marker, Object o) {
+                    if (marker instanceof SearchResult) {
+                        J.Literal literal = getCursor().getValue();
+                        Expression parent = getCursor().getParentTreeCursor().getValue();
+                        if (literal.getType() == JavaType.Primitive.Int) {
+                            assertThat(parent.getType().toString()).isEqualTo("java.util.List<java.lang.Integer>");
+                        } else if (literal.getType() == JavaType.Primitive.String) {
+                            assertThat(parent.getType().toString()).isEqualTo("java.util.List<java.lang.String>");
+                        }
+                    }
+                    return super.visitMarker(marker, o);
+                }
+            }.visit(cu, 0))
           ));
     }
 
