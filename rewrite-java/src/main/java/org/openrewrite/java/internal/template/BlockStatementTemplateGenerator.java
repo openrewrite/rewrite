@@ -46,22 +46,22 @@ public class BlockStatementTemplateGenerator {
     private static final String TEMPLATE_COMMENT = "__TEMPLATE__";
     private static final String STOP_COMMENT = "__TEMPLATE_STOP__";
     static final String EXPR_STATEMENT_PARAM = "class __P__ {" +
-                                               "  static native <T> T p();" +
-                                               "  static native <T> T[] arrp();" +
-                                               "  static native boolean booleanp();" +
-                                               "  static native byte bytep();" +
-                                               "  static native char charp();" +
-                                               "  static native double doublep();" +
-                                               "  static native int intp();" +
-                                               "  static native long longp();" +
-                                               "  static native short shortp();" +
-                                               "  static native float floatp();" +
-                                               "}";
+            "  static native <T> T p();" +
+            "  static native <T> T[] arrp();" +
+            "  static native boolean booleanp();" +
+            "  static native byte bytep();" +
+            "  static native char charp();" +
+            "  static native double doublep();" +
+            "  static native int intp();" +
+            "  static native long longp();" +
+            "  static native short shortp();" +
+            "  static native float floatp();" +
+            "}";
     private static final String METHOD_INVOCATION_STUBS = "class __M__ {" +
-                                                          "  static native Object any(Object o);" +
-                                                          "  static native Object any(java.util.function.Predicate<Boolean> o);" +
-                                                          "  static native <T> Object anyT();" +
-                                                          "}";
+            "  static native Object any(Object o);" +
+            "  static native Object any(java.util.function.Predicate<Boolean> o);" +
+            "  static native <T> Object anyT();" +
+            "}";
 
     private final Set<String> imports;
     private final boolean contextFree;
@@ -76,7 +76,7 @@ public class BlockStatementTemplateGenerator {
 
                     // for CoordinateBuilder.MethodDeclaration#replaceBody()
                     if (cursor.getValue() instanceof J.MethodDeclaration &&
-                        location.equals(Space.Location.BLOCK_PREFIX)) {
+                            location.equals(Space.Location.BLOCK_PREFIX)) {
                         J.MethodDeclaration method = cursor.getValue();
                         J.MethodDeclaration m = method.withBody(null).withLeadingAnnotations(emptyList()).withPrefix(Space.EMPTY);
                         before.insert(0, m.printTrimmed(cursor.getParentOrThrow()).trim() + '{');
@@ -227,17 +227,19 @@ public class BlockStatementTemplateGenerator {
             // incorrect, and it would not be obvious to the recipe author why.
             throw new IllegalArgumentException(
                     "Templating a class declaration requires a cursor from which package declaration and imports may be reached. " +
-                            "Pass a cursor pointing to the class declaration's parent to JavaTemplate.Builder.context()");
+                            "Pass a cursor pointing to the class declaration's parent to JavaTemplate.Builder#context()");
+        } else if (j instanceof J.Lambda) {
+            throw new IllegalArgumentException(
+                    "Templating a lambda requires a cursor so that it can be properly parsed and type-attributed. " +
+                            "Pass a cursor pointing to the lambda's parent to JavaTemplate.Builder#context()");
+        } else if (j instanceof J.MemberReference) {
+            throw new IllegalArgumentException(
+                    "Templating a method reference requires a cursor so that it can be properly parsed and type-attributed. " +
+                            "Pass a cursor pointing to the method reference's parent to JavaTemplate.Builder#context()");
         } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
             before.insert(0, "class Template {{\n");
-            if (j instanceof J.Lambda) {
-                //TODO
-            } else if (j instanceof J.MemberReference) {
-                //TODO
-            } else {
-                before.append("Object o = ");
-                after.append(";");
-            }
+            before.append("Object o = ");
+            after.append(";");
             after.append("\n}}");
         } else if (j instanceof J.MethodDeclaration || !(j instanceof J.Import) && !(j instanceof J.Package)) {
             before.insert(0, "class Template {\n");
@@ -288,9 +290,9 @@ public class BlockStatementTemplateGenerator {
                 }
 
                 before.insert(0, m.withBody(null)
-                                         .withLeadingAnnotations(emptyList())
-                                         .withPrefix(Space.EMPTY)
-                                         .printTrimmed(cursor).trim() + '{');
+                        .withLeadingAnnotations(emptyList())
+                        .withPrefix(Space.EMPTY)
+                        .printTrimmed(cursor).trim() + '{');
             } else if (parent instanceof J.Block || parent instanceof J.Lambda || parent instanceof J.Label || parent instanceof Loop) {
                 J.Block b = (J.Block) j;
 
@@ -522,7 +524,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.Ternary) {
             J.Ternary ternary = (J.Ternary) j;
             String condition = PatternVariables.simplifiedPatternVariableCondition(ternary.getCondition(), insertionPoint);
-            if(condition != null) {
+            if (condition != null) {
                 if (referToSameElement(prior, ternary.getCondition())) {
                     int splitIdx = condition.indexOf('§');
                     before.insert(0, condition.substring(0, splitIdx) + '(');
@@ -576,8 +578,8 @@ public class BlockStatementTemplateGenerator {
             }
             if (statement instanceof J.VariableDeclarations) {
                 before.insert(0, "\n" +
-                                 variable((J.VariableDeclarations) statement, true, cursor) +
-                                 ";\n");
+                        variable((J.VariableDeclarations) statement, true, cursor) +
+                        ";\n");
             } else if (statement instanceof J.If) {
                 J.If iff = (J.If) statement;
                 String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), insertionPoint);
