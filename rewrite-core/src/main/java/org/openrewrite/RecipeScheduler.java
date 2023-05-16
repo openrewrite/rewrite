@@ -102,8 +102,8 @@ public class RecipeScheduler {
         long cycleStartTime = System.nanoTime();
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean();
 
-        public LargeSourceSet scanSources(LargeSourceSet before, int cycle) {
-            return mapForRecipeRecursively(before, (recipeStack, sourceFile) -> {
+        public LargeSourceSet scanSources(LargeSourceSet sourceSet, int cycle) {
+            return mapForRecipeRecursively(sourceSet, (recipeStack, sourceFile) -> {
                 Recipe recipe = recipeStack.peek();
                 if (recipe.maxCycles() < cycle || !recipe.validate(ctx).isValid()) {
                     return sourceFile;
@@ -131,11 +131,11 @@ public class RecipeScheduler {
             });
         }
 
-        public LargeSourceSet generateSources(LargeSourceSet before, int cycle) {
+        public LargeSourceSet generateSources(LargeSourceSet sourceSet, int cycle) {
             List<SourceFile> generatedInThisCycle = new ArrayList<>();
 
             Stack<Stack<Recipe>> allRecipesStack = initRecipeStack();
-            LargeSourceSet acc = before;
+            LargeSourceSet acc = sourceSet;
             while (!allRecipesStack.isEmpty()) {
                 Stack<Recipe> recipeStack = allRecipesStack.pop();
                 Recipe recipe = recipeStack.peek();
@@ -146,10 +146,11 @@ public class RecipeScheduler {
                 if (recipe instanceof ScanningRecipe) {
                     //noinspection unchecked
                     ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
+                    sourceSet.setRecipe(recipeStack);
                     List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor), generatedInThisCycle, ctx));
                     generatedInThisCycle.addAll(generated);
                     generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
-                    acc = acc.concatAll(generated);
+                    acc = acc.generate(generated);
                 }
                 recurseRecipeList(allRecipesStack, recipeStack);
             }
@@ -157,8 +158,8 @@ public class RecipeScheduler {
             return acc;
         }
 
-        public LargeSourceSet editSources(LargeSourceSet before, int cycle) {
-            return mapForRecipeRecursively(before, (recipeStack, sourceFile) -> {
+        public LargeSourceSet editSources(LargeSourceSet sourceSet, int cycle) {
+            return mapForRecipeRecursively(sourceSet, (recipeStack, sourceFile) -> {
                 Recipe recipe = recipeStack.peek();
                 if (recipe.maxCycles() < cycle || !recipe.validate(ctx).isValid()) {
                     return sourceFile;
@@ -191,9 +192,11 @@ public class RecipeScheduler {
                         return sourceFile;
                     });
 
-                    if (after == null) {
-                        if (!sourceFile.getMarkers().findFirst(Generated.class).isPresent()) {
-                            before.delete(sourceFile, recipeStack);
+                    if (after != sourceFile) {
+                        if (sourceFile.getMarkers().findFirst(Generated.class).isPresent()) {
+                            // skip edits made to generated source files so that they don't show up in a diff
+                            // that later fails to apply on a freshly cloned repository
+                            return sourceFile;
                         }
                     }
                 } catch (Throwable t) {
@@ -227,13 +230,14 @@ public class RecipeScheduler {
             return after;
         }
 
-        private LargeSourceSet mapForRecipeRecursively(LargeSourceSet before, BiFunction<Stack<Recipe>, SourceFile, SourceFile> mapFn) {
-            return before.map(sourceFile -> {
+        private LargeSourceSet mapForRecipeRecursively(LargeSourceSet sourceSet, BiFunction<Stack<Recipe>, SourceFile, SourceFile> mapFn) {
+            return sourceSet.edit(sourceFile -> {
                 Stack<Stack<Recipe>> allRecipesStack = initRecipeStack();
 
                 SourceFile acc = sourceFile;
                 while (!allRecipesStack.isEmpty()) {
                     Stack<Recipe> recipeStack = allRecipesStack.pop();
+                    sourceSet.setRecipe(recipeStack);
                     acc = mapFn.apply(recipeStack, acc);
                     recurseRecipeList(allRecipesStack, recipeStack);
                 }

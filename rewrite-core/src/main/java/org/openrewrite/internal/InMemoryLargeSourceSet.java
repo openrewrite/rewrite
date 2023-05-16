@@ -36,6 +36,8 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
     @Nullable
     private Map<SourceFile, List<Recipe>> deletions;
 
+    private List<Recipe> currentRecipeStack;
+
     public InMemoryLargeSourceSet(List<SourceFile> ls) {
         this(null, null, ls);
     }
@@ -49,13 +51,27 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
     }
 
     @Override
-    public LargeSourceSet map(UnaryOperator<SourceFile> map) {
-        List<SourceFile> mapped = ListUtils.map(ls, map);
+    public void setRecipe(List<Recipe> recipeStack) {
+        this.currentRecipeStack = recipeStack;
+    }
+
+    @Override
+    public LargeSourceSet edit(UnaryOperator<SourceFile> map) {
+        List<SourceFile> mapped = ListUtils.map(ls, before -> {
+            SourceFile after = map.apply(before);
+            if (after == null) {
+                if (deletions == null) {
+                    deletions = new LinkedHashMap<>();
+                }
+                deletions.put(before, currentRecipeStack);
+            }
+            return after;
+        });
         return mapped != ls ? new InMemoryLargeSourceSet(getInitialState(), deletions, mapped) : this;
     }
 
     @Override
-    public LargeSourceSet concatAll(@Nullable Collection<? extends SourceFile> t) {
+    public LargeSourceSet generate(@Nullable Collection<? extends SourceFile> t) {
         if (t == null || t.isEmpty()) {
             //noinspection ConstantConditions
             return this;
@@ -105,14 +121,6 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
         }
 
         return new InMemoryChangeset(changes);
-    }
-
-    @Override
-    public void delete(SourceFile sourceFile, List<Recipe> recipeStack) {
-        if (deletions == null) {
-            deletions = new LinkedHashMap<>();
-        }
-        deletions.put(sourceFile, recipeStack);
     }
 
     @RequiredArgsConstructor

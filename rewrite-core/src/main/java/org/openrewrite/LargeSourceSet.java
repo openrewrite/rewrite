@@ -35,29 +35,29 @@ import java.util.function.UnaryOperator;
 public interface LargeSourceSet {
 
     /**
-     * Execute a transformation on all items. This causes the iterable to be iterated and a new
-     * iterable returned if any changes are made.
+     * Maintain context about what recipe is performing an edit or generating code.
+     *
+     * @param recipeStack A stack rooted at the currently operating recipe and extending up its containing recipes
+     *                    to top-level recipe that a developer is running directly.
+     */
+    void setRecipe(List<Recipe> recipeStack);
+
+    /**
+     * Execute a transformation on all items.
      *
      * @param map A transformation on T
      * @return A new source set if the map function results in any changes, otherwise this source set is returned.
      */
-    LargeSourceSet map(UnaryOperator<SourceFile> map);
+    LargeSourceSet edit(UnaryOperator<SourceFile> map);
 
     /**
-     * Concatenate new items. Where possible, implementations should not iterate the entire iterable in order
-     * to accomplish this, since the ordering of a {@link SourceFile} is not significant.
+     * Concatenate new items. Where possible, implementations should not iterate the entire source set in order
+     * to accomplish this, since the ordering of {@link SourceFile} is not significant.
      *
      * @param ls The new item to insert
      * @return A new source set with the new item inserted.
      */
-    LargeSourceSet concatAll(@Nullable Collection<? extends SourceFile> ls);
-
-    /**
-     * Called when a source file is deleted from the source set.
-     *
-     * @param sourceFile The source file that is deleted.
-     */
-    void delete(SourceFile sourceFile, List<Recipe> recipeStack);
+    LargeSourceSet generate(@Nullable Collection<? extends SourceFile> ls);
 
     /**
      * @return The set of changes (encompassing adds, edits, and deletions)
