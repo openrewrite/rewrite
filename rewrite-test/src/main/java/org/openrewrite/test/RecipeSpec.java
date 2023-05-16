@@ -101,6 +101,10 @@ public class RecipeSpec {
         return this;
     }
 
+    public RecipeSpec recipes(Recipe... recipes) {
+        throw new RuntimeException("Rewrite 8 feature!");
+    }
+
     public RecipeSpec recipe(InputStream yaml, String... activeRecipes) {
         return recipe(Environment.builder()
                 .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties()))

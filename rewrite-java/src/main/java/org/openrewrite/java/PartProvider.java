@@ -21,7 +21,9 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -37,10 +39,20 @@ public final class PartProvider {
         if (classpath.length != 0) {
             builder.classpathFromResources(new InMemoryExecutionContext(), classpath);
         }
+        return buildPart(codeToProvideAPart, expected, builder.build());
+    }
 
-        J.CompilationUnit cu = builder.build()
-            .parse(codeToProvideAPart).get(0);
+    public static <J2 extends J> J2 buildPart(@Language("java") String codeToProvideAPart,
+                                              Class<J2> expected,
+                                              Collection<Path> classpath) {
+        JavaParser.Builder<? extends JavaParser, ?> builder = JavaParser.fromJavaVersion().classpath(classpath);
+        return buildPart(codeToProvideAPart, expected, builder.build());
+    }
 
+    private static <J2 extends J> J2 buildPart(@Language("java") String codeToProvideAPart,
+                                                Class<J2> expected,
+                                               JavaParser parser) {
+        J.CompilationUnit cu = parser.parse(codeToProvideAPart).get(0);
         List<J2> parts = new ArrayList<>(1);
         new JavaVisitor<List<J2>>() {
             @Override
