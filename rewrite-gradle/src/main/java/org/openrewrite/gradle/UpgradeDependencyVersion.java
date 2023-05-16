@@ -21,6 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
+import org.openrewrite.gradle.util.ChangeStringLiteral;
 import org.openrewrite.gradle.util.Dependency;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyIsoVisitor;
@@ -116,16 +117,16 @@ public class UpgradeDependencyVersion extends Recipe {
             @Override
             public J postVisit(J tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
-                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-                    String variableName = getCursor().getMessage(VERSION_VARIABLE_KEY);
-                    if (variableName != null) {
+                    JavaSourceFile cu = (JavaSourceFile) tree;
+                    LinkedHashSet<String> variableNames = getCursor().getMessage(VERSION_VARIABLE_KEY);
+                    if (variableNames != null) {
                         Optional<GradleProject> maybeGp = cu.getMarkers()
                                 .findFirst(GradleProject.class);
                         if (!maybeGp.isPresent()) {
                             return cu;
                         }
 
-                        cu = (JavaSourceFile) new UpdateVariable(variableName, versionComparator, maybeGp.get()).visitNonNull(cu, ctx);
+                        cu = (JavaSourceFile) new UpdateVariable(variableNames, versionComparator, maybeGp.get()).visitNonNull(cu, ctx);
                     }
                     Set<GroupArtifactVersion> versionUpdates = getCursor().getMessage(NEW_VERSION_KEY);
                     if (versionUpdates != null) {
@@ -140,7 +141,6 @@ public class UpgradeDependencyVersion extends Recipe {
                         }
                         cu = cu.withMarkers(cu.getMarkers().removeByType(GradleProject.class).add(newGp));
                     }
-
                     return cu;
                 }
                 return tree;
@@ -179,7 +179,9 @@ public class UpgradeDependencyVersion extends Recipe {
                     if (StringUtils.matchesGlob(dep.getGroupId(), groupId)
                             && StringUtils.matchesGlob(dep.getArtifactId(), artifactId)) {
                         String versionVariableName = ((J.Identifier) versionValue.getTree()).getSimpleName();
-                        getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, VERSION_VARIABLE_KEY, versionVariableName);
+                        getCursor().dropParentUntil(p -> p instanceof SourceFile)
+                                .computeMessageIfAbsent(VERSION_VARIABLE_KEY, v -> new LinkedHashSet<String>())
+                                .add(versionVariableName);
                     }
                 } else if (depArgs.get(0) instanceof J.Literal) {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
@@ -266,7 +268,9 @@ public class UpgradeDependencyVersion extends Recipe {
                         return m.withArguments(newArgs);
                     } else if (versionExp instanceof J.Identifier) {
                         String versionVariableName = ((J.Identifier) versionExp).getSimpleName();
-                        getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, VERSION_VARIABLE_KEY, versionVariableName);
+                        getCursor().dropParentUntil(p -> p instanceof SourceFile)
+                                .computeMessageIfAbsent(VERSION_VARIABLE_KEY, v -> new LinkedHashSet<String>())
+                                .add(versionVariableName);
                     }
                 }
 
@@ -278,14 +282,21 @@ public class UpgradeDependencyVersion extends Recipe {
     @Value
     @EqualsAndHashCode(callSuper = true)
     private class UpdateVariable extends GroovyIsoVisitor<ExecutionContext> {
-        String versionVariableName;
+        LinkedHashSet<String> versionVariableNames;
         VersionComparator versionComparator;
         GradleProject gradleProject;
 
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
             J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
-            if (!versionVariableName.equals((v.getSimpleName()))) {
+            boolean noneMatch = true;
+            for (String versionVariableName : versionVariableNames) {
+                if (versionVariableName.equals((v.getSimpleName()))) {
+                    noneMatch = false;
+                    break;
+                }
+            }
+            if (noneMatch) {
                 return v;
             }
             if (!(v.getInitializer() instanceof J.Literal)) {
@@ -309,13 +320,58 @@ public class UpgradeDependencyVersion extends Recipe {
                         .computeMessageIfAbsent(NEW_VERSION_KEY, m -> new LinkedHashSet<GroupArtifactVersion>())
                         .add(new GroupArtifactVersion(groupId, artifactId, newVersion));
 
-                J.Literal newVersionLiteral = initializer.withValue(newVersion)
-                        .withValueSource("'" + newVersion + "'");
+                J.Literal newVersionLiteral = ChangeStringLiteral.withStringValue(initializer, newVersion);
                 v = v.withInitializer(newVersionLiteral);
             } catch (MavenDownloadingException e) {
                 return e.warn(v);
             }
             return v;
+        }
+
+        @Override
+        public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext ctx) {
+            J.Assignment a = super.visitAssignment(assignment, ctx);
+            if (!(a.getVariable() instanceof J.Identifier)) {
+                return a;
+            }
+            J.Identifier identifier = (J.Identifier) a.getVariable();
+            boolean noneMatch = true;
+            for (String versionVariableName : versionVariableNames) {
+                if (versionVariableName.equals(identifier.getSimpleName())) {
+                    noneMatch = false;
+                    break;
+                }
+            }
+            if (noneMatch) {
+                return a;
+            }
+            if (!(a.getAssignment() instanceof J.Literal)) {
+                return a;
+            }
+            J.Literal literal = (J.Literal) a.getAssignment();
+            if (literal.getType() != JavaType.Primitive.String) {
+                return a;
+            }
+            String version = (String) literal.getValue();
+            if (version == null) {
+                return a;
+            }
+
+            try {
+                String newVersion = findNewerVersion(groupId, artifactId, version, versionComparator, gradleProject, ctx);
+                if (newVersion == null) {
+                    return a;
+                }
+                getCursor().dropParentUntil(p -> p instanceof SourceFile)
+                        .computeMessageIfAbsent(NEW_VERSION_KEY, m -> new LinkedHashSet<GroupArtifactVersion>())
+                        .add(new GroupArtifactVersion(groupId, artifactId, newVersion));
+
+                J.Literal newVersionLiteral = ChangeStringLiteral.withStringValue(literal, newVersion);
+                a = a.withAssignment(newVersionLiteral);
+            } catch (MavenDownloadingException e) {
+                return e.warn(a);
+            }
+            return a;
         }
     }
 

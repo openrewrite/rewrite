@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
@@ -24,9 +25,13 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -96,7 +101,7 @@ class JavaParserTest implements RewriteTest {
         String source = """
           import java.util.List;
           import java.util.ArrayList;
-          
+                    
           class Something {
               List<Integer> getList() {
                   System.out.println("hello");
@@ -122,7 +127,50 @@ class JavaParserTest implements RewriteTest {
         m = c.getClasses().get(0).getBody().getStatements().stream().filter(J.MethodDeclaration.class::isInstance).map(J.MethodDeclaration.class::cast).findFirst().orElseThrow();
         methodType = m.getMethodType();
         assertThat(TypeUtils.asFullyQualified(methodType.getReturnType()).getFullyQualifiedName()).isEqualTo("java.util.List");
+    }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3222")
+    @ExpectedToFail
+    void parseFromByteArray() throws Exception {
+        // Load classes from test resources folder
+        Path start = Paths.get(getClass().getResource("/javaparser-byte-array-tests").getPath());
+        byte[][] classes;
+        try (Stream<Path> pathStream = Files.find(start, 2, (p, a) -> p.toString().endsWith(".class"))) {
+            classes = pathStream
+              .map(p -> {
+                  try {
+                      return Files.readAllBytes(p);
+                  } catch (Exception ex) {
+                      throw new IllegalStateException(ex);
+                  }
+              })
+              .toArray(byte[][]::new);
+            assertThat(classes.length).isEqualTo(2);
+        }
+
+        JavaParser parser = JavaParser.fromJavaVersion()
+          .classpath(classes)
+          .build();
+
+        //language=java
+        String source = """
+          import example.InterfaceA;
+          public class User implements InterfaceA, InterfaceB {
+          	@Override
+          	public void methodA() {}
+              
+          	@Override
+          	public void methodB() {}
+          }
+          """;
+        List<J.CompilationUnit> compilationUnits = parser.parse(new InMemoryExecutionContext(Throwable::printStackTrace), source);
+        assertThat(compilationUnits).singleElement()
+          .satisfies(cu -> assertThat(cu.getClasses()).singleElement()
+            .satisfies(cd -> assertThat(cd.getImplements()).satisfiesExactly(
+              i -> assertThat(i.getType()).hasToString("example.InterfaceA"),
+              i -> assertThat(i.getType()).hasToString("InterfaceB")
+            )));
     }
 
 }
