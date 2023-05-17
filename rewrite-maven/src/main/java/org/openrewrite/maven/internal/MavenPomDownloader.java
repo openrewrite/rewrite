@@ -60,6 +60,7 @@ public class MavenPomDownloader {
     private static final RetryConfig retryConfig = RetryConfig.custom()
             .retryOnException(throwable -> throwable instanceof SocketTimeoutException ||
                                            throwable instanceof TimeoutException)
+            .maxAttempts(5)
             .build();
 
     private static final RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
@@ -663,6 +664,12 @@ public class MavenPomDownloader {
             // There is also an edge case in which this condition is transient during `resolveParentPropertiesAndRepositoriesRecursively()`
             // and therefore, we do not want to cache a null normalization result.
             if (repository.getUri().contains("${")) {
+                return null;
+            }
+
+            // Skip blocked repositories
+            // https://github.com/openrewrite/rewrite/issues/3141
+            if (repository.getUri().contains("0.0.0.0")) {
                 return null;
             }
 

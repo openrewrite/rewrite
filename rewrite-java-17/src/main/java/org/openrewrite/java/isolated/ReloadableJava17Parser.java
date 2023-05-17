@@ -409,7 +409,7 @@ public class ReloadableJava17Parser implements JavaParser {
                                 .replace('/', '.'));
                         nameRef.set(name.substring(name.lastIndexOf('/') + 1));
                     } else {
-                        pkgRef.set(name);
+                        pkgRef.set("");
                         nameRef.set(name);
                     }
                 }

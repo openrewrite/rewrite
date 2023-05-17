@@ -68,6 +68,10 @@ public class SemanticallyEqual {
                 return null;
             }
             Xml.Tag otherTag = (Xml.Tag)other;
+            if (!tag.getName().equals(otherTag.getName())) {
+                areEqual = false;
+                return null;
+            }
             if(tag.getAttributes().size() != otherTag.getAttributes().size()) {
                 areEqual = false;
                 return null;

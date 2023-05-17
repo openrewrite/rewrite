@@ -101,4 +101,25 @@ class AddLicenseHeaderTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite/issues/3198")
+    void dontChangeInvalidJavadoc() {
+        rewriteRun(
+          java(
+            """
+              /*
+               * My license header
+               */
+              package com.sample;
+              /**
+               * {@link Stream<? extends Foo>}
+               */              
+              class Test {
+              }
+              """
+          )
+        );
+    }
 }
