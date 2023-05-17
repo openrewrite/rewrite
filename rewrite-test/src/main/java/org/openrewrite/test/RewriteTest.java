@@ -316,8 +316,17 @@ public interface RewriteTest extends SourceSpecs {
             recipeExecutionContext = testClassSpec.getRecipeExecutionContext();
         }
 
+        LargeSourceSet lss;
+        if (testMethodSpec.getSourceSet() != null) {
+            lss = testMethodSpec.getSourceSet().apply(runnableSourceFiles);
+        } else if (testClassSpec.getSourceSet() != null) {
+            lss = testClassSpec.getSourceSet().apply(runnableSourceFiles);
+        } else {
+            lss = new InMemoryLargeSourceSet(runnableSourceFiles);
+        }
+
         RecipeRun recipeRun = recipe.run(
-                new InMemoryLargeSourceSet(runnableSourceFiles),
+                lss,
                 recipeExecutionContext,
                 recipeSchedulerCheckingExpectedCycles,
                 cycles,

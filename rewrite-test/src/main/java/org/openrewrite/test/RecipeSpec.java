@@ -25,6 +25,7 @@ import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.ByteArrayInputStream;
@@ -34,6 +35,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -90,6 +92,9 @@ public class RecipeSpec {
 
     List<UncheckedConsumer<SourceSpec<?>>> allSources = new ArrayList<>();
 
+    @Nullable
+    Function<List<SourceFile>, LargeSourceSet> sourceSet;
+
     /**
      * Configuration that applies to all source file inputs.
      */
@@ -106,26 +111,6 @@ public class RecipeSpec {
     public RecipeSpec recipes(Recipe... recipes) {
         this.recipe = new CompositeRecipe(Arrays.asList(recipes));
         return this;
-    }
-
-    @RequiredArgsConstructor
-    public static class MultipleRecipes extends Recipe {
-        private final Recipe[] recipes;
-
-        @Override
-        public String getDisplayName() {
-            return "Multiple recipes running in sequence";
-        }
-
-        @Override
-        public String getDescription() {
-            return "Run multiple recipes in order.";
-        }
-
-        @Override
-        public List<Recipe> getRecipeList() {
-            return Arrays.asList(recipes);
-        }
     }
 
     public RecipeSpec recipe(InputStream yaml, String... activeRecipes) {
@@ -228,6 +213,11 @@ public class RecipeSpec {
     @Incubating(since = "7.35.0")
     public RecipeSpec validateRecipeSerialization(boolean validate) {
         this.serializationValidation = validate;
+        return this;
+    }
+
+    public RecipeSpec sourceSet(Function<List<SourceFile>, LargeSourceSet> sourceSetBuilder) {
+        this.sourceSet = sourceSetBuilder;
         return this;
     }
 
