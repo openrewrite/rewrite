@@ -59,8 +59,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     String attributeName;
 
     @Option(displayName = "Attribute value",
-            description = "The value to set the attribute to.",
+            description = "The value to set the attribute to. Set to `null` to remove the attribute.",
             example = "500")
+    @Nullable
     String attributeValue;
 
     @Option(displayName = "Add Only",
@@ -85,6 +86,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 String newAttributeValue = maybeQuoteStringArgument(attributeName, attributeValue, a);
                 List<Expression> currentArgs = a.getArguments();
                 if (currentArgs == null || currentArgs.isEmpty()) {
+                    if (newAttributeValue == null) {
+                        return a;
+                    }
+
                     if (attributeName == null || "value".equals(attributeName)) {
                         return a.withTemplate(
                                 JavaTemplate.builder(this::getCursor, "#{}")
@@ -110,6 +115,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 return it;
                             }
                             J.Literal value = (J.Literal) as.getAssignment();
+                            if (newAttributeValue == null) {
+                                return null;
+                            }
                             if (newAttributeValue.equals(value.getValueSource()) || Boolean.TRUE.equals(addOnly)) {
                                 foundAttributeWithDesiredValue.set(true);
                                 return it;
@@ -118,6 +126,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         } else if (it instanceof J.Literal) {
                             // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
                             if (attributeName == null || "value".equals(attributeName)) {
+                                if (newAttributeValue == null) {
+                                    return null;
+                                }
                                 J.Literal value = (J.Literal) it;
                                 if (newAttributeValue.equals(value.getValueSource()) || Boolean.TRUE.equals(addOnly)) {
                                     foundAttributeWithDesiredValue.set(true);
@@ -157,7 +168,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     }
 
     private static String maybeQuoteStringArgument(@Nullable String attributeName, String attributeValue, J.Annotation annotation) {
-        if (attributeIsString(attributeName, annotation)) {
+        if (attributeValue != null && attributeIsString(attributeName, annotation)) {
             return "\"" + attributeValue + "\"";
         } else {
             return attributeValue;
