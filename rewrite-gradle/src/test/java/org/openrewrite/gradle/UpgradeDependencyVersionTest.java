@@ -315,4 +315,55 @@ class UpgradeDependencyVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void matchesGlobs() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("com.google.*", "gua*", "30.x", "-jre")),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext {
+                  guavaVersion = "29.0-jre"
+              }
+
+              def guavaVersion2 = "29.0-jre"
+              dependencies {
+                  implementation("com.google.guava:guava:29.0-jre")
+                  implementation group: "com.google.guava", name: "guava", version: "29.0-jre"
+                  implementation "com.google.guava:guava:${guavaVersion}"
+                  implementation group: "com.google.guava", name: "guava", version: guavaVersion2
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+              }
+
+              repositories {
+                  mavenCentral()
+              }
+
+              ext {
+                  guavaVersion = "30.1.1-jre"
+              }
+
+              def guavaVersion2 = "30.1.1-jre"
+              dependencies {
+                  implementation("com.google.guava:guava:30.1.1-jre")
+                  implementation group: "com.google.guava", name: "guava", version: "30.1.1-jre"
+                  implementation "com.google.guava:guava:${guavaVersion}"
+                  implementation group: "com.google.guava", name: "guava", version: guavaVersion2
+              }
+              """
+          )
+        );
+    }
 }
