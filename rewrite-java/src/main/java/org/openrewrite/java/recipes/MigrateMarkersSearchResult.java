@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.upgrade;
+package org.openrewrite.java.recipes;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
@@ -43,7 +43,7 @@ public class MigrateMarkersSearchResult extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method,
@@ -65,7 +65,7 @@ public class MigrateMarkersSearchResult extends Recipe {
                             Expression searchResultSelect = m.getSelect();
                             if (searchResultSelect instanceof J.MethodInvocation) {
                                 J.MethodInvocation maybeGetMarkers = (J.MethodInvocation) searchResultSelect;
-                                if (GET_MARKERS_METHOD_MATCHER.matches(maybeGetMarkers) ) {
+                                if (GET_MARKERS_METHOD_MATCHER.matches(maybeGetMarkers)) {
                                     Expression s2 = maybeGetMarkers.getSelect();
                                     if (select instanceof J.Identifier && s2 instanceof J.Identifier) {
                                         J.Identifier id1 = (J.Identifier) select;
@@ -75,18 +75,20 @@ public class MigrateMarkersSearchResult extends Recipe {
                                         }
 
                                         maybeAddImport("org.openrewrite.marker.SearchResult");
-                                        JavaTemplate searchResultTemplate = JavaTemplate.builder(this::getCursor,
-                                                "SearchResult.found(#{any()}, #{any()})")
-                                            .javaParser(JavaParser.fromJavaVersion()
-                                                .classpath(JavaParser.runtimeClasspath()))
-                                            .imports("org.openrewrite.marker.SearchResult")
-                                            .build();
+                                        JavaTemplate searchResultTemplate = JavaTemplate
+                                                .builder("SearchResult.found(#{any()}, #{any()})")
+                                                .javaParser(JavaParser.fromJavaVersion()
+                                                        .classpath(JavaParser.runtimeClasspath()))
+                                                .imports("org.openrewrite.marker.SearchResult")
+                                                .build();
 
-                                        return method.withTemplate(searchResultTemplate,
-                                            method.getCoordinates().replace(),
-                                            select,
-                                            text
-                                            );
+                                        return method.withTemplate(
+                                                searchResultTemplate,
+                                                getCursor().getParentOrThrow(),
+                                                method.getCoordinates().replace(),
+                                                select,
+                                                text
+                                        );
                                     }
                                 }
                             }

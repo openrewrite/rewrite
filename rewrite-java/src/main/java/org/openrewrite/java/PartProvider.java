@@ -21,7 +21,9 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -29,6 +31,13 @@ import java.util.List;
  */
 public final class PartProvider {
     private PartProvider() {
+    }
+
+    public static <J2 extends J> J2 buildPart(@Language("java") String codeToProvideAPart,
+                                              Class<J2> expected,
+                                              Collection<Path> classpath) {
+        JavaParser.Builder<? extends JavaParser, ?> builder = JavaParser.fromJavaVersion().classpath(classpath);
+        return buildPart(codeToProvideAPart, expected, builder.build());
     }
 
     public static <J2 extends J> J2 buildPart(@Language("java") String codeToProvideAPart,

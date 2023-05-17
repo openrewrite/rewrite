@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.upgrade;
+package org.openrewrite.java.recipes;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaParser;

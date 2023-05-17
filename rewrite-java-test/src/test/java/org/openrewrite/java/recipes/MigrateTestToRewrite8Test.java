@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.upgrade;
+package org.openrewrite.java.recipes;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaParser;
@@ -47,7 +47,7 @@ class MigrateTestToRewrite8Test implements RewriteTest {
 
               import static org.openrewrite.test.SourceSpecs.text;
 
-              class A implements RewriteTest {
+              class Test implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
                       spec.recipe(new ChangeText("foo").doNext(new ChangeText("bar")))
@@ -82,7 +82,7 @@ class MigrateTestToRewrite8Test implements RewriteTest {
 
               import static org.openrewrite.test.SourceSpecs.text;
 
-              class A implements RewriteTest {
+              class Test implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
                       spec.recipes(new ChangeText("foo"), new ChangeText("bar"))
@@ -105,6 +105,4 @@ class MigrateTestToRewrite8Test implements RewriteTest {
           )
         );
     }
-
-
 }

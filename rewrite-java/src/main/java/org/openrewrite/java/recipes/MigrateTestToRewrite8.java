@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.upgrade;
+package org.openrewrite.java.recipes;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
@@ -46,7 +46,7 @@ public class MigrateTestToRewrite8 extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
 
             @Override
@@ -74,13 +74,14 @@ public class MigrateTestToRewrite8 extends Recipe {
                     List<Expression> recipes = flatDoNext(method.getArguments().get(0));
                     if (recipes.size() > 1) {
                         String argsPlaceHolders = String.join(",", Collections.nCopies(recipes.size(), "#{any()}"));
-                        JavaTemplate recipesTemplate = JavaTemplate.builder(this::getCursor,
-                                "#{any()}.recipes(" + argsPlaceHolders + ")")
-                            .javaParser(JavaParser.fromJavaVersion()
-                                .classpath(JavaParser.runtimeClasspath()))
-                            .imports("org.openrewrite.test.RecipeSpec", "org.openrewrite.test.RewriteTest")
-                            // .imports("org.openrewrite.Preconditions")
-                            .build();
+                        JavaTemplate recipesTemplate = JavaTemplate.builder(
+                                        "#{any()}.recipes(" + argsPlaceHolders + ")")
+                                .context(getCursor())
+                                .javaParser(JavaParser.fromJavaVersion()
+                                        .classpath(JavaParser.runtimeClasspath()))
+                                .imports("org.openrewrite.test.RecipeSpec", "org.openrewrite.test.RewriteTest")
+                                // .imports("org.openrewrite.Preconditions")
+                                .build();
 
                         Object[] parameters = new Object[recipes.size() + 1];
                         parameters[0] = method.getSelect();
@@ -88,10 +89,12 @@ public class MigrateTestToRewrite8 extends Recipe {
                             parameters[i + 1] = recipes.get(i);
                         }
                         method = method.withTemplate(
-                            recipesTemplate, method.getCoordinates().replace(),
-                            parameters
+                                recipesTemplate,
+                                getCursor().getParentOrThrow(),
+                                method.getCoordinates().replace(),
+                                parameters
                         );
-                        return autoFormat(method, ctx) ;
+                        return autoFormat(method, ctx);
                     }
                 }
                 return method;

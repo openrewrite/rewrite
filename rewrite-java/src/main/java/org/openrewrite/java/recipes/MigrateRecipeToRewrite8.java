@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.upgrade;
+package org.openrewrite.java.recipes;
 
 import lombok.Value;
 import lombok.With;
@@ -52,20 +52,20 @@ public class MigrateRecipeToRewrite8 extends Recipe {
     private static final MethodMatcher APPLICABILITY_NOT_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Applicability not(..)");
     private static final MethodMatcher DO_NEXT_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Recipe doNext(..)");
 
-    private static J.ParameterizedType getVisitorReturnTypeTemplate = null;
-    private static J.MethodDeclaration visitTreeMethodDeclarationTemplate = null;
-    private static J.MethodInvocation visitTreeMethodInvocationTemplate = null;
-    private static J.TypeCast visitTreeMethodInvocationTypeCastTemplate = null;
-    private static J.MethodInvocation preconditionAndTemplate = null;
-    private static J.MethodInvocation preconditionOrTemplate = null;
-    private static J.MethodInvocation preconditionNotTemplate = null;
-    private static J.MemberReference visitMemberReferenceTemplate = null;
+    private static J.ParameterizedType getVisitorReturnTypeTemplate;
+    private static J.MethodDeclaration visitTreeMethodDeclarationTemplate;
+    private static J.MethodInvocation visitTreeMethodInvocationTemplate;
+    private static J.TypeCast visitTreeMethodInvocationTypeCastTemplate;
+    private static J.MethodInvocation preconditionAndTemplate;
+    private static J.MethodInvocation preconditionOrTemplate;
+    private static J.MethodInvocation preconditionNotTemplate;
+    private static J.MemberReference visitMemberReferenceTemplate;
 
     public static final String MIGRATION_GUIDE_URL = "https://to-be-written";
     private static final String VISIT_SOURCE_FILES_COMMENT = " [Rewrite8 migration] This recipe uses the visit multiple sources method " +
-                         "`visit(List<SourceFile> before, P p)`, " +
-                         "needs to be migrated to use new introduced scanning recipe, " +
-                         "please follow the migration guide here : " + MIGRATION_GUIDE_URL;
+                                                             "`visit(List<SourceFile> before, P p)`, " +
+                                                             "needs to be migrated to use new introduced scanning recipe, " +
+                                                             "please follow the migration guide here : " + MIGRATION_GUIDE_URL;
     private static final String DO_NEXT_COMMENT = " [Rewrite8 migration] Method `Recipe#doNext(..)` is removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor#doAfterVisit`, " +
                                                   "please follow the migration guide here: " + MIGRATION_GUIDE_URL;
     private static final String APPLICABLE_TEST_COMMENT = " [Rewrite8 migration] Method `Recipe#getApplicableTest(..)" +
@@ -77,19 +77,19 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                                                                                 "please follow the migration guide here: " + MIGRATION_GUIDE_URL;
 
     private static String VISIT_TREE_METHOD_TEMPLATE_CODE = "import org.openrewrite.Tree;\n" +
-        "import org.openrewrite.internal.lang.Nullable;\n" +
-        "import org.openrewrite.java.JavaIsoVisitor;\n" +
-        "import org.openrewrite.java.tree.J;\n" +
-        "import org.openrewrite.java.tree.JavaSourceFile;\n" +
-        "public class A<P> extends JavaIsoVisitor<P> {\n" +
-        "    @Override\n" +
-        "    public @Nullable J visit(@Nullable Tree tree, P p) {\n" +
-        "        if (tree instanceof JavaSourceFile) {\n" +
-        "            JavaSourceFile toBeReplaced = (JavaSourceFile) tree;\n" +
-        "        }\n" +
-        "        return super.visit(tree, p);\n" +
-        "    }\n" +
-        "}";
+                                                            "import org.openrewrite.internal.lang.Nullable;\n" +
+                                                            "import org.openrewrite.java.JavaIsoVisitor;\n" +
+                                                            "import org.openrewrite.java.tree.J;\n" +
+                                                            "import org.openrewrite.java.tree.JavaSourceFile;\n" +
+                                                            "public class A<P> extends JavaIsoVisitor<P> {\n" +
+                                                            "    @Override\n" +
+                                                            "    public @Nullable J visit(@Nullable Tree tree, P p) {\n" +
+                                                            "        if (tree instanceof JavaSourceFile) {\n" +
+                                                            "            JavaSourceFile toBeReplaced = (JavaSourceFile) tree;\n" +
+                                                            "        }\n" +
+                                                            "        return super.visit(tree, p);\n" +
+                                                            "    }\n" +
+                                                            "}";
 
     @Override
     public String getDisplayName() {
@@ -104,7 +104,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             boolean hasApplicableTest = false;
             List<Statement> applicableTestMethodStatements = new ArrayList<>();
@@ -129,7 +129,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
 
                 method = super.visitMethodInvocation(method, ctx);
                 if (DO_NEXT_METHOD_MATCHER.matches(method.getMethodType())) {
-                    return MigratedTo8.withMarker( (J.MethodInvocation)commentOf(method, DO_NEXT_COMMENT));
+                    return MigratedTo8.withMarker((J.MethodInvocation) commentOf(method, DO_NEXT_COMMENT));
                 }
                 return method;
             }
@@ -146,7 +146,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                     if (!TypeUtils.isOfClassType(extendsType, REWRITE_RECIPE_FQN) &&
                         !TypeUtils.isOfClassType(extendsType, JAVA_ISO_VISITOR_FQN) &&
                         !TypeUtils.isOfClassType(extendsType, JAVA_VISITOR_FQN)
-                        ) {
+                    ) {
                         return classDecl;
                     }
                 } else {
@@ -181,7 +181,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method,
                                                                           ExecutionContext executionContext) {
                             if (VISIT_METHOD_MATCHER.matches(method.getMethodType())) {
-                                return (J.MethodDeclaration)commentOf(method, VISIT_SOURCE_FILES_COMMENT);
+                                return (J.MethodDeclaration) commentOf(method, VISIT_SOURCE_FILES_COMMENT);
                             }
                             return super.visitMethodDeclaration(method, executionContext);
                         }
@@ -218,7 +218,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                     // make the `Recipe#getVisitor()` methods public
                     if (J.Modifier.hasModifier(method.getModifiers(), Protected)) {
                         method = method.withModifiers(ListUtils.map(method.getModifiers(), mod ->
-                            mod.getType() == Protected ? mod.withType(Public) : mod));
+                                mod.getType() == Protected ? mod.withType(Public) : mod));
                         MigratedTo8.withMarker(method);
                     }
 
@@ -253,23 +253,24 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                             }
                         }
 
-                        JavaTemplate preconditionsCheckTemplate = JavaTemplate.builder(this::getCursor,
-                                "return Preconditions.check(#{any()}, #{any()});")
-                            .javaParser(JavaParser.fromJavaVersion()
-                                .classpath(JavaParser.runtimeClasspath()))
-                            .imports("org.openrewrite.Preconditions")
-                            .build();
+                        JavaTemplate preconditionsCheckTemplate = JavaTemplate
+                                .builder("return Preconditions.check(#{any()}, #{any()});")
+                                .javaParser(JavaParser.fromJavaVersion()
+                                        .classpath(JavaParser.runtimeClasspath()))
+                                .imports("org.openrewrite.Preconditions")
+                                .build();
 
                         getVisitorReturnStatements = getVisitorReturnStatements.withTemplate(
-                            preconditionsCheckTemplate, getVisitorReturnStatements.getCoordinates().replace(),
-                            ((J.Return) applicableTestReturnStatement).getExpression(),
-                            ((J.Return) getVisitorReturnStatements).getExpression()
+                                preconditionsCheckTemplate, getCursor().getParentOrThrow(),
+                                getVisitorReturnStatements.getCoordinates().replace(),
+                                ((J.Return) applicableTestReturnStatement).getExpression(),
+                                ((J.Return) getVisitorReturnStatements).getExpression()
                         );
 
                         mergedStatements.add(getVisitorReturnStatements);
                         method = method.withBody(method.getBody().withStatements(mergedStatements));
                         method = (J.MethodDeclaration) replaceApplicabilityMethods(method, ctx);
-                        return MigratedTo8.withMarker( autoFormat(super.visitMethodDeclaration(method, ctx), ctx));
+                        return MigratedTo8.withMarker(autoFormat(super.visitMethodDeclaration(method, ctx), ctx));
                     }
 
                     return super.visitMethodDeclaration(method, ctx);
@@ -283,9 +284,8 @@ public class MigrateRecipeToRewrite8 extends Recipe {
 
                     List<Statement> visitMethodStatements = visitMethod.getBody().getStatements();
                     J.If ifStatement = (J.If) visitMethodStatements.get(0);
-                    J.Block ifBlock =  (J.Block) ifStatement.getThenPart();
-                    List<Statement> ifBlockStatements = ifBlock.getStatements();
-                    List<Statement> mergedIfBlockStatements = ifBlockStatements;
+                    J.Block ifBlock = (J.Block) ifStatement.getThenPart();
+                    List<Statement> mergedIfBlockStatements = ifBlock.getStatements();
                     mergedIfBlockStatements.addAll(1, visitJavaSourceFileMethodStatements);
 
                     J.Block mergedIfBlock = ifBlock.withStatements(mergedIfBlockStatements);
@@ -296,11 +296,11 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                     visitMethod = (J.MethodDeclaration) new JavaVisitor<ExecutionContext>() {
                         @Override
                         public J visitMethodInvocation(J.MethodInvocation method,
-                                                                        ExecutionContext executionContext) {
+                                                       ExecutionContext executionContext) {
 
                             if (VISIT_JAVA_SOURCE_FILE_METHOD_MATCHER.matches(method.getMethodType())) {
                                 boolean isVariableDeclaration = getCursor().dropParentUntil(p -> p instanceof J.VariableDeclarations ||
-                                    p instanceof J.Block || p instanceof J.MethodDeclaration
+                                                                                                 p instanceof J.Block || p instanceof J.MethodDeclaration
                                 ).getValue() instanceof J.VariableDeclarations;
 
                                 if (isVariableDeclaration) {
@@ -338,25 +338,25 @@ public class MigrateRecipeToRewrite8 extends Recipe {
 
     private static J.MethodDeclaration findSingleSourceApplicableTest(J.ClassDeclaration classDecl) {
         return classDecl.getBody()
-            .getStatements()
-            .stream()
-            .filter(statement -> statement instanceof J.MethodDeclaration)
-            .map(J.MethodDeclaration.class::cast)
-            .filter(m -> GET_SINGLE_SOURCE_APPLICABLE_TEST_METHOD_MATCHER.matches(m.getMethodType()))
-            .findFirst()
-            .orElse(null);
+                .getStatements()
+                .stream()
+                .filter(statement -> statement instanceof J.MethodDeclaration)
+                .map(J.MethodDeclaration.class::cast)
+                .filter(m -> GET_SINGLE_SOURCE_APPLICABLE_TEST_METHOD_MATCHER.matches(m.getMethodType()))
+                .findFirst()
+                .orElse(null);
     }
 
     private static J.MethodDeclaration findVisitMethod(J.ClassDeclaration classDecl) {
         return classDecl.getBody()
-            .getStatements()
-            .stream()
-            .filter(statement -> statement instanceof J.MethodDeclaration)
-            .map(J.MethodDeclaration.class::cast)
-            .filter(m -> VISIT_METHOD_MATCHER.matches(m.getMethodType()))
-            .filter(m -> m.getLeadingAnnotations().stream().anyMatch(OVERRIDE_ANNOTATION_MATCHER::matches))
-            .findFirst()
-            .orElse(null);
+                .getStatements()
+                .stream()
+                .filter(statement -> statement instanceof J.MethodDeclaration)
+                .map(J.MethodDeclaration.class::cast)
+                .filter(m -> VISIT_METHOD_MATCHER.matches(m.getMethodType()))
+                .filter(m -> m.getLeadingAnnotations().stream().anyMatch(OVERRIDE_ANNOTATION_MATCHER::matches))
+                .findFirst()
+                .orElse(null);
     }
 
     private static J replaceApplicabilityMethods(J tree, ExecutionContext ctx) {
@@ -380,17 +380,17 @@ public class MigrateRecipeToRewrite8 extends Recipe {
     private static J.MethodDeclaration buildVisitMethod(List<Statement> visitJavaSourceFileMethodParameters) {
         J.MethodDeclaration visitMethodTemplate = getVisitTreeMethodTemplate();
 
-        J.Identifier javaSourceFiledId = ((J.VariableDeclarations)(visitJavaSourceFileMethodParameters.get(0))).getVariables().get(0).getName();
+        J.Identifier javaSourceFiledId = ((J.VariableDeclarations) (visitJavaSourceFileMethodParameters.get(0))).getVariables().get(0).getName();
         J.Identifier secondParameter = ((J.VariableDeclarations) visitJavaSourceFileMethodParameters.get(1)).getVariables().get(0).getName();
         J.MethodDeclaration visitMethod = visitMethodTemplate.withParameters(
-            ListUtils.mapLast(visitMethodTemplate.getParameters(), a -> visitJavaSourceFileMethodParameters.get(1))
+                ListUtils.mapLast(visitMethodTemplate.getParameters(), a -> visitJavaSourceFileMethodParameters.get(1))
         );
-        return (J.MethodDeclaration) new JavaIsoVisitor<J.Identifier>(){
+        return (J.MethodDeclaration) new JavaIsoVisitor<J.Identifier>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, J.Identifier replacement) {
                 if (TREE_VISITOR_VISIT_METHOD_MATCHER.matches(method.getMethodType())) {
                     return method.withArguments(ListUtils.mapLast(method.getArguments(),
-                        a -> replacement.withPrefix(Space.SINGLE_SPACE)));
+                            a -> replacement.withPrefix(Space.SINGLE_SPACE)));
                 }
                 return method;
             }
@@ -410,7 +410,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
 
     public static J commentOf(J j, String commentText) {
         Comment comment = new TextComment(false, commentText,
-            "\n" + j.getPrefix().getWhitespace().replace("\n", ""), Markers.EMPTY);
+                "\n" + j.getPrefix().getWhitespace().replace("\n", ""), Markers.EMPTY);
         Space prefix = j.getPrefix();
         if (prefix == null) {
             prefix = Space.build("", new ArrayList<>());
@@ -424,12 +424,15 @@ public class MigrateRecipeToRewrite8 extends Recipe {
     @With
     private static class MigratedTo8 implements Marker {
         UUID id;
+
         static <J2 extends J> J2 withMarker(J2 j) {
             return j.withMarkers(j.getMarkers().addIfAbsent(new MigratedTo8(randomId())));
         }
+
         static <J2 extends J> J2 removeMarker(J2 j) {
             return j.withMarkers(j.getMarkers().removeByType(MigratedTo8.class));
         }
+
         static boolean hasMarker(J j) {
             return j.getMarkers().findFirst(MigratedTo8.class).isPresent();
         }
@@ -438,11 +441,11 @@ public class MigrateRecipeToRewrite8 extends Recipe {
     private static J.ParameterizedType getGetVisitorReturnType() {
         if (getVisitorReturnTypeTemplate == null) {
             getVisitorReturnTypeTemplate = PartProvider.buildPart("import org.openrewrite.ExecutionContext;\n" +
-                                                             "import org.openrewrite.TreeVisitor;\n" +
-                                                             "\n" +
-                                                             "public class A {\n" +
-                                                             "    TreeVisitor<?, ExecutionContext> type;\n" +
-                                                             "}", J.ParameterizedType.class, JavaParser.runtimeClasspath());
+                                                                  "import org.openrewrite.TreeVisitor;\n" +
+                                                                  "\n" +
+                                                                  "public class A {\n" +
+                                                                  "    TreeVisitor<?, ExecutionContext> type;\n" +
+                                                                  "}", J.ParameterizedType.class, JavaParser.runtimeClasspath());
         }
         return getVisitorReturnTypeTemplate;
     }
@@ -450,7 +453,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
     private static J.MethodDeclaration getVisitTreeMethodTemplate() {
         if (visitTreeMethodDeclarationTemplate == null) {
             visitTreeMethodDeclarationTemplate = PartProvider.buildPart(VISIT_TREE_METHOD_TEMPLATE_CODE,
-                J.MethodDeclaration.class, JavaParser.runtimeClasspath());
+                    J.MethodDeclaration.class, JavaParser.runtimeClasspath());
         }
         return visitTreeMethodDeclarationTemplate;
     }
@@ -458,34 +461,34 @@ public class MigrateRecipeToRewrite8 extends Recipe {
     private static J.MethodInvocation getVisitMethodInvocationTemplate() {
         if (visitTreeMethodInvocationTemplate == null) {
             visitTreeMethodInvocationTemplate = PartProvider.buildPart("import org.openrewrite.Tree;\n" +
-                                   "import org.openrewrite.TreeVisitor;\n" +
-                                   "import org.openrewrite.internal.lang.Nullable;\n" +
-                                   "\n" +
-                                   "public class A<T extends Tree, P> extends TreeVisitor<T, P> {\n" +
-                                   "    @Override\n" +
-                                   "    public @Nullable T visit(@Nullable Tree tree, P p) {\n" +
-                                   "        return super.visit(tree, p);\n" +
-                                   "    }\n" +
-                                   "}", J.MethodInvocation.class, JavaParser.runtimeClasspath()
-                );
+                                                                       "import org.openrewrite.TreeVisitor;\n" +
+                                                                       "import org.openrewrite.internal.lang.Nullable;\n" +
+                                                                       "\n" +
+                                                                       "public class A<T extends Tree, P> extends TreeVisitor<T, P> {\n" +
+                                                                       "    @Override\n" +
+                                                                       "    public @Nullable T visit(@Nullable Tree tree, P p) {\n" +
+                                                                       "        return super.visit(tree, p);\n" +
+                                                                       "    }\n" +
+                                                                       "}", J.MethodInvocation.class, JavaParser.runtimeClasspath()
+            );
         }
         return visitTreeMethodInvocationTemplate;
     }
 
-    private static J.TypeCast getVisitMethodInvocationTypeCastTemplate () {
+    private static J.TypeCast getVisitMethodInvocationTypeCastTemplate() {
         if (visitTreeMethodInvocationTypeCastTemplate == null) {
             visitTreeMethodInvocationTypeCastTemplate = PartProvider.buildPart(
-                "import org.openrewrite.Tree;\n" +
-                "import org.openrewrite.internal.lang.Nullable;\n" +
-                "import org.openrewrite.java.JavaVisitor;\n" +
-                "import org.openrewrite.java.tree.JavaSourceFile;\n" +
-                "public class A<P> extends JavaVisitor<P> {\n" +
-                "    @Override\n" +
-                "    public @Nullable JavaSourceFile visit(@Nullable Tree tree, P p) {\n" +
-                "        return (JavaSourceFile) super.visit(tree, p);\n" +
-                "    }\n" +
-                "}",
-                J.TypeCast.class, JavaParser.runtimeClasspath()
+                    "import org.openrewrite.Tree;\n" +
+                    "import org.openrewrite.internal.lang.Nullable;\n" +
+                    "import org.openrewrite.java.JavaVisitor;\n" +
+                    "import org.openrewrite.java.tree.JavaSourceFile;\n" +
+                    "public class A<P> extends JavaVisitor<P> {\n" +
+                    "    @Override\n" +
+                    "    public @Nullable JavaSourceFile visit(@Nullable Tree tree, P p) {\n" +
+                    "        return (JavaSourceFile) super.visit(tree, p);\n" +
+                    "    }\n" +
+                    "}",
+                    J.TypeCast.class, JavaParser.runtimeClasspath()
             );
         }
         return visitTreeMethodInvocationTypeCastTemplate;
@@ -495,11 +498,11 @@ public class MigrateRecipeToRewrite8 extends Recipe {
     private static J.MethodInvocation getPreconditionsAndTemplate() {
         if (preconditionAndTemplate == null) {
             preconditionAndTemplate = PartProvider.buildPart("import org.openrewrite.Preconditions;\n" +
-                                                                "public class A {\n" +
-                                                                "    void method() {\n" +
-                                                                "         Preconditions.and(null);\n" +
-                                                                "    }\n" +
-                                                                "}", J.MethodInvocation.class, JavaParser.runtimeClasspath()
+                                                             "public class A {\n" +
+                                                             "    void method() {\n" +
+                                                             "         Preconditions.and(null);\n" +
+                                                             "    }\n" +
+                                                             "}", J.MethodInvocation.class, JavaParser.runtimeClasspath()
             );
         }
         return preconditionAndTemplate;
@@ -508,11 +511,11 @@ public class MigrateRecipeToRewrite8 extends Recipe {
     private static J.MethodInvocation getPreconditionsOrTemplate() {
         if (preconditionOrTemplate == null) {
             preconditionOrTemplate = PartProvider.buildPart("import org.openrewrite.Preconditions;\n" +
-                                                                "public class A {\n" +
-                                                                "    void method() {\n" +
-                                                                "         Preconditions.or(null);\n" +
-                                                                "    }\n" +
-                                                                "}", J.MethodInvocation.class, JavaParser.runtimeClasspath()
+                                                            "public class A {\n" +
+                                                            "    void method() {\n" +
+                                                            "         Preconditions.or(null);\n" +
+                                                            "    }\n" +
+                                                            "}", J.MethodInvocation.class, JavaParser.runtimeClasspath()
             );
         }
         return preconditionOrTemplate;
@@ -521,11 +524,11 @@ public class MigrateRecipeToRewrite8 extends Recipe {
     private static J.MethodInvocation getPreconditionsNotTemplate() {
         if (preconditionNotTemplate == null) {
             preconditionNotTemplate = PartProvider.buildPart("import org.openrewrite.Preconditions;\n" +
-                                                                "public class A {\n" +
-                                                                "    void method() {\n" +
-                                                                "         Preconditions.not(null);\n" +
-                                                                "    }\n" +
-                                                                "}", J.MethodInvocation.class, JavaParser.runtimeClasspath()
+                                                             "public class A {\n" +
+                                                             "    void method() {\n" +
+                                                             "         Preconditions.not(null);\n" +
+                                                             "    }\n" +
+                                                             "}", J.MethodInvocation.class, JavaParser.runtimeClasspath()
             );
         }
         return preconditionNotTemplate;
@@ -534,17 +537,17 @@ public class MigrateRecipeToRewrite8 extends Recipe {
     private static J.MemberReference getVisitMemberReferenceTemplate() {
         if (visitMemberReferenceTemplate == null) {
             visitMemberReferenceTemplate = PartProvider.buildPart(
-                "import org.openrewrite.java.JavaVisitor;\n" +
-                "import org.openrewrite.java.tree.J;\n" +
-                "import org.openrewrite.java.tree.JavaSourceFile;\n" +
-                "public class A<P> extends JavaVisitor<P> {\n" +
-                "    @Override\n" +
-                "    public J visitJavaSourceFile(JavaSourceFile cu, P p) {\n" +
-                "        return visitAndCast(cu, p, super::visit);\n" +
-                "    }\n" +
-                "}", J.MemberReference.class,
-                JavaParser.runtimeClasspath()
-                );
+                    "import org.openrewrite.java.JavaVisitor;\n" +
+                    "import org.openrewrite.java.tree.J;\n" +
+                    "import org.openrewrite.java.tree.JavaSourceFile;\n" +
+                    "public class A<P> extends JavaVisitor<P> {\n" +
+                    "    @Override\n" +
+                    "    public J visitJavaSourceFile(JavaSourceFile cu, P p) {\n" +
+                    "        return visitAndCast(cu, p, super::visit);\n" +
+                    "    }\n" +
+                    "}", J.MemberReference.class,
+                    JavaParser.runtimeClasspath()
+            );
         }
 
         return visitMemberReferenceTemplate;
