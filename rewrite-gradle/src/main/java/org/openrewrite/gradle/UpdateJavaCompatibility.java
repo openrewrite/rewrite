@@ -90,12 +90,20 @@ public class UpdateJavaCompatibility extends Recipe {
 
                 if (a.getVariable() instanceof J.Identifier) {
                     J.Identifier variable = (J.Identifier) a.getVariable();
-                    if (compatibilityType != null && !(compatibilityType.toString().toLowerCase() + "Compatibility").equals(variable.getSimpleName())) {
+                    if (compatibilityType == null) {
+                        if (!("sourceCompatibility".equals(variable.getSimpleName()) || "targetCompatibility".equals(variable.getSimpleName()))) {
+                            return a;
+                        }
+                    } else if (!(compatibilityType.toString().toLowerCase() + "Compatibility").equals(variable.getSimpleName())) {
                         return a;
                     }
                 } else if (a.getVariable() instanceof J.FieldAccess) {
                     J.FieldAccess fieldAccess = (J.FieldAccess) a.getVariable();
-                    if (compatibilityType != null && !(compatibilityType.toString().toLowerCase() + "Compatibility").equals(fieldAccess.getSimpleName())) {
+                    if (compatibilityType == null) {
+                        if (!("sourceCompatibility".equals(fieldAccess.getSimpleName()) || "targetCompatibility".equals(fieldAccess.getSimpleName()))) {
+                            return a;
+                        }
+                    } else if (!(compatibilityType.toString().toLowerCase() + "Compatibility").equals(fieldAccess.getSimpleName())) {
                         return a;
                     }
                 } else {

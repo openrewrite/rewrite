@@ -265,4 +265,30 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3258")
+    @Test
+    void onlyModifyCompatibilityAssignments() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(11, null, null)),
+          buildGradle(
+            """
+              version = "0.1.0-SNAPSHOT"
+              group = "com.example"
+              java {
+                  sourceCompatibility = JavaVersion.toVersion("1.8")
+                  targetCompatibility = JavaVersion.toVersion("1.8")
+              }
+              """,
+            """
+              version = "0.1.0-SNAPSHOT"
+              group = "com.example"
+              java {
+                  sourceCompatibility = JavaVersion.toVersion("11")
+                  targetCompatibility = JavaVersion.toVersion("11")
+              }
+              """
+          )
+        );
+    }
 }
