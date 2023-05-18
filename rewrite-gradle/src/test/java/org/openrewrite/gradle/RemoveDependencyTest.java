@@ -22,11 +22,11 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
-class RemoveGradleDependencyTest implements RewriteTest {
+class RemoveDependencyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new RemoveGradleDependency("implementation", "org.springframework.boot", "spring-boot-starter-web"));
+        spec.recipe(new RemoveDependency("org.springframework.boot", "spring-boot-starter-web", null));
     }
 
     @DocumentExample
@@ -168,6 +168,67 @@ class RemoveGradleDependencyTest implements RewriteTest {
               
               dependencies {
                   testImplementation "org.jupiter.vintage:junit-vintage-engine:5.6.2"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeWhenUsingVariableReplacement() {
+        rewriteRun(
+          buildGradle(
+            """
+              def springBootVersion = "2.7.0"
+              dependencies {
+                  implementation "org.springframework.boot:spring-boot-starter-web:${springBootVersion}"
+                  implementation group: "org.springframework.boot", name: "spring-boot-starter-web", version: springBootVersion
+                  testImplementation "org.jupiter.vintage:junit-vintage-engine:5.6.2"
+              }
+              """,
+            """
+              def springBootVersion = "2.7.0"
+              dependencies {
+                  testImplementation "org.jupiter.vintage:junit-vintage-engine:5.6.2"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removePlatformDependency() {
+        rewriteRun(
+          buildGradle(
+            """
+              dependencies {
+                  implementation platform("org.springframework.boot:spring-boot-starter-web:2.7.0")
+                  testImplementation "org.jupiter.vintage:junit-vintage-engine:5.6.2"
+              }
+              """,
+            """
+              dependencies {
+                  testImplementation "org.jupiter.vintage:junit-vintage-engine:5.6.2"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void onlyRemoveFromSpecifiedConfiguration() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("org.springframework.boot", "spring-boot-starter-test", "implementation")),
+          buildGradle(
+            """
+              dependencies {
+                  implementation "org.springframework.boot:spring-boot-starter-test:2.7.0"
+                  testImplementation "org.springframework.boot:spring-boot-starter-test:2.7.0"
+              }
+              """,
+            """
+              dependencies {
+                  testImplementation "org.springframework.boot:spring-boot-starter-test:2.7.0"
               }
               """
           )
