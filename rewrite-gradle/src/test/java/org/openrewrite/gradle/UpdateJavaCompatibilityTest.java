@@ -18,6 +18,7 @@ package org.openrewrite.gradle;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
@@ -111,11 +112,14 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
       Enum,1.8,JavaVersion.VERSION_1_8
       Enum,'1.8',JavaVersion.VERSION_1_8
       Enum,"1.8",JavaVersion.VERSION_1_8
+      Enum,JavaVersion.toVersion("1.8"),JavaVersion.VERSION_1_8
       Number,'1.8',1.8
       Number,"1.8",1.8
       Number,JavaVersion.VERSION_1_8,1.8
+      Number,JavaVersion.toVersion("1.8"),1.8
       String,1.8,'1.8'
       String,JavaVersion.VERSION_1_8,'1.8'
+      String,JavaVersion.toVersion("1.8"),'1.8'
       """, quoteCharacter = '`')
     void styleChange(String declarationStyle, String beforeCompatibility, String afterCompatibility) {
         rewriteRun(
@@ -197,6 +201,34 @@ class UpdateJavaCompatibilityTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3255")
+    @ParameterizedTest
+    @CsvSource(textBlock = """
+      11,"1.8","11"
+      11,1.8,11
+      11,8,11
+      8,11,8
+      """)
+    void handlesJavaVersionMethodInvocation(int version, String before, String after) {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateJavaCompatibility(version, null, null)),
+          buildGradle(
+            """
+              java {
+                  sourceCompatibility = JavaVersion.toVersion(%s)
+                  targetCompatibility = JavaVersion.toVersion(%s)
+              }
+              """.formatted(before, before),
+            """
+              java {
+                  sourceCompatibility = JavaVersion.toVersion(%s)
+                  targetCompatibility = JavaVersion.toVersion(%s)
+              }
+              """.formatted(after, after)
           )
         );
     }
