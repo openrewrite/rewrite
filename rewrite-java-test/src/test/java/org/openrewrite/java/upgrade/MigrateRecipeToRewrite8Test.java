@@ -23,8 +23,8 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
+@SuppressWarnings("all")
 class MigrateRecipeToRewrite8Test implements RewriteTest {
-
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new MigrateRecipeToRewrite8())
@@ -555,7 +555,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
                       return "Fields in a `Serializable` class should either be transient or serializable";
                   }
 
-                  // [Rewrite8 migration] This recipe uses the visit multiple sources method `visit(List<SourceFile> before, P p)`, needs to be migrated to use new introduced scanning recipe, please follow the migration guide here : https://to-be-written
+                  // [Rewrite8 migration] This recipe uses the visit multiple sources method `visit(List<SourceFile> before, P p)`, needs to be migrated to use new introduced scanning recipe, please follow the migration guide here: https://to-be-written
                   @Override
                   protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
                       return before;

@@ -47,7 +47,7 @@ class MigrateTestToRewrite8Test implements RewriteTest {
 
               import static org.openrewrite.test.SourceSpecs.text;
 
-              class A implements RewriteTest {
+              class MyTest implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
                       spec.recipe(new ChangeText("foo").doNext(new ChangeText("bar")))
@@ -82,7 +82,7 @@ class MigrateTestToRewrite8Test implements RewriteTest {
 
               import static org.openrewrite.test.SourceSpecs.text;
 
-              class A implements RewriteTest {
+              class MyTest implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
                       spec.recipes(new ChangeText("foo"), new ChangeText("bar"))

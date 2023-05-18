@@ -32,6 +32,7 @@ class MigrateMarkersSearchResultTest implements RewriteTest {
           );
     }
 
+    @SuppressWarnings("all")
     @Test
     void migrate() {
         rewriteRun(

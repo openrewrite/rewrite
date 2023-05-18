@@ -167,8 +167,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
         };
     }
 
-    private static String maybeQuoteStringArgument(@Nullable String attributeName, String attributeValue, J.Annotation annotation) {
-        if (attributeValue != null && attributeIsString(attributeName, annotation)) {
+    @Nullable
+    private static String maybeQuoteStringArgument(@Nullable String attributeName, @Nullable String attributeValue, J.Annotation annotation) {
+        if ((attributeValue != null) && attributeIsString(attributeName, annotation)) {
             return "\"" + attributeValue + "\"";
         } else {
             return attributeValue;

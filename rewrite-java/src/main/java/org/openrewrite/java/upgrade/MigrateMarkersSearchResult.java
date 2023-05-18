@@ -25,6 +25,9 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
+import java.util.Collections;
+import java.util.Set;
+
 public class MigrateMarkersSearchResult extends Recipe {
     private static final MethodMatcher WITH_MARKERS_METHOD_MATCHER = new MethodMatcher("org.openrewrite.yaml.tree.Yaml.Mapping.Entry withMarkers(org.openrewrite.marker.Markers)");
     private static final MethodMatcher SEARCH_RESULT_METHOD_MATCHER = new MethodMatcher("org.openrewrite.marker.Markers searchResult(java.lang.String)");
@@ -34,12 +37,17 @@ public class MigrateMarkersSearchResult extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "[Rewrite8 migration] Migrate deprecated `org.openrewrite.marker.Markers#SearchResult(..)`";
+        return "Migrate deprecated `org.openrewrite.marker.Markers#SearchResult(..)`";
     }
 
     @Override
     public String getDescription() {
-        return "[Rewrite8 migration] Methods of `org.openrewrite.marker.Markers#SearchResult(..)` are deprecated and removed in rewrite 8, use `SearchResult.found()` instead.";
+        return "Methods of `org.openrewrite.marker.Markers#SearchResult(..)` are deprecated and removed in rewrite 8, use `SearchResult.found()` instead.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("Rewrite8 migration");
     }
 
     @Override
