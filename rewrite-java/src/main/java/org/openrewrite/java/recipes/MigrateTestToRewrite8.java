@@ -29,6 +29,7 @@ import org.openrewrite.java.tree.TypeUtils;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 public class MigrateTestToRewrite8 extends Recipe {
     private static final String REWRITE_TEST_FQN = "org.openrewrite.test.RewriteTest";
@@ -37,12 +38,17 @@ public class MigrateTestToRewrite8 extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "[Rewrite8 migration] Migrate rewrite unit test from version 7 to 8";
+        return "Migrate rewrite unit test from version 7 to 8";
     }
 
     @Override
     public String getDescription() {
-        return "[Rewrite8 migration] Since the method `Recipe::doNext(..)` is deprecated, For unit test, change usage of `RecipeSpec.recipe(X.doNext(Y))` to `RecipeSpec.recipes(X, Y)`.";
+        return "Since the method `Recipe::doNext(..)` is deprecated, For unit test, change usage like `RecipeSpec.recipe(X.doNext(Y))` to `RecipeSpec.recipes(X, Y)`.";
+    }
+
+    @Override
+    public Set<String> getTags() {
+        return Collections.singleton("Rewrite8 migration");
     }
 
     @Override
@@ -68,7 +74,8 @@ public class MigrateTestToRewrite8 extends Recipe {
                                                             ExecutionContext ctx) {
                 method = super.visitMethodInvocation(method, ctx);
                 if (RECIPE_METHOD_MATCHER.matches(method.getMethodType())) {
-                    if (method.getArguments() == null || method.getArguments().isEmpty()) {
+                    method.getArguments();
+                    if (method.getArguments().isEmpty()) {
                         return method;
                     }
                     List<Expression> recipes = flatDoNext(method.getArguments().get(0));
@@ -110,7 +117,7 @@ public class MigrateTestToRewrite8 extends Recipe {
         }
 
         J.MethodInvocation method = (J.MethodInvocation) expression;
-        if (DO_NEXT_METHOD_MATCHER.matches(method)) {
+        if (DO_NEXT_METHOD_MATCHER.matches(method) && method.getSelect() != null) {
             recipes.addAll(flatDoNext(method.getSelect()));
             recipes.addAll(flatDoNext(method.getArguments().get(0)));
         }
