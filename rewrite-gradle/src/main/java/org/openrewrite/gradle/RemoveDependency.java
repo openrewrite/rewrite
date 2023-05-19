@@ -38,7 +38,7 @@ import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-class RemoveDependency extends Recipe {
+public class RemoveDependency extends Recipe {
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",
