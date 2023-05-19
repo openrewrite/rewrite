@@ -19,14 +19,19 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
+import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.settingsGradle;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.groovy.Assertions.srcMainGroovy;
 import static org.openrewrite.java.Assertions.*;
@@ -696,7 +701,9 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void addDependency() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("org.openrewrite:rewrite-core:1.0.0", "java.util.Date", "implementation")),
+          spec -> spec
+            .beforeRecipe(withToolingApi())
+            .recipe(addDependency("org.openrewrite:rewrite-core:latest.release", "java.util.Date", "implementation")),
           mavenProject("project",
             srcMainGroovy(
               groovy(
@@ -713,12 +720,45 @@ class AddDependencyTest implements RewriteTest {
               )
             ),
             buildGradle(
-              "",
               """
-                dependencies {
-                    implementation "org.openrewrite:rewrite-core:1.0.0"
+                plugins {
+                    id 'java'
                 }
-                """
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              """
+                plugins {
+                    id 'java'
+                }
+                repositories {
+                    mavenCentral()
+                }
+                
+                dependencies {
+                    implementation "org.openrewrite:rewrite-core:7.40.8"
+                }
+                """,
+              spec -> spec.afterRecipe(after -> {
+                  Optional<GradleProject> maybeGp = after.getMarkers().findFirst(GradleProject.class);
+                  assertThat(maybeGp).isPresent();
+                  GradleProject gp = maybeGp.get();
+                  GradleDependencyConfiguration compileClasspath = gp.getConfiguration("compileClasspath");
+                  assertThat(compileClasspath).isNotNull();
+                  assertThat(
+                    compileClasspath.getRequested().stream()
+                      .filter(dep -> "com.google.guava".equals(dep.getGroupId()) && "guava".equals(dep.getArtifactId()) && "30.1.1-jre".equals(dep.getVersion()))
+                      .findAny())
+                    .as("GradleProject requested dependencies should have been updated with the new version of guava")
+                    .isPresent();
+                  assertThat(
+                    compileClasspath.getResolved().stream()
+                      .filter(dep -> "com.google.guava".equals(dep.getGroupId()) && "guava".equals(dep.getArtifactId()) && "30.1.1-jre".equals(dep.getVersion()))
+                      .findAny())
+                    .as("GradleProject requested dependencies should have been updated with the new version of guava")
+                    .isPresent();
+              })
             )
           )
         );
@@ -739,7 +779,7 @@ class AddDependencyTest implements RewriteTest {
                 """,
               """
                 def gauvaVersion = "29.0-jre"
-
+                
                 dependencies {
                     implementation "com.google.guava:guava:${guavaVersion}"
                 }
