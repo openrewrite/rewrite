@@ -973,6 +973,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             pt = pt.getPadding().withTypeParameters(visitContainer(pt.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
         }
         pt = pt.getPadding().withTypeParameters(visitTypeNames(pt.getPadding().getTypeParameters(), p));
+        pt = pt.withType(visitType(pt.getType(), p));
         return pt;
     }
 
