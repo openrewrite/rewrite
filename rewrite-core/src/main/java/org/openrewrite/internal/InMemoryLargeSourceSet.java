@@ -134,7 +134,7 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
 
         @Override
         public List<Result> getPage(int start, int count) {
-            return change.subList(start, start + count);
+            return change.subList(start, Math.min(change.size(), start + count));
         }
 
         @Override

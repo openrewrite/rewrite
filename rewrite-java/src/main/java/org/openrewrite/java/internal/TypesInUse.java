@@ -22,8 +22,9 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
+
+import static java.util.Collections.newSetFromMap;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 @Getter
@@ -46,19 +47,19 @@ public class TypesInUse {
 
     @Getter
     public static class FindTypesInUse extends JavaIsoVisitor<Integer> {
-        private final Set<JavaType> types = new NullSkippingSet<>();
-        private final Set<JavaType.Method> declaredMethods = new NullSkippingSet<>();
-        private final Set<JavaType.Method> usedMethods = new NullSkippingSet<>();
-        private final Set<JavaType.Variable> variables = new NullSkippingSet<>();
+        private final Set<JavaType> types = newSetFromMap(new NullSkippingMap<>());
+        private final Set<JavaType.Method> declaredMethods = newSetFromMap(new NullSkippingMap<>());
+        private final Set<JavaType.Method> usedMethods = newSetFromMap(new NullSkippingMap<>());
+        private final Set<JavaType.Variable> variables = newSetFromMap(new NullSkippingMap<>());
 
         @Override
         public J preVisit(J tree, Integer integer) {
             if (tree instanceof TypedTree) {
                 if (!(tree instanceof J.ClassDeclaration) &&
-                        !(tree instanceof J.MethodDeclaration) &&
-                        !(tree instanceof J.MethodInvocation) &&
-                        !(tree instanceof J.Lambda) &&
-                        !(tree instanceof J.VariableDeclarations)) {
+                    !(tree instanceof J.MethodDeclaration) &&
+                    !(tree instanceof J.MethodInvocation) &&
+                    !(tree instanceof J.Lambda) &&
+                    !(tree instanceof J.VariableDeclarations)) {
                     types.add(((TypedTree) tree).getType());
                 }
             }
@@ -132,14 +133,13 @@ public class TypesInUse {
         }
     }
 
-
-    private static class NullSkippingSet<T> extends HashSet<T> {
+    private static class NullSkippingMap<T> extends IdentityHashMap<T, Boolean> {
         @Override
-        public boolean add(@Nullable T t) {
-            if (t != null) {
-                return super.add(t);
+        public Boolean put(@Nullable T key, Boolean value) {
+            if (key != null) {
+                return super.put(key, value);
             }
-            return false;
+            return null;
         }
     }
 }
