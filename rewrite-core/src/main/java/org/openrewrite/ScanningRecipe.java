@@ -19,6 +19,7 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.UUID;
 
 /**
  * A recipe that may first scan a repository and study it in one pass over the
@@ -32,7 +33,7 @@ import java.util.Collections;
  * @param <T> The type of the accumulator where scanning data is held until the transformation phase.
  */
 public abstract class ScanningRecipe<T> extends Recipe {
-    private String recipeAccMessage;
+    private final String recipeAccMessage = "org.openrewrite.recipe.acc." + UUID.randomUUID();
 
     /**
      * @return The initial value of the accumulator before any source files have been iterated over.
@@ -85,9 +86,6 @@ public abstract class ScanningRecipe<T> extends Recipe {
     }
 
     T getAccumulator(Cursor cursor) {
-        if (recipeAccMessage == null) {
-            recipeAccMessage = getClass().getName() + "-" + hashCode();
-        }
         return cursor.getRoot().computeMessageIfAbsent(recipeAccMessage, m -> getInitialValue());
     }
 
