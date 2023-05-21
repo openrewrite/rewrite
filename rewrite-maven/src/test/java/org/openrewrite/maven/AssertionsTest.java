@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import lombok.Getter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
@@ -104,10 +105,8 @@ class AssertionsTest implements RewriteTest {
             return "Super description.";
         }
 
-        @Override
-        public List<Recipe> getRecipeList() {
-            return Collections.singletonList(new NonMavenRecipe());
-        }
+        @Getter(lazy = true)
+        private final List<Recipe> recipeList = Collections.singletonList(new NonMavenRecipe());
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {

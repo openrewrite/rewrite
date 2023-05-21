@@ -16,6 +16,7 @@
 package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.Value;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -46,14 +47,12 @@ public class FindDeprecatedUses extends Recipe {
     @Nullable
     Boolean ignoreDeprecatedScopes;
 
-    @Override
-    public List<Recipe> getRecipeList() {
-        return Arrays.asList(
-                new FindDeprecatedMethods((typePattern == null || typePattern.isEmpty() ? null : typePattern + " *(..)"), ignoreDeprecatedScopes),
-                new FindDeprecatedClasses(typePattern, matchInherited, ignoreDeprecatedScopes),
-                new FindDeprecatedFields(typePattern, ignoreDeprecatedScopes)
-        );
-    }
+    @Getter(lazy = true)
+    List<Recipe> recipeList = Arrays.asList(
+            new FindDeprecatedMethods((typePattern == null || typePattern.isEmpty() ? null : typePattern + " *(..)"), ignoreDeprecatedScopes),
+            new FindDeprecatedClasses(typePattern, matchInherited, ignoreDeprecatedScopes),
+            new FindDeprecatedFields(typePattern, ignoreDeprecatedScopes)
+    );
 
     @Override
     public String getDisplayName() {
