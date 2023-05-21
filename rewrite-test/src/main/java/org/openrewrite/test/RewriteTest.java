@@ -169,6 +169,7 @@ public interface RewriteTest extends SourceSpecs {
                     .isEqualTo(recipe);
             validateRecipeNameAndDescription(recipe);
             validateRecipeOptions(recipe);
+            validateRecipeList(recipe);
         }
 
         int cycles = testMethodSpec.cycles == null ? testClassSpec.getCycles() : testMethodSpec.getCycles();
@@ -566,17 +567,28 @@ public interface RewriteTest extends SourceSpecs {
                 validateRecipeNameAndDescription(childRecipe);
             }
         } else {
-            assertThat(recipe.getDisplayName().endsWith(".")).as("%s Display Name should not end with a period.", recipe.getName()).isFalse();
-            assertThat(recipe.getDescription()).as("%s Description should not be null or empty", recipe.getName()).isNotEmpty();
-            assertThat(recipe.getDescription().endsWith(".")).as("%s Description should end with a period.", recipe.getName()).isTrue();
+            assertThat(recipe.getDisplayName()).as("%s display name should not end with a period.", recipe.getName()).doesNotEndWith(".");
+            assertThat(recipe.getDescription()).as("%s description should not be null or empty", recipe.getName()).isNotEmpty();
+            assertThat(recipe.getDescription()).as("%s description should end with a period.", recipe.getName()).endsWith(".");
+        }
+    }
+
+    default void validateRecipeList(Recipe recipe) {
+        List<Recipe> r1 = recipe.getRecipeList();
+        List<Recipe> r2 = recipe.getRecipeList();
+        assertThat(r1).hasSameSizeAs(r2);
+        for (int i = 0; i < r1.size(); i++) {
+            assertThat(r1.get(i))
+                    .as("%s getRecipeList() should return the same recipes (by reference) in the same order every time.", recipe.getName())
+                    .isSameAs(r2.get(i));
         }
     }
 
     default void validateRecipeOptions(Recipe recipe) {
         for (OptionDescriptor option : recipe.getDescriptor().getOptions()) {
-            if (option.getName().equals("name")) {
-                fail("Recipe option `name` conflicts with the recipe's name. Please use a different field name for this option.");
-            }
+            assertThat(option.getName())
+                    .as("%s option `name` conflicts with the recipe's name. Please use a different field name for this option.", recipe.getName())
+                    .isNotEqualTo("name");
         }
     }
 }
