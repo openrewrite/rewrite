@@ -85,7 +85,7 @@ public class RemoveDependency extends Recipe {
 
             @Override
             public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                G.CompilationUnit g = (G.CompilationUnit) super.visitJavaSourceFile(cu, ctx);
+                G.CompilationUnit g = (G.CompilationUnit) super.visitCompilationUnit(cu, ctx);
                 if (g == cu) {
                     return cu;
                 }
