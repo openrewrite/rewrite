@@ -119,7 +119,7 @@ public class RecipeScheduler {
                         recipeRunStats.recordScan(recipe, () -> {
                             TreeVisitor<?, ExecutionContext> scanner = scanningRecipe.getScanner(acc);
                             if (scanner.isAcceptable(sourceFile, ctx)) {
-                                scanner.visit(sourceFile, ctx);
+                                scanner.visit(sourceFile, ctx, rootCursor);
                             }
                             return sourceFile;
                         });
@@ -183,11 +183,11 @@ public class RecipeScheduler {
                     }
 
                     TreeVisitor<?, ExecutionContext> visitor = recipe.getVisitor();
-                    visitor.cursor = rootCursor;
 
                     after = recipeRunStats.recordEdit(recipe, () -> {
                         if (visitor.isAcceptable(sourceFile, ctx)) {
-                            return (SourceFile) visitor.visit(sourceFile, ctx);
+                            // propagate shared root cursor
+                            return (SourceFile) visitor.visit(sourceFile, ctx, rootCursor);
                         }
                         return sourceFile;
                     });

@@ -103,8 +103,13 @@ public abstract class ScanningRecipe<T> extends Recipe {
             }
 
             @Override
-            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
-                return delegate().isAcceptable(sourceFile, executionContext);
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                return delegate().isAcceptable(sourceFile, ctx);
+            }
+
+            @Override
+            public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx, Cursor parent) {
+                return delegate().visit(tree, ctx, parent);
             }
 
             @Override
