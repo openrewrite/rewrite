@@ -164,6 +164,9 @@ public class AddDependency extends Recipe {
             source.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
                     source.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
                         if (source != new UsesType<>(onlyIfUsing, true).visit(source, ctx)) {
+                            if (configurationByProject.containsKey(javaProject) && "implementation".equals(configurationByProject.get(javaProject))) {
+                                return;
+                            }
                             if (StringUtils.isNullOrEmpty(testSourceSet)) {
                                 configurationByProject.compute(javaProject, (jp, configuration) ->
                                         "test".equals(sourceSet.getName()) ? "testImplementation" : "implementation"
