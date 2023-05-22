@@ -22,10 +22,13 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
+import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.util.Dependency;
 import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
@@ -33,6 +36,8 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.semver.DependencyMatcher;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
@@ -77,6 +82,45 @@ public class RemoveDependency extends Recipe {
         return new GroovyVisitor<ExecutionContext>() {
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
             final DependencyMatcher dependencyMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
+
+            @Override
+            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                G.CompilationUnit g = (G.CompilationUnit) super.visitCompilationUnit(cu, ctx);
+                if (g == cu) {
+                    return cu;
+                }
+
+                Optional<GradleProject> maybeGp = g.getMarkers().findFirst(GradleProject.class);
+                if (!maybeGp.isPresent()) {
+                    return cu;
+                }
+
+                GradleProject gp = maybeGp.get();
+                Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
+                boolean anyChanged = false;
+                for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
+                    GradleDependencyConfiguration newGdc = gdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
+                        if (dependencyMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
+                            return null;
+                        }
+                        return requested;
+                    }));
+                    newGdc = newGdc.withResolved(ListUtils.map(newGdc.getResolved(), resolved -> {
+                        if (dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
+                            return null;
+                        }
+                        return resolved;
+                    }));
+                    nameToConfiguration.put(newGdc.getName(), newGdc);
+                    anyChanged |= newGdc != gdc;
+                }
+
+                if (!anyChanged) {
+                    return cu;
+                }
+
+                return g.withMarkers(g.getMarkers().setByType(gp.withNameToConfiguration(nameToConfiguration)));
+            }
 
             @Override
             public @Nullable J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
