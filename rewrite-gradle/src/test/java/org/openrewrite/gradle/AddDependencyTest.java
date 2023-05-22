@@ -77,6 +77,28 @@ class AddDependencyTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
+    void onlyIfUsingSmokeTestScope(String onlyIfUsing) {
+        AddDependency addDep = new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, onlyIfUsing, null, null, null, "smokeTest");
+        rewriteRun(
+          spec -> spec.recipe(addDep),
+          mavenProject("project",
+            srcSmokeTestJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              "",
+              """
+                dependencies {
+                    smokeTestImplementation "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
     void onlyIfUsingCompileScope(String onlyIfUsing) {
         rewriteRun(
           spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing)),
@@ -119,7 +141,7 @@ class AddDependencyTest implements RewriteTest {
 
     @Test
     void addDependencyWithClassifier() {
-        AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", "2.0.54.Final", null, "implementation", "com.google.common.math.IntMath", "linux-x86_64", null, null);
+        AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", "2.0.54.Final", null, "implementation", "com.google.common.math.IntMath", "linux-x86_64", null, null, null);
         rewriteRun(
           spec -> spec.recipe(addDep),
           mavenProject("project",
@@ -140,7 +162,7 @@ class AddDependencyTest implements RewriteTest {
 
     @Test
     void addDependencyWithoutVersion() {
-        AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", null, null, "implementation", "com.google.common.math.IntMath", null, null, null);
+        AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", null, null, "implementation", "com.google.common.math.IntMath", null, null, null, null);
         rewriteRun(
           spec -> spec.recipe(addDep),
           mavenProject("project",
@@ -162,7 +184,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void addDependencyWithoutVersionWithClassifier() {
         // Without a version, classifier must not be present in the result
-        AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", null, null, "implementation", "com.google.common.math.IntMath", "linux-x86_64", null, null);
+        AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", null, null, "implementation", "com.google.common.math.IntMath", "linux-x86_64", null, null, null);
         rewriteRun(
           spec -> spec.recipe(addDep),
           mavenProject("project",
@@ -520,7 +542,7 @@ class AddDependencyTest implements RewriteTest {
 
     @Test
     void addDependenciesWithoutVersionWithClassifierToExistingGrouping() {
-        AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", null, null, "testImplementation", "com.google.common.math.IntMath", "linux-x86_64", null, null);
+        AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", null, null, "testImplementation", "com.google.common.math.IntMath", "linux-x86_64", null, null, null);
         rewriteRun(
           spec -> spec.recipe(addDep),
           mavenProject("project",
@@ -791,7 +813,7 @@ class AddDependencyTest implements RewriteTest {
         String[] gavParts = gav.split(":");
         return new AddDependency(
           gavParts[0], gavParts[1], (gavParts.length < 3) ? null : gavParts[2], null, configuration, onlyIfUsing,
-          (gavParts.length < 4) ? null : gavParts[3], null, null
+          (gavParts.length < 4) ? null : gavParts[3], null, null, null
         );
     }
 }

@@ -119,6 +119,14 @@ public class AddDependency extends Recipe {
     @Nullable
     String familyPattern;
 
+    @Option(displayName = "Test Source Set",
+            description = "The test source set which will be used to determine the test configuration with which to add the dependency. " +
+                    "If not specified, all source sets other than 'test' will be added to 'implementation' configuration.",
+            example = "test",
+            required = false)
+    @Nullable
+    String testSourceSet;
+
     static final String DEPENDENCY_PRESENT = "org.openrewrite.gradle.AddDependency.DEPENDENCY_PRESENT";
 
     @Override
@@ -156,10 +164,15 @@ public class AddDependency extends Recipe {
             source.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
                     source.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
                         if (source != new UsesType<>(onlyIfUsing, true).visit(source, ctx)) {
-                            configurationByProject.compute(javaProject, (jp, configuration) -> "implementation".equals(configuration) ?
-                                    configuration :
-                                    "test".equals(sourceSet.getName()) ? "testImplementation" : "implementation"
-                            );
+                            if (StringUtils.isNullOrEmpty(testSourceSet)) {
+                                configurationByProject.compute(javaProject, (jp, configuration) ->
+                                        "test".equals(sourceSet.getName()) ? "testImplementation" : "implementation"
+                                );
+                            } else if ("main".equals(sourceSet.getName()) || testSourceSet.equals(sourceSet.getName())) {
+                                configurationByProject.compute(javaProject, (jp, configuration) ->
+                                        "main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation"
+                                );
+                            }
                         }
                     }));
         }
@@ -176,7 +189,9 @@ public class AddDependency extends Recipe {
                     @Override
                     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                         J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
-                        if (dependencyDslMatcher.matches(m) && (StringUtils.isBlank(configuration) || configuration.equals(m.getSimpleName()))) {
+                        String resolvedConfiguration = StringUtils.isBlank(configuration) ? configurationByProject.get(javaProject) : configuration;
+                        if ((dependencyDslMatcher.matches(m) && (StringUtils.isBlank(configuration) || configuration.equals(m.getSimpleName()))) ||
+                                (StringUtils.isNotEmpty(resolvedConfiguration) && resolvedConfiguration.equals(m.getSimpleName()))) {
                             if (m.getArguments().get(0) instanceof J.Literal) {
                                 //noinspection ConstantConditions
                                 Dependency dependency = DependencyStringNotationConverter.parse((String) ((J.Literal) m.getArguments().get(0)).getValue());
