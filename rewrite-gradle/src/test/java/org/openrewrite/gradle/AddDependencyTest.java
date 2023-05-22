@@ -699,11 +699,11 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
-    void addDependency() {
+    void addDynamicVersionDependency() {
         rewriteRun(
           spec -> spec
             .beforeRecipe(withToolingApi())
-            .recipe(addDependency("org.openrewrite:rewrite-core:latest.release", "java.util.Date", "implementation")),
+            .recipe(addDependency("org.openrewrite:rewrite-core:7.39.X", "java.util.Date", "implementation")),
           mavenProject("project",
             srcMainGroovy(
               groovy(
@@ -737,7 +737,7 @@ class AddDependencyTest implements RewriteTest {
                 }
                 
                 dependencies {
-                    implementation "org.openrewrite:rewrite-core:7.40.8"
+                    implementation "org.openrewrite:rewrite-core:7.39.1"
                 }
                 """,
               spec -> spec.afterRecipe(after -> {
@@ -748,15 +748,9 @@ class AddDependencyTest implements RewriteTest {
                   assertThat(compileClasspath).isNotNull();
                   assertThat(
                     compileClasspath.getRequested().stream()
-                      .filter(dep -> "com.google.guava".equals(dep.getGroupId()) && "guava".equals(dep.getArtifactId()) && "30.1.1-jre".equals(dep.getVersion()))
+                      .filter(dep -> "org.openrewrite".equals(dep.getGroupId()) && "rewrite-core".equals(dep.getArtifactId()) && "7.39.1".equals(dep.getVersion()))
                       .findAny())
-                    .as("GradleProject requested dependencies should have been updated with the new version of guava")
-                    .isPresent();
-                  assertThat(
-                    compileClasspath.getResolved().stream()
-                      .filter(dep -> "com.google.guava".equals(dep.getGroupId()) && "guava".equals(dep.getArtifactId()) && "30.1.1-jre".equals(dep.getVersion()))
-                      .findAny())
-                    .as("GradleProject requested dependencies should have been updated with the new version of guava")
+                    .as("GradleProject requested dependencies should have been updated with the new version of rewrite-core")
                     .isPresent();
               })
             )

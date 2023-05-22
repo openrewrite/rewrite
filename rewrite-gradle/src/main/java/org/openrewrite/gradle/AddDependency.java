@@ -50,6 +50,7 @@ import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -248,18 +249,31 @@ public class AddDependency extends Recipe {
                         }
 
                         String resolvedConfiguration = StringUtils.isBlank(configuration) ? maybeConfiguration : configuration;
-
-                        g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, version, StringUtils.isBlank(versionPattern) ? null : versionPattern, resolvedConfiguration,
-                                StringUtils.isBlank(classifier) ? null : classifier, StringUtils.isBlank(extension) ? null : extension, familyPatternCompiled)
-                                .visitNonNull(g, ctx);
+                        String resolvedVersion = version;
                         Optional<GradleProject> maybeGp = g.getMarkers().findFirst(GradleProject.class);
-                        if(g != cu && maybeGp.isPresent()) {
-                            GradleProject gp = maybeGp.get();
-                            String versionWithPattern = version + (StringUtils.isBlank(versionPattern) ? "" : versionPattern);
-                            VersionComparator versionComparator = Semver.validate(versionWithPattern, versionPattern).getValue();
-                            if(versionComparator instanceof ExactVersion) {
-
+                        if (version != null && maybeGp.isPresent()) {
+                            Validated versionValidation = Semver.validate(version, versionPattern);
+                            if (versionValidation.isValid() && versionValidation.getValue() != null) {
+                                VersionComparator versionComparator = versionValidation.getValue();
+                                if(!(versionComparator instanceof ExactVersion)) {
+                                    try {
+                                        resolvedVersion = findNewerVersion(groupId, artifactId, version, versionComparator, maybeGp.get(), ctx);
+                                    } catch (MavenDownloadingException e) {
+                                        throw new RuntimeException(e);
+                                    }
+                                }
                             }
+                        }
+
+                        g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, resolvedVersion,
+                                StringUtils.isBlank(versionPattern) ? null : versionPattern,
+                                resolvedConfiguration,
+                                StringUtils.isBlank(classifier) ? null : classifier,
+                                StringUtils.isBlank(extension) ? null : extension,
+                                familyPatternCompiled).visitNonNull(g, ctx, requireNonNull(getCursor().getParent()));
+                        if(g != cu && maybeGp.isPresent()) {
+                            String versionWithPattern = resolvedVersion + (StringUtils.isBlank(versionPattern) ? "" : versionPattern);
+                            GradleProject gp = maybeGp.get();
                             GradleProject newGp = addDependency(gp,
                                     gp.getConfiguration(resolvedConfiguration),
                                     new GroupArtifactVersion(groupId, artifactId, versionWithPattern),
@@ -347,7 +361,6 @@ public class AddDependency extends Recipe {
         }
         return gp;
     }
-
 
     @Nullable
     private String findNewerVersion(String groupId, String artifactId, String version, VersionComparator versionComparator,

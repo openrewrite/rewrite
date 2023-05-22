@@ -20,6 +20,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Validated;
 import org.openrewrite.gradle.internal.InsertDependencyComparator;
+import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -28,6 +29,11 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.internal.MavenPomDownloader;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.MavenMetadata;
+import org.openrewrite.semver.LatestPatch;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
@@ -36,6 +42,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 
 @RequiredArgsConstructor
@@ -72,13 +79,6 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
             }
         }
 
-        if (null != version) {
-            Validated versionValidation = Semver.validate(version, versionPattern);
-            if (versionValidation.isValid()) {
-                @Nullable VersionComparator versionComparator = versionValidation.getValue();
-            }
-        }
-
         if (dependenciesBlockMissing) {
             Statement dependenciesInvocation = GRADLE_PARSER.parse("dependencies {}").get(0).getStatements().get(0);
             dependenciesInvocation = autoFormat(dependenciesInvocation, ctx, new Cursor(getCursor(), cu));
@@ -88,7 +88,8 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                             dependenciesInvocation.withPrefix(Space.format("\n\n"))));
         }
 
-        doAfterVisit(new InsertDependencyInOrder(configuration));
+        groovy = (G.CompilationUnit) new InsertDependencyInOrder(configuration)
+                .visitNonNull(groovy, ctx, requireNonNull(getCursor().getParent()));
 
         return groovy;
     }
