@@ -183,6 +183,8 @@ public class RecipeScheduler {
                     }
 
                     TreeVisitor<?, ExecutionContext> visitor = recipe.getVisitor();
+                    // set root cursor as it is required by the `ScanningRecipe#isAcceptable()`
+                    visitor.setCursor(rootCursor);
 
                     after = recipeRunStats.recordEdit(recipe, () -> {
                         if (visitor.isAcceptable(sourceFile, ctx)) {
