@@ -48,11 +48,15 @@ public class FindDeprecatedUses extends Recipe {
     Boolean ignoreDeprecatedScopes;
 
     @Getter(lazy = true)
-    List<Recipe> recipeList = Arrays.asList(
-            new FindDeprecatedMethods((typePattern == null || typePattern.isEmpty() ? null : typePattern + " *(..)"), ignoreDeprecatedScopes),
-            new FindDeprecatedClasses(typePattern, matchInherited, ignoreDeprecatedScopes),
-            new FindDeprecatedFields(typePattern, ignoreDeprecatedScopes)
-    );
+    List<Recipe> recipeList = initRecipeList();
+
+    private List<Recipe> initRecipeList() {
+        return Arrays.asList(
+                new FindDeprecatedMethods((typePattern == null || typePattern.isEmpty() ? null : typePattern + " *(..)"), ignoreDeprecatedScopes),
+                new FindDeprecatedClasses(typePattern, matchInherited, ignoreDeprecatedScopes),
+                new FindDeprecatedFields(typePattern, ignoreDeprecatedScopes)
+        );
+    }
 
     @Override
     public String getDisplayName() {
