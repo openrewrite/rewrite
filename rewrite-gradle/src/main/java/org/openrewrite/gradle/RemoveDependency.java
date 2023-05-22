@@ -33,7 +33,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.semver.DependencyMatcher;
 
 import java.util.List;
@@ -85,36 +84,42 @@ public class RemoveDependency extends Recipe {
             final DependencyMatcher dependencyMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
 
             @Override
-            public J visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                JavaSourceFile sourceFile = (JavaSourceFile) super.visitJavaSourceFile(cu, ctx);
-                if (sourceFile != cu) {
-                    Optional<GradleProject> maybeGp = sourceFile.getMarkers().findFirst(GradleProject.class);
-                    if (maybeGp.isPresent()) {
-                        GradleProject gp = maybeGp.get();
-                        Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
-                        boolean anyChanged = false;
-                        for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
-                            GradleDependencyConfiguration newGdc = gdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
-                                if (dependencyMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
-                                    return null;
-                                }
-                                return requested;
-                            }));
-                            newGdc = newGdc.withResolved(ListUtils.map(newGdc.getResolved(), resolved -> {
-                                if (dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
-                                    return null;
-                                }
-                                return resolved;
-                            }));
-                            nameToConfiguration.put(newGdc.getName(), newGdc);
-                            anyChanged |= newGdc != gdc;
-                        }
-                        if (anyChanged) {
-                            sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(gp.withNameToConfiguration(nameToConfiguration)));
-                        }
-                    }
+            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                G.CompilationUnit g = (G.CompilationUnit) super.visitJavaSourceFile(cu, ctx);
+                if (g == cu) {
+                    return cu;
                 }
-                return sourceFile;
+
+                Optional<GradleProject> maybeGp = g.getMarkers().findFirst(GradleProject.class);
+                if (!maybeGp.isPresent()) {
+                    return cu;
+                }
+
+                GradleProject gp = maybeGp.get();
+                Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
+                boolean anyChanged = false;
+                for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
+                    GradleDependencyConfiguration newGdc = gdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
+                        if (dependencyMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
+                            return null;
+                        }
+                        return requested;
+                    }));
+                    newGdc = newGdc.withResolved(ListUtils.map(newGdc.getResolved(), resolved -> {
+                        if (dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
+                            return null;
+                        }
+                        return resolved;
+                    }));
+                    nameToConfiguration.put(newGdc.getName(), newGdc);
+                    anyChanged |= newGdc != gdc;
+                }
+
+                if (!anyChanged) {
+                    return cu;
+                }
+
+                return g.withMarkers(g.getMarkers().setByType(gp.withNameToConfiguration(nameToConfiguration)));
             }
 
             @Override
