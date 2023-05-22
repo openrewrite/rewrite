@@ -60,7 +60,7 @@ public class AppendToTextFile extends Recipe {
                     + "Subsequent instances of this recipe in the same Rewrite execution will always append.",
             valid = {"continue", "replace", "leave"},
             required = false)
-    @Nullable String existingFileStrategy;
+    @Nullable Strategy existingFileStrategy;
     public enum Strategy { CONTINUE, REPLACE, LEAVE }
 
     private final static String CREATED_THIS_EXECUTION_MESSAGE_KEY = "AppendToTextFile.CreatedThisExecution";
@@ -81,7 +81,7 @@ public class AppendToTextFile extends Recipe {
                 relativeFileName,
                 content + maybeNewline,
                 preamble != null ? preamble + maybeNewline : "",
-                existingFileStrategy != null ? Strategy.valueOf(existingFileStrategy.toUpperCase()) : Strategy.LEAVE);
+                existingFileStrategy != null ? existingFileStrategy : Strategy.LEAVE);
     }
 
     private List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx,

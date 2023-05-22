@@ -87,7 +87,7 @@ public class AddGradleEnterprise extends Recipe {
                     "When omitted scans will be published only when the `--scan` option is passed to the build.",
             required = false,
             valid = {"always", "failure"},
-            example = "true")
+            example = "always")
     @Nullable
     PublishCriteria publishCriteria;
 
