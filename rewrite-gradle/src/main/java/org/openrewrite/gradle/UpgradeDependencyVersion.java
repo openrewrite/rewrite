@@ -230,6 +230,7 @@ public class UpgradeDependencyVersion extends Recipe {
                     }
                     J.Literal groupLiteral = (J.Literal) groupValue;
                     J.Literal artifactLiteral = (J.Literal) artifactValue;
+                    //noinspection DataFlowIssue
                     if (!dependencyMatcher.matches((String) groupLiteral.getValue(), (String) artifactLiteral.getValue())) {
                         return m;
                     }
