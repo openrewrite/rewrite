@@ -387,4 +387,29 @@ class YamlResourceLoaderTest implements RewriteTest {
             assertThat(descriptorExamples).containsExactlyElementsOf(recipes.iterator().next().getExamples());
         });
     }
+
+    @Test
+    void caseInsensitiveEnums() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            //language=yml
+            """
+              ---
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.gradle.testCaseInsensitiveEnumInYaml
+              displayName: test Enum in yaml
+              description: test Enum in yaml.
+              recipeList:
+                - org.openrewrite.text.AppendToTextFile:
+                    relativeFileName: "file.txt"
+                    content: " World!"
+                    preamble: "preamble"
+                    appendNewline : false
+                    existingFileStrategy: "Continue"
+              """,
+            "org.openrewrite.gradle.testCaseInsensitiveEnumInYaml"
+          ),
+          text("Hello", "Hello World!")
+        );
+    }
 }
