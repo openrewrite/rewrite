@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.search;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Value;
@@ -48,6 +49,7 @@ public class FindDeprecatedUses extends Recipe {
     Boolean ignoreDeprecatedScopes;
 
     @Getter(lazy = true)
+    @JsonIgnore
     List<Recipe> recipeList = initRecipeList();
 
     private List<Recipe> initRecipeList() {
