@@ -197,7 +197,7 @@ class AddGradleEnterpriseMavenExtensionTest implements RewriteTest {
                 </server>
                 <buildScan>
                   <backgroundBuildScanUpload>false</backgroundBuildScanUpload>
-                  <publish>ON_FAILURE</publish> 
+                  <publish>ON_FAILURE</publish>
                   <capture>
                     <goalInputFiles>true</goalInputFiles>
                   </capture>

@@ -17,9 +17,11 @@ package org.openrewrite.maven;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.PrettyPrinter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
+import com.fasterxml.jackson.dataformat.xml.util.DefaultXmlPrettyPrinter;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
@@ -27,6 +29,7 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenXmlMapper;
+import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlIsoVisitor;
@@ -137,6 +140,7 @@ public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleE
     @Data
     static class Accumulator {
         boolean mavenProject;
+        boolean useCRLFNewLines;
         Path matchingExtensionsXmlFile;
         Path matchingGradleEnterpriseXmlFile;
     }
@@ -160,6 +164,8 @@ public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleE
                 switch (sourcePath) {
                     case "pom.xml":
                         acc.setMavenProject(true);
+                        acc.setUseCRLFNewLines(sourceFile.getStyle(GeneralFormatStyle.class, new GeneralFormatStyle(false))
+                                .isUseCRLFNewLines());
                         break;
                     case EXTENSIONS_XML_PATH:
                         if (!(sourceFile instanceof Xml.Document)) {
@@ -186,7 +192,7 @@ public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleE
         }
 
         List<SourceFile> sources = new ArrayList<>();
-        sources.add(createNewXml(GRADLE_ENTERPRISE_XML_PATH, gradleEnterpriseConfiguration()));
+        sources.add(createNewXml(GRADLE_ENTERPRISE_XML_PATH, gradleEnterpriseConfiguration(acc.isUseCRLFNewLines())));
 
         if (acc.getMatchingExtensionsXmlFile() == null) {
             Xml.Document extensionsXml = createNewXml(EXTENSIONS_XML_PATH, EXTENSIONS_XML_FORMAT);
@@ -257,14 +263,16 @@ public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleE
         Boolean goalInputFiles;
     }
 
-    private String gradleEnterpriseConfiguration() {
+    private String gradleEnterpriseConfiguration(boolean useCRLFNewLines) {
         BuildScanConfiguration buildScanConfiguration = buildScanConfiguration();
         ServerConfiguration serverConfiguration = new ServerConfiguration(server, allowUntrustedServer);
         try {
             ObjectMapper objectMapper = MavenXmlMapper.writeMapper();
             objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
             objectMapper.setSerializationInclusion(JsonInclude.Include.NON_ABSENT);
-            return objectMapper.writeValueAsString(new GradleEnterpriseConfiguration(serverConfiguration, buildScanConfiguration));
+            PrettyPrinter pp = new DefaultXmlPrettyPrinter().withCustomNewLine(useCRLFNewLines ? "\r\n" : "\n");
+            return objectMapper.writer(pp)
+                    .writeValueAsString(new GradleEnterpriseConfiguration(serverConfiguration, buildScanConfiguration));
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }

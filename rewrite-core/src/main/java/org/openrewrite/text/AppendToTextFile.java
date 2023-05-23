@@ -60,7 +60,8 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
                           + "Subsequent instances of this recipe in the same Rewrite execution will always append.",
             valid = {"continue", "replace", "leave"},
             required = false)
-    @Nullable String existingFileStrategy;
+    @Nullable Strategy existingFileStrategy;
+    public enum Strategy { CONTINUE, REPLACE, LEAVE }
 
     @Override
     public String getDisplayName() {
@@ -132,7 +133,7 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
                     String preamble = AppendToTextFile.this.preamble != null ? AppendToTextFile.this.preamble + maybeNewline : "";
 
                     PlainText existingPlainText = (PlainText) sourceFile;
-                    switch (existingFileStrategy != null ? Strategy.valueOf(existingFileStrategy.toUpperCase()) : Strategy.LEAVE) {
+                    switch (existingFileStrategy != null ? existingFileStrategy : Strategy.LEAVE) {
                         case CONTINUE:
                             if(!maybeNewline.isEmpty() && !existingPlainText.getText().endsWith(maybeNewline)) {
                                 content = maybeNewline + content;
@@ -147,9 +148,4 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
         });
     }
 
-    private enum Strategy {
-        CONTINUE,
-        REPLACE,
-        LEAVE
-    }
 }

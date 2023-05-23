@@ -140,6 +140,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
         mapper = JsonMapper.builder()
                 .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
+                .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS)
                 .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
                 .build()
                 .registerModule(new ParameterNamesModule())

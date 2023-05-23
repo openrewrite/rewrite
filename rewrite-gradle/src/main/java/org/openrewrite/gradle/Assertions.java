@@ -58,20 +58,24 @@ public class Assertions {
     public static UncheckedConsumer<List<SourceFile>> withToolingApi(@Nullable String version, @Nullable String distribution) {
         return sourceFiles -> {
             try {
-                Path projectDir = Files.createTempDirectory("project");
+                Path tempDirectory = Files.createTempDirectory("project");
+                // Usage of Assertions.mavenProject() might result in gradle files inside a subdirectory
+                Path projectDir = tempDirectory;
                 try {
                     for (SourceFile sourceFile : sourceFiles) {
                         if (sourceFile instanceof G.CompilationUnit) {
                             G.CompilationUnit g = (G.CompilationUnit) sourceFile;
                             if (g.getSourcePath().toString().endsWith(".gradle")) {
-                                Path groovyGradle = projectDir.resolve(g.getSourcePath());
+                                Path groovyGradle = tempDirectory.resolve(g.getSourcePath());
+                                projectDir = groovyGradle.getParent();
                                 Files.createDirectories(groovyGradle.getParent());
                                 Files.write(groovyGradle, g.printAllAsBytes());
                             }
                         } else if (sourceFile instanceof Properties.File) {
                             Properties.File f = (Properties.File) sourceFile;
                             if (f.getSourcePath().endsWith("gradle.properties")) {
-                                Path gradleProperties = projectDir.resolve(f.getSourcePath());
+                                Path gradleProperties = tempDirectory.resolve(f.getSourcePath());
+                                projectDir = gradleProperties.getParent();
                                 Files.createDirectories(gradleProperties.getParent());
                                 Files.write(gradleProperties, f.printAllAsBytes());
                             }
@@ -103,13 +107,13 @@ public class Assertions {
                     GradleProject gradleProject = GradleProject.fromToolingModel(model.gradleProject());
                     for (int i = 0; i < sourceFiles.size(); i++) {
                         SourceFile sourceFile = sourceFiles.get(i);
-                        if (sourceFile.getSourcePath().equals(Paths.get("build.gradle"))) {
+                        if (sourceFile.getSourcePath().toString().endsWith(".gradle")) {
                             sourceFiles.set(i, sourceFile.withMarkers(sourceFile.getMarkers().add(gradleProject)));
                             break;
                         }
                     }
                 } finally {
-                    deleteDirectory(projectDir.toFile());
+                    deleteDirectory(tempDirectory.toFile());
                 }
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
