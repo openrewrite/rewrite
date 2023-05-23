@@ -15,9 +15,7 @@
  */
 package org.openrewrite.java.search;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
 import lombok.Value;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -48,11 +46,8 @@ public class FindDeprecatedUses extends Recipe {
     @Nullable
     Boolean ignoreDeprecatedScopes;
 
-    @Getter(lazy = true)
-    @JsonIgnore
-    List<Recipe> recipeList = initRecipeList();
-
-    private List<Recipe> initRecipeList() {
+    @Override
+    public List<Recipe> getRecipeList() {
         return Arrays.asList(
                 new FindDeprecatedMethods((typePattern == null || typePattern.isEmpty() ? null : typePattern + " *(..)"), ignoreDeprecatedScopes),
                 new FindDeprecatedClasses(typePattern, matchInherited, ignoreDeprecatedScopes),

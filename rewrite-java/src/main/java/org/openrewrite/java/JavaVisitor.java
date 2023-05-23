@@ -272,7 +272,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                         ), JRightPadded.Location.DIMENSION, p)
                 )
         );
-        a = a.withType(visitType(a.getType(), p));
         return a;
     }
 
