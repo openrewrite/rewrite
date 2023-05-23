@@ -24,6 +24,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.Iterator;
 import java.util.List;
 
 public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
@@ -72,7 +73,10 @@ public class TabsAndIndentsVisitor<P> extends HclIsoVisitor<P> {
                 }
             }
         }
-        preVisit((Hcl) parent.getPath(Hcl.class::isInstance).next(), p);
+        Iterator<Object> path = parent.getPath(Hcl.class::isInstance);
+        if (path.hasNext()) {
+            preVisit((Hcl) path.next(), p);
+        }
         return visit(tree, p);
     }
 
