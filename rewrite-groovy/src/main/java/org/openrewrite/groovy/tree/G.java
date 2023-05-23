@@ -651,6 +651,10 @@ public interface G extends J {
                 return Space.EMPTY;
             }
 
+            public Space getAfter() {
+                return after == null ? Space.EMPTY : after;
+            }
+
             @Override
             public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
                 return v.visitGStringValue(this, p);
