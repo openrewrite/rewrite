@@ -17,9 +17,11 @@ package org.openrewrite.maven;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.PrettyPrinter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlRootElement;
+import com.fasterxml.jackson.dataformat.xml.util.DefaultXmlPrettyPrinter;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
@@ -27,6 +29,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenXmlMapper;
+import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.xml.*;
 import org.openrewrite.xml.tree.Xml;
 
@@ -137,6 +140,7 @@ public class AddGradleEnterpriseMavenExtension extends Recipe {
     @Override
     protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
         boolean isMavenProject = false;
+        boolean useCRLFNewLines = false;
         AtomicReference<SourceFile> matchingExtensionsXmlFile = new AtomicReference<>();
         AtomicReference<SourceFile> matchingGradleEnterpriseXmlFile = new AtomicReference<>();
 
@@ -145,6 +149,8 @@ public class AddGradleEnterpriseMavenExtension extends Recipe {
             switch (sourcePath) {
                 case "pom.xml":
                     isMavenProject = true;
+                    useCRLFNewLines = sourceFile.getStyle(GeneralFormatStyle.class, new GeneralFormatStyle(false))
+                            .isUseCRLFNewLines();
                     break;
                 case EXTENSIONS_XML_PATH:
                     matchingExtensionsXmlFile.set(sourceFile);
@@ -161,8 +167,7 @@ public class AddGradleEnterpriseMavenExtension extends Recipe {
         if (!isMavenProject || matchingGradleEnterpriseXmlFile.get() != null) {
             return before;
         }
-
-        Xml.Document gradleEnterpriseXml = createNewXml(GRADLE_ENTERPRISE_XML_PATH, gradleEnterpriseConfiguration());
+        Xml.Document gradleEnterpriseXml = createNewXml(GRADLE_ENTERPRISE_XML_PATH, gradleEnterpriseConfiguration(useCRLFNewLines));
 
         if (matchingExtensionsXmlFile.get() != null) {
             if (!(matchingExtensionsXmlFile.get() instanceof Xml.Document)) {
@@ -217,14 +222,16 @@ public class AddGradleEnterpriseMavenExtension extends Recipe {
         Boolean goalInputFiles;
     }
 
-    private String gradleEnterpriseConfiguration() {
+    private String gradleEnterpriseConfiguration(boolean useCRLFNewLines) {
         BuildScanConfiguration buildScanConfiguration = buildScanConfiguration();
         ServerConfiguration serverConfiguration = new ServerConfiguration(server, allowUntrustedServer);
         try {
             ObjectMapper objectMapper = MavenXmlMapper.writeMapper();
             objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
             objectMapper.setSerializationInclusion(JsonInclude.Include.NON_ABSENT);
-            return objectMapper.writeValueAsString(new GradleEnterpriseConfiguration(serverConfiguration, buildScanConfiguration));
+            PrettyPrinter pp = new DefaultXmlPrettyPrinter().withCustomNewLine(useCRLFNewLines ? "\r\n" : "\n");
+            return objectMapper.writer(pp)
+                    .writeValueAsString(new GradleEnterpriseConfiguration(serverConfiguration, buildScanConfiguration));
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
@@ -240,7 +247,7 @@ public class AddGradleEnterpriseMavenExtension extends Recipe {
         return null;
     }
 
-    private static Xml.Document createNewXml(String filePath, String fileContents) {
+    private static Xml.Document createNewXml(String filePath, @Language("xml") String fileContents) {
         XmlParser parser = new XmlParser();
         Xml.Document brandNewFile = parser.parse(fileContents).get(0);
         return brandNewFile.withSourcePath(Paths.get(filePath));
@@ -279,6 +286,6 @@ public class AddGradleEnterpriseMavenExtension extends Recipe {
         AddToTagVisitor<ExecutionContext> addToTagVisitor = new AddToTagVisitor<>(
                 extensionsXml.getRoot(),
                 Xml.Tag.build(tagSource));
-        return (Xml.Document) addToTagVisitor.visit(extensionsXml, ctx);
+        return (Xml.Document) addToTagVisitor.visitNonNull(extensionsXml, ctx);
     }
 }
