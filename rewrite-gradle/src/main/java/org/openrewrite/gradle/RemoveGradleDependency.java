@@ -34,7 +34,7 @@ import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-class RemoveGradleDependency extends Recipe {
+public class RemoveGradleDependency extends Recipe {
 
     @Option(displayName = "The dependency configuration", description = "The dependency configuration to remove from.", example = "api", required = false)
     @Nullable
