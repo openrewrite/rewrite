@@ -27,7 +27,6 @@ import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.*;
 
 import java.nio.file.Path;
@@ -193,29 +192,6 @@ public class Assertions {
     public static UncheckedConsumer<List<SourceFile>> addTypesToSourceSet(String sourceSetName, List<String> extendsFrom, List<Path> classpath) {
         return sourceFiles -> {
             JavaSourceSet sourceSet = JavaSourceSet.build(sourceSetName, classpath, null, false);
-            List<JavaType.FullyQualified> types = sourceSet.getClasspath();
-            for (SourceFile sourceFile : sourceFiles) {
-                if (!(sourceFile instanceof JavaSourceFile)) {
-                    continue;
-                }
-
-                Optional<JavaSourceSet> maybeCurrentSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class);
-                if (!maybeCurrentSourceSet.isPresent()) {
-                    continue;
-                }
-
-                JavaSourceSet currentSourceSet = maybeCurrentSourceSet.get();
-                if (!currentSourceSet.getName().equals(sourceSetName) && !extendsFrom.contains(currentSourceSet.getName())) {
-                    continue;
-                }
-
-                for (JavaType type : ((JavaSourceFile) sourceFile).getTypesInUse().getTypesInUse()) {
-                    if (type instanceof JavaType.FullyQualified) {
-                        types.add((JavaType.FullyQualified) type);
-                    }
-                }
-            }
-            sourceSet = sourceSet.withClasspath(types);
 
             for (int i = 0; i < sourceFiles.size(); i++) {
                 SourceFile sourceFile = sourceFiles.get(i);
