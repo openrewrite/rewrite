@@ -43,11 +43,11 @@ class RemoveXmlTagTest implements RewriteTest {
     @Test
     void elementNotMatched() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveXmlTag("notBean", null)),
+          spec -> spec.recipe(new RemoveXmlTag("//notBean", null)),
           xml(
             """
               <beans>
-                  <bean id='myBean.subpackage.subpackage2'/>
+                  <bean notBean='myBean.subpackage.subpackage2'/>
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """
