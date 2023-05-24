@@ -207,7 +207,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         a = a.withAnnotations(ListUtils.map(a.getAnnotations(), e -> visitAndCast(e, p)));
         a = a.withTypeExpression(visitAndCast(a.getTypeExpression(), p));
         a = a.withTypeExpression(visitTypeName(a.getTypeExpression(), p));
-        a = a.withType(visitType(a.getType(), p));
         return a;
     }
 
