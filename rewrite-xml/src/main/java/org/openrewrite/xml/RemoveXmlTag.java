@@ -34,10 +34,10 @@ public class RemoveXmlTag extends Recipe {
         return "Removes XML tags matching the provided expression.";
     }
 
-    @Option(displayName = "Element name",
-            description = "The name of the element which is to be removed. Interpreted as an XPath Expression.",
-            example = "/settings/servers/server/username")
-    String elementName;
+    @Option(displayName = "XPath",
+            description = "An XPath expression used to find matching tags.",
+            example = "/project/dependencies/dependency")
+    String xPath;
 
     @Option(displayName = "File matcher",
             description = "If provided only matching files will be modified. This is a glob expression.",
@@ -57,7 +57,7 @@ public class RemoveXmlTag extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new XmlIsoVisitor<ExecutionContext>() {
-            private final XPathMatcher xPathMatcher = new XPathMatcher(elementName);
+            private final XPathMatcher xPathMatcher = new XPathMatcher(xPath);
 
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
