@@ -35,8 +35,6 @@ class RemoveXmlTagTest implements RewriteTest {
     void removeMatchingElementInMatchingFile() {
         rewriteRun(
           spec -> spec.recipe(new RemoveXmlTag("//bean", "**/beans.xml")),
-
-
           xml(
             """
               <beans>
