@@ -56,7 +56,7 @@ class RemoveXmlTagTest implements RewriteTest {
     @Test
     void elementNotMatched() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveXmlTag("notBean", null)),
+          spec -> spec.recipe(new RemoveXmlTag("//notBean", null)),
           xml(
             """
               <beans>
