@@ -28,7 +28,9 @@ import java.util.List;
 
 /**
  * Produce a part by user provided sample code and type, make sure the part can be produced from the sample code and only once.
+ * Deprecated, please use JavaTemplate instead.
  */
+@Deprecated
 public final class PartProvider {
     private PartProvider() {
     }
