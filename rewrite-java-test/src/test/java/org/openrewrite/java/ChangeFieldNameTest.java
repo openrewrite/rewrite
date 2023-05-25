@@ -204,4 +204,29 @@ class ChangeFieldNameTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dontChangeFieldsInConstructor() {
+        rewriteRun(
+          spec -> spec.recipe(changeFieldName("Test", "a", "b")),
+          java(
+            """
+              class Test {
+                  String a;
+                  public Test(String a) {
+                      this.a = a;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  String b;
+                  public Test(String a) {
+                      this.b = a;
+                  }
+              }
+              """
+          )
+        );
+    }
 }
