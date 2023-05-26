@@ -16,23 +16,13 @@
 package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
 import lombok.Value;
-import org.openrewrite.*;
-import org.openrewrite.gradle.util.Dependency;
-import org.openrewrite.gradle.util.DependencyStringNotationConverter;
-import org.openrewrite.groovy.GroovyVisitor;
-import org.openrewrite.groovy.tree.G;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.semver.DependencyMatcher;
 
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
-
-import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -53,10 +43,6 @@ public class RemoveGradleDependency extends Recipe {
             example = "jackson-module*")
     String artifactId;
 
-
-    @Getter(lazy = true)
-    List<Recipe> recipeList = Arrays.asList(new RemoveDependency(groupId, artifactId, configuration));
-
     @Override
     public String getDisplayName() {
         return "Remove a Gradle dependency";
@@ -67,4 +53,7 @@ public class RemoveGradleDependency extends Recipe {
         return "Deprecated form of `RemoveDependency`. Use that instead.";
     }
 
+    public List<Recipe> getRecipeList() {
+        return Collections.singletonList(new RemoveDependency(groupId, artifactId, configuration));
+    }
 }

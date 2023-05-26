@@ -29,9 +29,7 @@ import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SourcesFileErrors;
 
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Stack;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiFunction;
 
@@ -98,6 +96,7 @@ public class RecipeScheduler {
         ExecutionContext ctx;
         RecipeRunStats recipeRunStats;
         SourcesFileErrors errorsTable;
+        Map<Recipe, List<Recipe>> recipeLists = new IdentityHashMap<>();
 
         long cycleStartTime = System.nanoTime();
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean();
@@ -257,7 +256,7 @@ public class RecipeScheduler {
         }
 
         private void recurseRecipeList(Stack<Stack<Recipe>> allRecipesStack, Stack<Recipe> recipeStack) {
-            List<Recipe> recipeList = recipeStack.peek().getRecipeList();
+            List<Recipe> recipeList = recipeLists.computeIfAbsent(recipeStack.peek(), Recipe::getRecipeList);
             for (int i = recipeList.size() - 1; i >= 0; i--) {
                 Recipe r = recipeList.get(i);
                 if (ctx.getMessage(PANIC) != null) {

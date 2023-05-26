@@ -257,9 +257,8 @@ public abstract class Recipe implements Cloneable {
 
     /**
      * A list of recipes that run, source file by source file,
-     * after this recipe. This list should return the same instances
-     * for each invocation of the method, and NOT construct new {@link Recipe}
-     * instances per invocation.
+     * after this recipe. This method is guaranteed to be called only once
+     * per cycle.
      *
      * @return The list of recipes to run.
      */

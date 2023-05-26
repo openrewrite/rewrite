@@ -105,8 +105,9 @@ class AssertionsTest implements RewriteTest {
             return "Super description.";
         }
 
-        @Getter(lazy = true)
-        private final List<Recipe> recipeList = Collections.singletonList(new NonMavenRecipe());
+        public List<Recipe> getRecipeList() {
+            return Collections.singletonList(new NonMavenRecipe());
+        }
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
