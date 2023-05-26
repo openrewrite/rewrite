@@ -67,7 +67,9 @@ public class Assertions {
                             G.CompilationUnit g = (G.CompilationUnit) sourceFile;
                             if (g.getSourcePath().toString().endsWith(".gradle")) {
                                 Path groovyGradle = tempDirectory.resolve(g.getSourcePath());
-                                projectDir = groovyGradle.getParent();
+                                if (!tempDirectory.equals(groovyGradle.getParent()) && tempDirectory.equals(groovyGradle.getParent().getParent())) {
+                                    projectDir = groovyGradle.getParent();
+                                }
                                 Files.createDirectories(groovyGradle.getParent());
                                 Files.write(groovyGradle, g.printAllAsBytes());
                             }
@@ -75,7 +77,9 @@ public class Assertions {
                             Properties.File f = (Properties.File) sourceFile;
                             if (f.getSourcePath().endsWith("gradle.properties")) {
                                 Path gradleProperties = tempDirectory.resolve(f.getSourcePath());
-                                projectDir = gradleProperties.getParent();
+                                if (!tempDirectory.equals(gradleProperties.getParent()) && tempDirectory.equals(gradleProperties.getParent().getParent())) {
+                                    projectDir = gradleProperties.getParent();
+                                }
                                 Files.createDirectories(gradleProperties.getParent());
                                 Files.write(gradleProperties, f.printAllAsBytes());
                             }
@@ -103,13 +107,12 @@ public class Assertions {
                         Files.copy(requireNonNull(UpdateGradleWrapper.class.getResourceAsStream("/gradlew.bat")), projectDir.resolve(GradleWrapper.WRAPPER_BATCH_LOCATION));
                     }
 
-                    OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile());
-                    GradleProject gradleProject = GradleProject.fromToolingModel(model.gradleProject());
                     for (int i = 0; i < sourceFiles.size(); i++) {
                         SourceFile sourceFile = sourceFiles.get(i);
-                        if (sourceFile.getSourcePath().toString().endsWith(".gradle")) {
+                        if (sourceFile.getSourcePath().toString().endsWith(".gradle") && !sourceFile.getSourcePath().endsWith("settings.gradle")) {
+                            OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile(), tempDirectory.resolve(sourceFile.getSourcePath()).toFile());
+                            GradleProject gradleProject = GradleProject.fromToolingModel(model.gradleProject());
                             sourceFiles.set(i, sourceFile.withMarkers(sourceFile.getMarkers().add(gradleProject)));
-                            break;
                         }
                     }
                 } finally {

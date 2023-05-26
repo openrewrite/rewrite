@@ -64,6 +64,9 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
         if (i.getFieldType() != null) {
             JavaType.Variable varType = i.getFieldType();
             if (varType.getName().equals(hasName) && TypeUtils.isOfClassType(varType.getOwner(), classType)) {
+                if (varType.getOwner() instanceof JavaType.Method) {
+                    return i;
+                }
                 i = new J.Identifier(
                         randomId(),
                         i.getPrefix(),

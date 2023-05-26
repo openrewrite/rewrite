@@ -169,6 +169,14 @@ public class Assertions {
         return srcTestResources(spec -> sourceSet(spec, "test"), resources);
     }
 
+    public static SourceSpecs srcSmokeTestJava(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
+        return dir("src/smokeTest/java", spec, javaSources);
+    }
+
+    public static SourceSpecs srcSmokeTestJava(SourceSpecs... javaSources) {
+        return srcSmokeTestJava(spec -> sourceSet(spec, "smokeTest"), javaSources);
+    }
+
     public static SourceSpec<?> version(SourceSpec<?> sourceSpec, int version) {
         return sourceSpec.markers(javaVersion(version));
     }

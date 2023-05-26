@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -1059,6 +1060,53 @@ class RemoveRedundantDependencyVersionsTest implements RewriteTest {
                     </dependencies>
                 </project>
                   """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3268")
+    void unmanagedDependency() {
+        rewriteRun(
+          pomXml(
+            """
+                  <project>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>30.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3268")
+    void unmanagedDependencyOnlyIfVersionsMatchFalse() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveRedundantDependencyVersions(null, null, false, null)),
+          pomXml(
+            """
+                  <project>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                      <dependencies>
+                          <dependency>
+                              <groupId>com.google.guava</groupId>
+                              <artifactId>guava</artifactId>
+                              <version>30.0-jre</version>
+                          </dependency>
+                      </dependencies>
+                  </project>
+              """
           )
         );
     }

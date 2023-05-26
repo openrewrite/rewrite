@@ -37,6 +37,7 @@ import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
+@Deprecated // Use UpgradeDependencyVersion instead
 public class ChangeDependencyVersion extends Recipe {
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. This can be a glob expression.",

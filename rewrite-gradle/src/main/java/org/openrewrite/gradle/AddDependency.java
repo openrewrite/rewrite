@@ -20,18 +20,14 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
-import org.openrewrite.gradle.util.Dependency;
-import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
-import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.MavenDownloadingException;
@@ -61,12 +57,12 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
+            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
             example = "com.google.guava")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`",
+            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'",
             example = "guava")
     String artifactId;
 
@@ -120,6 +116,13 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     @Nullable
     String familyPattern;
 
+    @Option(displayName = "Accept transitive",
+            description = "Default false. If enabled, the dependency will not be added if it is already on the classpath as a transitive dependency.",
+            example = "true",
+            required = false)
+    @Nullable
+    Boolean acceptTransitive;
+
     static final String DEPENDENCY_PRESENT = "org.openrewrite.gradle.AddDependency.DEPENDENCY_PRESENT";
 
     @Override
@@ -143,7 +146,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     static class Scanned {
         boolean usingType;
-        Map<JavaProject, String> configurationByProject = new HashMap<>();
+        Map<JavaProject, Set<String>> configurationsByProject = new HashMap<>();
     }
 
     @Override
@@ -161,10 +164,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
                             if (sourceFile != new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx)) {
                                 acc.usingType = true;
-                                acc.configurationByProject.compute(javaProject, (jp, configuration) -> "implementation".equals(configuration) ?
-                                        configuration :
-                                        "test".equals(sourceSet.getName()) ? "testImplementation" : "implementation"
-                                );
+                                Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
+                                configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation");
                             }
                         }));
                 return tree;
@@ -174,101 +175,69 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
-        return Preconditions.check(acc.usingType && !acc.configurationByProject.isEmpty(),
+        return Preconditions.check(acc.usingType && !acc.configurationsByProject.isEmpty(),
                 Preconditions.check(new IsBuildGradle<>(), new GroovyIsoVisitor<ExecutionContext>() {
-                    final MethodMatcher dependencyDslMatcher = new MethodMatcher("DependencyHandlerSpec *(..)");
                     final Pattern familyPatternCompiled = StringUtils.isBlank(familyPattern) ? null : Pattern.compile(familyPattern.replace("*", ".*"));
 
                     @Override
-                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                        J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                        if (dependencyDslMatcher.matches(m) && (StringUtils.isBlank(configuration) || configuration.equals(m.getSimpleName()))) {
-                            if (m.getArguments().get(0) instanceof J.Literal) {
-                                //noinspection ConstantConditions
-                                Dependency dependency = DependencyStringNotationConverter.parse((String) ((J.Literal) m.getArguments().get(0)).getValue());
-                                if (groupId.equals(dependency.getGroupId()) && artifactId.equals(dependency.getArtifactId())) {
-                                    getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, DEPENDENCY_PRESENT, true);
-                                }
-                            } else if (m.getArguments().get(0) instanceof G.GString) {
-                                List<J> strings = ((G.GString) m.getArguments().get(0)).getStrings();
-                                if (strings.size() >= 2 &&
-                                        strings.get(0) instanceof J.Literal) {
-                                    String dep = (String) ((J.Literal) strings.get(0)).getValue();
-                                    if (dep != null) {
-                                        Dependency dependency = DependencyStringNotationConverter.parse(dep);
-                                        if (groupId.equals(dependency.getGroupId()) && artifactId.equals(dependency.getArtifactId())) {
-                                            getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, DEPENDENCY_PRESENT, true);
-                                        }
-                                    }
-                                }
-                            } else if (m.getArguments().get(0) instanceof G.MapEntry) {
-                                G.MapEntry groupEntry = null;
-                                G.MapEntry artifactEntry = null;
+                    public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        if (!(tree instanceof JavaSourceFile)) {
+                            return (J) tree;
+                        }
+                        JavaSourceFile s = (JavaSourceFile) tree;
+                        if (!s.getSourcePath().toString().endsWith(".gradle") || s.getSourcePath().getFileName().toString().equals("settings.gradle")) {
+                            return s;
+                        }
 
-                                for (Expression e : m.getArguments()) {
-                                    if (!(e instanceof G.MapEntry)) {
-                                        continue;
-                                    }
-                                    G.MapEntry arg = (G.MapEntry) e;
-                                    if (!(arg.getKey() instanceof J.Literal) || !(arg.getValue() instanceof J.Literal)) {
-                                        continue;
-                                    }
-                                    J.Literal key = (J.Literal) arg.getKey();
-                                    J.Literal value = (J.Literal) arg.getValue();
-                                    if (!(key.getValue() instanceof String) || !(value.getValue() instanceof String)) {
-                                        continue;
-                                    }
-                                    if ("group".equals(key.getValue())) {
-                                        groupEntry = arg;
-                                    } else if ("name".equals(key.getValue())) {
-                                        artifactEntry = arg;
-                                    }
-                                }
+                        Optional<JavaProject> maybeJp = s.getMarkers().findFirst(JavaProject.class);
+                        if (!maybeJp.isPresent()) {
+                            return s;
+                        }
 
-                                if (groupEntry == null || artifactEntry == null) {
-                                    return m;
-                                }
+                        JavaProject jp = maybeJp.get();
+                        if (!acc.configurationsByProject.containsKey(jp)) {
+                            return s;
+                        }
 
-                                if (groupId.equals(((J.Literal) groupEntry.getValue()).getValue())
-                                    && artifactId.equals(((J.Literal) artifactEntry.getValue()).getValue())) {
-                                    getCursor().putMessageOnFirstEnclosing(G.CompilationUnit.class, DEPENDENCY_PRESENT, true);
+                        Optional<GradleProject> maybeGp = s.getMarkers().findFirst(GradleProject.class);
+                        if (!maybeGp.isPresent()) {
+                            return s;
+                        }
+
+                        GradleProject gp = maybeGp.get();
+
+                        Set<String> resolvedConfigurations = StringUtils.isBlank(configuration) ? acc.configurationsByProject.get(jp) : new HashSet<>(Collections.singletonList(configuration));
+                        Set<String> tmpConfigurations = new HashSet<>(resolvedConfigurations);
+                        for (String tmpConfiguration : tmpConfigurations) {
+                            GradleDependencyConfiguration gdc = gp.getConfiguration(tmpConfiguration);
+                            if (gdc == null || gdc.findRequestedDependency(groupId, artifactId) != null) {
+                                resolvedConfigurations.remove(tmpConfiguration);
+                            }
+                        }
+
+                        tmpConfigurations = new HashSet<>(resolvedConfigurations);
+                        for (String tmpConfiguration : tmpConfigurations) {
+                            GradleDependencyConfiguration gdc = gp.getConfiguration(tmpConfiguration);
+                            for (GradleDependencyConfiguration transitive : gp.configurationsExtendingFrom(gdc, true)) {
+                                if (resolvedConfigurations.contains(transitive.getName()) ||
+                                    (Boolean.TRUE.equals(acceptTransitive) && transitive.findResolvedDependency(groupId, artifactId) != null)) {
+                                    resolvedConfigurations.remove(transitive.getName());
                                 }
                             }
                         }
 
-                        return m;
-                    }
-
-                    @Override
-                    public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-                        if (!cu.getSourcePath().toString().endsWith(".gradle") || cu.getSourcePath().getFileName().toString().equals("settings.gradle")) {
-                            return cu;
+                        if (resolvedConfigurations.isEmpty()) {
+                            return s;
                         }
 
-                        JavaProject javaProject = getCursor().firstEnclosingOrThrow(JavaSourceFile.class)
-                                .getMarkers().findFirst(JavaProject.class).orElse(null);
-                        String maybeConfiguration = javaProject == null ? null :
-                                acc.configurationByProject.get(javaProject);
-                        if (maybeConfiguration == null) {
-                            return cu;
-                        }
-
-                        G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
-
-                        if (getCursor().getMessage(DEPENDENCY_PRESENT, false)) {
-                            return g;
-                        }
-
-                        String resolvedConfiguration = StringUtils.isBlank(configuration) ? maybeConfiguration : configuration;
                         String resolvedVersion = version;
-                        Optional<GradleProject> maybeGp = g.getMarkers().findFirst(GradleProject.class);
-                        if (version != null && maybeGp.isPresent()) {
+                        if (version != null) {
                             Validated versionValidation = Semver.validate(version, versionPattern);
                             if (versionValidation.isValid() && versionValidation.getValue() != null) {
                                 VersionComparator versionComparator = versionValidation.getValue();
-                                if(!(versionComparator instanceof ExactVersion)) {
+                                if (!(versionComparator instanceof ExactVersion)) {
                                     try {
-                                        resolvedVersion = findNewerVersion(groupId, artifactId, version, versionComparator, maybeGp.get(), ctx);
+                                        resolvedVersion = findNewerVersion(groupId, artifactId, version, versionComparator, gp, ctx);
                                     } catch (MavenDownloadingException e) {
                                         throw new RuntimeException(e);
                                     }
@@ -276,20 +245,22 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             }
                         }
 
-                        g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, resolvedVersion,
-                                StringUtils.isBlank(versionPattern) ? null : versionPattern,
-                                resolvedConfiguration,
-                                StringUtils.isBlank(classifier) ? null : classifier,
-                                StringUtils.isBlank(extension) ? null : extension,
-                                familyPatternCompiled).visitNonNull(g, ctx, requireNonNull(getCursor().getParent()));
-                        if(g != cu && maybeGp.isPresent()) {
-                            String versionWithPattern = resolvedVersion + (StringUtils.isBlank(versionPattern) ? "" : versionPattern);
-                            GradleProject gp = maybeGp.get();
-                            GradleProject newGp = addDependency(gp,
-                                    gp.getConfiguration(resolvedConfiguration),
-                                    new GroupArtifactVersion(groupId, artifactId, versionWithPattern),
-                                    classifier,
-                                    ctx);
+                        G.CompilationUnit g = (G.CompilationUnit) s;
+                        for (String resolvedConfiguration : resolvedConfigurations) {
+                            g = (G.CompilationUnit) new AddDependencyVisitor(groupId, artifactId, resolvedVersion, StringUtils.isBlank(versionPattern) ? null : versionPattern, resolvedConfiguration,
+                                    StringUtils.isBlank(classifier) ? null : classifier, StringUtils.isBlank(extension) ? null : extension, familyPatternCompiled).visitNonNull(g, ctx);
+                        }
+
+                        if (g != s) {
+                            String versionWithPattern = StringUtils.isBlank(resolvedVersion) || resolvedVersion.startsWith("$") ? null : resolvedVersion;
+                            GradleProject newGp = gp;
+                            for (String resolvedConfiguration : resolvedConfigurations) {
+                                newGp = addDependency(newGp,
+                                        newGp.getConfiguration(resolvedConfiguration),
+                                        new GroupArtifactVersion(groupId, artifactId, versionWithPattern),
+                                        classifier,
+                                        ctx);
+                            }
                             g = g.withMarkers(g.getMarkers().setByType(newGp));
                         }
                         return g;
@@ -302,11 +273,11 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
      * Update the dependency model, adding the specified dependency to the specified configuration and all configurations
      * which extend from it.
      *
-     * @param gp marker with the current, pre-update dependency information
+     * @param gp            marker with the current, pre-update dependency information
      * @param configuration the configuration to add the dependency to
-     * @param gav the group, artifact, and version of the dependency to add
-     * @param classifier the classifier of the dependency to add
-     * @param ctx context which will be used to download the pom for the dependency
+     * @param gav           the group, artifact, and version of the dependency to add
+     * @param classifier    the classifier of the dependency to add
+     * @param ctx           context which will be used to download the pom for the dependency
      * @return a copy of gp with the dependency added
      */
     static GradleProject addDependency(
@@ -316,14 +287,21 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             @Nullable String classifier,
             ExecutionContext ctx) {
         try {
-            if(gav.getGroupId() == null || gav.getArtifactId() == null || configuration == null) {
+            if (gav.getGroupId() == null || gav.getArtifactId() == null || configuration == null) {
                 return gp;
             }
-            MavenPomDownloader mpd = new MavenPomDownloader(emptyMap(), ctx, null,  null);
-            Pom pom = mpd.download(gav, null, null, gp.getMavenRepositories());
-            ResolvedPom resolvedPom = pom.resolve(emptyList(), mpd, gp.getMavenRepositories(), ctx);
-            ResolvedGroupArtifactVersion resolvedGav = resolvedPom.getGav();
-            List<ResolvedDependency> transitiveDependencies = resolvedPom.resolveDependencies(Scope.Runtime, mpd, ctx);
+            ResolvedGroupArtifactVersion resolvedGav;
+            List<ResolvedDependency> transitiveDependencies;
+            if (gav.getVersion() == null) {
+                resolvedGav = null;
+                transitiveDependencies = Collections.emptyList();
+            } else {
+                MavenPomDownloader mpd = new MavenPomDownloader(emptyMap(), ctx, null, null);
+                Pom pom = mpd.download(gav, null, null, gp.getMavenRepositories());
+                ResolvedPom resolvedPom = pom.resolve(emptyList(), mpd, gp.getMavenRepositories(), ctx);
+                resolvedGav = resolvedPom.getGav();
+                transitiveDependencies = resolvedPom.resolveDependencies(Scope.Runtime, mpd, ctx);
+            }
             Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
             Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());
 
@@ -332,8 +310,8 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             gp.configurationsExtendingFrom(configuration, true).stream())
                     .collect(Collectors.toSet());
 
-            for(GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
-                if(!configurationsToAdd.contains(gdc)) {
+            for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
+                if (!configurationsToAdd.contains(gdc)) {
                     newNameToConfiguration.put(gdc.getName(), gdc);
                     continue;
                 }
@@ -350,7 +328,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             return requested;
                         }),
                         newRequested));
-                if(newGdc.isCanBeResolved()) {
+                if (newGdc.isCanBeResolved() && resolvedGav != null) {
                     newGdc = newGdc.withResolved(ListUtils.concat(
                             ListUtils.map(gdc.getResolved(), resolved -> {
                                 // Remove any existing dependency with the same group and artifact id
@@ -360,7 +338,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                                 return resolved;
                             }),
                             new ResolvedDependency(null, resolvedGav, newRequested, transitiveDependencies,
-                                    emptyList(), "jar",  classifier, null, 0, null)));
+                                    emptyList(), "jar", classifier, null, 0, null)));
                 }
                 newNameToConfiguration.put(newGdc.getName(), newGdc);
             }

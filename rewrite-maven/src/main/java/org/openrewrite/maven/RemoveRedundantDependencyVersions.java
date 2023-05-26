@@ -117,10 +117,11 @@ public class RemoveRedundantDependencyVersions extends Recipe {
             }
 
             private boolean matchesVersion(ResolvedDependency d) {
-                return ignoreVersionMatching() ||
-                        d.getRequested().getVersion() != null
-                        && d.getRequested().getVersion().equals(getResolutionResult().getPom().getManagedVersion(d.getGroupId(), d.getArtifactId(),
-                        d.getRequested().getType(), d.getRequested().getClassifier()));
+                String managedVersion = getResolutionResult().getPom().getManagedVersion(d.getGroupId(),
+                        d.getArtifactId(), d.getRequested().getType(), d.getRequested().getClassifier());
+                return managedVersion != null && (
+                        ignoreVersionMatching() || managedVersion.equals(d.getRequested().getVersion())
+                );
             }
 
             private boolean ignoreVersionMatching() {
