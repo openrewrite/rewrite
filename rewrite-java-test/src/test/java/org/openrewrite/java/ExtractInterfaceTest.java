@@ -41,7 +41,7 @@ class ExtractInterfaceTest implements RewriteTest {
         }
 
         @Override
-        public AtomicReference<J.CompilationUnit> getInitialValue() {
+        public AtomicReference<J.CompilationUnit> getInitialValue(ExecutionContext ctx) {
             return new AtomicReference<>();
         }
 

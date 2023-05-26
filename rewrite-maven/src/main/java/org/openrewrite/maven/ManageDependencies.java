@@ -82,7 +82,7 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
     }
 
     @Override
-    public Map<GroupArtifactVersion, Collection<ResolvedDependency>> getInitialValue() {
+    public Map<GroupArtifactVersion, Collection<ResolvedDependency>> getInitialValue(ExecutionContext ctx) {
         return new HashMap<>();
     }
 

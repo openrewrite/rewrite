@@ -64,7 +64,7 @@ public class MoveContentToFile extends ScanningRecipe<MoveContentToFile.Scanned>
     }
 
     @Override
-    public Scanned getInitialValue() {
+    public Scanned getInitialValue(ExecutionContext ctx) {
         return new Scanned();
     }
 

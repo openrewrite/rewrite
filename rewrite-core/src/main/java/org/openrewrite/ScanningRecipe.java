@@ -38,12 +38,12 @@ public abstract class ScanningRecipe<T> extends Recipe {
     /**
      * @return The initial value of the accumulator before any source files have been iterated over.
      */
-    public abstract T getInitialValue();
+    public abstract T getInitialValue(ExecutionContext ctx);
 
     /**
      * A visitor that is called for each source file in the repository in an initial pass.
      * Scanning data should be accumulated to <code>acc</code>. The first source file to visit
-     * will receive an <code>acc</code> value that is supplied by {@link #getInitialValue()}.
+     * will receive an <code>acc</code> value that is supplied by {@link #getInitialValue(ExecutionContext)}.
      * <br/>
      * Any changes that the scanning visitor makes to the source file will be discarded.
      *
@@ -85,8 +85,8 @@ public abstract class ScanningRecipe<T> extends Recipe {
         return TreeVisitor.noop();
     }
 
-    T getAccumulator(Cursor cursor) {
-        return cursor.getRoot().computeMessageIfAbsent(recipeAccMessage, m -> getInitialValue());
+    T getAccumulator(Cursor cursor, ExecutionContext ctx) {
+        return cursor.getRoot().computeMessageIfAbsent(recipeAccMessage, m -> getInitialValue(ctx));
     }
 
     @Override
@@ -95,26 +95,26 @@ public abstract class ScanningRecipe<T> extends Recipe {
 
             private TreeVisitor<?, ExecutionContext> delegate;
 
-            private TreeVisitor<?, ExecutionContext> delegate() {
+            private TreeVisitor<?, ExecutionContext> delegate(ExecutionContext ctx) {
                 if (delegate == null) {
-                    delegate = getVisitor(getAccumulator(getCursor()));
+                    delegate = getVisitor(getAccumulator(getCursor(), ctx));
                 }
                 return delegate;
             }
 
             @Override
             public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
-                return delegate().isAcceptable(sourceFile, ctx);
+                return delegate(ctx).isAcceptable(sourceFile, ctx);
             }
 
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx, Cursor parent) {
-                return delegate().visit(tree, ctx, parent);
+                return delegate(ctx).visit(tree, ctx, parent);
             }
 
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                return delegate().visit(tree, ctx);
+                return delegate(ctx).visit(tree, ctx);
             }
         };
     }

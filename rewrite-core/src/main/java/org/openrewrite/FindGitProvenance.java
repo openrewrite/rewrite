@@ -42,7 +42,7 @@ public class FindGitProvenance extends ScanningRecipe<Set<GitProvenance>> {
     }
 
     @Override
-    public Set<GitProvenance> getInitialValue() {
+    public Set<GitProvenance> getInitialValue(ExecutionContext ctx) {
         return new HashSet<>();
     }
 

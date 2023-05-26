@@ -66,7 +66,7 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
     }
 
     @Override
-    public NeedsProperty getInitialValue() {
+    public NeedsProperty getInitialValue(ExecutionContext ctx) {
         return new NeedsProperty();
     }
 

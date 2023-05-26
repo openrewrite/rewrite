@@ -160,7 +160,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     }
 
     @Override
-    public Scanned getInitialValue() {
+    public Scanned getInitialValue(ExecutionContext ctx) {
         return new Scanned();
     }
 

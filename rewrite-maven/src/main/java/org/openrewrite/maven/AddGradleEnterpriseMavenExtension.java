@@ -146,7 +146,7 @@ public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleE
     }
 
     @Override
-    public Accumulator getInitialValue() {
+    public Accumulator getInitialValue(ExecutionContext ctx) {
         return new Accumulator();
     }
 

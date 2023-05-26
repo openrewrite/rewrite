@@ -114,7 +114,7 @@ public class RecipeScheduler {
                     try {
                         //noinspection unchecked
                         ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
-                        Object acc = scanningRecipe.getAccumulator(rootCursor);
+                        Object acc = scanningRecipe.getAccumulator(rootCursor, ctx);
                         recipeRunStats.recordScan(recipe, () -> {
                             TreeVisitor<?, ExecutionContext> scanner = scanningRecipe.getScanner(acc);
                             if (scanner.isAcceptable(sourceFile, ctx)) {
@@ -146,7 +146,7 @@ public class RecipeScheduler {
                     //noinspection unchecked
                     ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
                     sourceSet.setRecipe(recipeStack);
-                    List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor), generatedInThisCycle, ctx));
+                    List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), generatedInThisCycle, ctx));
                     generatedInThisCycle.addAll(generated);
                     generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
                     acc = acc.generate(generated);

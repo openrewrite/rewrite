@@ -102,7 +102,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     }
 
     @Override
-    public GradleWrapperState getInitialValue() {
+    public GradleWrapperState getInitialValue(ExecutionContext ctx) {
         return new GradleWrapperState();
     }
 

@@ -142,7 +142,7 @@ public class AddManagedDependency extends ScanningRecipe<AddManagedDependency.Sc
     }
 
     @Override
-    public Scanned getInitialValue() {
+    public Scanned getInitialValue(ExecutionContext ctx) {
         Scanned scanned = new Scanned();
         scanned.usingType = onlyIfUsing == null;
         return scanned;

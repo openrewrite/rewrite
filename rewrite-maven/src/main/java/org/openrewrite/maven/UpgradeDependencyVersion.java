@@ -117,7 +117,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
     }
 
     @Override
-    public Set<GroupArtifact> getInitialValue() {
+    public Set<GroupArtifact> getInitialValue(ExecutionContext ctx) {
         return new HashSet<>();
     }
 

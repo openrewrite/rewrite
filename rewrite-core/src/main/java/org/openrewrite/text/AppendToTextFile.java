@@ -79,7 +79,7 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
     }
 
     @Override
-    public AtomicBoolean getInitialValue() {
+    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
         return new AtomicBoolean(false);
     }
 
