@@ -160,7 +160,7 @@ public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleE
                 }
 
                 SourceFile sourceFile = (SourceFile) tree;
-                String sourcePath = sourceFile.getSourcePath().toString();
+                String sourcePath = PathUtils.separatorsToUnix(sourceFile.getSourcePath().toString());
                 switch (sourcePath) {
                     case "pom.xml":
                         acc.setMavenProject(true);
