@@ -38,9 +38,7 @@ import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.semver.DependencyMatcher;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import static java.util.Objects.requireNonNull;
 
@@ -102,7 +100,7 @@ public class ChangeDependency extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new GroovyIsoVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
@@ -260,12 +258,8 @@ public class ChangeDependency extends Recipe {
             }
 
             private GradleProject updateGradleModel(GradleProject gp) {
-                Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
-                Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());
-                boolean anyChanged = false;
-                for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
-                    GradleDependencyConfiguration newGdc = gdc;
-                    newGdc = newGdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
+                for (GradleDependencyConfiguration gdc : gp.getConfigurations()) {
+                    gdc.unsafeSetRequested(ListUtils.map(gdc.getRequested(), requested -> {
                         if (depMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
                             GroupArtifactVersion gav = requested.getGav();
                             if (newGroupId != null) {
@@ -280,7 +274,7 @@ public class ChangeDependency extends Recipe {
                         }
                         return requested;
                     }));
-                    newGdc = newGdc.withResolved(ListUtils.map(gdc.getResolved(), resolved -> {
+                    gdc.unsafeSetResolved(ListUtils.map(gdc.getResolved(), resolved -> {
                         if (depMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
                             ResolvedGroupArtifactVersion gav = resolved.getGav();
                             if (newGroupId != null) {
@@ -295,11 +289,6 @@ public class ChangeDependency extends Recipe {
                         }
                         return resolved;
                     }));
-                    anyChanged |= newGdc != gdc;
-                    newNameToConfiguration.put(newGdc.getName(), newGdc);
-                }
-                if (anyChanged) {
-                    gp = gp.withNameToConfiguration(newNameToConfiguration);
                 }
                 return gp;
             }

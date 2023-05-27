@@ -418,29 +418,20 @@ public class UpgradeDependencyVersion extends Recipe {
             ResolvedPom resolvedPom = pom.resolve(emptyList(), mpd, gp.getMavenRepositories(), ctx);
             ResolvedGroupArtifactVersion resolvedGav = resolvedPom.getGav();
             List<ResolvedDependency> transitiveDependencies = resolvedPom.resolveDependencies(Scope.Runtime, mpd, ctx);
-            Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
-            Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());
-            boolean anyChanged = false;
-            for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
-                GradleDependencyConfiguration newGdc = gdc;
-                newGdc = newGdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
+            for (GradleDependencyConfiguration gdc : gp.getConfigurations()) {
+                gdc.unsafeSetRequested(ListUtils.map(gdc.getRequested(), requested -> {
                     if (!Objects.equals(requested.getGroupId(), gav.getGroupId()) || !Objects.equals(requested.getArtifactId(), gav.getArtifactId())) {
                         return requested;
                     }
                     return requested.withGav(gav);
                 }));
-                newGdc = newGdc.withResolved(ListUtils.map(gdc.getResolved(), resolved -> {
+                gdc.unsafeSetResolved(ListUtils.map(gdc.getResolved(), resolved -> {
                     if (!Objects.equals(resolved.getGroupId(), resolvedGav.getGroupId()) || !Objects.equals(resolved.getArtifactId(), resolvedGav.getArtifactId())) {
                         return resolved;
                     }
                     return resolved.withGav(resolvedGav)
                             .withDependencies(transitiveDependencies);
                 }));
-                anyChanged |= newGdc != gdc;
-                newNameToConfiguration.put(newGdc.getName(), newGdc);
-            }
-            if(anyChanged) {
-                gp = gp.withNameToConfiguration(newNameToConfiguration);
             }
         } catch (MavenDownloadingException | MavenDownloadingExceptions  e) {
             return gp;

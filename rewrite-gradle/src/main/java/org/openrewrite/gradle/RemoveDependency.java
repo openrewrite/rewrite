@@ -36,7 +36,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.semver.DependencyMatcher;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
@@ -96,30 +95,22 @@ public class RemoveDependency extends Recipe {
                 }
 
                 GradleProject gp = maybeGp.get();
-                Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
-                boolean anyChanged = false;
-                for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
-                    GradleDependencyConfiguration newGdc = gdc.withRequested(ListUtils.map(gdc.getRequested(), requested -> {
+                for (GradleDependencyConfiguration gdc : gp.getConfigurations()) {
+                    gdc.unsafeSetRequested(ListUtils.map(gdc.getRequested(), requested -> {
                         if (dependencyMatcher.matches(requested.getGroupId(), requested.getArtifactId())) {
                             return null;
                         }
                         return requested;
                     }));
-                    newGdc = newGdc.withResolved(ListUtils.map(newGdc.getResolved(), resolved -> {
+                    gdc.unsafeSetResolved(ListUtils.map(gdc.getResolved(), resolved -> {
                         if (dependencyMatcher.matches(resolved.getGroupId(), resolved.getArtifactId())) {
                             return null;
                         }
                         return resolved;
                     }));
-                    nameToConfiguration.put(newGdc.getName(), newGdc);
-                    anyChanged |= newGdc != gdc;
                 }
 
-                if (!anyChanged) {
-                    return cu;
-                }
-
-                return g.withMarkers(g.getMarkers().setByType(gp.withNameToConfiguration(nameToConfiguration)));
+                return g;
             }
 
             @Override

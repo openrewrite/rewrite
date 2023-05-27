@@ -299,10 +299,9 @@ public class AddDependency extends Recipe {
                     continue;
                 }
 
-                GradleDependencyConfiguration newGdc = gdc;
                 org.openrewrite.maven.tree.Dependency newRequested = new org.openrewrite.maven.tree.Dependency(
                         gav, classifier, "jar", gdc.getName(), emptyList(), null);
-                newGdc = newGdc.withRequested(ListUtils.concat(
+                gdc.unsafeSetRequested(ListUtils.concat(
                         ListUtils.map(gdc.getRequested(), requested -> {
                             // Remove any existing dependency with the same group and artifact id
                             if (Objects.equals(requested.getGroupId(), gav.getGroupId()) && Objects.equals(requested.getArtifactId(), gav.getArtifactId())) {
@@ -311,8 +310,8 @@ public class AddDependency extends Recipe {
                             return requested;
                         }),
                         newRequested));
-                if (newGdc.isCanBeResolved() && resolvedGav != null) {
-                    newGdc = newGdc.withResolved(ListUtils.concat(
+                if (gdc.isCanBeResolved() && resolvedGav != null) {
+                    gdc.unsafeSetResolved(ListUtils.concat(
                             ListUtils.map(gdc.getResolved(), resolved -> {
                                 // Remove any existing dependency with the same group and artifact id
                                 if (Objects.equals(resolved.getGroupId(), resolvedGav.getGroupId()) && Objects.equals(resolved.getArtifactId(), resolvedGav.getArtifactId())) {
@@ -323,7 +322,7 @@ public class AddDependency extends Recipe {
                             new ResolvedDependency(null, resolvedGav, newRequested, transitiveDependencies,
                                     emptyList(), "jar",  classifier, null, 0, null)));
                 }
-                newNameToConfiguration.put(newGdc.getName(), newGdc);
+                newNameToConfiguration.put(gdc.getName(), gdc);
             }
             gp = gp.withNameToConfiguration(newNameToConfiguration);
         } catch (MavenDownloadingException | MavenDownloadingExceptions | IllegalArgumentException e) {
