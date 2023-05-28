@@ -3520,6 +3520,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         throw new UnsupportedOperationException(generateUnsupportedMessage("FirWrappedExpression"));
     }
 
+    public J visitNoReceiverExpression(FirNoReceiverExpression noReceiverExpression, ExecutionContext ctx) {
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirNoReceiverExpression"));
+    }
+
     /* Error element visits */
 
     @Override
@@ -3800,6 +3804,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitWrappedArgumentExpression((FirWrappedArgumentExpression) firElement, ctx);
         } else if (firElement instanceof FirWrappedExpression) {
             return visitWrappedExpression((FirWrappedExpression) firElement, ctx);
+        } else if(firElement instanceof FirNoReceiverExpression) {
+            return visitNoReceiverExpression((FirNoReceiverExpression) firElement, ctx);
         }
 
         throw new IllegalArgumentException("Unsupported FirElement.");
