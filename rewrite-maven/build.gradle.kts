@@ -36,8 +36,11 @@ dependencies {
     implementation("io.micrometer:micrometer-core:1.9.+")
 
     implementation("org.apache.commons:commons-text:latest.release")
+    implementation("commons-io:commons-io:2.12.0")
+    implementation("commons-codec:commons-codec:1.15")
 
     testImplementation(project(":rewrite-test"))
+    testImplementation(project(":rewrite-properties"))
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
     testImplementation("com.squareup.okio:okio-jvm:3.0.0")
     testImplementation("org.mapdb:mapdb:latest.release")
