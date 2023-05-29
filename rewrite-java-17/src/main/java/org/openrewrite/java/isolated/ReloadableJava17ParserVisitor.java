@@ -1472,10 +1472,14 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
         Space varargs = null;
         if (typeExpr != null && typeExpr.getMarkers().findFirst(JavaVarKeyword.class).isEmpty()) {
-            int varargStart = indexOfNextNonWhitespace(vartype.getStartPosition(), source);
+            int varargStart = indexOfNextNonWhitespace(vartype.pos, source);
             if (source.startsWith("...", varargStart)) {
-                varargs = format(source.substring(cursor, varargStart));
                 cursor = varargStart + 3;
+                if (vartype instanceof JCArrayTypeTree) {
+                    JCExpression elementType = ((JCArrayTypeTree) vartype).elemtype;
+                    varargStart = vartype.getStartPosition() + elementType.toString().length();
+                }
+                varargs = format(source.substring(varargStart, cursor));
             }
         }
 

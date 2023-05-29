@@ -64,6 +64,20 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void typeVarargs() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  void foo(String  ...  args) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void interfaceMethodDecl() {
         rewriteRun(
           java(
