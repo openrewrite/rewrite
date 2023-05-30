@@ -17,10 +17,10 @@ package org.openrewrite.maven.search;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenIsoVisitor;
-import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.tree.Xml;
@@ -42,7 +42,7 @@ public class EffectiveMavenRepositories extends Recipe {
     }
 
     @Override
-    protected MavenVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {

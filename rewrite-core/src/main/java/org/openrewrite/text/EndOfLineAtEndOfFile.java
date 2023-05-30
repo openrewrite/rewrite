@@ -17,8 +17,11 @@ package org.openrewrite.text;
 
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
+
+import static java.util.Objects.requireNonNull;
 
 public class EndOfLineAtEndOfFile extends Recipe {
 
@@ -35,10 +38,11 @@ public class EndOfLineAtEndOfFile extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Tree visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 if (sourceFile instanceof Quark || sourceFile instanceof Remote || sourceFile instanceof Binary) {
                     return sourceFile;
                 }

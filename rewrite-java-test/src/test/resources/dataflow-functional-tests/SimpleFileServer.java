@@ -17,15 +17,6 @@
  ******************************************************************************/
 package org.eclipse.californium.examples;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.SocketException;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-
 import org.eclipse.californium.core.CoapResource;
 import org.eclipse.californium.core.coap.CoAP;
 import org.eclipse.californium.core.coap.MediaTypeRegistry;
@@ -37,9 +28,9 @@ import org.eclipse.californium.core.server.resources.CoapExchange;
 import org.eclipse.californium.core.server.resources.MyIpResource;
 import org.eclipse.californium.core.server.resources.Resource;
 import org.eclipse.californium.elements.config.Configuration;
-import org.eclipse.californium.elements.config.UdpConfig;
 import org.eclipse.californium.elements.config.Configuration.DefinitionsProvider;
 import org.eclipse.californium.elements.config.TcpConfig;
+import org.eclipse.californium.elements.config.UdpConfig;
 import org.eclipse.californium.elements.util.StringUtil;
 import org.eclipse.californium.plugtests.AbstractTestServer;
 import org.eclipse.californium.plugtests.PlugtestServer.BaseConfig;
@@ -47,12 +38,20 @@ import org.eclipse.californium.plugtests.resources.MyContext;
 import org.eclipse.californium.scandium.config.DtlsConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.ParameterException;
 import picocli.CommandLine.ParseResult;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.SocketException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 public class SimpleFileServer extends AbstractTestServer {
 

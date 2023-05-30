@@ -23,7 +23,10 @@ import org.antlr.v4.runtime.tree.TerminalNode;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.json.internal.grammar.*;
+import org.openrewrite.json.internal.grammar.JsonPathLexer;
+import org.openrewrite.json.internal.grammar.JsonPathParser;
+import org.openrewrite.json.internal.grammar.JsonPathParserBaseVisitor;
+import org.openrewrite.json.internal.grammar.JsonPathParserVisitor;
 import org.openrewrite.json.tree.Json;
 
 import java.util.*;

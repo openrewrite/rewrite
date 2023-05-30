@@ -16,8 +16,8 @@
 package org.openrewrite.properties;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Issue;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.properties.Assertions.properties;
@@ -31,7 +31,6 @@ class ChangePropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "",
             "true",
-            null,
             null
           )),
           properties(
@@ -48,7 +47,6 @@ class ChangePropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "",
-            null,
             null
           )),
           properties(
@@ -65,7 +63,6 @@ class ChangePropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
-            null,
             null
           )),
           properties(
@@ -83,7 +80,6 @@ class ChangePropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
-            null,
             null
           )),
           properties(
@@ -105,8 +101,7 @@ class ChangePropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
-            ":",
-            null
+            ":"
           )),
           properties(
             """
@@ -127,8 +122,7 @@ class ChangePropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
-            "    ",
-            null
+            "    "
           )),
           properties(
             """
@@ -138,30 +132,6 @@ class ChangePropertyTest implements RewriteTest {
               management=true
               management.metrics.enable.process.files    true
               """
-          )
-        );
-    }
-
-    @Test
-    void changeOnlyMatchingFile() {
-        rewriteRun(
-          spec -> spec.recipe(new AddProperty(
-            "management.metrics.enable.process.files",
-            "true",
-            null,
-            "**/a.properties"
-          )),
-          properties(
-            "management=true",
-            """
-              management=true
-              management.metrics.enable.process.files=true
-              """,
-            spec -> spec.path("a.properties")
-          ),
-          properties(
-            "management=true",
-            spec -> spec.path("b.properties")
           )
         );
     }

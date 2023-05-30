@@ -204,7 +204,6 @@ public class Cursor {
         return cursor;
     }
 
-    @Incubating(since = "7.0.0")
     @Nullable
     public Cursor getParent(int levels) {
         Cursor cursor = this;
@@ -219,7 +218,6 @@ public class Cursor {
         return getParent(1);
     }
 
-    @Incubating(since = "7.0.0")
     public Cursor getParentOrThrow(int levels) {
         Cursor parent = getParent(levels);
         if (parent == null) {
@@ -235,7 +233,7 @@ public class Cursor {
     /**
      * Return the first parent of the current cursor which points to an AST element, or the root cursor if the current
      * cursor already points to the root AST element. This skips over non-tree Padding elements.
-     *
+     * <br/>
      * If you do want to access Padding elements, use getParent() or getParentOrThrow(), which do not skip over these elements.
      *
      * @return a cursor which either points at the first non-padding parent of the current element
@@ -273,8 +271,8 @@ public class Cursor {
         if (messages == null) {
             messages = new HashMap<>();
         }
-        @SuppressWarnings("unchecked") T t = (T) messages.computeIfAbsent(key, mappingFunction);
-        return t;
+        //noinspection unchecked
+        return (T) messages.computeIfAbsent(key, mappingFunction);
     }
 
     /**

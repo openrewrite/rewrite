@@ -16,9 +16,9 @@
 package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
-import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
@@ -46,7 +46,12 @@ class WrappingAndBracesTest implements RewriteTest {
 
     private static Consumer<RecipeSpec> wrappingAndBraces(UnaryOperator<SpacesStyle> spaces,
                                                           UnaryOperator<WrappingAndBracesStyle> wrapping) {
-        return spec -> spec.recipe(new WrappingAndBraces().doNext(new TabsAndIndents()).doNext(new Spaces()))
+        return spec -> spec
+          .recipes(
+            new WrappingAndBraces(),
+            new TabsAndIndents(),
+            new Spaces()
+          )
           .parser(JavaParser.fromJavaVersion().styles(singletonList(
             new NamedStyles(
               Tree.randomId(), "test", "test", "test", emptySet(),
@@ -63,7 +68,10 @@ class WrappingAndBracesTest implements RewriteTest {
     @Test
     void conditionalsShouldStartOnNewLines() {
         rewriteRun(
-          spec -> spec.recipe(new WrappingAndBraces().doNext(new TabsAndIndents())),
+          spec -> spec.recipes(
+            new WrappingAndBraces(),
+            new TabsAndIndents()
+          ),
           java(
             """
               class Test {

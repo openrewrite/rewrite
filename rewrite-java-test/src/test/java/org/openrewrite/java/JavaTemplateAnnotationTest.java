@@ -15,11 +15,10 @@
  */
 package org.openrewrite.java;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
@@ -41,10 +40,11 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   @Override
                   public J visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
                       annotation = annotation.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "@Deprecated(since = \"#{}\", forRemoval = true)")
+                        JavaTemplate.builder("@Deprecated(since = \"#{}\", forRemoval = true)")
+                          .context(getCursor())
                           .build(),
-                        annotation.getCoordinates().replace()
-                        ,
+                        getCursor(),
+                        annotation.getCoordinates().replace(),
                         "2.0"
                       );
                       return annotation;
@@ -75,10 +75,10 @@ class JavaTemplateAnnotationTest implements RewriteTest {
                   @Override
                   public J visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
                       annotation = annotation.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "@Deprecated(since = \"#{any(java.lang.String)}\", forRemoval = true)")
+                        JavaTemplate.builder("@Deprecated(since = \"#{any(java.lang.String)}\", forRemoval = true)")
                           .build(),
-                        annotation.getCoordinates().replace()
-                        ,
+                        getCursor(),
+                        annotation.getCoordinates().replace(),
                         "2.0"
                       );
                       return annotation;

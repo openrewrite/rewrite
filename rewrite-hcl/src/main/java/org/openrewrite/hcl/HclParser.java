@@ -20,7 +20,6 @@ import io.micrometer.core.instrument.Timer;
 import org.antlr.v4.runtime.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
 import org.openrewrite.hcl.internal.HclParserVisitor;
 import org.openrewrite.hcl.internal.grammar.HCLLexer;
 import org.openrewrite.hcl.internal.grammar.HCLParser;
@@ -37,8 +36,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-
-import static java.util.stream.Collectors.toList;
+import java.util.stream.Stream;
 
 public class HclParser implements Parser<Hcl.ConfigFile> {
     private final List<NamedStyles> styles;
@@ -48,7 +46,7 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
     }
 
     @Override
-    public List<Hcl.ConfigFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<Hcl.ConfigFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
@@ -88,8 +86,7 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
                         return null;
                     }
                 })
-                .filter(Objects::nonNull)
-                .collect(toList());
+                .filter(Objects::nonNull);
     }
 
     @Override

@@ -18,11 +18,9 @@ package org.openrewrite.xml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.HasSourcePath;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
@@ -47,21 +45,6 @@ public class ChangeTagName extends Recipe {
             description = "The new name for the tag.",
             example = "user")
     String newName;
-
-    @Option(displayName = "File matcher",
-            description = "If provided only matching files will be modified. This is a glob expression.",
-            required = false,
-            example = "'**/application-*.xml'")
-    @Nullable
-    String fileMatcher;
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        if (fileMatcher != null) {
-            return new HasSourcePath<>(fileMatcher);
-        }
-        return null;
-    }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {

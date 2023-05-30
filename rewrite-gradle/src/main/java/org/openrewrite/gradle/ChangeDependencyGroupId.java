@@ -71,18 +71,13 @@ public class ChangeDependencyGroupId extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsBuildGradle<>();
-    }
-
-    @Override
     public Validated validate() {
         return super.validate().and(DependencyMatcher.build(groupId + ":" + artifactId));
     }
 
     @Override
-    public GroovyVisitor<ExecutionContext> getVisitor() {
-        return new GroovyVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
 
@@ -186,6 +181,6 @@ public class ChangeDependencyGroupId extends Recipe {
 
                 return m;
             }
-        };
+        });
     }
 }

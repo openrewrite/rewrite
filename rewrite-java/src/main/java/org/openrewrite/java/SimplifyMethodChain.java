@@ -48,19 +48,6 @@ public class SimplifyMethodChain extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaVisitor<ExecutionContext>() {
-            @Override
-            public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                for (String method : methodPatternChain) {
-                    doAfterVisit(new UsesMethod<>(method));
-                }
-                return cu;
-            }
-        };
-    }
-
-    @Override
     public Validated validate() {
         return super.validate().and(Validated.test("methodPatternChain",
                 "Requires more than one pattern",
@@ -68,13 +55,21 @@ public class SimplifyMethodChain extends Recipe {
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         List<MethodMatcher> matchers = methodPatternChain.stream()
                 .map(MethodMatcher::new)
                 .collect(Collectors.toList());
         Collections.reverse(matchers);
 
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new JavaVisitor<ExecutionContext>() {
+            @Override
+            public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                for (String method : methodPatternChain) {
+                    doAfterVisit(new UsesMethod<>(method));
+                }
+                return cu;
+            }
+        }, new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
@@ -96,6 +91,6 @@ public class SimplifyMethodChain extends Recipe {
 
                 return m;
             }
-        };
+        });
     }
 }

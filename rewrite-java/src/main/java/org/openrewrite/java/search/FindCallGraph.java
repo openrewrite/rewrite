@@ -45,7 +45,7 @@ public class FindCallGraph extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             final JavaTypeSignatureBuilder signatureBuilder = new CallGraphSignatureBuilder();
             final Set<JavaType.Method> methodsCalledInDeclaration = Collections.newSetFromMap(new IdentityHashMap<>());

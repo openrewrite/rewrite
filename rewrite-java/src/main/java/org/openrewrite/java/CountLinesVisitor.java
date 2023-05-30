@@ -16,31 +16,41 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Tree;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.Statement;
 
 import java.util.concurrent.atomic.AtomicInteger;
+
+import static java.util.Objects.requireNonNull;
 
 public class CountLinesVisitor extends JavaVisitor<AtomicInteger> {
 
     @Override
-    public J visitJavaSourceFile(JavaSourceFile cu, AtomicInteger count) {
-        // Skip compilation unit prefix and EOF
-        if(cu.getPackageDeclaration() != null) {
-            // Package often does not have a prefix to count newlines within
-            count.incrementAndGet();
+    public J visit(@Nullable Tree tree, AtomicInteger count) {
+        if (tree instanceof JavaSourceFile) {
+            JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+            // Skip compilation unit prefix and EOF
+            if (cu.getPackageDeclaration() != null) {
+                // Package often does not have a prefix to count newlines within
+                count.incrementAndGet();
+            }
+            count.getAndAdd(cu.getImports().size());
+            for (J.ClassDeclaration c : cu.getClasses()) {
+                visit(c, count);
+            }
+            return cu;
         }
-        count.getAndAdd(cu.getImports().size());
-        for(J.ClassDeclaration c  : cu.getClasses()) {
-            visit(c, count);
-        }
-        return cu;
+        return super.visit(tree, count);
     }
 
     @Override
     public J visitBlock(J.Block block, AtomicInteger count) {
         // Skip whitespace related to opening and closing braces
         // Lines of code count shouldn't change based on curly brace placement
-        for(Statement s  : block.getStatements()) {
+        for (Statement s : block.getStatements()) {
             visit(s, count);
         }
         return block;
@@ -48,7 +58,7 @@ public class CountLinesVisitor extends JavaVisitor<AtomicInteger> {
 
     @Override
     public Space visitSpace(Space space, Space.Location loc, AtomicInteger count) {
-        if(space.getWhitespace().contains("\n")) {
+        if (space.getWhitespace().contains("\n")) {
             count.incrementAndGet();
         }
         return super.visitSpace(space, loc, count);

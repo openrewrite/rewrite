@@ -16,68 +16,49 @@
 package org.openrewrite.test;
 
 import lombok.RequiredArgsConstructor;
-import org.openrewrite.*;
+import org.openrewrite.LargeSourceSet;
+import org.openrewrite.RecipeScheduler;
+import org.openrewrite.Result;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.quark.Quark;
-
-import java.util.List;
-import java.util.Map;
-import java.util.Stack;
-import java.util.UUID;
-import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 
 @RequiredArgsConstructor
-class RecipeSchedulerCheckingExpectedCycles implements RecipeScheduler {
-    private final RecipeScheduler delegate;
+class RecipeSchedulerCheckingExpectedCycles extends RecipeScheduler {
     private final int expectedCyclesThatMakeChanges;
-
     private int cyclesThatResultedInChanges = 0;
+    @Nullable
+    private LargeSourceSet previousSourceSet;
 
     @Override
-    public <T> CompletableFuture<T> schedule(Callable<T> fn) {
-        return delegate.schedule(fn);
-    }
-
-    @Override
-    public <S extends SourceFile> List<S> scheduleVisit(
-            RecipeRunStats runStats,
-            Stack<Recipe> recipeStack,
-            List<S> before,
-            ExecutionContext ctx,
-            @Nullable Map<UUID, Boolean> singleSourceApplicableTestResult,
-            Map<UUID, Stack<Recipe>> recipeThatAddedOrDeletedSourceFile,
-            boolean isApplicableTest
-    ) {
-        ctx.putMessage("cyclesThatResultedInChanges", cyclesThatResultedInChanges);
-        List<S> afterList = delegate.scheduleVisit(runStats, recipeStack, before, ctx, singleSourceApplicableTestResult,
-            recipeThatAddedOrDeletedSourceFile, isApplicableTest);
-        if (afterList != before) {
+    public void afterCycle(LargeSourceSet sourceSet) {
+        if (sourceSet != previousSourceSet && sourceSet.getChangeset().size() > 0) {
             cyclesThatResultedInChanges++;
-            if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges &&
-                    !before.isEmpty() && !afterList.isEmpty()) {
-                for (int i = 0; i < before.size(); i++) {
-                    if (!(afterList.get(i) instanceof Quark)) {
-                        assertThat(afterList.get(i).printAllTrimmed())
+            if (cyclesThatResultedInChanges > expectedCyclesThatMakeChanges) {
+                for (Result result : sourceSet.getChangeset().getAllResults()) {
+                    SourceFile before = result.getBefore();
+                    SourceFile after = result.getAfter();
+                    if (before != null && after != null && !(after instanceof Quark)) {
+                        assertThat(after.printAllTrimmed())
                                 .as(
                                         "Expected recipe to complete in " + expectedCyclesThatMakeChanges + " cycle" + (expectedCyclesThatMakeChanges == 1 ? "" : "s") + ", " +
-                                                "but took at least one more cycle. Between the last two executed cycles there were changes to \"" + before.get(i).getSourcePath() + "\""
+                                        "but took at least one more cycle. Between the last two executed cycles there were changes to \"" + before.getSourcePath() + "\""
                                 )
-                                .isEqualTo(before.get(i).printAllTrimmed());
+                                .isEqualTo(before.printAllTrimmed());
                     }
                 }
             }
         }
-        return afterList;
+        previousSourceSet = sourceSet;
     }
 
     public void verify() {
         if (cyclesThatResultedInChanges != expectedCyclesThatMakeChanges) {
             fail("Expected recipe to complete in " + expectedCyclesThatMakeChanges + " cycle" + (expectedCyclesThatMakeChanges > 1 ? "s" : "") + ", " +
-                    "but took " + cyclesThatResultedInChanges + " cycle" + (cyclesThatResultedInChanges > 1 ? "s" : "") + ".");
+                 "but took " + cyclesThatResultedInChanges + " cycle" + (cyclesThatResultedInChanges > 1 ? "s" : "") + ".");
         }
     }
 }

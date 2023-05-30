@@ -45,8 +45,7 @@ public class TabsAndIndents extends Recipe {
             if (style == null) {
                 style = TabsAndIndentsStyle.DEFAULT;
             }
-            doAfterVisit(new TabsAndIndentsVisitor<>(style));
-            return document;
+            return (Xml.Document) new TabsAndIndentsVisitor<>(style).visitNonNull(document, ctx);
         }
     }
 }

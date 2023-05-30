@@ -63,8 +63,10 @@ class DeleteMethodArgumentTest implements RewriteTest {
     @Test
     void deleteArgumentsConsecutively() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteMethodArgument("B foo(int, int, int)", 1)
-            .doNext(new DeleteMethodArgument("B foo(int, int, int)", 1))),
+          spec -> spec.recipes(
+            new DeleteMethodArgument("B foo(int, int, int)", 1),
+            new DeleteMethodArgument("B foo(int, int, int)", 1)
+          ),
           java(b),
           java("public class A {{ B.foo(0, 1, 2); }}",
             "public class A {{ B.foo(0); }}"

@@ -17,8 +17,13 @@ package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.HasSourcePath;
+import org.openrewrite.Preconditions;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.yaml.tree.Yaml;
 
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.yaml.Assertions.yaml;
 
 class CopyValueTest implements RewriteTest {
@@ -27,7 +32,7 @@ class CopyValueTest implements RewriteTest {
     @Test
     void copyValueAndItsFormatting() {
         rewriteRun(
-          spec -> spec.recipe(new CopyValue(".source", ".destination", null)),
+          spec -> spec.recipe(new CopyValue(".source", ".destination")),
           yaml(
             """
               id: something
@@ -46,7 +51,7 @@ class CopyValueTest implements RewriteTest {
     @Test
     void onlyCopiesScalars() {
         rewriteRun(
-          spec -> spec.recipe(new CopyValue(".source", ".destination", null)),
+          spec -> spec.recipe(new CopyValue(".source", ".destination")),
           yaml(
             """
               id: something
@@ -62,9 +67,11 @@ class CopyValueTest implements RewriteTest {
     @Test
     void insertCopyValueAndRemoveSource() {
         rewriteRun(
-          spec -> spec.recipe(new MergeYaml("$", "destination: TEMP", true, null, null)
-            .doNext(new CopyValue(".source", ".destination", null))
-            .doNext(new DeleteKey(".source", null))),
+          spec -> spec.recipes(
+            new MergeYaml("$", "destination: TEMP", true, null),
+            new CopyValue(".source", ".destination"),
+            new DeleteKey(".source")
+          ),
           yaml(
             """
               id: something
@@ -81,7 +88,15 @@ class CopyValueTest implements RewriteTest {
     @Test
     void changeOnlyMatchingFile() {
         rewriteRun(
-          spec -> spec.recipe(new CopyValue(".source", ".destination", "**/a.yml")),
+          spec -> spec.recipe(
+            toRecipe(() -> Preconditions.check(new HasSourcePath<>("**/a.yml"), new YamlIsoVisitor<>() {
+                @Override
+                public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext executionContext) {
+                    doAfterVisit(new CopyValue(".source", ".destination"));
+                    return documents;
+                }
+            }))
+          ),
           yaml(
             """
               source: password

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.properties;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
@@ -29,8 +28,8 @@ import org.openrewrite.properties.tree.Properties;
 import java.util.List;
 import java.util.Set;
 
-@EqualsAndHashCode(callSuper = true)
 @Value
+@EqualsAndHashCode(callSuper = true)
 public class AddProperty extends Recipe {
 
     @Option(displayName = "Property key",
@@ -49,28 +48,6 @@ public class AddProperty extends Recipe {
     @Nullable
     String delimiter;
 
-    @Option(displayName = "Optional file matcher",
-            description = "Matching files will be modified. This is a glob expression.",
-            required = false,
-            example = "**/application-*.properties")
-    @Nullable
-    String fileMatcher;
-
-    public AddProperty(String property, String value, @Nullable String fileMatcher) {
-        this.property = property;
-        this.value = value;
-        this.delimiter = null;
-        this.fileMatcher = fileMatcher;
-    }
-
-    @JsonCreator
-    public AddProperty(String property, String value, @Nullable String delimiter, @Nullable String fileMatcher) {
-        this.property = property;
-        this.value = value;
-        this.delimiter = delimiter;
-        this.fileMatcher = fileMatcher;
-    }
-
     @Override
     public String getDisplayName() {
         return "Add a new property";
@@ -79,14 +56,6 @@ public class AddProperty extends Recipe {
     @Override
     public String getDescription() {
         return "Adds a new property to a property file at the bottom of the file if it's missing. Whitespace before and after the `=` must be included in the property and value.";
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        if (fileMatcher != null) {
-            return new HasSourcePath<>(fileMatcher);
-        }
-        return null;
     }
 
     @Override

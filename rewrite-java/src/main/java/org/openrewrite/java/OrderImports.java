@@ -30,7 +30,8 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaType;
 
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
 
 import static java.util.Collections.emptyList;
 

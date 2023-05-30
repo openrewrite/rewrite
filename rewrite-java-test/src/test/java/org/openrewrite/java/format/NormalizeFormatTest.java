@@ -16,9 +16,9 @@
 package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
@@ -40,10 +40,12 @@ class NormalizeFormatTest implements RewriteTest {
     @Test
     void removeAnnotationFromMethod() {
         rewriteRun(
-          spec -> spec.recipe(removeAnnotation
-            .doNext(new NormalizeFormat())
-            .doNext(new RemoveTrailingWhitespace())
-            .doNext(new TabsAndIndents())),
+          spec -> spec.recipes(
+            removeAnnotation,
+            new NormalizeFormat(),
+            new RemoveTrailingWhitespace(),
+            new TabsAndIndents()
+          ),
           java(
             """
               class Test {
@@ -54,7 +56,7 @@ class NormalizeFormatTest implements RewriteTest {
               """,
             """
               class Test {
-              
+                            
                   public void method(Test t) {
                   }
               }
@@ -66,10 +68,12 @@ class NormalizeFormatTest implements RewriteTest {
     @Test
     void removeAnnotationFromClass() {
         rewriteRun(
-          spec -> spec.recipe(removeAnnotation
-            .doNext(new NormalizeFormat())
-            .doNext(new RemoveTrailingWhitespace())
-            .doNext(new TabsAndIndents())),
+          spec -> spec.recipes(
+            removeAnnotation,
+            new NormalizeFormat(),
+            new RemoveTrailingWhitespace(),
+            new TabsAndIndents()
+          ),
           java(
             """
               class Test {
@@ -80,7 +84,7 @@ class NormalizeFormatTest implements RewriteTest {
               """,
             """
               class Test {
-              
+                            
                   class A {
                   }
               }
@@ -92,10 +96,12 @@ class NormalizeFormatTest implements RewriteTest {
     @Test
     void removeAnnotationFromVariable() {
         rewriteRun(
-          spec -> spec.recipe(removeAnnotation
-            .doNext(new NormalizeFormat())
-            .doNext(new RemoveTrailingWhitespace())
-            .doNext(new TabsAndIndents())),
+          spec -> spec.recipes(
+            removeAnnotation,
+            new NormalizeFormat(),
+            new RemoveTrailingWhitespace(),
+            new TabsAndIndents()
+          ),
           java(
             """
               class Test {
@@ -105,7 +111,7 @@ class NormalizeFormatTest implements RewriteTest {
               """,
             """
               class Test {
-              
+                            
                   public String s;
               }
               """

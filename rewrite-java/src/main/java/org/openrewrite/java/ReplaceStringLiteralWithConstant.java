@@ -19,11 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.experimental.NonFinal;
-
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
@@ -110,7 +106,7 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ReplaceStringLiteralVisitor(getLiteralValue(), getFullyQualifiedConstantName());
     }
 
@@ -145,7 +141,8 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
             maybeAddImport(owningType, false);
             return literal
                     .withTemplate(
-                            JavaTemplate.builder(this::getCursor, template).imports(owningType).build(),
+                            JavaTemplate.builder(template).context(getCursor()).imports(owningType).build(),
+                            getCursor(),
                             literal.getCoordinates().replace())
                     .withPrefix(literal.getPrefix());
         }

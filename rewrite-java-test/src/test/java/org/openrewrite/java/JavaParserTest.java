@@ -20,6 +20,7 @@ import io.github.classgraph.Resource;
 import io.github.classgraph.ResourceList;
 import io.github.classgraph.ScanResult;
 import org.intellij.lang.annotations.Language;
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
@@ -113,7 +114,7 @@ class JavaParserTest implements RewriteTest {
               }
           }
           """;
-        List<J.CompilationUnit> cus = parser.parse(source);
+        List<J.CompilationUnit> cus = parser.parse(source).collect(Collectors.toList());
 
         J.CompilationUnit c = cus.get(0);
         J.MethodDeclaration m = c.getClasses().get(0).getBody().getStatements().stream().filter(J.MethodDeclaration.class::isInstance).map(J.MethodDeclaration.class::cast).findFirst().orElseThrow();
@@ -123,7 +124,7 @@ class JavaParserTest implements RewriteTest {
         parser.reset(cus.stream().map(cu -> cu.getSourcePath().toUri()).collect(Collectors.toList()));
 //        parser.reset();
 
-        cus = parser.parse(source);
+        cus = parser.parse(source).collect(Collectors.toList());
         assertThat(cus.size()).isEqualTo(1);
         assertThat(cus.get(0).getClasses().size()).isEqualTo(1);
 
@@ -162,7 +163,7 @@ class JavaParserTest implements RewriteTest {
                public void methodB() {}
               }
               """;
-            List<J.CompilationUnit> compilationUnits = parser.parse(new InMemoryExecutionContext(Throwable::printStackTrace), source);
+            List<J.CompilationUnit> compilationUnits = parser.parse(new InMemoryExecutionContext(Throwable::printStackTrace), source).toList();
             assertThat(compilationUnits).singleElement()
               .satisfies(cu -> assertThat(cu.getClasses()).singleElement()
                 .satisfies(cd -> assertThat(cd.getImplements()).satisfiesExactly(

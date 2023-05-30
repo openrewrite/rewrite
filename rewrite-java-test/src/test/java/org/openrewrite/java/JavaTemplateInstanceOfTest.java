@@ -30,7 +30,10 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.fail;
@@ -54,16 +57,18 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
               @Override
               public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
                   return literal.getValue() == Integer.valueOf(42) ? literal.withTemplate(
-                    JavaTemplate.builder(this::getCursor, "s.length()")
+                    JavaTemplate.builder("s.length()")
+                      .context(getCursor())
 //                          .doBeforeParseTemplate(System.out::println)
                       .build(),
+                    getCursor(),
                     literal.getCoordinates().replace()
                   ) : super.visitLiteral(literal, executionContext);
               }
           }))
           // custom missing type validation
           .typeValidationOptions(TypeValidation.none())
-          .afterRecipe(run -> run.getResults().forEach(r -> assertTypeAttribution((J) r.getAfter())));
+          .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> assertTypeAttribution((J) r.getAfter())));
     }
 
     @SuppressWarnings({"PointlessBooleanExpression", "IfStatementWithIdenticalBranches"})
@@ -474,8 +479,10 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
 
                     List<Expression> arguments = mi.getArguments();
                     mi = mi.withTemplate(
-                      JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}.formatted(#{any()})")
+                      JavaTemplate.builder("#{any(java.lang.String)}.formatted(#{any()})")
+                        .context(getCursor())
                         .build(),
+                      getCursor(),
                       mi.getCoordinates().replace(),
                       arguments.toArray());
 

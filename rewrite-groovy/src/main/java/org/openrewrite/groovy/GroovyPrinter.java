@@ -47,8 +47,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitJavaSourceFile(JavaSourceFile sourceFile, PrintOutputCapture<P> p) {
-        G.CompilationUnit cu = (G.CompilationUnit) sourceFile;
+    public J visitCompilationUnit(G.CompilationUnit cu, PrintOutputCapture<P> p) {
         if (cu.getShebang() != null) {
             p.append(cu.getShebang());
         }
@@ -202,15 +201,15 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             if (i < nodes.size() - 1) {
                 p.append(suffixBetween);
             } else {
-                for(Marker m : node.getMarkers().getMarkers()) {
+                for (Marker m : node.getMarkers().getMarkers()) {
                     // Maintaining for backwards compatibility with old LSTs
                     //noinspection deprecation
-                    if(m instanceof TrailingComma) {
+                    if (m instanceof TrailingComma) {
                         p.append(suffixBetween);
                         //noinspection deprecation
                         visitSpace(((TrailingComma) m).getSuffix(), Space.Location.LANGUAGE_EXTENSION, p);
                         break;
-                    } else if(m instanceof org.openrewrite.java.marker.TrailingComma) {
+                    } else if (m instanceof org.openrewrite.java.marker.TrailingComma) {
                         p.append(suffixBetween);
                         visitSpace(((org.openrewrite.java.marker.TrailingComma) m).getSuffix(), Space.Location.LANGUAGE_EXTENSION, p);
                         break;

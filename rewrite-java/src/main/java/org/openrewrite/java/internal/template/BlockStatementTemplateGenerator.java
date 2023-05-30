@@ -34,7 +34,8 @@ import org.openrewrite.marker.Markers;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
-import static org.openrewrite.java.tree.JavaCoordinates.Mode.*;
+import static org.openrewrite.java.tree.JavaCoordinates.Mode.AFTER;
+import static org.openrewrite.java.tree.JavaCoordinates.Mode.REPLACEMENT;
 
 /**
  * Generates a stub containing enough variable, method, and class scope
@@ -45,24 +46,25 @@ public class BlockStatementTemplateGenerator {
     private static final String TEMPLATE_COMMENT = "__TEMPLATE__";
     private static final String STOP_COMMENT = "__TEMPLATE_STOP__";
     static final String EXPR_STATEMENT_PARAM = "class __P__ {" +
-                                               "  static native <T> T p();" +
-                                               "  static native <T> T[] arrp();" +
-                                               "  static native boolean booleanp();" +
-                                               "  static native byte bytep();" +
-                                               "  static native char charp();" +
-                                               "  static native double doublep();" +
-                                               "  static native int intp();" +
-                                               "  static native long longp();" +
-                                               "  static native short shortp();" +
-                                               "  static native float floatp();" +
-                                               "}";
+            "  static native <T> T p();" +
+            "  static native <T> T[] arrp();" +
+            "  static native boolean booleanp();" +
+            "  static native byte bytep();" +
+            "  static native char charp();" +
+            "  static native double doublep();" +
+            "  static native int intp();" +
+            "  static native long longp();" +
+            "  static native short shortp();" +
+            "  static native float floatp();" +
+            "}";
     private static final String METHOD_INVOCATION_STUBS = "class __M__ {" +
-                                                          "  static native Object any(Object o);" +
-                                                          "  static native Object any(java.util.function.Predicate<Boolean> o);" +
-                                                          "  static native <T> Object anyT();" +
-                                                          "}";
+            "  static native Object any(Object o);" +
+            "  static native Object any(java.util.function.Predicate<Boolean> o);" +
+            "  static native <T> Object anyT();" +
+            "}";
 
     private final Set<String> imports;
+    private final boolean contextFree;
 
     public String template(Cursor cursor, String template, Space.Location location, JavaCoordinates.Mode mode) {
         //noinspection ConstantConditions
@@ -74,7 +76,7 @@ public class BlockStatementTemplateGenerator {
 
                     // for CoordinateBuilder.MethodDeclaration#replaceBody()
                     if (cursor.getValue() instanceof J.MethodDeclaration &&
-                        location.equals(Space.Location.BLOCK_PREFIX)) {
+                            location.equals(Space.Location.BLOCK_PREFIX)) {
                         J.MethodDeclaration method = cursor.getValue();
                         J.MethodDeclaration m = method.withBody(null).withLeadingAnnotations(emptyList()).withPrefix(Space.EMPTY);
                         before.insert(0, m.printTrimmed(cursor.getParentOrThrow()).trim() + '{');
@@ -83,7 +85,7 @@ public class BlockStatementTemplateGenerator {
 
                     template(next(cursor), cursor.getValue(), before, after, cursor.getValue(), mode);
 
-                    return before.toString().trim() + "\n/*" + TEMPLATE_COMMENT + "*/" + template + "/*" + STOP_COMMENT + "*/" + "\n" + after;
+                    return before.toString().trim() + "\n/*" + TEMPLATE_COMMENT + "*/" + template + "/*" + STOP_COMMENT + "*/" + "\n" + after.toString().trim();
                 });
     }
 
@@ -208,8 +210,49 @@ public class BlockStatementTemplateGenerator {
         return js;
     }
 
-    @SuppressWarnings("ConstantConditions")
     private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
+        if (contextFree) {
+            contextFreeTemplate(prior, before, after, insertionPoint, mode);
+        } else {
+            contextTemplate(cursor, prior, before, after, insertionPoint, mode);
+        }
+    }
+
+    private void contextFreeTemplate(J j, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
+        if (j instanceof J.ClassDeclaration) {
+            // While not impossible to handle, reaching this point is likely to be a mistake.
+            // Without context a class declaration can include no imports, package, or outer class.
+            // It is a rare class that is deliberately in the root package with no imports.
+            // In the more likely case omission of these things is unintentional, the resulting type metadata would be
+            // incorrect, and it would not be obvious to the recipe author why.
+            throw new IllegalArgumentException(
+                    "Templating a class declaration requires a cursor from which package declaration and imports may be reached. " +
+                            "Pass a cursor pointing to the class declaration's parent to JavaTemplate.Builder#context()");
+        } else if (j instanceof J.Lambda) {
+            throw new IllegalArgumentException(
+                    "Templating a lambda requires a cursor so that it can be properly parsed and type-attributed. " +
+                            "Pass a cursor pointing to the lambda's parent to JavaTemplate.Builder#context()");
+        } else if (j instanceof J.MemberReference) {
+            throw new IllegalArgumentException(
+                    "Templating a method reference requires a cursor so that it can be properly parsed and type-attributed. " +
+                            "Pass a cursor pointing to the method reference's parent to JavaTemplate.Builder#context()");
+        } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
+            before.insert(0, "class Template {{\n");
+            before.append("Object o = ");
+            after.append(";");
+            after.append("\n}}");
+        } else if (j instanceof J.MethodDeclaration || !(j instanceof J.Import) && !(j instanceof J.Package)) {
+            before.insert(0, "class Template {\n");
+            after.append("\n}");
+        }
+        before.insert(0, EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
+        for (String anImport : imports) {
+            before.insert(0, anImport);
+        }
+    }
+
+    @SuppressWarnings("ConstantConditions")
+    private void contextTemplate(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
         J j = cursor.getValue();
         if (j instanceof JavaSourceFile) {
             before.insert(0, EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
@@ -247,9 +290,9 @@ public class BlockStatementTemplateGenerator {
                 }
 
                 before.insert(0, m.withBody(null)
-                                         .withLeadingAnnotations(emptyList())
-                                         .withPrefix(Space.EMPTY)
-                                         .printTrimmed(cursor).trim() + '{');
+                        .withLeadingAnnotations(emptyList())
+                        .withPrefix(Space.EMPTY)
+                        .printTrimmed(cursor).trim() + '{');
             } else if (parent instanceof J.Block || parent instanceof J.Lambda || parent instanceof J.Label || parent instanceof Loop) {
                 J.Block b = (J.Block) j;
 
@@ -481,7 +524,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.Ternary) {
             J.Ternary ternary = (J.Ternary) j;
             String condition = PatternVariables.simplifiedPatternVariableCondition(ternary.getCondition(), insertionPoint);
-            if(condition != null) {
+            if (condition != null) {
                 if (referToSameElement(prior, ternary.getCondition())) {
                     int splitIdx = condition.indexOf('§');
                     before.insert(0, condition.substring(0, splitIdx) + '(');
@@ -522,7 +565,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.EnumValueSet) {
             after.append(";");
         }
-        template(next(cursor), j, before, after, insertionPoint, REPLACEMENT);
+        contextTemplate(next(cursor), j, before, after, insertionPoint, REPLACEMENT);
     }
 
     private void addLeadingVariableDeclarations(Cursor cursor, J current, J.Block containingBlock, StringBuilder before, J insertionPoint) {
@@ -535,8 +578,8 @@ public class BlockStatementTemplateGenerator {
             }
             if (statement instanceof J.VariableDeclarations) {
                 before.insert(0, "\n" +
-                                 variable((J.VariableDeclarations) statement, true, cursor) +
-                                 ";\n");
+                        variable((J.VariableDeclarations) statement, true, cursor) +
+                        ";\n");
             } else if (statement instanceof J.If) {
                 J.If iff = (J.If) statement;
                 String condition = PatternVariables.simplifiedPatternVariableCondition(iff.getIfCondition().getTree(), insertionPoint);

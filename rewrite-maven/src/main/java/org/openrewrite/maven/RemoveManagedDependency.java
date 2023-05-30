@@ -15,31 +15,26 @@
  */
 package org.openrewrite.maven;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.ResolvedManagedDependency;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
-
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class RemoveManagedDependency extends Recipe {
 
     @Option(displayName = "Group",
-            description = "The first part of a managed dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The first part of a managed dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "com.google.guava")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a managed dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The second part of a managed dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "guava")
     String artifactId;
 

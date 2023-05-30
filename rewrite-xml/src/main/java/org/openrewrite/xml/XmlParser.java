@@ -33,14 +33,12 @@ import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Objects;
-
-import static java.util.stream.Collectors.toList;
+import java.util.stream.Stream;
 
 public class XmlParser implements Parser<Xml.Document> {
     @Override
-    public List<Xml.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<Xml.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
@@ -77,12 +75,11 @@ public class XmlParser implements Parser<Xml.Document> {
                         return null;
                     }
                 })
-                .filter(Objects::nonNull)
-                .collect(toList());
+                .filter(Objects::nonNull);
     }
 
     @Override
-    public List<Xml.Document> parse(@Language("xml") String... sources) {
+    public Stream<Xml.Document> parse(@Language("xml") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 

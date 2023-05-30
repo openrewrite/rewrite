@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.GroupArtifact;
@@ -37,22 +38,22 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @EqualsAndHashCode(callSuper = true)
 public class RemoveExclusion extends Recipe {
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob.",
+            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
             example = "com.google.guava")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob.",
+            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
             example = "guava")
     String artifactId;
 
     @Option(displayName = "Exclusion Group",
-            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob.",
+            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
             example = "com.google.guava")
     String exclusionGroupId;
 
     @Option(displayName = "Exclusion Artifact",
-            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob.",
+            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
             example = "guava")
     String exclusionArtifactId;
 
@@ -73,7 +74,7 @@ public class RemoveExclusion extends Recipe {
     }
 
     @Override
-    public MavenVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext executionContext) {

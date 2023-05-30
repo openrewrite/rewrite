@@ -16,7 +16,6 @@
 package org.openrewrite.java.tree;
 
 import lombok.Getter;
-import org.openrewrite.Tree;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;

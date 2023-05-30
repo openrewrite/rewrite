@@ -18,9 +18,6 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.java.cleanup.IsEmptyCallOnCollections;
-import org.openrewrite.java.cleanup.UseLambdaForFunctionalInterface;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
@@ -40,12 +37,12 @@ class JavaTemplateTest7Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               final MethodMatcher matcher = new MethodMatcher("Integer valueOf(..)");
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "new Integer(#{any()})").build();
+              final JavaTemplate t = JavaTemplate.builder("new Integer(#{any()})").build();
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
                   if (matcher.matches(method)) {
-                      return method.withTemplate(t, method.getCoordinates().replace(), method.getArguments().get(0));
+                      return method.withTemplate(t, getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
                   }
                   return super.visitMethodInvocation(method, p);
               }
@@ -78,7 +75,7 @@ class JavaTemplateTest7Test implements RewriteTest {
                   if (cd.getBody().getStatements().isEmpty()) {
                       cd = cd.withBody(
                         cd.getBody().withTemplate(
-                          JavaTemplate.builder(() -> getCursor().getParentOrThrow(),
+                          JavaTemplate.builder(
                               //language=groovy
                               """
                                 /**
@@ -88,7 +85,9 @@ class JavaTemplateTest7Test implements RewriteTest {
                                 }
                                 """
                             )
+                            .context(getCursor())
                             .build(),
+                          getCursor(),
                           cd.getBody().getCoordinates().firstStatement()
                         )
                       );
@@ -128,8 +127,8 @@ class JavaTemplateTest7Test implements RewriteTest {
                   if (a.getAssignment() instanceof J.MethodInvocation) {
                       J.MethodInvocation mi = (J.MethodInvocation) a.getAssignment();
                       a = a.withAssignment(mi.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "1")
-                          .build(),
+                        JavaTemplate.builder("1").build(),
+                        getCursor(),
                         mi.getCoordinates().replace()
                       ));
                   }
@@ -150,80 +149,6 @@ class JavaTemplateTest7Test implements RewriteTest {
                   void foo() {
                       int i;
                       i = 1;
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @DocumentExample
-    @SuppressWarnings({"Convert2Lambda", "TrivialFunctionalExpressionUsage", "CodeBlock2Expr"})
-    @Test
-    void nestedAnonymousRunnables() {
-        rewriteRun(
-          spec -> spec.recipe(new UseLambdaForFunctionalInterface()),
-          java(
-            """
-              class Test {
-                  public void test(int n) {
-                      new Runnable() {
-                          public void run() {
-                              Runnable r = new Runnable() {
-                                  public void run() {
-                                      System.out.println("Hello world!");
-                                  }
-                              };
-                          }
-                      }.run();
-                  }
-              }
-              """,
-            """
-              class Test {
-                  public void test(int n) {
-                      new Runnable() {
-                          public void run() {
-                              Runnable r = () -> {
-                                  System.out.println("Hello world!");
-                              };
-                          }
-                      }.run();
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void doWhileLoopCondition() {
-        rewriteRun(
-          spec -> spec.recipe(new IsEmptyCallOnCollections()),
-          java(
-            """
-              import java.util.List;
-
-              class Test {
-                  void method(List<String> l) {
-                      int i = l.size() - 1;
-                        do {
-                            l.remove(i);
-                            i--;
-                        } while (l.size() > 0);
-                  }
-              }
-              """,
-            """
-              import java.util.List;
-
-              class Test {
-                  void method(List<String> l) {
-                      int i = l.size() - 1;
-                        do {
-                            l.remove(i);
-                            i--;
-                        } while (!l.isEmpty());
                   }
               }
               """

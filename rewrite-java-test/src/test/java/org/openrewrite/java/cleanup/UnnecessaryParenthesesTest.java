@@ -17,9 +17,9 @@ package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
-import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
 import org.openrewrite.style.NamedStyles;
@@ -36,7 +36,7 @@ import static org.openrewrite.java.Assertions.java;
 @SuppressWarnings({
   "UnnecessaryLocalVariable", "ConstantConditions", "UnusedAssignment", "PointlessBooleanExpression",
   "MismatchedStringCase", "SillyAssignment"
-})
+  , "ParameterCanBeLocal"})
 class UnnecessaryParenthesesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {

@@ -37,10 +37,11 @@ class GradleJavaTemplateTest implements RewriteTest {
             public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
                 if (block.getStatements().isEmpty()) {
                     return block.withTemplate(
-                      JavaTemplate
-                        .builder(this::getCursor, "implementation(\"com.google.guava:guava:latest.release\")")
+                      JavaTemplate.builder("implementation(\"com.google.guava:guava:latest.release\")")
+                        .context(this::getCursor)
                         .doBeforeParseTemplate(System.out::println)
                         .build(),
+                      getCursor(),
                       block.getCoordinates().replace()
                     );
                 }

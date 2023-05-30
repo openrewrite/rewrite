@@ -29,8 +29,6 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Tree;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
@@ -38,9 +36,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParsingEventListener;
@@ -59,7 +55,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 /**
@@ -67,11 +62,7 @@ import static java.util.stream.Collectors.toList;
  */
 @NonNullApi
 public class ReloadableJava11Parser implements JavaParser {
-    private String sourceSet = "main";
     private final JavaTypeCache typeCache;
-
-    @Nullable
-    private transient JavaSourceSet sourceSetProvenance;
 
     @Nullable
     private Collection<Path> classpath;
@@ -156,11 +147,11 @@ public class ReloadableJava11Parser implements JavaParser {
     }
 
     @Override
-    public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
 
-        List<J.CompilationUnit> mappedCus = cus.entrySet().stream()
+        return cus.entrySet().stream()
                 .map(cuByPath -> {
                     Timer.Sample sample = Timer.start();
                     Input input = cuByPath.getKey();
@@ -196,10 +187,7 @@ public class ReloadableJava11Parser implements JavaParser {
                         return null;
                     }
                 })
-                .filter(Objects::nonNull)
-                .collect(toList());
-
-        return mappedCus;
+                .filter(Objects::nonNull);
     }
 
     LinkedHashMap<Input, JCTree.JCCompilationUnit> parseInputsToCompilerAst(Iterable<Input> sourceFiles, ExecutionContext ctx) {
@@ -286,25 +274,6 @@ public class ReloadableJava11Parser implements JavaParser {
 
     public void setClasspath(Collection<Path> classpath) {
         this.classpath = classpath;
-    }
-
-    @Override
-    public void setSourceSet(String sourceSet) {
-        this.sourceSetProvenance = null;
-        this.sourceSet = sourceSet;
-    }
-
-    @Override
-    public JavaSourceSet getSourceSet(ExecutionContext ctx) {
-        if (sourceSetProvenance == null) {
-            if (ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
-                sourceSetProvenance = new JavaSourceSet(Tree.randomId(), sourceSet, emptyList());
-            } else {
-                sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
-                        typeCache, false);
-            }
-        }
-        return sourceSetProvenance;
     }
 
     private void compileDependencies() {

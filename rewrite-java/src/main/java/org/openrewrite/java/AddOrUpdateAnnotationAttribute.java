@@ -17,10 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesType;
@@ -43,7 +40,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     @Override
     public String getDescription() {
         return "Some annotations accept arguments. This recipe sets an existing argument to the specified value, " +
-                "or adds the argument if it is not already set.";
+               "or adds the argument if it is not already set.";
     }
 
     @Option(displayName = "Annotation Type",
@@ -70,13 +67,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     Boolean addOnly;
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>(annotationType, false);
-    }
-
-    @Override
-    public JavaIsoVisitor<ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesType<>(annotationType, false), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Annotation visitAnnotation(J.Annotation a, ExecutionContext context) {
                 if (!TypeUtils.isOfClassType(a.getType(), annotationType)) {
@@ -92,14 +84,18 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                     if (attributeName == null || "value".equals(attributeName)) {
                         return a.withTemplate(
-                                JavaTemplate.builder(this::getCursor, "#{}")
+                                JavaTemplate.builder("#{}")
+                                        .context(this::getCursor)
                                         .build(),
+                                getCursor(),
                                 a.getCoordinates().replaceArguments(),
                                 newAttributeValue);
                     } else {
                         return a.withTemplate(
-                                JavaTemplate.builder(this::getCursor, attributeName + " = #{}")
+                                JavaTemplate.builder(attributeName + " = #{}")
+                                        .context(this::getCursor)
                                         .build(),
+                                getCursor(),
                                 a.getCoordinates().replaceArguments(),
                                 newAttributeValue);
                     }
@@ -138,8 +134,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                             } else {
                                 //noinspection ConstantConditions
                                 return ((J.Annotation) (finalA.withTemplate(
-                                        JavaTemplate.builder(this::getCursor, "value = #{}")
+                                        JavaTemplate.builder("value = #{}")
+                                                .context(this::getCursor)
                                                 .build(),
+                                        getCursor(),
                                         finalA.getCoordinates().replaceArguments(),
                                         it))).getArguments().get(0);
                             }
@@ -153,8 +151,10 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     String effectiveName = (attributeName == null) ? "value" : attributeName;
                     //noinspection ConstantConditions
                     J.Assignment as = (J.Assignment) ((J.Annotation) a.withTemplate(
-                            JavaTemplate.builder(this::getCursor, effectiveName + " = #{}")
+                            JavaTemplate.builder(effectiveName + " = #{}")
+                                    .context(this::getCursor)
                                     .build(),
+                            getCursor(),
                             a.getCoordinates().replaceArguments(),
                             newAttributeValue)).getArguments().get(0);
                     List<Expression> newArguments = ListUtils.concat(as, a.getArguments());
@@ -164,7 +164,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                 return a;
             }
-        };
+        });
     }
 
     @Nullable

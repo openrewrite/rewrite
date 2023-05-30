@@ -16,9 +16,10 @@
 package org.openrewrite.table;
 
 import lombok.Value;
-import org.openrewrite.Column;
-import org.openrewrite.DataTable;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
+import org.openrewrite.config.RecipeDescriptor;
+
+import java.util.Stack;
 
 public class SourcesFileResults extends DataTable<SourcesFileResults.Row> {
 
@@ -50,5 +51,34 @@ public class SourcesFileResults extends DataTable<SourcesFileResults.Row> {
                 description = "An estimated effort that a developer to fix manually instead of using this recipe," +
                               " in unit of seconds.")
         Long estimatedTimeSaving;
+    }
+
+    public static SourcesFileResults build(Changeset changeset, ExecutionContext ctx) {
+        SourcesFileResults resultsTable = new SourcesFileResults(Recipe.noop());
+        for (Result result : changeset.getAllResults()) {
+            Stack<RecipeDescriptor[]> recipeStack = new Stack<>();
+
+            for (RecipeDescriptor rd : result.getRecipeDescriptorsThatMadeChanges()) {
+                recipeStack.push(new RecipeDescriptor[]{null, rd});
+            }
+
+            while (!recipeStack.isEmpty()) {
+                RecipeDescriptor[] recipeThatMadeChange = recipeStack.pop();
+
+                resultsTable.insertRow(ctx, new SourcesFileResults.Row(
+                        result.getBefore() == null ? "" : result.getBefore().getSourcePath().toString(),
+                        result.getAfter() == null ? "" : result.getAfter().getSourcePath().toString(),
+                        recipeThatMadeChange[0] == null ? "" : recipeThatMadeChange[0].getName(),
+                        recipeThatMadeChange[1].getName(),
+                        result.getTimeSavings() == null ? 0 : result.getTimeSavings().getSeconds()
+                ));
+                for (int i = recipeThatMadeChange[1].getRecipeList().size() - 1; i >= 0; i--) {
+                    RecipeDescriptor rd = recipeThatMadeChange[1].getRecipeList().get(i);
+                    recipeStack.push(new RecipeDescriptor[]{recipeThatMadeChange[1], rd});
+                }
+            }
+        }
+
+        return resultsTable;
     }
 }

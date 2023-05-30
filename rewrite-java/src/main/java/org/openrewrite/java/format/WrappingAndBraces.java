@@ -16,6 +16,7 @@
 package org.openrewrite.java.format;
 
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
@@ -26,6 +27,8 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.Set;
+
+import static java.util.Objects.requireNonNull;
 
 public class WrappingAndBraces extends Recipe {
     @Override
@@ -55,13 +58,16 @@ public class WrappingAndBraces extends Recipe {
 
     private static class WrappingAndBracesCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-            WrappingAndBracesStyle style = ((SourceFile) cu).getStyle(WrappingAndBracesStyle.class);
-            if(style == null) {
-                style = IntelliJ.wrappingAndBraces();
+        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof JavaSourceFile) {
+                JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                WrappingAndBracesStyle style = ((SourceFile) cu).getStyle(WrappingAndBracesStyle.class);
+                if (style == null) {
+                    style = IntelliJ.wrappingAndBraces();
+                }
+                return new WrappingAndBracesVisitor<>(style).visit(cu, ctx);
             }
-            doAfterVisit(new WrappingAndBracesVisitor<>(style));
-            return cu;
+            return (J) tree;
         }
     }
 

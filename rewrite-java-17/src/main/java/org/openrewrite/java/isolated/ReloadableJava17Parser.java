@@ -29,7 +29,6 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Tree;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
@@ -37,7 +36,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
@@ -57,7 +55,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 /**
@@ -65,11 +62,7 @@ import static java.util.stream.Collectors.toList;
  */
 @NonNullApi
 public class ReloadableJava17Parser implements JavaParser {
-    private String sourceSet = "main";
     private final JavaTypeCache typeCache;
-
-    @Nullable
-    private transient JavaSourceSet sourceSetProvenance;
 
     @Nullable
     private Collection<Path> classpath;
@@ -154,10 +147,9 @@ public class ReloadableJava17Parser implements JavaParser {
     }
 
     @Override
-    public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
-
         return cus.entrySet().stream()
                 .map(cuByPath -> {
                     Timer.Sample sample = Timer.start();
@@ -194,8 +186,7 @@ public class ReloadableJava17Parser implements JavaParser {
                         return null;
                     }
                 })
-                .filter(Objects::nonNull)
-                .collect(toList());
+                .filter(Objects::nonNull);
     }
 
     LinkedHashMap<Input, JCTree.JCCompilationUnit> parseInputsToCompilerAst(Iterable<Input> sourceFiles, ExecutionContext ctx) {
@@ -284,25 +275,6 @@ public class ReloadableJava17Parser implements JavaParser {
         this.classpath = classpath;
     }
 
-    @Override
-    public void setSourceSet(String sourceSet) {
-        this.sourceSetProvenance = null;
-        this.sourceSet = sourceSet;
-    }
-
-    @Override
-    public JavaSourceSet getSourceSet(ExecutionContext ctx) {
-        if (sourceSetProvenance == null) {
-            if (ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
-                sourceSetProvenance = new JavaSourceSet(Tree.randomId(), sourceSet, emptyList());
-            } else {
-                sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
-                        typeCache, false);
-            }
-        }
-        return sourceSetProvenance;
-    }
-
     private void compileDependencies() {
         if (dependsOn != null) {
             InMemoryExecutionContext ctx = new InMemoryExecutionContext();
@@ -343,12 +315,7 @@ public class ReloadableJava17Parser implements JavaParser {
         }
 
         public void reset(Collection<URI> uris) {
-            for (Iterator<JavaFileObject> itr = sourceMap.keySet().iterator(); itr.hasNext();) {
-                JavaFileObject f = itr.next();
-                if (uris.contains(f.toUri())) {
-                    itr.remove();
-                }
-            }
+            sourceMap.keySet().removeIf(f -> uris.contains(f.toUri()));
         }
     }
 

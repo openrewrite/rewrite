@@ -16,10 +16,11 @@
 package org.openrewrite.java.recipes;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -39,7 +40,7 @@ public class SetDefaultEstimatedEffortPerOccurrence extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Retrofit recipes with a deafult estimated effort per occurrence.";
+        return "Retrofit recipes with a default estimated effort per occurrence.";
     }
 
     @Override
@@ -48,17 +49,13 @@ public class SetDefaultEstimatedEffortPerOccurrence extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>("org.openrewrite.Recipe", false);
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-            final JavaTemplate addMethod = JavaTemplate.builder(this::getCursor,
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesType<>("org.openrewrite.Recipe", false), new JavaIsoVisitor<ExecutionContext>() {
+            final JavaTemplate addMethod = JavaTemplate.builder(
                             "@Override public Duration getEstimatedEffortPerOccurrence() {\n" +
                                     "return Duration.ofMinutes(5);\n" +
                                     "}")
+                    .context(this::getCursor)
                     .imports("java.time.Duration")
                     .build();
 
@@ -79,7 +76,7 @@ public class SetDefaultEstimatedEffortPerOccurrence extends Recipe {
                     maybeAddImport("java.time.Duration");
 
                     try {
-                        return classDecl.withTemplate(addMethod, classDecl.getBody().getCoordinates().addMethodDeclaration(Comparator.comparing(
+                        return classDecl.withTemplate(addMethod, getCursor(), classDecl.getBody().getCoordinates().addMethodDeclaration(Comparator.comparing(
                                 J.MethodDeclaration::getSimpleName,
                                 new RuleBasedCollator("< getDisplayName < getDescription < getEstimatedEffortPerOccurrence < getVisitor")
                         )));
@@ -89,6 +86,6 @@ public class SetDefaultEstimatedEffortPerOccurrence extends Recipe {
                 }
                 return super.visitClassDeclaration(classDecl, executionContext);
             }
-        };
+        });
     }
 }

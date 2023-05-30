@@ -15,13 +15,12 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Applicability;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.cleanup.UnnecessaryParenthesesVisitor;
+import org.openrewrite.java.cleanup.UnnecessaryParentheses;
 import org.openrewrite.java.search.UsesMethod;
-import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
@@ -41,14 +40,8 @@ public class RemoveObjectsIsNull extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return Applicability.or(new UsesMethod<>(IS_NULL), new UsesMethod<>(NON_NULL));
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
-
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(Preconditions.or(new UsesMethod<>(IS_NULL), new UsesMethod<>(NON_NULL)), new JavaVisitor<ExecutionContext>() {
             @Override
             public Expression visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
@@ -61,12 +54,12 @@ public class RemoveObjectsIsNull extends Recipe {
             }
 
             private Expression replace(ExecutionContext executionContext, J.MethodInvocation m, String pattern) {
-                JavaTemplate template = JavaTemplate.builder(this::getCursor, pattern).build();
+                JavaTemplate template = JavaTemplate.builder(pattern).build();
                 Expression e = m.getArguments().get(0);
-                Expression replaced = m.withTemplate(template, m.getCoordinates().replace(), e);
-                UnnecessaryParenthesesVisitor<ExecutionContext> v = new UnnecessaryParenthesesVisitor<>(Checkstyle.unnecessaryParentheses());
-                return (Expression) v.visitNonNull(replaced, executionContext, getCursor());
+                Expression replaced = m.withTemplate(template, getCursor(), m.getCoordinates().replace(), e);
+                return (Expression) new UnnecessaryParentheses().getVisitor()
+                        .visitNonNull(replaced, executionContext, getCursor());
             }
-        };
+        });
     }
 }

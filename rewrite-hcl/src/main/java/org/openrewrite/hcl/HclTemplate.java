@@ -51,7 +51,7 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
     }
 
     @Override
-    public <H extends Hcl> H withTemplate(Tree changing, HclCoordinates coordinates, Object[] parameters) {
+    public <H extends Hcl> H withTemplate(Tree changing, Cursor parentScope, HclCoordinates coordinates, Object[] parameters) {
         if (parameters.length != parameterCount) {
             throw new IllegalArgumentException("This template requires " + parameterCount + " parameters.");
         }

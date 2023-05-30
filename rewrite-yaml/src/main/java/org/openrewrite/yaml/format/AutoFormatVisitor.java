@@ -35,10 +35,11 @@ public class AutoFormatVisitor<P> extends YamlIsoVisitor<P> {
         this.stopAfter = stopAfter;
     }
 
-    @Nullable
     @Override
-    public Yaml visit(@Nullable Tree tree, P p, Cursor cursor) {
-        Yaml.Documents docs = cursor.firstEnclosingOrThrow(Yaml.Documents.class);
+    public @Nullable Yaml preVisit(Yaml tree, P p) {
+        stopAfterPreVisit();
+        Yaml.Documents docs = getCursor().firstEnclosingOrThrow(Yaml.Documents.class);
+        Cursor cursor = getCursor().getParentOrThrow();
 
         Yaml y = new NormalizeFormatVisitor<>(stopAfter).visit(tree, p, cursor.fork());
 

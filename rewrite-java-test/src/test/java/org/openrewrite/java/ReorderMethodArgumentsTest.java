@@ -29,9 +29,10 @@ class ReorderMethodArgumentsTest implements RewriteTest {
     @Test
     void reorderArguments() {
         rewriteRun(
-          spec -> spec.recipe(new ReorderMethodArguments("a.A foo(String, Integer, Integer)",
-            new String[]{"n", "m", "s"}, null, null)
-            .doNext(toRecipe(() -> new JavaVisitor<>() {
+          spec -> spec.recipes(
+            new ReorderMethodArguments("a.A foo(String, Integer, Integer)",
+              new String[]{"n", "m", "s"}, null, null),
+            toRecipe(() -> new JavaVisitor<>() {
                 @Override
                 public J visitLiteral(J.Literal literal, ExecutionContext p) {
                     if (literal.getType() == JavaType.Primitive.String) {
@@ -39,7 +40,8 @@ class ReorderMethodArgumentsTest implements RewriteTest {
                     }
                     return super.visitLiteral(literal, p);
                 }
-            }))).cycles(1).expectedCyclesThatMakeChanges(1),
+            })
+          ).cycles(1).expectedCyclesThatMakeChanges(1),
           java(
             """
               package a;

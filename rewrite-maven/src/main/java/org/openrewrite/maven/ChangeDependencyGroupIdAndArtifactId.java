@@ -41,12 +41,12 @@ public class ChangeDependencyGroupIdAndArtifactId extends Recipe {
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Old groupId",
-            description = "The old groupId to replace. The groupId is the first part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
+            description = "The old groupId to replace. The groupId is the first part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob expressions.",
             example = "org.openrewrite.recipe")
     String oldGroupId;
 
     @Option(displayName = "Old artifactId",
-            description = "The old artifactId to replace. The artifactId is the second part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob expressions.",
+            description = "The old artifactId to replace. The artifactId is the second part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob expressions.",
             example = "rewrite-testing-frameworks")
     String oldArtifactId;
 

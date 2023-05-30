@@ -18,10 +18,7 @@ package org.openrewrite.gradle;
 import io.micrometer.core.instrument.util.StringUtils;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.util.Dependency;
@@ -73,13 +70,8 @@ public class RemoveDependency extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsBuildGradle<>();
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new GroovyVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
             final DependencyMatcher dependencyMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
 
@@ -196,6 +188,6 @@ public class RemoveDependency extends Recipe {
 
                 return m;
             }
-        };
+        });
     }
 }

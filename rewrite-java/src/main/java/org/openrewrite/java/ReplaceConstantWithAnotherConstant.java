@@ -46,13 +46,9 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>(existingFullyQualifiedConstantName.substring(0, existingFullyQualifiedConstantName.lastIndexOf('.')), false);
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new ReplaceConstantWithAnotherConstantVisitor(existingFullyQualifiedConstantName, fullyQualifiedConstantName);
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesType<>(existingFullyQualifiedConstantName.substring(0, existingFullyQualifiedConstantName.lastIndexOf('.')), false),
+                new ReplaceConstantWithAnotherConstantVisitor(existingFullyQualifiedConstantName, fullyQualifiedConstantName));
     }
 
     private static class ReplaceConstantWithAnotherConstantVisitor extends JavaVisitor<ExecutionContext> {
@@ -97,15 +93,16 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             JavaTemplate.Builder templateBuilder;
             if (fieldAccess instanceof J.Identifier) {
                 maybeAddImport(owningType, newConstantName, false);
-                templateBuilder = JavaTemplate.builder(this::getCursor, newConstantName)
+                templateBuilder = JavaTemplate.builder(newConstantName)
                         .staticImports(owningType + '.' + newConstantName);
             } else {
                 maybeAddImport(owningType, false);
-                templateBuilder = JavaTemplate.builder(this::getCursor, owningType.substring(owningType.lastIndexOf('.') + 1) + '.' + newConstantName)
+                templateBuilder = JavaTemplate.builder(owningType.substring(owningType.lastIndexOf('.') + 1) + '.' + newConstantName)
                         .imports(owningType);
             }
             return fieldAccess.withTemplate(
-                            templateBuilder.build(),
+                            templateBuilder.context(getCursor()).build(),
+                            getCursor(),
                             fieldAccess.getCoordinates().replace())
                     .withPrefix(fieldAccess.getPrefix());
         }

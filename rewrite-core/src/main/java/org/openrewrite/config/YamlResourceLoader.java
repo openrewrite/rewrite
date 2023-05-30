@@ -222,7 +222,7 @@ public class YamlResourceLoader implements ResourceLoader {
 
             List<Object> rawMaintainers = (List<Object>) r.getOrDefault("maintainers", emptyList());
             List<Maintainer> maintainers;
-            if(rawMaintainers.isEmpty()) {
+            if (rawMaintainers.isEmpty()) {
                 maintainers = emptyList();
             } else {
                 maintainers = new ArrayList<>(rawMaintainers.size());
@@ -231,7 +231,7 @@ public class YamlResourceLoader implements ResourceLoader {
                         Map<String, Object> maintainerMap = (Map<String, Object>) rawMaintainer;
                         String maintainerName = (String) maintainerMap.get("maintainer");
                         String logoString = (String) maintainerMap.get("logo");
-                        URI logo = (logoString == null) ? null :  URI.create(logoString);
+                        URI logo = (logoString == null) ? null : URI.create(logoString);
                         maintainers.add(new Maintainer(maintainerName, logo));
                     }
                 }
@@ -244,25 +244,9 @@ public class YamlResourceLoader implements ResourceLoader {
                 throw new RecipeException("Invalid Recipe [" + name + "] recipeList is null");
             }
             for (int i = 0; i < recipeList.size(); i++) {
-                loadRecipe(name, recipe, i, recipeList.get(i), DeclarativeRecipe.RecipeUse.Recipe);
+                loadRecipe(name, recipe, i, recipeList.get(i));
             }
 
-            Map<String, Object> applicability = (Map<String, Object>) r.get("applicability");
-            if (applicability != null) {
-                List<Object> singleSource = (List<Object>) applicability.get("singleSource");
-                if (singleSource != null) {
-                    for (int i = 0; i < singleSource.size(); i++) {
-                        loadRecipe(name, recipe, i, singleSource.get(i), DeclarativeRecipe.RecipeUse.SingleSourceApplicability);
-                    }
-                }
-
-                List<Object> anySource = (List<Object>) applicability.get("anySource");
-                if (anySource != null) {
-                    for (int i = 0; i < anySource.size(); i++) {
-                        loadRecipe(name, recipe, i, anySource.get(i), DeclarativeRecipe.RecipeUse.AnySourceApplicability);
-                    }
-                }
-            }
             recipe.setContributors(contributors.get(recipe.getName()));
             recipes.add(recipe);
         }
@@ -274,10 +258,9 @@ public class YamlResourceLoader implements ResourceLoader {
     private void loadRecipe(@Language("markdown") String name,
                             DeclarativeRecipe recipe,
                             int i,
-                            Object recipeData,
-                            DeclarativeRecipe.RecipeUse use) {
+                            Object recipeData) {
         if (recipeData instanceof String) {
-            recipe.addUninitialized(use, (String) recipeData, classLoader);
+            recipe.addUninitialized((String) recipeData, classLoader);
         } else if (recipeData instanceof Map) {
             Map.Entry<String, Object> nameAndConfig = ((Map<String, Object>) recipeData).entrySet().iterator().next();
             try {
@@ -285,7 +268,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     Map<Object, Object> withJsonType = new HashMap<>((Map<String, Object>) nameAndConfig.getValue());
                     withJsonType.put("@c", nameAndConfig.getKey());
                     try {
-                        recipe.addUninitialized(use, mapper.convertValue(withJsonType, Recipe.class));
+                        recipe.addUninitialized(mapper.convertValue(withJsonType, Recipe.class));
                     } catch (IllegalArgumentException e) {
                         if (e.getCause() instanceof InvalidTypeIdException) {
                             recipe.addValidation(Validated.invalid(nameAndConfig.getKey(),
@@ -452,7 +435,9 @@ public class YamlResourceLoader implements ResourceLoader {
             String recipeName = (String) examplesMap.get("recipeName");
             recipeNameToExamples.computeIfAbsent(recipeName, key -> new ArrayList<>());
 
-            List<Map<String, Object>> examples = (List<Map<String, Object>>) examplesMap.get("examples");
+
+            @SuppressWarnings("unchecked") List<Map<String, Object>> examples =
+                    (List<Map<String, Object>>) examplesMap.get("examples");
 
             List<RecipeExample> newExamples = examples.stream().map(exam -> {
                     RecipeExample recipeExample = new RecipeExample();
@@ -492,9 +477,9 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @Override
     public Map<String, List<Contributor>> listContributors() {
-        if(contributors == null) {
+        if (contributors == null) {
             Collection<Map<String, Object>> rawAttribution = loadResources(ResourceType.Attribution);
-            if(rawAttribution.isEmpty()) {
+            if (rawAttribution.isEmpty()) {
                 contributors = Collections.emptyMap();
             } else {
                 Map<String, List<Contributor>> result = new HashMap<>(rawAttribution.size());

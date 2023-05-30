@@ -16,9 +16,9 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.DocumentExample;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
@@ -33,28 +33,32 @@ class JavaVisitorTest implements RewriteTest {
     @Test
     void javaVisitorHandlesPaddedWithNullElem() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  var mi = super.visitMethodInvocation(method, p);
-                  if ("removeMethod".equals(mi.getSimpleName())) {
-                      //noinspection ConstantConditions
-                      return null;
-                  }
-                  return mi;
-              }
-          }).doNext(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  J.MethodDeclaration md = super.visitMethodDeclaration(method, p);
-                  if (md.getSimpleName().equals("allTheThings")) {
-                      md = md.withTemplate(JavaTemplate.builder(this::getCursor, "Exception").build(),
-                        md.getCoordinates().replaceThrows()
-                      );
-                  }
-                  return md;
-              }
-          }))).cycles(2).expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipes(
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                    var mi = super.visitMethodInvocation(method, p);
+                    if ("removeMethod".equals(mi.getSimpleName())) {
+                        //noinspection ConstantConditions
+                        return null;
+                    }
+                    return mi;
+                }
+            }),
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                    J.MethodDeclaration md = super.visitMethodDeclaration(method, p);
+                    if (md.getSimpleName().equals("allTheThings")) {
+                        md = md.withTemplate(JavaTemplate.builder("Exception").context(getCursor()).build(),
+                          getCursor(),
+                          md.getCoordinates().replaceThrows()
+                        );
+                    }
+                    return md;
+                }
+            })
+          ).cycles(2).expectedCyclesThatMakeChanges(2),
           java(
             """
               class A {
@@ -84,16 +88,16 @@ class JavaVisitorTest implements RewriteTest {
         rewriteRun(
           spec -> spec
             .executionContext(new InMemoryExecutionContext())
-            .afterRecipe(run -> assertThat(run.getResults().get(0).getRecipeErrors())
+            .afterRecipe(run -> assertThat(run.getChangeset().getAllResults().get(0).getRecipeErrors())
               .singleElement()
               .satisfies(t -> assertThat(t.getMessage()).containsSubsequence("A.java", "A", "allTheThings"))
             )
             .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Literal visitLiteral(final J.Literal literal, final ExecutionContext executionContext) {
-                  throw new IllegalStateException("boom");
-              }
-          })),
+                @Override
+                public J.Literal visitLiteral(final J.Literal literal, final ExecutionContext executionContext) {
+                    throw new IllegalStateException("boom");
+                }
+            })),
           java(
             """
               class A {

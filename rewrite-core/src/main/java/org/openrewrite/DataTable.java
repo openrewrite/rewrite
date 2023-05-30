@@ -22,7 +22,6 @@ import org.intellij.lang.annotations.Language;
 
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 

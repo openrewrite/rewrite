@@ -17,7 +17,6 @@ package org.openrewrite.xml.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
 
 public class LineBreaks extends Recipe {
     @Override
