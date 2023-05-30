@@ -48,11 +48,11 @@ public class Autodetect extends NamedStyles {
                 emptySet(), styles);
     }
 
-    public static AutodetectStream detect(Stream<? extends SourceFile> sourceFiles) {
-        return new AutodetectStream(sourceFiles);
+    public static Detector detect(Stream<? extends SourceFile> sourceFiles) {
+        return new Detector(sourceFiles);
     }
 
-    public static class AutodetectStream implements Stream<SourceFile> {
+    public static class Detector implements Stream<SourceFile> {
         @Delegate
         private final Stream<SourceFile> sourceFiles;
 
@@ -63,7 +63,7 @@ public class Autodetect extends NamedStyles {
 
         private final FindImportLayout findImportLayout = new FindImportLayout();
 
-        public AutodetectStream(Stream<? extends SourceFile> sourceFiles) {
+        public Detector(Stream<? extends SourceFile> sourceFiles) {
             FindIndentJavaVisitor findIndent = new FindIndentJavaVisitor();
             FindSpacesStyle findSpaces = new FindSpacesStyle();
             FindWrappingAndBracesStyle findWrappingAndBraces = new FindWrappingAndBracesStyle();

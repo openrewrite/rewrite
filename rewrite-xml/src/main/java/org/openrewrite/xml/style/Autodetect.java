@@ -16,6 +16,8 @@
 package org.openrewrite.xml.style;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.experimental.Delegate;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.GeneralFormatStyle;
@@ -27,6 +29,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptySet;
 import static java.util.function.Function.identity;
@@ -42,18 +45,31 @@ public class Autodetect extends NamedStyles {
                 emptySet(), styles);
     }
 
-    public static Autodetect detect(List<Xml.Document> xmls) {
-        IndentStatistics indentStatistics = new IndentStatistics();
-        GeneralFormatStatistics generalFormatStatistics = new GeneralFormatStatistics();
+    public static Detector detect(Stream<? extends SourceFile> sourceFiles) {
+        return new Detector(sourceFiles);
+    }
 
-        for (Xml.Document xml : xmls) {
-            new FindIndentXmlVisitor().visit(xml, indentStatistics);
-            new FindLineFormatJavaVisitor().visit(xml, generalFormatStatistics);
+    public static class Detector implements Stream<SourceFile> {
+        @Delegate
+        private final Stream<SourceFile> sourceFiles;
+
+        private final IndentStatistics indentStatistics = new IndentStatistics();
+        private final GeneralFormatStatistics generalFormatStatistics = new GeneralFormatStatistics();
+
+        public Detector(Stream<? extends SourceFile> sourceFiles) {
+            this.sourceFiles = sourceFiles
+                    .map(SourceFile.class::cast)
+                    .peek(xml -> {
+                        new FindIndentXmlVisitor().visit(xml, indentStatistics);
+                        new FindLineFormatJavaVisitor().visit(xml, generalFormatStatistics);
+                    });
         }
 
-        return new Autodetect(Tree.randomId(), Arrays.asList(
-                indentStatistics.getTabsAndIndentsStyle(),
-                generalFormatStatistics.getFormatStyle()));
+        public Autodetect build() {
+            return new Autodetect(Tree.randomId(), Arrays.asList(
+                    indentStatistics.getTabsAndIndentsStyle(),
+                    generalFormatStatistics.getFormatStyle()));
+        }
     }
 
     private static class IndentStatistics {
@@ -162,11 +178,11 @@ public class Autodetect extends NamedStyles {
         private void measureFrequencies(String prefix, IndentFrequencies frequencies) {
             AtomicBoolean takeWhile = new AtomicBoolean(true);
             if (prefix.chars()
-                    .filter(c -> {
-                        takeWhile.set(takeWhile.get() && (c == '\n' || c == '\r'));
-                        return takeWhile.get();
-                    })
-                    .count() > 0) {
+                        .filter(c -> {
+                            takeWhile.set(takeWhile.get() && (c == '\n' || c == '\r'));
+                            return takeWhile.get();
+                        })
+                        .count() > 0) {
                 int tabIndent = 0;
                 int spaceIndent = 0;
                 boolean mixed = false;
