@@ -154,6 +154,13 @@ public abstract class TreeVisitor<T extends Tree, P> {
         if (afterVisit == null) {
             afterVisit = new ArrayList<>(2);
         }
+
+        List<Recipe> subRecipes = recipe.getRecipeList();
+        if (!subRecipes.isEmpty()) {
+            for (Recipe r : subRecipes) {
+                afterVisit.add((TreeVisitor<T, P>) r.getVisitor());
+            }
+        }
         //noinspection unchecked
         afterVisit.add((TreeVisitor<T, P>) recipe.getVisitor());
     }
@@ -265,7 +272,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
         T t = null;
         // Do you visitor take tree and do you tree take visitor?
-        boolean isAcceptable = tree.isAcceptable(this, p) && (!(tree instanceof SourceFile) || isAcceptable((SourceFile) tree, p));
+        boolean isAcceptable = isAcceptableByVisitor(tree, this, p);
 
         try {
             if (isAcceptable) {
@@ -308,7 +315,9 @@ public abstract class TreeVisitor<T extends Tree, P> {
                     for (TreeVisitor<T, P> v : afterVisit) {
                         if (v != null) {
                             v.setCursor(getCursor());
-                            t = v.visit(t, p);
+                            if (isAcceptableByVisitor(t, v, p)) {
+                                t = v.visit(t, p);
+                            }
                         }
                     }
                 }
@@ -432,5 +441,9 @@ public abstract class TreeVisitor<T extends Tree, P> {
     @Incubating(since = "8.0.0")
     public void stopAfterPreVisit() {
         getCursor().putMessage(STOP_AFTER_PRE_VISIT, true);
+    }
+
+    private boolean isAcceptableByVisitor(Tree tree, TreeVisitor<T, P> visitor, P p) {
+        return tree.isAcceptable(visitor, p) && (!(tree instanceof SourceFile) || visitor.isAcceptable((SourceFile) tree, p));
     }
 }
