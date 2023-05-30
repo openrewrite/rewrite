@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.*;
 import org.openrewrite.xml.tree.Xml;
 
@@ -49,20 +50,23 @@ public class AddProfile extends Recipe {
 
     @Option(displayName = "Activation",
             description = "activation details of a maven profile, provided as raw XML.",
-            example     = "<activation><foo>foo</foo></activation>",
+            example = "<activation><foo>foo</foo></activation>",
             required = false)
+    @Nullable
     String activation;
 
     @Option(displayName = "Properties",
             description = "properties of a maven profile, provided as raw XML.",
-            example     = "<properties><foo>foo</foo><bar>bar</bar></properties>",
+            example = "<properties><foo>foo</foo><bar>bar</bar></properties>",
             required = false)
+    @Nullable
     String properties;
 
     @Option(displayName = "build",
             description = "build details of a maven profile, provided as raw XML.",
-            example     = "<build><foo>foo</foo></build>",
+            example = "<build><foo>foo</foo></build>",
             required = false)
+    @Nullable
     String build;
 
     @Override
@@ -73,7 +77,6 @@ public class AddProfile extends Recipe {
     private class AddProfileVisitor extends MavenIsoVisitor<ExecutionContext> {
 
 
-
         @Override
         public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
             Xml.Tag t = super.visitTag(tag, ctx);
@@ -81,7 +84,7 @@ public class AddProfile extends Recipe {
             if (PROJECT_MATCHER.matches(getCursor())) {
                 Optional<Xml.Tag> maybeProfiles = t.getChild("profiles");
                 Xml.Tag profiles;
-                if(maybeProfiles.isPresent()) {
+                if (maybeProfiles.isPresent()) {
                     profiles = maybeProfiles.get();
                 } else {
                     t = (Xml.Tag) new AddToTagVisitor<>(t, Xml.Tag.build("<profiles/>")).visitNonNull(t, ctx, getCursor().getParentOrThrow());
@@ -98,7 +101,7 @@ public class AddProfile extends Recipe {
                 if (maybeProfile.isPresent()) {
                     Xml.Tag profile = maybeProfile.get();
 
-                        t = (Xml.Tag) new RemoveContentVisitor(profile, false).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                    t = (Xml.Tag) new RemoveContentVisitor(profile, false).visitNonNull(t, ctx, getCursor().getParentOrThrow());
 
                 } else {
                     Xml.Tag profileTag = Xml.Tag.build("<profile>\n" +
