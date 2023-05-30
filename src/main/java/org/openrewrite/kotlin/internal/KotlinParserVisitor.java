@@ -866,14 +866,20 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitElvisExpression(FirElvisExpression elvisExpression, ExecutionContext ctx) {
         Space prefix = whitespace();
         J lhs = visitElement(elvisExpression.getLhs(), ctx);
+        if (lhs instanceof Statement && !(lhs instanceof Expression)) {
+            lhs = new K.StatementExpression(randomId(), (Statement) lhs);
+        }
         Space before = sourceBefore("?:");
         J rhs = visitElement(elvisExpression.getRhs(), ctx);
+        if (rhs instanceof Statement && !(rhs instanceof Expression)) {
+            rhs = new K.StatementExpression(randomId(), (Statement) rhs);
+        }
         return new J.Ternary(randomId(),
                 prefix,
                 Markers.EMPTY,
                 new J.Empty(randomId(), EMPTY, Markers.EMPTY),
-                padLeft(EMPTY, lhs instanceof Expression ? (Expression) lhs : new K.StatementExpression(randomId(), (Statement) lhs)),
-                padLeft(before, rhs instanceof Expression ? (Expression) rhs : new K.StatementExpression(randomId(), (Statement) rhs)),
+                padLeft(EMPTY, (Expression) lhs),
+                padLeft(before, (Expression) rhs),
                 typeMapping.type(elvisExpression));
     }
 
@@ -1142,7 +1148,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 for (int i = 0; i < flattenedExpressions.size(); i++) {
                     FirExpression expression = flattenedExpressions.get(i);
                     J j = convert(expression, ctx);
-                    Expression expr = !(j instanceof Expression) ? new K.StatementExpression(randomId(), (Statement) j) : (Expression) j;
+                    if (j instanceof Statement && !(j instanceof Expression)) {
+                        j = new K.StatementExpression(randomId(), (Statement) j);
+                    }
+                    Expression expr = (Expression) j;
                     if (isTrailingComma) {
                         expr = expr.withMarkers(expr.getMarkers().addIfAbsent(new TrailingLambdaArgument(randomId())));
                         expressions.add(padRight(expr, EMPTY));
@@ -1459,7 +1468,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitImport(FirImport firImport, ExecutionContext ctx) {
         Space prefix = sourceBefore("import");
-        JLeftPadded<Boolean> statik = padLeft(EMPTY, false);
+        JLeftPadded<Boolean> static_ = padLeft(EMPTY, false);
 
         Space space = whitespace();
         String packageName = firImport.getImportedFqName() == null ? "" : firImport.isAllUnder() ?
@@ -1482,7 +1491,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 randomId(),
                 prefix,
                 Markers.EMPTY,
-                statik,
+                static_,
                 qualid,
                 alias);
     }
@@ -1541,7 +1550,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J.Identifier name = createIdentifier(namedArgumentExpression.getName().toString());
         Space exprPrefix = sourceBefore("=");
         J j = visitElement(namedArgumentExpression.getExpression(), ctx);
-        Expression expr = j instanceof Expression ? (Expression) j : new K.StatementExpression(randomId(), (Statement) j);
+        if (j instanceof Statement && !(j instanceof Expression)) {
+            j = new K.StatementExpression(randomId(), (Statement) j);
+        }
+        Expression expr = (Expression) j;
         return new J.Assignment(
                 randomId(),
                 prefix,
@@ -2462,7 +2474,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             catches.add((J.Try.Catch) visitElement(aCatch, ctx));
         }
 
-        JLeftPadded<J.Block> finallyy = tryExpression.getFinallyBlock() == null ? null :
+        JLeftPadded<J.Block> finally_ = tryExpression.getFinallyBlock() == null ? null :
                 padLeft(sourceBefore("finally"), (J.Block) visitElement(tryExpression.getFinallyBlock(), ctx));
 
         return new J.Try(randomId(),
@@ -2471,7 +2483,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 resources,
                 block,
                 catches,
-                finallyy);
+                finally_);
     }
 
     @Override
@@ -2681,7 +2693,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             } else {
                 Space exprPrefix = sourceBefore("=");
                 J j = convert(variableAssignment.getRValue(), ctx);
-                Expression expr = j instanceof Expression ? (Expression) j : new K.StatementExpression(randomId(), (Statement) j);
+                if (j instanceof Statement && !(j instanceof Expression)) {
+                    j = new K.StatementExpression(randomId(), (Statement) j);
+                }
+                Expression expr = (Expression) j;
                 return new J.Assignment(
                         randomId(),
                         prefix,
@@ -3505,6 +3520,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         throw new UnsupportedOperationException(generateUnsupportedMessage("FirWrappedExpression"));
     }
 
+    public J visitNoReceiverExpression(FirNoReceiverExpression noReceiverExpression, ExecutionContext ctx) {
+        throw new UnsupportedOperationException(generateUnsupportedMessage("FirNoReceiverExpression"));
+    }
+
     /* Error element visits */
 
     @Override
@@ -3785,6 +3804,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitWrappedArgumentExpression((FirWrappedArgumentExpression) firElement, ctx);
         } else if (firElement instanceof FirWrappedExpression) {
             return visitWrappedExpression((FirWrappedExpression) firElement, ctx);
+        } else if(firElement instanceof FirNoReceiverExpression) {
+            return visitNoReceiverExpression((FirNoReceiverExpression) firElement, ctx);
         }
 
         throw new IllegalArgumentException("Unsupported FirElement.");
