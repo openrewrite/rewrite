@@ -160,14 +160,16 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
-                sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
-                        sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
-                            if (sourceFile != new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx)) {
-                                acc.usingType = true;
-                                Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
-                                configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation");
-                            }
-                        }));
+                if (sourceFile instanceof JavaSourceFile) {
+                    sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
+                            sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
+                                if (sourceFile != new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx)) {
+                                    acc.usingType = true;
+                                    Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
+                                    configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation");
+                                }
+                            }));
+                }
                 return tree;
             }
         };
