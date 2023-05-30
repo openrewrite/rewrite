@@ -110,7 +110,7 @@ public class Assertions {
                     for (int i = 0; i < sourceFiles.size(); i++) {
                         SourceFile sourceFile = sourceFiles.get(i);
                         if (sourceFile.getSourcePath().toString().endsWith(".gradle") && !sourceFile.getSourcePath().endsWith("settings.gradle")) {
-                            OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile());
+                            OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile(), tempDirectory.resolve(sourceFile.getSourcePath()).toFile());
                             GradleProject gradleProject = GradleProject.fromToolingModel(model.gradleProject());
                             sourceFiles.set(i, sourceFile.withMarkers(sourceFile.getMarkers().add(gradleProject)));
                         }

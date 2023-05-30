@@ -210,9 +210,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                         Set<String> tmpConfigurations = new HashSet<>(resolvedConfigurations);
                         for (String tmpConfiguration : tmpConfigurations) {
                             GradleDependencyConfiguration gdc = gp.getConfiguration(tmpConfiguration);
-
-                            if (gdc == null || gdc.getRequested().stream().filter(d -> d.getGroupId().equals(groupId)
-                                    && d.getArtifactId().equals(artifactId)).findFirst().isPresent()) {
+                            if (gdc == null || gdc.findRequestedDependency(groupId, artifactId) != null) {
                                 resolvedConfigurations.remove(tmpConfiguration);
                             }
                         }
@@ -222,9 +220,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
                             GradleDependencyConfiguration gdc = gp.getConfiguration(tmpConfiguration);
                             for (GradleDependencyConfiguration transitive : gp.configurationsExtendingFrom(gdc, true)) {
                                 if (resolvedConfigurations.contains(transitive.getName()) ||
-                                    (Boolean.TRUE.equals(acceptTransitive) && gdc.getRequested().stream()
-                                            .filter(d -> d.getGroupId().equals(groupId)
-                                            && d.getArtifactId().equals(artifactId)).findFirst().isPresent())) {
+                                    (Boolean.TRUE.equals(acceptTransitive) && transitive.findResolvedDependency(groupId, artifactId) != null)) {
                                     resolvedConfigurations.remove(transitive.getName());
                                 }
                             }
