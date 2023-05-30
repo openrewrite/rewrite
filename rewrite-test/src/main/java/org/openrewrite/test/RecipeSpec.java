@@ -38,6 +38,7 @@ import java.util.*;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 
 @SuppressWarnings("UnusedReturnValue")
 @Getter
@@ -182,9 +183,10 @@ public class RecipeSpec {
                     assertThat(rows).isNotNull();
                     assertThat(rows).isNotEmpty();
                     extract.accept(rows);
+                    return;
                 }
             }
-
+            fail("No data table found with row type " + rowType);
         });
     }
 

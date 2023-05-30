@@ -82,6 +82,8 @@ public class RecipeScheduler {
             ctxWithWatch.resetHasNewMessages();
         }
 
+        recipeRunStats.flush(ctx);
+
         return new RecipeRun(
                 after.getChangeset(),
                 ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap())
