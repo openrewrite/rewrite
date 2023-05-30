@@ -26,6 +26,7 @@ import org.openrewrite.xml.style.TabsAndIndentsStyle;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
+import java.util.stream.Stream;
 
 import static java.util.Collections.singletonList;
 import static org.openrewrite.xml.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
@@ -57,7 +58,8 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
         t = new LineBreaksVisitor<>(stopAfter).visit(t, p, cursor.fork());
 
         TabsAndIndentsStyle tabsStyle = Optional.ofNullable(doc.getStyle(TabsAndIndentsStyle.class))
-                .orElseGet(() -> NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(Autodetect.detect(singletonList(doc)))));
+                .orElseGet(() -> NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(
+                        Autodetect.detect(Stream.of(doc)).build())));
         assert tabsStyle != null;
 
         t = new NormalizeTabsOrSpacesVisitor<>(tabsStyle, stopAfter)
@@ -86,7 +88,8 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
         t = (Xml.Document) new LineBreaksVisitor<>(stopAfter).visit(t, p);
 
         TabsAndIndentsStyle tabsStyle = Optional.ofNullable(doc.getStyle(TabsAndIndentsStyle.class))
-                .orElseGet(() -> NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(Autodetect.detect(singletonList(doc)))));
+                .orElseGet(() -> NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(
+                        Autodetect.detect(Stream.of(doc)).build())));
         assert tabsStyle != null;
 
         t = (Xml.Document) new NormalizeTabsOrSpacesVisitor<>(tabsStyle, stopAfter).visit(t, p);
