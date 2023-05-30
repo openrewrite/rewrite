@@ -27,6 +27,7 @@ import org.openrewrite.marker.RecipesThatMadeChanges;
 import org.openrewrite.scheduling.WatchableExecutionContext;
 import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SourcesFileErrors;
+import org.openrewrite.table.SourcesFileResults;
 
 import java.time.Duration;
 import java.util.*;
@@ -51,6 +52,7 @@ public class RecipeScheduler {
 
         RecipeRunStats recipeRunStats = new RecipeRunStats(Recipe.noop());
         SourcesFileErrors errorsTable = new SourcesFileErrors(Recipe.noop());
+        SourcesFileResults sourceFileResults = new SourcesFileResults(Recipe.noop());
 
         LargeSourceSet acc = sourceSet;
         LargeSourceSet after = acc;
@@ -62,7 +64,7 @@ public class RecipeScheduler {
             Cursor rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
 
             RecipeRunCycle cycle = new RecipeRunCycle(recipe, rootCursor, ctxWithWatch,
-                    recipeRunStats, errorsTable);
+                    recipeRunStats, sourceFileResults, errorsTable);
 
             // pre-transformation scanning phase where there can only be modifications to capture exceptions
             // occurring during the scanning phase
@@ -97,6 +99,7 @@ public class RecipeScheduler {
         Cursor rootCursor;
         ExecutionContext ctx;
         RecipeRunStats recipeRunStats;
+        SourcesFileResults sourcesFileResults;
         SourcesFileErrors errorsTable;
         Map<Recipe, List<Recipe>> recipeLists = new IdentityHashMap<>();
 
@@ -196,6 +199,7 @@ public class RecipeScheduler {
                     });
 
                     if (after != sourceFile) {
+                        recordSourceFileResult(sourceFile, after, recipeStack, ctx);
                         if (sourceFile.getMarkers().findFirst(Generated.class).isPresent()) {
                             // skip edits made to generated source files so that they don't show up in a diff
                             // that later fails to apply on a freshly cloned repository
@@ -210,6 +214,44 @@ public class RecipeScheduler {
                 }
                 return after;
             });
+        }
+
+        private void recordSourceFileResult(@Nullable SourceFile before, @Nullable SourceFile after, Stack<Recipe> recipeStack, ExecutionContext ctx) {
+            String beforePath = (before == null) ? "" : before.getSourcePath().toString();
+            String afterPath = (after == null) ? "" : after.getSourcePath().toString();
+            Recipe recipe = recipeStack.peek();
+            Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null) ? 0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
+            String parentName = recipeStack.get(recipeStack.size() - 2).getName();
+            String recipeName = recipe.getName();
+            sourcesFileResults.insertRow(ctx, new SourcesFileResults.Row(
+                    beforePath,
+                    afterPath,
+                    parentName,
+                    recipeName,
+                    effortSeconds));
+            recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
+        }
+
+        private void recordSourceFileResult(@Nullable String beforePath, @Nullable String afterPath, List<Recipe> recipeStack, Long effortSeconds, ExecutionContext ctx) {
+            if(recipeStack.size() <= 1) {
+                // No reason to record the synthetic root recipe which contains the recipe run
+                return;
+            }
+            String parentName;
+            if(recipeStack.size() == 2) {
+                // Record the parent name as blank rather than CompositeRecipe when the parent is the synthetic root recipe
+                parentName = "";
+            } else {
+                parentName = recipeStack.get(recipeStack.size() - 2).getName();
+            }
+            Recipe recipe = recipeStack.get(recipeStack.size() - 1);
+            sourcesFileResults.insertRow(ctx, new SourcesFileResults.Row(
+                    beforePath,
+                    afterPath,
+                    parentName,
+                    recipe.getName(),
+                    effortSeconds));
+            recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
         }
 
         @Nullable
