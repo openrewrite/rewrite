@@ -158,6 +158,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
         List<Recipe> subRecipes = recipe.getRecipeList();
         if (!subRecipes.isEmpty()) {
             for (Recipe r : subRecipes) {
+                //noinspection unchecked
                 afterVisit.add((TreeVisitor<T, P>) r.getVisitor());
             }
         }
