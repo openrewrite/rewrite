@@ -88,7 +88,11 @@ public class DeclarativeRecipe extends Recipe {
                 Optional<Recipe> next = availableRecipes.stream()
                         .filter(r -> r.getName().equals(recipeFqn)).findAny();
                 if (next.isPresent()) {
-                    recipeList.add(next.get());
+                    Recipe subRecipe = next.get();
+                    if (subRecipe instanceof DeclarativeRecipe) {
+                        ((DeclarativeRecipe) subRecipe).initialize(availableRecipes, recipeToContributors);
+                    }
+                    recipeList.add(subRecipe);
                 } else {
                     validation = validation.and(
                             invalid(name + ".recipeList" +
@@ -99,6 +103,9 @@ public class DeclarativeRecipe extends Recipe {
                 }
             } else {
                 recipe.setContributors(recipeToContributors.getOrDefault(recipe.getName(), emptyList()));
+                if (recipe instanceof DeclarativeRecipe) {
+                    ((DeclarativeRecipe) recipe).initialize(availableRecipes, recipeToContributors);
+                }
                 recipeList.add(recipe);
             }
         }
