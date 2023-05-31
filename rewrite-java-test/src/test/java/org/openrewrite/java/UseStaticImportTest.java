@@ -96,7 +96,7 @@ class UseStaticImportTest implements RewriteTest {
 
               @Override
               public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-                  doAfterVisit(new UseStaticImport("asserts.Assert assert*(..)"));
+                  doAfterVisit(new UseStaticImport("asserts.Assert assert*(..)").getVisitor());
                   return super.visitCompilationUnit(cu, executionContext);
               }
           })).cycles(2).expectedCyclesThatMakeChanges(2),

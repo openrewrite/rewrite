@@ -92,7 +92,7 @@ class CopyValueTest implements RewriteTest {
             toRecipe(() -> Preconditions.check(new HasSourcePath<>("**/a.yml"), new YamlIsoVisitor<>() {
                 @Override
                 public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext executionContext) {
-                    doAfterVisit(new CopyValue(".source", ".destination"));
+                    doAfterVisit(new CopyValue(".source", ".destination").getVisitor());
                     return documents;
                 }
             }))

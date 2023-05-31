@@ -307,4 +307,40 @@ class RemoveDependencyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void removeLastDependency() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveDependency("org.junit.vintage", "junit-vintage-engine", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation "org.springframework.boot:spring-boot-starter-web:2.7.0"
+                  testImplementation "org.junit.vintage:junit-vintage-engine:5.6.2"
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation "org.springframework.boot:spring-boot-starter-web:2.7.0"
+              }
+              """
+          )
+        );
+    }
 }

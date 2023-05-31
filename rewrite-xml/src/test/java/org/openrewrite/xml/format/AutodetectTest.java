@@ -23,6 +23,7 @@ import org.openrewrite.xml.style.Autodetect;
 import org.openrewrite.xml.style.TabsAndIndentsStyle;
 
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.xml.Assertions.xml;
@@ -97,7 +98,7 @@ class AutodetectTest implements RewriteTest {
     private static Consumer<RecipeSpec> hasIndentation(int indentSize, int continuationIndentSize) {
         return spec -> spec.beforeRecipe(sources -> {
             Autodetect.Detector detector = Autodetect.detect(sources.stream());
-            assertThat(detector.count()).isEqualTo(1);
+            detector.forEach(it -> {}); // Terminal operation required
 
             TabsAndIndentsStyle tabsAndIndents = (TabsAndIndentsStyle) detector.build().getStyles().stream()
               .filter(TabsAndIndentsStyle.class::isInstance)

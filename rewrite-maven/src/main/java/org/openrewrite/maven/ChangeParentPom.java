@@ -184,12 +184,12 @@ public class ChangeParentPom extends Recipe {
 
                                 if (changeParentTagVisitors.size() > 0) {
                                     retainVersions();
-                                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, retainVersions));
+                                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, retainVersions).getVisitor());
                                     for (XmlVisitor<ExecutionContext> visitor : changeParentTagVisitors) {
                                         doAfterVisit(visitor);
                                     }
                                     maybeUpdateModel();
-                                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null));
+                                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null).getVisitor());
                                 }
                             }
                         } catch (MavenDownloadingException e) {
@@ -203,7 +203,7 @@ public class ChangeParentPom extends Recipe {
             private void retainVersions() {
                 for (Recipe retainVersionRecipe : RetainVersions.plan(this, retainVersions == null ?
                         emptyList() : retainVersions)) {
-                    doAfterVisit(retainVersionRecipe);
+                    doAfterVisit(retainVersionRecipe.getVisitor());
                 }
             }
 

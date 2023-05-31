@@ -168,7 +168,7 @@ public class UpgradePluginVersion extends Recipe {
                     String version = versionTag.get().getValue().orElse(null);
                     if (version != null) {
                         if (version.trim().startsWith("${") && !newVersion.equals(getResolutionResult().getPom().getValue(version.trim()))) {
-                            doAfterVisit(new ChangePropertyValue(version, newVersion, false, false));
+                            doAfterVisit(new ChangePropertyValue(version, newVersion, false, false).getVisitor());
                         } else if (!newVersion.equals(version)) {
                             doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
                         }

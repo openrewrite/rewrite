@@ -42,7 +42,7 @@ import static java.util.Collections.emptyList;
  * <p>
  * The @{link {@link OrderImports#removeUnused}} flag (which is defaulted to true) can be used to also remove any
  * imports that are not referenced within the compilation unit.
-         */
+ */
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class OrderImports extends Recipe {
@@ -65,51 +65,42 @@ public class OrderImports extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new OrderImportsVisitor<>(removeUnused);
-    }
+        return new JavaIsoVisitor<ExecutionContext>() {
+            @Override
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
+                        .orElse(IntelliJ.importLayout());
 
-    private static class OrderImportsVisitor<P> extends JavaIsoVisitor<P> {
-        @Nullable
-        private final Boolean removeUnused;
+                Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
+                List<JavaType.FullyQualified> classpath = emptyList();
+                if (sourceSet.isPresent()) {
+                    classpath = sourceSet.get().getClasspath();
+                }
 
-        OrderImportsVisitor(@Nullable Boolean removeUnused) {
-            this.removeUnused = removeUnused;
-        }
+                List<JRightPadded<J.Import>> orderedImports = layoutStyle.orderImports(cu.getPadding().getImports(), classpath);
 
-        @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P ctx) {
-            ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
-                    .orElse(IntelliJ.importLayout());
-
-            Optional<JavaSourceSet> sourceSet = cu.getMarkers().findFirst(JavaSourceSet.class);
-            List<JavaType.FullyQualified> classpath = emptyList();
-            if (sourceSet.isPresent()) {
-                classpath = sourceSet.get().getClasspath();
-            }
-
-            List<JRightPadded<J.Import>> orderedImports = layoutStyle.orderImports(cu.getPadding().getImports(), classpath);
-
-            boolean changed = false;
-            if (orderedImports.size() != cu.getImports().size()) {
-                cu = cu.getPadding().withImports(orderedImports);
-                changed = true;
-            } else {
-                for (int i = 0; i < orderedImports.size(); i++) {
-                    if (orderedImports.get(i) != cu.getPadding().getImports().get(i)) {
-                        cu = cu.getPadding().withImports(orderedImports);
-                        changed = true;
-                        break;
+                boolean changed = false;
+                if (orderedImports.size() != cu.getImports().size()) {
+                    cu = cu.getPadding().withImports(orderedImports);
+                    changed = true;
+                } else {
+                    for (int i = 0; i < orderedImports.size(); i++) {
+                        if (orderedImports.get(i) != cu.getPadding().getImports().get(i)) {
+                            cu = cu.getPadding().withImports(orderedImports);
+                            changed = true;
+                            break;
+                        }
                     }
                 }
-            }
 
-            if (Boolean.TRUE.equals(removeUnused)) {
-                doAfterVisit(new RemoveUnusedImports());
-            } else if (changed) {
-                doAfterVisit(new FormatFirstClassPrefix<>());
-            }
+                if (Boolean.TRUE.equals(removeUnused)) {
+                    doAfterVisit(new RemoveUnusedImports().getVisitor());
+                } else if (changed) {
+                    doAfterVisit(new FormatFirstClassPrefix<>());
+                }
 
-            return cu;
-        }
+                return cu;
+            }
+        };
     }
 }

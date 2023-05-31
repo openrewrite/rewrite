@@ -898,7 +898,7 @@ class AutodetectTest implements RewriteTest {
         var cus = jp().parse(
           """
             package com.test;
-                        
+            
             public class Foo {
                private static final int underIndented;
                      int overIndented;

@@ -162,7 +162,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
 
                 if (t != tag && PROJECT_MATCHER.matches(getCursor())) {
                     maybeUpdateModel();
-                    doAfterVisit(new RemoveRedundantDependencyVersions(groupId, artifactId, true, null));
+                    doAfterVisit(new RemoveRedundantDependencyVersions(groupId, artifactId, true, null).getVisitor());
                 }
 
                 return t;
@@ -177,10 +177,10 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
                             TreeVisitor<Xml, ExecutionContext> upgradeManagedDependency = upgradeManagedDependency(tag, ctx, t);
                             if (upgradeManagedDependency != null) {
                                 retainVersions();
-                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, retainVersions));
+                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, retainVersions).getVisitor());
                                 doAfterVisit(upgradeManagedDependency);
                                 maybeUpdateModel();
-                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null));
+                                doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null).getVisitor());
                             }
                         }
                     } catch (MavenDownloadingException e) {
@@ -192,7 +192,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
                 private void retainVersions() {
                     for (Recipe retainVersionRecipe : RetainVersions.plan(this, retainVersions == null ?
                             emptyList() : retainVersions)) {
-                        doAfterVisit(retainVersionRecipe);
+                        doAfterVisit(retainVersionRecipe.getVisitor());
                     }
                 }
             }
@@ -208,7 +208,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
                         if (version.isPresent()) {
                             String requestedVersion = d.getRequested().getVersion();
                             if (requestedVersion != null && requestedVersion.startsWith("${") && !implicitlyDefinedVersionProperties.contains(requestedVersion)) {
-                                doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false));
+                                doAfterVisit(new ChangePropertyValue(requestedVersion.substring(2, requestedVersion.length() - 1), newerVersion, overrideManagedVersion, false).getVisitor());
                             } else {
                                 t = (Xml.Tag) new ChangeTagValueVisitor<>(version.get(), newerVersion).visitNonNull(t, 0, getCursor().getParentOrThrow());
                             }
@@ -221,7 +221,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
                                 !implicitlyDefinedVersionProperties.contains(dm.getRequested().getVersion())) {
                                 doAfterVisit(new ChangePropertyValue(dm.getRequested().getVersion().substring(2,
                                         dm.getRequested().getVersion().length() - 1),
-                                        newerVersion, overrideManagedVersion, false));
+                                        newerVersion, overrideManagedVersion, false).getVisitor());
                             } else {
                                 // if the version is not present and the override managed version is set,
                                 // add a new explicit version tag

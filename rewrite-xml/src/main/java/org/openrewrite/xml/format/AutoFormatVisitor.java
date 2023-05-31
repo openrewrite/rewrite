@@ -58,7 +58,7 @@ public class AutoFormatVisitor<P> extends XmlVisitor<P> {
         t = new LineBreaksVisitor<>(stopAfter).visit(t, p, cursor.fork());
 
         TabsAndIndentsStyle tabsStyle = Optional.ofNullable(doc.getStyle(TabsAndIndentsStyle.class))
-                .orElseGet(() -> NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(
+                .orElse(NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(
                         Autodetect.detect(Stream.of(doc)).build())));
         assert tabsStyle != null;
 

@@ -221,7 +221,11 @@ public class RecipeScheduler {
             String afterPath = (after == null) ? "" : after.getSourcePath().toString();
             Recipe recipe = recipeStack.peek();
             Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null) ? 0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
-            String parentName = recipeStack.get(recipeStack.size() - 2).getName();
+            String parentName = "";
+            boolean hierarchical = recipeStack.size() > 1;
+            if(hierarchical) {
+                parentName = recipeStack.get(recipeStack.size() - 2).getName();
+            }
             String recipeName = recipe.getName();
             sourcesFileResults.insertRow(ctx, new SourcesFileResults.Row(
                     beforePath,
@@ -229,7 +233,9 @@ public class RecipeScheduler {
                     parentName,
                     recipeName,
                     effortSeconds));
-            recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
+            if(hierarchical) {
+                recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
+            }
         }
 
         private void recordSourceFileResult(@Nullable String beforePath, @Nullable String afterPath, List<Recipe> recipeStack, Long effortSeconds, ExecutionContext ctx) {

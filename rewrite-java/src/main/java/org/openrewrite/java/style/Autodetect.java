@@ -71,7 +71,7 @@ public class Autodetect extends NamedStyles {
 
             this.sourceFiles = sourceFiles
                     .map(SourceFile.class::cast)
-                    .peek(cu -> {
+                    .filter(cu -> {
                         if (cu instanceof JavaSourceFile) {
                             findImportLayout.visitNonNull(cu, 0);
                             findIndent.visitNonNull(cu, indentStatistics);
@@ -79,10 +79,18 @@ public class Autodetect extends NamedStyles {
                             findWrappingAndBraces.visitNonNull(cu, wrappingAndBracesStatistics);
                             findLineFormat.visitNonNull(cu, generalFormatStatistics);
                         }
+                        return true;
                     });
         }
 
         public Autodetect build() {
+            try {
+                // consume the stream if it hasn't been already
+                //noinspection ResultOfMethodCallIgnored
+                sourceFiles.count();
+            } catch (IllegalStateException ignore) {
+            }
+
             return new Autodetect(Tree.randomId(), Arrays.asList(
                     indentStatistics.getTabsAndIndentsStyle(),
                     findImportLayout.aggregate().getImportLayoutStyle(),

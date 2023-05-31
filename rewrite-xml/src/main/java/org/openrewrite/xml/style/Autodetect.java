@@ -59,13 +59,21 @@ public class Autodetect extends NamedStyles {
         public Detector(Stream<? extends SourceFile> sourceFiles) {
             this.sourceFiles = sourceFiles
                     .map(SourceFile.class::cast)
-                    .peek(xml -> {
+                    .filter(xml -> {
                         new FindIndentXmlVisitor().visit(xml, indentStatistics);
                         new FindLineFormatJavaVisitor().visit(xml, generalFormatStatistics);
+                        return true;
                     });
         }
 
         public Autodetect build() {
+            try {
+                // consume the stream if it hasn't been already
+                //noinspection ResultOfMethodCallIgnored
+                sourceFiles.count();
+            } catch (IllegalStateException ignore) {
+            }
+
             return new Autodetect(Tree.randomId(), Arrays.asList(
                     indentStatistics.getTabsAndIndentsStyle(),
                     generalFormatStatistics.getFormatStyle()));
