@@ -94,7 +94,7 @@ public class AddProfile extends Recipe {
 
                 Optional<Xml.Tag> maybeProfile = profiles.getChildren().stream()
                         .filter(profile ->
-                                "profile".equals(profile.getId())
+                                profile.getChildValue("id").get().equals(id)
                         )
                         .findAny();
 
@@ -103,15 +103,15 @@ public class AddProfile extends Recipe {
 
                     t = (Xml.Tag) new RemoveContentVisitor(profile, false).visitNonNull(t, ctx, getCursor().getParentOrThrow());
 
-                } else {
-                    Xml.Tag profileTag = Xml.Tag.build("<profile>\n" +
-                            "<id>" + id + "</id>\n" +
-                            (activation != null ? activation.trim() + "\n" : "") +
-                            (properties != null ? properties.trim() + "\n" : "") +
-                            (build != null ? build.trim() + "\n" : "") +
-                            "</profile>");
-                    t = (Xml.Tag) new AddToTagVisitor<>(profiles, profileTag).visitNonNull(t, ctx, getCursor().getParentOrThrow());
                 }
+                Xml.Tag profileTag = Xml.Tag.build("<profile>\n" +
+                        "<id>" + id + "</id>\n" +
+                        (activation != null ? activation.trim() + "\n" : "") +
+                        (properties != null ? properties.trim() + "\n" : "") +
+                        (build != null ? build.trim() + "\n" : "") +
+                        "</profile>");
+                t = (Xml.Tag) new AddToTagVisitor<>(profiles, profileTag).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+
             }
 
             return t;

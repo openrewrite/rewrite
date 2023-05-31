@@ -70,6 +70,111 @@ public class AddProfileTest implements RewriteTest {
 
 
     @Test
+    void preExistingOtherProfile() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
+            "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>"))
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
+          pomXml(
+            """
+              <project>
+                <groupId>group</groupId>
+                <artifactId>artifact</artifactId>
+                <version>1</version>
+                <profiles>
+                  <profile>
+                    <id>other.profile</id>
+                    <activation>
+                      <param>paramValue</param>
+                    </activation>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>group</groupId>
+                <artifactId>artifact</artifactId>
+                <version>1</version>
+                <profiles>
+                  <profile>
+                    <id>other.profile</id>
+                    <activation>
+                      <param>paramValue</param>
+                    </activation>
+                  </profile>
+                  <profile>
+                    <id>myprofile</id>
+                    <activation>
+                      <foo>foo</foo>
+                    </activation>
+                    <properties>
+                      <bar>bar</bar>
+                    </properties>
+                    <build>
+                      <param>value</param>
+                    </build>
+                  </profile>
+                </profiles>
+              </project>
+              """
+
+          )
+        );
+    }
+
+    @Test
+    void preExistingMatchingProfile() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProfile("myprofile", "<activation><foo>foo</foo></activation>",
+            "<properties><bar>bar</bar></properties>", "<build><param>value</param></build>"))
+            .cycles(1)
+            .expectedCyclesThatMakeChanges(1),
+          pomXml(
+            """
+              <project>
+                <groupId>group</groupId>
+                <artifactId>artifact</artifactId>
+                <version>1</version>
+                <profiles>
+                  <profile>
+                    <id>myprofile</id>
+                    <activation>
+                      <param>paramValue</param>
+                    </activation>
+                  </profile>
+                </profiles>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>group</groupId>
+                <artifactId>artifact</artifactId>
+                <version>1</version>
+                <profiles>
+                  <profile>
+                    <id>myprofile</id>
+                    <activation>
+                      <foo>foo</foo>
+                    </activation>
+                    <properties>
+                      <bar>bar</bar>
+                    </properties>
+                    <build>
+                      <param>value</param>
+                    </build>
+                  </profile>
+                </profiles>
+              </project>
+              """
+
+          )
+        );
+    }
+
+
+    @Test
     void notAPom() {
         rewriteRun(
           spec -> spec.recipe(new AddProfile("myprofile", "<activation></activation>",
