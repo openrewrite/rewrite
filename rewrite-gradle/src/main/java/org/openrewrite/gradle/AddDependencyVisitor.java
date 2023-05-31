@@ -20,28 +20,33 @@ import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Validated;
 import org.openrewrite.gradle.internal.InsertDependencyComparator;
+import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.internal.MavenPomDownloader;
-import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.maven.tree.MavenMetadata;
+import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.*;
+import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.LatestPatch;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 
@@ -69,11 +74,31 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
     @Nullable
     private final Pattern familyRegex;
 
+    @Nullable
+    private final MavenMetadataFailures metadataFailures;
+
+    @Nullable
+    private VersionComparator versionComparator;
+
+    @Nullable
+    private String resolvedVersion;
+
     @Override
     public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
-        G.CompilationUnit groovy = super.visitCompilationUnit(cu, ctx);
+        Optional<GradleProject> maybeGp = cu.getMarkers().findFirst(GradleProject.class);
+        if (!maybeGp.isPresent()) {
+            return cu;
+        }
+
+        GradleProject gp = maybeGp.get();
+        GradleDependencyConfiguration gdc = gp.getConfiguration(configuration);
+        if (gdc == null || gdc.findRequestedDependency(groupId, artifactId) != null) {
+            return cu;
+        }
+
+        G.CompilationUnit g = cu;
         boolean dependenciesBlockMissing = true;
-        for (Statement statement : groovy.getStatements()) {
+        for (Statement statement : g.getStatements()) {
             if (statement instanceof J.MethodInvocation && DEPENDENCIES_DSL_MATCHER.matches((J.MethodInvocation) statement)) {
                 dependenciesBlockMissing = false;
             }
@@ -85,21 +110,119 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
                     .getStatements().get(0);
             dependenciesInvocation = autoFormat(dependenciesInvocation, ctx, new Cursor(getCursor(), cu));
-            groovy = groovy.withStatements(ListUtils.concat(groovy.getStatements(),
-                    groovy.getStatements().isEmpty() ?
+            g = g.withStatements(ListUtils.concat(g.getStatements(),
+                    g.getStatements().isEmpty() ?
                             dependenciesInvocation :
                             dependenciesInvocation.withPrefix(Space.format("\n\n"))));
         }
 
-        groovy = (G.CompilationUnit) new InsertDependencyInOrder(configuration)
-                .visitNonNull(groovy, ctx, requireNonNull(getCursor().getParent()));
+        if (version != null) {
+            Validated versionValidated = Semver.validate(version, versionPattern);
+            if (versionValidated.isValid()) {
+                versionComparator = versionValidated.getValue();
+            }
+        }
 
-        return groovy;
+        g = (G.CompilationUnit) new InsertDependencyInOrder(configuration, gp)
+                .visitNonNull(g, ctx, requireNonNull(getCursor().getParent()));
+
+        if (g != cu) {
+            String versionWithPattern = StringUtils.isBlank(resolvedVersion) || resolvedVersion.startsWith("$") ? null : resolvedVersion;
+            GradleProject newGp = addDependency(gp,
+                        gdc,
+                        new GroupArtifactVersion(groupId, artifactId, versionWithPattern),
+                        classifier,
+                        ctx);
+            g = g.withMarkers(g.getMarkers().setByType(newGp));
+        }
+        return g;
+    }
+
+    /**
+     * Update the dependency model, adding the specified dependency to the specified configuration and all configurations
+     * which extend from it.
+     *
+     * @param gp marker with the current, pre-update dependency information
+     * @param configuration the configuration to add the dependency to
+     * @param gav the group, artifact, and version of the dependency to add
+     * @param classifier the classifier of the dependency to add
+     * @param ctx context which will be used to download the pom for the dependency
+     * @return a copy of gp with the dependency added
+     */
+    static GradleProject addDependency(
+            GradleProject gp,
+            @Nullable GradleDependencyConfiguration configuration,
+            GroupArtifactVersion gav,
+            @Nullable String classifier,
+            ExecutionContext ctx) {
+        try {
+            if(gav.getGroupId() == null || gav.getArtifactId() == null || configuration == null) {
+                return gp;
+            }
+            ResolvedGroupArtifactVersion resolvedGav;
+            List<ResolvedDependency> transitiveDependencies;
+            if (gav.getVersion() == null) {
+                resolvedGav = null;
+                transitiveDependencies = Collections.emptyList();
+            } else {
+                MavenPomDownloader mpd = new MavenPomDownloader(emptyMap(), ctx, null, null);
+                Pom pom = mpd.download(gav, null, null, gp.getMavenRepositories());
+                ResolvedPom resolvedPom = pom.resolve(emptyList(), mpd, gp.getMavenRepositories(), ctx);
+                resolvedGav = resolvedPom.getGav();
+                transitiveDependencies = resolvedPom.resolveDependencies(Scope.Runtime, mpd, ctx);
+            }
+            Map<String, GradleDependencyConfiguration> nameToConfiguration = gp.getNameToConfiguration();
+            Map<String, GradleDependencyConfiguration> newNameToConfiguration = new HashMap<>(nameToConfiguration.size());
+
+            Set<GradleDependencyConfiguration> configurationsToAdd = Stream.concat(
+                            Stream.of(configuration),
+                            gp.configurationsExtendingFrom(configuration, true).stream())
+                    .collect(Collectors.toSet());
+
+            for (GradleDependencyConfiguration gdc : nameToConfiguration.values()) {
+                if (!configurationsToAdd.contains(gdc)) {
+                    newNameToConfiguration.put(gdc.getName(), gdc);
+                    continue;
+                }
+
+                GradleDependencyConfiguration newGdc = gdc;
+                org.openrewrite.maven.tree.Dependency newRequested = new org.openrewrite.maven.tree.Dependency(
+                        gav, classifier, "jar", gdc.getName(), emptyList(), null);
+                newGdc = newGdc.withRequested(ListUtils.concat(
+                        ListUtils.map(gdc.getRequested(), requested -> {
+                            // Remove any existing dependency with the same group and artifact id
+                            if (Objects.equals(requested.getGroupId(), gav.getGroupId()) && Objects.equals(requested.getArtifactId(), gav.getArtifactId())) {
+                                return null;
+                            }
+                            return requested;
+                        }),
+                        newRequested));
+                if (newGdc.isCanBeResolved() && resolvedGav != null) {
+                    newGdc = newGdc.withResolved(ListUtils.concat(
+                            ListUtils.map(gdc.getResolved(), resolved -> {
+                                // Remove any existing dependency with the same group and artifact id
+                                if (Objects.equals(resolved.getGroupId(), resolvedGav.getGroupId()) && Objects.equals(resolved.getArtifactId(), resolvedGav.getArtifactId())) {
+                                    return null;
+                                }
+                                return resolved;
+                            }),
+                            new ResolvedDependency(null, resolvedGav, newRequested, transitiveDependencies,
+                                    emptyList(), "jar",  classifier, null, 0, null)));
+                }
+                newNameToConfiguration.put(newGdc.getName(), newGdc);
+            }
+            gp = gp.withNameToConfiguration(newNameToConfiguration);
+        } catch (MavenDownloadingException | MavenDownloadingExceptions | IllegalArgumentException e) {
+            return gp;
+        }
+        return gp;
     }
 
     @RequiredArgsConstructor
     private class InsertDependencyInOrder extends GroovyIsoVisitor<ExecutionContext> {
         private final String configuration;
+
+        private final GradleProject gp;
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
@@ -113,17 +236,27 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                 return m;
             }
 
+            String resolvedVersion = null;
+            if (versionComparator != null) {
+                try {
+                    resolvedVersion = findNewerVersion(groupId, artifactId, gp, ctx);
+                } catch (MavenDownloadingException e) {
+                    return e.warn(m);
+                }
+            }
+
+
             J.Block body = (J.Block) dependenciesBlock.getBody();
 
             String codeTemplate;
             DependencyStyle style = autodetectDependencyStyle(body.getStatements());
             if (style == DependencyStyle.String) {
                 codeTemplate = "dependencies {\n" +
-                        configuration + " \"" + groupId + ":" + artifactId + (version == null ? "" : ":" + version) + (version == null || classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\"" +
+                        configuration + " \"" + groupId + ":" + artifactId + (resolvedVersion == null ? "" : ":" + resolvedVersion) + (resolvedVersion == null || classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\"" +
                         "\n}";
             } else {
                 codeTemplate = "dependencies {\n" +
-                        configuration + " group: \"" + groupId + "\", name: \"" + artifactId + "\"" + (version == null ? "" :  ", version: \"" + version + "\"") + (classifier == null ? "" : ", classifier: \"" + classifier + "\"") + (extension == null ? "" : ", ext: \"" + extension + "\"") +
+                        configuration + " group: \"" + groupId + "\", name: \"" + artifactId + "\"" + (resolvedVersion == null ? "" :  ", version: \"" + resolvedVersion + "\"") + (classifier == null ? "" : ", classifier: \"" + classifier + "\"") + (extension == null ? "" : ", ext: \"" + extension + "\"") +
                         "\n}";
             }
             J.MethodInvocation addDependencyInvocation = requireNonNull((J.MethodInvocation) ((J.Return) (((J.Block) ((J.Lambda) ((J.MethodInvocation) GRADLE_PARSER.parse(codeTemplate)
@@ -194,6 +327,43 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
             m = m.withArguments(Collections.singletonList(dependenciesBlock.withBody(body)));
 
             return m;
+        }
+
+        @Nullable
+        private String findNewerVersion(String groupId, String artifactId, GradleProject gradleProject,
+                                        ExecutionContext ctx) throws MavenDownloadingException {
+            if (resolvedVersion != null) {
+                return resolvedVersion;
+            }
+
+            if (versionComparator == null || versionComparator instanceof ExactVersion) {
+                resolvedVersion = version;
+            } else {
+                // in the case of "latest.patch", a new version can only be derived if the
+                // current version is a semantic version
+                if (versionComparator instanceof LatestPatch && !versionComparator.isValid(version, version)) {
+                    return null;
+                }
+
+                try {
+                    MavenMetadata mavenMetadata = metadataFailures == null ?
+                            downloadMetadata(groupId, artifactId, gradleProject, ctx) :
+                            metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, gradleProject, ctx));
+                    resolvedVersion = versionComparator.upgrade(version, mavenMetadata.getVersioning().getVersions())
+                            .orElse(version);
+                } catch (IllegalStateException e) {
+                    // this can happen when we encounter exotic versions
+                    return null;
+                }
+            }
+
+            return resolvedVersion;
+        }
+
+        public MavenMetadata downloadMetadata(String groupId, String artifactId, GradleProject gradleProject, ExecutionContext ctx) throws MavenDownloadingException {
+            return new MavenPomDownloader(emptyMap(), ctx, null, null)
+                    .downloadMetadata(new GroupArtifact(groupId, artifactId), null,
+                            gradleProject.getMavenRepositories());
         }
     }
 
