@@ -16,29 +16,29 @@
 package org.openrewrite.java.spring;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Recipe;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Recipe;
 import org.openrewrite.test.AdHocRecipe;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
 
-import static java.util.Collections.emptyList;
 import static org.openrewrite.java.Assertions.java;
 
+@SuppressWarnings({"ResultOfMethodCallIgnored", "CodeBlock2Expr", "RedundantThrows", "Convert2MethodRef", "EmptyTryBlock", "CatchMayIgnoreException", "EmptyFinallyBlock", "StringBufferReplaceableByString", "UnnecessaryLocalVariable"})
 public class RemoveMethodInvocationsVisitorTest implements RewriteTest {
 
     private Recipe createRemoveMethodsRecipe(String... methods) {
-        return new AdHocRecipe(null, null, null, () -> new RemoveMethodInvocationsVisitor(List.of(methods)), null, null, null, emptyList());
+        return new AdHocRecipe(null, null, null, () -> new RemoveMethodInvocationsVisitor(List.of(methods)), null, null, null);
     }
 
     @DocumentExample
     @Test
     void removeFromEnd() {
-        //language=java
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder toString()"))
           ,
+          //language=java
           java(
             """
               public class Test {
@@ -75,9 +75,9 @@ public class RemoveMethodInvocationsVisitorTest implements RewriteTest {
 
     @Test
     void removeMultipleMethodsFromEnd() {
-        //language=java
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder toString()", "java.lang.StringBuilder append(java.lang.String)")),
+          //language=java
           java(
             """
               public class Test {
@@ -109,9 +109,9 @@ public class RemoveMethodInvocationsVisitorTest implements RewriteTest {
 
     @Test
     void removeFromMiddle() {
-        //language=java
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder reverse()")),
+          //language=java
           java(
             """
               public class Test {
@@ -147,9 +147,9 @@ public class RemoveMethodInvocationsVisitorTest implements RewriteTest {
 
     @Test
     void removeEntireStatement() {
-        //language=java
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+          //language=java
           java(
             """
               public class Test {
@@ -172,9 +172,9 @@ public class RemoveMethodInvocationsVisitorTest implements RewriteTest {
 
     @Test
     void keepSelectForAssignment() {
-        //language=java
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+          //language=java
           java(
             """
               public class Test {
@@ -201,9 +201,9 @@ public class RemoveMethodInvocationsVisitorTest implements RewriteTest {
 
     @Test
     void chainedCallsAsParameter() {
-        // language=java
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+          // language=java
           java(
             """
               class Test {
@@ -238,9 +238,9 @@ public class RemoveMethodInvocationsVisitorTest implements RewriteTest {
 
     @Test
     void removeFromLambda() {
-        // language=java
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+          // language=java
           java(
             """
               import java.util.List;
@@ -273,9 +273,9 @@ public class RemoveMethodInvocationsVisitorTest implements RewriteTest {
 
     @Test
     void complexCase() {
-        // language=java
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+          // language=java
           java(
             """
               import java.util.List;
@@ -320,9 +320,9 @@ public class RemoveMethodInvocationsVisitorTest implements RewriteTest {
 
     @Test
     void returnEmptyLambdaBody() {
-        // language=java
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+          // language=java
           java(
             """
               import java.util.function.Consumer;
@@ -357,6 +357,7 @@ public class RemoveMethodInvocationsVisitorTest implements RewriteTest {
     void lambdaAssignment() {
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+          // language=java
           java(
             """
               import java.util.function.Consumer;
@@ -391,6 +392,7 @@ public class RemoveMethodInvocationsVisitorTest implements RewriteTest {
     void tryCatchBlocks() {
         rewriteRun(
           spec -> spec.recipe(createRemoveMethodsRecipe("java.lang.StringBuilder append(java.lang.String)")),
+          // language=java
           java(
             """
               public class Test {
