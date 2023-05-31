@@ -23,6 +23,7 @@ import org.openrewrite.xml.style.Autodetect;
 import org.openrewrite.xml.style.TabsAndIndentsStyle;
 
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.xml.Assertions.xml;
