@@ -69,7 +69,6 @@ public class AddProfileTest implements RewriteTest {
     }
 
 
-    @DocumentExample
     @Test
     void notAPom() {
         rewriteRun(
