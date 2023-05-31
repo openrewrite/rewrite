@@ -15,9 +15,9 @@
 #
 
 type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.kotlin.staticanalysis
+name: org.openrewrite.kotlin.StaticAnalysis
 displayName: Kotlin Common Static Analysis
-description: Static analysis fixes for kotlin sources
+description: Static analysis fixes for Kotlin sources.
 recipeList:
   - org.openrewrite.java.cleanup.AddSerialVersionUidToSerializable
   - org.openrewrite.java.cleanup.AtomicPrimitiveEqualsUsesGet
