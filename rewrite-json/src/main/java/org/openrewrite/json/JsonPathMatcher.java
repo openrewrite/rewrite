@@ -15,6 +15,7 @@
  */
 package org.openrewrite.json;
 
+import lombok.EqualsAndHashCode;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -42,6 +43,7 @@ import static java.util.Collections.disjoint;
  * This is not a full implementation of the JsonPath syntax as linked in the "see also."
  * @see <a href="https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html">https://support.smartbear.com/alertsite/docs/monitors/api/endpoint/jsonpath.html</a>
  */
+@EqualsAndHashCode
 public class JsonPathMatcher {
 
     private final String jsonPath;
