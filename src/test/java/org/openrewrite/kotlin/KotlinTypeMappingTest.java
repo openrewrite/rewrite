@@ -32,11 +32,13 @@ import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 @SuppressWarnings("ConstantConditions")
 public class KotlinTypeMappingTest {
     private static final String goat = StringUtils.readFully(KotlinTypeMappingTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
+    @SuppressWarnings("OptionalGetWithoutIsPresent")
     private static JavaType.Parameterized goatType = requireNonNull(TypeUtils.asParameterized(KotlinParser.builder()
       .logCompilationWarningsAndErrors(true)
       .build()
       .parse(new InMemoryExecutionContext(), goat)
-      .get(0)
+      .findFirst()
+      .get()
       .getClasses()
       .get(0)
       .getType()));

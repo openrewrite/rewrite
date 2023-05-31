@@ -50,12 +50,12 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitJavaSourceFile(JavaSourceFile sourceFile, PrintOutputCapture<P> p) {
-        K.CompilationUnit cu = (K.CompilationUnit) sourceFile;
+    public J visitCompilationUnit(K.CompilationUnit sourceFile, PrintOutputCapture<P> p) {
+        K.CompilationUnit cu = sourceFile;
 
         beforeSyntax(cu, Space.Location.COMPILATION_UNIT_PREFIX, p);
 
-        visit(((K.CompilationUnit) sourceFile).getAnnotations(), p);
+        visit((sourceFile).getAnnotations(), p);
 
         JRightPadded<J.Package> pkg = cu.getPadding().getPackageDeclaration();
         if (pkg != null) {

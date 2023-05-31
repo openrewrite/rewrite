@@ -22,35 +22,10 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-public class ChangeTypeAliasTest implements RewriteTest {
+public class RenameTypeAliasTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ChangeTypeAlias("OldAlias", "NewAlias", "Test"));
-    }
-
-    @Test
-    void nameExists() {
-        rewriteRun(
-          kotlin(
-            """
-            class Test
-            """
-          ),
-          kotlin(
-            """
-            typealias OldAlias = Test
-            typealias NewAlias = Map<String, String>
-            val NewAlias1 = null
-            val test: OldAlias = Test()
-            """,
-            """
-            typealias NewAlias2 = Test
-            typealias NewAlias = Map<String, String>
-            val NewAlias1 = null
-            val test: NewAlias2 = Test()
-            """
-          )
-        );
+        spec.recipe(new RenameTypeAlias("OldAlias", "NewAlias", "Test"));
     }
 
     @Test

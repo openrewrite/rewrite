@@ -18,6 +18,7 @@ package org.openrewrite.kotlin;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.kotlin.table.KotlinSourceFile;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.SearchResult;
@@ -40,23 +41,26 @@ public class FindKotlinSources extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Tree visitSourceFile(SourceFile sourceFile, ExecutionContext ctx) {
-                if (sourceFile.getSourcePath().toString().endsWith(".kt")) {
-                    KotlinSourceFile.SourceFileType sourceFileType = null;
-                    if (sourceFile instanceof K.CompilationUnit) {
-                        sourceFileType = KotlinSourceFile.SourceFileType.Kotlin;
-                    } else if (sourceFile instanceof Quark) {
-                        sourceFileType = KotlinSourceFile.SourceFileType.Quark;
-                    } else if (sourceFile instanceof PlainText) {
-                        sourceFileType = KotlinSourceFile.SourceFileType.PlainText;
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if(tree instanceof SourceFile) {
+                    SourceFile sourceFile = ((SourceFile) tree);
+                    if (sourceFile.getSourcePath().toString().endsWith(".kt")) {
+                        KotlinSourceFile.SourceFileType sourceFileType = null;
+                        if (sourceFile instanceof K.CompilationUnit) {
+                            sourceFileType = KotlinSourceFile.SourceFileType.Kotlin;
+                        } else if (sourceFile instanceof Quark) {
+                            sourceFileType = KotlinSourceFile.SourceFileType.Quark;
+                        } else if (sourceFile instanceof PlainText) {
+                            sourceFileType = KotlinSourceFile.SourceFileType.PlainText;
+                        }
+                        kotlinSourceFile.insertRow(ctx, new KotlinSourceFile.Row(sourceFile.getSourcePath().toString(), sourceFileType));
+                        return SearchResult.found(sourceFile);
                     }
-                    kotlinSourceFile.insertRow(ctx, new KotlinSourceFile.Row(sourceFile.getSourcePath().toString(), sourceFileType));
-                    return SearchResult.found(sourceFile);
                 }
-                return sourceFile;
+                return tree;
             }
         };
     }

@@ -179,7 +179,7 @@ public interface K extends J {
         }
 
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
-            return v.visitJavaSourceFile(this, p);
+            return v.visitCompilationUnit(this, p);
         }
 
         @Override
