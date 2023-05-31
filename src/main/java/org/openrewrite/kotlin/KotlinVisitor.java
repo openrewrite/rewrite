@@ -146,6 +146,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         }
         w = w.withSelector(visitAndCast(w.getSelector(), p));
         w = w.withBranches(visitAndCast(w.getBranches(), p));
+        w = w.withType(visitType(w.getType(), p));
         return w;
     }
 

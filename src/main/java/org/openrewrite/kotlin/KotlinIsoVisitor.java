@@ -17,7 +17,6 @@ package org.openrewrite.kotlin;
 
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.kotlin.tree.K;
 
