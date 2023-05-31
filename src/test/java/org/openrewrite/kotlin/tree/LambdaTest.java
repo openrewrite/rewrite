@@ -124,4 +124,60 @@ class LambdaTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/110")
+    @Test
+    void unusedVar() {
+        rewriteRun(
+          kotlin(
+            """
+              package foo
+              class Bar {
+                  companion object {
+                      fun bar(e: Any) {
+                      }
+                  }
+              }
+              """
+          ),
+          kotlin(
+            """
+              import foo.Bar
+              fun test() {
+                  val a = Bar.bar {
+                      _ : Any? ->
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/110")
+    @Test
+    void fullyQualifiedKotlinTypeReference() {
+        rewriteRun(
+          kotlin(
+            """
+              package foo
+              class Bar {
+                  companion object {
+                      fun bar(e: Any) {
+                      }
+                  }
+              }
+              """
+          ),
+          kotlin(
+            """
+              import foo.Bar
+              fun test() {
+                  val a = Bar.bar {
+                      _ : kotlin.Int? ->
+                  }
+              }
+              """
+          )
+        );
+    }
 }

@@ -281,12 +281,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     J.Lambda.Parameters destructParamsExpr = new J.Lambda.Parameters(randomId(), destructPrefix, Markers.EMPTY, true, destructParams);
                     paramExprs.add(JRightPadded.build(destructParamsExpr));
                 } else {
-                    J expr;
-                    if ("<unused var>".equals(p.getName().asString())) {
-                        expr = createIdentifier("_", typeMapping.type(p), null);
-                    } else {
-                        expr = visitElement(p, ctx);
-                    }
+                    J expr = visitElement(p, ctx);
 
                     JRightPadded<J> param = JRightPadded.build(expr);
                     if (i != parameters.size() - 1) {
@@ -1414,12 +1409,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             List<FirValueParameter> parameters = functionTypeRef.getValueParameters();
             for (int i = 0; i < parameters.size(); i++) {
                 FirValueParameter p = parameters.get(i);
-                J expr;
-                if ("<unused var>".equals(p.getName().asString())) {
-                    expr = createIdentifier("_", typeMapping.type(p), null);
-                } else {
-                    expr = visitElement(p, ctx);
-                }
+                J expr = visitElement(p, ctx);
+
                 JRightPadded<J> param = JRightPadded.build(expr);
                 Space after = i < parameters.size() - 1 ? sourceBefore(",") : (parenthesized ? sourceBefore(")") : EMPTY);
                 param = param.withAfter(after);
@@ -2010,6 +2001,30 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
             }
             return j;
+        } else {
+            FirRegularClassSymbol symbol = TypeUtilsKt.toRegularClassSymbol(resolvedTypeRef.getType(), firSession);
+            if (symbol != null) {
+                Space prefix = whitespace();
+                String name = symbol.getName().asString();
+                int pos = source.substring(cursor).indexOf(name);
+                String fullName = source.substring(cursor, cursor + pos + name.length());
+                skip(fullName);
+                TypeTree typeTree = TypeTree.build(fullName).withPrefix(prefix);
+                int saveCursor = cursor;
+                Space nextPrefix = whitespace();
+                if (source.startsWith("?", cursor)) {
+                    skip("?");
+                    if (typeTree instanceof J.FieldAccess) {
+                        J.FieldAccess fa = (J.FieldAccess) typeTree;
+                        typeTree = fa.withName(fa.getName().withMarkers(fa.getName().getMarkers().addIfAbsent(new IsNullable(randomId(), nextPrefix))));
+                    } else {
+                        typeTree = typeTree.withMarkers(typeTree.getMarkers().addIfAbsent(new IsNullable(randomId(), nextPrefix)));
+                    }
+                } else {
+                    cursor(saveCursor);
+                }
+                return typeTree.withType(typeMapping.type(resolvedTypeRef));
+            }
         }
         throw new UnsupportedOperationException("Unsupported null delegated type reference.");
     }
@@ -2568,6 +2583,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             if (sourceElement == null) {
                 throw new IllegalStateException("Unexpected null source.");
             }
+        } else if ("<unused var>".equals(valueParameter.getName().toString())) {
+            valueName = "_";
+            namePrefix = whitespace();
         } else {
             valueName = valueParameter.getName().asString();
             namePrefix = whitespace();
@@ -2589,6 +2607,21 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     typeExpression = (TypeTree) j;
                 } else {
                     typeExpression = new K.FunctionType(randomId(), (TypedTree) j, null, null);
+                }
+            } else if ("_".equals(valueName)) {
+                int savedCursor = cursor;
+                Space delimiterPrefix = whitespace();
+                if (source.startsWith(":", cursor)) {
+                    skip(":");
+                    markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), delimiterPrefix));
+                    J j = visitElement(typeRef, ctx);
+                    if (j instanceof TypeTree) {
+                        typeExpression = (TypeTree) j;
+                    } else {
+                        typeExpression = new K.FunctionType(randomId(), (TypedTree) j, null, null);
+                    }
+                } else {
+                    cursor = savedCursor;
                 }
             }
         }
