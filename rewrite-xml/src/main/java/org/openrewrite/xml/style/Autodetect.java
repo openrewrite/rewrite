@@ -60,8 +60,10 @@ public class Autodetect extends NamedStyles {
             this.sourceFiles = sourceFiles
                     .map(SourceFile.class::cast)
                     .filter(xml -> {
-                        new FindIndentXmlVisitor().visit(xml, indentStatistics);
-                        new FindLineFormatJavaVisitor().visit(xml, generalFormatStatistics);
+                        if (xml instanceof Xml.Document) {
+                            new FindIndentXmlVisitor().visit(xml, indentStatistics);
+                            new FindLineFormatJavaVisitor().visit(xml, generalFormatStatistics);
+                        }
                         return true;
                     });
         }
