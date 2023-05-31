@@ -34,6 +34,7 @@ import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.groovy.Assertions.srcMainGroovy;
 import static org.openrewrite.java.Assertions.*;
+import static org.openrewrite.properties.Assertions.properties;
 
 class AddDependencyTest implements RewriteTest {
     @Override
@@ -995,6 +996,60 @@ class AddDependencyTest implements RewriteTest {
                     %s "com.fasterxml.jackson.core:jackson-core:2.12.0"
                 }
                 """.formatted(configuration)
+            )
+          )
+        );
+    }
+
+    @Test
+    void addDependencyToProjectWithOtherSourceTypes() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", "com.google.common.math.IntMath", "implementation")),
+          mavenProject("root",
+            buildGradle(
+              ""
+            ),
+            settingsGradle(
+              """
+                include "project1"
+                include "project2"
+                """
+            ),
+            mavenProject("project1",
+              srcMainJava(
+                java(usingGuavaIntMath)
+              ),
+              srcMainResources(properties("micronaut.application.name=foo", s -> s.path("application.properties"))),
+              buildGradle(
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  
+                  repositories {
+                      mavenCentral()
+                  }
+                  """,
+                """
+                  plugins {
+                      id 'java-library'
+                  }
+                  
+                  repositories {
+                      mavenCentral()
+                  }
+                  
+                  dependencies {
+                      implementation "com.google.guava:guava:29.0-jre"
+                  }
+                  """
+              )
+            ),
+            mavenProject("project2",
+              srcMainResources(properties("micronaut.application.name=bar", s -> s.path("application.properties"))),
+              buildGradle(
+                ""
+              )
             )
           )
         );
