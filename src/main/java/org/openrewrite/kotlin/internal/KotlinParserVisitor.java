@@ -2002,6 +2002,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
             return j;
         } else {
+            // The type reference only exists in the source code if it is not a delegated type reference.
+            // So, we use the name of the symbol to find the type reference in the source code.
             FirRegularClassSymbol symbol = TypeUtilsKt.toRegularClassSymbol(resolvedTypeRef.getType(), firSession);
             if (symbol != null) {
                 Space prefix = whitespace();
