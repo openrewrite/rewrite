@@ -84,7 +84,7 @@ public class ChangePropertyValue extends Recipe {
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Xml.Document d = super.visitDocument(document, ctx);
                 if (Boolean.TRUE.equals(addIfMissing)) {
-                    doAfterVisit(new AddProperty(key, newValue, true, false));
+                    doAfterVisit(new AddProperty(key, newValue, true, false).getVisitor());
                 }
                 return d;
             }

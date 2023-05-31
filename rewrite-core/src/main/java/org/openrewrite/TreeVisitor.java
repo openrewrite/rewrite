@@ -76,7 +76,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
         };
     }
 
-    private List<TreeVisitor<T, P>> afterVisit;
+    private List<TreeVisitor<?, P>> afterVisit;
 
     private int visitCount;
     private final DistributionSummary visitCountSummary = DistributionSummary.builder("rewrite.visitor.visit.method.count").description("Visit methods called per source file visited.").tag("visitor.class", getClass().getName()).register(Metrics.globalRegistry);
@@ -133,32 +133,14 @@ public abstract class TreeVisitor<T extends Tree, P> {
      *
      * @param visitor The visitor to run.
      */
-    protected void doAfterVisit(TreeVisitor<T, P> visitor) {
+    protected void doAfterVisit(TreeVisitor<?, P> visitor) {
         if (afterVisit == null) {
             afterVisit = new ArrayList<>(2);
         }
         afterVisit.add(visitor);
     }
 
-    /**
-     * Execute the recipe's main visitor once after the whole source file has been visited.
-     * The visitor is executed against the whole source file. This operation only happens once
-     * immediately after the containing visitor visits the whole source file. A subsequent {@link Recipe}
-     * cycle will not run it.
-     * <p>
-     * This method is ideal for one-off operations like auto-formatting, adding/removing imports, etc.
-     *
-     * @param recipe The recipe whose visitor to run.
-     */
-    protected void doAfterVisit(Recipe recipe) {
-        if (afterVisit == null) {
-            afterVisit = new ArrayList<>(2);
-        }
-        //noinspection unchecked
-        afterVisit.add((TreeVisitor<T, P>) recipe.getVisitor());
-    }
-
-    protected List<TreeVisitor<T, P>> getAfterVisit() {
+    protected List<TreeVisitor<?, P>> getAfterVisit() {
         return afterVisit == null ? emptyList() : afterVisit;
     }
 
@@ -305,10 +287,11 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 visitCountSummary.record(visitCount);
 
                 if (t != null && afterVisit != null) {
-                    for (TreeVisitor<T, P> v : afterVisit) {
+                    for (TreeVisitor<?, P> v : afterVisit) {
                         if (v != null) {
                             v.setCursor(getCursor());
-                            t = v.visit(t, p);
+                            //noinspection unchecked
+                            t = (T) v.visit(t, p);
                         }
                     }
                 }
@@ -402,7 +385,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
             }
         }
         throw new IllegalArgumentException("Expected to find a tree type somewhere in the type parameters of the " +
-                                           "type hierarhcy of visitor " + getClass().getName());
+                                           "type hierarchy of visitor " + getClass().getName());
     }
 
     public <R extends Tree, V extends TreeVisitor<R, P>> V adapt(Class<? extends V> adaptTo) {

@@ -49,7 +49,7 @@ public class OmitParenthesesFormat extends Recipe {
                 SourceFile cu = (SourceFile) requireNonNull(tree);
                 OmitParenthesesStyle style = Optional.ofNullable(cu.getStyle(OmitParenthesesStyle.class)).orElse(OmitParenthesesStyle.DEFAULT);
                 if (style.getLastArgumentLambda()) {
-                    doAfterVisit(new OmitParenthesesForLastArgumentLambda());
+                    doAfterVisit(new OmitParenthesesForLastArgumentLambda().getVisitor());
                 }
             }
             return super.visit(tree, ctx);
