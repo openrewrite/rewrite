@@ -29,10 +29,12 @@ import org.openrewrite.java.tree.TypeUtils;
 @EqualsAndHashCode(callSuper = false)
 public class ReplaceConstantWithAnotherConstant extends Recipe {
 
-    @Option(displayName = "Fully qualified name of the constant to replace", example = "org.springframework.http.MediaType.APPLICATION_JSON_VALUE")
+    @Option(displayName = "Fully qualified name of the constant to replace",
+            example = "org.springframework.http.MediaType.APPLICATION_JSON_VALUE")
     String existingFullyQualifiedConstantName;
 
-    @Option(displayName = "Fully qualified name of the constant to use in place of existing constant", example = "org.springframework.http.MediaType.APPLICATION_JSON_VALUE")
+    @Option(displayName = "Fully qualified name of the constant to use in place of existing constant",
+            example = "org.springframework.http.MediaType.APPLICATION_JSON_VALUE")
     String fullyQualifiedConstantName;
 
     @Override
@@ -42,7 +44,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Replace constant with another constant, adding/removing import on class if needed.";
+        return "Replace a constant with another constant, adding/removing import on class if needed.";
     }
 
     @Override
@@ -100,16 +102,15 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
                 templateBuilder = JavaTemplate.builder(owningType.substring(owningType.lastIndexOf('.') + 1) + '.' + newConstantName)
                         .imports(owningType);
             }
-            return fieldAccess.withTemplate(
-                            templateBuilder.context(getCursor()).build(),
-                            getCursor(),
-                            fieldAccess.getCoordinates().replace())
+
+            return templateBuilder.contextSensitive().build()
+                    .apply(getCursor(), fieldAccess.getCoordinates().replace())
                     .withPrefix(fieldAccess.getPrefix());
         }
 
         private boolean isConstant(@Nullable JavaType.Variable varType) {
             return varType != null && TypeUtils.isOfClassType(varType.getOwner(), existingOwningType) &&
-                    varType.getName().equals(constantName);
+                   varType.getName().equals(constantName);
         }
 
         private boolean isVariableDeclaration() {
@@ -128,7 +129,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             }
 
             return constantName.equals(((J.VariableDeclarations) maybeVariable.getValue()).getVariables().get(0).getSimpleName()) &&
-                    existingOwningType.equals(ownerFqn.getFullyQualifiedName());
+                   existingOwningType.equals(ownerFqn.getFullyQualifiedName());
         }
     }
 }

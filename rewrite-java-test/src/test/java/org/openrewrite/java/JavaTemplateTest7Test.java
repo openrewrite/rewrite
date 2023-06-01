@@ -42,7 +42,7 @@ class JavaTemplateTest7Test implements RewriteTest {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
                   if (matcher.matches(method)) {
-                      return method.withTemplate(t, getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                      return t.apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
                   }
                   return super.visitMethodInvocation(method, p);
               }
@@ -73,24 +73,19 @@ class JavaTemplateTest7Test implements RewriteTest {
               public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
                   var cd = classDecl;
                   if (cd.getBody().getStatements().isEmpty()) {
-                      cd = cd.withBody(
-                        cd.getBody().withTemplate(
-                          JavaTemplate.builder(
-                              //language=groovy
-                              """
-                                /**
-                                 * comment
-                                 */
-                                void foo() {
-                                }
-                                """
-                            )
-                            .context(getCursor())
-                            .build(),
-                          getCursor(),
-                          cd.getBody().getCoordinates().firstStatement()
+                      cd = JavaTemplate.builder(
+                          //language=groovy
+                          """
+                            /**
+                             * comment
+                             */
+                            void foo() {
+                            }
+                            """
                         )
-                      );
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), cd.getBody().getCoordinates().firstStatement());
                   }
                   return cd;
               }
@@ -126,11 +121,8 @@ class JavaTemplateTest7Test implements RewriteTest {
                   var a = assignment;
                   if (a.getAssignment() instanceof J.MethodInvocation) {
                       J.MethodInvocation mi = (J.MethodInvocation) a.getAssignment();
-                      a = a.withAssignment(mi.withTemplate(
-                        JavaTemplate.builder("1").build(),
-                        getCursor(),
-                        mi.getCoordinates().replace()
-                      ));
+                      a = JavaTemplate.builder("1").build()
+                        .apply(getCursor(), mi.getCoordinates().replace());
                   }
                   return a;
               }

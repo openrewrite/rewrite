@@ -45,11 +45,7 @@ class JavaTemplateTest6Test implements RewriteTest {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext p) {
                   if (multiVariable.getLeadingAnnotations().isEmpty()) {
-                      return multiVariable.withTemplate(
-                        t,
-                        getCursor(),
-                        multiVariable.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName))
-                      );
+                      return t.apply(getCursor(), multiVariable.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
                   }
                   return super.visitVariableDeclarations(multiVariable, p);
               }
@@ -87,7 +83,7 @@ class JavaTemplateTest6Test implements RewriteTest {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getLeadingAnnotations().isEmpty()) {
-                      return method.withTemplate(t, getCursor(), method.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
+                      return t.apply(getCursor(), method.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
                   }
                   return super.visitMethodDeclaration(method, p);
               }
@@ -130,10 +126,7 @@ class JavaTemplateTest6Test implements RewriteTest {
               @Override
               public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
                   if (classDecl.getLeadingAnnotations().isEmpty() && !classDecl.getSimpleName().equals("Test")) {
-                      return classDecl.withTemplate(
-                        t,
-                        getCursor(),
-                        classDecl.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
+                      return t.apply(getCursor(), classDecl.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName)));
                   }
                   return super.visitClassDeclaration(classDecl, p);
               }
@@ -165,7 +158,7 @@ class JavaTemplateTest6Test implements RewriteTest {
               @Override
               public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext p) {
                   if (annotation.getSimpleName().equals("SuppressWarnings")) {
-                      return annotation.withTemplate(t, getCursor(), annotation.getCoordinates().replace());
+                      return t.apply(getCursor(), annotation.getCoordinates().replace());
                   }
                   return annotation;
               }
@@ -189,7 +182,7 @@ class JavaTemplateTest6Test implements RewriteTest {
     void replaceClassImplements() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("Serializable, Closeable").context(this::getCursor)
+              final JavaTemplate t = JavaTemplate.builder("Serializable, Closeable").contextSensitive()
                 .imports("java.io.*")
                 .build();
 
@@ -198,7 +191,7 @@ class JavaTemplateTest6Test implements RewriteTest {
                   if (classDecl.getImplements() == null) {
                       maybeAddImport("java.io.Closeable");
                       maybeAddImport("java.io.Serializable");
-                      return classDecl.withTemplate(t, getCursor(), classDecl.getCoordinates().replaceImplementsClause());
+                      return t.apply(getCursor(), classDecl.getCoordinates().replaceImplementsClause());
                   }
                   return super.visitClassDeclaration(classDecl, p);
               }
@@ -231,7 +224,7 @@ class JavaTemplateTest6Test implements RewriteTest {
               public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
                   if (classDecl.getExtends() == null) {
                       maybeAddImport("java.util.List");
-                      return classDecl.withTemplate(t, getCursor(), classDecl.getCoordinates().replaceExtendsClause());
+                      return t.apply(getCursor(), classDecl.getCoordinates().replaceExtendsClause());
                   }
                   return super.visitClassDeclaration(classDecl, p);
               }
@@ -256,12 +249,12 @@ class JavaTemplateTest6Test implements RewriteTest {
     void replaceThrows() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("Exception").context(this::getCursor).build();
+              final JavaTemplate t = JavaTemplate.builder("Exception").contextSensitive().build();
 
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getThrows() == null) {
-                      return method.withTemplate(t, getCursor(), method.getCoordinates().replaceThrows());
+                      return t.apply(getCursor(), method.getCoordinates().replaceThrows());
                   }
                   return super.visitMethodDeclaration(method, p);
               }
@@ -300,12 +293,8 @@ class JavaTemplateTest6Test implements RewriteTest {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getTypeParameters() == null) {
-                      return method.withTemplate(
-                          typeParamsTemplate,
-                          getCursor(),
-                          method.getCoordinates().replaceTypeParameters()
-                        )
-                        .withTemplate(methodArgsTemplate, getCursor(), method.getCoordinates().replaceParameters());
+                      J j = typeParamsTemplate.apply(getCursor(), method.getCoordinates().replaceTypeParameters());
+                      return methodArgsTemplate.apply(getCursor().attach(j), method.getCoordinates().replaceParameters());
                   }
                   return super.visitMethodDeclaration(method, p);
               }
@@ -317,14 +306,14 @@ class JavaTemplateTest6Test implements RewriteTest {
               assertThat(paramTypes.get(0))
                 .as("The method declaration's type's genericSignature first argument should have have type 'java.util.List'")
                 .matches(tType -> tType instanceof JavaType.FullyQualified &&
-                  TypeUtils.asFullyQualified(tType).getFullyQualifiedName().equals("java.util.List"));
+                                  TypeUtils.asFullyQualified(tType).getFullyQualifiedName().equals("java.util.List"));
 
               assertThat(paramTypes.get(1))
                 .as("The method declaration's type's genericSignature second argument should have type 'U' with bound 'java.lang.Object'")
                 .matches(uType ->
                   uType instanceof JavaType.GenericTypeVariable &&
-                    TypeUtils.asGeneric(uType).getName().equals("U") &&
-                    TypeUtils.asGeneric(uType).getBounds().isEmpty());
+                  TypeUtils.asGeneric(uType).getName().equals("U") &&
+                  TypeUtils.asGeneric(uType).getBounds().isEmpty());
           }),
           java(
             """
@@ -358,7 +347,7 @@ class JavaTemplateTest6Test implements RewriteTest {
               @Override
               public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
                   if (classDecl.getTypeParameters() == null) {
-                      return classDecl.withTemplate(t, getCursor(), classDecl.getCoordinates().replaceTypeParameters());
+                      return t.apply(getCursor(), classDecl.getCoordinates().replaceTypeParameters());
                   }
                   return super.visitClassDeclaration(classDecl, p);
               }
@@ -380,13 +369,13 @@ class JavaTemplateTest6Test implements RewriteTest {
     void replaceBody() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("n = 1;").context(this::getCursor).build();
+              final JavaTemplate t = JavaTemplate.builder("n = 1;").contextSensitive().build();
 
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   var statement = method.getBody().getStatements().get(0);
                   if (statement instanceof J.Unary) {
-                      return method.withTemplate(t, getCursor(), method.getCoordinates().replaceBody());
+                      return t.apply(getCursor(), method.getCoordinates().replaceBody());
                   }
                   return method;
               }
@@ -416,18 +405,14 @@ class JavaTemplateTest6Test implements RewriteTest {
     void replaceMissingBody() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("").build();
-
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  var m = method;
-                  if (!m.isAbstract()) {
-                      return m;
+                  if (!method.isAbstract()) {
+                      return method;
                   }
-                  m = m.withReturnTypeExpression(m.getReturnTypeExpression().withPrefix(Space.EMPTY));
-                  m = m.withModifiers(emptyList());
-                  m = m.withTemplate(t, getCursor(), m.getCoordinates().replaceBody());
-                  return m;
+                  return JavaTemplate.<J.MethodDeclaration>apply("", getCursor(), method.getCoordinates().replaceBody())
+                    .withModifiers(emptyList())
+                    .withReturnTypeExpression(method.getReturnTypeExpression().withPrefix(Space.EMPTY));
               }
           })),
           java(
@@ -462,7 +447,7 @@ class JavaTemplateTest6Test implements RewriteTest {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
                   if (matcher.matches(method)) {
-                      return method.withTemplate(t, getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                      return t.apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
                   }
                   return super.visitMethodInvocation(method, p);
               }

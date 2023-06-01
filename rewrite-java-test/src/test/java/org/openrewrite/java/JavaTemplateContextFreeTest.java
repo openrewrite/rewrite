@@ -36,12 +36,11 @@ class JavaTemplateContextFreeTest implements RewriteTest {
     void replaceMethodBody() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              private final JavaTemplate before = JavaTemplate.builder("System.out.println(1);").build();
-              private final JavaTemplate after = JavaTemplate.builder("System.out.println(2);").build();
-
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  return before.matches(method.getBody()) ? method.withTemplate(after, getCursor(), method.getCoordinates().replaceBody()) : super.visitMethodDeclaration(method, ctx);
+                  return method.getBody() != null && JavaTemplate.matches("System.out.println(1);", getCursor().attach(method.getBody())) ?
+                    JavaTemplate.apply("System.out.println(2);", getCursor(), method.getCoordinates().replaceBody()) :
+                    super.visitMethodDeclaration(method, ctx);
               }
           })),
           java(
@@ -72,8 +71,8 @@ class JavaTemplateContextFreeTest implements RewriteTest {
               @Override
               public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
                   if (literal.getMarkers().findFirst(SearchResult.class).isEmpty() &&
-                    (Objects.equals(literal.getValue(), 1) || Objects.requireNonNull(literal.getValue()).equals("s"))) {
-                      return literal.withTemplate(template, getCursor(), literal.getCoordinates().replace(), SearchResult.found(literal));
+                      (Objects.equals(literal.getValue(), 1) || Objects.requireNonNull(literal.getValue()).equals("s"))) {
+                      return template.apply(getCursor(), literal.getCoordinates().replace(), SearchResult.found(literal));
                   }
                   return super.visitLiteral(literal, executionContext);
               }

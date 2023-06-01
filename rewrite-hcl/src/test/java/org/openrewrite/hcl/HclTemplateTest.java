@@ -34,14 +34,11 @@ class HclTemplateTest implements RewriteTest {
     void lastInConfigFile() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new HclVisitor<>() {
-              final HclTemplate t = HclTemplate.builder(this::getCursor, "after {\n}").build();
-
               @Override
               public Hcl visitConfigFile(Hcl.ConfigFile configFile, ExecutionContext p) {
-                  if (configFile.getBody().size() == 1) {
-                      return configFile.withTemplate(t, getCursor(), configFile.getCoordinates().last());
-                  }
-                  return super.visitConfigFile(configFile, p);
+                  return configFile.getBody().size() == 1 ?
+                    HclTemplate.apply("after {\n}", getCursor(), configFile.getCoordinates().last()) :
+                    super.visitConfigFile(configFile, p);
               }
           })),
           hcl(
@@ -63,14 +60,11 @@ class HclTemplateTest implements RewriteTest {
     void firstInConfigFile() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new HclVisitor<>() {
-              final HclTemplate t = HclTemplate.builder(this::getCursor, "after {\n}").build();
-
               @Override
               public Hcl visitConfigFile(Hcl.ConfigFile configFile, ExecutionContext p) {
-                  if (configFile.getBody().size() == 1) {
-                      return configFile.withTemplate(t, getCursor(), configFile.getCoordinates().first());
-                  }
-                  return super.visitConfigFile(configFile, p);
+                  return configFile.getBody().size() == 1 ?
+                    HclTemplate.apply("after {\n}", getCursor(), configFile.getCoordinates().first()) :
+                    super.visitConfigFile(configFile, p);
               }
           })),
           hcl(
@@ -92,12 +86,10 @@ class HclTemplateTest implements RewriteTest {
     void middleOfConfigFile() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new HclVisitor<>() {
-              final HclTemplate t = HclTemplate.builder(this::getCursor, "second {\n}").build();
-
               @Override
               public Hcl visitConfigFile(Hcl.ConfigFile configFile, ExecutionContext p) {
                   if (configFile.getBody().size() == 2) {
-                      return configFile.withTemplate(t, getCursor(), configFile.getCoordinates().add(
+                      return HclTemplate.apply("second {\n}", getCursor(), configFile.getCoordinates().add(
                         Comparator.comparing(bc -> requireNonNull(((Hcl.Block) bc).getType()).getName())));
                   }
                   return super.visitConfigFile(configFile, p);
@@ -126,14 +118,11 @@ class HclTemplateTest implements RewriteTest {
     void lastBodyContentInBlock() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new HclVisitor<>() {
-              final HclTemplate t = HclTemplate.builder(this::getCursor, "encrypted = true").build();
-
               @Override
               public Hcl visitBlock(Hcl.Block block, ExecutionContext p) {
-                  if (block.getBody().size() == 1) {
-                      return block.withTemplate(t, getCursor(), block.getCoordinates().last());
-                  }
-                  return super.visitBlock(block, p);
+                  return block.getBody().size() == 1 ?
+                    HclTemplate.apply("encrypted = true", getCursor(), block.getCoordinates().last()) :
+                    super.visitBlock(block, p);
               }
           })),
           hcl(
@@ -156,18 +145,15 @@ class HclTemplateTest implements RewriteTest {
     void replaceBlock() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new HclVisitor<>() {
-              final HclTemplate t = HclTemplate.builder(
-                this::getCursor, """
-                      resource "azure_storage_volume" {
-                        size = 1
-                      }
-                  """
-              ).build();
 
               @Override
               public Hcl visitBlock(Hcl.Block block, ExecutionContext p) {
                   if (((Hcl.Literal) block.getLabels().get(0)).getValueSource().contains("aws")) {
-                      return block.withTemplate(t, getCursor(), block.getCoordinates().replace());
+                      return HclTemplate.apply("""
+                            resource "azure_storage_volume" {
+                              size = 1
+                            }
+                        """, getCursor(), block.getCoordinates().replace());
                   }
                   return super.visitBlock(block, p);
               }
@@ -191,12 +177,10 @@ class HclTemplateTest implements RewriteTest {
     void replaceExpression() {
         rewriteRun(
           spec -> spec.recipe(RewriteTest.toRecipe(() -> new HclVisitor<>() {
-              final HclTemplate t = HclTemplate.builder(this::getCursor, "\"jonathan\"").build();
-
               @Override
               public Hcl visitExpression(Expression expression, ExecutionContext p) {
                   if (expression instanceof Hcl.QuotedTemplate && expression.print(getCursor().getParentOrThrow()).contains("you")) {
-                      return expression.withTemplate(t, getCursor(), expression.getCoordinates().replace());
+                      return HclTemplate.apply("\"jonathan\"", getCursor(), expression.getCoordinates().replace());
                   }
                   return super.visitExpression(expression, p);
               }

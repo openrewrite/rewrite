@@ -142,7 +142,7 @@ public class ChangePackage extends Recipe {
                 getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, RENAME_TO_KEY, newPackageName);
 
                 if (!newPackageName.isEmpty()) {
-                    pkg = pkg.withTemplate(JavaTemplate.builder(newPackageName).context(this::getCursor).build(), getCursor(), pkg.getCoordinates().replace());
+                    pkg = JavaTemplate.builder(newPackageName).contextSensitive().build().apply(getCursor(), pkg.getCoordinates().replace());
                 } else {
                     // Covers unlikely scenario where the package is removed.
                     getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "UPDATE_PREFIX", true);
@@ -151,7 +151,7 @@ public class ChangePackage extends Recipe {
             } else if (isTargetRecursivePackageName(original)) {
                 String changingTo = getNewPackageName(original);
                 getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, RENAME_TO_KEY, changingTo);
-                pkg = pkg.withTemplate(JavaTemplate.builder(changingTo).context(getCursor()).build(), getCursor(), pkg.getCoordinates().replace());
+                pkg = JavaTemplate.builder(changingTo).contextSensitive().build().apply(getCursor(), pkg.getCoordinates().replace());
             }
             //noinspection ConstantConditions
             return pkg;

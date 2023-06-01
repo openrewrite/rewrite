@@ -60,10 +60,6 @@ public interface Hcl extends Tree {
 
     <H extends Hcl> H withPrefix(Space prefix);
 
-    default <H extends Hcl> H withTemplate(SourceTemplate<Hcl, HclCoordinates> template, Cursor parentScope, HclCoordinates coordinates, Object... parameters) {
-        return template.withTemplate(this, parentScope, coordinates, parameters);
-    }
-
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor

@@ -42,7 +42,7 @@ class JavaTemplateTest5Test implements RewriteTest {
               @Override
               public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
                   if (classDecl.getBody().getStatements().isEmpty()) {
-                      return classDecl.withTemplate(t, getCursor(), classDecl.getBody().getCoordinates().lastStatement());
+                      return t.apply(getCursor(), classDecl.getBody().getCoordinates().lastStatement());
                   }
                   return classDecl;
               }
@@ -65,12 +65,12 @@ class JavaTemplateTest5Test implements RewriteTest {
     void lastStatementInMethodBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("n = 1;").context(this::getCursor).build();
+              final JavaTemplate t = JavaTemplate.builder("n = 1;").contextSensitive().build();
 
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getBody().getStatements().size() == 1) {
-                      return method.withTemplate(t, getCursor(), method.getBody().getCoordinates().lastStatement());
+                      return t.apply(getCursor(), method.getBody().getCoordinates().lastStatement());
                   }
                   return method;
               }
@@ -108,7 +108,7 @@ class JavaTemplateTest5Test implements RewriteTest {
               @Override
               public J visitAssert(J.Assert azzert, ExecutionContext p) {
                   maybeAddImport("java.util.List");
-                  return azzert.withTemplate(t, getCursor(), azzert.getCoordinates().replace());
+                  return t.apply(getCursor(), azzert.getCoordinates().replace());
               }
           })),
           java(
@@ -139,12 +139,12 @@ class JavaTemplateTest5Test implements RewriteTest {
     void replaceArguments() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("m, Integer.valueOf(n), \"foo\"").context(this::getCursor).build();
+              final JavaTemplate t = JavaTemplate.builder("m, Integer.valueOf(n), \"foo\"").contextSensitive().build();
 
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
                   if (method.getArguments().size() == 1) {
-                      return method.withTemplate(t, getCursor(), method.getCoordinates().replaceArguments());
+                      return t.apply(getCursor(), method.getCoordinates().replaceArguments());
                   }
                   return method;
               }
@@ -187,10 +187,9 @@ class JavaTemplateTest5Test implements RewriteTest {
         @Override
         public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext p) {
             if (annotation.getSimpleName().equals("SuppressWarnings")) {
-                return annotation.withTemplate(t, getCursor(), annotation.getCoordinates().replace());
+                return t.apply(getCursor(), annotation.getCoordinates().replace());
             } else if (annotation.getSimpleName().equals("A1")) {
-                return annotation.withTemplate(JavaTemplate.builder("@A2")
-                  .build(), getCursor(), annotation.getCoordinates().replace());
+                return JavaTemplate.apply("@A2", getCursor(), annotation.getCoordinates().replace());
             }
             return super.visitAnnotation(annotation, p);
         }
@@ -293,7 +292,7 @@ class JavaTemplateTest5Test implements RewriteTest {
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getLeadingAnnotations().isEmpty()) {
-                      return method.withTemplate(t, getCursor(), method.getCoordinates().replaceAnnotations());
+                      return t.apply(getCursor(), method.getCoordinates().replaceAnnotations());
                   }
                   return super.visitMethodDeclaration(method, p);
               }
@@ -343,7 +342,7 @@ class JavaTemplateTest5Test implements RewriteTest {
               @Override
               public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
                   if (classDecl.getLeadingAnnotations().isEmpty() && !classDecl.getSimpleName().equals("Test")) {
-                      return classDecl.withTemplate(t, getCursor(), classDecl.getCoordinates().replaceAnnotations());
+                      return t.apply(getCursor(), classDecl.getCoordinates().replaceAnnotations());
                   }
                   return super.visitClassDeclaration(classDecl, p);
               }
@@ -379,7 +378,7 @@ class JavaTemplateTest5Test implements RewriteTest {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext p) {
                   if (multiVariable.getLeadingAnnotations().isEmpty()) {
-                      return multiVariable.withTemplate(t, getCursor(), multiVariable.getCoordinates().replaceAnnotations());
+                      return t.apply(getCursor(), multiVariable.getCoordinates().replaceAnnotations());
                   }
                   return super.visitVariableDeclarations(multiVariable, p);
               }
@@ -418,7 +417,7 @@ class JavaTemplateTest5Test implements RewriteTest {
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext p) {
                   if (multiVariable.getLeadingAnnotations().size() == 1) {
-                      return multiVariable.withTemplate(t, getCursor(), multiVariable.getCoordinates().addAnnotation(comparing(a -> 0)));
+                      return t.apply(getCursor(), multiVariable.getCoordinates().addAnnotation(comparing(a -> 0)));
                   }
                   return super.visitVariableDeclarations(multiVariable, p);
               }

@@ -51,6 +51,15 @@ public class Cursor {
         return c;
     }
 
+    /**
+     * @param value The value to attach to this cursor.
+     * @return A new cursor whose {@link #getValue()} returns the supplied value and whose
+     * ancestry is the current cursor.
+     */
+    public Cursor attach(Object value) {
+        return new Cursor(this, value);
+    }
+
     public Iterator<Cursor> getPathAsCursors() {
         return new CursorPathIterator(this);
     }
@@ -174,12 +183,12 @@ public class Cursor {
     @Override
     public String toString() {
         return "Cursor{" +
-                stream(Spliterators.spliteratorUnknownSize(getPath(), 0), false)
-                        .map(t -> t instanceof Tree ?
-                                t.getClass().getSimpleName() :
-                                t.toString())
-                        .collect(Collectors.joining("->"))
-                + "}";
+               stream(Spliterators.spliteratorUnknownSize(getPath(), 0), false)
+                       .map(t -> t instanceof Tree ?
+                               t.getClass().getSimpleName() :
+                               t.toString())
+                       .collect(Collectors.joining("->"))
+               + "}";
     }
 
     public Cursor dropParentUntil(Predicate<Object> valuePredicate) {
@@ -249,7 +258,7 @@ public class Cursor {
 
     public boolean isScopeInPath(Tree scope) {
         return value instanceof Tree && ((Tree) value).getId().equals(scope.getId()) ||
-                getPathAsStream().anyMatch(p -> p instanceof Tree && ((Tree) p).getId().equals(scope.getId()));
+               getPathAsStream().anyMatch(p -> p instanceof Tree && ((Tree) p).getId().equals(scope.getId()));
     }
 
     public void putMessageOnFirstEnclosing(Class<?> enclosing, String key, Object value) {
@@ -290,8 +299,8 @@ public class Cursor {
 
     public <T> T getNearestMessage(String key, T defaultValue) {
         @SuppressWarnings("unchecked") T t = messages == null ? null : (T) messages.get(key);
-        if(t == null) {
-            if(parent != null) {
+        if (t == null) {
+            if (parent != null) {
                 return parent.getNearestMessage(key, defaultValue);
             }
             return defaultValue;

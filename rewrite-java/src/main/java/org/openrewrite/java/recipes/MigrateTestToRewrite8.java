@@ -83,7 +83,7 @@ public class MigrateTestToRewrite8 extends Recipe {
                         String argsPlaceHolders = String.join(",", Collections.nCopies(recipes.size(), "#{any()}"));
                         JavaTemplate recipesTemplate = JavaTemplate.builder(
                                         "#{any()}.recipes(" + argsPlaceHolders + ")")
-                                .context(getCursor())
+                                .contextSensitive()
                                 .javaParser(JavaParser.fromJavaVersion()
                                         .classpath(JavaParser.runtimeClasspath()))
                                 .imports("org.openrewrite.test.RecipeSpec", "org.openrewrite.test.RewriteTest")
@@ -95,13 +95,11 @@ public class MigrateTestToRewrite8 extends Recipe {
                         for (int i = 0; i < recipes.size(); i++) {
                             parameters[i + 1] = recipes.get(i);
                         }
-                        method = method.withTemplate(
-                                recipesTemplate,
-                                getCursor().getParentOrThrow(),
+                        return recipesTemplate.apply(
+                                getCursor(),
                                 method.getCoordinates().replace(),
                                 parameters
                         );
-                        return autoFormat(method, ctx);
                     }
                 }
                 return method;

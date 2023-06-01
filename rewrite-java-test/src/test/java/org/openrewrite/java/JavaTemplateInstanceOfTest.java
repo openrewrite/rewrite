@@ -56,14 +56,15 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
-                  return literal.getValue() == Integer.valueOf(42) ? literal.withTemplate(
+                  return literal.getValue() == Integer.valueOf(42) ?
                     JavaTemplate.builder("s.length()")
-                      .context(getCursor())
-//                          .doBeforeParseTemplate(System.out::println)
-                      .build(),
-                    getCursor(),
-                    literal.getCoordinates().replace()
-                  ) : super.visitLiteral(literal, executionContext);
+                      .contextSensitive()
+                      .build()
+                      .apply(
+                        getCursor(),
+                        literal.getCoordinates().replace()
+                      ) :
+                    super.visitLiteral(literal, executionContext);
               }
           }))
           // custom missing type validation
@@ -71,7 +72,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
           .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> assertTypeAttribution((J) r.getAfter())));
     }
 
-    @SuppressWarnings({"PointlessBooleanExpression", "IfStatementWithIdenticalBranches"})
+    @SuppressWarnings({"PointlessBooleanExpression", "IfStatementWithIdenticalBranches", "ConstantValue"})
     @Test
     void replaceExpressionInNestedIfCondition() {
         rewriteRun(
@@ -478,13 +479,14 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                     }
 
                     List<Expression> arguments = mi.getArguments();
-                    mi = mi.withTemplate(
-                      JavaTemplate.builder("#{any(java.lang.String)}.formatted(#{any()})")
-                        .context(getCursor())
-                        .build(),
-                      getCursor(),
-                      mi.getCoordinates().replace(),
-                      arguments.toArray());
+                    mi = JavaTemplate.builder("#{any(java.lang.String)}.formatted(#{any()})")
+                      .contextSensitive()
+                      .build()
+                      .apply(
+                        getCursor(),
+                        mi.getCoordinates().replace(),
+                        arguments.toArray()
+                      );
 
                     mi = maybeAutoFormat(mi, mi.withArguments(
                       ListUtils.map(arguments.subList(1, arguments.size()), (a, b) -> b.withPrefix(arguments.get(a + 1).getPrefix()))), p);

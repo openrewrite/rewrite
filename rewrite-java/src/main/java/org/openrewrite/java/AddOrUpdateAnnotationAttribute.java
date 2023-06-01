@@ -83,21 +83,15 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     }
 
                     if (attributeName == null || "value".equals(attributeName)) {
-                        return a.withTemplate(
-                                JavaTemplate.builder("#{}")
-                                        .context(this::getCursor)
-                                        .build(),
-                                getCursor(),
-                                a.getCoordinates().replaceArguments(),
-                                newAttributeValue);
+                        return JavaTemplate.builder("#{}")
+                                .contextSensitive()
+                                .build()
+                                .apply(getCursor(), a.getCoordinates().replaceArguments(), newAttributeValue);
                     } else {
-                        return a.withTemplate(
-                                JavaTemplate.builder(attributeName + " = #{}")
-                                        .context(this::getCursor)
-                                        .build(),
-                                getCursor(),
-                                a.getCoordinates().replaceArguments(),
-                                newAttributeValue);
+                        return JavaTemplate.builder("#{} = #{}")
+                                .contextSensitive()
+                                .build()
+                                .apply(getCursor(), a.getCoordinates().replaceArguments(), attributeName, newAttributeValue);
                     }
                 } else {
                     // First assume the value exists amongst the arguments and attempt to update it
@@ -133,13 +127,11 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 return ((J.Literal) it).withValue(newAttributeValue).withValueSource(newAttributeValue);
                             } else {
                                 //noinspection ConstantConditions
-                                return ((J.Annotation) (finalA.withTemplate(
-                                        JavaTemplate.builder("value = #{}")
-                                                .context(this::getCursor)
-                                                .build(),
-                                        getCursor(),
-                                        finalA.getCoordinates().replaceArguments(),
-                                        it))).getArguments().get(0);
+                                return ((J.Annotation) JavaTemplate.builder("value = #{}")
+                                        .contextSensitive()
+                                        .build()
+                                        .apply(getCursor(), finalA.getCoordinates().replaceArguments(), it)
+                                ).getArguments().get(0);
                             }
                         }
                         return it;
@@ -150,13 +142,11 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     // There was no existing value to update, so add a new value into the argument list
                     String effectiveName = (attributeName == null) ? "value" : attributeName;
                     //noinspection ConstantConditions
-                    J.Assignment as = (J.Assignment) ((J.Annotation) a.withTemplate(
-                            JavaTemplate.builder(effectiveName + " = #{}")
-                                    .context(this::getCursor)
-                                    .build(),
-                            getCursor(),
-                            a.getCoordinates().replaceArguments(),
-                            newAttributeValue)).getArguments().get(0);
+                    J.Assignment as = (J.Assignment) ((J.Annotation) JavaTemplate.builder("#{} = #{}")
+                            .contextSensitive()
+                            .build()
+                            .apply(getCursor(), a.getCoordinates().replaceArguments(), effectiveName, newAttributeValue)
+                    ).getArguments().get(0);
                     List<Expression> newArguments = ListUtils.concat(as, a.getArguments());
                     a = a.withArguments(newArguments);
                     a = autoFormat(a, context);
