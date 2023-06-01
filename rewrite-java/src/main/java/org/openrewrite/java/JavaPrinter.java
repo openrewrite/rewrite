@@ -1057,6 +1057,22 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitUnknown(J.Unknown unknown, PrintOutputCapture<P> p) {
+        beforeSyntax(unknown, Space.Location.UNKNOWN_PREFIX, p);
+        visit(unknown.getSource(), p);
+        afterSyntax(unknown, p);
+        return unknown;
+    }
+
+    @Override
+    public J visitUnknownSource(J.Unknown.Source source, PrintOutputCapture<P> p) {
+        beforeSyntax(source, Space.Location.UNKNOWN_SOURCE_PREFIX, p);
+        p.append(source.getText());
+        afterSyntax(source, p);
+        return source;
+    }
+
+    @Override
     public J visitVariable(VariableDeclarations.NamedVariable variable, PrintOutputCapture<P> p) {
         beforeSyntax(variable, Space.Location.VARIABLE_PREFIX, p);
         visit(variable.getName(), p);

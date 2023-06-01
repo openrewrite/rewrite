@@ -31,10 +31,8 @@ import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.internal.TypesInUse;
-import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.template.SourceTemplate;
 
 import java.beans.Transient;
 import java.lang.ref.SoftReference;
@@ -5865,6 +5863,70 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitYield(this, p);
+        }
+    }
+
+    /**
+     * A tree node that represents an unparsed element.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor
+    @Data
+    @With
+    final class Unknown implements J, Statement, Expression, TypeTree, TypedTree, NameTree {
+
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        Source source;
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitUnknown(this, p);
+        }
+
+        @Nullable
+        @Override
+        public JavaType getType() {
+            return null;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public Unknown withType(@Nullable JavaType type) {
+            return this;
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        /**
+         * This class only exists to clean up the printed results from `SearchResult` markers.
+         * Without the marker the comments will print before the LST prefix.
+         */
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @AllArgsConstructor
+        @Data
+        @With
+        public static class Source implements J {
+
+            @EqualsAndHashCode.Include
+            UUID id;
+
+            Space prefix;
+            Markers markers;
+            String text;
+
+            @Override
+            public <P> J acceptJava(JavaVisitor<P> v, P p) {
+                return v.visitUnknownSource(this, p);
+            }
         }
     }
 }
