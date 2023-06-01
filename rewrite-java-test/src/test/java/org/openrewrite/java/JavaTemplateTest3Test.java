@@ -73,12 +73,10 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replaceMethod() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("int test2(int n) { return n; }").build();
-
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getSimpleName().equals("test")) {
-                      return t.apply(getCursor(), method.getCoordinates().replace());
+                      return JavaTemplate.apply("int test2(int n) { return n; }", getCursor(), method.getCoordinates().replace());
                   }
                   return super.visitMethodDeclaration(method, p);
               }
@@ -290,12 +288,11 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replaceSingleExpressionInLambdaBody() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("#{any(java.lang.String)}.toUpperCase()").build();
-
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
                   if (method.getSimpleName().equals("toLowerCase")) {
-                      return t.apply(getCursor(), method.getCoordinates().replace(), method.getSelect());
+                      return JavaTemplate.apply("#{any(java.lang.String)}.toUpperCase()", getCursor(),
+                        method.getCoordinates().replace(), method.getSelect());
                   }
                   return super.visitMethodInvocation(method, p);
               }
@@ -434,13 +431,11 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replaceMethodInvocationWithArray() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("#{anyArray(int)}").build();
-
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
                   J.MethodInvocation m = super.visitMethodInvocation(method, p);
                   if (m.getSimpleName().equals("method") && m.getArguments().size() == 2) {
-                      m = t.apply(getCursor(), m.getCoordinates().replaceArguments(), m.getArguments().get(0));
+                      m = JavaTemplate.apply("#{anyArray(int)}", getCursor(), m.getCoordinates().replaceArguments(), m.getArguments().get(0));
                   }
                   return m;
               }

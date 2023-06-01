@@ -21,6 +21,7 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.marker.JavaVersion;
@@ -122,10 +123,7 @@ public class Assertions {
 
     private static void acceptSpec(Consumer<SourceSpec<J.CompilationUnit>> spec, SourceSpec<J.CompilationUnit> java) {
         Consumer<J.CompilationUnit> userSuppliedAfterRecipe = java.getAfterRecipe();
-        java.afterRecipe(cu -> {
-            J.clearCaches();
-            userSuppliedAfterRecipe.accept(cu);
-        });
+        java.afterRecipe(userSuppliedAfterRecipe::accept);
         spec.accept(java);
     }
 
@@ -199,7 +197,7 @@ public class Assertions {
 
     public static UncheckedConsumer<List<SourceFile>> addTypesToSourceSet(String sourceSetName, List<String> extendsFrom, List<Path> classpath) {
         return sourceFiles -> {
-            JavaSourceSet sourceSet = JavaSourceSet.build(sourceSetName, classpath, null, false);
+            JavaSourceSet sourceSet = JavaSourceSet.build(sourceSetName, classpath, new JavaTypeCache(), false);
 
             for (int i = 0; i < sourceFiles.size(); i++) {
                 SourceFile sourceFile = sourceFiles.get(i);

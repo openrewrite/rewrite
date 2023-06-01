@@ -66,13 +66,11 @@ class JavaTemplateContextFreeTest implements RewriteTest {
     void genericsAndAnyParameters() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              private final JavaTemplate template = JavaTemplate.builder("java.util.List.of(#{any()})").build();
-
               @Override
               public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
                   if (literal.getMarkers().findFirst(SearchResult.class).isEmpty() &&
                       (Objects.equals(literal.getValue(), 1) || Objects.requireNonNull(literal.getValue()).equals("s"))) {
-                      return template.apply(getCursor(), literal.getCoordinates().replace(), SearchResult.found(literal));
+                      return JavaTemplate.apply("java.util.List.of(#{any()})", getCursor(), literal.getCoordinates().replace(), SearchResult.found(literal));
                   }
                   return super.visitLiteral(literal, executionContext);
               }

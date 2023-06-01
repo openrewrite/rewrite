@@ -32,13 +32,12 @@ class JavaTemplateTest2Test implements RewriteTest {
 
     private final Recipe replaceToStringWithLiteralRecipe = toRecipe(() -> new JavaVisitor<>() {
         private final MethodMatcher toString = new MethodMatcher("java.lang.String toString()");
-        private final JavaTemplate t = JavaTemplate.builder("#{any(java.lang.String)}").build();
 
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J mi = super.visitMethodInvocation(method, ctx);
             if (mi instanceof J.MethodInvocation && toString.matches((J.MethodInvocation) mi)) {
-                return t.apply(getCursor(), ((J.MethodInvocation) mi).getCoordinates().replace(),
+                return JavaTemplate.apply("#{any(java.lang.String)}", getCursor(), ((J.MethodInvocation) mi).getCoordinates().replace(),
                   ((J.MethodInvocation) mi).getSelect());
             }
             return mi;
@@ -253,8 +252,8 @@ class JavaTemplateTest2Test implements RewriteTest {
               @Override
               public J visitIdentifier(J.Identifier identifier, ExecutionContext p) {
                   if (identifier.getSimpleName().equals("f")) {
-                      return JavaTemplate.builder("#{any(java.io.File)}.getCanonicalFile().toPath()").build()
-                        .apply(getCursor(), identifier.getCoordinates().replace(), identifier);
+                      return JavaTemplate.apply("#{any(java.io.File)}.getCanonicalFile().toPath()",
+                        getCursor(), identifier.getCoordinates().replace(), identifier);
                   }
                   return identifier;
               }
@@ -348,7 +347,6 @@ class JavaTemplateTest2Test implements RewriteTest {
                       String string  = asString();
                       return new Integer(string.toString());
                   }
-
               }
               """,
             """
@@ -371,7 +369,6 @@ class JavaTemplateTest2Test implements RewriteTest {
                       String string  = asString();
                       return new Integer(string);
                   }
-
               }
               """
           )

@@ -153,12 +153,10 @@ class JavaTemplateTest6Test implements RewriteTest {
     void replaceAnnotation() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("@Deprecated").build();
-
               @Override
               public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext p) {
                   if (annotation.getSimpleName().equals("SuppressWarnings")) {
-                      return t.apply(getCursor(), annotation.getCoordinates().replace());
+                      return JavaTemplate.apply("@Deprecated", getCursor(), annotation.getCoordinates().replace());
                   }
                   return annotation;
               }
@@ -342,12 +340,10 @@ class JavaTemplateTest6Test implements RewriteTest {
     void replaceClassTypeParameters() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("T, U").build();
-
               @Override
               public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
                   if (classDecl.getTypeParameters() == null) {
-                      return t.apply(getCursor(), classDecl.getCoordinates().replaceTypeParameters());
+                      return JavaTemplate.apply("@Deprecated", getCursor(), classDecl.getCoordinates().replaceTypeParameters());
                   }
                   return super.visitClassDeclaration(classDecl, p);
               }

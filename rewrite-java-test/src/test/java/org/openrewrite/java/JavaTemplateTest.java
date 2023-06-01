@@ -830,8 +830,8 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J visitNewClass(J.NewClass newClass, ExecutionContext p) {
                   J.NewClass nc = (J.NewClass) super.visitNewClass(newClass, p);
-                  return JavaTemplate.builder("Integer.valueOf(#{any(java.lang.Integer)}").build()
-                    .apply(getCursor(), nc.getCoordinates().replace(), nc.getArguments().get(0));
+                  return JavaTemplate.apply("Integer.valueOf(#{any(java.lang.Integer)}",
+                    getCursor(), nc.getCoordinates().replace(), nc.getArguments().get(0));
               }
           })),
           java(

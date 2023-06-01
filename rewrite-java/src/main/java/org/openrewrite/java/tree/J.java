@@ -54,9 +54,6 @@ import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("unused")
 public interface J extends Tree {
-    static void clearCaches() {
-        JavaTemplateParser.clearCache();
-    }
 
     @SuppressWarnings("unchecked")
     @Override

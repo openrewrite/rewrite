@@ -37,12 +37,10 @@ class JavaTemplateTest5Test implements RewriteTest {
     void lastStatementInClassBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("int n;").build();
-
               @Override
               public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
                   if (classDecl.getBody().getStatements().isEmpty()) {
-                      return t.apply(getCursor(), classDecl.getBody().getCoordinates().lastStatement());
+                      return JavaTemplate.apply("int n;", getCursor(), classDecl.getBody().getCoordinates().lastStatement());
                   }
                   return classDecl;
               }
@@ -412,12 +410,10 @@ class JavaTemplateTest5Test implements RewriteTest {
     void addVariableAnnotationsToVariableAlreadyAnnotated() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("@Deprecated").build();
-
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext p) {
                   if (multiVariable.getLeadingAnnotations().size() == 1) {
-                      return t.apply(getCursor(), multiVariable.getCoordinates().addAnnotation(comparing(a -> 0)));
+                      return JavaTemplate.apply("@Deprecated", getCursor(), multiVariable.getCoordinates().addAnnotation(comparing(a -> 0)));
                   }
                   return super.visitVariableDeclarations(multiVariable, p);
               }

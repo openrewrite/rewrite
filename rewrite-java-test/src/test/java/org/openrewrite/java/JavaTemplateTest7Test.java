@@ -37,12 +37,11 @@ class JavaTemplateTest7Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               final MethodMatcher matcher = new MethodMatcher("Integer valueOf(..)");
-              final JavaTemplate t = JavaTemplate.builder("new Integer(#{any()})").build();
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
                   if (matcher.matches(method)) {
-                      return t.apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
+                      return JavaTemplate.apply("new Integer(#{any()})", getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
                   }
                   return super.visitMethodInvocation(method, p);
               }
@@ -121,8 +120,7 @@ class JavaTemplateTest7Test implements RewriteTest {
                   var a = assignment;
                   if (a.getAssignment() instanceof J.MethodInvocation) {
                       J.MethodInvocation mi = (J.MethodInvocation) a.getAssignment();
-                      a = JavaTemplate.builder("1").build()
-                        .apply(getCursor(), mi.getCoordinates().replace());
+                      a = JavaTemplate.apply("1", getCursor(), mi.getCoordinates().replace());
                   }
                   return a;
               }

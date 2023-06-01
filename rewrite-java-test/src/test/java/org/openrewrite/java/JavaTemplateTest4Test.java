@@ -210,12 +210,10 @@ class JavaTemplateTest4Test implements RewriteTest {
     void replaceLambdaParameters() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("int m, int n").build();
-
               @Override
               public J.Lambda visitLambda(J.Lambda lambda, ExecutionContext p) {
                   if (lambda.getParameters().getParameters().size() == 1) {
-                      return t.apply(getCursor(), lambda.getParameters().getCoordinates().replace());
+                      return JavaTemplate.apply("int m, int n", getCursor(), lambda.getParameters().getCoordinates().replace());
                   }
                   return super.visitLambda(lambda, p);
               }
@@ -431,12 +429,10 @@ class JavaTemplateTest4Test implements RewriteTest {
     void firstStatementInMethodBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("int m = 0;").build();
-
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getBody().getStatements().size() == 1) {
-                      return t.apply(getCursor(), method.getBody().getCoordinates().firstStatement());
+                      return JavaTemplate.apply("int m = 0;", getCursor(), method.getBody().getCoordinates().firstStatement());
                   }
                   return method;
               }
