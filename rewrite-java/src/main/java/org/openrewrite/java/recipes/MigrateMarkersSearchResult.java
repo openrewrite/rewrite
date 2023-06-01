@@ -91,7 +91,7 @@ public class MigrateMarkersSearchResult extends Recipe {
                                                 .build();
 
                                         return searchResultTemplate.apply(
-                                                getCursor(),
+                                                updateCursor(method),
                                                 method.getCoordinates().replace(),
                                                 select,
                                                 text

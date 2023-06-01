@@ -37,6 +37,7 @@ import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -145,6 +146,26 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     public final Cursor getCursor() {
+        return cursor;
+    }
+
+    /**
+     * Updates the cursor on this visitor and returns the updated cursor.
+     *
+     * @param currentValue The new (current) value of the cursor based on a mutation of what was formerly the
+     *                     {@link Cursor#getValue()}.
+     * @return The updated cursor.
+     */
+    public final Cursor updateCursor(T currentValue) {
+        Object old = cursor.getValue();
+        if (!(old instanceof Tree)) {
+            throw new IllegalArgumentException("To update the cursor, it must currently be positioned at a Tree instance");
+        }
+        if (!((Tree) old).getId().equals(currentValue.getId())) {
+            throw new IllegalArgumentException("Updating the cursor in place is only supported for mutations on a Tree instance " +
+                                               "that maintain the same ID after the mutation.");
+        }
+        cursor = new Cursor(cursor.getParentOrThrow(), currentValue);
         return cursor;
     }
 

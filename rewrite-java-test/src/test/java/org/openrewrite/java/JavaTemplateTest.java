@@ -41,12 +41,11 @@ class JavaTemplateTest implements RewriteTest {
               public J.Assignment visitAssignment(J.Assignment assignment, ExecutionContext p) {
                   if ((assignment.getAssignment() instanceof J.Literal) &&
                       ((J.Literal) assignment.getAssignment()).getValue().equals(1)) {
-                      J j = JavaTemplate.builder("value = 0")
+                      return JavaTemplate.builder("value = 0")
                         .contextSensitive()
                         .doBeforeParseTemplate(System.out::println)
                         .build()
                         .apply(getCursor(), assignment.getCoordinates().replace());
-                      return (J.Assignment) j;
                   }
                   return assignment;
               }
@@ -228,13 +227,12 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitNewClass(J.NewClass newClass, ExecutionContext p) {
-                  var nc = super.visitNewClass(newClass, p);
                   if (TypeUtils.isOfClassType(newClass.getType(), "java.util.ArrayList")) {
-                      nc = JavaTemplate.builder("Collections.emptyList()")
+                      return JavaTemplate.builder("Collections.emptyList()")
                         .imports("java.util.Collections").build()
                         .apply(getCursor(), newClass.getCoordinates().replace());
                   }
-                  return nc;
+                  return newClass;
               }
           })),
           java(
@@ -318,12 +316,13 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                   if (method.getSimpleName().equals("asList")) {
-                      method = JavaTemplate.builder("Collections.singletonList(#{any()})")
+                      maybeAddImport("java.util.Collections");
+                      maybeRemoveImport("java.util.Arrays");
+
+                      return JavaTemplate.builder("Collections.singletonList(#{any()})")
                         .imports("java.util.Collections")
                         .build()
                         .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
-                      maybeAddImport("java.util.Collections");
-                      maybeRemoveImport("java.util.Arrays");
                   }
                   return method;
               }
@@ -415,13 +414,13 @@ class JavaTemplateTest implements RewriteTest {
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
                   if (method.getSimpleName().equals("asList")) {
-                      method = JavaTemplate.builder("Collections.singletonList(#{any()})")
+                      maybeAddImport("java.util.Collections");
+                      maybeRemoveImport("java.util.Arrays");
+                      return JavaTemplate.builder("Collections.singletonList(#{any()})")
                         .contextSensitive()
                         .imports("java.util.Collections")
                         .build()
                         .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
-                      maybeAddImport("java.util.Collections");
-                      maybeRemoveImport("java.util.Arrays");
                   }
                   return method;
               }
@@ -513,7 +512,7 @@ class JavaTemplateTest implements RewriteTest {
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
                   J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, p);
                   if (bigDecimalSetScale.matches(mi)) {
-                      mi = twoArgScale.apply(getCursor(), mi.getCoordinates().replaceArguments(),
+                      mi = twoArgScale.apply(updateCursor(mi), mi.getCoordinates().replaceArguments(),
                         mi.getArguments().get(0), "RoundingMode.HALF_UP");
                   }
                   return mi;
@@ -553,11 +552,13 @@ class JavaTemplateTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitUnary(J.Unary unary, ExecutionContext p) {
-                  return JavaTemplate.builder("#{any()}++").contextSensitive().build().apply(
-                    getCursor(),
-                    unary.getCoordinates().replace(),
-                    unary.getExpression()
-                  );
+                  return JavaTemplate.builder("#{any()}++")
+                    .contextSensitive()
+                    .build().apply(
+                      getCursor(),
+                      unary.getCoordinates().replace(),
+                      unary.getExpression()
+                    );
               }
           })).expectedCyclesThatMakeChanges(1).cycles(1),
           java(
@@ -775,14 +776,14 @@ class JavaTemplateTest implements RewriteTest {
 
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  var mi = super.visitMethodInvocation(method, p);
-                  if (mm.matches(mi)) {
-                      mi = JavaTemplate.builder("Arrays.asList(#{any(java.lang.Integer)}, #{any(java.lang.Integer)}, #{any(java.lang.Integer)})")
+                  if (mm.matches(method)) {
+                      return JavaTemplate.builder("Arrays.asList(#{any(java.lang.Integer)}, #{any(java.lang.Integer)}, #{any(java.lang.Integer)})")
                         .imports("java.util.Arrays")
                         .build()
-                        .apply(getCursor(), mi.getCoordinates().replace(), mi.getArguments().get(0), mi.getArguments().get(1), mi.getArguments().get(2));
+                        .apply(getCursor(), method.getCoordinates().replace(), method.getArguments().get(0),
+                          method.getArguments().get(1), method.getArguments().get(2));
                   }
-                  return mi;
+                  return method;
               }
           })),
           java(

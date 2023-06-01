@@ -395,7 +395,7 @@ class AddImportTest implements RewriteTest {
                       .imports("java.math.BigDecimal", "java.math.RoundingMode")
                       .build()
                       .apply(
-                        getCursor(),
+                        updateCursor(c),
                         c.getBody().getCoordinates().lastStatement()
                       );
                 }

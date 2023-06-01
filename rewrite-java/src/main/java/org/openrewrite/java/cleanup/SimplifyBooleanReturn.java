@@ -112,7 +112,7 @@ public class SimplifyBooleanReturn extends Recipe {
 
                             if (returnThenPart) {
                                 // we need to NOT the expression inside the if condition
-                                return notIfConditionReturn.apply(getCursor(), i.getCoordinates().replace(), ifCondition);
+                                return notIfConditionReturn.apply(updateCursor(i), i.getCoordinates().replace(), ifCondition);
                             }
                         }
                     }

@@ -483,22 +483,22 @@ public class ChangeType extends Recipe {
 
         @Override
         public J.Package visitPackage(J.Package pkg, ExecutionContext executionContext) {
-            J.Package p = super.visitPackage(pkg, executionContext);
-            String original = p.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
+            String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
             if (original.equals(originalType.getPackageName())) {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
                 if (fq != null) {
                     if (fq.getPackageName().isEmpty()) {
                         getCursor().putMessageOnFirstEnclosing(J.CompilationUnit.class, "UPDATE_PREFIX", true);
-                        p = null;
+                        //noinspection DataFlowIssue
+                        return null;
                     } else {
                         String newPkg = targetType.getPackageName();
-                        p = JavaTemplate.builder(newPkg).contextSensitive().build().apply(getCursor(), p.getCoordinates().replace());
+                        return JavaTemplate.builder(newPkg).contextSensitive().build().apply(getCursor(), pkg.getCoordinates().replace());
                     }
                 }
             }
             //noinspection ConstantConditions
-            return p;
+            return pkg;
         }
 
         @Override

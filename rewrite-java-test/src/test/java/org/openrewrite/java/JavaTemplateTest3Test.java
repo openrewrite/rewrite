@@ -35,12 +35,11 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replacePackage() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("b").contextSensitive().build();
-
               @Override
               public J.Package visitPackage(J.Package pkg, ExecutionContext p) {
                   if (pkg.getExpression().printTrimmed(getCursor()).equals("a")) {
-                      return t.apply(getCursor(), pkg.getCoordinates().replace());
+                      return JavaTemplate.builder("b").contextSensitive().build()
+                        .apply(getCursor(), pkg.getCoordinates().replace());
                   }
                   return super.visitPackage(pkg, p);
               }
@@ -366,26 +365,26 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replaceMethodNameAndArgumentsSimultaneously() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("acceptString(#{any()}.toString())").contextSensitive()
-                .javaParser(JavaParser.fromJavaVersion()
-                  .dependsOn(
-                    """
-                          package org.openrewrite;
-                          public class A {
-                              public A acceptInteger(Integer i) { return this; }
-                              public A acceptString(String s) { return this; }
-                              public A someOtherMethod() { return this; }
-                          }
-                      """
-                  )).build();
-
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  J.MethodInvocation m = super.visitMethodInvocation(method, p);
-                  if (m.getSimpleName().equals("acceptInteger")) {
-                      m = t.apply(getCursor(), m.getCoordinates().replaceMethod(), m.getArguments().get(0));
+                  if (method.getSimpleName().equals("acceptInteger")) {
+                      return JavaTemplate.builder("acceptString(#{any()}.toString())").contextSensitive()
+                        .javaParser(JavaParser.fromJavaVersion()
+                          .dependsOn(
+                            """
+                                  package org.openrewrite;
+                                  public class A {
+                                      public A acceptInteger(Integer i) { return this; }
+                                      public A acceptString(String s) { return this; }
+                                      public A someOtherMethod() { return this; }
+                                  }
+                              """
+                          )
+                        )
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replaceMethod(), method.getArguments().get(0));
                   }
-                  return m;
+                  return method;
               }
           })),
           java(
@@ -479,11 +478,12 @@ class JavaTemplateTest3Test implements RewriteTest {
     void replaceMethodInvocationWithMethodReference() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("Object::toString").contextSensitive().build();
-
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  return t.apply(getCursor(), method.getCoordinates().replace());
+                  return JavaTemplate.builder("Object::toString")
+                    .contextSensitive()
+                    .build()
+                    .apply(getCursor(), method.getCoordinates().replace());
               }
           })),
           java(

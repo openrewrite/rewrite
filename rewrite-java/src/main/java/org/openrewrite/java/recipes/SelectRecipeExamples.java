@@ -139,7 +139,8 @@ public class SelectRecipeExamples extends Recipe {
                 maybeAddImport(DOCUMENT_EXAMPLE_ANNOTATION_FQN);
 
                 selectedCount++;
-                return JavaTemplate.builder("@DocumentExample").contextSensitive()
+                return JavaTemplate.builder("@DocumentExample")
+                        .contextSensitive()
                         .imports(DOCUMENT_EXAMPLE_ANNOTATION_FQN)
                         .javaParser(JavaParser.fromJavaVersion()
                                 .classpath(JavaParser.runtimeClasspath()))

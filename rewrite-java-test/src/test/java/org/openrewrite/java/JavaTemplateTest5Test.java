@@ -63,12 +63,13 @@ class JavaTemplateTest5Test implements RewriteTest {
     void lastStatementInMethodBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("n = 1;").contextSensitive().build();
-
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getBody().getStatements().size() == 1) {
-                      return t.apply(getCursor(), method.getBody().getCoordinates().lastStatement());
+                      return JavaTemplate.builder("n = 1;")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getBody().getCoordinates().lastStatement());
                   }
                   return method;
               }
@@ -99,14 +100,13 @@ class JavaTemplateTest5Test implements RewriteTest {
     void replaceStatementRequiringNewImport() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("List<String> s = null;")
-                .imports("java.util.List")
-                .build();
-
               @Override
               public J visitAssert(J.Assert azzert, ExecutionContext p) {
                   maybeAddImport("java.util.List");
-                  return t.apply(getCursor(), azzert.getCoordinates().replace());
+                  return JavaTemplate.builder("List<String> s = null;")
+                    .imports("java.util.List")
+                    .build()
+                    .apply(getCursor(), azzert.getCoordinates().replace());
               }
           })),
           java(
@@ -137,12 +137,13 @@ class JavaTemplateTest5Test implements RewriteTest {
     void replaceArguments() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("m, Integer.valueOf(n), \"foo\"").contextSensitive().build();
-
               @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   if (method.getArguments().size() == 1) {
-                      return t.apply(getCursor(), method.getCoordinates().replaceArguments());
+                      return JavaTemplate.builder("m, Integer.valueOf(n), \"foo\"")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replaceArguments());
                   }
                   return method;
               }
@@ -180,12 +181,10 @@ class JavaTemplateTest5Test implements RewriteTest {
     }
 
     Recipe replaceAnnotationRecipe = toRecipe(() -> new JavaIsoVisitor<>() {
-        final JavaTemplate t = JavaTemplate.builder("@Deprecated").build();
-
         @Override
         public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext p) {
             if (annotation.getSimpleName().equals("SuppressWarnings")) {
-                return t.apply(getCursor(), annotation.getCoordinates().replace());
+                return JavaTemplate.apply("@Deprecated", getCursor(), annotation.getCoordinates().replace());
             } else if (annotation.getSimpleName().equals("A1")) {
                 return JavaTemplate.apply("@A2", getCursor(), annotation.getCoordinates().replace());
             }
@@ -285,12 +284,11 @@ class JavaTemplateTest5Test implements RewriteTest {
     void replaceMethodAnnotations() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("@SuppressWarnings(\"other\")").build();
-
               @Override
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getLeadingAnnotations().isEmpty()) {
-                      return t.apply(getCursor(), method.getCoordinates().replaceAnnotations());
+                      return JavaTemplate.apply("@SuppressWarnings(\"other\")",
+                        getCursor(), method.getCoordinates().replaceAnnotations());
                   }
                   return super.visitMethodDeclaration(method, p);
               }
@@ -335,12 +333,10 @@ class JavaTemplateTest5Test implements RewriteTest {
     void replaceClassAnnotations() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("@SuppressWarnings(\"other\")").build();
-
               @Override
               public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
                   if (classDecl.getLeadingAnnotations().isEmpty() && !classDecl.getSimpleName().equals("Test")) {
-                      return t.apply(getCursor(), classDecl.getCoordinates().replaceAnnotations());
+                      return JavaTemplate.apply("@SuppressWarnings(\"other\")", getCursor(), classDecl.getCoordinates().replaceAnnotations());
                   }
                   return super.visitClassDeclaration(classDecl, p);
               }
@@ -371,12 +367,10 @@ class JavaTemplateTest5Test implements RewriteTest {
     void replaceVariableAnnotations() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final JavaTemplate t = JavaTemplate.builder("@SuppressWarnings(\"other\")").build();
-
               @Override
               public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext p) {
                   if (multiVariable.getLeadingAnnotations().isEmpty()) {
-                      return t.apply(getCursor(), multiVariable.getCoordinates().replaceAnnotations());
+                      return JavaTemplate.apply("@SuppressWarnings(\"other\")", getCursor(), multiVariable.getCoordinates().replaceAnnotations());
                   }
                   return super.visitVariableDeclarations(multiVariable, p);
               }

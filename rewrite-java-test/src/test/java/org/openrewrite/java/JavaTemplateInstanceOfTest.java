@@ -483,7 +483,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                       .contextSensitive()
                       .build()
                       .apply(
-                        getCursor(),
+                        updateCursor(mi),
                         mi.getCoordinates().replace(),
                         arguments.toArray()
                       );

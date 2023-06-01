@@ -180,10 +180,9 @@ class JavaTemplateTest2Test implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
-                  var nc = super.visitNewClass(newClass, ctx);
                   var md = getCursor().firstEnclosing(J.MethodDeclaration.class);
                   if (md != null && md.getSimpleName().equals("createBis")) {
-                      return nc;
+                      return newClass;
                   }
                   if (newClass.getType() != null &&
                       TypeUtils.asFullyQualified(newClass.getType()).getFullyQualifiedName().equals("java.io.ByteArrayInputStream") &&
@@ -193,7 +192,7 @@ class JavaTemplateTest2Test implements RewriteTest {
                         .build()
                         .apply(getCursor(), newClass.getCoordinates().replace(), newClass.getArguments().get(0));
                   }
-                  return nc;
+                  return newClass;
               }
           })),
           java(

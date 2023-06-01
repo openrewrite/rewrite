@@ -48,12 +48,11 @@ class JavaVisitorTest implements RewriteTest {
             toRecipe(() -> new JavaIsoVisitor<>() {
                 @Override
                 public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                    J.MethodDeclaration md = super.visitMethodDeclaration(method, p);
-                    if (md.getSimpleName().equals("allTheThings")) {
-                        md = JavaTemplate.builder("Exception").contextSensitive().build()
-                          .apply(getCursor(), md.getCoordinates().replaceThrows());
+                    if (method.getSimpleName().equals("allTheThings")) {
+                        return JavaTemplate.builder("Exception").contextSensitive().build()
+                          .apply(getCursor(), method.getCoordinates().replaceThrows());
                     }
-                    return md;
+                    return method;
                 }
             })
           ).cycles(2).expectedCyclesThatMakeChanges(2),
