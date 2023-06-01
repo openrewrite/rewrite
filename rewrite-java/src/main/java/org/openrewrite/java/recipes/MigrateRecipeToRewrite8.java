@@ -282,7 +282,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                         }
 
                         getVisitorReturnStatements = preconditionsCheckTemplate.apply(
-                                getCursor().attach(getVisitorReturnStatements),
+                                new Cursor(getCursor(), getVisitorReturnStatements),
                                 getVisitorReturnStatements.getCoordinates().replace(),
                                 ((J.Return) applicableTestReturnStatement).getExpression(),
                                 ((J.Return) getVisitorReturnStatements).getExpression()

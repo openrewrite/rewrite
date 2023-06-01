@@ -80,7 +80,7 @@ public class GenerateGetterAndSetterVisitor<P> extends JavaIsoVisitor<P> {
             if (getCursor().pollMessage("getter-exists") == null) {
                 Statement getterStatement = maybeAutoFormat(c, c.withBody(
                         getter.apply(
-                                getCursor().attach(c.getBody().withStatements(emptyList())),
+                                new Cursor(getCursor(), c.getBody().withStatements(emptyList())),
                                 c.getBody().getCoordinates().lastStatement(),
                                 fieldType, getterPrefix + capitalizedFieldName, var.getName()
                         )), p).getBody().getStatements().get(0);
@@ -89,7 +89,7 @@ public class GenerateGetterAndSetterVisitor<P> extends JavaIsoVisitor<P> {
             if (getCursor().pollMessage("setter-exists") == null) {
                 Statement setterStatement = maybeAutoFormat(c, c.withBody(
                         setter.apply(
-                                getCursor().attach(c.getBody().withStatements(emptyList())),
+                                new Cursor(getCursor(), c.getBody().withStatements(emptyList())),
                                 c.getBody().getCoordinates().lastStatement(),
                                 capitalizedFieldName, fieldType, var.getSimpleName(), var.getSimpleName(), var.getSimpleName()
                         )), p).getBody().getStatements().get(0);

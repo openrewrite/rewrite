@@ -51,15 +51,6 @@ public class Cursor {
         return c;
     }
 
-    /**
-     * @param value The value to attach to this cursor.
-     * @return A new cursor whose {@link #getValue()} returns the supplied value and whose
-     * ancestry is the current cursor.
-     */
-    public Cursor attach(Object value) {
-        return new Cursor(this, value);
-    }
-
     public Iterator<Cursor> getPathAsCursors() {
         return new CursorPathIterator(this);
     }

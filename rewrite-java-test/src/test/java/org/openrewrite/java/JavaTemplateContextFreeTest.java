@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -38,7 +39,7 @@ class JavaTemplateContextFreeTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                  return method.getBody() != null && JavaTemplate.matches("System.out.println(1);", getCursor().attach(method.getBody())) ?
+                  return method.getBody() != null && JavaTemplate.matches("System.out.println(1);", new Cursor(getCursor(), method.getBody())) ?
                     JavaTemplate.apply("System.out.println(2);", getCursor(), method.getCoordinates().replaceBody()) :
                     super.visitMethodDeclaration(method, ctx);
               }

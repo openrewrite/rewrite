@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -292,7 +293,7 @@ class JavaTemplateTest6Test implements RewriteTest {
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                   if (method.getTypeParameters() == null) {
                       J j = typeParamsTemplate.apply(getCursor(), method.getCoordinates().replaceTypeParameters());
-                      return methodArgsTemplate.apply(getCursor().attach(j), method.getCoordinates().replaceParameters());
+                      return methodArgsTemplate.apply(new Cursor(getCursor(), j), method.getCoordinates().replaceParameters());
                   }
                   return super.visitMethodDeclaration(method, p);
               }

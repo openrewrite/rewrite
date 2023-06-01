@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
@@ -47,7 +48,7 @@ class JavaTemplateTest4Test implements RewriteTest {
 
                       // insert in inner method
                       J.MethodDeclaration innerMethod = (J.MethodDeclaration) newRunnable.getBody().getStatements().get(0);
-                      return t.apply(getCursor().attach(m), innerMethod.getCoordinates().replaceParameters());
+                      return t.apply(new Cursor(getCursor(), m), innerMethod.getCoordinates().replaceParameters());
                   }
                   return super.visitMethodDeclaration(method, p);
               }
@@ -112,7 +113,7 @@ class JavaTemplateTest4Test implements RewriteTest {
 
                       // insert in inner method
                       J.MethodDeclaration innerMethod = (J.MethodDeclaration) newRunnable.getBody().getStatements().get(0);
-                      return t.apply(getCursor().attach(m), innerMethod.getCoordinates().replaceParameters());
+                      return t.apply(new Cursor(getCursor(), m), innerMethod.getCoordinates().replaceParameters());
                   }
                   return super.visitMethodDeclaration(method, p);
               }
