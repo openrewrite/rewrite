@@ -343,7 +343,7 @@ class JavaTemplateTest6Test implements RewriteTest {
               @Override
               public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
                   if (classDecl.getTypeParameters() == null) {
-                      return JavaTemplate.apply("@Deprecated", getCursor(), classDecl.getCoordinates().replaceTypeParameters());
+                      return JavaTemplate.apply("T, U", getCursor(), classDecl.getCoordinates().replaceTypeParameters());
                   }
                   return super.visitClassDeclaration(classDecl, p);
               }
