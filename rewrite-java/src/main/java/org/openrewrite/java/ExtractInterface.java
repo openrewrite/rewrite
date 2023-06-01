@@ -111,41 +111,43 @@ public class ExtractInterface {
             if (classDecl.getType() != null && classDecl.getType().getFullyQualifiedName().equals(fullyQualifiedInterfaceName)) {
                 return classDecl;
             }
+
             maybeAddImport(fullyQualifiedInterfaceName);
             JavaType.ShallowClass type = JavaType.ShallowClass.build(fullyQualifiedInterfaceName);
 
             J.Block body = classDecl.getBody();
-            return ((J.ClassDeclaration) new ImplementInterface<>(classDecl, type).visitNonNull(classDecl, ctx))
-                    .withBody(body.withStatements(ListUtils.map(body.getStatements(), s -> {
-                        if (s instanceof J.MethodDeclaration) {
-                            J.MethodDeclaration methodDeclaration = (J.MethodDeclaration) s;
-                            try {
-                                if (!methodDeclaration.hasModifier(J.Modifier.Type.Public) ||
-                                    methodDeclaration.hasModifier(J.Modifier.Type.Static) ||
-                                    methodDeclaration.isConstructor()) {
-                                    return s;
-                                }
+            J.ClassDeclaration implementing = (J.ClassDeclaration) new ImplementInterface<>(classDecl, type).visitNonNull(classDecl, ctx);
 
-                                if (FindAnnotations.find(methodDeclaration, "@java.lang.Override").isEmpty()) {
-                                    return methodDeclaration.withTemplate(
-                                            JavaTemplate.builder("@Override").build(),
-                                            getCursor(),
-                                            methodDeclaration.getCoordinates().addAnnotation(
-                                                    Comparator
-                                                            .comparing(
-                                                                    J.Annotation::getSimpleName,
-                                                                    new RuleBasedCollator("< Override")
-                                                            ))
-                                    );
-                                }
-
-                                return methodDeclaration;
-                            } catch (ParseException e) {
-                                throw new RuntimeException(e);
+            return (J.ClassDeclaration) new JavaIsoVisitor<ExecutionContext>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                    if (getCursor().getParentTreeCursor().getValue() == body) {
+                        try {
+                            if (!method.hasModifier(J.Modifier.Type.Public) ||
+                                method.hasModifier(J.Modifier.Type.Static) ||
+                                method.isConstructor()) {
+                                return method;
                             }
+
+                            if (FindAnnotations.find(method, "@java.lang.Override").isEmpty()) {
+                                return JavaTemplate.apply(
+                                        "@Override",
+                                        getCursor(),
+                                        method.getCoordinates().addAnnotation(Comparator.comparing(
+                                                J.Annotation::getSimpleName,
+                                                new RuleBasedCollator("< Override")
+                                        ))
+                                );
+                            }
+
+                            return method;
+                        } catch (ParseException e) {
+                            throw new RuntimeException(e);
                         }
-                        return s;
-                    })));
+                    }
+                    return super.visitMethodDeclaration(method, ctx);
+                }
+            }.visitNonNull(implementing, ctx, getCursor().getParentOrThrow());
         }
     }
 }

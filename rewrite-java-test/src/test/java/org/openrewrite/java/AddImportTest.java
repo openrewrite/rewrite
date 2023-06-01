@@ -389,16 +389,15 @@ class AddImportTest implements RewriteTest {
                 @Override
                 public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                     J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
-                    J.Block b = c.getBody();
-                    JavaTemplate t = JavaTemplate.builder(
-                        "BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
-                      .imports("java.math.BigDecimal", "java.math.RoundingMode")
-                      .build();
-
-                    b = b.withTemplate(t, getCursor(), b.getCoordinates().lastStatement());
                     maybeAddImport("java.math.BigDecimal");
                     maybeAddImport("java.math.RoundingMode");
-                    return c.withBody(b);
+                    return JavaTemplate.builder("BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
+                      .imports("java.math.BigDecimal", "java.math.RoundingMode")
+                      .build()
+                      .apply(
+                        getCursor(),
+                        c.getBody().getCoordinates().lastStatement()
+                      );
                 }
             }
           ).withMaxCycles(1)),
@@ -665,22 +664,19 @@ class AddImportTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
                 @Override
                 public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                    J.ClassDeclaration cd = classDecl;
-                    if (!cd.getBody().getStatements().isEmpty()) {
-                        return cd;
+                    if (!classDecl.getBody().getStatements().isEmpty()) {
+                        return classDecl;
                     }
-                    cd = cd.withTemplate(
-                      JavaTemplate.builder("ChronoUnit unit = MILLIS;").context(this::getCursor)
-                        .imports("java.time.temporal.ChronoUnit")
-                        .staticImports("java.time.temporal.ChronoUnit.MILLIS")
-                        .build(),
-                      getCursor(),
-                      cd.getBody().getCoordinates().lastStatement()
-                    );
+
                     maybeAddImport("java.time.temporal.ChronoUnit");
                     maybeAddImport("java.time.temporal.ChronoUnit", "MILLIS");
 
-                    return cd;
+                    return JavaTemplate.builder("ChronoUnit unit = MILLIS;")
+                      .contextSensitive()
+                      .imports("java.time.temporal.ChronoUnit")
+                      .staticImports("java.time.temporal.ChronoUnit.MILLIS")
+                      .build()
+                      .apply(getCursor(), classDecl.getBody().getCoordinates().lastStatement());
                 }
             }
           )),

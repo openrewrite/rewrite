@@ -139,11 +139,11 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
             }
 
             maybeAddImport(owningType, false);
-            return literal
-                    .withTemplate(
-                            JavaTemplate.builder(template).context(getCursor()).imports(owningType).build(),
-                            getCursor(),
-                            literal.getCoordinates().replace())
+            return JavaTemplate.builder(template)
+                    .contextSensitive()
+                    .imports(owningType)
+                    .build()
+                    .apply(getCursor(), literal.getCoordinates().replace())
                     .withPrefix(literal.getPrefix());
         }
     }

@@ -36,14 +36,10 @@ class GradleJavaTemplateTest implements RewriteTest {
             @Override
             public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
                 if (block.getStatements().isEmpty()) {
-                    return block.withTemplate(
-                      JavaTemplate.builder("implementation(\"com.google.guava:guava:latest.release\")")
-                        .context(this::getCursor)
-                        .doBeforeParseTemplate(System.out::println)
-                        .build(),
-                      getCursor(),
-                      block.getCoordinates().replace()
-                    );
+                    return JavaTemplate.builder("implementation(\"com.google.guava:guava:latest.release\")")
+                      .contextSensitive()
+                      .build()
+                      .apply(getCursor(), block.getCoordinates().replace());
                 }
                 return super.visitBlock(block, ctx);
             }

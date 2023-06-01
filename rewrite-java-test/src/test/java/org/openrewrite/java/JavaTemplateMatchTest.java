@@ -40,7 +40,7 @@ class JavaTemplateMatchTest implements RewriteTest {
 
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
-                  return template.matches(binary) ? SearchResult.found(binary) : super.visitBinary(binary, ctx);
+                  return template.matches(getCursor()) ? SearchResult.found(binary) : super.visitBinary(binary, ctx);
               }
           })),
           java(
@@ -72,7 +72,7 @@ class JavaTemplateMatchTest implements RewriteTest {
 
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
-                  return template.matches(binary) ? SearchResult.found(binary) : super.visitBinary(binary, ctx);
+                  return template.matches(getCursor()) ? SearchResult.found(binary) : super.visitBinary(binary, ctx);
               }
           })),
           java(
@@ -107,10 +107,10 @@ class JavaTemplateMatchTest implements RewriteTest {
 
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
-                  JavaTemplate.Matcher matcher = template.matcher(binary);
+                  JavaTemplate.Matcher matcher = template.matcher(getCursor());
                   if (matcher.find()) {
                       maybeAddImport("java.util.Objects");
-                      return binary.withTemplate(replacement, getCursor(), binary.getCoordinates().replace(), matcher.parameter(0));
+                      return replacement.apply(getCursor(), binary.getCoordinates().replace(), matcher.parameter(0));
                   }
                   return super.visitBinary(binary, ctx);
               }
@@ -147,7 +147,7 @@ class JavaTemplateMatchTest implements RewriteTest {
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  return miTemplate.matches(method) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+                  return miTemplate.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
               }
 
               @Override
@@ -155,7 +155,7 @@ class JavaTemplateMatchTest implements RewriteTest {
                   if (getCursor().getParentTreeCursor().getValue() instanceof J.Import) {
                       return fieldAccess;
                   }
-                  return faTemplate.matches(fieldAccess) ? SearchResult.found(fieldAccess) : super.visitFieldAccess(fieldAccess, ctx);
+                  return faTemplate.matches(getCursor()) ? SearchResult.found(fieldAccess) : super.visitFieldAccess(fieldAccess, ctx);
               }
 
               @Override
@@ -163,7 +163,7 @@ class JavaTemplateMatchTest implements RewriteTest {
                   if (ident.getFieldType() == null) {
                       return ident;
                   }
-                  return faTemplate.matches(ident) ? SearchResult.found(ident) : super.visitIdentifier(ident, ctx);
+                  return faTemplate.matches(getCursor()) ? SearchResult.found(ident) : super.visitIdentifier(ident, ctx);
               }
           })),
           java(
@@ -216,7 +216,7 @@ class JavaTemplateMatchTest implements RewriteTest {
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  return miTemplate.matches(method) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+                  return miTemplate.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
               }
 
               @Override
@@ -224,7 +224,7 @@ class JavaTemplateMatchTest implements RewriteTest {
                   if (getCursor().getParentTreeCursor().getValue() instanceof J.Import) {
                       return fieldAccess;
                   }
-                  return faTemplate.matches(fieldAccess) ? SearchResult.found(fieldAccess) : super.visitFieldAccess(fieldAccess, ctx);
+                  return faTemplate.matches(getCursor()) ? SearchResult.found(fieldAccess) : super.visitFieldAccess(fieldAccess, ctx);
               }
 
               @Override
@@ -232,7 +232,7 @@ class JavaTemplateMatchTest implements RewriteTest {
                   if (ident.getFieldType() == null) {
                       return ident;
                   }
-                  return faTemplate.matches(ident) ? SearchResult.found(ident) : super.visitIdentifier(ident, ctx);
+                  return faTemplate.matches(getCursor()) ? SearchResult.found(ident) : super.visitIdentifier(ident, ctx);
               }
           })),
           java(
@@ -285,7 +285,7 @@ class JavaTemplateMatchTest implements RewriteTest {
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  return miTemplate.matches(method) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+                  return miTemplate.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
               }
 
               @Override
@@ -293,7 +293,7 @@ class JavaTemplateMatchTest implements RewriteTest {
                   if (getCursor().getParentTreeCursor().getValue() instanceof J.Import) {
                       return fieldAccess;
                   }
-                  return faTemplate.matches(fieldAccess) ? SearchResult.found(fieldAccess) : super.visitFieldAccess(fieldAccess, ctx);
+                  return faTemplate.matches(getCursor()) ? SearchResult.found(fieldAccess) : super.visitFieldAccess(fieldAccess, ctx);
               }
 
               @Override
@@ -301,7 +301,7 @@ class JavaTemplateMatchTest implements RewriteTest {
                   if (ident.getFieldType() == null) {
                       return ident;
                   }
-                  return faTemplate.matches(ident) ? SearchResult.found(ident) : super.visitIdentifier(ident, ctx);
+                  return faTemplate.matches(getCursor()) ? SearchResult.found(ident) : super.visitIdentifier(ident, ctx);
               }
           })),
           java(
@@ -351,7 +351,7 @@ class JavaTemplateMatchTest implements RewriteTest {
 
               @Override
               public J visitExpression(Expression expression, ExecutionContext ctx) {
-                  return expression.getMarkers().findFirst(SearchResult.class).isEmpty() && template.matches(expression) ? SearchResult.found(expression) : super.visitExpression(expression, ctx);
+                  return expression.getMarkers().findFirst(SearchResult.class).isEmpty() && template.matches(getCursor()) ? SearchResult.found(expression) : super.visitExpression(expression, ctx);
               }
           })),
           java(
@@ -397,7 +397,7 @@ class JavaTemplateMatchTest implements RewriteTest {
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                  return method.getMarkers().findFirst(SearchResult.class).isEmpty() && template.matches(method) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
+                  return method.getMarkers().findFirst(SearchResult.class).isEmpty() && template.matches(getCursor()) ? SearchResult.found(method) : super.visitMethodInvocation(method, ctx);
               }
           })),
           java(
@@ -440,7 +440,7 @@ class JavaTemplateMatchTest implements RewriteTest {
 
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
-                  return binary.getMarkers().findFirst(SearchResult.class).isEmpty() && template.matches(binary) ? SearchResult.found(binary) : super.visitBinary(binary, ctx);
+                  return binary.getMarkers().findFirst(SearchResult.class).isEmpty() && template.matches(getCursor()) ? SearchResult.found(binary) : super.visitBinary(binary, ctx);
               }
           })),
           java(
@@ -476,7 +476,7 @@ class JavaTemplateMatchTest implements RewriteTest {
 
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
-                  return template.matches(binary) ? SearchResult.found(binary) : super.visitBinary(binary, ctx);
+                  return template.matches(getCursor()) ? SearchResult.found(binary) : super.visitBinary(binary, ctx);
               }
           })),
           java(
@@ -515,7 +515,7 @@ class JavaTemplateMatchTest implements RewriteTest {
 
               @Override
               public J visitBinary(J.Binary binary, ExecutionContext ctx) {
-                  return binary.getMarkers().findFirst(SearchResult.class).isEmpty() && template.matches(binary) ? SearchResult.found(binary) : super.visitBinary(binary, ctx);
+                  return binary.getMarkers().findFirst(SearchResult.class).isEmpty() && template.matches(getCursor()) ? SearchResult.found(binary) : super.visitBinary(binary, ctx);
               }
           })),
           java(

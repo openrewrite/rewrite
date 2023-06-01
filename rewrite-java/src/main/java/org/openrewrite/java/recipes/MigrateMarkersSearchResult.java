@@ -90,9 +90,8 @@ public class MigrateMarkersSearchResult extends Recipe {
                                                 .imports("org.openrewrite.marker.SearchResult")
                                                 .build();
 
-                                        return method.withTemplate(
-                                                searchResultTemplate,
-                                                getCursor().getParentOrThrow(),
+                                        return searchResultTemplate.apply(
+                                                getCursor(),
                                                 method.getCoordinates().replace(),
                                                 select,
                                                 text

@@ -60,18 +60,18 @@ public class JavaTemplateParser {
     private final Consumer<String> onAfterVariableSubstitution;
     private final Consumer<String> onBeforeParseTemplate;
     private final Set<String> imports;
-    private final boolean contextFree;
+    private final boolean contextSensitive;
     private final BlockStatementTemplateGenerator statementTemplateGenerator;
     private final AnnotationTemplateGenerator annotationTemplateGenerator;
 
-    public JavaTemplateParser(JavaParser.Builder<?, ?> parser, Consumer<String> onAfterVariableSubstitution,
-                              Consumer<String> onBeforeParseTemplate, Set<String> imports, boolean contextFree) {
+    public JavaTemplateParser(boolean contextSensitive, JavaParser.Builder<?, ?> parser, Consumer<String> onAfterVariableSubstitution,
+                              Consumer<String> onBeforeParseTemplate, Set<String> imports) {
         this.parser = parser;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.onBeforeParseTemplate = onBeforeParseTemplate;
         this.imports = imports;
-        this.contextFree = contextFree;
-        this.statementTemplateGenerator = new BlockStatementTemplateGenerator(imports, contextFree);
+        this.contextSensitive = contextSensitive;
+        this.statementTemplateGenerator = new BlockStatementTemplateGenerator(imports, contextSensitive);
         this.annotationTemplateGenerator = new AnnotationTemplateGenerator(imports);
     }
 
@@ -251,7 +251,7 @@ public class JavaTemplateParser {
     /**
      * Return the result of parsing the stub.
      * Cache the LST elements parsed from stub only if the stub is context free.
-     *
+     * <p>
      * For a stub to be context free nothing about its meaning can be changed by the context in which it is parsed.
      * For example, the statement `int i = 0;` is context free because it will always be parsed as a variable
      * The statement `i++;` cannot be context free because it cannot be parsed without a preceding declaration of i.
@@ -263,11 +263,12 @@ public class JavaTemplateParser {
      */
     private <J2 extends J> List<J2> cacheIfContextFree(Cursor cursor, String stub, Supplier<List<? extends J>> supplier) {
         if (cursor.getParent() == null) {
-            throw new IllegalArgumentException("Expecting the `cursor` to have a parent element");
+            throw new IllegalArgumentException("Expecting `cursor` to have a parent element");
         }
-        if (contextFree) {
+        if (!contextSensitive) {
             return cache(stub, supplier);
         }
+        //noinspection unchecked
         return (List<J2>) supplier.get();
     }
 

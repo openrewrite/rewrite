@@ -50,10 +50,8 @@ class JavaVisitorTest implements RewriteTest {
                 public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
                     J.MethodDeclaration md = super.visitMethodDeclaration(method, p);
                     if (md.getSimpleName().equals("allTheThings")) {
-                        md = md.withTemplate(JavaTemplate.builder("Exception").context(getCursor()).build(),
-                          getCursor(),
-                          md.getCoordinates().replaceThrows()
-                        );
+                        md = JavaTemplate.builder("Exception").contextSensitive().build()
+                          .apply(getCursor(), md.getCoordinates().replaceThrows());
                     }
                     return md;
                 }

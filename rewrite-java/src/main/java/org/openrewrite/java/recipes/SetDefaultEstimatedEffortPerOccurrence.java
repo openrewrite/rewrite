@@ -53,9 +53,9 @@ public class SetDefaultEstimatedEffortPerOccurrence extends Recipe {
         return Preconditions.check(new UsesType<>("org.openrewrite.Recipe", false), new JavaIsoVisitor<ExecutionContext>() {
             final JavaTemplate addMethod = JavaTemplate.builder(
                             "@Override public Duration getEstimatedEffortPerOccurrence() {\n" +
-                                    "return Duration.ofMinutes(5);\n" +
-                                    "}")
-                    .context(this::getCursor)
+                            "return Duration.ofMinutes(5);\n" +
+                            "}")
+                    .contextSensitive()
                     .imports("java.time.Duration")
                     .build();
 
@@ -76,10 +76,13 @@ public class SetDefaultEstimatedEffortPerOccurrence extends Recipe {
                     maybeAddImport("java.time.Duration");
 
                     try {
-                        return classDecl.withTemplate(addMethod, getCursor(), classDecl.getBody().getCoordinates().addMethodDeclaration(Comparator.comparing(
-                                J.MethodDeclaration::getSimpleName,
-                                new RuleBasedCollator("< getDisplayName < getDescription < getEstimatedEffortPerOccurrence < getVisitor")
-                        )));
+                        return addMethod.apply(
+                                getCursor(),
+                                classDecl.getBody().getCoordinates().addMethodDeclaration(Comparator.comparing(
+                                        J.MethodDeclaration::getSimpleName,
+                                        new RuleBasedCollator("< getDisplayName < getDescription < getEstimatedEffortPerOccurrence < getVisitor")
+                                ))
+                        );
                     } catch (ParseException e) {
                         throw new RuntimeException(e);
                     }
