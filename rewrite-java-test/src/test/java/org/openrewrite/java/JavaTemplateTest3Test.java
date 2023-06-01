@@ -366,8 +366,9 @@ class JavaTemplateTest3Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  if (method.getSimpleName().equals("acceptInteger")) {
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+                  if (mi.getSimpleName().equals("acceptInteger")) {
                       return JavaTemplate.builder("acceptString(#{any()}.toString())").contextSensitive()
                         .javaParser(JavaParser.fromJavaVersion()
                           .dependsOn(
@@ -382,9 +383,9 @@ class JavaTemplateTest3Test implements RewriteTest {
                           )
                         )
                         .build()
-                        .apply(getCursor(), method.getCoordinates().replaceMethod(), method.getArguments().get(0));
+                        .apply(updateCursor(mi), mi.getCoordinates().replaceMethod(), mi.getArguments().get(0));
                   }
-                  return method;
+                  return mi;
               }
           })),
           java(

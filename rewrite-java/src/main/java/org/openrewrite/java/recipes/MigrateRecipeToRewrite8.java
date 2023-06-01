@@ -270,23 +270,21 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                             }
                         }
 
-                        JavaTemplate preconditionsCheckTemplate = JavaTemplate
-                                .builder("return Preconditions.check(#{any()}, #{any()});")
-                                .javaParser(JavaParser.fromJavaVersion()
-                                        .classpath(JavaParser.runtimeClasspath()))
-                                .imports("org.openrewrite.Preconditions")
-                                .build();
-
                         if (getVisitorReturnStatements == null || applicableTestReturnStatement == null) {
                             return method;
                         }
 
-                        getVisitorReturnStatements = preconditionsCheckTemplate.apply(
-                                new Cursor(getCursor(), getVisitorReturnStatements),
-                                getVisitorReturnStatements.getCoordinates().replace(),
-                                ((J.Return) applicableTestReturnStatement).getExpression(),
-                                ((J.Return) getVisitorReturnStatements).getExpression()
-                        );
+                        getVisitorReturnStatements = JavaTemplate
+                                .builder("return Preconditions.check(#{any()}, #{any()});")
+                                .javaParser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()))
+                                .imports("org.openrewrite.Preconditions")
+                                .build()
+                                .apply(
+                                        new Cursor(getCursor(), getVisitorReturnStatements),
+                                        getVisitorReturnStatements.getCoordinates().replace(),
+                                        ((J.Return) applicableTestReturnStatement).getExpression(),
+                                        ((J.Return) getVisitorReturnStatements).getExpression()
+                                );
 
                         mergedStatements.add(getVisitorReturnStatements);
                         method = method.withBody(method.getBody().withStatements(mergedStatements));
