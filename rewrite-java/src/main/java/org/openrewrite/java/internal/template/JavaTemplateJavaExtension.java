@@ -100,6 +100,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     )
                             );
                         }
+                        break;
                     }
                     case STATEMENT_PREFIX: {
                         return block.withStatements(ListUtils.flatMap(block.getStatements(), statement -> {
