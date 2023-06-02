@@ -1183,6 +1183,21 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return u;
     }
 
+    public J visitUnknown(J.Unknown unknown, P p) {
+        J.Unknown u = unknown;
+        u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.UNKNOWN_PREFIX, p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.withSource(visitAndCast(u.getSource(), p));
+        return u;
+    }
+
+    public J visitUnknownSource(J.Unknown.Source source, P p) {
+        J.Unknown.Source s = source;
+        s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.UNKNOWN_SOURCE_PREFIX, p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
+    }
+
     public J visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
         J.VariableDeclarations.NamedVariable v = variable;
         v = v.withPrefix(visitSpace(v.getPrefix(), Space.Location.VARIABLE_PREFIX, p));
@@ -1377,7 +1392,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     /**
-     * Check if a child AST element is in the same lexical scope as that of the AST element associated with the current
+     * Check if a child LST element is in the same lexical scope as that of the LST element associated with the current
      * cursor.
      * <p>
      * See {@link JavaVisitor#isInSameNameScope}

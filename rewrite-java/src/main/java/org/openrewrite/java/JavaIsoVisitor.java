@@ -321,6 +321,16 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
+    public J.Unknown visitUnknown(J.Unknown unknown, P p) {
+        return (J.Unknown) super.visitUnknown(unknown, p);
+    }
+
+    @Override
+    public J.Unknown.Source visitUnknownSource(J.Unknown.Source source, P p) {
+        return (J.Unknown.Source) super.visitUnknownSource(source, p);
+    }
+
+    @Override
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
         return (J.VariableDeclarations.NamedVariable) super.visitVariable(variable, p);
     }
