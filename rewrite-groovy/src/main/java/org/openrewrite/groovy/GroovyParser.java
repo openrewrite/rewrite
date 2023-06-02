@@ -18,6 +18,7 @@ package org.openrewrite.groovy;
 import groovy.lang.GroovyClassLoader;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.Value;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.ModuleNode;
 import org.codehaus.groovy.control.*;
@@ -101,8 +102,8 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         ParsingEventListener parsingListener = pctx.getParsingListener();
         return parseInputsToCompilerAst(sources, relativeTo, pctx)
                 .map(entry -> {
-                    CompiledGroovySource compiled = entry.getKey();
-                    List<ParseWarning> warnings = entry.getValue();
+                    CompiledGroovySource compiled = entry.getCompiledGroovySource();
+                    List<ParseWarning> warnings = entry.getWarnings();
                     try {
                         GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
                                 compiled.getInput().getRelativePath(relativeTo),
@@ -130,25 +131,13 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                 .filter(Objects::nonNull);
     }
 
-    static class Pair<K, V> {
-        private K key;
-        private V value;
-
-        public Pair(K key, V value) {
-            this.key = key;
-            this.value = value;
-        }
-
-        public K getKey() {
-            return key;
-        }
-
-        public V getValue() {
-            return value;
-        }
+    @Value
+    static class Intermediate {
+        CompiledGroovySource compiledGroovySource;
+        List<ParseWarning> warnings;
     }
 
-    Stream<Pair<CompiledGroovySource, List<ParseWarning>>> parseInputsToCompilerAst(Iterable<Input> sources, @Nullable Path relativeTo, ParsingExecutionContextView ctx) {
+    Stream<Intermediate> parseInputsToCompilerAst(Iterable<Input> sources, @Nullable Path relativeTo, ParsingExecutionContextView ctx) {
         CompilerConfiguration configuration = new CompilerConfiguration();
         configuration.setTolerance(Integer.MAX_VALUE);
         configuration.setWarningLevel(WarningMessage.NONE);
@@ -194,7 +183,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                                 }
                             }
 
-                            return new Pair<>(new CompiledGroovySource(input, unit, ast), errorCollector.getWarningMarkers());
+                            return new Intermediate(new CompiledGroovySource(input, unit, ast), errorCollector.getWarningMarkers());
                         } catch (Throwable t) {
                             ctx.parseFailure(input, relativeTo, this, t);
                             ctx.getOnError().accept(t);

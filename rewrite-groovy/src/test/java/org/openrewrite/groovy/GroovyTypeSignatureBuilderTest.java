@@ -42,7 +42,7 @@ public class GroovyTypeSignatureBuilderTest implements JavaTypeSignatureBuilderT
         singletonList(new Parser.Input(Paths.get("GroovyTypeGoat.groovy"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))),
         null,
         new ParsingExecutionContextView(new InMemoryExecutionContext(Throwable::printStackTrace)))
-      .map(GroovyParser.Pair::getKey)
+      .map(GroovyParser.Intermediate::getCompiledGroovySource)
       .iterator()
       .next();
 
