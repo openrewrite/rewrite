@@ -68,7 +68,9 @@ public class RecipeScheduler {
 
             // pre-transformation scanning phase where there can only be modifications to capture exceptions
             // occurring during the scanning phase
-            after = cycle.scanSources(after, i);
+            if (hasScanningRecipe(recipe)) {
+                after = cycle.scanSources(after, i);
+            }
 
             // transformation phases
             after = cycle.generateSources(after, i);
@@ -90,6 +92,18 @@ public class RecipeScheduler {
                 after.getChangeset(),
                 ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap())
         );
+    }
+
+    private boolean hasScanningRecipe(Recipe recipe) {
+        if (recipe instanceof ScanningRecipe) {
+            return true;
+        }
+        for (Recipe r : recipe.getRecipeList()) {
+            if (hasScanningRecipe(r)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @RequiredArgsConstructor
@@ -223,7 +237,7 @@ public class RecipeScheduler {
             Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null) ? 0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
             String parentName = "";
             boolean hierarchical = recipeStack.size() > 1;
-            if(hierarchical) {
+            if (hierarchical) {
                 parentName = recipeStack.get(recipeStack.size() - 2).getName();
             }
             String recipeName = recipe.getName();
@@ -233,18 +247,18 @@ public class RecipeScheduler {
                     parentName,
                     recipeName,
                     effortSeconds));
-            if(hierarchical) {
+            if (hierarchical) {
                 recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
             }
         }
 
         private void recordSourceFileResult(@Nullable String beforePath, @Nullable String afterPath, List<Recipe> recipeStack, Long effortSeconds, ExecutionContext ctx) {
-            if(recipeStack.size() <= 1) {
+            if (recipeStack.size() <= 1) {
                 // No reason to record the synthetic root recipe which contains the recipe run
                 return;
             }
             String parentName;
-            if(recipeStack.size() == 2) {
+            if (recipeStack.size() == 2) {
                 // Record the parent name as blank rather than CompositeRecipe when the parent is the synthetic root recipe
                 parentName = "";
             } else {
