@@ -89,27 +89,6 @@ public class Result {
                 .getRecipes());
     }
 
-    public List<Throwable> getRecipeErrors() {
-        List<Throwable> exceptions = new ArrayList<>();
-        new TreeVisitor<Tree, Integer>() {
-            @Nullable
-            @Override
-            public Tree visit(@Nullable Tree tree, Integer p) {
-                if (tree != null) {
-                    try {
-                        Method getMarkers = tree.getClass().getDeclaredMethod("getMarkers");
-                        Markers markers = (Markers) getMarkers.invoke(tree);
-                        markers.findFirst(Markup.Error.class)
-                                .ifPresent(e -> exceptions.add(e.getException()));
-                    } catch (Throwable ignored) {
-                    }
-                }
-                return super.visit(tree, p);
-            }
-        }.visit(after, 0);
-        return exceptions;
-    }
-
     /**
      * Return a list of recipes that have made changes as a hierarchy of descriptors.
      * The method transforms the flat, stack-based representation into descriptors where children are grouped under their common parents.

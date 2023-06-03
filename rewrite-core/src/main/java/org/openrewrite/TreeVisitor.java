@@ -37,7 +37,6 @@ import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -327,7 +326,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 throw e;
             }
 
-            throw new RecipeRunException(e, getCursor(), describeLocation(getCursor()));
+            throw new RecipeRunException(e, getCursor());
         }
 
         //noinspection unchecked
@@ -417,15 +416,6 @@ public abstract class TreeVisitor<T extends Tree, P> {
             throw new IllegalArgumentException(getClass().getSimpleName() + " must be adaptable to " + adaptTo.getName() + ".");
         }
         return TreeVisitorAdapter.adapt(this, adaptTo);
-    }
-
-    @Nullable
-    protected String describeLocation(Cursor cursor) {
-        SourceFile sourceFile = cursor.firstEnclosing(SourceFile.class);
-        if (sourceFile == null) {
-            return null;
-        }
-        return sourceFile.getSourcePath().toString();
     }
 
     /**

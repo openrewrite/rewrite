@@ -25,7 +25,6 @@ import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -1402,21 +1401,5 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
      */
     protected boolean isInSameNameScope(Cursor child) {
         return isInSameNameScope(getCursor(), child);
-    }
-
-    @Override
-    protected @Nullable String describeLocation(Cursor cursor) {
-        List<String> namedElements = new ArrayList<>();
-        for (Iterator<Object> it = cursor.getPath(); it.hasNext(); ) {
-            final Object tree = it.next();
-            if (tree instanceof J.ClassDeclaration) {
-                namedElements.add(0, ((J.ClassDeclaration) tree).getSimpleName());
-            } else if (tree instanceof J.MethodDeclaration) {
-                namedElements.add(0, ((J.MethodDeclaration) tree).getSimpleName());
-            }
-        }
-        String location = String.join(".", namedElements);
-        String filename = super.describeLocation(cursor);
-        return "".equals(location) ? filename : String.format("%s (in %s)", filename, location);
     }
 }
