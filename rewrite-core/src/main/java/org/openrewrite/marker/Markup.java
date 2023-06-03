@@ -116,6 +116,7 @@ public interface Markup extends Marker {
     }
 
     @Value
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
     @With
     class Warn implements Markup {
         UUID id;
