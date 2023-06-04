@@ -23,6 +23,6 @@ description: |
   In those cases, this recipe will add a comment to the code and request a human to review and handle it manually.
   Reference : Migration guide (URL to be written).
 recipeList:
-  - org.openrewrite.java.upgrade.MigrateRecipeToRewrite8
-  - org.openrewrite.java.upgrade.MigrateTestToRewrite8
-  - org.openrewrite.java.upgrade.MigrateMarkersSearchResult
+  - org.openrewrite.java.recipes.MigrateRecipeToRewrite8
+  - org.openrewrite.java.recipes.MigrateTestToRewrite8
+  - org.openrewrite.java.recipes.MigrateMarkersSearchResult
