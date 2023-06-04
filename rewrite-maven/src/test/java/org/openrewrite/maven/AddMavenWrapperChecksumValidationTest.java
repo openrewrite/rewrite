@@ -23,7 +23,7 @@ import static org.openrewrite.properties.Assertions.properties;
 public class AddMavenWrapperChecksumValidationTest implements RewriteTest {
 
     private static final String WRAPPER_URL = "https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.2.0/maven-wrapper-3.2.0.jar";
-    private static final String WRAPPER_SHA256_SUM = "https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.2.0/maven-wrapper-3.2.0.jar";
+    private static final String WRAPPER_SHA256_SUM = "e63a53cfb9c4d291ebe3c2b0edacb7622bbc480326beaa5a0456e412f52f066a";
     private static final String DISTRIBUTION_URL = "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.9.1/apache-maven-3.9.1-bin.zip";
     private static final String DISTRIBUTION_SHA256_SUM = "10b13517951362d435a3256222efd8b71524d9335d6dca4e78648a67ef71da41";
 
@@ -33,8 +33,6 @@ public class AddMavenWrapperChecksumValidationTest implements RewriteTest {
           spec -> spec.recipe(new AddMavenWrapperChecksumValidation(
           )),
           properties(
-            """
-              distributionUrl=%s""".formatted(DISTRIBUTION_URL),
             """
               distributionUrl=%s""".formatted(DISTRIBUTION_URL),
             spec -> spec.path(".mvn/wrapper/gradle-wrapper.properties")
@@ -69,10 +67,6 @@ public class AddMavenWrapperChecksumValidationTest implements RewriteTest {
               distributionUrl=%s
               distributionSha256Sum=%s
               """.formatted(DISTRIBUTION_URL, DISTRIBUTION_SHA256_SUM),
-            """
-              distributionUrl=%s
-              distributionSha256Sum=%s
-              """.formatted(DISTRIBUTION_URL, DISTRIBUTION_SHA256_SUM),
             spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
           )
         );
@@ -84,10 +78,6 @@ public class AddMavenWrapperChecksumValidationTest implements RewriteTest {
           spec -> spec.recipe(new AddMavenWrapperChecksumValidation(
           )),
           properties(
-            """
-              distributionUrl=%s
-              distributionSha256Sum=%s
-              """.formatted(DISTRIBUTION_URL, "1"),
             """
               distributionUrl=%s
               distributionSha256Sum=%s
@@ -124,10 +114,6 @@ public class AddMavenWrapperChecksumValidationTest implements RewriteTest {
               wrapperUrl=%s
               wrapperSha256Sum=%s
               """.formatted(WRAPPER_URL, WRAPPER_SHA256_SUM),
-            """
-              wrapperUrl=%s
-              wrapperSha256Sum=%s
-              """.formatted(WRAPPER_URL, WRAPPER_SHA256_SUM),
             spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
           )
         );
@@ -139,10 +125,6 @@ public class AddMavenWrapperChecksumValidationTest implements RewriteTest {
           spec -> spec.recipe(new AddMavenWrapperChecksumValidation(
           )),
           properties(
-            """
-              wrapperUrl=%s
-              wrapperSha256Sum=%s
-              """.formatted(WRAPPER_URL, "1"),
             """
               wrapperUrl=%s
               wrapperSha256Sum=%s
