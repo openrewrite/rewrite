@@ -37,7 +37,6 @@ dependencies {
 
     implementation("org.apache.commons:commons-text:latest.release")
     implementation("commons-io:commons-io:2.12.0")
-    implementation("commons-codec:commons-codec:1.15")
 
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-properties"))
