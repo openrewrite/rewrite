@@ -18,8 +18,10 @@ package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
@@ -206,18 +208,37 @@ class GroovyTypeAttributionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void typeFromClasspathResources() {
+        rewriteRun(
+          spec -> spec.recipe(new FindTypes("org.junit.jupiter.api.Test", null))
+            .parser(GroovyParser.builder()
+                .classpathFromResource(new InMemoryExecutionContext(), "junit-jupiter-api-5.+")),
+          groovy("""
+            import org.junit.jupiter.api.Test
+            class A {
+                Test t
+            }
+            """,
+            """
+            import org.junit.jupiter.api.Test
+            class A {
+                /*~~>*/Test t
+            }
+            """)
+        );
+    }
+
     private Consumer<SourceSpec<G.CompilationUnit>> isAttributed(boolean attributed) {
-        return spec -> spec.afterRecipe(cu -> {
-            new JavaVisitor<Integer>() {
-                @SuppressWarnings("ConstantConditions")
-                @Override
-                public J visitVariable(J.VariableDeclarations.NamedVariable variable, Integer integer) {
-                    assertThat(TypeUtils.asFullyQualified(variable.getVariableType().getType())
-                      .getFullyQualifiedName())
-                      .isEqualTo(attributed ? "java.util.ArrayList" : "java.lang.Object");
-                    return variable;
-                }
-            }.visit(cu, 0);
-        });
+        return spec -> spec.afterRecipe(cu -> new JavaVisitor<Integer>() {
+            @SuppressWarnings("ConstantConditions")
+            @Override
+            public J visitVariable(J.VariableDeclarations.NamedVariable variable, Integer integer) {
+                assertThat(TypeUtils.asFullyQualified(variable.getVariableType().getType())
+                  .getFullyQualifiedName())
+                  .isEqualTo(attributed ? "java.util.ArrayList" : "java.lang.Object");
+                return variable;
+            }
+        }.visit(cu, 0));
     }
 }
