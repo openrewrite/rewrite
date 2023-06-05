@@ -89,6 +89,15 @@ public class TypesInUse {
         }
 
         @Override
+        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer integer) {
+            if ("class".equals(fieldAccess.getSimpleName()) && fieldAccess.getTarget() instanceof J.FieldAccess) {
+                J.FieldAccess target = (J.FieldAccess) fieldAccess.getTarget();
+                types.add(JavaType.buildType(target.toString()));
+            }
+            return super.visitFieldAccess(fieldAccess, integer);
+        }
+
+        @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, Integer p) {
             variables.add(identifier.getFieldType());
             return super.visitIdentifier(identifier, p);

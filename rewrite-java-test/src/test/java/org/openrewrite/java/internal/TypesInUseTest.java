@@ -16,9 +16,12 @@
 package org.openrewrite.java.internal;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import java.util.stream.Collectors;
 
@@ -62,4 +65,97 @@ class TypesInUseTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3200")
+    void annotationArgumentFullyQualified() {
+        rewriteRun(
+          java("""
+              package org.openrewrite;
+              class Argument {}
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              package com.acme;
+                            
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+                            
+              @Target({ElementType.TYPE, ElementType.METHOD})
+              @Retention(RetentionPolicy.RUNTIME)
+              public @interface Test {
+                  Class<T> value();
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import com.acme.Test;
+              public class ATest {
+                  @Test(org.openrewrite.Argument.class)
+                  void method() {}
+              }
+              """,
+            spec -> spec.afterRecipe(cu ->
+              assertThat(cu.getTypesInUse().getTypesInUse().stream()
+                .filter(t -> t instanceof JavaType.FullyQualified)
+                .map(t -> ((JavaType.FullyQualified) t).getFullyQualifiedName())
+                .toList())
+                .contains("org.openrewrite.Argument")
+            )
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3200")
+    @ExpectedToFail("Non fully qualified annotation argument types are not yet supported")
+    void annotationArgument() {
+        rewriteRun(
+          java("""
+              package org.openrewrite;
+              class Argument {}
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              package com.acme;
+                            
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+                            
+              @Target({ElementType.TYPE, ElementType.METHOD})
+              @Retention(RetentionPolicy.RUNTIME)
+              public @interface Test {
+                  Class<T> value();
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import com.acme.Test;
+              import org.openrewrite.Argument;
+              public class ATest {
+                  @Test(Argument.class)
+                  void method() {}
+              }
+              """,
+            spec -> spec.afterRecipe(cu ->
+              assertThat(cu.getTypesInUse().getTypesInUse().stream()
+                .filter(t -> t instanceof JavaType.FullyQualified)
+                .map(t -> ((JavaType.FullyQualified) t).getFullyQualifiedName())
+                .toList())
+                .contains("org.openrewrite.Argument")
+            )
+          )
+        );
+    }
+
 }
