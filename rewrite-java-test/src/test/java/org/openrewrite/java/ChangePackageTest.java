@@ -555,7 +555,6 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
     void annotationArgument() {
         rewriteRun(
@@ -607,7 +606,6 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
     void annotationArgumentNamed() {
         rewriteRun(
@@ -659,7 +657,6 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
     void annotationArgumentFullyQualified() {
         rewriteRun(
@@ -709,7 +706,6 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
     void annotationArgumentNamedFullyQualified() {
         rewriteRun(
