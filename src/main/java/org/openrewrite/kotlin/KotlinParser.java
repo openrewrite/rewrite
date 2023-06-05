@@ -185,7 +185,8 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                         ctx.getOnError().accept(t);
                     }
                     return null;
-                });
+                })
+                .filter(Objects::nonNull);
     }
 
     /**
