@@ -272,7 +272,7 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
      *
      * @param dependency the dependency being analyzed
      * @param engine the engine doing the analysis
-     * @param scanDepth the current scan depth; extracctAndAnalyze is recursive
+     * @param scanDepth the current scan depth; extractAndAnalyze is recursive
      * and will, be default, only go 3 levels deep
      * @throws AnalysisException thrown if there is a problem analyzing the
      * dependencies
@@ -478,7 +478,7 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
                 } else if ("rpm".equals(archiveExt)) {
                     rin = new RpmInputStream(fis);
                     //return of getTag is not used - but the call is a
-                    //necassary step in reading from the stream
+                    //necessary step in reading from the stream
                     rin.getPayloadHeader().getTag(RpmTag.NAME);
                     cain = new CpioArchiveInputStream(rin);
                     extractArchive(cain, destination, engine);

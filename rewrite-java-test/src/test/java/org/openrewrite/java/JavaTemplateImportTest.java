@@ -37,9 +37,9 @@ class JavaTemplateImportTest implements RewriteTest {
           spec -> spec.expectedCyclesThatMakeChanges(2)
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                   @Override
-                  public J visitImport(J.Import anImport, ExecutionContext executionContext) {
+                  public J visitImport(J.Import import_, ExecutionContext executionContext) {
                       return JavaTemplate.apply("import #{}", getCursor(),
-                        anImport.getCoordinates().replace(), "java.util.Stack");
+                        import_.getCoordinates().replace(), "java.util.Stack");
                   }
               }
             )),

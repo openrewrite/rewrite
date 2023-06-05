@@ -856,7 +856,7 @@ class AutodetectTest implements RewriteTest {
     }
 
     @Test
-    void detectClrfLineFormat() {
+    void detectCrlfLineFormat() {
         @SuppressWarnings("TextBlockMigration") var cus = jp().parse(
           "class Test {\r\n" +
           "    // some comment\r\n" +

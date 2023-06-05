@@ -145,7 +145,7 @@ class ManageDependenciesTest implements RewriteTest {
     }
 
     @Test
-    void manageToSpecefiedVersion() {
+    void manageToSpecifiedVersion() {
         rewriteRun(
           spec -> spec.recipe(new ManageDependencies(
             "junit",

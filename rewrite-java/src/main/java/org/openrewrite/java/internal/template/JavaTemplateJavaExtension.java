@@ -372,8 +372,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             JavaType.Method type = m.getMethodType();
                             if (type != null) {
                                 List<JavaType.FullyQualified> newThrows = new ArrayList<>();
-                                List<NameTree> throwz = (m.getThrows() == null) ? emptyList() : m.getThrows();
-                                for (NameTree t : throwz) {
+                                List<NameTree> throws_ = (m.getThrows() == null) ? emptyList() : m.getThrows();
+                                for (NameTree t : throws_) {
                                     J.Identifier exceptionIdent = (J.Identifier) t;
                                     newThrows.add((JavaType.FullyQualified) exceptionIdent.getType());
                                 }

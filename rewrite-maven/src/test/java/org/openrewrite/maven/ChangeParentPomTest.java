@@ -215,7 +215,7 @@ class ChangeParentPomTest implements RewriteTest {
     }
 
     @Test
-    void downgradeToLowerVersionWhenFlagisSet() {
+    void downgradeToLowerVersionWhenFlagIsSet() {
         rewriteRun(
           spec -> spec.recipe(new ChangeParentPom(
             "org.springframework.boot",

@@ -1294,9 +1294,9 @@ public class Autodetect extends NamedStyles {
 
     private static class FindWrappingAndBracesStyle extends JavaIsoVisitor<WrappingAndBracesStatistics> {
         @Override
-        public J.If.Else visitElse(J.If.Else elze, WrappingAndBracesStatistics stats) {
-            stats.elseOnNewLine += hasNewLine(elze.getPrefix());
-            return super.visitElse(elze, stats);
+        public J.If.Else visitElse(J.If.Else else_, WrappingAndBracesStatistics stats) {
+            stats.elseOnNewLine += hasNewLine(else_.getPrefix());
+            return super.visitElse(else_, stats);
         }
 
         private int hasNewLine(Space space) {

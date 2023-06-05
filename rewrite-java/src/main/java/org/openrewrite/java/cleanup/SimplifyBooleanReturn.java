@@ -80,23 +80,23 @@ public class SimplifyBooleanReturn extends Recipe {
                             .map(J.Return::getExpression);
 
                     if (followingStatements.isEmpty() || singleFollowingStatement.map(r -> isLiteralFalse(r) || isLiteralTrue(r)).orElse(false)) {
-                        J.Return retrn = getReturnIfOnlyStatementInThen(iff).orElse(null);
-                        assert retrn != null;
+                        J.Return return_ = getReturnIfOnlyStatementInThen(iff).orElse(null);
+                        assert return_ != null;
 
                         Expression ifCondition = i.getIfCondition().getTree();
 
-                        if (isLiteralTrue(retrn.getExpression())) {
+                        if (isLiteralTrue(return_.getExpression())) {
                             if (singleFollowingStatement.map(this::isLiteralFalse).orElse(false) && i.getElsePart() == null) {
                                 doAfterVisit(new DeleteStatement<>(followingStatements().get(0)));
-                                return maybeAutoFormat(retrn, retrn.withExpression(ifCondition), ctx, parent);
+                                return maybeAutoFormat(return_, return_.withExpression(ifCondition), ctx, parent);
                             } else if (!singleFollowingStatement.isPresent() &&
                                        getReturnExprIfOnlyStatementInElseThen(i).map(this::isLiteralFalse).orElse(false)) {
                                 if (i.getElsePart() != null) {
                                     doAfterVisit(new DeleteStatement<>(i.getElsePart().getBody()));
                                 }
-                                return maybeAutoFormat(retrn, retrn.withExpression(ifCondition), ctx, parent);
+                                return maybeAutoFormat(return_, return_.withExpression(ifCondition), ctx, parent);
                             }
-                        } else if (isLiteralFalse(retrn.getExpression())) {
+                        } else if (isLiteralFalse(return_.getExpression())) {
                             boolean returnThenPart = false;
 
                             if (singleFollowingStatement.map(this::isLiteralTrue).orElse(false) && i.getElsePart() == null) {
@@ -127,7 +127,7 @@ public class SimplifyBooleanReturn extends Recipe {
 
             private boolean thenHasOnlyReturnStatement(J.If iff) {
                 return getReturnIfOnlyStatementInThen(iff)
-                        .map(retrn -> isLiteralFalse(retrn.getExpression()) || isLiteralTrue(retrn.getExpression()))
+                        .map(return_ -> isLiteralFalse(return_.getExpression()) || isLiteralTrue(return_.getExpression()))
                         .orElse(false);
             }
 
@@ -169,13 +169,13 @@ public class SimplifyBooleanReturn extends Recipe {
                     return Optional.empty();
                 }
 
-                Statement elze = iff2.getElsePart().getBody();
-                if (elze instanceof J.Return) {
-                    return Optional.ofNullable(((J.Return) elze).getExpression());
+                Statement else_ = iff2.getElsePart().getBody();
+                if (else_ instanceof J.Return) {
+                    return Optional.ofNullable(((J.Return) else_).getExpression());
                 }
 
-                if (elze instanceof J.Block) {
-                    List<Statement> statements = ((J.Block) elze).getStatements();
+                if (else_ instanceof J.Block) {
+                    List<Statement> statements = ((J.Block) else_).getStatements();
                     if (statements.size() == 1) {
                         J statement = statements.get(0);
                         if (statement instanceof J.Return) {

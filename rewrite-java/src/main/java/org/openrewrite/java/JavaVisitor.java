@@ -273,8 +273,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return a;
     }
 
-    public J visitAssert(J.Assert azzert, P p) {
-        J.Assert a = azzert;
+    public J visitAssert(J.Assert assert_, P p) {
+        J.Assert a = assert_;
         a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.ASSERT_PREFIX, p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
         Statement temp = (Statement) visitStatement(a, p);
@@ -383,8 +383,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return b;
     }
 
-    public J visitCase(J.Case caze, P p) {
-        J.Case c = caze;
+    public J visitCase(J.Case case_, P p) {
+        J.Case c = case_;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.CASE_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
         Statement temp = (Statement) visitStatement(c, p);
@@ -399,8 +399,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return c;
     }
 
-    public J visitCatch(J.Try.Catch catzh, P p) {
-        J.Try.Catch c = catzh;
+    public J visitCatch(J.Try.Catch catch_, P p) {
+        J.Try.Catch c = catch_;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.CATCH_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
         c = c.withParameter(visitAndCast(c.getParameter(), p));
@@ -532,8 +532,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return e;
     }
 
-    public J visitEnumValue(J.EnumValue enoom, P p) {
-        J.EnumValue e = enoom;
+    public J visitEnumValue(J.EnumValue enum_, P p) {
+        J.EnumValue e = enum_;
         e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.ENUM_VALUE_PREFIX, p));
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
         e = e.withAnnotations(ListUtils.map(e.getAnnotations(), a -> visitAndCast(a, p)));
@@ -643,8 +643,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return i;
     }
 
-    public J visitElse(J.If.Else elze, P p) {
-        J.If.Else e = elze;
+    public J visitElse(J.If.Else else_, P p) {
+        J.If.Else e = else_;
         e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.ELSE_PREFIX, p));
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
         e = e.getPadding().withBody(visitRightPadded(e.getPadding().getBody(), JRightPadded.Location.IF_ELSE, p));
@@ -667,8 +667,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return i;
     }
 
-    public J visitImport(J.Import impoort, P p) {
-        J.Import i = impoort;
+    public J visitImport(J.Import import_, P p) {
+        J.Import i = import_;
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.IMPORT_PREFIX, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
         i = i.getPadding().withStatic(visitLeftPadded(i.getPadding().getStatic(), JLeftPadded.Location.STATIC_IMPORT, p));
@@ -1003,8 +1003,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return pr;
     }
 
-    public J visitReturn(J.Return retrn, P p) {
-        J.Return r = retrn;
+    public J visitReturn(J.Return return_, P p) {
+        J.Return r = return_;
         r = r.withPrefix(visitSpace(r.getPrefix(), Space.Location.RETURN_PREFIX, p));
         r = r.withMarkers(visitMarkers(r.getMarkers(), p));
         Statement temp = (Statement) visitStatement(r, p);
@@ -1017,8 +1017,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return r;
     }
 
-    public J visitSwitch(J.Switch switzh, P p) {
-        J.Switch s = switzh;
+    public J visitSwitch(J.Switch switch_, P p) {
+        J.Switch s = switch_;
         s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.SWITCH_PREFIX, p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
         Statement temp = (Statement) visitStatement(s, p);
@@ -1032,8 +1032,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return s;
     }
 
-    public J visitSwitchExpression(J.SwitchExpression switzh, P p) {
-        J.SwitchExpression s = switzh;
+    public J visitSwitchExpression(J.SwitchExpression switch_, P p) {
+        J.SwitchExpression s = switch_;
         s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.SWITCH_EXPRESSION_PREFIX, p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
         Expression temp = (Expression) visitExpression(s, p);

@@ -44,7 +44,7 @@ public class CategoryDescriptor {
      * priority category descriptor for a given package name will be used.
      * <p/>
      * Lower values have higher priority. The default value is {@link #LOWEST_PRECEDENCE}, indicating the lowest priority
-     * (effectively deferring to any other specified prioritiy value).
+     * (effectively deferring to any other specified priority value).
      **/
     int priority;
 

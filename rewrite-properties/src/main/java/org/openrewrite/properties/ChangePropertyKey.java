@@ -47,7 +47,7 @@ public class ChangePropertyKey extends Recipe {
     Boolean relaxedBinding;
 
     @Option(displayName = "Regex",
-            description = "Default false. If enabled, `oldPropertyKey` will be interepreted as a Regular Expression, and capture group contents will be available in `newPropertyKey`",
+            description = "Default false. If enabled, `oldPropertyKey` will be interpreted as a Regular Expression, and capture group contents will be available in `newPropertyKey`",
             required = false)
     @Nullable
     Boolean regex;

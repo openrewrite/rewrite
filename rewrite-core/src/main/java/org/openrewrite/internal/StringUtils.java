@@ -352,7 +352,7 @@ public class StringUtils {
      *
      * @param text      A target string
      * @param substring The substring to search for
-     * @return the number of times the substring is found in the target. 0 if no occurances are found.
+     * @return the number of times the substring is found in the target. 0 if no occurrences are found.
      */
     public static int countOccurrences(@NonNull String text, @NonNull String substring) {
 

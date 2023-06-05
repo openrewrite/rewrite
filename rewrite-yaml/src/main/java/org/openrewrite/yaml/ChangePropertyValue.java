@@ -45,7 +45,7 @@ public class ChangePropertyValue extends Recipe {
     String oldValue;
 
     @Option(displayName = "Regex",
-            description = "Default false. If enabled, `oldValue` will be interepreted as a Regular Expression, and capture group contents will be available in `newValue`",
+            description = "Default false. If enabled, `oldValue` will be interpreted as a Regular Expression, and capture group contents will be available in `newValue`",
             required = false)
     @Nullable
     Boolean regex;
