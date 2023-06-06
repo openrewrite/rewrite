@@ -60,6 +60,12 @@ public interface LargeSourceSet {
     LargeSourceSet generate(@Nullable Collection<? extends SourceFile> ls);
 
     /**
+     * Called by {@link RecipeScheduler} at the conclusion of a scan/edit/generation cycle.
+     */
+    default void afterCycle(boolean lastCycle) {
+    }
+
+    /**
      * @return The set of changes (encompassing adds, edits, and deletions)
      * to the initial state.
      */

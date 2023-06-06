@@ -289,15 +289,11 @@ public abstract class Recipe implements Cloneable {
     }
 
     public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx, int maxCycles) {
-        return run(before, ctx, new RecipeScheduler(), maxCycles, 1);
+        return run(before, ctx, maxCycles, 1);
     }
 
-    public final RecipeRun run(LargeSourceSet before,
-                               ExecutionContext ctx,
-                               RecipeScheduler recipeScheduler,
-                               int maxCycles,
-                               int minCycles) {
-        return recipeScheduler.scheduleRun(this, before, ctx, maxCycles, minCycles);
+    public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx, int maxCycles, int minCycles) {
+        return new RecipeScheduler().scheduleRun(this, before, ctx, maxCycles, minCycles);
     }
 
     public Validated validate(ExecutionContext ctx) {

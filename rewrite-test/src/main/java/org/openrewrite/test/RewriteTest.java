@@ -22,7 +22,6 @@ import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
-import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
@@ -189,9 +188,6 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
-        RecipeSchedulerCheckingExpectedCycles recipeSchedulerCheckingExpectedCycles =
-                new RecipeSchedulerCheckingExpectedCycles(expectedCyclesThatMakeChanges);
-
         ExecutionContext executionContext;
         if (testMethodSpec.getExecutionContext() != null) {
             executionContext = testMethodSpec.getExecutionContext();
@@ -322,13 +318,12 @@ public interface RewriteTest extends SourceSpecs {
         } else if (testClassSpec.getSourceSet() != null) {
             lss = testClassSpec.getSourceSet().apply(runnableSourceFiles);
         } else {
-            lss = new InMemoryLargeSourceSet(runnableSourceFiles);
+            lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles);
         }
 
         RecipeRun recipeRun = recipe.run(
                 lss,
                 recipeExecutionContext,
-                recipeSchedulerCheckingExpectedCycles,
                 cycles,
                 expectedCyclesThatMakeChanges + 1
         );
@@ -531,8 +526,6 @@ public interface RewriteTest extends SourceSpecs {
                      + "\" that was not expected.");
             }
         }
-
-        recipeSchedulerCheckingExpectedCycles.verify();
     }
 
     default void rewriteRun(SourceSpec<?>... sources) {

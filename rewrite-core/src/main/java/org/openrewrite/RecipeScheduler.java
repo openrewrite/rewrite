@@ -40,9 +40,6 @@ import static org.openrewrite.Recipe.PANIC;
 
 public class RecipeScheduler {
 
-    public void afterCycle(LargeSourceSet sourceSet) {
-    }
-
     public RecipeRun scheduleRun(Recipe recipe,
                                  LargeSourceSet sourceSet,
                                  ExecutionContext ctx,
@@ -78,10 +75,11 @@ public class RecipeScheduler {
 
             if (i >= minCycles &&
                 ((after == acc && !ctxWithWatch.hasNewMessages()) || !recipe.causesAnotherCycle())) {
+                after.afterCycle(true);
                 break;
             }
 
-            afterCycle(after);
+            after.afterCycle(i == maxCycles);
             acc = after;
             ctxWithWatch.resetHasNewMessages();
         }
