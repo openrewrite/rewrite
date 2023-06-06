@@ -22,6 +22,7 @@ dependencies {
 
     implementation(platform("org.openrewrite:rewrite-bom:${latest}"))
     implementation("org.openrewrite:rewrite-java")
+    implementation("org.openrewrite.recipe:rewrite-all:${latest}")
 
     implementation(platform(kotlin("bom", kotlinVersion)))
     implementation(kotlin("compiler-embeddable"))

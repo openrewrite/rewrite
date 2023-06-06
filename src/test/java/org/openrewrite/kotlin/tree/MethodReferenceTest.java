@@ -59,7 +59,7 @@ class MethodReferenceTest implements RewriteTest {
           kotlin(
             """
             fun method() {
-                listOf(1, 2, 3).map(::println)
+                listOf ( 1 , 2 , 3 ) . map ( :: println )
             }
             """
           )
