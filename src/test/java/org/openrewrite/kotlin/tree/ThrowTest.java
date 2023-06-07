@@ -18,7 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class ThrowTest implements RewriteTest {
 
@@ -27,10 +27,10 @@ class ThrowTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-                throw IllegalArgumentException ( "42" )
-            }
-            """
+              fun method ( ) {
+                  throw IllegalArgumentException ( "42" )
+              }
+              """
           )
         );
     }

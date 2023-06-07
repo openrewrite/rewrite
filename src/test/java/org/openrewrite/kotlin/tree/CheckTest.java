@@ -18,7 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class CheckTest implements RewriteTest {
 
@@ -27,13 +27,13 @@ class CheckTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( a : Any ) {
-                if ( a !is String ) {
-                }
-                if ( a is String ) {
-                }
-            }
-            """
+              fun method ( a : Any ) {
+                  if ( a !is String ) {
+                  }
+                  if ( a is String ) {
+                  }
+              }
+              """
           )
         );
     }
@@ -43,19 +43,19 @@ class CheckTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class A {
-                fun method ( ) : Int ? {
-                    return 1
-                }
-            }
-            """
+              class A {
+                  fun method ( ) : Int ? {
+                      return 1
+                  }
+              }
+              """
           ),
           kotlin(
             """
-            val a = A ( )
-            val b = a . method ( ) !!
-            val c = b !!
-            """
+              val a = A ( )
+              val b = a . method ( ) !!
+              val c = b !!
+              """
           )
         );
     }

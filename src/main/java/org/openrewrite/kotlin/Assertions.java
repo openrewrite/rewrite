@@ -20,6 +20,9 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.kotlin.internal.KotlinParsingException;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
@@ -30,6 +33,7 @@ import static org.openrewrite.java.Assertions.sourceSet;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 public final class Assertions {
+
     private Assertions() {
     }
 
@@ -86,7 +90,15 @@ public final class Assertions {
 
     private static void acceptSpec(Consumer<SourceSpec<K.CompilationUnit>> spec, SourceSpec<K.CompilationUnit> kotlin) {
         Consumer<K.CompilationUnit> userSuppliedAfterRecipe = kotlin.getAfterRecipe();
-        kotlin.afterRecipe(userSuppliedAfterRecipe::accept);
+        kotlin.beforeRecipe(cu -> new JavaVisitor<Integer>() {
+            @Override
+            public Space visitSpace(Space space, Space.Location loc, Integer integer) {
+                if (!space.getWhitespace().trim().isEmpty()) {
+                    throw new KotlinParsingException("Parsing error detected, whitespace contains non-whitespace characters: " + space.getWhitespace(), new RuntimeException());
+                }
+                return super.visitSpace(space, loc, integer);
+            }
+        }.visit(cu, 0)).afterRecipe(userSuppliedAfterRecipe::accept);
         spec.accept(kotlin);
     }
 }

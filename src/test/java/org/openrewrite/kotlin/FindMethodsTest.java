@@ -45,11 +45,11 @@ public class FindMethodsTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun function() {}
-            fun usesFunction() {
-                function()
-            }
-            """
+              fun function() {}
+              fun usesFunction() {
+                  function()
+              }
+              """
           )
         );
     }

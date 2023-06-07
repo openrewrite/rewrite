@@ -20,7 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 public class FindKotlinSourcesTest implements RewriteTest {
 
@@ -35,11 +35,11 @@ public class FindKotlinSourcesTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class A
-            """,
+              class A
+              """,
             """
-            /*~~>*/class A
-            """
+              /*~~>*/class A
+              """
           )
         );
     }

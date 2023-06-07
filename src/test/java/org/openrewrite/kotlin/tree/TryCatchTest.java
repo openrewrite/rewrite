@@ -18,7 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class TryCatchTest implements RewriteTest {
 
@@ -28,12 +28,12 @@ class TryCatchTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-                try {
-                } catch ( ex : Exception ) {
-                }
-            }
-            """
+              fun method ( ) {
+                  try {
+                  } catch ( ex : Exception ) {
+                  }
+              }
+              """
           )
         );
     }
@@ -43,12 +43,12 @@ class TryCatchTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-                try {
-                } finally {
-                }
-            }
-            """
+              fun method ( ) {
+                  try {
+                  } finally {
+                  }
+              }
+              """
           )
         );
     }

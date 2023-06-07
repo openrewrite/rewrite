@@ -18,7 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class AssignmentTest implements RewriteTest {
 
@@ -27,11 +27,11 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-                var s : String
-                s = "42"
-            }
-            """
+              fun method ( ) {
+                  var s : String
+                  s = "42"
+              }
+              """
           )
         );
     }
@@ -41,11 +41,11 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            val i = - 1
-            val l = - 2L
-            val f = - 3.0f
-            val d = - 4.0
-            """
+              val i = - 1
+              val l = - 2L
+              val f = - 3.0f
+              val d = - 4.0
+              """
           )
         );
     }
@@ -55,11 +55,11 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            val i = + 1
-            val l = + 2L
-            val f = + 3.0f
-            val d = + 4.0
-            """
+              val i = + 1
+              val l = + 2L
+              val f = + 3.0f
+              val d = + 4.0
+              """
           )
         );
     }
@@ -69,9 +69,9 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            var a = 42
-            val b = -- a
-            """
+              var a = 42
+              val b = -- a
+              """
           )
         );
     }
@@ -81,9 +81,9 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            var a = 42
-            val b = ++ a
-            """
+              var a = 42
+              val b = ++ a
+              """
           )
         );
     }
@@ -93,9 +93,9 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            var a = 42
-            val b = a --
-            """
+              var a = 42
+              val b = a --
+              """
           )
         );
     }
@@ -105,9 +105,9 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            var a = 42
-            val b = a ++
-            """
+              var a = 42
+              val b = a ++
+              """
           )
         );
     }
@@ -117,9 +117,9 @@ class AssignmentTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            val a = true
-            val b = ! a
-            """
+              val a = true
+              val b = ! a
+              """
           )
         );
     }

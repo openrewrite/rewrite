@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class VariableDeclarationTest implements RewriteTest {
 
@@ -57,12 +57,12 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            val latest = if ( true ) {
-                "latest.release"
-            } else {
-                "latest.integration"
-            }
-            """
+              val latest = if ( true ) {
+                  "latest.release"
+              } else {
+                  "latest.integration"
+              }
+              """
           )
         );
     }
@@ -81,9 +81,9 @@ class VariableDeclarationTest implements RewriteTest {
           kotlin("class Spec"),
           kotlin(
             """
-            val isEmpty : Boolean
-                get ( ) : Boolean = 1 == 1
-            """
+              val isEmpty : Boolean
+                  get ( ) : Boolean = 1 == 1
+              """
           )
         );
     }
@@ -100,12 +100,12 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            val a = "Hello"
-            val b = "World"
-            val c = "${a} ${b}!"
-            
-            val after = 0
-            """
+              val a = "Hello"
+              val b = "World"
+              val c = "${a} ${b}!"
+                          
+              val after = 0
+              """
           )
         );
     }
@@ -115,12 +115,12 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            val a = "Hello"
-            val b = "World"
-            val c = "$a $b!"
-            
-            val after = 0
-            """
+              val a = "Hello"
+              val b = "World"
+              val c = "$a $b!"
+                          
+              val after = 0
+              """
           )
         );
     }
@@ -130,14 +130,14 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class Test {
-                val value = 10
-            }
-            val a = Test ( )
-            val b = "${a.value}"
-            
-            val after = 0
-            """
+              class Test {
+                  val value = 10
+              }
+              val a = Test ( )
+              val b = "${a.value}"
+                          
+              val after = 0
+              """
           )
         );
     }
@@ -147,16 +147,16 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class Test {
-                val testValue = Inner ( )
-                class Inner {
-                    val innerValue = 10
-                }
-            }
-            
-            val a = Test ( )
-            val b = "${a.testValue.innerValue}"
-            """
+              class Test {
+                  val testValue = Inner ( )
+                  class Inner {
+                      val innerValue = 10
+                  }
+              }
+                          
+              val a = Test ( )
+              val b = "${a.testValue.innerValue}"
+              """
           )
         );
     }
@@ -166,10 +166,10 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            val template = \"\"\"
-              Hello world!
-            \"\"\"
-            """
+              val template = \"\"\"
+                Hello world!
+              \"\"\"
+              """
           )
         );
     }
@@ -179,8 +179,8 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
-            """
+              val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
+              """
           )
         );
     }
@@ -191,15 +191,15 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            package org.foo
-            class Test<T>
-            """
+              package org.foo
+              class Test<T>
+              """
           ),
           kotlin(
             """
-            import org.foo.Test
-            val a : Test < * > = null
-            """
+              import org.foo.Test
+              val a : Test < * > = null
+              """
           )
         );
     }
@@ -209,25 +209,8 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( condition : Boolean ) : Unit = if ( condition ) Unit else Unit
-            """
-          )
-        );
-    }
-
-    @Test
-    void typeAlias() {
-        rewriteRun(
-          kotlin(
-            """
-            class Test
-            """
-          ),
-          kotlin(
-            """
-            typealias TestAlias = Test
-            val a : TestAlias = Test ( )
-            """
+              fun method ( condition : Boolean ) : Unit = if ( condition ) Unit else Unit
+              """
           )
         );
     }
@@ -238,10 +221,10 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun example ( ) {
-              val ( a , b , c ) = Triple ( 1 , 2 , 3 )
-            }
-            """
+              fun example ( ) {
+                val ( a , b , c ) = Triple ( 1 , 2 , 3 )
+              }
+              """
           )
         );
     }
@@ -252,10 +235,10 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class Test {
-                val value by lazy { 10 }
-            }
-            """
+              class Test {
+                  val value by lazy { 10 }
+              }
+              """
           )
         );
     }
@@ -266,11 +249,11 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            val first : String = "1"
-            val second : Int = 2
-           
-            val l = listOf ( "foo" to first , "bar" to second )
-            """
+              val first : String = "1"
+              val second : Int = 2
+                         
+              val l = listOf ( "foo" to first , "bar" to second )
+              """
           )
         );
     }
@@ -281,8 +264,8 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            val t = SomeInput.Test
-            """
+              val t = SomeInput.Test
+              """
           )
         );
     }
@@ -293,17 +276,17 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class StringValue {
-                val value: String = ""
-            }
-            """
+              class StringValue {
+                  val value: String = ""
+              }
+              """
           ),
           kotlin(
             """
-            fun method(input : Any) {
-                val split = (input as StringValue).value.split("-").toTypedArray()
-            }
-            """
+              fun method(input : Any) {
+                  val split = (input as StringValue).value.split("-").toTypedArray()
+              }
+              """
           )
         );
     }
@@ -315,9 +298,9 @@ class VariableDeclarationTest implements RewriteTest {
           kotlin("class SomeParameterized<T>"),
           kotlin(
             """
-            val SomeParameterized < Int > . receivedMember : Int
-                get ( ) = 42
-            """
+              val SomeParameterized < Int > . receivedMember : Int
+                  get ( ) = 42
+              """
           )
         );
     }
@@ -329,10 +312,10 @@ class VariableDeclarationTest implements RewriteTest {
           kotlin("class SomeParameterized<T>"),
           kotlin(
             """
-            abstract class Test {
-                abstract val SomeParameterized < Int > . receivedMember : Int
-            }
-            """
+              abstract class Test {
+                  abstract val SomeParameterized < Int > . receivedMember : Int
+              }
+              """
           )
         );
     }
@@ -343,11 +326,11 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            var s: String = ""
-                set ( value ) {
-                    field = value
-                }
-            """
+              var s: String = ""
+                  set ( value ) {
+                      field = value
+                  }
+              """
           )
         );
     }
@@ -358,14 +341,14 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class Test {
-                var stringRepresentation : String = ""
-                    get ( ) = field
-                    set ( value ) {
-                        field = value
-                    }
-            }
-            """
+              class Test {
+                  var stringRepresentation : String = ""
+                      get ( ) = field
+                      set ( value ) {
+                          field = value
+                      }
+              }
+              """
           )
         );
     }
@@ -376,14 +359,14 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class Test {
-                var stringRepresentation : String = ""
-                    set ( value ) {
-                        field = value
-                    }
-                    get ( ) = field
-            }
-            """
+              class Test {
+                  var stringRepresentation : String = ""
+                      set ( value ) {
+                          field = value
+                      }
+                      get ( ) = field
+              }
+              """
           )
         );
     }

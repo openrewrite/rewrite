@@ -20,7 +20,7 @@ import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class ClassDeclarationTest implements RewriteTest {
 
@@ -29,10 +29,10 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            package some.package.name
-            class A { }
-            class B { }
-            """
+              package some.package.name
+              class A { }
+              class B { }
+              """
           )
         );
     }
@@ -42,9 +42,9 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class A
-            class B
-            """
+              class A
+              class B
+              """
           )
         );
     }
@@ -54,11 +54,11 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            interface A
-            interface B
-            class C : A , B
-            class D : B , A
-            """
+              interface A
+              interface B
+              class C : A , B
+              class D : B , A
+              """
           )
         );
     }
@@ -68,9 +68,9 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            open class A
-            class B : A ( )
-            """
+              open class A
+              class B : A ( )
+              """
           )
         );
     }
@@ -80,12 +80,12 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            interface A
-            interface B
-            open class C
+              interface A
+              interface B
+              open class C
 
-            class D : A , C ( ) , B
-            """
+              class D : A , C ( ) , B
+              """
           )
         );
     }
@@ -130,16 +130,16 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            public @Deprecated ( "message 0" ) abstract @Suppress("") class Test
-            
-            @Deprecated ( "message 1" )
-            @Suppress ( "" )
-            class A
-            
-            @Suppress ( "unused" , "unchecked" )
-            @Deprecated ( "message 2" )
-            class B
-            """
+              public @Deprecated ( "message 0" ) abstract @Suppress("") class Test
+                          
+              @Deprecated ( "message 1" )
+              @Suppress ( "" )
+              class A
+                          
+              @Suppress ( "unused" , "unchecked" )
+              @Deprecated ( "message 2" )
+              class B
+              """
           )
         );
     }
@@ -163,11 +163,11 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            interface A
-            interface B
-            
-            class KotlinTypeGoat < T : A , S : B>
-            """
+              interface A
+              interface B
+                          
+              class KotlinTypeGoat < T : A , S : B>
+              """
           )
         );
     }
@@ -185,10 +185,10 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class Test ( val answer : Int ) {
-                constructor ( ) : this ( 42 )
-            }
-            """
+              class Test ( val answer : Int ) {
+                  constructor ( ) : this ( 42 )
+              }
+              """
           )
         );
     }
@@ -214,10 +214,10 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            @Deprecated ( "" )
-            // Some comment
-            open class A
-            """
+              @Deprecated ( "" )
+              // Some comment
+              open class A
+              """
           )
         );
     }
@@ -228,13 +228,13 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            interface A
-            interface B
-            interface C
-            interface D
-            
-            class KotlinTypeGoat < T , S > where S : A , T : D , S : B , T : C
-            """
+              interface A
+              interface B
+              interface C
+              interface D
+                          
+              class KotlinTypeGoat < T , S > where S : A , T : D , S : B , T : C
+              """
           )
         );
     }
@@ -253,10 +253,10 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin("object Companion"),
           kotlin(
             """
-            class Test {
-                companion object
-            }
-            """
+              class Test {
+                  companion object
+              }
+              """
           )
         );
     }
@@ -275,13 +275,13 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            sealed class InvalidField {
-              abstract val field: String
-            }
-            data class InvalidEmail( val errors : List<String> ) : InvalidField ( ) {
-              override val field : String = "email"
-            }
-            """
+              sealed class InvalidField {
+                abstract val field: String
+              }
+              data class InvalidEmail( val errors : List<String> ) : InvalidField ( ) {
+                override val field : String = "email"
+              }
+              """
           )
         );
     }
@@ -292,13 +292,13 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            sealed interface InvalidField {
-              val field : String
-            }
-            data class InvalidEmail( val errors : List<String> ) : InvalidField {
-              override val field : String = "email"
-            }
-            """
+              sealed interface InvalidField {
+                val field : String
+              }
+              data class InvalidEmail( val errors : List<String> ) : InvalidField {
+                override val field : String = "email"
+              }
+              """
           )
         );
     }
@@ -308,13 +308,13 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            sealed interface InvalidField {
-              val field : String
-            }
-            object InvalidEmail : InvalidField {
-              override val field : String = "email"
-            }
-            """
+              sealed interface InvalidField {
+                val field : String
+              }
+              object InvalidEmail : InvalidField {
+                override val field : String = "email"
+              }
+              """
           )
         );
     }
@@ -346,22 +346,22 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            abstract class BaseSubProjectionNode < T , R > (
-                val parent : T,
-                val root : R
-            ) {
-            
-                constructor ( parent : T , root : R ) : this ( parent , root )
-            
-                fun parent ( ) : T {
-                    return parent
-                }
-            
-                fun root ( ) : R {
-                    return root
-                }
-            }
-            """
+              abstract class BaseSubProjectionNode < T , R > (
+                  val parent : T,
+                  val root : R
+              ) {
+                  
+                  constructor ( parent : T , root : R ) : this ( parent , root )
+                  
+                  fun parent ( ) : T {
+                      return parent
+                  }
+                  
+                  fun root ( ) : R {
+                      return root
+                  }
+              }
+              """
           )
         );
     }
@@ -372,12 +372,12 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            abstract class Test(arg: Test.() -> Unit = {}) {
-                init {
-                    arg()
-                }
-            }
-            """
+              abstract class Test(arg: Test.() -> Unit = {}) {
+                  init {
+                      arg()
+                  }
+              }
+              """
           )
         );
     }

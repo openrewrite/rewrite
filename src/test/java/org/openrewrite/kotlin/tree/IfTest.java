@@ -18,7 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class IfTest implements RewriteTest {
 
@@ -27,12 +27,12 @@ class IfTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-                val n : Int = 0
-                if ( n == 0 ) {
-                }
-            }
-            """
+              fun method ( ) {
+                  val n : Int = 0
+                  if ( n == 0 ) {
+                  }
+              }
+              """
           )
         );
     }
@@ -42,17 +42,17 @@ class IfTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-                val n : Int = 0
-                if ( n == 0 ) {
-                    val x = 0
-                } else if ( n == 1 ) {
-                    val x = 1
-                } else {
-                    val x = 2
-                }
-            }
-            """
+              fun method ( ) {
+                  val n : Int = 0
+                  if ( n == 0 ) {
+                      val x = 0
+                  } else if ( n == 1 ) {
+                      val x = 1
+                  } else {
+                      val x = 2
+                  }
+              }
+              """
           )
         );
     }
@@ -62,16 +62,16 @@ class IfTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-                var n : Int = 0
-                if ( n == 0 )
-                    n = 1
-                else if ( n == 1 )
-                    n = 2
-                else
-                    n = 3
-            }
-            """
+              fun method ( ) {
+                  var n : Int = 0
+                  if ( n == 0 )
+                      n = 1
+                  else if ( n == 1 )
+                      n = 2
+                  else
+                      n = 3
+              }
+              """
           )
         );
     }
@@ -81,11 +81,11 @@ class IfTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( n : Int ) {
-                if ( n in 1 .. 4 ) {
-                }
-            }
-            """
+              fun method ( n : Int ) {
+                  if ( n in 1 .. 4 ) {
+                  }
+              }
+              """
           )
         );
     }

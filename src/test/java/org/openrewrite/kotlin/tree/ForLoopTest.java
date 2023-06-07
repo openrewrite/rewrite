@@ -18,7 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class ForLoopTest implements RewriteTest {
 
@@ -27,13 +27,13 @@ class ForLoopTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-                val l = listOf ( 1 , 2 , 3 )
-                for ( i in l ) {
-                    println ( i )
-                }
-            }
-            """
+              fun method ( ) {
+                  val l = listOf ( 1 , 2 , 3 )
+                  for ( i in l ) {
+                      println ( i )
+                  }
+              }
+              """
           )
         );
     }
@@ -43,15 +43,15 @@ class ForLoopTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method() {
-                val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
-                for ( ( key , value ) in map ) {
-                    print ( key )
-                    print ( ", " )
-                    println ( value )
-                }
-            }
-            """
+              fun method() {
+                  val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
+                  for ( ( key , value ) in map ) {
+                      print ( key )
+                      print ( ", " )
+                      println ( value )
+                  }
+              }
+              """
           )
         );
     }
@@ -61,12 +61,12 @@ class ForLoopTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-                for ( i in 1..42 ) {
-                    println ( i )
-                }
-            }
-            """
+              fun method ( ) {
+                  for ( i in 1..42 ) {
+                      println ( i )
+                  }
+              }
+              """
           )
         );
     }
@@ -76,11 +76,11 @@ class ForLoopTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( array : Array < Int > ) {
-                for ( ( index , value ) in array . withIndex ( ) ) {
-                }
-            }
-            """
+              fun method ( array : Array < Int > ) {
+                  for ( ( index , value ) in array . withIndex ( ) ) {
+                  }
+              }
+              """
           )
         );
     }
@@ -90,11 +90,11 @@ class ForLoopTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-                for ( i in 6 downTo 0 step 2 ) {
-                }
-            }
-            """
+              fun method ( ) {
+                  for ( i in 6 downTo 0 step 2 ) {
+                  }
+              }
+              """
           )
         );
     }

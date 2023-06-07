@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class MethodDeclarationTest implements RewriteTest {
 
@@ -70,10 +70,10 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) : Boolean {
-                return true
-            }
-            """
+              fun method ( ) : Boolean {
+                  return true
+              }
+              """
           )
         );
     }
@@ -83,11 +83,11 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class A {
-                fun method ( ) {
-                }
-            }
-            """
+              class A {
+                  fun method ( ) {
+                  }
+              }
+              """
           )
         );
     }
@@ -96,21 +96,21 @@ class MethodDeclarationTest implements RewriteTest {
     void infix() {
         rewriteRun(
           kotlin(
-           """
-            class Spec {
-                fun version ( version : String) : Spec {
-                    return this
-                }
-            }
             """
+              class Spec {
+                  fun version ( version : String) : Spec {
+                      return this
+                  }
+              }
+              """
           ),
           kotlin(
             """
-            class A {
-              fun method ( ) {
+              class A {
+                fun method ( ) {
+                }
               }
-            }
-            """
+              """
           ),
           kotlin("infix fun Spec . version ( version : String ) : Spec = version ( version )")
         );
@@ -157,18 +157,18 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class Test {
-                fun build ( s : ( ) -> String ) {
-                }
-            }
-            """
+              class Test {
+                  fun build ( s : ( ) -> String ) {
+                  }
+              }
+              """
           ),
           kotlin(
             """
-            fun Test . method ( ) = build {
-                "42"
-            }
-            """
+              fun Test . method ( ) = build {
+                  "42"
+              }
+              """
           )
         );
     }
@@ -178,9 +178,9 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) : Array < Int > ? {
-            }
-            """
+              fun method ( ) : Array < Int > ? {
+              }
+              """
           )
         );
     }
@@ -190,8 +190,8 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun < T : Any > Array < Int > . method ( t : T ) = Unit
-            """
+              fun < T : Any > Array < Int > . method ( t : T ) = Unit
+              """
           )
         );
     }
@@ -202,11 +202,11 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            suspend fun example (
-              title : String ,
-              verifyUnique : suspend ( String ) -> Boolean
-            ) : String = TODO()
-            """
+              suspend fun example (
+                title : String ,
+                verifyUnique : suspend ( String ) -> Boolean
+              ) : String = TODO()
+              """
           )
         );
     }
@@ -217,10 +217,10 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            inline fun example (
-              crossinline block : ( ) -> Unit
-            ) : Unit = Unit
-            """)
+              inline fun example (
+                crossinline block : ( ) -> Unit
+              ) : Unit = Unit
+              """)
         );
     }
 
@@ -230,10 +230,10 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            inline fun example (
-              noinline block : ( ) -> Unit
-            ) : Unit = Unit
-            """)
+              inline fun example (
+                noinline block : ( ) -> Unit
+              ) : Unit = Unit
+              """)
         );
     }
 }

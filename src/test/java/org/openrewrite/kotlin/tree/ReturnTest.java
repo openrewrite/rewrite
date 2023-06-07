@@ -18,7 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class ReturnTest implements RewriteTest {
 
@@ -27,10 +27,10 @@ class ReturnTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) : String {
-                return "42"
-            }
-            """
+              fun method ( ) : String {
+                  return "42"
+              }
+              """
           )
         );
     }
@@ -40,10 +40,10 @@ class ReturnTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) : String {
-                "42"
-            }
-            """
+              fun method ( ) : String {
+                  "42"
+              }
+              """
           )
         );
     }
@@ -53,10 +53,10 @@ class ReturnTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) : Unit {
-                return
-            }
-            """
+              fun method ( ) : Unit {
+                  return
+              }
+              """
           )
         );
     }
@@ -66,13 +66,13 @@ class ReturnTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( i : Int ) : String {
-                return when {
-                    i . mod ( 2 ) . equals ( 0 ) -> "even"
-                    else -> "odd"
-                }
-            }
-            """
+              fun method ( i : Int ) : String {
+                  return when {
+                      i . mod ( 2 ) . equals ( 0 ) -> "even"
+                      else -> "odd"
+                  }
+              }
+              """
           )
         );
     }
@@ -82,12 +82,12 @@ class ReturnTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) : Unit {
-                return try {
-                } catch ( e : Exception ) {
-                }
-            }
-            """
+              fun method ( ) : Unit {
+                  return try {
+                  } catch ( e : Exception ) {
+                  }
+              }
+              """
           )
         );
     }

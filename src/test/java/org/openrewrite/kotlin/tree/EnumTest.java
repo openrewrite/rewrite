@@ -18,7 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class EnumTest implements RewriteTest {
 
@@ -34,11 +34,11 @@ class EnumTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            enum class A {
-                B , C ,
-                D
-            }
-            """
+              enum class A {
+                  B , C ,
+                  D
+              }
+              """
           )
         );
     }
@@ -48,12 +48,12 @@ class EnumTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class A {
-                enum class B {
-                    C
-                }
-            }
-            """
+              class A {
+                  enum class B {
+                      C
+                  }
+              }
+              """
           )
         );
     }

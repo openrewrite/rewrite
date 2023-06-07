@@ -18,7 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class WhileLoopTest implements RewriteTest {
 
@@ -28,10 +28,10 @@ class WhileLoopTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun test ( ) {
-                while ( true ) { }
-            }
-            """
+              fun test ( ) {
+                  while ( true ) { }
+              }
+              """
           )
         );
     }
@@ -41,10 +41,10 @@ class WhileLoopTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun test ( ) {
-                while ( true ) test ( )
-            }
-            """
+              fun test ( ) {
+                  while ( true ) test ( )
+              }
+              """
           )
         );
     }

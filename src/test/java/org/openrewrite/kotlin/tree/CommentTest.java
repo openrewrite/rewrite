@@ -18,7 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class CommentTest implements RewriteTest {
 
@@ -27,15 +27,15 @@ class CommentTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class Test {
-                /*
-                 * C1
-                 */
-                /*
-                 * C2
-                 */
-            }
-            """
+              class Test {
+                  /*
+                   * C1
+                   */
+                  /*
+                   * C2
+                   */
+              }
+              """
           )
         );
     }
@@ -45,9 +45,9 @@ class CommentTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class Test { // /*
-            }
-            """
+              class Test { // /*
+              }
+              """
           )
         );
     }

@@ -18,7 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class MapEntryTest implements RewriteTest {
 
@@ -27,9 +27,9 @@ class MapEntryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            val a = mapOf ( 1 to "one" , 2 to "two" )
-            val b = a [ 1 ]
-            """
+              val a = mapOf ( 1 to "one" , 2 to "two" )
+              val b = a [ 1 ]
+              """
           )
         );
     }

@@ -15,21 +15,17 @@
  */
 package org.openrewrite.kotlin;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Issue;
 import org.openrewrite.java.AddImport;
-import org.openrewrite.java.ChangeType;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 public class AddImportTest implements RewriteTest {
+
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(toRecipe(() -> new AddImport<>("a.b.Target", null, false)));
@@ -40,30 +36,30 @@ public class AddImportTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            package a.b
-            class Original
-            """),
+              package a.b
+              class Original
+              """),
           kotlin(
             """
-            package a.b
-            class Target
-            """),
+              package a.b
+              class Target
+              """),
           kotlin(
             """
-            import a.b.Original
-            
-            class A {
-                val type : Original = Original()
-            }
-            """,
+              import a.b.Original
+              
+              class A {
+                  val type : Original = Original()
+              }
+              """,
             """
-            import a.b.Original
-            import a.b.Target
-            
-            class A {
-                val type : Original = Original()
-            }
-            """
+              import a.b.Original
+              import a.b.Target
+              
+              class A {
+                  val type : Original = Original()
+              }
+              """
           )
         );
     }
@@ -74,35 +70,35 @@ public class AddImportTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("a.b.Target", "method", false))),
           kotlin(
             """
-            package a.b
-            class Original
-            """
+              package a.b
+              class Original
+              """
           ),
           kotlin(
             """
-            package a.b
-            class Target {
-                inline fun method() {}
-            }
-            """
+              package a.b
+              class Target {
+                  inline fun method() {}
+              }
+              """
           ),
           kotlin(
             """
-            import a.b.Original
-            
-            class A {
-                val type : Original = Original()
-            }
-            """,
+              import a.b.Original
+              
+              class A {
+                  val type : Original = Original()
+              }
+              """,
             """
-            import a.b.Original
-            
-            import a.b.method
-            
-            class A {
-                val type : Original = Original()
-            }
-            """
+              import a.b.Original
+              
+              import a.b.method
+              
+              class A {
+                  val type : Original = Original()
+              }
+              """
           )
         );
     }

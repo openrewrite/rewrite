@@ -72,13 +72,13 @@ public class KotlinTypeSignatureBuilderTest {
 
     public String constructorSignature() {
         return signatureBuilder().methodDeclarationSignature(getCompiledSource().getDeclarations().stream()
-          .map(FirRegularClass.class::cast)
-          .flatMap(it -> it.getDeclarations().stream())
-          .filter(FirConstructor.class::isInstance)
-          .map(FirFunction.class::cast)
-          .findFirst()
-          .orElseThrow()
-          .getSymbol());
+                .map(FirRegularClass.class::cast)
+                .flatMap(it -> it.getDeclarations().stream())
+                .filter(FirConstructor.class::isInstance)
+                .map(FirFunction.class::cast)
+                .findFirst()
+                .orElseThrow()
+                .getSymbol());
     }
 
     public Object innerClassSignature(String innerClassSimpleName) {

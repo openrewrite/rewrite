@@ -18,7 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class ImportTest implements RewriteTest {
 
@@ -48,19 +48,19 @@ class ImportTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            package a.b
-            class Target {
-                inline fun method() {}
-            }
-            """
+              package a.b
+              class Target {
+                  inline fun method() {}
+              }
+              """
           ),
           kotlin(
             """
-            import a.b.method
-            
-            class A {
-            }
-            """
+              import a.b.method
+              
+              class A {
+              }
+              """
           )
         );
     }

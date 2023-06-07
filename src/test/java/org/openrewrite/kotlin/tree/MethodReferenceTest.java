@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class MethodReferenceTest implements RewriteTest {
 
@@ -28,12 +28,12 @@ class MethodReferenceTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class Test ( val answer : Int )
-            fun method ( ) {
-                val l = listOf ( Test ( 42 ) )
-                l . map { Test :: answer }
-            }
-            """
+              class Test ( val answer : Int )
+              fun method ( ) {
+                  val l = listOf ( Test ( 42 ) )
+                  l . map { Test :: answer }
+              }
+              """
           )
         );
     }
@@ -58,10 +58,10 @@ class MethodReferenceTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method() {
-                listOf ( 1 , 2 , 3 ) . map ( :: println )
-            }
-            """
+              fun method() {
+                  listOf ( 1 , 2 , 3 ) . map ( :: println )
+              }
+              """
           )
         );
     }

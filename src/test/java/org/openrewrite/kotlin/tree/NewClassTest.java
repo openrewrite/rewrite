@@ -18,7 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class NewClassTest implements RewriteTest {
 
@@ -35,21 +35,21 @@ class NewClassTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            open class Test ( val a: Int, val b: Int ) {
-                open fun base() : Boolean {
-                    return false
-                }
-            }
-            """
+              open class Test ( val a: Int, val b: Int ) {
+                  open fun base() : Boolean {
+                      return false
+                  }
+              }
+              """
           ),
           kotlin(
             """
-            val t = object : Test ( 1 , 2 ) {
-                override fun base ( ) : Boolean {
-                    return true
-                }
-            }
-            """
+              val t = object : Test ( 1 , 2 ) {
+                  override fun base ( ) : Boolean {
+                      return true
+                  }
+              }
+              """
           )
         );
     }
@@ -59,14 +59,14 @@ class NewClassTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            package a.b
-            class Test
-            """
+              package a.b
+              class Test
+              """
           ),
           kotlin(
             """
-            val type : a . b . Test = a . b . Test ( )
-            """
+              val type : a . b . Test = a . b . Test ( )
+              """
           )
         );
     }
@@ -76,16 +76,16 @@ class NewClassTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            package a.b
-            class Test {
-                class Inner
-            }
-            """
+              package a.b
+              class Test {
+                  class Inner
+              }
+              """
           ),
           kotlin(
             """
-            val type : a . b . Test . Inner = a . b . Test . Inner ( )
-            """
+              val type : a . b . Test . Inner = a . b . Test . Inner ( )
+              """
           )
         );
     }

@@ -18,7 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class LabelTest implements RewriteTest {
 
@@ -27,29 +27,30 @@ class LabelTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun foo() {
-                run loop@ {
-                    listOf ( 1 , 2 , 3 , 4 , 5 ) . forEach {
-                        if ( it == 3 ) return@loop
-                        println ( it )
-                    }
-                }
-            }
-            """
+              fun foo() {
+                  run loop@ {
+                      listOf ( 1 , 2 , 3 , 4 , 5 ) . forEach {
+                          if ( it == 3 ) return@loop
+                          println ( it )
+                      }
+                  }
+              }
+              """
           )
         );
     }
+
     @Test
     void breakFromLabeledWhileLoop() {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-                labeled@ while ( true ) {
-                    break@labeled
-                }
-            }
-            """
+              fun method ( ) {
+                  labeled@ while ( true ) {
+                      break@labeled
+                  }
+              }
+              """
           )
         );
     }
@@ -59,12 +60,12 @@ class LabelTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class Test {
-                fun test ( ) {
-                    labeled@ while ( true ) continue@labeled
-                }
-            }
-            """
+              class Test {
+                  fun test ( ) {
+                      labeled@ while ( true ) continue@labeled
+                  }
+              }
+              """
           )
         );
     }
@@ -74,14 +75,14 @@ class LabelTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun test ( ) {
-                var i = 0
-                labeled@ do {
-                    i++
-                    break@labeled
-                } while ( i < 10 )
-            }
-            """
+              fun test ( ) {
+                  var i = 0
+                  labeled@ do {
+                      i++
+                      break@labeled
+                  } while ( i < 10 )
+              }
+              """
           )
         );
     }
@@ -91,12 +92,12 @@ class LabelTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun test ( ) {
-                labeled@ for (i in 1..10) {
-                    break@labeled
-                }
-            }
-            """
+              fun test ( ) {
+                  labeled@ for (i in 1..10) {
+                      break@labeled
+                  }
+              }
+              """
           )
         );
     }

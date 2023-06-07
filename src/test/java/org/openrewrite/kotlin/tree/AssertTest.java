@@ -18,7 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class AssertTest implements RewriteTest {
 
@@ -27,10 +27,10 @@ class AssertTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-                assert ( 1 == 1 )
-            }
-            """
+              fun method ( ) {
+                  assert ( 1 == 1 )
+              }
+              """
           )
         );
     }

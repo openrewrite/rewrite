@@ -38,29 +38,29 @@ class ChangePackageTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            package a.b
-            class Original
-            """,
+              package a.b
+              class Original
+              """,
             """
-            package x.y
-            class Original
-            """
+              package x.y
+              class Original
+              """
           ),
           kotlin(
             """
-            import a.b.Original
-            
-            class A {
-                val type = Original()
-            }
-            """,
+              import a.b.Original
+              
+              class A {
+                  val type = Original()
+              }
+              """,
             """
-            import x.y.Original
-            
-            class A {
-                val type = Original()
-            }
-            """
+              import x.y.Original
+              
+              class A {
+                  val type = Original()
+              }
+              """
           )
         );
     }
@@ -70,25 +70,25 @@ class ChangePackageTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            package a.b
-            class Original
-            """,
+              package a.b
+              class Original
+              """,
             """
-            package x.y
-            class Original
-            """
+              package x.y
+              class Original
+              """
           ),
           kotlin(
             """
-            class A {
-                val type = a.b.Original()
-            }
-            """,
+              class A {
+                  val type = a.b.Original()
+              }
+              """,
             """
-            class A {
-                val type = x.y.Original()
-            }
-            """
+              class A {
+                  val type = x.y.Original()
+              }
+              """
           )
         );
     }

@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class LambdaTest implements RewriteTest {
 
@@ -28,10 +28,10 @@ class LambdaTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-                val square = { number : Int -> number * number }
-            }
-            """
+              fun method ( ) {
+                  val square = { number : Int -> number * number }
+              }
+              """
           )
         );
     }
@@ -41,10 +41,10 @@ class LambdaTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun plugins ( input : ( ) -> String ) {
-              println ( input( ) )
-            }
-            """
+              fun plugins ( input : ( ) -> String ) {
+                println ( input( ) )
+              }
+              """
           )
         );
     }
@@ -54,17 +54,17 @@ class LambdaTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            abstract class SomeClass {
-            
-                private val defaults = emptySet < String > ( )
-            
-                abstract fun fields ( ) : List < Pair < String , Any ? > >
-            
-                fun inputValues ( ) : List < Pair < String , Any ? > > {
-                    return fields ( ) .filter { ( k , _ ) -> ! defaults . contains ( k ) }
-                }
-            }
-            """
+              abstract class SomeClass {
+                  
+                  private val defaults = emptySet < String > ( )
+                  
+                  abstract fun fields ( ) : List < Pair < String , Any ? > >
+                  
+                  fun inputValues ( ) : List < Pair < String , Any ? > > {
+                      return fields ( ) .filter { ( k , _ ) -> ! defaults . contains ( k ) }
+                  }
+              }
+              """
           )
         );
     }
@@ -75,10 +75,10 @@ class LambdaTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-                val lambda: suspend ( ) -> Int = suspend { 1 }
-            }
-            """
+              fun method ( ) {
+                  val lambda: suspend ( ) -> Int = suspend { 1 }
+              }
+              """
           )
         );
     }
@@ -89,10 +89,10 @@ class LambdaTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-                val lambda: suspend ( Int ) -> Int = { number : Int -> number * number }
-            }
-            """
+              fun method ( ) {
+                  val lambda: suspend ( Int ) -> Int = { number : Int -> number * number }
+              }
+              """
           )
         );
     }
@@ -102,11 +102,11 @@ class LambdaTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method() {
-                val list = listOf(1, 2, 3)
-                list.filterIndexed { index, ignored -> index % 2 == 0 }
-            }
-            """
+              fun method() {
+                  val list = listOf(1, 2, 3)
+                  list.filterIndexed { index, ignored -> index % 2 == 0 }
+              }
+              """
           )
         );
     }
@@ -116,11 +116,11 @@ class LambdaTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method() {
-                val list = listOf(1, 2, 3)
-                list.filterIndexed { index, _ -> index % 2 == 0 }
-            }
-            """
+              fun method() {
+                  val list = listOf(1, 2, 3)
+                  list.filterIndexed { index, _ -> index % 2 == 0 }
+              }
+              """
           )
         );
     }

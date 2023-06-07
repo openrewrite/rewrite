@@ -24,7 +24,7 @@ import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class FieldAccessTest implements RewriteTest {
@@ -34,13 +34,13 @@ class FieldAccessTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class Test {
-                var id : String = ""
-                fun setId ( id : String ) {
-                    this . id = id
-                }
-            }
-            """
+              class Test {
+                  var id : String = ""
+                  fun setId ( id : String ) {
+                      this . id = id
+                  }
+              }
+              """
           )
         );
     }
@@ -51,19 +51,19 @@ class FieldAccessTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            open class Super {
-                val id : String = ""
-            }
-            """
+              open class Super {
+                  val id : String = ""
+              }
+              """
           ),
           kotlin(
             """
-            class Test : Super() {
-                fun getId ( ) : String {
-                    return super . id
-                }
-            }
-            """
+              class Test : Super() {
+                  fun getId ( ) : String {
+                      return super . id
+                  }
+              }
+              """
           )
         );
     }
@@ -73,17 +73,17 @@ class FieldAccessTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class Test {
-                val property = 42
-            }
-            """
+              class Test {
+                  val property = 42
+              }
+              """
           ),
           kotlin(
             """
-            fun method ( test : Test ? ) {
-                val a = test ?. property
-            }
-            """
+              fun method ( test : Test ? ) {
+                  val a = test ?. property
+              }
+              """
           )
         );
     }
@@ -93,17 +93,17 @@ class FieldAccessTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            class Test {
-                val value : Int ? = 42
-            }
-            """
+              class Test {
+                  val value : Int ? = 42
+              }
+              """
           ),
           kotlin(
             """
-            fun method ( test : Test ) {
-                val a = test . value ?: null
-            }
-            """
+              fun method ( test : Test ) {
+                  val a = test . value ?: null
+              }
+              """
           )
         );
     }
@@ -113,10 +113,10 @@ class FieldAccessTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            import java.nio.ByteBuffer
-            
-            private val crlf : ByteBuffer = ByteBuffer . wrap( "\\r\\n" . toByteArray ( ) )
-            """
+              import java.nio.ByteBuffer
+              
+              private val crlf : ByteBuffer = ByteBuffer . wrap( "\\r\\n" . toByteArray ( ) )
+              """
           )
         );
     }
@@ -138,8 +138,8 @@ class FieldAccessTest implements RewriteTest {
           })),
           kotlin(
             """
-            val pattern = java.util.regex.Pattern.compile(".*")
-            """
+              val pattern = java.util.regex.Pattern.compile(".*")
+              """
           )
         );
     }
@@ -164,8 +164,8 @@ class FieldAccessTest implements RewriteTest {
           })),
           kotlin(
             """
-            val i = Int.MIN_VALUE
-            """
+              val i = Int.MIN_VALUE
+              """
           )
         );
     }

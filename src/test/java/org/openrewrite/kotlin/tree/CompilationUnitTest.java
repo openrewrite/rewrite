@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class CompilationUnitTest implements RewriteTest {
 
@@ -42,10 +42,10 @@ class CompilationUnitTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            import java.util.List
-            import java.io.*
-            class A
-            """
+              import java.util.List
+              import java.io.*
+              class A
+              """
           )
         );
     }
@@ -55,13 +55,13 @@ class CompilationUnitTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            /* Comment */
-            package a
-            import java.util.List
-                          
-            class A
-            // comment
-            """,
+              /* Comment */
+              package a
+              import java.util.List
+              
+              class A
+              // comment
+              """,
             SourceSpec::noTrim
           )
         );

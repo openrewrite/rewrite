@@ -18,7 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class ArrayTest implements RewriteTest {
 
@@ -62,9 +62,9 @@ class ArrayTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            val arr = IntArray ( 1 )
-            val a = arr [ 0 ]
-            """
+              val arr = IntArray ( 1 )
+              val a = arr [ 0 ]
+              """
           )
         );
     }

@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.tree.ParserAssertions.kotlin;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class BinaryTest implements RewriteTest {
 
@@ -28,11 +28,11 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-              val n = 0
-              val b = n == 0
-            }
-            """
+              fun method ( ) {
+                val n = 0
+                val b = n == 0
+              }
+              """
           )
         );
     }
@@ -42,11 +42,11 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-              val n = 0
-              val b = n != 0
-            }
-            """
+              fun method ( ) {
+                val n = 0
+                val b = n != 0
+              }
+              """
           )
         );
     }
@@ -56,11 +56,11 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-              val n = 0
-              val b = n > 0
-            }
-            """
+              fun method ( ) {
+                val n = 0
+                val b = n > 0
+              }
+              """
           )
         );
     }
@@ -70,11 +70,11 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-              val n = 0
-              val b = n >= 0
-            }
-            """
+              fun method ( ) {
+                val n = 0
+                val b = n >= 0
+              }
+              """
           )
         );
     }
@@ -84,11 +84,11 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-              val n = 0
-              val b = n < 0
-            }
-            """
+              fun method ( ) {
+                val n = 0
+                val b = n < 0
+              }
+              """
           )
         );
     }
@@ -98,11 +98,11 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-              val n = 0
-              val b = n <= 0
-            }
-            """
+              fun method ( ) {
+                val n = 0
+                val b = n <= 0
+              }
+              """
           )
         );
     }
@@ -112,12 +112,12 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-                val b : Boolean = 1 == 1 // c1
-                            && 2 == 2 // c2
-                            && 3 == 3
-            }
-            """
+              fun method ( ) {
+                  val b : Boolean = 1 == 1 // c1
+                              && 2 == 2 // c2
+                              && 3 == 3
+              }
+              """
           )
         );
     }
@@ -127,11 +127,11 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-              val a = 0
-              val b = a and 1
-            }
-            """
+              fun method ( ) {
+                val a = 0
+                val b = a and 1
+              }
+              """
           )
         );
     }
@@ -141,11 +141,11 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-              val a = 0
-              val b = a or 1
-            }
-            """
+              fun method ( ) {
+                val a = 0
+                val b = a or 1
+              }
+              """
           )
         );
     }
@@ -155,11 +155,11 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-              val a = 0
-              val b = a xor 1
-            }
-            """
+              fun method ( ) {
+                val a = 0
+                val b = a xor 1
+              }
+              """
           )
         );
     }
@@ -169,11 +169,11 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-              val a = 0
-              val b = a . inv ( )
-            }
-            """
+              fun method ( ) {
+                val a = 0
+                val b = a . inv ( )
+              }
+              """
           )
         );
     }
@@ -183,11 +183,11 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-              val a = 0
-              val b = a shl 1
-            }
-            """
+              fun method ( ) {
+                val a = 0
+                val b = a shl 1
+              }
+              """
           )
         );
     }
@@ -197,11 +197,11 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-              val a = 0
-              val b = a shr 1
-            }
-            """
+              fun method ( ) {
+                val a = 0
+                val b = a shr 1
+              }
+              """
           )
         );
     }
@@ -211,11 +211,11 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-              val a = 0
-              val b = a ushr 1
-            }
-            """
+              fun method ( ) {
+                val a = 0
+                val b = a ushr 1
+              }
+              """
           )
         );
     }
@@ -225,10 +225,10 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-              val a = 0 === 0
-            }
-            """
+              fun method ( ) {
+                val a = 0 === 0
+              }
+              """
           )
         );
     }
@@ -238,10 +238,10 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-              val a = 0 !== 0
-            }
-            """
+              fun method ( ) {
+                val a = 0 !== 0
+              }
+              """
           )
         );
     }
@@ -252,11 +252,11 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-              val n = 0
-              val b = n == ( 1 - 1 )
-            }
-            """
+              fun method ( ) {
+                val n = 0
+                val b = n == ( 1 - 1 )
+              }
+              """
           )
         );
     }
@@ -266,11 +266,11 @@ class BinaryTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-            fun method ( ) {
-              val n = 0
-              val b = n % 2 == 0
-            }
-            """
+              fun method ( ) {
+                val n = 0
+                val b = n % 2 == 0
+              }
+              """
           )
         );
     }

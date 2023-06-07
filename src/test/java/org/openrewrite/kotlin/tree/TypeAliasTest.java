@@ -16,68 +16,43 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Issue;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-class AnnotationTest implements RewriteTest {
+class TypeAliasTest implements RewriteTest {
 
     @Test
-    void fileScope() {
+    void typeAlias() {
         rewriteRun(
           kotlin(
             """
-              @file : Suppress ( "DEPRECATION_ERROR" , "RedundantUnitReturnType" )
-
-              class A
-              """
-          )
-        );
-    }
-
-    @Test
-    void annotationWithDefaultArgument() {
-        rewriteRun(
-          kotlin(
-            """
-              @SuppressWarnings ( "ConstantConditions" , "unchecked" )
-              class A
-              """
-          )
-        );
-    }
-
-    @Test
-    void arrayArgument() {
-        rewriteRun(
-          kotlin(
-            """
-              @Target ( AnnotationTarget . LOCAL_VARIABLE )
-              @Retention ( AnnotationRetention . SOURCE )
-              annotation class Test ( val values : Array < String > ) {
-              }
+              class Test
               """
           ),
           kotlin(
             """
-              @Test( values = [ "a" , "b" , "c" ] )
-              val a = 42
+              typealias TestAlias = Test
+              val a : TestAlias = Test ( )
               """
           )
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/80")
+    @ExpectedToFail
     @Test
-    void jvmNameAnnotation() {
+    void parameterizedType() {
         rewriteRun(
           kotlin(
             """
-              import kotlin.jvm.JvmName
-              @get : JvmName ( "getCount" )
-              val count : Int ?
-                  get ( ) = 1
+              class Test<T>
+              """
+          ),
+          kotlin(
+            """
+              typealias OldAlias<T> = Test<T>
+              val a: OldAlias<String> = Test<String>()
               """
           )
         );
