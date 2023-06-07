@@ -15,11 +15,11 @@
  */
 package org.openrewrite.java.recipes;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 
 import static org.openrewrite.java.Assertions.java;
@@ -31,10 +31,10 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
         spec.recipe(new MigrateRecipeToRewrite8())
           .parser(JavaParser.fromJavaVersion()
             .classpath(JavaParser.runtimeClasspath())
-          );
+          )
+          .typeValidationOptions(TypeValidation.none());
     }
 
-    @Disabled
     @Test
     void deprecateVisitJavaSourceFile() {
         // language=java
@@ -145,7 +145,6 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void getSingleSourceApplicableTestToPreconditions() {
         // language=java
@@ -246,7 +245,6 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void visitAndCast() {
         // language=java
@@ -318,7 +316,6 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void castReturnTypeForSuperVisit() {
         rewriteRun(
@@ -434,7 +431,6 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void doNextToDoAfterVisit() {
         rewriteRun(
@@ -517,7 +513,6 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void addCommentToMigrateScanningRecipeManually() {
         rewriteRun(
@@ -573,7 +568,6 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
         );
     }
 
-    @Disabled
     @Test
     void multipleReturnsInGetSingleSourceApplicableTest() {
         rewriteRun(
