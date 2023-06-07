@@ -17,6 +17,7 @@ package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -26,6 +27,36 @@ public class RenameTypeAliasTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new RenameTypeAlias("OldAlias", "NewAlias", "Test"));
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/119")
+    @Test
+    void doesNotMatchType() {
+        rewriteRun(
+          kotlin(
+            """
+            class Other
+            """
+          ),
+          kotlin(
+            "typealias OldAlias = Other"
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/119")
+    @Test
+    void differentAliasName() {
+        rewriteRun(
+          kotlin(
+            """
+            class Test
+            """
+          ),
+          kotlin(
+            "typealias OtherAlias = Test"
+          )
+        );
     }
 
     @Test

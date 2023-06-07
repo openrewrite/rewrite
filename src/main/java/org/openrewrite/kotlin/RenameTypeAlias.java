@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.TypeUtils;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -55,10 +56,10 @@ public class RenameTypeAlias extends Recipe {
         return new KotlinIsoVisitor<ExecutionContext>() {
             @Override
             public J.Identifier visitIdentifier(J.Identifier i, ExecutionContext executionContext) {
-                if(!i.getSimpleName().equals(aliasName)) {
+                if (!i.getSimpleName().equals(aliasName) || !TypeUtils.isOfClassType(i.getType(), fullyQualifiedAliasedType)) {
                     return i;
                 }
-                if(!isVariableName(getCursor().getParentTreeCursor(), i)) {
+                if (!isVariableName(getCursor().getParentTreeCursor(), i)) {
                     i = i.withSimpleName(newName);
                 }
                 return i;
@@ -71,26 +72,25 @@ public class RenameTypeAlias extends Recipe {
         if (value instanceof J.MethodInvocation) {
             J.MethodInvocation m = (J.MethodInvocation) value;
             return m.getName() != ident;
-        } else if(value instanceof J.NewClass) {
+        } else if (value instanceof J.NewClass) {
             J.NewClass m = (J.NewClass) value;
             return m.getClazz() != ident;
-        } else if(value instanceof J.NewArray) {
+        } else if (value instanceof J.NewArray) {
             J.NewArray a = (J.NewArray) value;
             return a.getTypeExpression() != ident;
-        } else if(value instanceof J.VariableDeclarations) {
+        } else if (value instanceof J.VariableDeclarations) {
             J.VariableDeclarations v = (J.VariableDeclarations) value;
             return ident != v.getTypeExpression();
-        } else if(value instanceof J.VariableDeclarations.NamedVariable) {
-            J.VariableDeclarations.NamedVariable nv = (J.VariableDeclarations.NamedVariable) value;
+        } else if (value instanceof J.VariableDeclarations.NamedVariable) {
             Object maybeVd = cursor.getParentTreeCursor().getValue();
-            if(maybeVd instanceof J.VariableDeclarations) {
+            if (maybeVd instanceof J.VariableDeclarations) {
                 J.VariableDeclarations vd = (J.VariableDeclarations) maybeVd;
-                if(vd.getLeadingAnnotations().stream().anyMatch(it -> it.getSimpleName().equals("typealias"))) {
+                if (vd.getLeadingAnnotations().stream().anyMatch(it -> it.getSimpleName().equals("typealias"))) {
                     return false;
                 }
             }
             return true;
-        } else if(value instanceof J.ParameterizedType) {
+        } else if (value instanceof J.ParameterizedType) {
             return false;
         }
         return true;
