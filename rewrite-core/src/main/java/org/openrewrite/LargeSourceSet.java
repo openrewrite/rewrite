@@ -33,7 +33,7 @@ import java.util.function.UnaryOperator;
 public interface LargeSourceSet {
 
     /**
-     * Called by {@link RecipeScheduler} at the conclusion of a scan/generate/edit cycle.
+     * Called by {@link RecipeScheduler} at the beginning of a scan/generate/edit cycle.
      */
     default void beforeCycle() {
     }

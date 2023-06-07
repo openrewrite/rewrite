@@ -36,9 +36,8 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
                 "Statistics used in analyzing the performance of recipes.");
     }
 
-    public SourceFile recordScan(Recipe recipe, Callable<SourceFile> scan) throws Exception {
-        //noinspection DataFlowIssue
-        return Timer.builder("rewrite.recipe.scan")
+    public void recordScan(Recipe recipe, Callable<SourceFile> scan) throws Exception {
+        Timer.builder("rewrite.recipe.scan")
                 .tag("name", recipe.getName())
                 .publishPercentiles(0.99)
                 .register(registry)

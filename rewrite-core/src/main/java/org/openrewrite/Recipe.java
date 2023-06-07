@@ -247,11 +247,6 @@ public abstract class Recipe implements Cloneable {
      * another cycle (or if there are no changes made in a cycle), then another will not run.
      */
     public boolean causesAnotherCycle() {
-        for (Recipe recipe : getRecipeList()) {
-            if (recipe.causesAnotherCycle()) {
-                return true;
-            }
-        }
         return false;
     }
 

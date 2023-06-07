@@ -51,8 +51,7 @@ public class RecipeScheduler {
         SourcesFileErrors errorsTable = new SourcesFileErrors(Recipe.noop());
         SourcesFileResults sourceFileResults = new SourcesFileResults(Recipe.noop());
 
-        LargeSourceSet acc = sourceSet;
-        LargeSourceSet after = acc;
+        LargeSourceSet after = sourceSet;
 
         for (int i = 1; i <= maxCycles; i++) {
             after.beforeCycle();
@@ -62,7 +61,7 @@ public class RecipeScheduler {
             // use cases like sharing a `JavaTypeCache` between `JavaTemplate` parsers).
             Cursor rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
 
-            RecipeRunCycle cycle = new RecipeRunCycle(recipe, rootCursor, ctxWithWatch,
+            RecipeRunCycle cycle = new RecipeRunCycle(recipe, i, rootCursor, ctxWithWatch,
                     recipeRunStats, sourceFileResults, errorsTable);
 
             // pre-transformation scanning phase where there can only be modifications to capture exceptions
@@ -75,16 +74,21 @@ public class RecipeScheduler {
             after = cycle.generateSources(after, i);
             after = cycle.editSources(after, i);
 
+            boolean anyRecipeCausingAnotherCycle = false;
+            for (Recipe madeChanges : cycle.madeChangesInThisCycle) {
+                if (madeChanges.causesAnotherCycle()) {
+                    anyRecipeCausingAnotherCycle = true;
+                }
+            }
+
             if (i >= minCycles &&
-                // FIXME after will ALWAYS be == acc in MLSS (always breaks after first cycle)
-                // FIXME causesAnotherCycle always causes another cycle regardless of whether recipe made a change
-                ((after == acc && !ctxWithWatch.hasNewMessages()) || !recipe.causesAnotherCycle())) {
+                ((cycle.madeChangesInThisCycle.isEmpty() && !ctxWithWatch.hasNewMessages()) ||
+                 !anyRecipeCausingAnotherCycle)) {
                 after.afterCycle(true);
                 break;
             }
 
             after.afterCycle(i == maxCycles);
-            acc = after;
             ctxWithWatch.resetHasNewMessages();
         }
 
@@ -112,6 +116,7 @@ public class RecipeScheduler {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     static class RecipeRunCycle {
         Recipe recipe;
+        int cycle;
         Cursor rootCursor;
         ExecutionContext ctx;
         RecipeRunStats recipeRunStats;
@@ -121,6 +126,7 @@ public class RecipeScheduler {
 
         long cycleStartTime = System.nanoTime();
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean();
+        List<Recipe> madeChangesInThisCycle = new ArrayList<>();
 
         public LargeSourceSet scanSources(LargeSourceSet sourceSet, int cycle) {
             return mapForRecipeRecursively(sourceSet, (recipeStack, sourceFile) -> {
@@ -170,11 +176,14 @@ public class RecipeScheduler {
                     List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), generatedInThisCycle, ctx));
                     generatedInThisCycle.addAll(generated);
                     generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
-                    acc = acc.generate(generated);
+                    if (!generated.isEmpty()) {
+                        madeChangesInThisCycle.add(recipe);
+                    }
                 }
                 recurseRecipeList(allRecipesStack, recipeStack);
             }
 
+            acc = acc.generate(generatedInThisCycle);
             return acc;
         }
 
@@ -215,6 +224,7 @@ public class RecipeScheduler {
                     });
 
                     if (after != sourceFile) {
+                        madeChangesInThisCycle.add(recipeStack.peek());
                         recordSourceFileResult(sourceFile, after, recipeStack, ctx);
                         if (sourceFile.getMarkers().findFirst(Generated.class).isPresent()) {
                             // skip edits made to generated source files so that they don't show up in a diff
@@ -232,7 +242,6 @@ public class RecipeScheduler {
             });
         }
 
-        // FIXME could record the same source file for a recipe multiple times if edited by the same recipe across multiple cycles
         private void recordSourceFileResult(@Nullable SourceFile before, @Nullable SourceFile after, Stack<Recipe> recipeStack, ExecutionContext ctx) {
             String beforePath = (before == null) ? "" : before.getSourcePath().toString();
             String afterPath = (after == null) ? "" : after.getSourcePath().toString();
@@ -249,7 +258,8 @@ public class RecipeScheduler {
                     afterPath,
                     parentName,
                     recipeName,
-                    effortSeconds));
+                    effortSeconds,
+                    cycle));
             if (hierarchical) {
                 recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
             }
@@ -273,7 +283,8 @@ public class RecipeScheduler {
                     afterPath,
                     parentName,
                     recipe.getName(),
-                    effortSeconds));
+                    effortSeconds,
+                    cycle));
             recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
         }
 
