@@ -440,33 +440,37 @@ public class YamlResourceLoader implements ResourceLoader {
                     (List<Map<String, Object>>) examplesMap.get("examples");
 
             List<RecipeExample> newExamples = examples.stream().map(exam -> {
-                    RecipeExample recipeExample = new RecipeExample();
-                    recipeExample.setDescription((String) exam.get("description"));
+                        RecipeExample recipeExample = new RecipeExample();
+                        recipeExample.setDescription((String) exam.get("description"));
 
-                    if (exam.get("parameters") != null) {
-                        recipeExample.setParameters(((List<Object>) exam.get("parameters")).stream()
-                            .filter(Objects::nonNull)
-                            .map(Object::toString).collect(toList()));
-                    }
-
-                    List<RecipeExample.Source> sources = new ArrayList<>();
-                    List<Object> ss = (List<Object>) exam.get("sources");
-                    if (ss != null) {
-                        for (Object s : ss) {
-                            HashMap sMap = (HashMap)s;
-                            String before = (String) sMap.get("before");
-                            String after = (String) sMap.get("after");
-                            String path = (String) sMap.get("path");
-                            String language = (String)((HashMap)s).get("language");
-
-                            RecipeExample.Source source = new RecipeExample.Source(before, after, path, language);
-                            sources.add(source);
+                        if (exam.get("parameters") != null) {
+                            //noinspection unchecked
+                            recipeExample.setParameters(((List<Object>) exam.get("parameters")).stream()
+                                    .filter(Objects::nonNull)
+                                    .map(Object::toString).collect(toList()));
                         }
-                    }
 
-                    recipeExample.setSources(sources);
-                    return recipeExample;
-                }
+                        List<RecipeExample.Source> sources = new ArrayList<>();
+                        //noinspection unchecked
+                        List<Object> ss = (List<Object>) exam.get("sources");
+                        if (ss != null) {
+                            for (Object s : ss) {
+                                //noinspection rawtypes
+                                HashMap sMap = (HashMap) s;
+                                String before = (String) sMap.get("before");
+                                String after = (String) sMap.get("after");
+                                String path = (String) sMap.get("path");
+                                //noinspection rawtypes
+                                String language = (String) ((HashMap) s).get("language");
+
+                                RecipeExample.Source source = new RecipeExample.Source(before, after, path, language);
+                                sources.add(source);
+                            }
+                        }
+
+                        recipeExample.setSources(sources);
+                        return recipeExample;
+                    }
             ).collect(toList());
 
             recipeNameToExamples.get(recipeName).addAll(newExamples);

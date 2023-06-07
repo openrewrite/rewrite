@@ -55,7 +55,6 @@ public class DeclarativeRecipe extends Recipe {
 
     private final URI source;
 
-
     private final boolean causesAnotherCycle;
 
     @Override

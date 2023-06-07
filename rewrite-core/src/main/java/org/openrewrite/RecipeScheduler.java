@@ -82,7 +82,7 @@ public class RecipeScheduler {
             }
 
             if (i >= minCycles &&
-                ((cycle.madeChangesInThisCycle.isEmpty() && !ctxWithWatch.hasNewMessages()) ||
+                ((cycle.madeChangesInThisCycle.isEmpty() && !ctxWithWatch.hasNewMessages()) &&
                  !anyRecipeCausingAnotherCycle)) {
                 after.afterCycle(true);
                 break;
@@ -174,8 +174,8 @@ public class RecipeScheduler {
                     ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
                     sourceSet.setRecipe(recipeStack);
                     List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), generatedInThisCycle, ctx));
-                    generatedInThisCycle.addAll(generated);
                     generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
+                    generatedInThisCycle.addAll(generated);
                     if (!generated.isEmpty()) {
                         madeChangesInThisCycle.add(recipe);
                     }

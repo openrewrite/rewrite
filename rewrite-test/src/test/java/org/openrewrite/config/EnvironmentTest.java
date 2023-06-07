@@ -467,7 +467,7 @@ class EnvironmentTest implements RewriteTest {
             new Properties()
           )).build();
         var recipe = env.activateRecipes("test.Foo");
-        assertThat(recipe.causesAnotherCycle()).isTrue();
+        assertThat(recipe.getRecipeList().get(0).causesAnotherCycle()).isTrue();
     }
 
     @Test
