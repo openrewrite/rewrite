@@ -33,14 +33,8 @@ public class RenameTypeAliasTest implements RewriteTest {
     @Test
     void doesNotMatchType() {
         rewriteRun(
-          kotlin(
-            """
-            class Other
-            """
-          ),
-          kotlin(
-            "typealias OldAlias = Other"
-          )
+          kotlin("class Other"),
+          kotlin("typealias OldAlias = Other")
         );
     }
 
@@ -48,25 +42,15 @@ public class RenameTypeAliasTest implements RewriteTest {
     @Test
     void differentAliasName() {
         rewriteRun(
-          kotlin(
-            """
-            class Test
-            """
-          ),
-          kotlin(
-            "typealias OtherAlias = Test"
-          )
+          kotlin("class Test"),
+          kotlin("typealias OtherAlias = Test")
         );
     }
 
     @Test
     void declaration() {
         rewriteRun(
-          kotlin(
-            """
-              class Test
-              """
-          ),
+          kotlin("class Test"),
           kotlin(
             "typealias OldAlias = Test",
             "typealias NewAlias = Test"
@@ -102,11 +86,7 @@ public class RenameTypeAliasTest implements RewriteTest {
     @Test
     void variableTypeExpression() {
         rewriteRun(
-          kotlin(
-            """
-              class Test
-              """
-          ),
+          kotlin("class Test"),
           kotlin(
             """
               typealias OldAlias = Test
@@ -123,11 +103,7 @@ public class RenameTypeAliasTest implements RewriteTest {
     @Test
     void functionParameter() {
         rewriteRun(
-          kotlin(
-            """
-              class Test
-              """
-          ),
+          kotlin("class Test"),
           kotlin(
             """
               typealias OldAlias = Test
@@ -143,15 +119,10 @@ public class RenameTypeAliasTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void parameterizedType() {
         rewriteRun(
-          kotlin(
-            """
-              class Test<T>
-              """
-          ),
+          kotlin("class Test<T>"),
           kotlin(
             """
               typealias OldAlias<T> = Test<T>

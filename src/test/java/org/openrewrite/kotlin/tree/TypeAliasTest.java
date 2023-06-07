@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -40,19 +39,18 @@ class TypeAliasTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
-    void parameterizedType() {
+    void parameterizedTypeAlias() {
         rewriteRun(
           kotlin(
             """
-              class Test<T>
+              class Test < T >
               """
           ),
           kotlin(
             """
-              typealias OldAlias<T> = Test<T>
-              val a: OldAlias<String> = Test<String>()
+              typealias OldAlias < T > = Test < T >
+              val a : OldAlias < String > = Test < String> ( )
               """
           )
         );

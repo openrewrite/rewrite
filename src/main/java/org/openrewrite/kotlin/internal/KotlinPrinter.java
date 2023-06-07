@@ -778,6 +778,14 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
         @Override
         public J visitVariableDeclarations(J.VariableDeclarations multiVariable, PrintOutputCapture<P> p) {
+            // TypeAliases are converted into a J.VariableDeclaration to re-use complex recipes like RenameVariable and ChangeType.
+            // However, a type alias has different syntax and is printed separately to reduce code complexity in visitVariableDeclarations.
+            // This is a temporary solution until K.TypeAlias is added to the model, and RenameVariable is revised to operator from a J.Identifier.
+            if (multiVariable.getLeadingAnnotations().stream().anyMatch(it -> "typealias".equals(it.getSimpleName()))) {
+                visitTypeAlias(multiVariable, p);
+                return multiVariable;
+            }
+
             beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
             visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
             visit(multiVariable.getLeadingAnnotations(), p);
@@ -863,6 +871,20 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visitLeftPadded(isTypeReceiver ? "" : "=", variable.getPadding().getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
             afterSyntax(variable, p);
             return variable;
+        }
+
+        private void visitTypeAlias(J.VariableDeclarations typeAlias, PrintOutputCapture<P> p) {
+            beforeSyntax(typeAlias, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
+            visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
+            visit(typeAlias.getLeadingAnnotations(), p);
+            for (J.Modifier m : typeAlias.getModifiers()) {
+                visitModifier(m, p);
+            }
+
+            visit(typeAlias.getTypeExpression(), p);
+            visitVariable(typeAlias.getPadding().getVariables().get(0).getElement(), p);
+            visitMarkers(typeAlias.getPadding().getVariables().get(0).getMarkers(), p);
+            afterSyntax(typeAlias, p);
         }
 
         protected void visitStatement(@Nullable JRightPadded<Statement> paddedStat, JRightPadded.Location location, PrintOutputCapture<P> p) {

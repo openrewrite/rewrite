@@ -21,7 +21,6 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
@@ -520,6 +519,7 @@ public interface K extends J {
 
         @Override
         public <J2 extends J> J2 withPrefix(Space space) {
+            //noinspection unchecked
             return (J2) withExpression(expression.withPrefix(space));
         }
 
@@ -530,6 +530,7 @@ public interface K extends J {
 
         @Override
         public <J2 extends Tree> J2 withMarkers(Markers markers) {
+            //noinspection unchecked
             return (J2) withExpression(expression.withMarkers(markers));
         }
 

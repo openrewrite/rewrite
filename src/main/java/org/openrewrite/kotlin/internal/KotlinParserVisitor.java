@@ -2347,16 +2347,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
         } else {
             valueName = typeAlias.getName().asString();
-            namePrefix = whitespace();
         }
         J.Identifier name = createIdentifier(valueName, typeMapping.type(typeAlias.getExpandedTypeRef()), null);
 
-        TypeTree typeExpression = new J.Identifier(
+        TypeTree typeExpression = typeAlias.getTypeParameters().isEmpty() ? name : new J.ParameterizedType(
                 randomId(),
-                EMPTY,
+                name.getPrefix(),
                 Markers.EMPTY,
-                "",
-                typeMapping.type(typeAlias.getExpandedTypeRef()),
+                name.withPrefix(EMPTY),
+                JContainer.build(sourceBefore("<"), convertAll(typeAlias.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx), Markers.EMPTY),
                 null
         );
 
@@ -2368,9 +2367,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = maybeSemicolon(
                 new J.VariableDeclarations.NamedVariable(
                         randomId(),
-                        namePrefix,
+                        EMPTY,
                         Markers.EMPTY,
-                        name,
+                        new J.Identifier(
+                                randomId(),
+                                EMPTY,
+                                Markers.EMPTY,
+                                "",
+                                null,
+                                null),
                         dimensionsAfterName,
                         padLeft(initializerPrefix, expr),
                         null
