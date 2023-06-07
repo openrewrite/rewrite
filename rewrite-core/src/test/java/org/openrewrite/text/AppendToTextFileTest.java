@@ -16,9 +16,9 @@
 package org.openrewrite.text;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
-import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
 
@@ -47,15 +47,14 @@ class AppendToTextFileTest implements RewriteTest {
     void createsFileIfNeededWithMultipleInstances() {
         Supplier<Recipe> r = () -> new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.LEAVE);
         rewriteRun(
-          spec -> spec.recipe(r.get().doNext(r.get())),
+          spec -> spec.recipes(r.get(), r.get()),
           text(
             null,
             """
               preamble
               content
-              content
               """,
-            SourceSpec::noTrim
+            spec -> spec.path("file.txt")
           )
         );
     }
@@ -106,13 +105,14 @@ class AppendToTextFileTest implements RewriteTest {
     @Test
     void multipleInstancesCanAppend() {
         rewriteRun(
-          spec -> spec.recipe(
-            new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.REPLACE)
-              .doNext(new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.REPLACE))),
+          spec -> spec.recipes(
+            new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.CONTINUE),
+            new AppendToTextFile("file.txt", "content", "preamble", true, AppendToTextFile.Strategy.CONTINUE)
+          ),
           text(
             "existing",
             """
-              preamble
+              existing
               content
               content
               """,
@@ -140,8 +140,10 @@ class AppendToTextFileTest implements RewriteTest {
     @Test
     void multipleFiles() {
         rewriteRun(
-          spec -> spec.recipe(new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.REPLACE)
-            .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.REPLACE))),
+          spec -> spec.recipes(
+            new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.REPLACE),
+            new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.REPLACE)
+          ),
           text(
             "existing1",
             """
@@ -166,8 +168,10 @@ class AppendToTextFileTest implements RewriteTest {
     void missingExpectedGeneratedFiles() {
         assertThatExceptionOfType(AssertionError.class).isThrownBy(() ->
           rewriteRun(
-            spec -> spec.recipe(new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.REPLACE)
-              .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.REPLACE))),
+            spec -> spec.recipes(
+              new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.REPLACE),
+              new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.REPLACE)
+            ),
             text(
               "existing2",
               """
@@ -183,8 +187,10 @@ class AppendToTextFileTest implements RewriteTest {
     @Test
     void changeAndCreatedFilesIfNeeded() {
         rewriteRun(
-          spec -> spec.recipe(new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.REPLACE)
-            .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.REPLACE))),
+          spec -> spec.recipes(
+            new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.REPLACE),
+            new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.REPLACE)
+          ),
           text(
             "existing2",
             """
@@ -206,16 +212,16 @@ class AppendToTextFileTest implements RewriteTest {
     @Test
     void multipleInstancesOnMultipleFiles() {
         rewriteRun(
-          spec -> spec.recipe(
-            new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.REPLACE)
-              .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.REPLACE))
-              .doNext(new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.REPLACE))
-              .doNext(new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.REPLACE))),
+          spec -> spec.recipes(
+            new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.REPLACE),
+            new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.REPLACE),
+            new AppendToTextFile("file1.txt", "content1", "preamble1", true, AppendToTextFile.Strategy.REPLACE),
+            new AppendToTextFile("file2.txt", "content2", "preamble2", true, AppendToTextFile.Strategy.REPLACE)
+          ),
           text(
             "existing1",
             """
               preamble1
-              content1
               content1
               """,
             spec -> spec.path("file1.txt").noTrim()
@@ -224,7 +230,6 @@ class AppendToTextFileTest implements RewriteTest {
             "existing2",
             """
               preamble2
-              content2
               content2
               """,
             spec -> spec.path("file2.txt").noTrim()

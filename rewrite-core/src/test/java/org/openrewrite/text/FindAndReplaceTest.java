@@ -27,7 +27,7 @@ class FindAndReplaceTest implements RewriteTest {
     @Test
     void nonTxtExtension() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace(".", "G", null, null)),
+          spec -> spec.recipe(new FindAndReplace(".", "G", null)),
           text(
             """
               This is text.
@@ -43,7 +43,7 @@ class FindAndReplaceTest implements RewriteTest {
     @Test
     void defaultNonRegex() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace(".", "G", null, null)),
+          spec -> spec.recipe(new FindAndReplace(".", "G", null)),
           text(
             """
               This is text.
@@ -58,7 +58,7 @@ class FindAndReplaceTest implements RewriteTest {
     @Test
     void regexReplace() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace(".", "G", true, null)),
+          spec -> spec.recipe(new FindAndReplace(".", "G", true)),
           text(
             """
               This is text.
@@ -73,7 +73,7 @@ class FindAndReplaceTest implements RewriteTest {
     @Test
     void captureGroups() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace("This is ([^.]+).", "I like $1.", true, null)),
+          spec -> spec.recipe(new FindAndReplace("This is ([^.]+).", "I like $1.", true)),
           text(
             """
               This is text.

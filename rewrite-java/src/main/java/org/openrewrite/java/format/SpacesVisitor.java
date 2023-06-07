@@ -403,8 +403,8 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.If.Else visitElse(J.If.Else elze, P p) {
-        J.If.Else e = super.visitElse(elze, p);
+    public J.If.Else visitElse(J.If.Else else_, P p) {
+        J.If.Else e = super.visitElse(else_, p);
         e = e.getPadding().withBody(spaceBeforeRightPaddedElement(e.getPadding().getBody(), style.getBeforeLeftBrace().getElseLeftBrace()));
         e = spaceBefore(e, style.getBeforeKeywords().getElseKeyword());
         return e;

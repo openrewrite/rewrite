@@ -21,7 +21,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.*;
 
-import java.util.HashSet;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -75,6 +75,19 @@ public class SemanticallyEqual {
         protected boolean nullListSizeMissMatch(List<?> list1, List<?> list2) {
             return nullMissMatch(list1, list2) ||
                    list1 != null && list2 != null && list1.size() != list2.size();
+        }
+
+        protected boolean modifierListMissMatch(List<J.Modifier> list1, List<J.Modifier> list2) {
+            if (list1.size() != list2.size()) {
+                return true;
+            }
+            EnumSet<J.Modifier.Type> modifiers1 = EnumSet.noneOf(J.Modifier.Type.class);
+            EnumSet<J.Modifier.Type> modifiers2 = EnumSet.noneOf(J.Modifier.Type.class);
+            for (int i = 0; i < list1.size(); i++) {
+                modifiers1.add(list1.get(i).getType());
+                modifiers2.add(list2.get(i).getType());
+            }
+            return !modifiers1.equals(modifiers2);
         }
 
         protected void visitList(@Nullable List<? extends J> list1, @Nullable List<? extends J> list2) {
@@ -377,8 +390,7 @@ public class SemanticallyEqual {
                 J.ClassDeclaration compareTo = (J.ClassDeclaration) j;
                 if (!classDecl.getSimpleName().equals(compareTo.getSimpleName()) ||
                     !TypeUtils.isOfType(classDecl.getType(), compareTo.getType()) ||
-                    classDecl.getModifiers().size() != compareTo.getModifiers().size() ||
-                    !new HashSet<>(classDecl.getModifiers()).containsAll(compareTo.getModifiers()) ||
+                    modifierListMissMatch(classDecl.getModifiers(), compareTo.getModifiers()) ||
                     classDecl.getKind() != compareTo.getKind() ||
                     nullListSizeMissMatch(classDecl.getPermits(), compareTo.getPermits()) ||
                     nullListSizeMissMatch(classDecl.getLeadingAnnotations(), compareTo.getLeadingAnnotations()) ||
@@ -490,17 +502,17 @@ public class SemanticallyEqual {
         }
 
         @Override
-        public J.If.Else visitElse(J.If.Else elze, J j) {
+        public J.If.Else visitElse(J.If.Else else_, J j) {
             if (isEqual.get()) {
                 if (!(j instanceof J.If.Else)) {
                     isEqual.set(false);
-                    return elze;
+                    return else_;
                 }
 
                 J.If.Else compareTo = (J.If.Else) j;
-                visit(elze.getBody(), compareTo.getBody());
+                visit(else_.getBody(), compareTo.getBody());
             }
-            return elze;
+            return else_;
         }
 
         @Override
@@ -817,8 +829,7 @@ public class SemanticallyEqual {
                 J.MethodDeclaration compareTo = (J.MethodDeclaration) j;
                 if (!method.getSimpleName().equals(compareTo.getSimpleName()) ||
                     !TypeUtils.isOfType(method.getMethodType(), compareTo.getMethodType()) ||
-                    method.getModifiers().size() != compareTo.getModifiers().size() ||
-                    !new HashSet<>(method.getModifiers()).containsAll(compareTo.getModifiers()) ||
+                    modifierListMissMatch(method.getModifiers(), compareTo.getModifiers()) ||
 
                     method.getLeadingAnnotations().size() != compareTo.getLeadingAnnotations().size() ||
                     method.getParameters().size() != compareTo.getParameters().size() ||
@@ -830,7 +841,7 @@ public class SemanticallyEqual {
                     nullListSizeMissMatch(method.getThrows(), compareTo.getThrows()) ||
 
                     nullMissMatch(method.getBody(), compareTo.getBody()) ||
-                    nullListSizeMissMatch(method.getBody().getStatements(), compareTo.getBody().getStatements())) {
+                    method.getBody() != null && compareTo.getBody() != null && nullListSizeMissMatch(method.getBody().getStatements(), compareTo.getBody().getStatements())) {
                     isEqual.set(false);
                     return method;
                 }

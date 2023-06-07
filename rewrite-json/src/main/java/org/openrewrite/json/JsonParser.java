@@ -33,14 +33,12 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.InputStream;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Objects;
-
-import static java.util.stream.Collectors.toList;
+import java.util.stream.Stream;
 
 public class JsonParser implements Parser<Json.Document> {
     @Override
-    public List<Json.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<Json.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
@@ -70,12 +68,11 @@ public class JsonParser implements Parser<Json.Document> {
                         return null;
                     }
                 })
-                .filter(Objects::nonNull)
-                .collect(toList());
+                .filter(Objects::nonNull);
     }
 
     @Override
-    public List<Json.Document> parse(@Language("Json") String... sources) {
+    public Stream<Json.Document> parse(@Language("Json") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 

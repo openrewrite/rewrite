@@ -15,12 +15,9 @@
  */
 package org.openrewrite;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import lombok.EqualsAndHashCode;
 import lombok.Setter;
-import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.config.DataTableDescriptor;
 import org.openrewrite.config.OptionDescriptor;
@@ -29,7 +26,6 @@ import org.openrewrite.config.RecipeExample;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.scheduling.ForkJoinScheduler;
 import org.openrewrite.table.RecipeRunStats;
 import org.openrewrite.table.SourcesFileErrors;
 import org.openrewrite.table.SourcesFileResults;
@@ -41,24 +37,22 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
 
 /**
- * Provides a formalized link list data structure of {@link Recipe recipes} and a {@link Recipe#run(List)} method which will
+ * Provides a formalized link list data structure of {@link Recipe recipes} and a {@link Recipe#run(LargeSourceSet, ExecutionContext)} method which will
  * apply each recipes {@link TreeVisitor visitor} visit method to a list of {@link SourceFile sourceFiles}
  * <p>
  * Requires a name, {@link TreeVisitor visitor}.
- * Optionally a subsequent Recipe can be linked via {@link #doNext(Recipe)}}
+ * Optionally a subsequent Recipe can be linked via {@link #getRecipeList()}}
  * <p>
  * An {@link ExecutionContext} controls parallel execution and lifecycle while providing a message bus
  * for sharing state between recipes and their visitors
  * <p>
  * returns a list of {@link Result results} for each modified {@link SourceFile}
  */
-@PolyglotExport(typeScript = "Recipe", llvm = "Recipe")
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 public abstract class Recipe implements Cloneable {
     public static final String PANIC = "__AHHH_PANIC!!!__";
@@ -78,8 +72,6 @@ public abstract class Recipe implements Cloneable {
         }
     };
 
-    private transient List<Recipe> singleSourceApplicableTests;
-    private transient List<Recipe> applicableTests;
     private transient RecipeDescriptor descriptor;
 
     @Nullable
@@ -106,38 +98,12 @@ public abstract class Recipe implements Cloneable {
         }
     }
 
-    @Value
-    @EqualsAndHashCode(callSuper = true)
-    private static class AdHocRecipe extends Recipe {
-        @Language("markdown")
-        String displayName;
-        @Language("markdown")
-        String description;
-        TreeVisitor<?, ExecutionContext> visitor;
-
-        @Override
-        public String getDisplayName() {
-            return displayName;
-        }
-
-        @Override
-        public String getDescription() {
-            return description;
-        }
-
-        @Override
-        public TreeVisitor<?, ExecutionContext> getVisitor() {
-            return visitor;
-        }
-
-        @Nullable
-        static AdHocRecipe fromNullableVisitor(
-                @Language("markdown") String displayName,
-                @Language("markdown") String description,
-                @Nullable TreeVisitor<?, ExecutionContext> visitor
-        ) {
-            return visitor == null ? null : new AdHocRecipe(displayName, description, visitor);
-        }
+    /**
+     * @return The maximum number of cycles this recipe is allowed to make changes in a recipe run.
+     */
+    @Incubating(since = "8.0.0")
+    public int maxCycles() {
+        return Integer.MAX_VALUE;
     }
 
     /**
@@ -164,9 +130,7 @@ public abstract class Recipe implements Cloneable {
      * @return The display name.
      */
     @Language("markdown")
-    public String getDescription() {
-        return "";
-    }
+    public abstract String getDescription();
 
     /**
      * A set of strings used for categorizing related recipes. For example
@@ -208,7 +172,7 @@ public abstract class Recipe implements Cloneable {
         }
 
         return new RecipeDescriptor(getName(), getDisplayName(), getDescription(), getTags(),
-                getEstimatedEffortPerOccurrence(), options, getLanguages(), recipeList1, getDataTableDescriptors(),
+                getEstimatedEffortPerOccurrence(), options, recipeList1, getDataTableDescriptors(),
                 getMaintainers(), getContributors(), getExamples(), recipeSource);
     }
 
@@ -249,15 +213,6 @@ public abstract class Recipe implements Cloneable {
     }
 
     /**
-     * @return Describes the language type(s) that this recipe applies to, e.g. java, xml, properties.
-     * @deprecated
-     */
-    @Deprecated
-    public List<String> getLanguages() {
-        return emptyList();
-    }
-
-    /**
      * @return a list of the organization(s) responsible for maintaining this recipe.
      */
     public List<Maintainer> getMaintainers() {
@@ -268,7 +223,7 @@ public abstract class Recipe implements Cloneable {
     protected List<Contributor> contributors;
 
     public List<Contributor> getContributors() {
-        if(contributors == null) {
+        if (contributors == null) {
             return new ArrayList<>();
         }
         return contributors;
@@ -278,7 +233,7 @@ public abstract class Recipe implements Cloneable {
     protected transient List<RecipeExample> examples;
 
     public List<RecipeExample> getExamples() {
-        if(examples == null) {
+        if (examples == null) {
             return new ArrayList<>();
         }
         return examples;
@@ -291,93 +246,30 @@ public abstract class Recipe implements Cloneable {
      * the recipe will still run on another cycle if any other recipe causes another cycle to run. But if every recipe reports no need to run
      * another cycle (or if there are no changes made in a cycle), then another will not run.
      */
-    @Incubating(since = "7.3.0")
     public boolean causesAnotherCycle() {
-        return recipeList.stream().anyMatch(Recipe::causesAnotherCycle);
+        return false;
     }
 
-    @JsonIgnore
-    private final List<Recipe> recipeList = new CopyOnWriteArrayList<>();
-
     /**
-     * @param recipe {@link Recipe} to add to this recipe's pipeline.
-     * @return This recipe.
+     * A list of recipes that run, source file by source file,
+     * after this recipe. This method is guaranteed to be called only once
+     * per cycle.
+     *
+     * @return The list of recipes to run.
      */
-    public Recipe doNext(Recipe recipe) {
-        if (recipe == this) {
-            throw new IllegalArgumentException("Cannot add a recipe to itself.");
-        }
-        recipeList.add(recipe);
-        descriptor = null;
-        return this;
-    }
-
     public List<Recipe> getRecipeList() {
-        return recipeList;
+        return Collections.emptyList();
     }
 
     /**
-     * A recipe can optionally encasulate a visitor that performs operations on a set of source files. Subclasses
+     * A recipe can optionally encapsulate a visitor that performs operations on a set of source files. Subclasses
      * of the recipe may override this method to provide an instance of a visitor that will be used when the recipe
      * is executed.
      *
      * @return A tree visitor that will perform operations associated with the recipe.
      */
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return NOOP;
-    }
-
-    /**
-     * A recipe can optionally include an applicability test that can be used to determine whether it should run on a
-     * set of source files (or even be listed in a suggested list of recipes for a particular codebase).
-     * <p>
-     * To identify a tree as applicable, the visitor should mark or otherwise modify any tree at any level.
-     * Any change made by the applicability test visitor will not be included in the results.
-     *
-     * @return A tree visitor that performs an applicability test.
-     */
-    @Nullable
-    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
-        return null;
-    }
-
-    /**
-     * A recipe can be configured with any number of applicable tests that can be used to determine whether it should run on a
-     * particular source file. If multiple applicable tests configured, the final result of the applicable test depends
-     * on all conditions being met, that is, a logical 'AND' relationship.
-     * <p>
-     * To identify a {@link SourceFile} as applicable, the {@link TreeVisitor} should mark or change it at any level. Any mutation
-     * that the applicability test visitor makes on the tree will not be included in the results.
-     * <p>
-     *
-     * @return This recipe.
-     */
-    @SuppressWarnings("unused")
-    public Recipe addApplicableTest(TreeVisitor<?, ExecutionContext> test) {
-        return addApplicableTest(AdHocRecipe.fromNullableVisitor(
-                "Add applicable test for: " + getDisplayName(),
-                "Add applicable test for: " + getDescription(),
-                test
-        ));
-    }
-
-    /**
-     * A recipe can be configured with any number of applicable tests that can be used to determine whether it should run on a
-     * particular source file. If multiple applicable tests configured, the final result of the applicable test depends
-     * on all conditions being met, that is, a logical 'AND' relationship.
-     * <p>
-     * To identify a {@link SourceFile} as applicable, the {@link Recipe} should mark or change it at any level. Any mutation
-     * that the applicability test recipe makes on the tree will not be included in the results.
-     * <p>
-     *
-     * @return This recipe. Not the argument passed.
-     */
-    public Recipe addApplicableTest(Recipe test) {
-        if (applicableTests == null) {
-            applicableTests = new ArrayList<>(1);
-        }
-        applicableTests.add(test);
-        return this;
     }
 
     public void addDataTable(DataTable<?> dataTable) {
@@ -387,121 +279,22 @@ public abstract class Recipe implements Cloneable {
         dataTables.add(dataTableDescriptorFromDataTable(dataTable));
     }
 
-    public List<Recipe> getApplicableTests() {
-        List<Recipe> tests = ListUtils.concat(
-                AdHocRecipe.fromNullableVisitor(
-                        "Applicable test for: " + getDisplayName(),
-                        "Applicable test for: " + getDescription(),
-                        getApplicableTest()
-                ),
-                applicableTests
-        );
-        return tests == null ? emptyList() : tests;
-    }
-
-    /**
-     * A recipe can optionally include an applicability test that can be used to determine whether it should run on a
-     * particular source file.
-     * <p>
-     * To identify a {@link SourceFile} as applicable, the visitor should mark it at any level. Any mutation
-     * that the applicability test visitor makes on the tree will not be included in the results.
-     *
-     * @return A tree visitor that performs an applicability test.
-     */
-    @Nullable
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return null;
-    }
-
-    /**
-     * A recipe can be configured with any number of applicable tests that can be used to determine whether it should run on a
-     * particular source file. If multiple applicable tests configured, the final result of the applicable test depends
-     * on all conditions being met, that is, a logical 'AND' relationship.
-     * <p>
-     * To identify a {@link SourceFile} as applicable, the {@link TreeVisitor} should mark or change it at any level. Any mutation
-     * that the applicability test visitor makes on the tree will not be included in the results.
-     *
-     * @return This recipe.
-     */
-    @SuppressWarnings("unused")
-    public Recipe addSingleSourceApplicableTest(TreeVisitor<?, ExecutionContext> test) {
-        return addSingleSourceApplicableTest(AdHocRecipe.fromNullableVisitor(
-                "Add single source applicable test for: " + getDisplayName(),
-                "Add single source applicable test for: " + getDescription(),
-                test
-        ));
-    }
-
-    /**
-     * A recipe can be configured with any number of applicable tests that can be used to determine whether it should run on a
-     * particular source file. If multiple applicable tests configured, the final result of the applicable test depends
-     * on all conditions being met, that is, a logical 'AND' relationship.
-     * <p>
-     * To identify a {@link SourceFile} as applicable, the {@link Recipe} should mark or change it at any level. Any mutation
-     * that the applicability test recipe makes on the tree will not be included in the results.
-     *
-     * @return This recipe. Not the argument passed.
-     */
-    public Recipe addSingleSourceApplicableTest(Recipe test) {
-        if (singleSourceApplicableTests == null) {
-            singleSourceApplicableTests = new ArrayList<>(1);
-        }
-        singleSourceApplicableTests.add(test);
-        return this;
-    }
-
-    public List<Recipe> getSingleSourceApplicableTests() {
-        List<Recipe> tests = ListUtils.concat(
-                AdHocRecipe.fromNullableVisitor(
-                        "Single Source Applicable test for: " + getDisplayName(),
-                        "Single Source Applicable test for: " + getDescription(),
-                        getSingleSourceApplicableTest()
-                ),
-                singleSourceApplicableTests
-        );
-        return tests == null ? emptyList() : tests;
-    }
-
-    /**
-     * Override this to generate new source files or delete source files.
-     * Note that here, as throughout OpenRewrite, we use referential equality to detect that a change has occured.
-     * To indicate to rewrite that the recipe has made changes a different instance must be returned than the instance
-     * passed in as "before".
-     * <p>
-     * Currently, the list passed in as "before" is not immutable, but you should treat it as such anyway.
-     *
-     * @param before The set of source files to operate on.
-     * @param ctx    The current execution context.
-     * @return A set of source files, with some files potentially added/deleted/modified.
-     */
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        return before;
-    }
-
-    public final RecipeRun run(List<? extends SourceFile> before) {
-        return run(before, new InMemoryExecutionContext());
-    }
-
-    public final RecipeRun run(List<? extends SourceFile> before, ExecutionContext ctx) {
+    public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx) {
         return run(before, ctx, 3);
     }
 
-    public final RecipeRun run(List<? extends SourceFile> before, ExecutionContext ctx, int maxCycles) {
-        return run(before, ctx, ForkJoinScheduler.common(), maxCycles, 1);
+    public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx, int maxCycles) {
+        return run(before, ctx, maxCycles, 1);
     }
 
-    public final RecipeRun run(List<? extends SourceFile> before,
-                               ExecutionContext ctx,
-                               RecipeScheduler recipeScheduler,
-                               int maxCycles,
-                               int minCycles) {
-        return recipeScheduler.scheduleRun(this, before, ctx, maxCycles, minCycles);
+    public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx, int maxCycles, int minCycles) {
+        return new RecipeScheduler().scheduleRun(this, before, ctx, maxCycles, minCycles);
     }
 
     public Validated validate(ExecutionContext ctx) {
         Validated validated = validate();
 
-        for (Recipe recipe : recipeList) {
+        for (Recipe recipe : getRecipeList()) {
             validated = validated.and(recipe.validate(ctx));
         }
         return validated;
@@ -524,16 +317,10 @@ public abstract class Recipe implements Cloneable {
                 logger.warn("Unable to validate the field [{}] on the class [{}]", field.getName(), this.getClass().getName());
             }
         }
-        for (Recipe recipe : recipeList) {
+        for (Recipe recipe : getRecipeList()) {
             validated = validated.and(recipe.validate());
         }
         return validated;
-    }
-
-    @SuppressWarnings("unused")
-    @Incubating(since = "7.0.0")
-    public final Collection<Validated> validateAll(ExecutionContext ctx) {
-        return validateAll(ctx, new ArrayList<>());
     }
 
     public final Collection<Validated> validateAll() {
@@ -542,7 +329,7 @@ public abstract class Recipe implements Cloneable {
 
     private Collection<Validated> validateAll(ExecutionContext ctx, Collection<Validated> acc) {
         acc.add(validate(ctx));
-        for (Recipe recipe : recipeList) {
+        for (Recipe recipe : getRecipeList()) {
             recipe.validateAll(ctx, acc);
         }
         return acc;

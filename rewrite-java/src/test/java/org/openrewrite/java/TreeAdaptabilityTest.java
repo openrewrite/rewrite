@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java;
 
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.J;

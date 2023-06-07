@@ -28,6 +28,7 @@ import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
@@ -107,44 +108,43 @@ public class UpgradeDependencyVersion extends Recipe {
         return validated;
     }
 
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor();
-    }
-
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
         VersionComparator versionComparator = requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
         DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, versionComparator);
-        return new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker), new GroovyVisitor<ExecutionContext>() {
 
             @Override
-            public J visitJavaSourceFile(JavaSourceFile sourceFile, ExecutionContext ctx) {
-                JavaSourceFile cu = (JavaSourceFile) super.visitJavaSourceFile(sourceFile, ctx);
-                Map<String, GroupArtifact> variableNames = getCursor().getMessage(VERSION_VARIABLE_KEY);
-                if(variableNames != null) {
-                    Optional<GradleProject> maybeGp = cu.getMarkers()
-                            .findFirst(GradleProject.class);
-                    if(!maybeGp.isPresent()) {
-                        return cu;
-                    }
+            public J postVisit(J tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) tree;
+                    Map<String, GroupArtifact>  variableNames = getCursor().getMessage(VERSION_VARIABLE_KEY);
+                    if (variableNames != null) {
+                        Optional<GradleProject> maybeGp = cu.getMarkers()
+                                .findFirst(GradleProject.class);
+                        if (!maybeGp.isPresent()) {
+                            return cu;
+                        }
 
-                    cu = (JavaSourceFile) new UpdateVariable(variableNames, versionComparator, maybeGp.get()).visitNonNull(cu, ctx);
-                }
-                Set<GroupArtifactVersion> versionUpdates = getCursor().getMessage(NEW_VERSION_KEY);
-                if(versionUpdates != null) {
-                    Optional<GradleProject> maybeGp = cu.getMarkers()
-                            .findFirst(GradleProject.class);
-                    if(!maybeGp.isPresent()) {
-                        return cu;
+                        cu = (JavaSourceFile) new UpdateVariable(variableNames, versionComparator, maybeGp.get()).visitNonNull(cu, ctx);
                     }
-                    GradleProject newGp = maybeGp.get();
-                    for (GroupArtifactVersion gav : versionUpdates) {
-                        newGp = replaceVersion(newGp, ctx, gav);
+                    Set<GroupArtifactVersion> versionUpdates = getCursor().getMessage(NEW_VERSION_KEY);
+                    if (versionUpdates != null) {
+                        Optional<GradleProject> maybeGp = cu.getMarkers()
+                                .findFirst(GradleProject.class);
+                        if (!maybeGp.isPresent()) {
+                            return cu;
+                        }
+                        GradleProject newGp = maybeGp.get();
+                        for (GroupArtifactVersion gav : versionUpdates) {
+                            newGp = replaceVersion(newGp, ctx, gav);
+                        }
+                        cu = cu.withMarkers(cu.getMarkers().removeByType(GradleProject.class).add(newGp));
                     }
-                    cu = cu.withMarkers(cu.getMarkers().removeByType(GradleProject.class).add(newGp));
+                    return cu;
                 }
-                return cu;
+                return tree;
             }
 
             @Override
@@ -276,7 +276,7 @@ public class UpgradeDependencyVersion extends Recipe {
 
                 return m;
             }
-        };
+        });
     }
 
     @Value
@@ -285,6 +285,7 @@ public class UpgradeDependencyVersion extends Recipe {
         Map<String, GroupArtifact> versionVariableNames;
         VersionComparator versionComparator;
         GradleProject gradleProject;
+
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
             J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
@@ -300,15 +301,15 @@ public class UpgradeDependencyVersion extends Recipe {
             if (noneMatch) {
                 return v;
             }
-            if(!(v.getInitializer() instanceof J.Literal)) {
+            if (!(v.getInitializer() instanceof J.Literal)) {
                 return v;
             }
             J.Literal initializer = (J.Literal) v.getInitializer();
-            if(initializer.getType() != JavaType.Primitive.String) {
+            if (initializer.getType() != JavaType.Primitive.String) {
                 return v;
             }
             String version = (String) initializer.getValue();
-            if(version == null) {
+            if (version == null) {
                 return v;
             }
 
@@ -410,7 +411,7 @@ public class UpgradeDependencyVersion extends Recipe {
 
     static GradleProject replaceVersion(GradleProject gp, ExecutionContext ctx, GroupArtifactVersion gav) {
         try {
-            if(gav.getGroupId() == null || gav.getArtifactId() == null) {
+            if (gav.getGroupId() == null || gav.getArtifactId() == null) {
                 return gp;
             }
             MavenPomDownloader mpd = new MavenPomDownloader(emptyMap(), ctx, null, null);
@@ -439,10 +440,10 @@ public class UpgradeDependencyVersion extends Recipe {
                 anyChanged |= newGdc != gdc;
                 newNameToConfiguration.put(newGdc.getName(), newGdc);
             }
-            if(anyChanged) {
+            if (anyChanged) {
                 gp = gp.withNameToConfiguration(newNameToConfiguration);
             }
-        } catch (MavenDownloadingException | MavenDownloadingExceptions  e) {
+        } catch (MavenDownloadingException | MavenDownloadingExceptions e) {
             return gp;
         }
         return gp;

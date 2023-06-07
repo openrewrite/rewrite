@@ -15,6 +15,12 @@
  */
 package org.openrewrite.java;
 
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.Resource;
+import io.github.classgraph.ResourceList;
+import io.github.classgraph.ScanResult;
+import org.intellij.lang.annotations.Language;
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
@@ -24,6 +30,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -107,7 +114,7 @@ class JavaParserTest implements RewriteTest {
               }
           }
           """;
-        List<J.CompilationUnit> cus = parser.parse(source);
+        List<J.CompilationUnit> cus = parser.parse(source).collect(Collectors.toList());
 
         J.CompilationUnit c = cus.get(0);
         J.MethodDeclaration m = c.getClasses().get(0).getBody().getStatements().stream().filter(J.MethodDeclaration.class::isInstance).map(J.MethodDeclaration.class::cast).findFirst().orElseThrow();
@@ -117,7 +124,7 @@ class JavaParserTest implements RewriteTest {
         parser.reset(cus.stream().map(cu -> cu.getSourcePath().toUri()).collect(Collectors.toList()));
 //        parser.reset();
 
-        cus = parser.parse(source);
+        cus = parser.parse(source).collect(Collectors.toList());
         assertThat(cus.size()).isEqualTo(1);
         assertThat(cus.get(0).getClasses().size()).isEqualTo(1);
 
@@ -129,45 +136,40 @@ class JavaParserTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3222")
-    void parseFromByteArray() throws Exception {
-        // Load classes from test resources folder
-        Path start = Paths.get(getClass().getResource("/javaparser-byte-array-tests").getPath());
-        byte[][] classes;
-        try (Stream<Path> pathStream = Files.find(start, 2, (p, a) -> p.toString().endsWith(".class"))) {
-            classes = pathStream
-              .map(p -> {
+    void parseFromByteArray() {
+        try (ScanResult scan = new ClassGraph().scan()) {
+            byte[][] classes = scan.getResourcesMatchingWildcard("javaparser-byte-array-tests/**.class").stream()
+              .map(it -> {
                   try {
-                      return Files.readAllBytes(p);
-                  } catch (Exception ex) {
-                      throw new IllegalStateException(ex);
+                      return it.read().array();
+                  } catch (IOException e) {
+                      throw new RuntimeException(e);
                   }
               })
               .toArray(byte[][]::new);
-            assertThat(classes.length).isEqualTo(2);
-        }
 
-        JavaParser parser = JavaParser.fromJavaVersion()
-          .classpath(classes)
-          .build();
+            JavaParser parser = JavaParser.fromJavaVersion()
+              .classpath(classes)
+              .build();
 
-        //language=java
-        String source = """
-          import example.InterfaceA;
-          public class User implements InterfaceA, InterfaceB {
-          	@Override
-          	public void methodA() {}
+            @Language("java")
+            String source = """
+              import example.InterfaceA;
+              public class User implements InterfaceA, InterfaceB {
+                @Override
+                public void methodA() {}
               
-          	@Override
-          	public void methodB() {}
-          }
-          """;
-        List<J.CompilationUnit> compilationUnits = parser.parse(new InMemoryExecutionContext(Throwable::printStackTrace), source);
-        assertThat(compilationUnits).singleElement()
-          .satisfies(cu -> assertThat(cu.getClasses()).singleElement()
-            .satisfies(cd -> assertThat(cd.getImplements()).satisfiesExactly(
-              i -> assertThat(i.getType()).hasToString("example.InterfaceA"),
-              i -> assertThat(i.getType()).hasToString("InterfaceB")
-            )));
+                @Override
+               public void methodB() {}
+              }
+              """;
+            List<J.CompilationUnit> compilationUnits = parser.parse(new InMemoryExecutionContext(Throwable::printStackTrace), source).toList();
+            assertThat(compilationUnits).singleElement()
+              .satisfies(cu -> assertThat(cu.getClasses()).singleElement()
+                .satisfies(cd -> assertThat(cd.getImplements()).satisfiesExactly(
+                  i -> assertThat(i.getType()).hasToString("example.InterfaceA"),
+                  i -> assertThat(i.getType()).hasToString("InterfaceB")
+                )));
+        }
     }
-
 }

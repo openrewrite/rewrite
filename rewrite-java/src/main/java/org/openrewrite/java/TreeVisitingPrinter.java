@@ -15,9 +15,6 @@
  */
 package org.openrewrite.java;
 
-import java.util.*;
-import java.util.stream.Collectors;
-
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
@@ -25,7 +22,10 @@ import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 
-import static java.util.stream.StreamSupport.*;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static java.util.stream.StreamSupport.stream;
 
 
 /**

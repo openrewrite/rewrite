@@ -27,6 +27,9 @@ import java.io.*;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -55,8 +58,8 @@ public class QuarkParser implements Parser<Quark> {
             @Override
             public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
                 if (!attrs.isSymbolicLink() && !attrs.isOther() &&
-                        !sourceFilePaths.contains(rootDir.relativize(file)) &&
-                        !isIgnored(file)) {
+                    !sourceFilePaths.contains(rootDir.relativize(file)) &&
+                    !isIgnored(file)) {
                     quarks.add(file);
                 }
                 return FileVisitResult.CONTINUE;
@@ -81,7 +84,9 @@ public class QuarkParser implements Parser<Quark> {
                 return false;
             }
         });
-        return new QuarkParser().parse(quarks, rootDir, new InMemoryExecutionContext());
+
+        return new QuarkParser().parse(quarks, rootDir, new InMemoryExecutionContext())
+                .collect(Collectors.toList());
     }
 
     private static void parseGitignore(File gitignore, Stack<List<PathMatcher>> gitignores) throws IOException {
@@ -93,7 +98,7 @@ public class QuarkParser implements Parser<Quark> {
                 while ((line = reader.readLine()) != null) {
                     if (!line.trim().startsWith("#") && !StringUtils.isBlank(line)) {
                         gitignorePaths.add(gitignore.toPath().getFileSystem().getPathMatcher("glob:**/" + line.trim() +
-                                (line.trim().endsWith("/") ? "**" : "")));
+                                                                                             (line.trim().endsWith("/") ? "**" : "")));
                     }
                 }
                 gitignores.add(gitignorePaths);
@@ -102,17 +107,15 @@ public class QuarkParser implements Parser<Quark> {
     }
 
     @Override
-    public List<Quark> parseInputs(Iterable<Parser.Input> sources, @Nullable Path relativeTo,
-                                   ExecutionContext ctx) {
-        List<Quark> quarks = new ArrayList<>();
-        for (Parser.Input source : sources) {
-            quarks.add(new Quark(randomId(),
-                    source.getRelativePath(relativeTo),
-                    Markers.EMPTY,
-                    null,
-                    source.getFileAttributes()));
-        }
-        return quarks;
+    public Stream<Quark> parseInputs(Iterable<Parser.Input> sources, @Nullable Path relativeTo,
+                                     ExecutionContext ctx) {
+        return StreamSupport.stream(sources.spliterator(), false).map(source ->
+                new Quark(randomId(),
+                        source.getRelativePath(relativeTo),
+                        Markers.EMPTY,
+                        null,
+                        source.getFileAttributes())
+        );
     }
 
     @Override
@@ -129,7 +132,7 @@ public class QuarkParser implements Parser<Quark> {
         return new Builder();
     }
 
-    public static class Builder extends Parser.Builder{
+    public static class Builder extends Parser.Builder {
         public Builder() {
             super(Quark.class);
         }

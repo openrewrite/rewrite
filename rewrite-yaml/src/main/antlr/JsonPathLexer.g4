@@ -68,7 +68,7 @@ EQUALITY_OPERATOR: (EQ | NE) ;
 EQ : '==';
 NE : '!=';
 
-// Note: if possible, distinguish long from int for positive and negative numbers if comparisions are implemented.
+// Note: if possible, distinguish long from int for positive and negative numbers if comparisons are implemented.
 //GE : '>=';
 //GT : '>';
 //LE : '<=';

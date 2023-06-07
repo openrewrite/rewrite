@@ -17,8 +17,8 @@ package org.openrewrite.java.search;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Issue;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -127,8 +127,10 @@ class FindTypesTest implements RewriteTest {
     @Test
     void classDecl() {
         rewriteRun(
-          spec -> spec.recipe(new FindTypes("I1", false)
-            .doNext(new FindTypes("a.A1", false))),
+          spec -> spec.recipes(
+            new FindTypes("I1", false),
+            new FindTypes("a.A1", false)
+          ),
           java(
             """
               import a.A1;

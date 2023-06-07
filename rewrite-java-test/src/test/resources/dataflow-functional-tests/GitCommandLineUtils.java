@@ -35,7 +35,6 @@ package org.apache.maven.scm.provider.git.gitexe.command;
  */
 
 import org.apache.commons.io.FilenameUtils;
-
 import org.apache.maven.scm.ScmException;
 import org.apache.maven.scm.provider.git.util.GitUtil;
 import org.apache.maven.scm.providers.gitlib.settings.Settings;

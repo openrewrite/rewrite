@@ -16,6 +16,7 @@
 package org.openrewrite.benchmarks.maven;
 
 import org.openjdk.jmh.annotations.*;
+import org.openjdk.jmh.infra.Blackhole;
 import org.openjdk.jmh.profile.GCProfiler;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
@@ -31,7 +32,9 @@ import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Paths;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Fork(1)
 @Measurement(iterations = 2)
@@ -54,11 +57,12 @@ public class MavenParserBenchmark {
     }
 
     @Benchmark
-    public void parse() {
+    public void parse(Blackhole blackhole) {
         MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
         ctx.setPomCache(pomCache);
 
-        Xml.Document maven = MavenParser.builder().build().parse(ctx, "" +
+        Optional<Xml.Document> maven = MavenParser.builder().build().parse(ctx,
+                "" +
                 "<project>" +
                 "  <parent>" +
                 "    <groupId>org.springframework.boot</groupId>" +
@@ -80,9 +84,8 @@ public class MavenParserBenchmark {
                 "    </dependency>" +
                 "  </dependencies>" +
                 "</project>"
-        ).get(0);
+        ).findFirst();
 
-//        System.out.println(maven.getMarkers().findFirst(MavenResolutionResult.class).get().getDependencies()
-//                .get(org.openrewrite.maven.tree.Scope.Compile).size());
+        blackhole.consume(maven);
     }
 }

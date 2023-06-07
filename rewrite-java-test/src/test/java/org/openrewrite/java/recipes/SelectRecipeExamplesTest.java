@@ -28,8 +28,7 @@ class SelectRecipeExamplesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new SelectRecipeExamples())
-          .parser(JavaParser.fromJavaVersion()
-            .classpath(JavaParser.runtimeClasspath()));
+          .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
     }
 
     @DocumentExample
@@ -39,18 +38,18 @@ class SelectRecipeExamplesTest implements RewriteTest {
           java(
             """
               package org.openrewrite.java.cleanup;
-             
+                           
               import org.junit.jupiter.api.Test;
               import org.openrewrite.Recipe;
               import org.openrewrite.test.RecipeSpec;
               import org.openrewrite.test.RewriteTest;
-             
+                           
               import static org.openrewrite.java.Assertions.java;
-              
-              class ChainStringBuilderAppendCallsTest implements RewriteTest {
+                            
+              class UnnecessaryParenthesesTest implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
-                      Recipe recipe = new ChainStringBuilderAppendCalls();
+                      Recipe recipe = new UnnecessaryParentheses();
                       spec.recipe(recipe);
                   }
 
@@ -59,11 +58,11 @@ class SelectRecipeExamplesTest implements RewriteTest {
                       rewriteRun(
                         java(
                           \"""
-                              BEFORE
-                          \""",
+                            BEFORE
+                            \""",
                           \"""
-                              AFTER
-                          \"""
+                            AFTER
+                            \"""
                         )
                       );
                   }
@@ -73,11 +72,11 @@ class SelectRecipeExamplesTest implements RewriteTest {
                       rewriteRun(
                         java(
                           \"""
-                              BEFORE
-                          \""",
+                            BEFORE
+                            \""",
                           \"""
-                              AFTER
-                          \"""
+                            AFTER
+                            \"""
                         )
                       );
                   }
@@ -85,19 +84,19 @@ class SelectRecipeExamplesTest implements RewriteTest {
               """,
             """
               package org.openrewrite.java.cleanup;
-             
+                           
               import org.junit.jupiter.api.Test;
               import org.openrewrite.DocumentExample;
               import org.openrewrite.Recipe;
               import org.openrewrite.test.RecipeSpec;
               import org.openrewrite.test.RewriteTest;
-             
+                           
               import static org.openrewrite.java.Assertions.java;
-              
-              class ChainStringBuilderAppendCallsTest implements RewriteTest {
+                            
+              class UnnecessaryParenthesesTest implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
-                      Recipe recipe = new ChainStringBuilderAppendCalls();
+                      Recipe recipe = new UnnecessaryParentheses();
                       spec.recipe(recipe);
                   }
 
@@ -107,11 +106,11 @@ class SelectRecipeExamplesTest implements RewriteTest {
                       rewriteRun(
                         java(
                           \"""
-                              BEFORE
-                          \""",
+                            BEFORE
+                            \""",
                           \"""
-                              AFTER
-                          \"""
+                            AFTER
+                            \"""
                         )
                       );
                   }
@@ -121,11 +120,11 @@ class SelectRecipeExamplesTest implements RewriteTest {
                       rewriteRun(
                         java(
                           \"""
-                              BEFORE
-                          \""",
+                            BEFORE
+                            \""",
                           \"""
-                              AFTER
-                          \"""
+                            AFTER
+                            \"""
                         )
                       );
                   }
@@ -141,18 +140,18 @@ class SelectRecipeExamplesTest implements RewriteTest {
           java(
             """
               package org.openrewrite.java.cleanup;
-             
+                           
               import org.junit.jupiter.api.Test;
               import org.openrewrite.Recipe;
               import org.openrewrite.test.RecipeSpec;
               import org.openrewrite.test.RewriteTest;
-             
+                           
               import static org.openrewrite.java.Assertions.java;
-              
-              class ChainStringBuilderAppendCallsTest implements RewriteTest {
+                            
+              class UnnecessaryParenthesesTest implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
-                      Recipe recipe = new ChainStringBuilderAppendCalls();
+                      Recipe recipe = new UnnecessaryParentheses();
                       spec.recipe(recipe);
                   }
 
@@ -161,8 +160,8 @@ class SelectRecipeExamplesTest implements RewriteTest {
                       rewriteRun(
                         java(
                           \"""
-                              BEFORE
-                          \"""
+                            BEFORE
+                            \"""
                         )
                       );
                   }
@@ -172,11 +171,11 @@ class SelectRecipeExamplesTest implements RewriteTest {
                       rewriteRun(
                         java(
                           \"""
-                              BEFORE
-                          \""",
+                            BEFORE
+                            \""",
                           \"""
-                              AFTER
-                          \"""
+                            AFTER
+                            \"""
                         )
                       );
                   }
@@ -184,19 +183,19 @@ class SelectRecipeExamplesTest implements RewriteTest {
               """,
             """
               package org.openrewrite.java.cleanup;
-             
+                           
               import org.junit.jupiter.api.Test;
               import org.openrewrite.DocumentExample;
               import org.openrewrite.Recipe;
               import org.openrewrite.test.RecipeSpec;
               import org.openrewrite.test.RewriteTest;
-             
+                           
               import static org.openrewrite.java.Assertions.java;
-              
-              class ChainStringBuilderAppendCallsTest implements RewriteTest {
+                            
+              class UnnecessaryParenthesesTest implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
-                      Recipe recipe = new ChainStringBuilderAppendCalls();
+                      Recipe recipe = new UnnecessaryParentheses();
                       spec.recipe(recipe);
                   }
 
@@ -205,8 +204,8 @@ class SelectRecipeExamplesTest implements RewriteTest {
                       rewriteRun(
                         java(
                           \"""
-                              BEFORE
-                          \"""
+                            BEFORE
+                            \"""
                         )
                       );
                   }
@@ -217,11 +216,11 @@ class SelectRecipeExamplesTest implements RewriteTest {
                       rewriteRun(
                         java(
                           \"""
-                              BEFORE
-                          \""",
+                            BEFORE
+                            \""",
                           \"""
-                              AFTER
-                          \"""
+                            AFTER
+                            \"""
                         )
                       );
                   }
@@ -237,19 +236,19 @@ class SelectRecipeExamplesTest implements RewriteTest {
           java(
             """
               package org.openrewrite.java.cleanup;
-             
+                           
               import org.junit.jupiter.api.Test;
               import org.openrewrite.Issue;
               import org.openrewrite.Recipe;
               import org.openrewrite.test.RecipeSpec;
               import org.openrewrite.test.RewriteTest;
-             
+                           
               import static org.openrewrite.java.Assertions.java;
-              
-              class ChainStringBuilderAppendCallsTest implements RewriteTest {
+                            
+              class UnnecessaryParenthesesTest implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
-                      Recipe recipe = new ChainStringBuilderAppendCalls();
+                      Recipe recipe = new UnnecessaryParentheses();
                       spec.recipe(recipe);
                   }
 
@@ -258,12 +257,12 @@ class SelectRecipeExamplesTest implements RewriteTest {
                   void test1() {
                       rewriteRun(
                         java(
-                          ""\"
-                              BEFORE
-                          ""\",
-                          ""\"
-                              AFTER
-                          ""\"
+                          \"""
+                            BEFORE
+                            \""",
+                          \"""
+                            AFTER
+                            \"""
                         )
                       );
                   }
@@ -272,12 +271,12 @@ class SelectRecipeExamplesTest implements RewriteTest {
                   void test2() {
                       rewriteRun(
                         java(
-                          ""\"
-                              BEFORE
-                          ""\",
-                          ""\"
-                              AFTER
-                          ""\"
+                          \"""
+                            BEFORE
+                            \""",
+                          \"""
+                            AFTER
+                            \"""
                         )
                       );
                   }
@@ -285,20 +284,20 @@ class SelectRecipeExamplesTest implements RewriteTest {
               """,
             """
               package org.openrewrite.java.cleanup;
-             
+                           
               import org.junit.jupiter.api.Test;
               import org.openrewrite.DocumentExample;
               import org.openrewrite.Issue;
               import org.openrewrite.Recipe;
               import org.openrewrite.test.RecipeSpec;
               import org.openrewrite.test.RewriteTest;
-             
+                           
               import static org.openrewrite.java.Assertions.java;
-              
-              class ChainStringBuilderAppendCallsTest implements RewriteTest {
+                            
+              class UnnecessaryParenthesesTest implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
-                      Recipe recipe = new ChainStringBuilderAppendCalls();
+                      Recipe recipe = new UnnecessaryParentheses();
                       spec.recipe(recipe);
                   }
 
@@ -307,12 +306,12 @@ class SelectRecipeExamplesTest implements RewriteTest {
                   void test1() {
                       rewriteRun(
                         java(
-                          ""\"
-                              BEFORE
-                          ""\",
-                          ""\"
-                              AFTER
-                          ""\"
+                          \"""
+                            BEFORE
+                            \""",
+                          \"""
+                            AFTER
+                            \"""
                         )
                       );
                   }
@@ -322,12 +321,12 @@ class SelectRecipeExamplesTest implements RewriteTest {
                   void test2() {
                       rewriteRun(
                         java(
-                          ""\"
-                              BEFORE
-                          ""\",
-                          ""\"
-                              AFTER
-                          ""\"
+                          \"""
+                            BEFORE
+                            \""",
+                          \"""
+                            AFTER
+                            \"""
                         )
                       );
                   }
@@ -344,19 +343,19 @@ class SelectRecipeExamplesTest implements RewriteTest {
           java(
             """
               package org.openrewrite.java.cleanup;
-             
+                           
               import org.junit.jupiter.api.Disabled;
               import org.junit.jupiter.api.Test;
               import org.openrewrite.Recipe;
               import org.openrewrite.test.RecipeSpec;
               import org.openrewrite.test.RewriteTest;
-             
+                           
               import static org.openrewrite.java.Assertions.java;
-              
-              class ChainStringBuilderAppendCallsTest implements RewriteTest {
+                            
+              class UnnecessaryParenthesesTest implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
-                      Recipe recipe = new ChainStringBuilderAppendCalls();
+                      Recipe recipe = new UnnecessaryParentheses();
                       spec.recipe(recipe);
                   }
 
@@ -365,12 +364,12 @@ class SelectRecipeExamplesTest implements RewriteTest {
                   void test1() {
                       rewriteRun(
                         java(
-                          ""\"
-                              BEFORE
-                          ""\",
-                          ""\"
-                              AFTER
-                          ""\"
+                          \"""
+                            BEFORE
+                            \""",
+                          \"""
+                            AFTER
+                            \"""
                         )
                       );
                   }
@@ -386,19 +385,19 @@ class SelectRecipeExamplesTest implements RewriteTest {
           java(
             """
               package org.openrewrite.java.cleanup;
-             
+                           
               import org.junit.jupiter.api.Test;
               import org.openrewrite.Recipe;
               import org.openrewrite.DocumentExample;
               import org.openrewrite.test.RecipeSpec;
               import org.openrewrite.test.RewriteTest;
-             
+                           
               import static org.openrewrite.java.Assertions.java;
-              
-              class ChainStringBuilderAppendCallsTest implements RewriteTest {
+                            
+              class UnnecessaryParenthesesTest implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
-                      Recipe recipe = new ChainStringBuilderAppendCalls();
+                      Recipe recipe = new UnnecessaryParentheses();
                       spec.recipe(recipe);
                   }
 
@@ -407,12 +406,12 @@ class SelectRecipeExamplesTest implements RewriteTest {
                   void test1() {
                       rewriteRun(
                         java(
-                          ""\"
-                              BEFORE
-                          ""\",
-                          ""\"
-                              AFTER
-                          ""\"
+                          \"""
+                            BEFORE
+                            \""",
+                          \"""
+                            AFTER
+                            \"""
                         )
                       );
                   }
@@ -421,5 +420,4 @@ class SelectRecipeExamplesTest implements RewriteTest {
           )
         );
     }
-
 }

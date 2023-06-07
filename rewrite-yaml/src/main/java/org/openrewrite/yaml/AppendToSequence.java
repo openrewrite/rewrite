@@ -18,7 +18,6 @@ package org.openrewrite.yaml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.HasSourcePath;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -46,19 +45,12 @@ public class AppendToSequence extends Recipe {
     @Nullable
     List<String> existingSequenceValues;
 
-    @Option(displayName = "Optional boolean: match existing sequence values in any order",
+    @Option(displayName = "Optional: match existing sequence values in any order",
             description = "match existing sequence values in any order",
             example = "true",
             required = false)
     @Nullable
-    String matchExistingSequenceValuesInAnyOrder;
-
-    @Option(displayName = "Optional file matcher",
-            description = "Matching files will be modified. This is a glob expression.",
-            required = false,
-            example = "**/application-*.yml")
-    @Nullable
-    String fileMatcher;
+    Boolean matchExistingSequenceValuesInAnyOrder;
 
     @Override
     public String getDisplayName() {
@@ -71,17 +63,9 @@ public class AppendToSequence extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        if (fileMatcher != null) {
-            return new HasSourcePath<>(fileMatcher);
-        }
-        return null;
-    }
-
-    @Override
-    public YamlVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(sequencePath);
-        boolean anyOrder = (this.matchExistingSequenceValuesInAnyOrder == null) ? false : Boolean.valueOf(this.matchExistingSequenceValuesInAnyOrder);
-        return new AppendToSequenceVisitor(matcher, value, existingSequenceValues, anyOrder);
+        return new AppendToSequenceVisitor(matcher, value, existingSequenceValues,
+                Boolean.TRUE.equals(matchExistingSequenceValuesInAnyOrder));
     }
 }

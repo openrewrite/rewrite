@@ -16,8 +16,8 @@
 package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.gradle.plugins.UpgradePluginVersion;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.gradle.plugins.UpgradePluginVersion;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;

@@ -17,14 +17,11 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.internal.ListUtils;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markup;
 
-import java.util.List;
+import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -32,7 +29,7 @@ public class RecipeMarkupDemonstration extends Recipe {
 
     @Option(displayName = "Level",
             description = "The `Markup#Level` to add.",
-            valid = { "debug", "info", "warning", "error" })
+            valid = {"debug", "info", "warning", "error"})
     String level;
 
     @Override
@@ -46,19 +43,23 @@ public class RecipeMarkupDemonstration extends Recipe {
     }
 
     @Override
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        return ListUtils.mapFirst(before, sourceFile -> {
-            switch(level) {
-                case "info":
-                    return Markup.info(sourceFile, "This is an info message.");
-                case "warning":
-                    return Markup.warn(sourceFile, new IllegalStateException("This is a warning message."));
-                case "error":
-                    return Markup.error(sourceFile, new IllegalStateException("This is an error message."));
-                case "debug":
-                default:
-                    return Markup.debug(sourceFile, "This is a debug message.");
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                switch (level) {
+                    case "info":
+                        return Markup.info(sourceFile, "This is an info message.");
+                    case "warning":
+                        return Markup.warn(sourceFile, new IllegalStateException("This is a warning message."));
+                    case "error":
+                        return Markup.error(sourceFile, new IllegalStateException("This is an error message."));
+                    case "debug":
+                    default:
+                        return Markup.debug(sourceFile, "This is a debug message.");
+                }
             }
-        });
+        };
     }
 }

@@ -15,19 +15,16 @@
  */
 package org.openrewrite;
 
-import lombok.*;
+import lombok.Value;
+import lombok.With;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.nio.file.attribute.PosixFilePermission;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Value
 @With

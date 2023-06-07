@@ -47,16 +47,8 @@ public class RemoveXmlTag extends Recipe {
     String fileMatcher;
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        if (fileMatcher != null) {
-            return new HasSourcePath<>(fileMatcher);
-        }
-        return null;
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new XmlIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(fileMatcher != null ? new HasSourcePath<>(fileMatcher) : TreeVisitor.noop(), new XmlIsoVisitor<ExecutionContext>() {
             private final XPathMatcher xPathMatcher = new XPathMatcher(xPath);
 
             @Override
@@ -66,7 +58,7 @@ public class RemoveXmlTag extends Recipe {
                 }
                 return super.visitTag(tag, ctx);
             }
-        };
+        });
     }
 
 }

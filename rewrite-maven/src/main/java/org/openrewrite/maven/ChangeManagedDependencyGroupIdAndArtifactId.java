@@ -15,9 +15,9 @@
  */
 package org.openrewrite.maven;
 
-import java.util.*;
-
 import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.table.MavenMetadataFailures;
@@ -27,8 +27,7 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
+import java.util.*;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -42,12 +41,12 @@ public class ChangeManagedDependencyGroupIdAndArtifactId extends Recipe {
     ));
 
     @Option(displayName = "Old groupId",
-            description = "The old groupId to replace. The groupId is the first part of a managed dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The old groupId to replace. The groupId is the first part of a managed dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "org.openrewrite.recipe")
     String oldGroupId;
 
     @Option(displayName = "Old artifactId",
-            description = "The old artifactId to replace. The artifactId is the second part of a managed dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The old artifactId to replace. The artifactId is the second part of a managed dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "rewrite-testing-frameworks")
     String oldArtifactId;
 

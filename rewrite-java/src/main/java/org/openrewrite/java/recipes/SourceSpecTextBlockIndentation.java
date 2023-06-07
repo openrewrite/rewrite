@@ -39,7 +39,7 @@ public class SourceSpecTextBlockIndentation extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             final Pattern endTextBlockOnOwnLine = Pattern.compile("\\s+\"\"\"\\s*$");
 

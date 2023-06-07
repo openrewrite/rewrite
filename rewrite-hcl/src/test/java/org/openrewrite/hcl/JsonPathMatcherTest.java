@@ -251,7 +251,7 @@ class JsonPathMatcherTest implements RewriteTest {
 
     private List<String> visit(List<String> before, String jsonPath, boolean printMatches) {
         var ctx = new InMemoryExecutionContext();
-        var documents = HclParser.builder().build().parse(ctx, before.toArray(new String[0]));
+        var documents = HclParser.builder().build().parse(ctx, before.toArray(new String[0])).toList();
         if (documents.isEmpty()) {
             return emptyList();
         }

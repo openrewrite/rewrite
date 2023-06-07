@@ -15,7 +15,6 @@
  */
 package org.openrewrite.semver;
 
-import org.openrewrite.Incubating;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -58,7 +57,6 @@ public class Semver {
         );
     }
 
-    @Incubating(since = "7.16.0")
     public static String majorVersion(String version) {
         Scanner scanner = new Scanner(version);
         scanner.useDelimiter("[.\\-$]");
@@ -68,7 +66,6 @@ public class Semver {
         return version;
     }
 
-    @Incubating(since = "7.16.0")
     public static String minorVersion(String version) {
         Scanner scanner = new Scanner(version);
         scanner.useDelimiter("[.\\-$]");

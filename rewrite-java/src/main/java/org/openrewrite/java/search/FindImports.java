@@ -20,8 +20,7 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
-import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.java.tree.J;
@@ -48,7 +47,7 @@ public class FindImports extends Recipe {
     }
 
     @Override
-    public JavaIsoVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         TypeMatcher typeMatcher = new TypeMatcher(typePattern);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override

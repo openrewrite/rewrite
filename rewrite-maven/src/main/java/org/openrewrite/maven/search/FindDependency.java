@@ -30,12 +30,12 @@ import java.util.Set;
 public class FindDependency extends Recipe {
 
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob.",
+            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
             example = "com.google.guava")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob.",
+            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
             example = "guava")
     String artifactId;
 

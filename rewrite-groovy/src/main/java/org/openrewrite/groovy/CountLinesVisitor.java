@@ -16,10 +16,6 @@
 package org.openrewrite.groovy;
 
 import org.openrewrite.Tree;
-import org.openrewrite.groovy.tree.G;
-import org.openrewrite.java.tree.*;
-
-import java.util.concurrent.atomic.AtomicInteger;
 
 // Originally created this thinking there would be a need for groovy-specific specialization, but so far the
 // java line counter has been sufficient.

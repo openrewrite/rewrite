@@ -28,7 +28,28 @@ public class UseJavaParserBuilderInJavaTemplateTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new UseJavaParserBuilderInJavaTemplate())
-          .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()));
+          .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath())
+            .dependsOn(
+              """
+                package org.openrewrite.java;
+                
+                import org.openrewrite.Cursor;
+                import java.util.function.Supplier;
+                
+                public class JavaTemplate {
+                    public static Builder builder(Supplier<Cursor> parentScope, String code) {
+                        return new Builder();
+                    }
+                    public static class Builder {
+                        public Builder javaParser(Supplier<JavaParser> javaParser) {
+                            return this;
+                        }
+                        public Builder javaParser(JavaParser.Builder<?, ?> javaParser) {
+                            return this;
+                        }
+                    }
+                }
+                """));
     }
 
     @DocumentExample

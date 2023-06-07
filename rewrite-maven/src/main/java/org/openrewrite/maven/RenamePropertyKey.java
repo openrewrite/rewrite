@@ -15,17 +15,14 @@
  */
 package org.openrewrite.maven;
 
-import java.util.Optional;
-
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
+
+import java.util.Optional;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -52,19 +49,14 @@ public class RenamePropertyKey extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new MavenVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
                 // Scanning every tag's value is not an efficient applicable test, so just accept all maven files
                 return SearchResult.found(document);
             }
-        };
-    }
-
-    @Override
-    public TreeVisitor<Xml, ExecutionContext> getVisitor() {
-        return new MavenIsoVisitor<ExecutionContext>() {
+        }, new MavenIsoVisitor<ExecutionContext>() {
             final String oldKeyAsProperty = "${" + oldKey + "}";
             final String newKeyAsProperty = "${" + newKey + "}";
 
@@ -84,6 +76,6 @@ public class RenamePropertyKey extends Recipe {
                 }
                 return t;
             }
-        };
+        });
     }
 }

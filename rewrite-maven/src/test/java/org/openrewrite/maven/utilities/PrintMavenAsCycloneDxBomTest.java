@@ -52,7 +52,7 @@ class PrintMavenAsCycloneDxBomTest implements RewriteTest {
                   </dependencies>
                 </project>
                 """
-          ).get(0);
+          ).findFirst().orElseThrow(() -> new IllegalArgumentException("Could not parse as XML"));
 
         String bom = PrintMavenAsCycloneDxBom.print(pom)
           .replaceAll("<timestamp>.*</timestamp>", "<timestamp>TODAY</timestamp>");

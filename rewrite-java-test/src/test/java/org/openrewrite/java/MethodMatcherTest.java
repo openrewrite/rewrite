@@ -398,7 +398,7 @@ class MethodMatcherTest implements RewriteTest {
                 }
             }
             """, code)
-        ).get(0);
+        ).findFirst().orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
         var classDecl = cu.getClasses().get(0);
         J.MethodDeclaration testMethod = (J.MethodDeclaration) classDecl.getBody().getStatements().get(0);
         return (J.MethodInvocation) testMethod.getBody().getStatements().get(0);

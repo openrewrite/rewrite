@@ -65,7 +65,7 @@ class MavenArtifactDownloaderTest {
                   </dependencies>
               </project>
               """.formatted(recipeGav.getGroupId(), recipeGav.getArtifactId(), recipeGav.getVersion()))
-        ).get(0);
+        ).findFirst().orElseThrow(() -> new IllegalArgumentException("Could not parse as XML"));
 
         MavenResolutionResult mavenModel = parsed.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
         assertThat(mavenModel.getDependencies()).isNotEmpty();

@@ -17,9 +17,9 @@ package org.openrewrite.config;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Contributor;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Maintainer;
 import org.openrewrite.Recipe;
-import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import java.io.ByteArrayInputStream;
@@ -43,10 +43,6 @@ class YamlResourceLoaderTest implements RewriteTest {
               type: specs.openrewrite.org/v1beta/recipe
               name: test.ChangeTextToHello
               displayName: Change text to hello
-              applicability:
-                  singleSource:
-                      - org.openrewrite.FindSourceFiles:
-                          filePattern: '**/hello.txt'
               recipeList:
                   - org.openrewrite.text.ChangeText:
                       toText: Hello!
@@ -91,105 +87,6 @@ class YamlResourceLoaderTest implements RewriteTest {
         Maintainer jon = descriptor.getMaintainers().get(1);
         assertThat(jon.getMaintainer()).isEqualTo("Jon");
         assertThat(jon.getLogo()).isNull();
-    }
-
-    @DocumentExample
-    @Test
-    void singleSourceApplicability() {
-        rewriteRun(
-          spec -> spec.recipeFromYaml(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.ChangeTextToHello
-              displayName: Change text to hello
-              applicability:
-                  singleSource:
-                      - org.openrewrite.FindSourceFiles:
-                          filePattern: '**/hello.txt'
-              recipeList:
-                  - org.openrewrite.text.ChangeText:
-                      toText: Hello!
-              """
-            ,
-            "test.ChangeTextToHello"
-          ),
-          text(
-            "Hello, world!",
-            "Hello!",
-            spec -> spec.path("hello.txt")
-          ),
-          text(
-            "Hello, world!",
-            spec -> spec.path("ignore.txt")
-          )
-        );
-    }
-
-    @Test
-    void anySourceApplicability() {
-        rewriteRun(
-          spec -> spec.recipeFromYaml(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.ChangeTextToHello
-              displayName: Change text to hello
-              applicability:
-                  anySource:
-                      - org.openrewrite.FindSourceFiles:
-                          filePattern: '**/hello.txt'
-              recipeList:
-                  - org.openrewrite.text.ChangeText:
-                      toText: Hello!
-              """,
-            "test.ChangeTextToHello"
-          ),
-          text(
-            "Hello, world!",
-            "Hello!",
-            spec -> spec.path("hello.txt")
-          ),
-          text(
-            "Hello, world!",
-            "Hello!",
-            spec -> spec.path("goodbye.txt")
-          )
-        );
-    }
-
-    @Test
-    void bothAnySourceAndSingleSourceApplicability() {
-        rewriteRun(
-          spec -> spec.recipeFromYaml(
-            //language=yml
-            """
-              type: specs.openrewrite.org/v1beta/recipe
-              name: test.ChangeTextToHello
-              displayName: Change text to hello
-              applicability:
-                  anySource:
-                      - org.openrewrite.FindSourceFiles:
-                          filePattern: '**/day.txt'
-                  singleSource:
-                      - org.openrewrite.FindSourceFiles:
-                          filePattern: '**/night.txt'
-              recipeList:
-                  - org.openrewrite.text.ChangeText:
-                      toText: Hello!
-              """,
-            "test.ChangeTextToHello"
-          ),
-          text(
-            "Good morning!",
-            spec -> spec.path("day.txt")
-          ),
-          text(
-            "Good night!",
-            "Hello!",
-            spec -> spec.path("night.txt")
-          )
-        );
     }
 
     @Test
@@ -279,6 +176,7 @@ class YamlResourceLoaderTest implements RewriteTest {
     }
 
     @Test
+    @DocumentExample
     void recipeExamples() {
         Environment env = Environment.builder()
           .load(new YamlResourceLoader(new ByteArrayInputStream(
@@ -361,6 +259,7 @@ class YamlResourceLoaderTest implements RewriteTest {
 
                 assertThat(e.getSources()).hasSize(1);
                 assertThat(e.getSources()).first().satisfies( s -> {
+                    //language=java
                     assertThat(s.getBefore()).isEqualTo("""
                       public class A {
                           void method() {
@@ -368,6 +267,7 @@ class YamlResourceLoaderTest implements RewriteTest {
                           }
                       }
                       """);
+                    //language=java
                     assertThat(s.getAfter()).isEqualTo("""
                       public class A {
                           void method() {

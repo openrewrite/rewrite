@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.groovy.GroovyVisitor;
@@ -49,14 +50,9 @@ public class DependencyUseStringNotation extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsBuildGradle<>();
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
-        return new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, context);
@@ -160,6 +156,6 @@ public class DependencyUseStringNotation extends Recipe {
                 }
                 return null;
             }
-        };
+        });
     }
 }

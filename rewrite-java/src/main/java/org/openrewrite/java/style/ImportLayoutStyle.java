@@ -485,8 +485,8 @@ public class ImportLayoutStyle implements JavaStyle {
     private static class LayoutState {
         Map<Block, List<JRightPadded<J.Import>>> imports = new HashMap<>();
 
-        public void claimImport(Block block, JRightPadded<J.Import> impoort) {
-            imports.computeIfAbsent(block, b -> new ArrayList<>()).add(impoort);
+        public void claimImport(Block block, JRightPadded<J.Import> import_) {
+            imports.computeIfAbsent(block, b -> new ArrayList<>()).add(import_);
         }
 
         public List<JRightPadded<J.Import>> getImports(Block block) {

@@ -18,6 +18,7 @@ package org.openrewrite.groovy;
 import groovy.lang.GroovyClassLoader;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
+import lombok.Value;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.ModuleNode;
 import org.codehaus.groovy.control.*;
@@ -35,13 +36,9 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
-import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.StringWriter;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -51,6 +48,7 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
@@ -66,7 +64,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
     private final List<Consumer<CompilerConfiguration>> compilerCustomizers;
 
     @Override
-    public List<G.CompilationUnit> parse(@Language("groovy") String... sources) {
+    public Stream<G.CompilationUnit> parse(@Language("groovy") String... sources) {
         Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
         Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
 
@@ -82,7 +80,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                             String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
 
                             String className = Optional.ofNullable(simpleName.apply(sourceFile))
-                                    .orElse(Long.toString(System.nanoTime())) + ".java";
+                                                       .orElse(Long.toString(System.nanoTime())) + ".java";
 
                             Path path = Paths.get(pkg + className);
                             return new Input(
@@ -98,45 +96,46 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
     }
 
     @Override
-    public List<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
-        ParsingEventListener parsingListener = pctx.getParsingListener();
-        Map<CompiledGroovySource, List<ParseWarning>> compilerCus = parseInputsToCompilerAst(sources, relativeTo, pctx);
-        List<G.CompilationUnit> cus = new ArrayList<>(compilerCus.size());
-
-        for (Map.Entry<CompiledGroovySource, List<ParseWarning>> entry : compilerCus.entrySet()) {
-            CompiledGroovySource compiled = entry.getKey();
-            List<ParseWarning> warnings = entry.getValue();
-            try {
-                GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
-                        compiled.getInput().getRelativePath(relativeTo),
-                        compiled.getInput().getFileAttributes(),
-                        compiled.getInput().getSource(ctx),
-                        typeCache,
-                        ctx
-                );
-                G.CompilationUnit gcu = mappingVisitor.visit(compiled.getSourceUnit(), compiled.getModule());
-                if(warnings.size() > 0) {
-                    Markers m = gcu.getMarkers();
-                    for(ParseWarning warning : warnings) {
-                        m = m.add(warning);
+        return parseInputsToCompilerAst(sources, relativeTo, pctx)
+                .map(entry -> {
+                    CompiledGroovySource compiled = entry.getCompiledGroovySource();
+                    List<ParseWarning> warnings = entry.getWarnings();
+                    try {
+                        GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
+                                compiled.getInput().getRelativePath(relativeTo),
+                                compiled.getInput().getFileAttributes(),
+                                compiled.getInput().getSource(ctx),
+                                typeCache,
+                                ctx
+                        );
+                        G.CompilationUnit gcu = mappingVisitor.visit(compiled.getSourceUnit(), compiled.getModule());
+                        if (warnings.size() > 0) {
+                            Markers m = gcu.getMarkers();
+                            for (ParseWarning warning : warnings) {
+                                m = m.add(warning);
+                            }
+                            gcu = gcu.withMarkers(m);
+                        }
+                        pctx.getParsingListener().parsed(compiled.getInput(), gcu);
+                        return gcu;
+                    } catch (Throwable t) {
+                        pctx.parseFailure(compiled.getInput(), relativeTo, this, t);
+                        ctx.getOnError().accept(t);
                     }
-                    gcu = gcu.withMarkers(m);
-                }
-                cus.add(gcu);
-                parsingListener.parsed(compiled.getInput(), gcu);
-            } catch (Throwable t) {
-                pctx.parseFailure(compiled.getInput(), relativeTo, this, t);
-                ctx.getOnError().accept(t);
-            }
-        }
-
-        return cus;
+                    return null;
+                })
+                .filter(Objects::nonNull);
     }
 
-    Map<CompiledGroovySource, List<ParseWarning>> parseInputsToCompilerAst(Iterable<Input> sources, @Nullable Path relativeTo, ParsingExecutionContextView ctx) {
-        Map<CompiledGroovySource, List<ParseWarning>> cus = new LinkedHashMap<>();
+    @Value
+    static class Intermediate {
+        CompiledGroovySource compiledGroovySource;
+        List<ParseWarning> warnings;
+    }
 
+    Stream<Intermediate> parseInputsToCompilerAst(Iterable<Input> sources, @Nullable Path relativeTo, ParsingExecutionContextView ctx) {
         CompilerConfiguration configuration = new CompilerConfiguration();
         configuration.setTolerance(Integer.MAX_VALUE);
         configuration.setWarningLevel(WarningMessage.NONE);
@@ -144,7 +143,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                 .flatMap(cp -> {
                     try {
                         return Stream.of(cp.toFile().toString());
-                    } catch(UnsupportedOperationException e) {
+                    } catch (UnsupportedOperationException e) {
                         // can happen e.g. in the case of jdk.internal.jrtfs.JrtPath
                         return Stream.empty();
                     }
@@ -153,52 +152,49 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         for (Consumer<CompilerConfiguration> compilerCustomizer : compilerCustomizers) {
             compilerCustomizer.accept(configuration);
         }
-        for (Input input : sources) {
+        return StreamSupport.stream(sources.spliterator(), false)
+                .map(input -> {
+                    ParseWarningCollector errorCollector = new ParseWarningCollector(configuration, this);
+                    try (GroovyClassLoader classLoader = new GroovyClassLoader(getClass().getClassLoader(), configuration, true)) {
+                        SourceUnit unit = new SourceUnit(
+                                "doesntmatter",
+                                new InputStreamReaderSource(input.getSource(ctx), configuration),
+                                configuration,
+                                classLoader,
+                                errorCollector
+                        );
 
-            ParseWarningCollector errorCollector = new ParseWarningCollector(configuration, this);
-            GroovyClassLoader classLoader = new GroovyClassLoader(getClass().getClassLoader(), configuration, true);
-            SourceUnit unit = new SourceUnit(
-                    "doesntmatter",
-                    new InputStreamReaderSource(input.getSource(ctx), configuration),
-                    configuration,
-                    classLoader,
-                    errorCollector
-            );
+                        CompilationUnit compUnit = new CompilationUnit(configuration, null, classLoader, classLoader);
+                        compUnit.addSource(unit);
+                        compUnit.compile(Phases.CANONICALIZATION);
+                        ModuleNode ast = unit.getAST();
 
-            CompilationUnit compUnit = new CompilationUnit(configuration, null, classLoader, classLoader);
-            compUnit.addSource(unit);
+                        for (ClassNode aClass : ast.getClasses()) {
+                            try {
+                                StaticTypeCheckingVisitor staticTypeCheckingVisitor = new StaticTypeCheckingVisitor(unit, aClass);
+                                staticTypeCheckingVisitor.setCompilationUnit(compUnit);
+                                staticTypeCheckingVisitor.visitClass(aClass);
+                            } catch (NoClassDefFoundError ignored) {
+                            }
+                        }
 
-            try {
-                compUnit.compile(Phases.CANONICALIZATION);
-                ModuleNode ast = unit.getAST();
-
-                for (ClassNode aClass : ast.getClasses()) {
-                    try {
-                        StaticTypeCheckingVisitor staticTypeCheckingVisitor = new StaticTypeCheckingVisitor(unit, aClass);
-                        staticTypeCheckingVisitor.setCompilationUnit(compUnit);
-                        staticTypeCheckingVisitor.visitClass(aClass);
-                    } catch (NoClassDefFoundError ignored) {
+                        return new Intermediate(new CompiledGroovySource(input, unit, ast), errorCollector.getWarningMarkers());
+                    } catch (Throwable t) {
+                        ctx.parseFailure(input, relativeTo, this, t);
+                        ctx.getOnError().accept(t);
+                    } finally {
+                        if (logCompilationWarningsAndErrors && (errorCollector.hasErrors() || errorCollector.hasWarnings())) {
+                            try (StringWriter sw = new StringWriter();
+                                 PrintWriter pw = new PrintWriter(sw)) {
+                                errorCollector.write(pw, new Janitor());
+                                org.slf4j.LoggerFactory.getLogger(GroovyParser.class).warn(sw.toString());
+                            } catch (IOException ignored) {
+                                // unreachable
+                            }
+                        }
                     }
-                }
-
-                cus.put(new CompiledGroovySource(input, unit, ast), errorCollector.getWarningMarkers());
-            } catch (Throwable t) {
-                ctx.parseFailure(input, relativeTo, this, t);
-                ctx.getOnError().accept(t);
-            } finally {
-                if (logCompilationWarningsAndErrors && (errorCollector.hasErrors() || errorCollector.hasWarnings())) {
-                    try (StringWriter sw = new StringWriter();
-                         PrintWriter pw = new PrintWriter(sw)) {
-                        errorCollector.write(pw, new Janitor());
-                        org.slf4j.LoggerFactory.getLogger(GroovyParser.class).warn(sw.toString());
-                    } catch (IOException ignored) {
-                        // unreachable
-                    }
-                }
-            }
-        }
-
-        return cus;
+                    return null;
+                });
     }
 
     @Override

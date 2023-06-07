@@ -16,8 +16,10 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.*;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.J;
@@ -100,8 +102,10 @@ class AddImportTest implements RewriteTest {
     @Test
     void dontDuplicateImports() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("org.springframework.http.HttpStatus", null, false))
-            .doNext(toRecipe(() -> new AddImport<>("org.springframework.http.HttpStatus.Series", null, false)))),
+          spec -> spec.recipes(
+            toRecipe(() -> new AddImport<>("org.springframework.http.HttpStatus", null, false)),
+            toRecipe(() -> new AddImport<>("org.springframework.http.HttpStatus.Series", null, false))
+          ),
           java(
             "class A {}",
             """
@@ -280,8 +284,10 @@ class AddImportTest implements RewriteTest {
     @Test
     void addMultipleImports() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))
-            .doNext(toRecipe(() -> new AddImport<>("java.util.Set", null, false)))),
+          spec -> spec.recipes(
+            toRecipe(() -> new AddImport<>("java.util.List", null, false)),
+            toRecipe(() -> new AddImport<>("java.util.Set", null, false))
+          ),
           java(
             """
               class A {}
@@ -383,23 +389,18 @@ class AddImportTest implements RewriteTest {
                 @Override
                 public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                     J.ClassDeclaration c = super.visitClassDeclaration(classDecl, ctx);
-                    J.Block b = c.getBody();
-                    if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
-                        JavaTemplate t = JavaTemplate.builder(
-                            this::getCursor,
-                            "BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);"
-                          )
-                          .imports("java.math.BigDecimal", "java.math.RoundingMode")
-                          .build();
-
-                        b = b.withTemplate(t, b.getCoordinates().lastStatement());
-                        maybeAddImport("java.math.BigDecimal");
-                        maybeAddImport("java.math.RoundingMode");
-                    }
-                    return c.withBody(b);
+                    maybeAddImport("java.math.BigDecimal");
+                    maybeAddImport("java.math.RoundingMode");
+                    return JavaTemplate.builder("BigDecimal d = BigDecimal.valueOf(1).setScale(1, RoundingMode.HALF_EVEN);")
+                      .imports("java.math.BigDecimal", "java.math.RoundingMode")
+                      .build()
+                      .apply(
+                        updateCursor(c),
+                        c.getBody().getCoordinates().lastStatement()
+                      );
                 }
             }
-          )),
+          ).withMaxCycles(1)),
           java(
             """
               package a;
@@ -524,9 +525,9 @@ class AddImportTest implements RewriteTest {
                   """,
                 String.format("""
                     package a;
-                    
+                                        
                     %s
-                    
+                                        
                     class A {}
                     """,
                   expectedImports.stream().map(i -> "import " + i + ";").collect(Collectors.joining("\n"))
@@ -663,21 +664,19 @@ class AddImportTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
                 @Override
                 public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                    J.ClassDeclaration cd = classDecl;
-                    if (!cd.getBody().getStatements().isEmpty()) {
-                        return cd;
+                    if (!classDecl.getBody().getStatements().isEmpty()) {
+                        return classDecl;
                     }
-                    cd = cd.withTemplate(
-                      JavaTemplate.builder(this::getCursor, "ChronoUnit unit = MILLIS;")
-                        .imports("java.time.temporal.ChronoUnit")
-                        .staticImports("java.time.temporal.ChronoUnit.MILLIS")
-                        .build(),
-                      cd.getBody().getCoordinates().lastStatement()
-                    );
+
                     maybeAddImport("java.time.temporal.ChronoUnit");
                     maybeAddImport("java.time.temporal.ChronoUnit", "MILLIS");
 
-                    return cd;
+                    return JavaTemplate.builder("ChronoUnit unit = MILLIS;")
+                      .contextSensitive()
+                      .imports("java.time.temporal.ChronoUnit")
+                      .staticImports("java.time.temporal.ChronoUnit.MILLIS")
+                      .build()
+                      .apply(getCursor(), classDecl.getBody().getCoordinates().lastStatement());
                 }
             }
           )),
@@ -709,9 +708,9 @@ class AddImportTest implements RewriteTest {
           java(
             """
               package a;
-              
+                            
               import java.time.temporal.ChronoUnit;
-              
+                            
               class A {
                   static final int MILLIS = 1;
                   ChronoUnit unit = ChronoUnit.MILLIS;
@@ -738,12 +737,15 @@ class AddImportTest implements RewriteTest {
     @Test
     void addNamedStaticImportWhenReferenced() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                  return method.withSelect(null);
-              }
-          }).doNext(toRecipe(() -> new AddImport<>("java.util.Collections", "emptyList", true)))),
+          spec -> spec.recipes(
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                    return method.withSelect(null);
+                }
+            }),
+            toRecipe(() -> new AddImport<>("java.util.Collections", "emptyList", true))
+          ),
           java(
             """
               package a;
@@ -790,15 +792,18 @@ class AddImportTest implements RewriteTest {
     @Test
     void addStaticWildcardImportWhenReferenced() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                  if (method.getName().getSimpleName().equals("emptyList")) {
-                      return method.withSelect(null);
-                  }
-                  return method;
-              }
-          }).doNext(toRecipe(() -> new AddImport<>("java.util.Collections", "*", true)))),
+          spec -> spec.recipes(
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+                    if (method.getName().getSimpleName().equals("emptyList")) {
+                        return method.withSelect(null);
+                    }
+                    return method;
+                }
+            }),
+            toRecipe(() -> new AddImport<>("java.util.Collections", "*", true))
+          ),
           java(
             """
               package a;

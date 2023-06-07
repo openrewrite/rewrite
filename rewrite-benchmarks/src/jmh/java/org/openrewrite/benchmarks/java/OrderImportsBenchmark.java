@@ -21,6 +21,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.java.OrderImports;
 
 import java.util.concurrent.TimeUnit;
@@ -35,7 +36,8 @@ public class OrderImportsBenchmark {
 
     @Benchmark
     public void orderImports(JavaCompilationUnitState state) {
-        new OrderImports(false).run(state.getSourceFiles());
+        new OrderImports(false)
+                .run(state.getSourceSet(), new InMemoryExecutionContext());
     }
 
     public static void main(String[] args) throws RunnerException {

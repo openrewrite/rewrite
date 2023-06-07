@@ -38,10 +38,10 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
         this.typeParameters = typeParameters;
     }
 
-    public ImplementInterface(J.ClassDeclaration scope, String interfaze, @Nullable List<Expression> typeParameters) {
+    public ImplementInterface(J.ClassDeclaration scope, String interface_, @Nullable List<Expression> typeParameters) {
         this(scope, ListUtils.nullIfEmpty(typeParameters) != null ?
-                new JavaType.Parameterized(null, JavaType.ShallowClass.build(interfaze), typeParameters.stream().map(Expression::getType).collect(Collectors.toList()))
-                : JavaType.ShallowClass.build(interfaze),
+                new JavaType.Parameterized(null, JavaType.ShallowClass.build(interface_), typeParameters.stream().map(Expression::getType).collect(Collectors.toList()))
+                : JavaType.ShallowClass.build(interface_),
                 typeParameters
         );
     }
@@ -50,8 +50,8 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
         this(scope, interfaceType, null);
     }
 
-    public ImplementInterface(J.ClassDeclaration scope, String interfaze) {
-        this(scope, interfaze, null);
+    public ImplementInterface(J.ClassDeclaration scope, String interface_) {
+        this(scope, interface_, null);
     }
 
     @Override

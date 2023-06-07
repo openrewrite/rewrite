@@ -76,18 +76,12 @@ public class UpgradePluginVersion extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return Applicability.or(new IsBuildGradle<>(), new IsSettingsGradle<>());
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
         assert versionComparator != null;
-
         MethodMatcher pluginMatcher = new MethodMatcher("PluginSpec id(..)", false);
         MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)", false);
-        return new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new GroovyVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
@@ -131,6 +125,6 @@ public class UpgradePluginVersion extends Recipe {
 
                 return m;
             }
-        };
+        });
     }
 }

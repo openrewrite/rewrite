@@ -47,8 +47,7 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitJavaSourceFile(JavaSourceFile sourceFile, PrintOutputCapture<P> p) {
-        G.CompilationUnit cu = (G.CompilationUnit) sourceFile;
+    public J visitCompilationUnit(G.CompilationUnit cu, PrintOutputCapture<P> p) {
         if (cu.getShebang() != null) {
             p.append(cu.getShebang());
         }
@@ -202,15 +201,15 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             if (i < nodes.size() - 1) {
                 p.append(suffixBetween);
             } else {
-                for(Marker m : node.getMarkers().getMarkers()) {
+                for (Marker m : node.getMarkers().getMarkers()) {
                     // Maintaining for backwards compatibility with old LSTs
                     //noinspection deprecation
-                    if(m instanceof TrailingComma) {
+                    if (m instanceof TrailingComma) {
                         p.append(suffixBetween);
                         //noinspection deprecation
                         visitSpace(((TrailingComma) m).getSuffix(), Space.Location.LANGUAGE_EXTENSION, p);
                         break;
-                    } else if(m instanceof org.openrewrite.java.marker.TrailingComma) {
+                    } else if (m instanceof org.openrewrite.java.marker.TrailingComma) {
                         p.append(suffixBetween);
                         visitSpace(((org.openrewrite.java.marker.TrailingComma) m).getSuffix(), Space.Location.LANGUAGE_EXTENSION, p);
                         break;
@@ -232,8 +231,8 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
-        public J visitImport(J.Import impoort, PrintOutputCapture<P> p) {
-            J.Import i = (J.Import) super.visitImport(impoort, p);
+        public J visitImport(J.Import import_, PrintOutputCapture<P> p) {
+            J.Import i = (J.Import) super.visitImport(import_, p);
             JLeftPadded<J.Identifier> alias = i.getPadding().getAlias();
             if (alias == null) {
                 return i;
@@ -372,16 +371,16 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
-        public J visitReturn(J.Return retrn, PrintOutputCapture<P> p) {
-            if (retrn.getMarkers().findFirst(ImplicitReturn.class).isPresent() ||
-                retrn.getMarkers().findFirst(org.openrewrite.java.marker.ImplicitReturn.class).isPresent()) {
-                visitSpace(retrn.getPrefix(), Space.Location.RETURN_PREFIX, p);
-                visitMarkers(retrn.getMarkers(), p);
-                visit(retrn.getExpression(), p);
-                afterSyntax(retrn, p);
-                return retrn;
+        public J visitReturn(J.Return return_, PrintOutputCapture<P> p) {
+            if (return_.getMarkers().findFirst(ImplicitReturn.class).isPresent() ||
+                return_.getMarkers().findFirst(org.openrewrite.java.marker.ImplicitReturn.class).isPresent()) {
+                visitSpace(return_.getPrefix(), Space.Location.RETURN_PREFIX, p);
+                visitMarkers(return_.getMarkers(), p);
+                visit(return_.getExpression(), p);
+                afterSyntax(return_, p);
+                return return_;
             }
-            return super.visitReturn(retrn, p);
+            return super.visitReturn(return_, p);
         }
 
         protected void visitStatement(@Nullable JRightPadded<Statement> paddedStat, JRightPadded.Location location, PrintOutputCapture<P> p) {

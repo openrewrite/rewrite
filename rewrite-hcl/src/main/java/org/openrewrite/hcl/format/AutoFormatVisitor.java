@@ -39,8 +39,10 @@ public class AutoFormatVisitor<P> extends HclVisitor<P> {
     }
 
     @Override
-    public Hcl visit(@Nullable Tree tree, P p, Cursor cursor) {
-        Hcl.ConfigFile cf = cursor.firstEnclosingOrThrow(Hcl.ConfigFile.class);
+    public @Nullable Hcl preVisit(Hcl tree, P p) {
+        stopAfterPreVisit();
+        Cursor cursor = getCursor().getParentOrThrow();
+        Hcl.ConfigFile cf = getCursor().firstEnclosingOrThrow(Hcl.ConfigFile.class);
 
         Hcl t = new NormalizeFormatVisitor<>().visit(tree, p, cursor.fork());
 

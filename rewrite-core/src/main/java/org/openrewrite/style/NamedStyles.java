@@ -15,7 +15,10 @@
  */
 package org.openrewrite.style;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.With;
 import org.openrewrite.Tree;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;

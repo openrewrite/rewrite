@@ -41,7 +41,9 @@ public class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTe
     private final String goat = StringUtils.readFully(JavaParserTypeMappingTest.class.getResourceAsStream("/JavaTypeGoat.java"));
 
     private final J.CompilationUnit goatCu = JavaParser.fromJavaVersion().build()
-      .parse(goat).get(0);
+      .parse(goat)
+      .findFirst()
+      .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
 
     @Override
     public JavaType.FullyQualified classType(String fqn) {

@@ -18,7 +18,6 @@ package org.openrewrite.maven.tree;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.maven.MavenDownloadingException;
@@ -76,7 +75,6 @@ public class MavenResolutionResult implements Marker {
         return this;
     }
 
-    @Incubating(since = "7.18.0")
     @Nullable
     public ResolvedDependency getResolvedDependency(Dependency dependency) {
         for (int i = Scope.values().length - 1; i >= 0; i--) {
@@ -103,7 +101,6 @@ public class MavenResolutionResult implements Marker {
      * @param scope      The scope to limit the search to, or null to search all scopes
      * @return A list of matching dependencies
      */
-    @Incubating(since = "7.19.0")
     public List<ResolvedDependency> findDependencies(String groupId, String artifactId, @Nullable Scope scope) {
         return findDependencies(d -> matchesGlob(d.getGroupId(), groupId) && matchesGlob(d.getArtifactId(), artifactId), scope);
     }
@@ -118,7 +115,6 @@ public class MavenResolutionResult implements Marker {
      * @param scope   A scope to limit the search to, or null to search all scopes
      * @return A list of matching dependencies
      */
-    @Incubating(since = "7.19.0")
     public List<ResolvedDependency> findDependencies(Predicate<ResolvedDependency> matcher, @Nullable Scope scope) {
         List<ResolvedDependency> found = null;
         for (Map.Entry<Scope, List<ResolvedDependency>> entry : dependencies.entrySet()) {
@@ -156,7 +152,6 @@ public class MavenResolutionResult implements Marker {
         this.modules = new ArrayList<>(modules);
     }
 
-    @Incubating(since = "7.18.0")
     @Nullable
     public ResolvedManagedDependency getResolvedManagedDependency(ManagedDependency dependency) {
         for (ResolvedManagedDependency dm : pom.getDependencyManagement()) {

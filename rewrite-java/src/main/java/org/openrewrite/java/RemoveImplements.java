@@ -17,9 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -40,7 +38,7 @@ public class RemoveImplements extends Recipe {
     @Override
     public String getDescription() {
         return "Removes `implements` clauses from classes implementing the specified interface. " +
-                "Removes `@Overrides` annotations from methods which no longer override anything.";
+               "Removes `@Overrides` annotations from methods which no longer override anything.";
     }
 
     @Option(displayName = "Interface Type",
@@ -50,39 +48,33 @@ public class RemoveImplements extends Recipe {
 
     @Option(displayName = "Filter",
             description = "Only apply the interface removal to classes with fully qualified names that begin with this filter. " +
-                    "`null` or empty matches all classes.",
+                          "`null` or empty matches all classes.",
             example = "com.yourorg.")
     @Nullable
     String filter;
 
     @Override
-    protected JavaIsoVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDeclaration, ExecutionContext ctx) {
-                J.ClassDeclaration cd = super.visitClassDeclaration(classDeclaration, ctx);
-                if(!(cd.getType() instanceof JavaType.Class) || cd.getImplements() == null) {
-                    return cd;
+                if (!(classDeclaration.getType() instanceof JavaType.Class) || classDeclaration.getImplements() == null) {
+                    return super.visitClassDeclaration(classDeclaration, ctx);
                 }
-                JavaType.Class cdt = (JavaType.Class) cd.getType();
-                if((filter == null || cdt.getFullyQualifiedName().startsWith(filter)) && cdt.getInterfaces().stream().anyMatch(it -> isOfClassType(it, interfaceType))) {
-                    return SearchResult.found(cd, "");
+                JavaType.Class cdt = (JavaType.Class) classDeclaration.getType();
+                if ((filter == null || cdt.getFullyQualifiedName().startsWith(filter)) && cdt.getInterfaces().stream().anyMatch(it -> isOfClassType(it, interfaceType))) {
+                    return SearchResult.found(classDeclaration, "");
                 }
-                return cd;
+                return super.visitClassDeclaration(classDeclaration, ctx);
             }
-        };
-    }
-
-    @Override
-    public JavaIsoVisitor<ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+        }, new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration cd, ExecutionContext ctx) {
-                if(!(cd.getType() instanceof JavaType.Class) || cd.getImplements() == null) {
+                if (!(cd.getType() instanceof JavaType.Class) || cd.getImplements() == null) {
                     return super.visitClassDeclaration(cd, ctx);
                 }
                 JavaType.Class cdt = (JavaType.Class) cd.getType();
-                if((filter == null || cdt.getFullyQualifiedName().startsWith(filter)) && cdt.getInterfaces().stream().anyMatch(it -> isOfClassType(it, interfaceType))) {
+                if ((filter == null || cdt.getFullyQualifiedName().startsWith(filter)) && cdt.getInterfaces().stream().anyMatch(it -> isOfClassType(it, interfaceType))) {
                     cd = cd.withImplements(cd.getImplements().stream()
                             .filter(implement -> !isOfClassType(implement.getType(), interfaceType))
                             .collect(toList()));
@@ -98,21 +90,21 @@ public class RemoveImplements extends Recipe {
 
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration md, ExecutionContext context) {
-                if(md.getMethodType() == null) {
+                if (md.getMethodType() == null) {
                     return super.visitMethodDeclaration(md, context);
                 }
                 Object maybeClassType = getCursor().getNearestMessage(md.getMethodType().getDeclaringType().getFullyQualifiedName());
-                if(!(maybeClassType instanceof JavaType.Class)) {
+                if (!(maybeClassType instanceof JavaType.Class)) {
                     return super.visitMethodDeclaration(md, context);
                 }
-                JavaType.Class cdt = (JavaType.Class)maybeClassType;
+                JavaType.Class cdt = (JavaType.Class) maybeClassType;
                 md = md.withMethodType(md.getMethodType().withDeclaringType(cdt));
-                if(md.getAllAnnotations().stream().noneMatch(ann -> isOfClassType(ann.getType(), "java.lang.Override")) || TypeUtils.isOverride(md.getMethodType())) {
+                if (md.getAllAnnotations().stream().noneMatch(ann -> isOfClassType(ann.getType(), "java.lang.Override")) || TypeUtils.isOverride(md.getMethodType())) {
                     return super.visitMethodDeclaration(md, context);
                 }
                 md = (J.MethodDeclaration) new RemoveAnnotation("@java.lang.Override").getVisitor().visitNonNull(md, context, getCursor().getParentOrThrow());
                 return super.visitMethodDeclaration(md, context);
             }
-        };
+        });
     }
 }

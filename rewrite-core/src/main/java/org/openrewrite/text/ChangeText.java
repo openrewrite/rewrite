@@ -17,14 +17,15 @@ package org.openrewrite.text;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 
 import java.util.Collections;
 import java.util.Set;
 
-@Getter
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@RequiredArgsConstructor
+@Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangeText extends Recipe {
 

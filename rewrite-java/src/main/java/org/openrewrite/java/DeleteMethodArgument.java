@@ -17,9 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -69,13 +67,8 @@ public class DeleteMethodArgument extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(methodPattern);
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new DeleteMethodArgumentVisitor(new MethodMatcher(methodPattern));
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesMethod<>(methodPattern), new DeleteMethodArgumentVisitor(new MethodMatcher(methodPattern)));
     }
 
     private class DeleteMethodArgumentVisitor extends JavaIsoVisitor<ExecutionContext> {

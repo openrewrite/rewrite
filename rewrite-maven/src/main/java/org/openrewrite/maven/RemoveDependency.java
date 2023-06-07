@@ -29,12 +29,12 @@ import org.openrewrite.xml.tree.Xml;
 public class RemoveDependency extends Recipe {
 
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "com.google.guava")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "guava")
     String artifactId;
 

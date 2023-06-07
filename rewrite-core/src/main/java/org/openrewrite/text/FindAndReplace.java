@@ -23,6 +23,8 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 
+import static java.util.Objects.requireNonNull;
+
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindAndReplace extends Recipe {
@@ -43,18 +45,6 @@ public class FindAndReplace extends Recipe {
     @Nullable
     Boolean regex;
 
-    /**
-     * @deprecated Use {@link Recipe#addSingleSourceApplicableTest(Recipe)} instead.
-     */
-    @SuppressWarnings("DeprecatedIsStillUsed")
-    @Option(displayName = "Optional file Matcher",
-            description = "Matching files will be modified. This is a glob expression.",
-            example = "foo/bar/baz.txt",
-            required = false)
-    @Nullable
-    @Deprecated
-    String fileMatcher;
-
     @Override
     public String getDisplayName() {
         return "Find and replace";
@@ -67,15 +57,11 @@ public class FindAndReplace extends Recipe {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new HasSourcePath<>(fileMatcher);
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public @Nullable Tree visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 if(sourceFile instanceof Quark || sourceFile instanceof Remote || sourceFile instanceof Binary) {
                     return sourceFile;
                 }

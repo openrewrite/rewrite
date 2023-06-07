@@ -15,7 +15,10 @@
  */
 package org.openrewrite.java.marker;
 
-import io.github.classgraph.*;
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ClassInfo;
+import io.github.classgraph.ClassInfoList;
+import io.github.classgraph.ScanResult;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
@@ -130,8 +133,7 @@ public class JavaSourceSet implements SourceSet {
                     .classpath(classpath)
                     .build();
 
-            List<J.CompilationUnit> cus = jp.parse(noRecursiveJavaSourceSet, typeStubs);
-            for (J.CompilationUnit cu : cus) {
+            jp.parse(noRecursiveJavaSourceSet, typeStubs).forEach(cu -> {
                 if (!cu.getClasses().isEmpty()) {
                     J.Block body = cu.getClasses().get(0).getBody();
                     for (Statement s : body.getStatements()) {
@@ -141,7 +143,7 @@ public class JavaSourceSet implements SourceSet {
                         }
                     }
                 }
-            }
+            });
         } else {
             for (Map.Entry<String, List<String>> packageToTypes : packagesToTypes.entrySet()) {
                 for (String className : packageToTypes.getValue()) {
@@ -161,7 +163,7 @@ public class JavaSourceSet implements SourceSet {
         for (Map.Entry<String, List<String>> packageToTypes : packagesToTypeNames.entrySet()) {
             boolean isJreType = packageToTypes.getKey().startsWith("java.");
             StringBuilder sb = new StringBuilder("package ");
-            if(isJreType) {
+            if (isJreType) {
                 // Avoid java compiler complaints that we're redefining java.lang, etc.
                 // Only apply to java provided types because this limits our ability to get type information from package-private classes
                 sb.append("rewrite.");
@@ -190,14 +192,14 @@ public class JavaSourceSet implements SourceSet {
      * The declarable name of "class A$B {}" is "A$B"
      * The declarable name of class B in "class A { class B {}}" is "A.B"
      * ClassInfo.getPackageName() does not understand this and will always replace "$" in names with "."
-     *
+     * <p>
      * This method takes all of these considerations into account and returns a fully qualified name which replaces
      * inner-class signifying "$" with ".", while preserving
      */
     @Nullable
     private static String declarableFullyQualifiedName(ClassInfo classInfo) {
         String name;
-        if(classInfo.getName().startsWith("java.") && !classInfo.isPublic()) {
+        if (classInfo.getName().startsWith("java.") && !classInfo.isPublic()) {
             // Because we put java-supplied types into another package, we cannot access package-private types
             return null;
         }
@@ -210,17 +212,17 @@ public class JavaSourceSet implements SourceSet {
                 if (outerClass.isPrivate() || outerClass.isAnonymousInnerClass() || outerClass.isSynthetic() || outerClass.isExternalClass()) {
                     return null;
                 }
-                if(i == outerClasses.size() - 1) {
+                if (i == outerClasses.size() - 1) {
                     sb.append(outerClass.getName()).append(".");
                 } else if (!outerClass.getName().startsWith(sb.toString())) {
-                    // Code obfuscaters can generate inner classes which don't share a common package prefix with their outer class
+                    // Code obfuscators can generate inner classes which don't share a common package prefix with their outer class
                     return classInfo.getName();
                 } else {
                     sb.append(outerClass.getName().substring(sb.length())).append(".");
                 }
             }
             if (!classInfo.getName().startsWith(sb.toString())) {
-                // Code obfuscaters can generate inner classes which don't share a common package prefix with their outer class
+                // Code obfuscators can generate inner classes which don't share a common package prefix with their outer class
                 return classInfo.getName();
             }
             String nameFragment = classInfo.getName().substring(sb.length());

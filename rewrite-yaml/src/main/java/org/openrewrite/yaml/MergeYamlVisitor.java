@@ -43,7 +43,10 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private boolean shouldAutoFormat = true;
 
     public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs, @Nullable String objectIdentifyingProperty) {
-        this(scope, new YamlParser().parse(yamlString).get(0).getDocuments().get(0).getBlock(), acceptTheirs, objectIdentifyingProperty);
+        this(scope, new YamlParser().parse(yamlString)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML"))
+                .getDocuments().get(0).getBlock(), acceptTheirs, objectIdentifyingProperty);
     }
 
     @Override

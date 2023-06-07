@@ -33,14 +33,13 @@ import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Objects;
-
-import static java.util.stream.Collectors.toList;
+import java.util.stream.Stream;
 
 public class ProtoParser implements Parser<Proto.Document> {
+
     @Override
-    public List<Proto.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<Proto.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
@@ -79,12 +78,11 @@ public class ProtoParser implements Parser<Proto.Document> {
                         return null;
                     }
                 })
-                .filter(Objects::nonNull)
-                .collect(toList());
+                .filter(Objects::nonNull);
     }
 
     @Override
-    public List<Proto.Document> parse(@Language("protobuf") String... sources) {
+    public Stream<Proto.Document> parse(@Language("protobuf") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
