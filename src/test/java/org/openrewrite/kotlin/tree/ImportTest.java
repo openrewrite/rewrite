@@ -44,7 +44,7 @@ class ImportTest implements RewriteTest {
     }
 
     @Test
-    void staticEquivalent() {
+    void inlineImport() {
         rewriteRun(
           kotlin(
             """

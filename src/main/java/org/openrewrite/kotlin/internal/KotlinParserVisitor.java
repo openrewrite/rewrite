@@ -4125,7 +4125,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     private List<J.Annotation> mapModifiers(List<FirAnnotation> firAnnotations, String stopWord) {
         if ("<no name provided>".equals(stopWord)) {
-            return mapAnnotations(firAnnotations);
+            List<J.Annotation> annotations = mapAnnotations(firAnnotations);
+            return annotations == null ? emptyList() : annotations;
         }
 
         List<FirAnnotation> findMatch = new ArrayList<>(firAnnotations.size());

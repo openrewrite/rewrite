@@ -65,7 +65,7 @@ public class AddImportTest implements RewriteTest {
     }
 
     @Test
-    void addStaticImport() {
+    void inlineImport() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new AddImport<>("a.b.Target", "method", false))),
           kotlin(
