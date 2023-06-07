@@ -487,7 +487,7 @@ public interface JavaType {
         public ShallowClass(@Nullable Integer managedReference, long flagsBitMap, String fullyQualifiedName, Kind kind,
                             @Nullable List<JavaType> typeParameters, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
                             @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces, @Nullable List<Variable> members, @Nullable List<Method> methods) {
-            super(managedReference, flagsBitMap, fullyQualifiedName, kind, typeParameters, supertype, owningClass, annotations, interfaces, members, methods);
+            super(managedReference, flagsBitMap, fullyQualifiedName, kind, null, null, owningClass, null, null, null, null);
         }
 
         /**
