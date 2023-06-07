@@ -3388,15 +3388,15 @@ public interface J extends Tree {
         }
 
         @Nullable
-        JContainer<NameTree> throws_;
+        JContainer<NameTree> throwz;
 
         @Nullable
         public List<NameTree> getThrows() {
-            return throws_ == null ? null : throws_.getElements();
+            return throwz == null ? null : throwz.getElements();
         }
 
-        public MethodDeclaration withThrows(@Nullable List<NameTree> throws_) {
-            return getPadding().withThrows(JContainer.withElementsNullable(this.throws_, throws_));
+        public MethodDeclaration withThrows(@Nullable List<NameTree> throwz) {
+            return getPadding().withThrows(JContainer.withElementsNullable(this.throwz, throwz));
         }
 
         /**
@@ -3430,7 +3430,7 @@ public interface J extends Tree {
             if (type == this.methodType) {
                 return this;
             }
-            return new MethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression, name, parameters, throws_, body, defaultValue, type);
+            return new MethodDeclaration(id, prefix, markers, leadingAnnotations, modifiers, typeParameters, returnTypeExpression, name, parameters, throwz, body, defaultValue, type);
         }
 
         public JavaType getType() {
@@ -3530,16 +3530,16 @@ public interface J extends Tree {
             }
 
             public MethodDeclaration withParameters(JContainer<Statement> parameters) {
-                return t.parameters == parameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, parameters, t.throws_, t.body, t.defaultValue, t.methodType);
+                return t.parameters == parameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, parameters, t.throwz, t.body, t.defaultValue, t.methodType);
             }
 
             @Nullable
             public JContainer<NameTree> getThrows() {
-                return t.throws_;
+                return t.throwz;
             }
 
-            public MethodDeclaration withThrows(@Nullable JContainer<NameTree> throws_) {
-                return t.throws_ == throws_ ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, throws_, t.body, t.defaultValue, t.methodType);
+            public MethodDeclaration withThrows(@Nullable JContainer<NameTree> throwz) {
+                return t.throwz == throwz ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, throwz, t.body, t.defaultValue, t.methodType);
             }
 
             @Nullable
@@ -3548,7 +3548,7 @@ public interface J extends Tree {
             }
 
             public MethodDeclaration withDefaultValue(@Nullable JLeftPadded<Expression> defaultValue) {
-                return t.defaultValue == defaultValue ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throws_, t.body, defaultValue, t.methodType);
+                return t.defaultValue == defaultValue ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, defaultValue, t.methodType);
             }
 
             @Nullable
@@ -3557,7 +3557,7 @@ public interface J extends Tree {
             }
 
             public MethodDeclaration withTypeParameters(@Nullable TypeParameters typeParameters) {
-                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throws_, t.body, t.defaultValue, t.methodType);
+                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, t.defaultValue, t.methodType);
             }
         }
 
@@ -3586,7 +3586,7 @@ public interface J extends Tree {
             }
 
             public MethodDeclaration withTypeParameters(@Nullable TypeParameters typeParameters) {
-                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throws_, t.body, t.defaultValue, t.methodType);
+                return t.typeParameters == typeParameters ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, typeParameters, t.returnTypeExpression, t.name, t.parameters, t.throwz, t.body, t.defaultValue, t.methodType);
             }
 
             public IdentifierWithAnnotations getName() {
@@ -3594,7 +3594,7 @@ public interface J extends Tree {
             }
 
             public MethodDeclaration withName(IdentifierWithAnnotations name) {
-                return t.name == name ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, name, t.parameters, t.throws_, t.body, t.defaultValue, t.methodType);
+                return t.name == name ? t : new MethodDeclaration(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.typeParameters, t.returnTypeExpression, name, t.parameters, t.throwz, t.body, t.defaultValue, t.methodType);
             }
         }
     }
@@ -4730,8 +4730,8 @@ public interface J extends Tree {
                 @Override
                 public J visitBlock(Block block, AtomicReference<JavaType> javaType) {
                     if (!block.getStatements().isEmpty()) {
-                        Case case_ = (Case) block.getStatements().get(0);
-                        javaType.set(case_.getExpressions().get(0).getType());
+                        Case caze = (Case) block.getStatements().get(0);
+                        javaType.set(caze.getExpressions().get(0).getType());
                     }
                     return block;
                 }
@@ -4971,15 +4971,15 @@ public interface J extends Tree {
         List<Catch> catches;
 
         @Nullable
-        JLeftPadded<Block> finally_;
+        JLeftPadded<Block> finallie;
 
         @Nullable
         public Block getFinally() {
-            return finally_ == null ? null : finally_.getElement();
+            return finallie == null ? null : finallie.getElement();
         }
 
-        public Try withFinally(@Nullable Block finally_) {
-            return getPadding().withFinally(JLeftPadded.withElement(this.finally_, finally_));
+        public Try withFinally(@Nullable Block finallie) {
+            return getPadding().withFinally(JLeftPadded.withElement(this.finallie, finallie));
         }
 
         @Override
@@ -5078,16 +5078,16 @@ public interface J extends Tree {
             }
 
             public Try withResources(@Nullable JContainer<Resource> resources) {
-                return t.resources == resources ? t : new Try(t.id, t.prefix, t.markers, resources, t.body, t.catches, t.finally_);
+                return t.resources == resources ? t : new Try(t.id, t.prefix, t.markers, resources, t.body, t.catches, t.finallie);
             }
 
             @Nullable
             public JLeftPadded<Block> getFinally() {
-                return t.finally_;
+                return t.finallie;
             }
 
-            public Try withFinally(@Nullable JLeftPadded<Block> finally_) {
-                return t.finally_ == finally_ ? t : new Try(t.id, t.prefix, t.markers, t.resources, t.body, t.catches, finally_);
+            public Try withFinally(@Nullable JLeftPadded<Block> finallie) {
+                return t.finallie == finallie ? t : new Try(t.id, t.prefix, t.markers, t.resources, t.body, t.catches, finallie);
             }
         }
     }
