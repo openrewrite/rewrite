@@ -25,9 +25,7 @@ import java.util.function.UnaryOperator;
  * A source set that may be too large to be materialized in memory.
  * It contains operations for filtering and mapping that are optimized
  * for large repositories, though the same operations work on small repositories.
- * <br/>
- * Ordering is not guaranteed.
- * <br/>
+ * <p>
  * A large source set must always track of its initial state to be
  * able to produce {@link #getChangeset()} from that initial state
  * through any number of transformations to some end state.

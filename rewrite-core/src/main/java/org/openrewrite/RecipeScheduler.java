@@ -232,6 +232,7 @@ public class RecipeScheduler {
             });
         }
 
+        // FIXME could record the same source file for a recipe multiple times if edited by the same recipe across multiple cycles
         private void recordSourceFileResult(@Nullable SourceFile before, @Nullable SourceFile after, Stack<Recipe> recipeStack, ExecutionContext ctx) {
             String beforePath = (before == null) ? "" : before.getSourcePath().toString();
             String afterPath = (after == null) ? "" : after.getSourcePath().toString();
