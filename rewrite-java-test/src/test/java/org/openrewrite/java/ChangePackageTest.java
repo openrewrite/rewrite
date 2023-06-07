@@ -297,22 +297,20 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               import org.openrewrite.Test;
-              
+                            
               public class A {
                   Test a;
               }
               """,
             """
               import org.openrewrite.test.Test;
-              
+                            
               public class A {
                   Test a;
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(TypeUtils.asFullyQualified(cu.getTypesInUse().getVariables().iterator().next().getType()).
-                  getFullyQualifiedName()).isEqualTo("org.openrewrite.test.Test");
-            })
+            spec -> spec.afterRecipe(cu -> assertThat(TypeUtils.asFullyQualified(cu.getTypesInUse().getVariables().iterator().next().getType()).
+              getFullyQualifiedName()).isEqualTo("org.openrewrite.test.Test"))
           )
         );
     }
@@ -558,7 +556,7 @@ class ChangePackageTest implements RewriteTest {
         rewriteRun(
           java("""
               package org.openrewrite;
-              class Argument {}
+              public class Argument {}
               """,
             SourceSpec::skip),
           java(
@@ -573,7 +571,7 @@ class ChangePackageTest implements RewriteTest {
               @Target({ElementType.TYPE, ElementType.METHOD})
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test {
-                  Class<T> value();
+                  Class<?> value();
               }
               """,
             SourceSpec::skip
@@ -597,7 +595,7 @@ class ChangePackageTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.findType("org.openrewrite.Argument")).isEmpty();
-                // assertThat(cu.findType("org.openrewrite.test.Argument")).isNotEmpty();
+                assertThat(cu.findType("org.openrewrite.test.Argument")).isNotEmpty();
             })
           )
         );
@@ -609,7 +607,7 @@ class ChangePackageTest implements RewriteTest {
         rewriteRun(
           java("""
               package org.openrewrite;
-              class Argument {}
+              public class Argument {}
               """,
             SourceSpec::skip),
           java(
@@ -624,7 +622,7 @@ class ChangePackageTest implements RewriteTest {
               @Target({ElementType.TYPE, ElementType.METHOD})
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test {
-                  Class<T> named();
+                  Class<?> named();
               }
               """,
             SourceSpec::skip
@@ -648,7 +646,7 @@ class ChangePackageTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.findType("org.openrewrite.Argument")).isEmpty();
-                // assertThat(cu.findType("org.openrewrite.test.Argument")).isNotEmpty();
+                assertThat(cu.findType("org.openrewrite.test.Argument")).isNotEmpty();
             })
           )
         );
@@ -660,7 +658,7 @@ class ChangePackageTest implements RewriteTest {
         rewriteRun(
           java("""
               package org.openrewrite;
-              class Argument {}
+              public class Argument {}
               """,
             SourceSpec::skip),
           java(
@@ -675,7 +673,7 @@ class ChangePackageTest implements RewriteTest {
               @Target({ElementType.TYPE, ElementType.METHOD})
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test {
-                  Class<T> value();
+                  Class<?> value();
               }
               """,
             SourceSpec::skip
@@ -697,7 +695,7 @@ class ChangePackageTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.findType("org.openrewrite.Argument")).isEmpty();
-                // assertThat(cu.findType("org.openrewrite.test.Argument")).isNotEmpty();
+                assertThat(cu.findType("org.openrewrite.test.Argument")).isNotEmpty();
             })
           )
         );
@@ -709,7 +707,7 @@ class ChangePackageTest implements RewriteTest {
         rewriteRun(
           java("""
               package org.openrewrite;
-              class Argument {}
+              public class Argument {}
               """,
             SourceSpec::skip),
           java(
@@ -724,7 +722,7 @@ class ChangePackageTest implements RewriteTest {
               @Target({ElementType.TYPE, ElementType.METHOD})
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test {
-                  Class<T> named();
+                  Class<?> named();
               }
               """,
             SourceSpec::skip
@@ -746,7 +744,7 @@ class ChangePackageTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 assertThat(cu.findType("org.openrewrite.Argument")).isEmpty();
-                // assertThat(cu.findType("org.openrewrite.test.Argument")).isNotEmpty();
+                assertThat(cu.findType("org.openrewrite.test.Argument")).isNotEmpty();
             })
           )
         );
@@ -1258,13 +1256,13 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               import org.openrewrite.Test;
-              public class Test {
+              public class A {
                   Class<?> clazz = Test.class;
               }
               """,
             """
               import org.openrewrite.test.Test;
-              public class Test {
+              public class A {
                   Class<?> clazz = Test.class;
               }
               """,
