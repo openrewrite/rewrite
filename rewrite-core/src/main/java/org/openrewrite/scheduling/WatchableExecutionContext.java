@@ -24,7 +24,6 @@ import java.util.function.Consumer;
 
 @RequiredArgsConstructor
 public class WatchableExecutionContext implements ExecutionContext {
-
     private final ExecutionContext delegate;
 
     private boolean hasNewMessages = false;
@@ -41,6 +40,10 @@ public class WatchableExecutionContext implements ExecutionContext {
     public void putMessage(String key, @Nullable Object value) {
         hasNewMessages = true;
         delegate.putMessage(key, value);
+    }
+
+    public void putCycle(int cycle) {
+        delegate.putMessage(CURRENT_CYCLE, cycle);
     }
 
     @Nullable

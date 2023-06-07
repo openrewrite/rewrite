@@ -54,6 +54,7 @@ public class RecipeScheduler {
         LargeSourceSet after = sourceSet;
 
         for (int i = 1; i <= maxCycles; i++) {
+            ctxWithWatch.putCycle(i);
             after.beforeCycle();
 
             // this root cursor is shared by all `TreeVisitor` instances used created from `getVisitor` and
