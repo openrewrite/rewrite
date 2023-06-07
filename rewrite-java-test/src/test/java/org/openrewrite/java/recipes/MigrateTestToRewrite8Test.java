@@ -15,11 +15,11 @@
  */
 package org.openrewrite.java.recipes;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -29,10 +29,9 @@ class MigrateTestToRewrite8Test implements RewriteTest {
         spec.recipe(new MigrateTestToRewrite8())
           .parser(JavaParser.fromJavaVersion()
             .classpath(JavaParser.runtimeClasspath())
-          );
+          ).typeValidationOptions(TypeValidation.none());
     }
 
-    @Disabled
     @Test
     void doNextToRecipes() {
         // language=java

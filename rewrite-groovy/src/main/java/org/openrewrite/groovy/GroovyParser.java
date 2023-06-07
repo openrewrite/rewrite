@@ -36,7 +36,6 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
-import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.*;
@@ -99,7 +98,6 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
     @Override
     public Stream<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
-        ParsingEventListener parsingListener = pctx.getParsingListener();
         return parseInputsToCompilerAst(sources, relativeTo, pctx)
                 .map(entry -> {
                     CompiledGroovySource compiled = entry.getCompiledGroovySource();
@@ -120,7 +118,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                             }
                             gcu = gcu.withMarkers(m);
                         }
-                        parsingListener.parsed(compiled.getInput(), gcu);
+                        pctx.getParsingListener().parsed(compiled.getInput(), gcu);
                         return gcu;
                     } catch (Throwable t) {
                         pctx.parseFailure(compiled.getInput(), relativeTo, this, t);
@@ -154,11 +152,10 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
         for (Consumer<CompilerConfiguration> compilerCustomizer : compilerCustomizers) {
             compilerCustomizer.accept(configuration);
         }
-
-        try (GroovyClassLoader classLoader = new GroovyClassLoader(getClass().getClassLoader(), configuration, true)) {
-            return StreamSupport.stream(sources.spliterator(), false)
-                    .map(input -> {
-                        ParseWarningCollector errorCollector = new ParseWarningCollector(configuration, this);
+        return StreamSupport.stream(sources.spliterator(), false)
+                .map(input -> {
+                    ParseWarningCollector errorCollector = new ParseWarningCollector(configuration, this);
+                    try (GroovyClassLoader classLoader = new GroovyClassLoader(getClass().getClassLoader(), configuration, true)) {
                         SourceUnit unit = new SourceUnit(
                                 "doesntmatter",
                                 new InputStreamReaderSource(input.getSource(ctx), configuration),
@@ -169,40 +166,35 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
 
                         CompilationUnit compUnit = new CompilationUnit(configuration, null, classLoader, classLoader);
                         compUnit.addSource(unit);
+                        compUnit.compile(Phases.CANONICALIZATION);
+                        ModuleNode ast = unit.getAST();
 
-                        try {
-                            compUnit.compile(Phases.CANONICALIZATION);
-                            ModuleNode ast = unit.getAST();
-
-                            for (ClassNode aClass : ast.getClasses()) {
-                                try {
-                                    StaticTypeCheckingVisitor staticTypeCheckingVisitor = new StaticTypeCheckingVisitor(unit, aClass);
-                                    staticTypeCheckingVisitor.setCompilationUnit(compUnit);
-                                    staticTypeCheckingVisitor.visitClass(aClass);
-                                } catch (NoClassDefFoundError ignored) {
-                                }
-                            }
-
-                            return new Intermediate(new CompiledGroovySource(input, unit, ast), errorCollector.getWarningMarkers());
-                        } catch (Throwable t) {
-                            ctx.parseFailure(input, relativeTo, this, t);
-                            ctx.getOnError().accept(t);
-                        } finally {
-                            if (logCompilationWarningsAndErrors && (errorCollector.hasErrors() || errorCollector.hasWarnings())) {
-                                try (StringWriter sw = new StringWriter();
-                                     PrintWriter pw = new PrintWriter(sw)) {
-                                    errorCollector.write(pw, new Janitor());
-                                    org.slf4j.LoggerFactory.getLogger(GroovyParser.class).warn(sw.toString());
-                                } catch (IOException ignored) {
-                                    // unreachable
-                                }
+                        for (ClassNode aClass : ast.getClasses()) {
+                            try {
+                                StaticTypeCheckingVisitor staticTypeCheckingVisitor = new StaticTypeCheckingVisitor(unit, aClass);
+                                staticTypeCheckingVisitor.setCompilationUnit(compUnit);
+                                staticTypeCheckingVisitor.visitClass(aClass);
+                            } catch (NoClassDefFoundError ignored) {
                             }
                         }
-                        return null;
-                    });
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+
+                        return new Intermediate(new CompiledGroovySource(input, unit, ast), errorCollector.getWarningMarkers());
+                    } catch (Throwable t) {
+                        ctx.parseFailure(input, relativeTo, this, t);
+                        ctx.getOnError().accept(t);
+                    } finally {
+                        if (logCompilationWarningsAndErrors && (errorCollector.hasErrors() || errorCollector.hasWarnings())) {
+                            try (StringWriter sw = new StringWriter();
+                                 PrintWriter pw = new PrintWriter(sw)) {
+                                errorCollector.write(pw, new Janitor());
+                                org.slf4j.LoggerFactory.getLogger(GroovyParser.class).warn(sw.toString());
+                            } catch (IOException ignored) {
+                                // unreachable
+                            }
+                        }
+                    }
+                    return null;
+                });
     }
 
     @Override
