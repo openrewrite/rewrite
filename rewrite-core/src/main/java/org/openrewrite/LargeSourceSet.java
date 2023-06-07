@@ -35,6 +35,12 @@ import java.util.function.UnaryOperator;
 public interface LargeSourceSet {
 
     /**
+     * Called by {@link RecipeScheduler} at the conclusion of a scan/generate/edit cycle.
+     */
+    default void beforeCycle() {
+    }
+
+    /**
      * Maintain context about what recipe is performing an edit or generating code.
      *
      * @param recipeStack A stack rooted at the currently operating recipe and extending up its containing recipes
@@ -60,7 +66,7 @@ public interface LargeSourceSet {
     LargeSourceSet generate(@Nullable Collection<? extends SourceFile> ls);
 
     /**
-     * Called by {@link RecipeScheduler} at the conclusion of a scan/edit/generation cycle.
+     * Called by {@link RecipeScheduler} at the conclusion of a scan/generate/edit cycle.
      */
     default void afterCycle(boolean lastCycle) {
     }

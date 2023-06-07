@@ -55,6 +55,8 @@ public class RecipeScheduler {
         LargeSourceSet after = acc;
 
         for (int i = 1; i <= maxCycles; i++) {
+            after.beforeCycle();
+
             // this root cursor is shared by all `TreeVisitor` instances used created from `getVisitor` and
             // single source applicable tests so that data can be shared at the root (especially for caching
             // use cases like sharing a `JavaTypeCache` between `JavaTemplate` parsers).
@@ -74,6 +76,8 @@ public class RecipeScheduler {
             after = cycle.editSources(after, i);
 
             if (i >= minCycles &&
+                // FIXME after will ALWAYS be == acc in MLSS (always breaks after first cycle)
+                // FIXME causesAnotherCycle always causes another cycle regardless of whether recipe made a change
                 ((after == acc && !ctxWithWatch.hasNewMessages()) || !recipe.causesAnotherCycle())) {
                 after.afterCycle(true);
                 break;
