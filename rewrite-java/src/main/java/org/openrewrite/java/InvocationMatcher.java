@@ -26,8 +26,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Matcher for finding {@link J.NewClass} and {@link J.MethodInvocation} {@link Expression}s.
@@ -41,7 +39,7 @@ public interface InvocationMatcher {
         return new AdvancedInvocationMatcher(this);
     }
 
-    static InvocationMatcher fromInvocationMatchers(Collection<? extends InvocationMatcher> matchers) {
+    static InvocationMatcher or(Collection<? extends InvocationMatcher> matchers) {
         if (matchers.isEmpty()) {
             return expression -> false;
         }
@@ -51,8 +49,8 @@ public interface InvocationMatcher {
         return expression -> matchers.stream().anyMatch(matcher -> matcher.matches(expression));
     }
 
-    static InvocationMatcher fromInvocationMatchers(InvocationMatcher... invocationMatchers) {
-        return fromInvocationMatchers(Arrays.asList(invocationMatchers));
+    static InvocationMatcher or(InvocationMatcher... invocationMatchers) {
+        return or(Arrays.asList(invocationMatchers));
     }
 
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
