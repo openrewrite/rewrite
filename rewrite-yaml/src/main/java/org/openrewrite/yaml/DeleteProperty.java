@@ -17,22 +17,23 @@ package org.openrewrite.yaml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import lombok.With;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Spliterators.spliteratorUnknownSize;
 import static java.util.stream.StreamSupport.stream;
+import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -112,6 +113,37 @@ public class DeleteProperty extends Recipe {
         private DeletePropertyVisitor(Yaml.Mapping.Entry scope) {
             this.scope = scope;
         }
+        @Override
+        public Yaml visitSequence(Yaml.Sequence sequence, P p) {
+            sequence = (Yaml.Sequence) super.visitSequence(sequence, p);
+            List<Yaml.Sequence.Entry> entries = sequence.getEntries();
+            entries = ListUtils.map(entries, entry -> {
+                if (ToBeRemoved.hasMarker(entry)) {
+                    return null;
+                } else {
+                    return entry;
+                }
+            });
+
+            if (entries.isEmpty()) {
+                return ToBeRemoved.withMarker(sequence);
+            } else {
+                return sequence.withEntries(entries);
+            }
+        }
+
+        @Override
+        public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
+            entry = (Yaml.Sequence.Entry) super.visitSequenceEntry(entry, p);
+            if (entry.getBlock() instanceof Yaml.Mapping) {
+                Yaml.Mapping m = (Yaml.Mapping) entry.getBlock();
+                if (ToBeRemoved.hasMarker(m)) {
+                    // remove by returning null
+                    return ToBeRemoved.withMarker(entry);
+                }
+            }
+            return entry;
+        }
 
         @Override
         public Yaml visitMapping(Yaml.Mapping mapping, P p) {
@@ -121,6 +153,11 @@ public class DeleteProperty extends Recipe {
             List<Yaml.Mapping.Entry> entries = new ArrayList<>();
             String deletedPrefix = null;
             for (Yaml.Mapping.Entry entry : m.getEntries()) {
+                if (ToBeRemoved.hasMarker(entry.getValue())) {
+                    changed = true;
+                    continue;
+                }
+
                 if (entry == scope || (entry.getValue() instanceof Yaml.Mapping && ((Yaml.Mapping) entry.getValue()).getEntries().isEmpty())) {
                     deletedPrefix = entry.getPrefix();
                     changed = true;
@@ -135,6 +172,9 @@ public class DeleteProperty extends Recipe {
 
             if (changed) {
                 m = m.withEntries(entries);
+                if (entries.isEmpty()) {
+                    m = ToBeRemoved.withMarker(m);
+                }
 
                 if (getCursor().getParentOrThrow().getValue() instanceof Yaml.Document) {
                     Yaml.Document document = getCursor().getParentOrThrow().getValue();
@@ -147,4 +187,17 @@ public class DeleteProperty extends Recipe {
         }
     }
 
+    @Value
+    @With
+    private static class ToBeRemoved implements Marker {
+        UUID id;
+
+        static <Y2 extends Yaml> Y2 withMarker(Y2 y) {
+            return y.withMarkers(y.getMarkers().addIfAbsent(new ToBeRemoved(randomId())));
+        }
+
+        static boolean hasMarker(Yaml y) {
+            return y.getMarkers().findFirst(ToBeRemoved.class).isPresent();
+        }
+    }
 }
