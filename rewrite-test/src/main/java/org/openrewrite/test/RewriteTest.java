@@ -421,7 +421,8 @@ public interface RewriteTest extends SourceSpecs {
         for (Map.Entry<SourceFile, SourceSpec<?>> specForSourceFile : specBySourceFile.entrySet()) {
             SourceSpec<?> sourceSpec = specForSourceFile.getValue();
             for (Result result : allResults) {
-                if (result.getBefore() == specForSourceFile.getKey()) {
+                if ((result.getBefore() == null && specForSourceFile.getKey() == null) ||
+                    (result.getBefore() != null && result.getBefore().getId().equals(specForSourceFile.getKey().getId()))) {
                     if (result.getAfter() != null) {
                         String expectedAfter = sourceSpec.after == null ? null :
                                 sourceSpec.after.apply(result.getAfter().printAll(out.clone()));
