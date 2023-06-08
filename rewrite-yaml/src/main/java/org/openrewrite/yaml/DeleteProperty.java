@@ -113,23 +113,13 @@ public class DeleteProperty extends Recipe {
         private DeletePropertyVisitor(Yaml.Mapping.Entry scope) {
             this.scope = scope;
         }
+
         @Override
         public Yaml visitSequence(Yaml.Sequence sequence, P p) {
             sequence = (Yaml.Sequence) super.visitSequence(sequence, p);
             List<Yaml.Sequence.Entry> entries = sequence.getEntries();
-            entries = ListUtils.map(entries, entry -> {
-                if (ToBeRemoved.hasMarker(entry)) {
-                    return null;
-                } else {
-                    return entry;
-                }
-            });
-
-            if (entries.isEmpty()) {
-                return ToBeRemoved.withMarker(sequence);
-            } else {
-                return sequence.withEntries(entries);
-            }
+            entries = ListUtils.map(entries, entry -> ToBeRemoved.hasMarker(entry) ? null : entry);
+            return entries.isEmpty() ? ToBeRemoved.withMarker(sequence) : sequence.withEntries(entries);
         }
 
         @Override
@@ -138,7 +128,6 @@ public class DeleteProperty extends Recipe {
             if (entry.getBlock() instanceof Yaml.Mapping) {
                 Yaml.Mapping m = (Yaml.Mapping) entry.getBlock();
                 if (ToBeRemoved.hasMarker(m)) {
-                    // remove by returning null
                     return ToBeRemoved.withMarker(entry);
                 }
             }
@@ -152,6 +141,7 @@ public class DeleteProperty extends Recipe {
             boolean changed = false;
             List<Yaml.Mapping.Entry> entries = new ArrayList<>();
             String deletedPrefix = null;
+            int count = 0;
             for (Yaml.Mapping.Entry entry : m.getEntries()) {
                 if (ToBeRemoved.hasMarker(entry.getValue())) {
                     changed = true;
@@ -163,10 +153,14 @@ public class DeleteProperty extends Recipe {
                     changed = true;
                 } else {
                     if (deletedPrefix != null) {
-                        entry = entry.withPrefix(deletedPrefix);
+                        if (count == 0 && containsOnlyWhitespace(entry.getPrefix())) {
+                            // do this only if the entry will be the first element
+                            entry = entry.withPrefix(deletedPrefix);
+                        }
                         deletedPrefix = null;
                     }
                     entries.add(entry);
+                    count++;
                 }
             }
 
@@ -187,15 +181,28 @@ public class DeleteProperty extends Recipe {
         }
     }
 
+    private static boolean containsOnlyWhitespace(String str) {
+        if (str == null || str.isEmpty()) {
+            return false;
+        }
+
+        for (int i = 0; i < str.length(); i++) {
+            char c = str.charAt(i);
+            if (!Character.isWhitespace(c)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     @Value
     @With
     private static class ToBeRemoved implements Marker {
         UUID id;
-
         static <Y2 extends Yaml> Y2 withMarker(Y2 y) {
             return y.withMarkers(y.getMarkers().addIfAbsent(new ToBeRemoved(randomId())));
         }
-
         static boolean hasMarker(Yaml y) {
             return y.getMarkers().findFirst(ToBeRemoved.class).isPresent();
         }

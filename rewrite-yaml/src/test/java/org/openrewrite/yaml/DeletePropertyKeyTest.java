@@ -95,11 +95,40 @@ class DeletePropertyKeyTest implements RewriteTest {
                 bar:
                   sequence:
                     - propertyA: fieldA
+                  # comments
                   scalar: value
               """,
             """
               foo:
                 bar:
+                  # comments
+                  scalar: value
+              """
+          )
+        );
+    }
+
+
+    @Test
+    void deleteFirstItemWithComments() {
+        rewriteRun(
+          spec -> spec.recipe(new DeleteProperty("foo.bar.sequence",
+            null, null)),
+          yaml(
+            """
+              foo:
+                bar:
+                  sequence:
+                    - name: name
+                    - propertyA: fieldA
+                    - propertyB: fieldB
+                  # Some comments
+                  scalar: value
+              """,
+            """
+              foo:
+                bar:
+                  # Some comments
                   scalar: value
               """
           )
