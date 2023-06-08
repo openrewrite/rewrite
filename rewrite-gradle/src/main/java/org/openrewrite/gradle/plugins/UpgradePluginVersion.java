@@ -71,7 +71,7 @@ public class UpgradePluginVersion extends Recipe {
     }
 
     @Override
-    public Validated validate() {
+    public Validated<Object> validate() {
         return super.validate().and(Semver.validate(newVersion, versionPattern));
     }
 
