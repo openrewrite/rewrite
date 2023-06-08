@@ -141,7 +141,6 @@ class PrintMavenAsCycloneDxBomTest implements RewriteTest {
         String bom = PrintMavenAsCycloneDxBom.print(pom)
           .replaceAll("<timestamp>.*</timestamp>", "<timestamp>TODAY</timestamp>");
 
-        String expectedQualifier = "type=pom";
         assertThat(bom).isEqualTo(String.format(
             """
             <?xml version="1.0" encoding="UTF-8"?>
@@ -160,11 +159,11 @@ class PrintMavenAsCycloneDxBomTest implements RewriteTest {
                         <name>pom_packaging</name>
                         <version>1.0</version>
                         <scope>required</scope>
-                        <purl>pkg:maven/org.example/pom_packaging@1.0?%s</purl>
+                        <purl>pkg:maven/org.example/pom_packaging@1.0?type=pom</purl>
                     </component>
                 </metadata>
             </bom>
-            """, pom.getId().toString(), expectedQualifier)
+            """, pom.getId().toString())
         );
 
     }
