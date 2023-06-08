@@ -32,20 +32,20 @@ class QualifyThisVisitorTest implements RewriteTest {
     void qualifyThis() {
         rewriteRun(
                 java("""
-                public class Foo {
-                    private String str = "str";
-                    public String getStr() {
-                        return this.str;
-                    }
-                }
-                """, """
-                public class Foo {
-                    private String str = "str";
-                    public String getStr() {
-                        return Foo.this.str;
-                    }
-                }
-                """)
+                        public class Foo {
+                            private String str = "str";
+                            public String getStr() {
+                                return this.str;
+                            }
+                        }
+                        """, """
+                        public class Foo {
+                            private String str = "str";
+                            public String getStr() {
+                                return Foo.this.str;
+                            }
+                        }
+                        """)
         );
     }
 
@@ -53,20 +53,20 @@ class QualifyThisVisitorTest implements RewriteTest {
     void qualifyThisMethodInvocation() {
         rewriteRun(
                 java("""
-                public class Foo {
-                    private String str = "str";
-                    public int getLength() {
-                        return this.str.length();
-                    }
-                }
-                """, """
-                public class Foo {
-                    private String str = "str";
-                    public int getLength() {
-                        return Foo.this.str.length();
-                    }
-                }
-                """)
+                        public class Foo {
+                            private String str = "str";
+                            public int getLength() {
+                                return this.str.length();
+                            }
+                        }
+                        """, """
+                        public class Foo {
+                            private String str = "str";
+                            public int getLength() {
+                                return Foo.this.str.length();
+                            }
+                        }
+                        """)
         );
     }
 }
