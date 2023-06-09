@@ -49,14 +49,6 @@ class LombokUtilityClassTest implements RewriteTest {
                                       return x + y;
                                    }
                                 }
-                                """,
-                        """
-                                public class A {
-                                   private final int x = 0;
-                                   public static int add(final int x, final int y) {
-                                      return x + y;
-                                   }
-                                }
                                 """
                 )
         );
@@ -69,13 +61,6 @@ class LombokUtilityClassTest implements RewriteTest {
                 recipeSpec -> recipeSpec
                         .recipe(new LombokUtilityClass()),
                 java(
-                        """
-                                public class A {
-                                   public int add(final int x, final int y) {
-                                      return x + y;
-                                   }
-                                }
-                                """,
                         """
                                 public class A {
                                    public int add(final int x, final int y) {
