@@ -57,7 +57,7 @@ public class MergeYaml extends Recipe {
                 .and(Validated.test("yaml", "Must be valid YAML",
                         yaml, y -> new YamlParser().parse(yaml)
                                 .findFirst()
-                                .map(doc -> !doc.getDocuments().isEmpty())
+                                .map(doc -> !((Yaml.Documents) doc).getDocuments().isEmpty())
                                 .orElse(false)));
     }
 
@@ -76,6 +76,7 @@ public class MergeYaml extends Recipe {
         JsonPathMatcher matcher = new JsonPathMatcher(key);
         Yaml incoming = new YamlParser().parse(yaml)
                 .findFirst()
+                .map(Yaml.Documents.class::cast)
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML"))
                 .getDocuments().get(0).getBlock();
 

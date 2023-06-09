@@ -20,6 +20,7 @@ import io.micrometer.core.instrument.Timer;
 import org.antlr.v4.runtime.*;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.hcl.internal.HclParserVisitor;
 import org.openrewrite.hcl.internal.grammar.HCLLexer;
 import org.openrewrite.hcl.internal.grammar.HCLParser;
@@ -38,7 +39,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
 
-public class HclParser implements Parser<Hcl.ConfigFile> {
+public class HclParser implements Parser {
     private final List<NamedStyles> styles;
 
     private HclParser(List<NamedStyles> styles) {
@@ -46,7 +47,7 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
     }
 
     @Override
-    public Stream<Hcl.ConfigFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
@@ -78,7 +79,7 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
 
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, configFile);
-                        return configFile;
+                        return (SourceFile) configFile;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
                         ParsingExecutionContextView.view(ctx).parseFailure(sourceFile, relativeTo, this, t);

@@ -27,15 +27,14 @@ import java.io.*;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static org.openrewrite.Tree.randomId;
 
-public class QuarkParser implements Parser<Quark> {
+public class QuarkParser implements Parser {
 
-    public static List<Quark> parseAllOtherFiles(Path rootDir, List<SourceFile> sourceFiles) throws IOException {
+    public static Stream<SourceFile> parseAllOtherFiles(Path rootDir, List<SourceFile> sourceFiles) throws IOException {
         Stack<List<PathMatcher>> gitignores = new Stack<>();
         parseGitignore(new File(System.getProperty("user.home") + "/.gitignore"), gitignores);
 
@@ -85,8 +84,7 @@ public class QuarkParser implements Parser<Quark> {
             }
         });
 
-        return new QuarkParser().parse(quarks, rootDir, new InMemoryExecutionContext())
-                .collect(Collectors.toList());
+        return new QuarkParser().parse(quarks, rootDir, new InMemoryExecutionContext());
     }
 
     private static void parseGitignore(File gitignore, Stack<List<PathMatcher>> gitignores) throws IOException {
@@ -107,7 +105,7 @@ public class QuarkParser implements Parser<Quark> {
     }
 
     @Override
-    public Stream<Quark> parseInputs(Iterable<Parser.Input> sources, @Nullable Path relativeTo,
+    public Stream<SourceFile> parseInputs(Iterable<Parser.Input> sources, @Nullable Path relativeTo,
                                      ExecutionContext ctx) {
         return StreamSupport.stream(sources.spliterator(), false).map(source ->
                 new Quark(randomId(),
@@ -138,7 +136,7 @@ public class QuarkParser implements Parser<Quark> {
         }
 
         @Override
-        public Parser<Quark> build() {
+        public QuarkParser build() {
             return new QuarkParser();
         }
 

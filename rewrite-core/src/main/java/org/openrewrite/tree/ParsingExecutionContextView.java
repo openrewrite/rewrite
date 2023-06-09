@@ -55,7 +55,7 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
         return getMessage(PARSING_LISTENER, ParsingEventListener.NOOP);
     }
 
-    public ParsingExecutionContextView parseFailure(Parser.Input input, @Nullable Path relativeTo, Parser<?> parser, Throwable t) {
+    public ParsingExecutionContextView parseFailure(Parser.Input input, @Nullable Path relativeTo, Parser parser, Throwable t) {
         PlainText pt = PlainText.builder()
                 .sourcePath(input.getRelativePath(relativeTo))
                 .text(input.getSource(this).readFully())
@@ -63,7 +63,7 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
         return parseFailure(pt, parser, t);
     }
 
-    public ParsingExecutionContextView parseFailure(PlainText raw, Parser<?> parser, Throwable t) {
+    public ParsingExecutionContextView parseFailure(PlainText raw, Parser parser, Throwable t) {
         putMessageInCollection(PARSING_FAILURES,
                 raw.withMarkers(raw.getMarkers().addIfAbsent(ParseExceptionResult.build(parser, t))),
                 ArrayList::new);

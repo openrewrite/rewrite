@@ -29,6 +29,7 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -134,7 +135,7 @@ class ReloadableJava8Parser implements JavaParser {
     }
 
     @Override
-    public Stream<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         if (classpath != null) { // override classpath
@@ -203,7 +204,7 @@ class ReloadableJava8Parser implements JavaParser {
                                                 .tag("step", "(3) Map to Rewrite AST"))
                                 .register(Metrics.globalRegistry));
                         parsingListener.parsed(input, cu);
-                        return cu;
+                        return (SourceFile) cu;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(
                                         Timer.builder("rewrite.parse")

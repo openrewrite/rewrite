@@ -26,10 +26,7 @@ import org.codehaus.groovy.control.io.InputStreamReaderSource;
 import org.codehaus.groovy.control.messages.WarningMessage;
 import org.codehaus.groovy.transform.stc.StaticTypeCheckingVisitor;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.ParseWarning;
-import org.openrewrite.Parser;
+import org.openrewrite.*;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
@@ -54,7 +51,7 @@ import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-public class GroovyParser implements Parser<G.CompilationUnit> {
+public class GroovyParser implements Parser {
     @Nullable
     private final Collection<Path> classpath;
 
@@ -64,7 +61,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
     private final List<Consumer<CompilerConfiguration>> compilerCustomizers;
 
     @Override
-    public Stream<G.CompilationUnit> parse(@Language("groovy") String... sources) {
+    public Stream<SourceFile> parse(@Language("groovy") String... sources) {
         Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
         Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
 
@@ -96,7 +93,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
     }
 
     @Override
-    public Stream<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         return parseInputsToCompilerAst(sources, relativeTo, pctx)
                 .map(entry -> {
@@ -119,7 +116,7 @@ public class GroovyParser implements Parser<G.CompilationUnit> {
                             gcu = gcu.withMarkers(m);
                         }
                         pctx.getParsingListener().parsed(compiled.getInput(), gcu);
-                        return gcu;
+                        return (SourceFile) gcu;
                     } catch (Throwable t) {
                         pctx.parseFailure(compiled.getInput(), relativeTo, this, t);
                         ctx.getOnError().accept(t);

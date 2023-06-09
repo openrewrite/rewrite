@@ -17,6 +17,7 @@ package org.openrewrite.binary;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParsingExecutionContextView;
@@ -32,15 +33,15 @@ import static org.openrewrite.internal.StreamUtils.readAllBytes;
 /**
  * Doesn't actually _parse_ anything, but if you want to wrap binary data into a SourceFile, this will do the trick
  */
-public class BinaryParser implements Parser<Binary> {
+public class BinaryParser implements Parser {
 
     @Override
-    public Stream<Binary> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         return StreamSupport.stream(sources.spliterator(), false)
                 .map(source -> {
                     Path path = source.getRelativePath(relativeTo);
                     try {
-                        return new Binary(randomId(),
+                        return (SourceFile) new Binary(randomId(),
                                 path,
                                 Markers.EMPTY,
                                 source.getFileAttributes(),

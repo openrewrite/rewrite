@@ -22,6 +22,7 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.lang.Nullable;
@@ -36,9 +37,9 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.stream.Stream;
 
-public class XmlParser implements Parser<Xml.Document> {
+public class XmlParser implements Parser {
     @Override
-    public Stream<Xml.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
@@ -67,7 +68,7 @@ public class XmlParser implements Parser<Xml.Document> {
 
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, document);
-                        return document;
+                        return (SourceFile) document;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
                         ParsingExecutionContextView.view(ctx).parseFailure(sourceFile, relativeTo, this, t);
@@ -79,7 +80,7 @@ public class XmlParser implements Parser<Xml.Document> {
     }
 
     @Override
-    public Stream<Xml.Document> parse(@Language("xml") String... sources) {
+    public Stream<SourceFile> parse(@Language("xml") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 

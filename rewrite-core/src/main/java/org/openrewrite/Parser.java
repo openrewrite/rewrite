@@ -37,8 +37,8 @@ import java.util.stream.StreamSupport;
 
 import static java.util.stream.Collectors.toList;
 
-public interface Parser<S extends SourceFile> {
-    default Stream<S> parse(Iterable<Path> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+public interface Parser {
+    default Stream<SourceFile> parse(Iterable<Path> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return parseInputs(StreamSupport
                         .stream(sourceFiles.spliterator(), false)
                         .map(sourceFile -> new Input(sourceFile, () -> {
@@ -54,11 +54,11 @@ public interface Parser<S extends SourceFile> {
         );
     }
 
-    default Stream<S> parse(String... sources) {
+    default Stream<SourceFile> parse(String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
-    default Stream<S> parse(ExecutionContext ctx, String... sources) {
+    default Stream<SourceFile> parse(ExecutionContext ctx, String... sources) {
         return parseInputs(
                 Arrays.stream(sources).map(source ->
                         new Input(
@@ -79,7 +79,7 @@ public interface Parser<S extends SourceFile> {
      * @param ctx        The execution context
      * @return A stream of {@link SourceFile}.
      */
-    Stream<S> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx);
+    Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx);
 
     boolean accept(Path path);
 
@@ -93,7 +93,7 @@ public interface Parser<S extends SourceFile> {
                 .collect(toList());
     }
 
-    default Parser<S> reset() {
+    default Parser reset() {
         return this;
     }
 
@@ -218,7 +218,7 @@ public interface Parser<S extends SourceFile> {
         @Getter
         private final Class<? extends SourceFile> sourceFileType;
 
-        public abstract Parser<?> build();
+        public abstract Parser build();
 
         /**
          * The name of the domain specific language this parser builder produces a parser for.

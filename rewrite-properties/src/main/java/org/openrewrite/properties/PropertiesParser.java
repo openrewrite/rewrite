@@ -18,10 +18,7 @@ package org.openrewrite.properties;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.FileAttributes;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Parser;
+import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.lang.Nullable;
@@ -38,14 +35,14 @@ import java.util.stream.Stream;
 
 import static org.openrewrite.Tree.randomId;
 
-public class PropertiesParser implements Parser<Properties.File> {
+public class PropertiesParser implements Parser {
     @Override
-    public Stream<Properties.File> parse(@Language("properties") String... sources) {
+    public Stream<SourceFile> parse(@Language("properties") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
     @Override
-    public Stream<Properties.File> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
@@ -59,7 +56,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                                 .withFileAttributes(sourceFile.getFileAttributes());
                         sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, file);
-                        return file;
+                        return (SourceFile) file;
                     } catch (Throwable t) {
                         sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
                         ParsingExecutionContextView.view(ctx).parseFailure(sourceFile, relativeTo, this, t);

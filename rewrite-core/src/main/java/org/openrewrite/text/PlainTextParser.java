@@ -31,7 +31,7 @@ import java.util.stream.StreamSupport;
 
 import static org.openrewrite.Tree.randomId;
 
-public class PlainTextParser implements Parser<PlainText> {
+public class PlainTextParser implements Parser {
 
     /**
      * Downcast a {@link SourceFile} to a {@link PlainText} if it isn't already one.
@@ -59,7 +59,7 @@ public class PlainTextParser implements Parser<PlainText> {
     }
 
     @Override
-    public Stream<PlainText> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
+    public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
                                          ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return StreamSupport.stream(sources.spliterator(), false)
@@ -78,7 +78,7 @@ public class PlainTextParser implements Parser<PlainText> {
                                 sourceStr,
                                 null);
                         parsingListener.parsed(source, plainText);
-                        return plainText;
+                        return (SourceFile) plainText;
                     } catch (Throwable t) {
                         ParsingExecutionContextView.view(ctx).parseFailure(source, relativeTo, this, t);
                         ctx.getOnError().accept(t);
@@ -108,7 +108,7 @@ public class PlainTextParser implements Parser<PlainText> {
         }
 
         @Override
-        public Parser<?> build() {
+        public PlainTextParser build() {
             return new PlainTextParser();
         }
 

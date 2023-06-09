@@ -17,10 +17,7 @@ package org.openrewrite.maven;
 
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.ParseExceptionResult;
-import org.openrewrite.Parser;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.RawPom;
@@ -45,16 +42,16 @@ import static java.util.Collections.*;
 import static org.openrewrite.Tree.randomId;
 
 @RequiredArgsConstructor
-public class MavenParser implements Parser<Xml.Document> {
+public class MavenParser implements Parser {
     private final Collection<String> activeProfiles;
 
     @Override
-    public Stream<Xml.Document> parse(@Language("xml") String... sources) {
+    public Stream<SourceFile> parse(@Language("xml") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
     @Override
-    public Stream<Xml.Document> parse(ExecutionContext ctx, @Language("xml") String... sources) {
+    public Stream<SourceFile> parse(ExecutionContext ctx, @Language("xml") String... sources) {
         return Parser.super.parse(ctx, sources);
     }
 
@@ -66,7 +63,7 @@ public class MavenParser implements Parser<Xml.Document> {
     }
 
     @Override
-    public Stream<Xml.Document> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
+    public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
                                           ExecutionContext ctx) {
         Map<Xml.Document, Pom> projectPoms = new LinkedHashMap<>();
         Map<Path, Pom> projectPomsByPath = new HashMap<>();
@@ -83,7 +80,7 @@ public class MavenParser implements Parser<Xml.Document> {
                 pom.getProperties().put("project.basedir", baseDir);
                 pom.getProperties().put("basedir", baseDir);
 
-                Xml.Document xml = new MavenXmlParser()
+                Xml.Document xml = (Xml.Document) new MavenXmlParser()
                         .parseInputs(singletonList(source), relativeTo, ctx)
                         .iterator().next();
 
@@ -95,7 +92,7 @@ public class MavenParser implements Parser<Xml.Document> {
             }
         }
 
-        List<Xml.Document> parsed = new ArrayList<>();
+        List<SourceFile> parsed = new ArrayList<>();
         MavenPomDownloader downloader = new MavenPomDownloader(projectPomsByPath, ctx);
 
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);
@@ -115,14 +112,14 @@ public class MavenParser implements Parser<Xml.Document> {
         }
 
         for (int i = 0; i < parsed.size(); i++) {
-            Xml.Document maven = parsed.get(i);
+            SourceFile maven = parsed.get(i);
             Optional<MavenResolutionResult> maybeResolutionResult = maven.getMarkers().findFirst(MavenResolutionResult.class);
             if(!maybeResolutionResult.isPresent()) {
                 continue;
             }
             MavenResolutionResult resolutionResult = maybeResolutionResult.get();
             List<MavenResolutionResult> modules = new ArrayList<>(0);
-            for (Xml.Document possibleModule : parsed) {
+            for (SourceFile possibleModule : parsed) {
                 if (possibleModule == maven) {
                     continue;
                 }
