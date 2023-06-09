@@ -50,6 +50,20 @@ class QualifyThisVisitorTest implements RewriteTest {
     }
 
     @Test
+    void alreadyQualifiedNoop() {
+        rewriteRun(
+                java("""
+                        public class Foo {
+                            private String str = "str";
+                            public String getStr() {
+                                return Foo.this.str;
+                            }
+                        }
+                        """)
+        );
+    }
+
+    @Test
     void qualifyThisMethodInvocation() {
         rewriteRun(
                 java("""
