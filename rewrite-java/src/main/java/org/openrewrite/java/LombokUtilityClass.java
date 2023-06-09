@@ -57,6 +57,7 @@ public class LombokUtilityClass extends Recipe {
             return JavaTemplate
                     .builder("@UtilityClass")
                     .imports("lombok.experimental.UtilityClass")
+                    .javaParser(JavaParser.fromJavaVersion().classpath("lombok"))
                     .build()
                     .apply(
                             getCursor(),
