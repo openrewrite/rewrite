@@ -57,10 +57,7 @@ import org.jetbrains.kotlin.modules.TargetId;
 import org.jetbrains.kotlin.platform.CommonPlatforms;
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms;
 import org.jetbrains.kotlin.utils.PathUtil;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Parser;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.JavaTypeCache;
@@ -98,7 +95,7 @@ import static org.jetbrains.kotlin.config.JVMConfigurationKeys.DO_NOT_CLEAR_BIND
 import static org.jetbrains.kotlin.config.JVMConfigurationKeys.FRIEND_PATHS;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
-public class KotlinParser implements Parser<K.CompilationUnit> {
+public class KotlinParser implements Parser {
     public static final String SKIP_SOURCE_SET_TYPE_GENERATION = "org.openrewrite.kotlin.skipSourceSetTypeGeneration";
 
     private String sourceSet = "main";
@@ -115,7 +112,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
     private final String moduleName;
 
     @Override
-    public Stream<K.CompilationUnit> parse(@Language("kotlin") String... sources) {
+    public Stream<SourceFile> parse(@Language("kotlin") String... sources) {
         Pattern packagePattern = Pattern.compile("^package\\s+([^;]+);");
         Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
 
@@ -147,7 +144,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
     }
 
     @Override
-    public Stream<K.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         ParsingEventListener parsingListener = pctx.getParsingListener();
 
@@ -176,12 +173,11 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
                                 ctx
                         );
 
-                        K.CompilationUnit kcu = (K.CompilationUnit) mappingVisitor.visitFile(compiled.getFirFile(), new InMemoryExecutionContext());
+                        SourceFile kcu = (SourceFile) mappingVisitor.visitFile(compiled.getFirFile(), new InMemoryExecutionContext());
 
                         parsingListener.parsed(compiled.getInput(), kcu);
                         return kcu;
                     } catch (Throwable t) {
-                        pctx.parseFailure(compiled.getInput(), relativeTo, this, t);
                         ctx.getOnError().accept(t);
                     }
                     return null;
@@ -276,7 +272,7 @@ public class KotlinParser implements Parser<K.CompilationUnit> {
             `LightVirtualFile` are created to support tests and in the future, Kotlin template.
             We might want to extract the generation of `platformSources` later on.
          */
-        List<Input> inputs = acceptedInputs(sources);
+        List<Input> inputs = acceptedInputs(sources).collect(toList());
         for (int i = 0; i < inputs.size(); i++) {
             Input source = inputs.get(i);
             String fileName = "openRewriteFile.kt".equals(source.getPath().toString()) ? "openRewriteFile" + i + ".kt" : source.getPath().toString();
