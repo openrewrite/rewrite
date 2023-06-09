@@ -65,6 +65,8 @@ public class MavenParser implements Parser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
                                           ExecutionContext ctx) {
+        List<SourceFile> parsed = new ArrayList<>();
+
         Map<Xml.Document, Pom> projectPoms = new LinkedHashMap<>();
         Map<Path, Pom> projectPomsByPath = new HashMap<>();
         for (Input source : sources) {
@@ -87,12 +89,11 @@ public class MavenParser implements Parser {
                 projectPoms.put(xml, pom);
                 projectPomsByPath.put(pomPath, pom);
             } catch (Throwable t) {
-                ParsingExecutionContextView.view(ctx).parseFailure(source, relativeTo, this, t);
                 ctx.getOnError().accept(t);
+                parsed.add(ParseError.build(this, source, relativeTo, ctx, t));
             }
         }
 
-        List<SourceFile> parsed = new ArrayList<>();
         MavenPomDownloader downloader = new MavenPomDownloader(projectPomsByPath, ctx);
 
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);

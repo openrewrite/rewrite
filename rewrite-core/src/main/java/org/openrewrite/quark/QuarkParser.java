@@ -144,6 +144,5 @@ public class QuarkParser implements Parser {
         public String getDslName() {
             return "other";
         }
-
     }
 }

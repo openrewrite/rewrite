@@ -16,14 +16,13 @@
 package org.openrewrite.binary;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.ParseError;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.nio.file.Path;
-import java.util.Objects;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -41,19 +40,17 @@ public class BinaryParser implements Parser {
                 .map(source -> {
                     Path path = source.getRelativePath(relativeTo);
                     try {
-                        return (SourceFile) new Binary(randomId(),
+                        return new Binary(randomId(),
                                 path,
                                 Markers.EMPTY,
                                 source.getFileAttributes(),
                                 null,
                                 readAllBytes(source.getSource(ctx)));
-                    } catch (Exception e) {
-                        ParsingExecutionContextView.view(ctx).parseFailure(source, relativeTo, this, e);
-                        ctx.getOnError().accept(e);
+                    } catch (Throwable t) {
+                        ctx.getOnError().accept(t);
+                        return ParseError.build(this, source, relativeTo, ctx, t);
                     }
-                    return null;
-                })
-                .filter(Objects::nonNull);
+                });
     }
 
     @Override

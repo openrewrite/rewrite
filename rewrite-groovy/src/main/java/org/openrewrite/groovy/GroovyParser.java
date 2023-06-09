@@ -18,7 +18,6 @@ package org.openrewrite.groovy;
 import groovy.lang.GroovyClassLoader;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
-import lombok.Value;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.ModuleNode;
 import org.codehaus.groovy.control.*;
@@ -35,7 +34,10 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -94,45 +96,6 @@ public class GroovyParser implements Parser {
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
-        ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
-        return parseInputsToCompilerAst(sources, relativeTo, pctx)
-                .map(entry -> {
-                    CompiledGroovySource compiled = entry.getCompiledGroovySource();
-                    List<ParseWarning> warnings = entry.getWarnings();
-                    try {
-                        GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
-                                compiled.getInput().getRelativePath(relativeTo),
-                                compiled.getInput().getFileAttributes(),
-                                compiled.getInput().getSource(ctx),
-                                typeCache,
-                                ctx
-                        );
-                        G.CompilationUnit gcu = mappingVisitor.visit(compiled.getSourceUnit(), compiled.getModule());
-                        if (warnings.size() > 0) {
-                            Markers m = gcu.getMarkers();
-                            for (ParseWarning warning : warnings) {
-                                m = m.add(warning);
-                            }
-                            gcu = gcu.withMarkers(m);
-                        }
-                        pctx.getParsingListener().parsed(compiled.getInput(), gcu);
-                        return (SourceFile) gcu;
-                    } catch (Throwable t) {
-                        pctx.parseFailure(compiled.getInput(), relativeTo, this, t);
-                        ctx.getOnError().accept(t);
-                    }
-                    return null;
-                })
-                .filter(Objects::nonNull);
-    }
-
-    @Value
-    static class Intermediate {
-        CompiledGroovySource compiledGroovySource;
-        List<ParseWarning> warnings;
-    }
-
-    Stream<Intermediate> parseInputsToCompilerAst(Iterable<Input> sources, @Nullable Path relativeTo, ParsingExecutionContextView ctx) {
         CompilerConfiguration configuration = new CompilerConfiguration();
         configuration.setTolerance(Integer.MAX_VALUE);
         configuration.setWarningLevel(WarningMessage.NONE);
@@ -149,6 +112,8 @@ public class GroovyParser implements Parser {
         for (Consumer<CompilerConfiguration> compilerCustomizer : compilerCustomizers) {
             compilerCustomizer.accept(configuration);
         }
+
+        ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         return StreamSupport.stream(sources.spliterator(), false)
                 .map(input -> {
                     ParseWarningCollector errorCollector = new ParseWarningCollector(configuration, this);
@@ -175,10 +140,28 @@ public class GroovyParser implements Parser {
                             }
                         }
 
-                        return new Intermediate(new CompiledGroovySource(input, unit, ast), errorCollector.getWarningMarkers());
+                        CompiledGroovySource compiled = new CompiledGroovySource(input, unit, ast);
+                        List<ParseWarning> warnings = errorCollector.getWarningMarkers();
+                        GroovyParserVisitor mappingVisitor = new GroovyParserVisitor(
+                                compiled.getInput().getRelativePath(relativeTo),
+                                compiled.getInput().getFileAttributes(),
+                                compiled.getInput().getSource(ctx),
+                                typeCache,
+                                ctx
+                        );
+                        G.CompilationUnit gcu = mappingVisitor.visit(compiled.getSourceUnit(), compiled.getModule());
+                        if (warnings.size() > 0) {
+                            Markers m = gcu.getMarkers();
+                            for (ParseWarning warning : warnings) {
+                                m = m.add(warning);
+                            }
+                            gcu = gcu.withMarkers(m);
+                        }
+                        pctx.getParsingListener().parsed(compiled.getInput(), gcu);
+                        return gcu;
                     } catch (Throwable t) {
-                        ctx.parseFailure(input, relativeTo, this, t);
                         ctx.getOnError().accept(t);
+                        return ParseError.build(this, input, relativeTo, ctx, t);
                     } finally {
                         if (logCompilationWarningsAndErrors && (errorCollector.hasErrors() || errorCollector.hasWarnings())) {
                             try (StringWriter sw = new StringWriter();
@@ -190,7 +173,6 @@ public class GroovyParser implements Parser {
                             }
                         }
                     }
-                    return null;
                 });
     }
 

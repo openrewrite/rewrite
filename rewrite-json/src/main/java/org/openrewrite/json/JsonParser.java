@@ -15,15 +15,10 @@
  */
 package org.openrewrite.json;
 
-import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Timer;
 import org.antlr.v4.runtime.*;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
-import org.openrewrite.internal.MetricsHelper;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.json.internal.JsonParserVisitor;
 import org.openrewrite.json.internal.grammar.JSON5Lexer;
@@ -34,42 +29,32 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.InputStream;
 import java.nio.file.Path;
-import java.util.Objects;
 import java.util.stream.Stream;
 
 public class JsonParser implements Parser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        return acceptedInputs(sourceFiles).stream()
-                .map(sourceFile -> {
-                    Timer.Builder timer = Timer.builder("rewrite.parse")
-                            .description("The time spent parsing an Json file")
-                            .tag("file.type", "Json");
-                    Timer.Sample sample = Timer.start();
-                    try (InputStream sourceStream = sourceFile.getSource(ctx)) {
-                        JSON5Parser parser = new JSON5Parser(new CommonTokenStream(new JSON5Lexer(
-                                CharStreams.fromStream(sourceStream))));
+        return acceptedInputs(sourceFiles).map(sourceFile -> {
+            try (InputStream sourceStream = sourceFile.getSource(ctx)) {
+                JSON5Parser parser = new JSON5Parser(new CommonTokenStream(new JSON5Lexer(
+                        CharStreams.fromStream(sourceStream))));
 
-                        parser.removeErrorListeners();
-                        parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
+                parser.removeErrorListeners();
+                parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
 
-                        Json.Document document = new JsonParserVisitor(
-                                sourceFile.getRelativePath(relativeTo),
-                                sourceFile.getFileAttributes(),
-                                sourceFile.getSource(ctx)
-                        ).visitJson5(parser.json5());
-                        sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
-                        parsingListener.parsed(sourceFile, document);
-                        return (SourceFile) document;
-                    } catch (Throwable t) {
-                        sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
-                        ParsingExecutionContextView.view(ctx).parseFailure(sourceFile, relativeTo, this, t);
-                        ctx.getOnError().accept(new IllegalStateException(sourceFile.getPath() + " " + t.getMessage(), t));
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull);
+                Json.Document document = new JsonParserVisitor(
+                        sourceFile.getRelativePath(relativeTo),
+                        sourceFile.getFileAttributes(),
+                        sourceFile.getSource(ctx)
+                ).visitJson5(parser.json5());
+                parsingListener.parsed(sourceFile, document);
+                return document;
+            } catch (Throwable t) {
+                ctx.getOnError().accept(t);
+                return ParseError.build(this, sourceFile, relativeTo, ctx, t);
+            }
+        });
     }
 
     @Override
@@ -107,6 +92,7 @@ public class JsonParser implements Parser {
     public static Builder builder() {
         return new Builder();
     }
+
     public static class Builder extends org.openrewrite.Parser.Builder {
 
         public Builder() {

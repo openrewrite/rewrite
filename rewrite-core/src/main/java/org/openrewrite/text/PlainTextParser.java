@@ -16,6 +16,7 @@
 package org.openrewrite.text;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.ParseError;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
@@ -25,7 +26,6 @@ import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.nio.file.Path;
-import java.util.Objects;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -60,32 +60,31 @@ public class PlainTextParser implements Parser {
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
-                                         ExecutionContext ctx) {
+                                          ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        return StreamSupport.stream(sources.spliterator(), false)
-                .map(source -> {
-                    Path path = source.getRelativePath(relativeTo);
-                    try {
-                        EncodingDetectingInputStream is = source.getSource(ctx);
-                        String sourceStr = is.readFully();
-                        PlainText plainText = new PlainText(randomId(),
-                                path,
-                                Markers.EMPTY,
-                                is.getCharset().name(),
-                                is.isCharsetBomMarked(),
-                                source.getFileAttributes(),
-                                null,
-                                sourceStr,
-                                null);
-                        parsingListener.parsed(source, plainText);
-                        return (SourceFile) plainText;
-                    } catch (Throwable t) {
-                        ParsingExecutionContextView.view(ctx).parseFailure(source, relativeTo, this, t);
-                        ctx.getOnError().accept(t);
-                    }
-                    return null;
-                })
-                .filter(Objects::nonNull);
+        return StreamSupport.stream(sources.spliterator(), false).map(source -> {
+            Path path = source.getRelativePath(relativeTo);
+            try {
+                EncodingDetectingInputStream is = source.getSource(ctx);
+                String sourceStr = is.readFully();
+                PlainText plainText = new PlainText(
+                        randomId(),
+                        path,
+                        Markers.EMPTY,
+                        is.getCharset().name(),
+                        is.isCharsetBomMarked(),
+                        source.getFileAttributes(),
+                        null,
+                        sourceStr,
+                        null
+                );
+                parsingListener.parsed(source, plainText);
+                return plainText;
+            } catch (Throwable t) {
+                ctx.getOnError().accept(t);
+                return ParseError.build(this, source, relativeTo, ctx, t);
+            }
+        });
     }
 
     @Override

@@ -87,10 +87,9 @@ public interface Parser {
         return input.isSynthetic() || accept(input.getPath());
     }
 
-    default List<Input> acceptedInputs(Iterable<Input> input) {
+    default Stream<Input> acceptedInputs(Iterable<Input> input) {
         return StreamSupport.stream(input.spliterator(), false)
-                .filter(this::accept)
-                .collect(toList());
+                .filter(this::accept);
     }
 
     default Parser reset() {

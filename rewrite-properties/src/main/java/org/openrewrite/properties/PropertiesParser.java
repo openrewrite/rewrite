@@ -15,12 +15,9 @@
  */
 package org.openrewrite.properties;
 
-import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Timer;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
-import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.tree.Properties;
@@ -30,7 +27,6 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Stream;
 
 import static org.openrewrite.Tree.randomId;
@@ -44,27 +40,18 @@ public class PropertiesParser implements Parser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        return acceptedInputs(sourceFiles).stream()
-                .map(sourceFile -> {
-                    Path path = sourceFile.getRelativePath(relativeTo);
-                    Timer.Builder timer = Timer.builder("rewrite.parse")
-                            .description("The time spent parsing a properties file")
-                            .tag("file.type", "Properties");
-                    Timer.Sample sample = Timer.start();
-                    try (EncodingDetectingInputStream is = sourceFile.getSource(ctx)) {
-                        Properties.File file = parseFromInput(path, is)
-                                .withFileAttributes(sourceFile.getFileAttributes());
-                        sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
-                        parsingListener.parsed(sourceFile, file);
-                        return (SourceFile) file;
-                    } catch (Throwable t) {
-                        sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
-                        ParsingExecutionContextView.view(ctx).parseFailure(sourceFile, relativeTo, this, t);
-                        ctx.getOnError().accept(new IllegalStateException(sourceFile.getPath() + " " + t.getMessage(), t));
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull);
+        return acceptedInputs(sourceFiles).map(sourceFile -> {
+            Path path = sourceFile.getRelativePath(relativeTo);
+            try (EncodingDetectingInputStream is = sourceFile.getSource(ctx)) {
+                Properties.File file = parseFromInput(path, is)
+                        .withFileAttributes(sourceFile.getFileAttributes());
+                parsingListener.parsed(sourceFile, file);
+                return file;
+            } catch (Throwable t) {
+                ctx.getOnError().accept(t);
+                return ParseError.build(this, sourceFile, relativeTo, ctx, t);
+            }
+        });
     }
 
     private Properties.File parseFromInput(Path sourceFile, EncodingDetectingInputStream source) {
@@ -119,7 +106,7 @@ public class PropertiesParser implements Parser {
                 source.isCharsetBomMarked(),
                 FileAttributes.fromPath(sourceFile),
                 null
-                );
+        );
     }
 
     @Nullable
@@ -142,7 +129,7 @@ public class PropertiesParser implements Parser {
     }
 
     private boolean isDelimitedByWhitespace(String line) {
-        return line.length() >=3 && !Character.isWhitespace(line.charAt(0)) && !Character.isWhitespace(line.length() - 1) && line.contains(" ");
+        return line.length() >= 3 && !Character.isWhitespace(line.charAt(0)) && !Character.isWhitespace(line.length() - 1) && line.contains(" ");
     }
 
     private Properties.Comment commentFromLine(String line, String prefix, Properties.Comment.Delimiter delimiter) {
@@ -283,6 +270,7 @@ public class PropertiesParser implements Parser {
     public static Builder builder() {
         return new Builder();
     }
+
     public static class Builder extends org.openrewrite.Parser.Builder {
 
         public Builder() {
