@@ -23,7 +23,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.properties.Assertions.properties;
 
 @SuppressWarnings("UnusedProperty")
-class ChangePropertyTest implements RewriteTest {
+class AddPropertyTest implements RewriteTest {
 
     @Test
     void emptyProperty() {
@@ -131,6 +131,26 @@ class ChangePropertyTest implements RewriteTest {
             """
               management=true
               management.metrics.enable.process.files    true
+              """
+          )
+        );
+    }
+
+    @Test
+    void addToEmptyFile() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "management.metrics.enable.process.files",
+            "true",
+            null
+          )),
+          // document current behaviour or excess preceding newlines added to empty files; ought to be rare but still
+          properties(
+            "",
+            """
+              
+              
+              management.metrics.enable.process.files=true
               """
           )
         );
