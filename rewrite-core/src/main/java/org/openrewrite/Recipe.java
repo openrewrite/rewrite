@@ -323,11 +323,11 @@ public abstract class Recipe implements Cloneable {
         return validated;
     }
 
-    public final Collection<Validated> validateAll() {
+    public final Collection<Validated<Object>> validateAll() {
         return validateAll(new InMemoryExecutionContext(), new ArrayList<>());
     }
 
-    private Collection<Validated> validateAll(ExecutionContext ctx, Collection<Validated> acc) {
+    private Collection<Validated<Object>> validateAll(ExecutionContext ctx, Collection<Validated<Object>> acc) {
         acc.add(validate(ctx));
         for (Recipe recipe : getRecipeList()) {
             recipe.validateAll(ctx, acc);
