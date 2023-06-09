@@ -104,6 +104,7 @@ public class MoveContentToFile extends ScanningRecipe<MoveContentToFile.Scanned>
         }
         Hcl.ConfigFile configFile = HclParser.builder().build().parse("")
                 .findFirst()
+                .map(Hcl.ConfigFile.class::cast)
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as HCL"));
         configFile = configFile.withBody(Collections.singletonList(acc.toMove.withPrefix(Space.EMPTY)))
                 .withSourcePath(Paths.get(destinationPath));

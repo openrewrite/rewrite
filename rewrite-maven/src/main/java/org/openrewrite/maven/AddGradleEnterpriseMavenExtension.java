@@ -291,6 +291,7 @@ public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleE
     private static Xml.Document createNewXml(String filePath, @Language("xml") String fileContents) {
         XmlParser parser = new XmlParser();
         Xml.Document brandNewFile = parser.parse(fileContents).findFirst()
+                .map(Xml.Document.class::cast)
                 .orElseThrow(() -> new IllegalArgumentException("Unable to parse XML contents"));
         return brandNewFile.withSourcePath(Paths.get(filePath));
     }

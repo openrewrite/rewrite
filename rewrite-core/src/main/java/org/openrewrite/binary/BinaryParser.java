@@ -16,13 +16,13 @@
 package org.openrewrite.binary;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.ParseError;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.nio.file.Path;
-import java.util.Objects;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -32,10 +32,10 @@ import static org.openrewrite.internal.StreamUtils.readAllBytes;
 /**
  * Doesn't actually _parse_ anything, but if you want to wrap binary data into a SourceFile, this will do the trick
  */
-public class BinaryParser implements Parser<Binary> {
+public class BinaryParser implements Parser {
 
     @Override
-    public Stream<Binary> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         return StreamSupport.stream(sources.spliterator(), false)
                 .map(source -> {
                     Path path = source.getRelativePath(relativeTo);
@@ -46,13 +46,11 @@ public class BinaryParser implements Parser<Binary> {
                                 source.getFileAttributes(),
                                 null,
                                 readAllBytes(source.getSource(ctx)));
-                    } catch (Exception e) {
-                        ParsingExecutionContextView.view(ctx).parseFailure(source, relativeTo, this, e);
-                        ctx.getOnError().accept(e);
+                    } catch (Throwable t) {
+                        ctx.getOnError().accept(t);
+                        return ParseError.build(this, source, relativeTo, ctx, t);
                     }
-                    return null;
-                })
-                .filter(Objects::nonNull);
+                });
     }
 
     @Override

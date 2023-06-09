@@ -227,6 +227,7 @@ public class AddGradleEnterprise extends Recipe {
         G.CompilationUnit cu = GradleParser.builder().build()
                 .parseInputs(singletonList(
                         Parser.Input.fromString(Paths.get("settings.gradle"), ge.toString())), null, ctx)
+                .map(G.CompilationUnit.class::cast)
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
 
