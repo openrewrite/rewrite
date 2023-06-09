@@ -27,7 +27,7 @@ class LombokUtilityClassTest implements RewriteTest {
                                 """,
                         """
                                 import lombok.experimental.UtilityClass;
-                                
+                                                                
                                 @UtilityClass
                                 public class A {
                                    public int add(final int x, final int y) {
@@ -38,6 +38,64 @@ class LombokUtilityClassTest implements RewriteTest {
                 )
         );
     }
+
+
+    @Test
+    void doNotUpgradeToUtilityClassIfNonStaticVariables() {
+        rewriteRun(
+                recipeSpec -> recipeSpec
+                        .recipes(
+                                new LombokUtilityClass()
+                        ),
+                java(
+                        """
+                                public class A {
+                                   private final int x = 0;
+                                   public static int add(final int x, final int y) {
+                                      return x + y;
+                                   }
+                                }
+                                """,
+                        """
+                                public class A {
+                                   private final int x = 0;
+                                   public static int add(final int x, final int y) {
+                                      return x + y;
+                                   }
+                                }
+                                """
+                )
+        );
+    }
+
+
+    @Test
+    void doNotUpgradeToUtilityClassIfNonStaticMethods() {
+        rewriteRun(
+                recipeSpec -> recipeSpec
+                        .recipes(
+                                addDependency("org.projectlombok:lombok:1.18.28", "false"),
+                                new LombokUtilityClass()
+                        ),
+                java(
+                        """
+                                public class A {
+                                   public int add(final int x, final int y) {
+                                      return x + y;
+                                   }
+                                }
+                                """,
+                        """
+                                public class A {
+                                   public int add(final int x, final int y) {
+                                      return x + y;
+                                   }
+                                }
+                                """
+                )
+        );
+    }
+
 
     private AddDependency addDependency(String gav, String onlyIfUsing) {
         return addDependency(gav, onlyIfUsing, null, null);
