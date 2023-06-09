@@ -223,4 +223,22 @@ public class KotlinTypeMappingTest {
         JavaType.GenericTypeVariable clazz = TypeUtils.asGeneric(firstMethodParameter("recursiveIntersection"));
         assertThat(clazz.toString()).isEqualTo("Generic{U extends org.openrewrite.java.JavaTypeGoat$Extension<Generic{U}> & org.openrewrite.java.Intersection<Generic{U}>}");
     }
+
+    @Test
+    void javaLangObject() {
+        // These assertions are all based on the JavaTypeMapper.
+        JavaType.Class c = (JavaType.Class) firstMethodParameter("javaType");
+        assertThat(c.getFullyQualifiedName()).isEqualTo("java.lang.Object");
+        assertThat(c.getSupertype()).isNull();
+        assertThat(c.getMethods().size()).isEqualTo(12);
+
+        // Assert generic type parameters have the correct type bounds.
+        JavaType.Method method = c.getMethods().stream().filter(it -> "getClass".equals(it.getName())).findFirst().orElse(null);
+        assertThat(method).isNotNull();
+        assertThat(method.toString()).isEqualTo("java.lang.Object{name=getClass,return=java.lang.Class<Generic{?}>,parameters=[]}");
+
+        JavaType.Parameterized returnType = (JavaType.Parameterized) method.getReturnType();
+        // Assert the type of the parameterized type contains the type parameter from the source.
+        assertThat(returnType.getType().getTypeParameters().get(0).toString()).isEqualTo("Generic{T}");
+    }
 }

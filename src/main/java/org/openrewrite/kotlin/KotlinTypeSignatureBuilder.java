@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin;
 
+import org.jetbrains.kotlin.builtins.PrimitiveType;
 import org.jetbrains.kotlin.fir.ClassMembersKt;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
@@ -32,6 +33,8 @@ import org.jetbrains.kotlin.fir.symbols.impl.*;
 import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.fir.types.jvm.FirJavaTypeRef;
+import org.jetbrains.kotlin.load.java.structure.*;
+import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaClass;
 import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource;
 import org.jetbrains.kotlin.name.ClassId;
 import org.openrewrite.Incubating;
@@ -79,6 +82,12 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return signature(((FirBasedSymbol<?>) type).getFir(), ownerSymbol);
         } else if (type instanceof FirFile) {
             return ((FirFile) type).getName();
+        } else if (type instanceof FirJavaTypeRef) {
+            return signature(((FirJavaTypeRef) type).getType());
+        } else if (type instanceof org.jetbrains.kotlin.load.java.structure.JavaType) {
+            return mapJavaTypeSignature((org.jetbrains.kotlin.load.java.structure.JavaType) type);
+        } else if (type instanceof JavaElement) {
+            return mapJavaElementSignature((JavaElement) type);
         }
 
         return resolveSignature(type, ownerSymbol);
@@ -97,8 +106,6 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             return signature(((FirExpression) type).getTypeRef(), ownerSymbol);
         } else if (type instanceof FirFunctionTypeRef) {
             return signature(((FirFunctionTypeRef) type).getReturnTypeRef(), ownerSymbol);
-        } else if (type instanceof FirJavaTypeRef) {
-            return type.toString();
         } else if (type instanceof FirResolvedNamedReference) {
             FirBasedSymbol<?> resolvedSymbol = ((FirResolvedNamedReference) type).getResolvedSymbol();
             if (resolvedSymbol instanceof FirConstructorSymbol) {
@@ -323,6 +330,143 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return s.toString();
     }
 
+    private String mapJavaElementSignature(JavaElement type) {
+        if (type instanceof BinaryJavaClass) {
+            return ((BinaryJavaClass) type).getTypeParameters().isEmpty() ? javaClassSignature((JavaClass) type) : javaParameterizedSignature((JavaClass) type);
+        } else if (type instanceof JavaTypeParameter) {
+            return mapJavaTypeParameter((JavaTypeParameter) type);
+        } else if (type instanceof JavaValueParameter) {
+            return mapJavaValueParameter((JavaValueParameter) type);
+        } else if (type instanceof JavaAnnotation) {
+            return convertClassIdToFqn(((JavaAnnotation) type).getClassId());
+        }
+        // This should never happen unless a new JavaElement is added.
+        throw new UnsupportedOperationException("Unsupported JavaElement type: " + type.getClass().getName());
+    }
+
+    private String mapJavaTypeSignature(org.jetbrains.kotlin.load.java.structure.JavaType type) {
+        if (type instanceof JavaPrimitiveType) {
+            return primitive(((JavaPrimitiveType) type).getType());
+        } else if (type instanceof JavaClassifierType) {
+            return mapClassifierType((JavaClassifierType) type);
+        } else if (type instanceof JavaArrayType) {
+            return array((JavaArrayType) type);
+        } else if (type instanceof JavaWildcardType) {
+            return mapWildCardType((JavaWildcardType) type);
+        }
+        // This should never happen unless a new JavaType is added.
+        throw new UnsupportedOperationException("Unsupported kotlin structure JavaType: " + type.getClass().getName());
+    }
+
+    private String mapClassifierType(JavaClassifierType type) {
+        if (type.getTypeArguments().isEmpty()) {
+            return type.getClassifierQualifiedName();
+        }
+        StringBuilder s = new StringBuilder(type.getClassifierQualifiedName());
+        StringJoiner joiner = new StringJoiner(", ", "<", ">");
+        for (JavaType tp : type.getTypeArguments()) {
+            String signature = signature(tp);
+            joiner.add(signature);
+        }
+        s.append(joiner);
+        return s.toString();
+    }
+
+    private String mapWildCardType(JavaWildcardType type) {
+        StringBuilder s = new StringBuilder("Generic{?");
+        if (type.getBound() != null) {
+            s.append(type.isExtends() ? " extends " : " super ");
+            s.append(signature(type.getBound()));
+        }
+        return s.append("}").toString();
+    }
+
+    private String array(JavaArrayType type) {
+        return signature(type.getComponentType()) + "[]";
+    }
+
+    private String javaClassSignature(JavaClass type) {
+        if (type.getFqName() == null) {
+            return "{undefined}";
+        }
+
+        if (type.getOuterClass() != null) {
+            return javaClassSignature(type.getOuterClass()) + "$" + type.getName();
+        }
+
+        return type.getFqName().asString();
+    }
+
+    private String javaParameterizedSignature(JavaClass type) {
+        StringBuilder s = new StringBuilder(javaClassSignature(type));
+        StringJoiner joiner = new StringJoiner(", ", "<", ">");
+        for (JavaTypeParameter tp : type.getTypeParameters()) {
+            String signature = signature(tp);
+            joiner.add(signature);
+        }
+        s.append(joiner);
+        return s.toString();
+    }
+
+    private String mapJavaTypeParameter(JavaTypeParameter typeParameter) {
+        String name = typeParameter.getName().asString();
+
+        if (typeVariableNameStack == null) {
+            typeVariableNameStack = new HashSet<>();
+        }
+
+        if (!typeVariableNameStack.add(name)) {
+            return "Generic{" + name + "}";
+        }
+
+        StringBuilder s = new StringBuilder("Generic{").append(name);
+        StringJoiner boundSigs = new StringJoiner(", ");
+        for (JavaClassifierType type : typeParameter.getUpperBounds()) {
+            if (type.getClassifier() != null && !"java.lang.Object".equals(type.getClassifierQualifiedName())) {
+                boundSigs.add(signature(type));
+            }
+        }
+
+        String boundSigStr = boundSigs.toString();
+        if (!boundSigStr.isEmpty()) {
+            s.append(": ").append(boundSigStr);
+        }
+
+        typeVariableNameStack.remove(name);
+        return s.append("}").toString();
+    }
+
+    private String mapJavaValueParameter(JavaValueParameter type) {
+        return mapJavaTypeSignature(type.getType());
+    }
+
+    private String primitive(@Nullable PrimitiveType type) {
+        if (type == null) {
+            return "void";
+        }
+
+        switch (type) {
+            case BOOLEAN:
+                return "java.lang.boolean";
+            case BYTE:
+                return "java.lang.byte";
+            case CHAR:
+                return "java.lang.char";
+            case DOUBLE:
+                return "java.lang.double";
+            case FLOAT:
+                return "java.lang.float";
+            case INT:
+                return "java.lang.int";
+            case LONG:
+                return "java.lang.long";
+            case SHORT:
+                return "java.lang.short";
+            default:
+                throw new IllegalArgumentException("Unsupported primitive type.");
+        }
+    }
+
     /**
      * Kotlin does not support primitives.
      */
@@ -358,6 +502,15 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
 
                 signature(symbol.getResolvedReturnTypeRef());
         return owner + "{name=" + symbol.getName().asString() + ",type=" + typeSig + '}';
+    }
+
+    public String variableSignature(JavaField javaField) {
+        String owner = signature(javaField.getContainingClass());
+        if (owner.contains("<")) {
+            owner = owner.substring(0, owner.indexOf('<'));
+        }
+
+        return owner + "{name=" + javaField.getName().asString() + ",type=" + signature(javaField.getType()) + '}';
     }
 
     public String methodSignature(FirFunctionCall functionCall, @Nullable FirBasedSymbol<?> ownerSymbol) {
@@ -418,7 +571,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         } else {
             String returnSignature;
             if (symbol.getFir() instanceof FirJavaMethod) {
-                returnSignature = signature(symbol.getFir().getDispatchReceiverType());
+                returnSignature = signature((symbol.getFir()).getReturnTypeRef());
             } else {
                 returnSignature = signature(symbol.getResolvedReturnTypeRef());
             }
@@ -426,6 +579,22 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
                     ",return=" + returnSignature;
         }
         return s + ",parameters=" + methodArgumentSignature(symbol) + '}';
+    }
+
+    public String methodDeclarationSignature(JavaMethod method) {
+        String s = javaClassSignature(method.getContainingClass());
+
+        String returnSignature = signature(method.getReturnType());
+        s += "{name=" + method.getName().asString() +
+                ",return=" + returnSignature;
+        return s + ",parameters=" + javaMethodArgumentSignature(method.getValueParameters()) + '}';
+    }
+
+    public String methodConstructorSignature(JavaConstructor method) {
+        String s = javaClassSignature(method.getContainingClass());
+
+        s += "{name=<constructor>,return=" + s;
+        return s + ",parameters=" + javaMethodArgumentSignature(method.getValueParameters()) + '}';
     }
 
     /**
@@ -463,6 +632,15 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         return genericArgumentTypes.toString();
     }
 
+    private String javaMethodArgumentSignature(List<JavaValueParameter> valueParameters) {
+        StringJoiner genericArgumentTypes = new StringJoiner(",", "[", "]");
+        for (JavaValueParameter valueParameter : valueParameters) {
+            genericArgumentTypes.add(signature(valueParameter));
+        }
+
+        return genericArgumentTypes.toString();
+    }
+
     /**
      *  Converts the ConeKotlinType to it's FirRegularClass.
      */
@@ -480,8 +658,8 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     /**
      *  Converts the Kotlin ClassId to a {@link org.openrewrite.java.tree.J} style FQN.
      */
-    public static String convertClassIdToFqn(ClassId classId) {
-        return convertKotlinFqToJavaFq(classId.toString());
+    public static String convertClassIdToFqn(@Nullable ClassId classId) {
+        return classId == null ? "{undefined}" : convertKotlinFqToJavaFq(classId.toString());
     }
 
     /**
