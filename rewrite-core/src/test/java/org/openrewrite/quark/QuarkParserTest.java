@@ -28,7 +28,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.stream.Stream;
+import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,9 +44,9 @@ class QuarkParserTest implements RewriteTest {
         rewriteRun(
           spec -> spec.beforeRecipe(sources -> {
               try {
-                  Stream<SourceFile> quarks = QuarkParser.parseAllOtherFiles(Paths.get("../"), sources);
+                  List<SourceFile> quarks = QuarkParser.parseAllOtherFiles(Paths.get("../"), sources).toList();
                   assertThat(quarks).isNotEmpty();
-                  assertThat(quarks.map(SourceFile::getSourcePath))
+                  assertThat(quarks.stream().map(SourceFile::getSourcePath))
                     .doesNotContain(Paths.get("build.gradle.kts"));
               } catch (IOException e) {
                   throw new RuntimeException(e);
