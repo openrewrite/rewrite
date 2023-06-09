@@ -17,6 +17,7 @@ package org.openrewrite.xml;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.tree.Xml;
@@ -27,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class XPathMatcherTest {
 
-    private final Xml.Document xmlDoc = new XmlParser().parse(
+    private final SourceFile xmlDoc = new XmlParser().parse(
       """
         <?xml version="1.0" encoding="UTF-8"?>
         <dependencies>
@@ -40,9 +41,9 @@ class XPathMatcherTest {
             </dependency>
         </dependencies>
         """
-    ).findFirst().orElseThrow(() -> new IllegalArgumentException("Could not parse as XML"));
+    ).toList().get(0);
 
-    private final Xml.Document pomXml = new XmlParser().parse(
+    private final SourceFile pomXml = new XmlParser().parse(
       """
         <project>
           <groupId>com.mycompany.app</groupId>
@@ -64,6 +65,7 @@ class XPathMatcherTest {
         </project>
         """
     ).toList().get(0);
+
 
     @Test
     void matchAbsolute() {
@@ -107,7 +109,7 @@ class XPathMatcherTest {
           pomXml)).isFalse();
     }
 
-    private boolean match(String xpath, Xml.Document x) {
+    private boolean match(String xpath, SourceFile x) {
         XPathMatcher matcher = new XPathMatcher(xpath);
         return !TreeVisitor.collect(new XmlVisitor<>() {
             @Override

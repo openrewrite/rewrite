@@ -190,6 +190,7 @@ class ReloadableJava8Parser implements JavaParser {
                         ctx,
                         context);
                 J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
+                cuByPath.setValue(null); // allow memory used by this JCCompilationUnit to be released
                 parsingListener.parsed(input, cu);
                 return (SourceFile) cu;
             } catch (Throwable t) {

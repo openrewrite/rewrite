@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.cache.MavenArtifactCache;
@@ -26,7 +27,6 @@ import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.maven.tree.Scope;
-import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -48,7 +48,7 @@ class MavenArtifactDownloaderTest {
           "1.6.0", null);
 
         MavenParser mavenParser = MavenParser.builder().build();
-        Xml.Document parsed = mavenParser.parse(ctx,
+        SourceFile parsed = mavenParser.parse(ctx,
           String.format(
             //language=xml
             """

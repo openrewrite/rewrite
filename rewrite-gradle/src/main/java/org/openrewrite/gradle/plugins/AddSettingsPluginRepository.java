@@ -132,6 +132,7 @@ public class AddSettingsPluginRepository extends Recipe {
                 }
 
                 return (J.MethodInvocation) GradleParser.builder().build().parseInputs(Collections.singletonList(Parser.Input.fromString(Paths.get("settings.gradle"), code)), null, ctx)
+                        .map(G.CompilationUnit.class::cast)
                         .collect(Collectors.toList()).get(0).getStatements().get(0);
             }
 
