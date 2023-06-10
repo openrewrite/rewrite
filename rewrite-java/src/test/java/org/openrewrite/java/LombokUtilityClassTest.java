@@ -8,7 +8,7 @@ import static org.openrewrite.java.Assertions.java;
 class LombokUtilityClassTest implements RewriteTest {
 
     @Test
-    void happyPath1() {
+    void happyPathSimple() {
         rewriteRun(
                 recipeSpec -> recipeSpec
                         .recipe(new LombokUtilityClass()
@@ -136,6 +136,122 @@ class LombokUtilityClassTest implements RewriteTest {
                                    public int add(final int x, final int y) {
                                       return A.add(x, y);
                                    }
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void happyPathInner() {
+        rewriteRun(
+                recipeSpec -> recipeSpec
+                        .recipe(new LombokUtilityClass()),
+                java(
+                        """
+                                public class A {
+                                   public int add(final int x, final int y) {
+                                      return x + y;
+                                   }
+                                   private class B {
+                                    private static int substract(final int x, final int y) {
+                                        return x - y;
+                                    }
+                                   }
+                                }
+                                """,
+                        """
+                                import lombok.experimental.UtilityClass;
+                                              
+                                public class A {
+                                   public int add(final int x, final int y) {
+                                      return x + y;
+                                   }
+                                                     
+                                   @UtilityClass
+                                   private class B {
+                                    private int substract(final int x, final int y) {
+                                        return x - y;
+                                    }
+                                   }
+                                }
+                                """
+                )
+        );
+    }
+
+    /**
+     * Nested ~ inner static
+     */
+    @Test
+    void happyPathNested() {
+        rewriteRun(
+                recipeSpec -> recipeSpec
+                        .recipe(new LombokUtilityClass()),
+                java(
+                        """
+                                public class A {
+                                   public int add(final int x, final int y) {
+                                      return x + y;
+                                   }
+                                   private static class B {
+                                    private static int substract(final int x, final int y) {
+                                        return x - y;
+                                    }
+                                   }
+                                }
+                                """,
+                        """
+                                import lombok.experimental.UtilityClass;
+                                              
+                                public class A {
+                                   public int add(final int x, final int y) {
+                                      return x + y;
+                                   }
+                                                     
+                                   @UtilityClass
+                                   private static class B {
+                                    private int substract(final int x, final int y) {
+                                        return x - y;
+                                    }
+                                   }
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void happyPathNonPublic() {
+        rewriteRun(
+                recipeSpec -> recipeSpec
+                        .recipe(new LombokUtilityClass()),
+                java(
+                        """
+                                public class A {
+                                   public int add(final int x, final int y) {
+                                      return x + y;
+                                   }
+                                }
+                                class B {
+                                    public static int substract(final int x, final int y) {
+                                        return x - y;
+                                    }
+                                }
+                                """,
+                        """
+                                import lombok.experimental.UtilityClass;
+                                              
+                                public class A {
+                                   public int add(final int x, final int y) {
+                                      return x + y;
+                                   }
+                                }
+                                @UtilityClass
+                                class B {
+                                    public int substract(final int x, final int y) {
+                                        return x - y;
+                                    }
                                 }
                                 """
                 )
