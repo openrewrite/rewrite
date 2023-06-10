@@ -13,12 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@file:Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+
 package org.openrewrite.kotlin
+
+import java.lang.Object
 
 @AnnotationWithRuntimeRetention
 @AnnotationWithSourceRetention
 abstract class KotlinTypeGoat<T, S> {
-//abstract class KotlinTypeGoat<T, S> where S: PT<S>, S: C {
+    //abstract class KotlinTypeGoat<T, S> where S: PT<S>, S: C {
     val parameterizedField: PT<TypeA> = object : PT<TypeA> {}
 
 //    abstract class InheritedKotlinTypeGoat<T, U> : KotlinTypeGoat<T, U>() where U : PT<U>, U : C
@@ -59,6 +63,8 @@ abstract class KotlinTypeGoat<T, S> {
     abstract fun genericT(n: T): T // remove after signatures are common.
 
 //    abstract fun <U> recursiveIntersection(n: U) where U : KotlinTypeGoat.Extension<U>, U : Intersection<U>
+
+    abstract fun javaType(n: Object)
 }
 
 interface C {

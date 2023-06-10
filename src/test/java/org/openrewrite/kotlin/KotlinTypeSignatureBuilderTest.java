@@ -31,6 +31,7 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -42,7 +43,7 @@ public class KotlinTypeSignatureBuilderTest {
     private static final String goat = StringUtils.readFully(KotlinTypeSignatureBuilderTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
 
     private static Disposable disposable = Disposer.newDisposable();
-    private static Map<FirSession, List<CompiledKotlinSource>> cu;
+    private static Map<FirSession, List<CompiledKotlinSource>> cu = new LinkedHashMap<>();
 
     @BeforeAll
     static void beforeAll() {
@@ -265,5 +266,13 @@ public class KotlinTypeSignatureBuilderTest {
                 .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat<Generic{ extends kotlin.Array<Generic{U}>, Generic{*}>");
         assertThat(methodSignature("genericRecursive"))
                 .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=genericRecursive,return=org.openrewrite.kotlin.KotlinTypeGoat<Generic{? extends Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{?}>}[]}, Generic{?}>,parameters=[org.openrewrite.kotlin.KotlinTypeGoat<Generic{? extends Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{?}>}[]}, Generic{?}>]}");
+    }
+
+    @Test
+    void javaReference() {
+        assertThat(firstMethodParameterSignature("javaType"))
+          .isEqualTo("java.lang.Object");
+        assertThat(methodSignature("javaType"))
+          .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=javaType,return=kotlin.Unit,parameters=[java.lang.Object]}");
     }
 }
