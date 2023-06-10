@@ -71,4 +71,74 @@ class LombokUtilityClassTest implements RewriteTest {
                 )
         );
     }
+
+    @Test
+    void onlyUpgradeRelevantToUtilityClass() {
+        rewriteRun(
+                recipeSpec -> recipeSpec
+                        .recipe(new LombokUtilityClass()),
+                java(
+                        """
+                                public class A {
+                                   public static int add(final int x, final int y) {
+                                      return x + y;
+                                   }
+                                }
+                                """,
+                        """
+                                import lombok.experimental.UtilityClass;
+                                                                
+                                @UtilityClass
+                                public class A {
+                                   public int add(final int x, final int y) {
+                                      return x + y;
+                                   }
+                                }
+                                """
+                ),
+                java("""
+                                public class B {
+                                   public int add(final int x, final int y) {
+                                      return x + y;
+                                   }
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void doNotChangeReferenced() {
+        rewriteRun(
+                recipeSpec -> recipeSpec
+                        .recipe(new LombokUtilityClass()),
+                java(
+                        """
+                                public class A {
+                                   public static int add(final int x, final int y) {
+                                      return x + y;
+                                   }
+                                }
+                                """,
+                        """
+                                import lombok.experimental.UtilityClass;
+                                                                
+                                @UtilityClass
+                                public class A {
+                                   public int add(final int x, final int y) {
+                                      return x + y;
+                                   }
+                                }
+                                """
+                ),
+                java("""
+                                public class B {
+                                   public int add(final int x, final int y) {
+                                      return A.add(x, y);
+                                   }
+                                }
+                                """
+                )
+        );
+    }
 }

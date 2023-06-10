@@ -28,6 +28,8 @@ import static java.util.Comparator.comparing;
  * - Transformation: Replace instantiation with static calls to methods
  */
 public class LombokUtilityClass extends Recipe {
+    private int violations = -1;
+
     @Override
     public String getDisplayName() {
         return "Lombok UtilityClass";
@@ -81,30 +83,32 @@ public class LombokUtilityClass extends Recipe {
         }
     }
 
-    private static class LombokUtilityClassChangeVisitor extends JavaIsoVisitor<ExecutionContext> {
-
-        private int violations = 0;
+    private class LombokUtilityClassChangeVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         @Override
         public J.ClassDeclaration visitClassDeclaration(
                 final J.ClassDeclaration classDecl,
                 final ExecutionContext executionContext
         ) {
-            this.violations = LombokUtilityClassCheckVisitor.countViolations(classDecl);
+            if (LombokUtilityClass.this.violations == -1) {
+                LombokUtilityClass.this.violations = LombokUtilityClassCheckVisitor.countViolations(classDecl);
+            }
 
-            if (violations == 0) {
+            if (LombokUtilityClass.this.violations == 0
+                    && classDecl.getLeadingAnnotations().stream().noneMatch(a -> "UtilityClass".equals(a.getSimpleName()))) {
 
                 maybeAddImport("lombok.experimental.UtilityClass", false);
 
-                return JavaTemplate
-                        .builder("@UtilityClass")
-                        .imports("lombok.experimental.UtilityClass")
-                        .javaParser(JavaParser.fromJavaVersion().classpath("lombok"))
-                        .build()
-                        .apply(
-                                getCursor(),
-                                classDecl.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName))
-                        );
+                return super.visitClassDeclaration(
+                        JavaTemplate
+                                .builder("@UtilityClass")
+                                .imports("lombok.experimental.UtilityClass")
+                                .javaParser(JavaParser.fromJavaVersion().classpath("lombok"))
+                                .build()
+                                .apply(
+                                        getCursor(),
+                                        classDecl.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName))
+                                ), executionContext);
             }
 
             return super.visitClassDeclaration(classDecl, executionContext);
@@ -115,7 +119,7 @@ public class LombokUtilityClass extends Recipe {
                 final J.MethodDeclaration method,
                 final ExecutionContext executionContext
         ) {
-            if (violations == 0) {
+            if (LombokUtilityClass.this.violations == 0) {
                 return super.visitMethodDeclaration(
                         method.withModifiers(method.getModifiers().stream()
                                 .filter(m -> m.getType() != J.Modifier.Type.Static)
