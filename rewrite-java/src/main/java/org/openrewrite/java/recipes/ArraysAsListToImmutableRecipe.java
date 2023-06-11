@@ -1,7 +1,6 @@
 package org.openrewrite.java.recipes;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
@@ -21,8 +20,7 @@ import org.openrewrite.java.tree.J;
 public class ArraysAsListToImmutableRecipe extends Recipe {
 
   @JsonCreator
-  public ArraysAsListToImmutableRecipe() {
-  }
+  public ArraysAsListToImmutableRecipe() {}
 
   @Override
   public String getDisplayName() {
