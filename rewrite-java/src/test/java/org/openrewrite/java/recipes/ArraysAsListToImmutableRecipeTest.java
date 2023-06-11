@@ -9,8 +9,7 @@ class ArraysAsListToImmutableRecipeTest implements RewriteTest {
 	@Test
 	void wrapArrayListToBeUnmodifiable1() {
 		rewriteRun(
-				recipeSpec -> recipeSpec.recipe(new ArraysAsListToImmutableRecipe("Arrays.asList(\"A\",\"B\");",
-						"Collections.unmodifiableList(Arrays.asList(\"A\", \"B\"))")),
+				recipeSpec -> recipeSpec.recipe(new ArraysAsListToImmutableRecipe()),
 				java(
 						"""
 								package my.test;

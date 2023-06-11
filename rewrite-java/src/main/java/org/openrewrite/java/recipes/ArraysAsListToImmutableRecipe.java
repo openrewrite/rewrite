@@ -19,14 +19,9 @@ import org.openrewrite.java.tree.J;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ArraysAsListToImmutableRecipe extends Recipe {
-  private String before;
-  private String after;
 
   @JsonCreator
-  public ArraysAsListToImmutableRecipe(
-      @JsonProperty("before") String before, @JsonProperty("after") String after) {
-    this.before = before;
-    this.after = after;
+  public ArraysAsListToImmutableRecipe() {
   }
 
   @Override
