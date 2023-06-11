@@ -2,12 +2,11 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.util.Comparator.comparing;
@@ -28,7 +27,6 @@ import static java.util.Comparator.comparing;
  * - Transformation: Replace instantiation with static calls to methods
  */
 public class LombokUtilityClass extends Recipe {
-    private int violations = -1;
 
     @Override
     public String getDisplayName() {
@@ -43,92 +41,95 @@ public class LombokUtilityClass extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new LombokUtilityClassChangeVisitor();
+        return new ChangeVisitor();
     }
 
-    private static class LombokUtilityClassCheckVisitor extends JavaIsoVisitor<AtomicInteger> {
+
+    private static class ChangeVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         @Override
         public J.ClassDeclaration visitClassDeclaration(
                 final J.ClassDeclaration classDecl,
-                final AtomicInteger counter
+                final ExecutionContext executionContext
+        ) {
+            if (!CheckVisitor.shouldPerformChanges(classDecl)) {
+                return super.visitClassDeclaration(classDecl, executionContext);
+            }
+
+            maybeAddImport("lombok.experimental.UtilityClass", false);
+
+            return super.visitClassDeclaration(
+                    JavaTemplate
+                            .builder("@UtilityClass")
+                            .imports("lombok.experimental.UtilityClass")
+                            .javaParser(JavaParser.fromJavaVersion().classpath("lombok"))
+                            .build()
+                            .apply(
+                                    getCursor(),
+                                    classDecl.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName))
+                            ),
+                    executionContext
+            );
+        }
+
+        @Override
+        public J.MethodDeclaration visitMethodDeclaration(
+                final J.MethodDeclaration method,
+                final ExecutionContext executionContext
+        ) {
+            final J.ClassDeclaration classDecl = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
+            if (!CheckVisitor.shouldPerformChanges(classDecl)) {
+                return super.visitMethodDeclaration(method, executionContext);
+            }
+
+            return super.visitMethodDeclaration(
+                    method.withModifiers(method.getModifiers().stream()
+                            .filter(m -> m.getType() != J.Modifier.Type.Static)
+                            .collect(Collectors.toList())),
+                    executionContext
+            );
+        }
+    }
+
+    private static class CheckVisitor extends JavaIsoVisitor<AtomicBoolean> {
+
+        @Override
+        public J.ClassDeclaration visitClassDeclaration(
+                final J.ClassDeclaration classDecl,
+                final AtomicBoolean shouldPerformChanges
         ) {
             if (classDecl.getLeadingAnnotations().stream().anyMatch(a -> "UtilityClass".equals(a.getSimpleName()))) {
-                counter.getAndIncrement();
+                shouldPerformChanges.set(false);
             }
-            return super.visitClassDeclaration(classDecl, counter);
+            return super.visitClassDeclaration(classDecl, shouldPerformChanges);
         }
 
         @Override
         public J.MethodDeclaration visitMethodDeclaration(
                 final J.MethodDeclaration method,
-                final AtomicInteger counter
+                final AtomicBoolean shouldPerformChanges
         ) {
             if (!method.hasModifier(J.Modifier.Type.Static)) {
-                counter.getAndIncrement();
+                shouldPerformChanges.set(false);
             }
-            return super.visitMethodDeclaration(method, counter);
+            return super.visitMethodDeclaration(method, shouldPerformChanges);
         }
 
         @Override
-        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, AtomicInteger counter) {
-            if (variable.isField(getCursor()) && !variable.getVariableType().hasFlags(Flag.Static)) {
-                counter.getAndIncrement();
-            }
-            return super.visitVariable(variable, counter);
-        }
-
-        public static int countViolations(Tree t) {
-            return new LombokUtilityClassCheckVisitor().reduce(t, new AtomicInteger(0)).get();
-        }
-    }
-
-    private class LombokUtilityClassChangeVisitor extends JavaIsoVisitor<ExecutionContext> {
-
-        @Override
-        public J.ClassDeclaration visitClassDeclaration(
-                final J.ClassDeclaration classDecl,
-                final ExecutionContext executionContext
+        public J.VariableDeclarations.NamedVariable visitVariable(
+                final J.VariableDeclarations.NamedVariable variable,
+                final AtomicBoolean shouldPerformChanges
         ) {
-            if (LombokUtilityClass.this.violations == -1) {
-                LombokUtilityClass.this.violations = LombokUtilityClassCheckVisitor.countViolations(classDecl);
+            if (variable.isField(getCursor())
+                    && variable.getVariableType() != null
+                    && !variable.getVariableType().hasFlags(Flag.Static)) {
+                shouldPerformChanges.set(false);
             }
-
-            if (LombokUtilityClass.this.violations == 0
-                    && classDecl.getLeadingAnnotations().stream().noneMatch(a -> "UtilityClass".equals(a.getSimpleName()))) {
-
-                maybeAddImport("lombok.experimental.UtilityClass", false);
-
-                return super.visitClassDeclaration(
-                        JavaTemplate
-                                .builder("@UtilityClass")
-                                .imports("lombok.experimental.UtilityClass")
-                                .javaParser(JavaParser.fromJavaVersion().classpath("lombok"))
-                                .build()
-                                .apply(
-                                        getCursor(),
-                                        classDecl.getCoordinates().addAnnotation(comparing(J.Annotation::getSimpleName))
-                                ), executionContext);
-            }
-
-            return super.visitClassDeclaration(classDecl, executionContext);
+            return super.visitVariable(variable, shouldPerformChanges);
         }
 
-        @Override
-        public J.MethodDeclaration visitMethodDeclaration(
-                final J.MethodDeclaration method,
-                final ExecutionContext executionContext
-        ) {
-            if (LombokUtilityClass.this.violations == 0) {
-                return super.visitMethodDeclaration(
-                        method.withModifiers(method.getModifiers().stream()
-                                .filter(m -> m.getType() != J.Modifier.Type.Static)
-                                .collect(Collectors.toList())),
-                        executionContext
-                );
-            }
-
-            return super.visitMethodDeclaration(method, executionContext);
+        private static boolean shouldPerformChanges(final J.ClassDeclaration classDecl) {
+            return new CheckVisitor().reduce(classDecl, new AtomicBoolean(true)).get();
         }
     }
 }

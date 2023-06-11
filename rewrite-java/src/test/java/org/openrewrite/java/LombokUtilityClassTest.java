@@ -150,30 +150,31 @@ class LombokUtilityClassTest implements RewriteTest {
                 java(
                         """
                                 public class A {
-                                   public int add(final int x, final int y) {
-                                      return x + y;
-                                   }
-                                   private class B {
-                                    private static int substract(final int x, final int y) {
-                                        return x - y;
+                                    public int add(final int x, final int y) {
+                                        return x + y;
                                     }
-                                   }
+                                    
+                                    private class B {
+                                        private static int substract(final int x, final int y) {
+                                            return x - y;
+                                        }
+                                    }
                                 }
                                 """,
                         """
                                 import lombok.experimental.UtilityClass;
                                               
                                 public class A {
-                                   public int add(final int x, final int y) {
-                                      return x + y;
-                                   }
-                                                     
-                                   @UtilityClass
-                                   private class B {
-                                    private int substract(final int x, final int y) {
-                                        return x - y;
+                                    public int add(final int x, final int y) {
+                                        return x + y;
                                     }
-                                   }
+                                    
+                                    @UtilityClass
+                                    private class B {
+                                        private int substract(final int x, final int y) {
+                                            return x - y;
+                                        }
+                                    }
                                 }
                                 """
                 )
@@ -191,30 +192,31 @@ class LombokUtilityClassTest implements RewriteTest {
                 java(
                         """
                                 public class A {
-                                   public int add(final int x, final int y) {
-                                      return x + y;
-                                   }
-                                   private static class B {
-                                    private static int substract(final int x, final int y) {
-                                        return x - y;
+                                    public int add(final int x, final int y) {
+                                        return x + y;
                                     }
-                                   }
+                                    
+                                    private static class B {
+                                        private static int substract(final int x, final int y) {
+                                            return x - y;
+                                        }
+                                    }
                                 }
                                 """,
                         """
                                 import lombok.experimental.UtilityClass;
-                                              
+                                
                                 public class A {
-                                   public int add(final int x, final int y) {
-                                      return x + y;
-                                   }
-                                                     
-                                   @UtilityClass
-                                   private static class B {
-                                    private int substract(final int x, final int y) {
-                                        return x - y;
+                                    public int add(final int x, final int y) {
+                                        return x + y;
                                     }
-                                   }
+                                    
+                                    @UtilityClass
+                                    private static class B {
+                                        private int substract(final int x, final int y) {
+                                            return x - y;
+                                        }
+                                    }
                                 }
                                 """
                 )
@@ -247,6 +249,7 @@ class LombokUtilityClassTest implements RewriteTest {
                                       return x + y;
                                    }
                                 }
+                                
                                 @UtilityClass
                                 class B {
                                     public int substract(final int x, final int y) {
