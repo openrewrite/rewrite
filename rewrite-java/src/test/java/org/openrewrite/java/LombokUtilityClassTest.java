@@ -59,6 +59,30 @@ class LombokUtilityClassTest implements RewriteTest {
         );
     }
 
+    @Test
+    void happyPathMultiVariableField() {
+        rewriteRun(
+                recipeSpec -> recipeSpec
+                        .recipe(new LombokUtilityClass()
+                        ),
+                java(
+                        """
+                                public class A {
+                                   public static final int A, B, C = 0;
+                                }
+                                """,
+                        """
+                                import lombok.experimental.UtilityClass;
+                                                                
+                                @UtilityClass
+                                public class A {
+                                   public final int a, b, c = 0;
+                                }
+                                """
+                )
+        );
+    }
+
 
     @Test
     void doNotUpgradeToUtilityClassIfNonStaticVariables() {
