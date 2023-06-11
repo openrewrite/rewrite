@@ -8,7 +8,7 @@ import static org.openrewrite.java.Assertions.java;
 class LombokUtilityClassTest implements RewriteTest {
 
     @Test
-    void happyPathSimple() {
+    void happyPathSimpleMethod() {
         rewriteRun(
                 recipeSpec -> recipeSpec
                         .recipe(new LombokUtilityClass()
@@ -29,6 +29,30 @@ class LombokUtilityClassTest implements RewriteTest {
                                    public int add(final int x, final int y) {
                                       return x + y;
                                    }
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
+    void happyPathSimpleField() {
+        rewriteRun(
+                recipeSpec -> recipeSpec
+                        .recipe(new LombokUtilityClass()
+                        ),
+                java(
+                        """
+                                public class A {
+                                   public static final int C = 0;
+                                }
+                                """,
+                        """
+                                import lombok.experimental.UtilityClass;
+                                                                
+                                @UtilityClass
+                                public class A {
+                                   public final int c = 0;
                                 }
                                 """
                 )

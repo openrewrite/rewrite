@@ -5,7 +5,10 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -86,6 +89,29 @@ public class LombokUtilityClass extends Recipe {
                     method.withModifiers(method.getModifiers().stream()
                             .filter(m -> m.getType() != J.Modifier.Type.Static)
                             .collect(Collectors.toList())),
+                    executionContext
+            );
+        }
+
+        @Override
+        public J.VariableDeclarations.NamedVariable visitVariable(
+                final J.VariableDeclarations.NamedVariable variable,
+                final ExecutionContext executionContext
+        ) {
+            final J.ClassDeclaration classDecl = getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class);
+            if (!CheckVisitor.shouldPerformChanges(classDecl)) {
+                return super.visitVariable(variable, executionContext);
+            }
+
+            JavaType.Variable vari = variable.getVariableType();
+            Set<Flag> flags = new HashSet<>(vari.getFlags());
+            flags.remove(Flag.Static);
+
+            return super.visitVariable(
+                    variable
+                            .withName(variable.getName().withSimpleName(variable.getName().getSimpleName().toLowerCase()))
+                            //.withVariableType(vari.withFlags(Collections.emptySet())),
+                            .withVariableType(new JavaType.Variable(null, Flag.Final.getBitMask(), "", null, null, null)),
                     executionContext
             );
         }
