@@ -10,9 +10,7 @@ class LombokUtilityClassTest implements RewriteTest {
     @Test
     void happyPathSimpleMethod() {
         rewriteRun(
-                recipeSpec -> recipeSpec
-                        .recipe(new LombokUtilityClass()
-                        ),
+                recipeSpec -> recipeSpec.recipe(new LombokUtilityClass()),
                 java(
                         """
                                 public class A {
@@ -62,9 +60,7 @@ class LombokUtilityClassTest implements RewriteTest {
     @Test
     void happyPathMultiVariableField() {
         rewriteRun(
-                recipeSpec -> recipeSpec
-                        .recipe(new LombokUtilityClass()
-                        ),
+                recipeSpec -> recipeSpec.recipe(new LombokUtilityClass()),
                 java(
                         """
                                 public class A {
@@ -87,8 +83,7 @@ class LombokUtilityClassTest implements RewriteTest {
     @Test
     void doNotUpgradeToUtilityClassIfNonStaticVariables() {
         rewriteRun(
-                recipeSpec -> recipeSpec
-                        .recipe(new LombokUtilityClass()),
+                recipeSpec -> recipeSpec.recipe(new LombokUtilityClass()),
                 java(
                         """
                                 public class A {
@@ -106,8 +101,7 @@ class LombokUtilityClassTest implements RewriteTest {
     @Test
     void doNotUpgradeToUtilityClassIfNonStaticMethods() {
         rewriteRun(
-                recipeSpec -> recipeSpec
-                        .recipe(new LombokUtilityClass()),
+                recipeSpec -> recipeSpec.recipe(new LombokUtilityClass()),
                 java(
                         """
                                 public class A {
@@ -123,8 +117,7 @@ class LombokUtilityClassTest implements RewriteTest {
     @Test
     void onlyUpgradeRelevantToUtilityClass() {
         rewriteRun(
-                recipeSpec -> recipeSpec
-                        .recipe(new LombokUtilityClass()),
+                recipeSpec -> recipeSpec.recipe(new LombokUtilityClass()),
                 java(
                         """
                                 public class A {
@@ -145,12 +138,12 @@ class LombokUtilityClassTest implements RewriteTest {
                                 """
                 ),
                 java("""
-                                public class B {
-                                   public int add(final int x, final int y) {
-                                      return x + y;
-                                   }
-                                }
-                                """
+                        public class B {
+                           public int add(final int x, final int y) {
+                              return x + y;
+                           }
+                        }
+                        """
                 )
         );
     }
@@ -158,8 +151,7 @@ class LombokUtilityClassTest implements RewriteTest {
     @Test
     void doNotChangeReferenced() {
         rewriteRun(
-                recipeSpec -> recipeSpec
-                        .recipe(new LombokUtilityClass()),
+                recipeSpec -> recipeSpec.recipe(new LombokUtilityClass()),
                 java(
                         """
                                 public class A {
@@ -180,12 +172,12 @@ class LombokUtilityClassTest implements RewriteTest {
                                 """
                 ),
                 java("""
-                                public class B {
-                                   public int add(final int x, final int y) {
-                                      return A.add(x, y);
-                                   }
-                                }
-                                """
+                        public class B {
+                           public int add(final int x, final int y) {
+                              return A.add(x, y);
+                           }
+                        }
+                        """
                 )
         );
     }
@@ -193,8 +185,7 @@ class LombokUtilityClassTest implements RewriteTest {
     @Test
     void happyPathInner() {
         rewriteRun(
-                recipeSpec -> recipeSpec
-                        .recipe(new LombokUtilityClass()),
+                recipeSpec -> recipeSpec.recipe(new LombokUtilityClass()),
                 java(
                         """
                                 public class A {
@@ -235,8 +226,7 @@ class LombokUtilityClassTest implements RewriteTest {
     @Test
     void happyPathNested() {
         rewriteRun(
-                recipeSpec -> recipeSpec
-                        .recipe(new LombokUtilityClass()),
+                recipeSpec -> recipeSpec.recipe(new LombokUtilityClass()),
                 java(
                         """
                                 public class A {
@@ -253,7 +243,7 @@ class LombokUtilityClassTest implements RewriteTest {
                                 """,
                         """
                                 import lombok.experimental.UtilityClass;
-                                
+                                                                
                                 public class A {
                                     public int add(final int x, final int y) {
                                         return x + y;
@@ -274,8 +264,7 @@ class LombokUtilityClassTest implements RewriteTest {
     @Test
     void happyPathNonPublic() {
         rewriteRun(
-                recipeSpec -> recipeSpec
-                        .recipe(new LombokUtilityClass()),
+                recipeSpec -> recipeSpec.recipe(new LombokUtilityClass()),
                 java(
                         """
                                 public class A {
@@ -297,7 +286,7 @@ class LombokUtilityClassTest implements RewriteTest {
                                       return x + y;
                                    }
                                 }
-                                
+                                                                
                                 @UtilityClass
                                 class B {
                                     public int substract(final int x, final int y) {
