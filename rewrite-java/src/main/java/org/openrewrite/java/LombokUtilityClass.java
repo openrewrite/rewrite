@@ -13,18 +13,20 @@ import static java.util.Comparator.comparing;
 
 /**
  * TODO: Check the following criteria:
- * - Lombok in dependencies
- * - All methods of class are static
- * - No instances of given class
- * - All static attributes are final
+ * - Lombok in dependencies +
+ * - All methods of class are static +
+ * - No instances of given class +
+ * - All static attributes are final +
  * <p>
  * TODO: Perform the transformation:
- * - Add the annotation
- * - Remove static from all attributes and methods
+ * - Add the annotation +
+ * - Remove static from all attributes and methods +
  * <p>
  * TODO: Features to consider:
  * - Transformation: Add Lombok config if not present + supported configuration options for utility class
- * - Transformation: Replace instantiation with static calls to methods
+ * - Transformation: Replace instantiation with static calls to methods --> na
+ * - Anonymous classes ???
+ * - Reflection ???
  */
 public class LombokUtilityClass extends Recipe {
 
@@ -145,7 +147,7 @@ public class LombokUtilityClass extends Recipe {
         ) {
             if (variable.isField(getCursor())
                     && variable.getVariableType() != null
-                    && !variable.getVariableType().hasFlags(Flag.Static)) {
+                    && !variable.getVariableType().hasFlags(Flag.Static, Flag.Final)) {
                 shouldPerformChanges.set(false);
             }
             return super.visitVariable(variable, shouldPerformChanges);

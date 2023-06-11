@@ -58,6 +58,22 @@ class LombokUtilityClassTest implements RewriteTest {
     }
 
     @Test
+    void doNotChangeFieldIfNotFinal() {
+        rewriteRun(
+                recipeSpec -> recipeSpec
+                        .recipe(new LombokUtilityClass()
+                        ),
+                java(
+                        """
+                                public class A {
+                                   public static int C = 0;
+                                }
+                                """
+                )
+        );
+    }
+
+    @Test
     void happyPathMultiVariableField() {
         rewriteRun(
                 recipeSpec -> recipeSpec.recipe(new LombokUtilityClass()),
