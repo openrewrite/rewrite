@@ -127,17 +127,6 @@ class ArraysAsListToImmutableRecipeTest implements RewriteTest {
 								{
 								   public static final List<String> entries = Collections.unmodifiableList(Arrays.asList("A", "B"));
 								}
-								""",
-						"""
-								package my.test;
-											
-								import java.util.Arrays;
-								import java.util.Collections;
-           								   
-								class A
-								{
-								   public static final List<String> entries = Collections.unmodifiableList(Arrays.asList("A", "B"));
-								}
 								"""
 				)
 		);
