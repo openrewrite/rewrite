@@ -18,6 +18,8 @@ package org.openrewrite;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.internal.ExceptionUtils;
+import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
@@ -28,9 +30,28 @@ import static org.openrewrite.Tree.randomId;
 @With
 public class ParseExceptionResult implements Marker {
     UUID id;
+    String parserType;
+    String exceptionType;
     String message;
 
+    /**
+     * The type of tree element that was being parsed when the failure occurred.
+     */
+    @Nullable
+    String treeType;
+
+    public static ParseExceptionResult build(Class<? extends Parser> parserClass, Throwable t) {
+        String simpleName = t.getClass().getSimpleName();
+        return new ParseExceptionResult(
+                randomId(),
+                parserClass.getSimpleName(),
+                !StringUtils.isBlank(simpleName) ? simpleName : t.getClass().getName(),
+                ExceptionUtils.sanitizeStackTrace(t, parserClass),
+                null
+        );
+    }
+
     public static ParseExceptionResult build(Parser parser, Throwable t) {
-        return new ParseExceptionResult(randomId(), ExceptionUtils.sanitizeStackTrace(t, parser.getClass()));
+        return build(parser.getClass(), t);
     }
 }
