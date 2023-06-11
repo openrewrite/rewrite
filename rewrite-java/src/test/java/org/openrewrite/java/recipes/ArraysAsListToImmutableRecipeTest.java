@@ -5,11 +5,12 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-class CollectionsToImmutableTest implements RewriteTest {
+class ArraysAsListToImmutableRecipeTest implements RewriteTest {
 	@Test
-	void renameFieldRenamesFoundField() {
+	void wrapArrayListToBeUnmodifiable1() {
 		rewriteRun(
-				recipeSpec -> recipeSpec.recipe(new CollectionsToImmutableRecipe("Arrays.asList(\"A\",\"B\");", "y")),
+				recipeSpec -> recipeSpec.recipe(new ArraysAsListToImmutableRecipe("Arrays.asList(\"A\",\"B\");",
+						"Collections.unmodifiableList(Arrays.asList(\"A\", \"B\"))")),
 				java(
 						"""
 								package my.test;
