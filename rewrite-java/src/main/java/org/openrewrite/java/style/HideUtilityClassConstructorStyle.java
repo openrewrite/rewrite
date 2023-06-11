@@ -17,13 +17,11 @@ package org.openrewrite.java.style;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.Incubating;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaStyle;
 
 import java.util.Collection;
 
-@Incubating(since = "7.0.0")
 @Value
 @With
 public class HideUtilityClassConstructorStyle implements JavaStyle {

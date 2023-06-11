@@ -18,18 +18,21 @@ package org.openrewrite.benchmarks.java;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.LargeSourceSet;
+import org.openrewrite.SourceFile;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.tree.J;
 
 import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @State(Scope.Benchmark)
 public class JavaCompilationUnitState {
-    List<J.CompilationUnit> sourceFiles;
+    List<SourceFile> sourceFiles;
 
     @Setup(Level.Trial)
     public void setup() throws URISyntaxException {
@@ -71,7 +74,8 @@ public class JavaCompilationUnitState {
                         "org.eclipse.jgit")
 //                .logCompilationWarningsAndErrors(true)
                 .build()
-                .parse(inputs, null, new InMemoryExecutionContext(Throwable::printStackTrace));
+                .parse(inputs, null, new InMemoryExecutionContext(Throwable::printStackTrace))
+                .collect(Collectors.toList());
     }
 
     @TearDown(Level.Trial)
@@ -79,7 +83,11 @@ public class JavaCompilationUnitState {
         hole.consume(sourceFiles.size());
     }
 
-    public List<J.CompilationUnit> getSourceFiles() {
+    public LargeSourceSet getSourceSet() {
+        return new InMemoryLargeSourceSet(sourceFiles);
+    }
+
+    public List<SourceFile> getSourceFiles() {
         return sourceFiles;
     }
 }

@@ -21,7 +21,6 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.tree.G;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -37,6 +36,8 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static java.util.Objects.requireNonNull;
 
 
 @Value
@@ -71,86 +72,90 @@ public class DependencyInsight extends Recipe {
     @Override
     public String getDescription() {
         return "Find direct and transitive dependencies matching a group, artifact, and optionally a configuration name. " +
-                "Results include dependencies that either directly match or transitively include a matching dependency.";
+               "Results include dependencies that either directly match or transitively include a matching dependency.";
     }
 
     @Override
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        return ListUtils.map(before, sourceFile -> {
-            Optional<GradleProject> maybeGradleProject = sourceFile.getMarkers().findFirst(GradleProject.class);
-            if (!maybeGradleProject.isPresent()) {
-                return sourceFile;
-            }
-            GradleProject gp = maybeGradleProject.get();
-            String projectName = sourceFile.getMarkers()
-                    .findFirst(JavaProject.class)
-                    .map(JavaProject::getProjectName)
-                    .orElse("");
-            String sourceSetName = sourceFile.getMarkers()
-                    .findFirst(JavaSourceSet.class)
-                    .map(JavaSourceSet::getName)
-                    .orElse("main");
-            // configuration -> dependency which is or transitively depends on search target -> search target
-            Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency = new HashMap<>();
-            Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency = new HashMap<>();
-            for (GradleDependencyConfiguration c : gp.getConfigurations()) {
-                if (configuration == null || configuration.isEmpty() || c.getName().equals(configuration)) {
-                    for (ResolvedDependency resolvedDependency : c.getResolved()) {
-                        ResolvedDependency dep = resolvedDependency.findDependency(groupIdPattern, artifactIdPattern);
-                        if (dep != null) {
-                            GroupArtifactVersion requestedGav = new GroupArtifactVersion(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId(), resolvedDependency.getVersion());
-                            GroupArtifactVersion targetGav = new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), dep.getVersion());
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                Optional<GradleProject> maybeGradleProject = sourceFile.getMarkers().findFirst(GradleProject.class);
+                if (!maybeGradleProject.isPresent()) {
+                    return sourceFile;
+                }
+                GradleProject gp = maybeGradleProject.get();
+                String projectName = sourceFile.getMarkers()
+                        .findFirst(JavaProject.class)
+                        .map(JavaProject::getProjectName)
+                        .orElse("");
+                String sourceSetName = sourceFile.getMarkers()
+                        .findFirst(JavaSourceSet.class)
+                        .map(JavaSourceSet::getName)
+                        .orElse("main");
+                // configuration -> dependency which is or transitively depends on search target -> search target
+                Map<String, Set<GroupArtifactVersion>> configurationToDirectDependency = new HashMap<>();
+                Map<GroupArtifactVersion, Set<GroupArtifactVersion>> directDependencyToTargetDependency = new HashMap<>();
+                for (GradleDependencyConfiguration c : gp.getConfigurations()) {
+                    if (configuration == null || configuration.isEmpty() || c.getName().equals(configuration)) {
+                        for (ResolvedDependency resolvedDependency : c.getResolved()) {
+                            ResolvedDependency dep = resolvedDependency.findDependency(groupIdPattern, artifactIdPattern);
+                            if (dep != null) {
+                                GroupArtifactVersion requestedGav = new GroupArtifactVersion(resolvedDependency.getGroupId(), resolvedDependency.getArtifactId(), resolvedDependency.getVersion());
+                                GroupArtifactVersion targetGav = new GroupArtifactVersion(dep.getGroupId(), dep.getArtifactId(), dep.getVersion());
+                                configurationToDirectDependency.compute(c.getName(), (k, v) -> {
+                                    if (v == null) {
+                                        v = new LinkedHashSet<>();
+                                    }
+                                    v.add(requestedGav);
+                                    return v;
+                                });
+                                directDependencyToTargetDependency.compute(requestedGav, (k, v) -> {
+                                    if (v == null) {
+                                        v = new LinkedHashSet<>();
+                                    }
+                                    v.add(targetGav);
+                                    return v;
+                                });
+                                dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
+                                        projectName,
+                                        sourceSetName,
+                                        dep.getGroupId(),
+                                        dep.getArtifactId(),
+                                        dep.getVersion(),
+                                        dep.getDatedSnapshotVersion(),
+                                        dep.getRequested().getScope(),
+                                        dep.getDepth()
+                                ));
+                            }
+                        }
+                    }
+                }
+                if (directDependencyToTargetDependency.isEmpty()) {
+                    return sourceFile;
+                }
+                // Non-resolvable configurations may contain the requested which has been found to transitively depend on the target
+                for (GradleDependencyConfiguration c : gp.getConfigurations()) {
+                    if (configurationToDirectDependency.containsKey(c.getName())) {
+                        continue;
+                    }
+                    for (Dependency dependency : c.getRequested()) {
+                        if (directDependencyToTargetDependency.containsKey(new GroupArtifactVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion()))) {
                             configurationToDirectDependency.compute(c.getName(), (k, v) -> {
                                 if (v == null) {
                                     v = new LinkedHashSet<>();
                                 }
-                                v.add(requestedGav);
+                                v.add(new GroupArtifactVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion()));
                                 return v;
                             });
-                            directDependencyToTargetDependency.compute(requestedGav, (k, v) -> {
-                                if (v == null) {
-                                    v = new LinkedHashSet<>();
-                                }
-                                v.add(targetGav);
-                                return v;
-                            });
-                            dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
-                                    projectName,
-                                    sourceSetName,
-                                    dep.getGroupId(),
-                                    dep.getArtifactId(),
-                                    dep.getVersion(),
-                                    dep.getDatedSnapshotVersion(),
-                                    dep.getRequested().getScope(),
-                                    dep.getDepth()
-                            ));
                         }
                     }
                 }
+                return new MarkIndividualDependency(configurationToDirectDependency, directDependencyToTargetDependency)
+                        .visitNonNull(sourceFile, ctx);
             }
-            if (directDependencyToTargetDependency.isEmpty()) {
-                return sourceFile;
-            }
-            // Non-resolvable configurations may contain the requested which has been found to transitively depend on the target
-            for (GradleDependencyConfiguration c : gp.getConfigurations()) {
-                if(configurationToDirectDependency.containsKey(c.getName())) {
-                    continue;
-                }
-                for (Dependency dependency : c.getRequested()) {
-                    if(directDependencyToTargetDependency.containsKey(new GroupArtifactVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion()))) {
-                        configurationToDirectDependency.compute(c.getName(), (k, v) -> {
-                            if (v == null) {
-                                v = new LinkedHashSet<>();
-                            }
-                            v.add(new GroupArtifactVersion(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion()));
-                            return v;
-                        });
-                    }
-                }
-            }
-            return (SourceFile) new MarkIndividualDependency(configurationToDirectDependency, directDependencyToTargetDependency)
-                    .visitNonNull(sourceFile, ctx);
-        });
+        };
     }
 
     @EqualsAndHashCode(callSuper = true)
@@ -164,7 +169,7 @@ public class DependencyInsight extends Recipe {
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if (!DEPENDENCY_CONFIGURATION_MATCHER.matches(m) || !configurationToDirectDependency.containsKey(m.getSimpleName()) ||
-                    m.getArguments().isEmpty()) {
+                m.getArguments().isEmpty()) {
                 return m;
             }
 

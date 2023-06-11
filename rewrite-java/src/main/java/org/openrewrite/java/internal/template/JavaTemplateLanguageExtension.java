@@ -17,15 +17,12 @@ package org.openrewrite.java.internal.template;
 
 import lombok.AccessLevel;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.java.tree.Space;
-
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Each language that extends {@link J} should provide a template extension that helps
@@ -42,12 +39,9 @@ public abstract class JavaTemplateLanguageExtension {
     Tree insertionPoint;
     Space.Location loc;
     JavaCoordinates.Mode mode;
-    AtomicReference<Cursor> parentCursorRef;
-    Cursor parentScope;
 
     public JavaTemplateLanguageExtension(JavaTemplateParser templateParser, Substitutions substitutions,
-                                         String substitutedTemplate, JavaCoordinates coordinates,
-                                         AtomicReference<Cursor> parentCursorRef, Cursor parentScope) {
+                                         String substitutedTemplate, JavaCoordinates coordinates) {
         this.templateParser = templateParser;
         this.substitutions = substitutions;
         this.substitutedTemplate = substitutedTemplate;
@@ -55,8 +49,6 @@ public abstract class JavaTemplateLanguageExtension {
         this.insertionPoint = coordinates.getTree();
         this.loc = coordinates.getSpaceLocation();
         this.mode = coordinates.getMode();
-        this.parentCursorRef = parentCursorRef;
-        this.parentScope = parentScope;
     }
 
     public abstract TreeVisitor<? extends J, Integer> getMixin();

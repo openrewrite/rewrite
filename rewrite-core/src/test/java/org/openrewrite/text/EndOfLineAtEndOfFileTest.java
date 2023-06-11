@@ -62,7 +62,7 @@ public class EndOfLineAtEndOfFileTest implements RewriteTest {
     }
 
     @Test
-    void fileContainingCLRFWillEndWithCLRF() {
+    void fileContainingCRLFWillEndWithCRLF() {
         rewriteRun(
           text(
             "Test\r\nLine",

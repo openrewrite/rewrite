@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Modifier;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -131,7 +132,10 @@ public class ClasspathScanningLoader implements ResourceLoader {
 
             for (ClassInfo classInfo : result.getSubclasses(Recipe.class.getName())) {
                 Class<?> recipeClass = classInfo.loadClass();
-                if (recipeClass.getName().equals(DeclarativeRecipe.class.getName()) || recipeClass.getEnclosingClass() != null) {
+                if (recipeClass.getName().equals(DeclarativeRecipe.class.getName())
+                        || recipeClass.getEnclosingClass() != null
+                        // `ScanningRecipe` is an example of an abstract `Recipe` subtype
+                        || (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
                     continue;
                 }
                 try {

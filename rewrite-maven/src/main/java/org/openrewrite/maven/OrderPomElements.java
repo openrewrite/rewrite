@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
@@ -76,7 +77,7 @@ public class OrderPomElements extends Recipe {
     }
 
     @Override
-    public MavenVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
@@ -133,8 +134,8 @@ public class OrderPomElements extends Recipe {
                     int beforeIndex = 0;
                     int afterIndex = 0;
                     for (int i = 0; i < root.getContent().size() &&
-                            beforeIndex != root.getContent().size() &&
-                            afterIndex != updatedOrder.size(); i++) {
+                                    beforeIndex != root.getContent().size() &&
+                                    afterIndex != updatedOrder.size(); i++) {
 
                         Content original = root.getContent().get(beforeIndex);
                         Content updated = updatedOrder.get(afterIndex);
@@ -215,11 +216,11 @@ public class OrderPomElements extends Recipe {
                     }
 
                     if ((groupPos > artifactPos ||
-                            (versionPos > -1 && (artifactPos > versionPos)))) {
+                         (versionPos > -1 && (artifactPos > versionPos)))) {
                         List<Content> orderedContents = new ArrayList<>();
                         for (String type : new String[]{"groupId", "artifactId", "version"}) {
                             List<Content> gavContents = gavGroups.get(type);
-                            if(gavContents != null) {
+                            if (gavContents != null) {
                                 orderedContents.addAll(gavContents);
                             }
                         }

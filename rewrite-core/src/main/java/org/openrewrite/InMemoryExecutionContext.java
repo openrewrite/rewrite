@@ -84,9 +84,4 @@ public class InMemoryExecutionContext implements ExecutionContext {
     public BiConsumer<Throwable, ExecutionContext> getOnTimeout() {
         return onTimeout;
     }
-
-    @Override
-    public Duration getRunTimeout(int inputs) {
-        return runTimeout.apply(inputs);
-    }
 }

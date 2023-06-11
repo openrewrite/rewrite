@@ -163,22 +163,4 @@ public class Markers {
                 .map(markerType::cast)
                 .findFirst();
     }
-
-    /**
-     * @deprecated Use {@link SearchResult#found(Tree)} instead.
-     * @return A markers instance with a search result added.
-     */
-    @Deprecated
-    public Markers searchResult() {
-        return searchResult(null);
-    }
-
-    /**
-     * @deprecated Use {@link SearchResult#found(Tree, String)} instead.
-     * @return A markers instance with a search result added.
-     */
-    @Deprecated
-    public Markers searchResult(@Nullable String description) {
-        return computeByType(new SearchResult(randomId(), description), (s1, s2) -> s1 == null ? s2 : s1);
-    }
 }

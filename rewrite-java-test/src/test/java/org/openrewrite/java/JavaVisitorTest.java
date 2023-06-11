@@ -16,13 +16,11 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -33,28 +31,29 @@ class JavaVisitorTest implements RewriteTest {
     @Test
     void javaVisitorHandlesPaddedWithNullElem() {
         rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                  var mi = super.visitMethodInvocation(method, p);
-                  if ("removeMethod".equals(mi.getSimpleName())) {
-                      //noinspection ConstantConditions
-                      return null;
-                  }
-                  return mi;
-              }
-          }).doNext(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                  J.MethodDeclaration md = super.visitMethodDeclaration(method, p);
-                  if (md.getSimpleName().equals("allTheThings")) {
-                      md = md.withTemplate(JavaTemplate.builder(this::getCursor, "Exception").build(),
-                        md.getCoordinates().replaceThrows()
-                      );
-                  }
-                  return md;
-              }
-          }))).cycles(2).expectedCyclesThatMakeChanges(2),
+          spec -> spec.recipes(
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
+                    var mi = super.visitMethodInvocation(method, p);
+                    if ("removeMethod".equals(mi.getSimpleName())) {
+                        //noinspection ConstantConditions
+                        return null;
+                    }
+                    return mi;
+                }
+            }),
+            toRecipe(() -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                    if (method.getSimpleName().equals("allTheThings")) {
+                        return JavaTemplate.builder("Exception").contextSensitive().build()
+                          .apply(getCursor(), method.getCoordinates().replaceThrows());
+                    }
+                    return method;
+                }
+            })
+          ).cycles(2).expectedCyclesThatMakeChanges(2),
           java(
             """
               class A {
@@ -73,40 +72,6 @@ class JavaVisitorTest implements RewriteTest {
                   }
                   void doSomething() {}
                   void removeMethod() {}
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void thrownExceptionsAreSpecific() {
-        rewriteRun(
-          spec -> spec
-            .executionContext(new InMemoryExecutionContext())
-            .afterRecipe(run -> assertThat(run.getResults().get(0).getRecipeErrors())
-              .singleElement()
-              .satisfies(t -> assertThat(t.getMessage()).containsSubsequence("A.java", "A", "allTheThings"))
-            )
-            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.Literal visitLiteral(final J.Literal literal, final ExecutionContext executionContext) {
-                  throw new IllegalStateException("boom");
-              }
-          })),
-          java(
-            """
-              class A {
-                  void allTheThings() {
-                      String var = "qwe";
-                  }
-              }
-              """,
-            """
-              class A {
-                  void allTheThings() {
-                      String var = /*~~(boom)~~>*/"qwe";
-                  }
               }
               """
           )

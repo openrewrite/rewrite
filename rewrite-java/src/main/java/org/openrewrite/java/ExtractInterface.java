@@ -17,7 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.Tree;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.FindAnnotations;
 import org.openrewrite.java.tree.*;
@@ -27,54 +27,49 @@ import java.text.ParseException;
 import java.text.RuleBasedCollator;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
 
 public class ExtractInterface {
-    public static List<JavaSourceFile> extract(JavaSourceFile cu, String fullyQualifiedInterfaceName) {
-        return Arrays.asList(
-                (JavaSourceFile) new CreateInterface(fullyQualifiedInterfaceName).visitNonNull(cu, 0),
-                (JavaSourceFile) new ImplementAndAddOverrideAnnotations(fullyQualifiedInterfaceName).visitNonNull(cu, 0)
-        );
-    }
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class CreateInterface extends JavaIsoVisitor<Integer> {
+    public static class CreateInterface extends JavaIsoVisitor<ExecutionContext> {
         String fullyQualifiedInterfaceName;
 
         @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, Integer p) {
-            String pkg = cu.getPackageDeclaration() == null ? "" :
-                    Arrays.stream(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor()).split("\\."))
-                            .map(subpackage -> "..")
-                            .collect(Collectors.joining("/", "../", "/"));
+        public J postVisit(J tree, ExecutionContext ctx) {
+            if (tree instanceof JavaSourceFile) {
+                JavaSourceFile c = (JavaSourceFile) requireNonNull(tree);
 
-            JavaSourceFile c = super.visitJavaSourceFile(cu, p)
-                    .withId(Tree.randomId());
+                String pkg = c.getPackageDeclaration() == null ? "" :
+                        Arrays.stream(c.getPackageDeclaration().getExpression().printTrimmed(getCursor()).split("\\."))
+                                .map(subpackage -> "..")
+                                .collect(Collectors.joining("/", "../", "/"));
 
-            String interfacePkg = JavaType.ShallowClass.build(fullyQualifiedInterfaceName).getPackageName();
-            if (!interfacePkg.isEmpty()) {
-                c = c.withPackageDeclaration(new J.Package(randomId(),
-                        cu.getPackageDeclaration() == null ? Space.EMPTY : cu.getPackageDeclaration().getPrefix(),
-                        Markers.EMPTY,
-                        TypeTree.build(interfacePkg).withPrefix(Space.format(" ")),
-                        cu.getPackageDeclaration() == null ? emptyList() : cu.getPackageDeclaration().getAnnotations()));
+                String interfacePkg = JavaType.ShallowClass.build(fullyQualifiedInterfaceName).getPackageName();
+                if (!interfacePkg.isEmpty()) {
+                    c = c.withPackageDeclaration(new J.Package(randomId(),
+                            c.getPackageDeclaration() == null ? Space.EMPTY : c.getPackageDeclaration().getPrefix(),
+                            Markers.EMPTY,
+                            TypeTree.build(interfacePkg).withPrefix(Space.format(" ")),
+                            c.getPackageDeclaration() == null ? emptyList() : c.getPackageDeclaration().getAnnotations()));
+                }
+
+                c = (JavaSourceFile) c.withSourcePath(c.getSourcePath()
+                        .resolve(pkg + fullyQualifiedInterfaceName.replace('.', '/') + ".java")
+                        .normalize());
+
+                return c;
             }
-
-            c = (JavaSourceFile) c.withSourcePath(cu.getSourcePath()
-                    .resolve(pkg + fullyQualifiedInterfaceName.replace('.', '/') + ".java")
-                    .normalize());
-
-            return c;
+            return super.postVisit(tree, ctx);
         }
 
         @Override
-        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
             J.ClassDeclaration c = classDecl;
 
             c = c.withKind(J.ClassDeclaration.Kind.Type.Interface);
@@ -83,14 +78,16 @@ public class ExtractInterface {
             c = c.withName(c.getName().withSimpleName(fullyQualifiedInterfaceName.substring(
                     fullyQualifiedInterfaceName.lastIndexOf('.') + 1
             )));
+            c = c.withType(JavaType.ShallowClass.build(fullyQualifiedInterfaceName)
+                    .withKind(JavaType.FullyQualified.Kind.Interface));
 
-            return autoFormat(super.visitClassDeclaration(c, p), p);
+            return autoFormat(super.visitClassDeclaration(c, ctx), ctx);
         }
 
         @Override
-        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer p) {
+        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             if (method.hasModifier(J.Modifier.Type.Static) || !method.hasModifier(J.Modifier.Type.Public) ||
-                    method.isConstructor()) {
+                method.isConstructor()) {
                 //noinspection ConstantConditions
                 return null;
             }
@@ -98,53 +95,59 @@ public class ExtractInterface {
             return method
                     .withModifiers(ListUtils.map(method.getModifiers(), m ->
                             m.getType() == J.Modifier.Type.Public ||
-                                    m.getType() == J.Modifier.Type.Final ||
-                                    m.getType() == J.Modifier.Type.Native ? null : m))
+                            m.getType() == J.Modifier.Type.Final ||
+                            m.getType() == J.Modifier.Type.Native ? null : m))
                     .withBody(null);
         }
     }
 
     @Value
     @EqualsAndHashCode(callSuper = false)
-    private static class ImplementAndAddOverrideAnnotations extends JavaIsoVisitor<Integer> {
+    public static class ImplementAndAddOverrideAnnotations extends JavaIsoVisitor<ExecutionContext> {
         String fullyQualifiedInterfaceName;
 
         @Override
-        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer p) {
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+            if (classDecl.getType() != null && classDecl.getType().getFullyQualifiedName().equals(fullyQualifiedInterfaceName)) {
+                return classDecl;
+            }
+
             maybeAddImport(fullyQualifiedInterfaceName);
             JavaType.ShallowClass type = JavaType.ShallowClass.build(fullyQualifiedInterfaceName);
 
             J.Block body = classDecl.getBody();
-            return ((J.ClassDeclaration) new ImplementInterface<>(classDecl, type).visitNonNull(classDecl, p))
-                    .withBody(body.withStatements(ListUtils.map(body.getStatements(), s -> {
-                        if (s instanceof J.MethodDeclaration) {
-                            J.MethodDeclaration methodDeclaration = (J.MethodDeclaration) s;
-                            try {
-                                if (!methodDeclaration.hasModifier(J.Modifier.Type.Public) ||
-                                        methodDeclaration.hasModifier(J.Modifier.Type.Static) ||
-                                        methodDeclaration.isConstructor()) {
-                                    return s;
-                                }
+            J.ClassDeclaration implementing = (J.ClassDeclaration) new ImplementInterface<>(classDecl, type).visitNonNull(classDecl, ctx);
 
-                                if(FindAnnotations.find(methodDeclaration, "@java.lang.Override").isEmpty()) {
-                                    return methodDeclaration.withTemplate(
-                                            JavaTemplate.builder(this::getCursor, "@Override").build(),
-                                            methodDeclaration.getCoordinates().addAnnotation(
-                                                    Comparator
-                                                            .comparing(
-                                                                    J.Annotation::getSimpleName,
-                                                                    new RuleBasedCollator("< Override")
-                                                            ))
-                                    );
-                                }
-
-                                return methodDeclaration;
-                            } catch (ParseException e) {
-                                throw new RuntimeException(e);
+            return (J.ClassDeclaration) new JavaIsoVisitor<ExecutionContext>() {
+                @Override
+                public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                    if (getCursor().getParentTreeCursor().getValue() == body) {
+                        try {
+                            if (!method.hasModifier(J.Modifier.Type.Public) ||
+                                method.hasModifier(J.Modifier.Type.Static) ||
+                                method.isConstructor()) {
+                                return method;
                             }
+
+                            if (FindAnnotations.find(method, "@java.lang.Override").isEmpty()) {
+                                return JavaTemplate.apply(
+                                        "@Override",
+                                        getCursor(),
+                                        method.getCoordinates().addAnnotation(Comparator.comparing(
+                                                J.Annotation::getSimpleName,
+                                                new RuleBasedCollator("< Override")
+                                        ))
+                                );
+                            }
+
+                            return method;
+                        } catch (ParseException e) {
+                            throw new RuntimeException(e);
                         }
-                        return s;
-                    })));
+                    }
+                    return super.visitMethodDeclaration(method, ctx);
+                }
+            }.visitNonNull(implementing, ctx, getCursor().getParentOrThrow());
         }
     }
 }

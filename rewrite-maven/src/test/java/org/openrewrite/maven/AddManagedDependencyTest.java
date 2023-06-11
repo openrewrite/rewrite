@@ -16,8 +16,8 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Validated;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Validated;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,7 +30,7 @@ class AddManagedDependencyTest implements RewriteTest {
     void validation()  {
         AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
           "pom", null, null, null, "org.apache.logging:*", true);
-        Validated validated = recipe.validate();
+        Validated<Object> validated = recipe.validate();
         assertThat(validated).allMatch(Validated::isValid);
     }
 
@@ -38,7 +38,7 @@ class AddManagedDependencyTest implements RewriteTest {
     void validationAllowsDashesInOnlyIfUsing()  {
         AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
           "pom", null, null, null, "something-with:dashes-is-ok*", true);
-        Validated validated = recipe.validate();
+        Validated<Object> validated = recipe.validate();
         assertThat(validated).allMatch(Validated::isValid);
     }
 
@@ -46,7 +46,7 @@ class AddManagedDependencyTest implements RewriteTest {
     void badCharactersInOnlyIfUsingAreInvalid() {
         AddManagedDependency recipe = new AddManagedDependency("org.apache.logging.log4j", "log4j-bom", "latest.release", "import",
           "pom", null, null, null, "spaced group:*", true);
-        Validated validated = recipe.validate();
+        Validated<Object> validated = recipe.validate();
         assertThat(validated.isValid()).isFalse();
         assertThat(validated.failures()).anyMatch(v -> "onlyIfUsing".equals(v.getProperty()));
     }

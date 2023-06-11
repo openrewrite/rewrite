@@ -85,7 +85,7 @@ public class ReloadableJava11ParserInputFileObject implements JavaFileObject {
 
     @Override
     public CharSequence getCharContent(boolean ignoreEncodingErrors) {
-        return input.getSource().readFully();
+        return input.getSource(ctx).readFully();
     }
 
     @Override

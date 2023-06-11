@@ -760,7 +760,12 @@ class JsonPathMatcherTest {
                 }
                 return super.visitDocument(document, p);
             }
-        }.reduce(JsonParser.builder().build().parse(simple.toArray(new String[0])), new ArrayList<>())).hasSize(1);
+        }
+          .reduce(JsonParser.builder().build()
+            .parse(simple.toArray(new String[0]))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Could not parse as JSON")), new ArrayList<>()))
+          .hasSize(1);
     }
 
     private void assertNotMatched(String jsonPath, List<String> before) {
@@ -847,6 +852,9 @@ class JsonPathMatcherTest {
                 }
                 return e;
             }
-        }.reduce(new JsonParser().parse(before.toArray(new String[0])), new ArrayList<>());
+        }
+          .reduce(new JsonParser().parse(before.toArray(new String[0]))
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("Could not parse as XML")), new ArrayList<>());
     }
 }

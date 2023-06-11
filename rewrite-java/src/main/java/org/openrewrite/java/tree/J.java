@@ -31,10 +31,8 @@ import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.internal.TypesInUse;
-import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.template.SourceTemplate;
 
 import java.beans.Transient;
 import java.lang.ref.SoftReference;
@@ -54,9 +52,6 @@ import static java.util.stream.Collectors.toList;
 
 @SuppressWarnings("unused")
 public interface J extends Tree {
-    static void clearCaches() {
-        JavaTemplateParser.clearCache();
-    }
 
     @SuppressWarnings("unchecked")
     @Override
@@ -84,11 +79,6 @@ public interface J extends Tree {
 
     default <J2 extends J> J2 withComments(List<Comment> comments) {
         return withPrefix(getPrefix().withComments(comments));
-    }
-
-    @Incubating(since = "7.0.0")
-    default <J2 extends J> J2 withTemplate(SourceTemplate<J, JavaCoordinates> template, JavaCoordinates coordinates, Object... parameters) {
-        return template.withTemplate(this, coordinates, parameters);
     }
 
     /**
@@ -1527,7 +1517,7 @@ public interface J extends Tree {
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
-            return v.visitJavaSourceFile(this, p);
+            return v.visitCompilationUnit(this, p);
         }
 
         public Set<NameTree> findType(String clazz) {
@@ -3143,7 +3133,7 @@ public interface J extends Tree {
         /**
          * Checks if the given {@link Expression} is a {@link Literal} with the given value.
          *
-         * @param maybeLiteral An expresssion that may be an {@link Literal}.
+         * @param maybeLiteral An expression that may be an {@link Literal}.
          * @param value        The value to compare against.
          * @return {@code true} if the given {@link Expression} is a {@link Literal} with the given value.
          */
@@ -5873,6 +5863,70 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitYield(this, p);
+        }
+    }
+
+    /**
+     * A tree node that represents an unparsed element.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor
+    @Data
+    @With
+    final class Unknown implements J, Statement, Expression, TypeTree, TypedTree, NameTree {
+
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        Source source;
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitUnknown(this, p);
+        }
+
+        @Nullable
+        @Override
+        public JavaType getType() {
+            return null;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public Unknown withType(@Nullable JavaType type) {
+            return this;
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        /**
+         * This class only exists to clean up the printed results from `SearchResult` markers.
+         * Without the marker the comments will print before the LST prefix.
+         */
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @AllArgsConstructor
+        @Data
+        @With
+        public static class Source implements J {
+
+            @EqualsAndHashCode.Include
+            UUID id;
+
+            Space prefix;
+            Markers markers;
+            String text;
+
+            @Override
+            public <P> J acceptJava(JavaVisitor<P> v, P p) {
+                return v.visitUnknownSource(this, p);
+            }
         }
     }
 }

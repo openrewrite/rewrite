@@ -16,11 +16,14 @@
 package org.openrewrite.java.format;
 
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+
+import static java.util.Objects.requireNonNull;
 
 public class TabsAndIndents extends Recipe {
     @Override
@@ -40,13 +43,16 @@ public class TabsAndIndents extends Recipe {
 
     private static class TabsAndIndentsFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-            TabsAndIndentsStyle style = ((SourceFile) cu).getStyle(TabsAndIndentsStyle.class);
-            if (style == null) {
-                style = IntelliJ.tabsAndIndents();
+        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof JavaSourceFile) {
+                JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                TabsAndIndentsStyle style = ((SourceFile) cu).getStyle(TabsAndIndentsStyle.class);
+                if (style == null) {
+                    style = IntelliJ.tabsAndIndents();
+                }
+                return new TabsAndIndentsVisitor<>(style).visit(tree, ctx);
             }
-            doAfterVisit(new TabsAndIndentsVisitor<>(style));
-            return cu;
+            return (J) tree;
         }
     }
 

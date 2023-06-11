@@ -16,10 +16,8 @@
 package org.openrewrite.ipc.http;
 
 import java.io.*;
-import java.net.*;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.net.HttpURLConnection;
+import java.net.Proxy;
 import java.time.Duration;
 import java.util.Map;
 

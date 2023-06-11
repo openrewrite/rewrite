@@ -18,6 +18,7 @@ package org.openrewrite.xml.security;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
@@ -42,53 +43,46 @@ public class RemoveOwaspSuppressions extends Recipe {
     @Override
     public String getDescription() {
         return "Remove all OWASP suppressions with a suppression end date in the past, as these are no longer valid. " +
-                "For use with the OWASP `dependency-check` tool. " +
-                "More details on OWASP suppression files: https://jeremylong.github.io/DependencyCheck/general/suppression.html.";
+               "For use with the OWASP `dependency-check` tool. " +
+               "More details on OWASP suppression files can be found [here](https://jeremylong.github.io/DependencyCheck/general/suppression.html).";
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RemoveSuppressionsVisitor();
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsOwaspSuppressionsFile().getVisitor();
-    }
-
-    private static class RemoveSuppressionsVisitor extends XmlIsoVisitor<ExecutionContext> {
-        @Override
-        public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
-            Xml.Tag t = super.visitTag(tag, ctx);
-            if (!new XPathMatcher("/suppressions").matches(getCursor()) || t.getContent() == null) {
-                return t;
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new IsOwaspSuppressionsFile(), new XmlIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = super.visitTag(tag, ctx);
+                if (!new XPathMatcher("/suppressions").matches(getCursor()) || t.getContent() == null) {
+                    return t;
+                }
+                return t.withContent(ListUtils.map(t.getContent(), c -> isPastDueSuppression(c) ? null : c));
             }
-            return t.withContent(ListUtils.map(t.getContent(), c -> isPastDueSuppression(c) ? null : c));
-        }
 
-        private boolean isPastDueSuppression(Content content) {
-            if (content instanceof Xml.Tag) {
-                Xml.Tag child = (Xml.Tag) content;
-                if (child.getName().equals("suppress")) {
-                    for (Xml.Attribute attribute : child.getAttributes()) {
-                        if (attribute.getKeyAsString().equals("until")) {
-                            String maybeDate = attribute.getValueAsString();
-                            if (maybeDate.endsWith("Z")) {
-                                maybeDate = maybeDate.substring(0, maybeDate.length() - 1);
-                            }
-                            try {
-                                LocalDate date = LocalDate.parse(maybeDate);
-                                if (date.isBefore(LocalDate.now().minus(1, ChronoUnit.DAYS))) {
-                                    return true;
+            private boolean isPastDueSuppression(Content content) {
+                if (content instanceof Xml.Tag) {
+                    Xml.Tag child = (Xml.Tag) content;
+                    if (child.getName().equals("suppress")) {
+                        for (Xml.Attribute attribute : child.getAttributes()) {
+                            if (attribute.getKeyAsString().equals("until")) {
+                                String maybeDate = attribute.getValueAsString();
+                                if (maybeDate.endsWith("Z")) {
+                                    maybeDate = maybeDate.substring(0, maybeDate.length() - 1);
                                 }
-                            } catch (DateTimeParseException e) {
-                                return false;
+                                try {
+                                    LocalDate date = LocalDate.parse(maybeDate);
+                                    if (date.isBefore(LocalDate.now().minus(1, ChronoUnit.DAYS))) {
+                                        return true;
+                                    }
+                                } catch (DateTimeParseException e) {
+                                    return false;
+                                }
                             }
                         }
                     }
                 }
+                return false;
             }
-            return false;
-        }
+        });
     }
 }

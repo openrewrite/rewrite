@@ -26,8 +26,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Objects;
-
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class RemoveRepository extends Recipe {
@@ -55,7 +53,7 @@ public class RemoveRepository extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {

@@ -17,9 +17,7 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
@@ -43,14 +41,9 @@ public class RemoveRepository extends Recipe {
     String repository;
 
     @Override
-    protected IsBuildGradle<ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsBuildGradle<>();
-    }
-
-    @Override
-    public GroovyVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher repositories = new MethodMatcher("org.gradle.api.artifacts.dsl.RepositoryHandler " + repository + "()");
-        return new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if(repositories.matches(method)) {
@@ -59,6 +52,6 @@ public class RemoveRepository extends Recipe {
                 }
                 return super.visitMethodInvocation(method, ctx);
             }
-        };
+        });
     }
 }

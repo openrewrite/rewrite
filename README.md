@@ -1,5 +1,5 @@
 <h1 align="center">OpenRewrite</h1>
-<p align="center"><i></i><b>🎉 Automate software refactoring 🎉</b></i></p>
+<p align="center"><i><b>🎉 Automate software refactoring 🎉</b></i></p>
 
 ---
 

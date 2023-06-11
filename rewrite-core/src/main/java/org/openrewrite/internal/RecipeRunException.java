@@ -19,27 +19,20 @@ import lombok.Getter;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.lang.Nullable;
 
+/**
+ * This provides a way for us to capture the cursor position where an unexpected exception was thrown so that
+ * {@link org.openrewrite.RecipeScheduler} can add an {@link org.openrewrite.marker.Markup.Error} marker on the
+ * part of the LST as part of the recipe running lifecycle.
+ * <p>
+ * Developers should never see this exception propagated out of the recipe running lifecycle.
+ */
 public class RecipeRunException extends RuntimeException {
-    /**
-     * Null if the exception occurs outside a visitor in an applicable test, etc.
-     */
     @Getter
     @Nullable
     private final Cursor cursor;
 
     public RecipeRunException(Throwable cause, @Nullable Cursor cursor) {
-        this(cause, cursor, null);
-    }
-
-    public RecipeRunException(Throwable cause, @Nullable Cursor cursor, @Nullable String visitedLocation) {
-        super(message(visitedLocation, cause), cause);
+        super(cause);
         this.cursor = cursor;
-    }
-
-    @Nullable
-    private static String message(@Nullable String visitedLocation, Throwable cause) {
-        return visitedLocation == null ? null
-                : String.format("Exception while visiting project file '%s', caused by: %s, at %s",
-                visitedLocation, cause, cause.getStackTrace()[0]);
     }
 }

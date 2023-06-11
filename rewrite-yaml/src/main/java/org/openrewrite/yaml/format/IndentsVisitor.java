@@ -22,6 +22,7 @@ import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.style.IndentsStyle;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.util.Iterator;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
@@ -50,7 +51,10 @@ public class IndentsVisitor<P> extends YamlIsoVisitor<P> {
                 }
             }
         }
-        preVisit((Yaml) parent.getPath(Yaml.class::isInstance).next(), p);
+        Iterator<Object> path = parent.getPath(Yaml.class::isInstance);
+        if (path.hasNext()) {
+            preVisit((Yaml) path.next(), p);
+        }
         return visit(tree, p);
     }
 

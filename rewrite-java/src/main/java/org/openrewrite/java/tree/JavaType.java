@@ -347,11 +347,6 @@ public interface JavaType {
             this.methods = nullIfEmpty(methods);
         }
 
-        @Deprecated
-        public static Class build(String fullyQualifiedName) {
-            return ShallowClass.build(fullyQualifiedName);
-        }
-
         public List<FullyQualified> getAnnotations() {
             return annotations == null ? emptyList() : annotations;
         }
@@ -492,7 +487,7 @@ public interface JavaType {
         public ShallowClass(@Nullable Integer managedReference, long flagsBitMap, String fullyQualifiedName, Kind kind,
                             @Nullable List<JavaType> typeParameters, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
                             @Nullable List<FullyQualified> annotations, @Nullable List<FullyQualified> interfaces, @Nullable List<Variable> members, @Nullable List<Method> methods) {
-            super(managedReference, flagsBitMap, fullyQualifiedName, kind, typeParameters, supertype, owningClass, annotations, interfaces, members, methods);
+            super(managedReference, flagsBitMap, fullyQualifiedName, kind, null, null, owningClass, null, null, null, null);
         }
 
         /**
@@ -698,19 +693,6 @@ public interface JavaType {
 
         public GenericTypeVariable unsafeSet(String name, Variance variance, @Nullable List<JavaType> bounds) {
             this.name = name;
-            this.variance = variance;
-            this.bounds = nullIfEmpty(bounds);
-            return this;
-        }
-
-        /**
-         * @param variance The new variance
-         * @param bounds The new bounds
-         * @return This instance, with modifications/
-         * @deprecated Use {@link #unsafeSet(String, Variance, List)} instead.
-         */
-        @Deprecated
-        public GenericTypeVariable unsafeSet(Variance variance, @Nullable List<JavaType> bounds) {
             this.variance = variance;
             this.bounds = nullIfEmpty(bounds);
             return this;

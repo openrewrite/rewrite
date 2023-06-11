@@ -19,11 +19,9 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindReferencedTypes;
-import org.openrewrite.java.tree.*;
-import org.openrewrite.marker.Markers;
-
-import static java.util.Collections.emptyList;
-import static org.openrewrite.Tree.randomId;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Statement;
 
 /**
  * Deletes standalone statements.

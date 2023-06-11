@@ -16,8 +16,8 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.config.Environment;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.config.Environment;
 import org.openrewrite.java.search.FindText;
 import org.openrewrite.test.RewriteTest;
 

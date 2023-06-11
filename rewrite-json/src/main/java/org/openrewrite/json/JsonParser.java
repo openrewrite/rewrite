@@ -15,14 +15,10 @@
  */
 package org.openrewrite.json;
 
-import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Timer;
 import org.antlr.v4.runtime.*;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
-import org.openrewrite.internal.MetricsHelper;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.json.internal.JsonParserVisitor;
 import org.openrewrite.json.internal.grammar.JSON5Lexer;
@@ -33,49 +29,36 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.InputStream;
 import java.nio.file.Path;
-import java.util.List;
-import java.util.Objects;
+import java.util.stream.Stream;
 
-import static java.util.stream.Collectors.toList;
-
-public class JsonParser implements Parser<Json.Document> {
+public class JsonParser implements Parser {
     @Override
-    public List<Json.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        return acceptedInputs(sourceFiles).stream()
-                .map(sourceFile -> {
-                    Timer.Builder timer = Timer.builder("rewrite.parse")
-                            .description("The time spent parsing an Json file")
-                            .tag("file.type", "Json");
-                    Timer.Sample sample = Timer.start();
-                    try (InputStream sourceStream = sourceFile.getSource(ctx)) {
-                        JSON5Parser parser = new JSON5Parser(new CommonTokenStream(new JSON5Lexer(
-                                CharStreams.fromStream(sourceStream))));
+        return acceptedInputs(sourceFiles).map(sourceFile -> {
+            try (InputStream sourceStream = sourceFile.getSource(ctx)) {
+                JSON5Parser parser = new JSON5Parser(new CommonTokenStream(new JSON5Lexer(
+                        CharStreams.fromStream(sourceStream))));
 
-                        parser.removeErrorListeners();
-                        parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
+                parser.removeErrorListeners();
+                parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
 
-                        Json.Document document = new JsonParserVisitor(
-                                sourceFile.getRelativePath(relativeTo),
-                                sourceFile.getFileAttributes(),
-                                sourceFile.getSource(ctx)
-                        ).visitJson5(parser.json5());
-                        sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
-                        parsingListener.parsed(sourceFile, document);
-                        return document;
-                    } catch (Throwable t) {
-                        sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
-                        ParsingExecutionContextView.view(ctx).parseFailure(sourceFile, relativeTo, this, t);
-                        ctx.getOnError().accept(new IllegalStateException(sourceFile.getPath() + " " + t.getMessage(), t));
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull)
-                .collect(toList());
+                Json.Document document = new JsonParserVisitor(
+                        sourceFile.getRelativePath(relativeTo),
+                        sourceFile.getFileAttributes(),
+                        sourceFile.getSource(ctx)
+                ).visitJson5(parser.json5());
+                parsingListener.parsed(sourceFile, document);
+                return document;
+            } catch (Throwable t) {
+                ctx.getOnError().accept(t);
+                return ParseError.build(this, sourceFile, relativeTo, ctx, t);
+            }
+        });
     }
 
     @Override
-    public List<Json.Document> parse(@Language("Json") String... sources) {
+    public Stream<SourceFile> parse(@Language("Json") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
@@ -109,6 +92,7 @@ public class JsonParser implements Parser<Json.Document> {
     public static Builder builder() {
         return new Builder();
     }
+
     public static class Builder extends org.openrewrite.Parser.Builder {
 
         public Builder() {

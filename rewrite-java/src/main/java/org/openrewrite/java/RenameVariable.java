@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.Cursor;
-import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -32,7 +31,6 @@ import java.util.Stack;
  * Notes:
  * - The current version will rename variables even if a variable with `toName` is already declared in the same scope.
  */
-@Incubating(since = "7.5.0")
 public class RenameVariable<P> extends JavaIsoVisitor<P> {
     private final J.VariableDeclarations.NamedVariable variable;
     private final String toName;

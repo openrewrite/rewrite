@@ -927,7 +927,7 @@ class MavenParserTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            ).get(0);
+            ).findFirst().orElseThrow(() -> new IllegalArgumentException("Could not parse as XML"));
 
             assertThat(mockRepo.getRequestCount())
               .as("The mock repository received no requests. Applying mirrors is probably broken")

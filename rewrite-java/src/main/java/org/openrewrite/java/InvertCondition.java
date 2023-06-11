@@ -16,40 +16,42 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.cleanup.SimplifyBooleanExpressionVisitor;
+import org.openrewrite.java.cleanup.SimplifyBooleanExpression;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import static org.openrewrite.Tree.randomId;
 
-public class InvertCondition<P> extends JavaVisitor<P> {
+public class InvertCondition extends JavaVisitor<ExecutionContext> {
 
     @SuppressWarnings("unchecked")
     public static <J2 extends J> J.ControlParentheses<J2> invert(J.ControlParentheses<J2> controlParentheses, Cursor cursor) {
         //noinspection ConstantConditions
-        return (J.ControlParentheses<J2>) new InvertCondition<Integer>()
-                .visit(controlParentheses, 0, cursor.getParentOrThrow());
+        return (J.ControlParentheses<J2>) new InvertCondition()
+                .visit(controlParentheses, new InMemoryExecutionContext(), cursor.getParentOrThrow());
     }
 
     @Nullable
     @Override
-    public J visit(@Nullable Tree tree, P p) {
+    public J visit(@Nullable Tree tree, ExecutionContext ctx) {
         J t;
         if (tree instanceof Expression && !(tree instanceof J.ControlParentheses) && !(tree instanceof J.Binary)) {
             Expression expression = (Expression) tree;
             t = new J.Unary(randomId(), expression.getPrefix(), Markers.EMPTY,
                     JLeftPadded.build(J.Unary.Type.Not), expression.withPrefix(Space.EMPTY), expression.getType());
         } else {
-            t = super.visit(tree, p);
+            t = super.visit(tree, ctx);
         }
 
-        return new SimplifyBooleanExpressionVisitor<>().visit(t, p, getCursor().getParentOrThrow());
+        return (J) new SimplifyBooleanExpression().getVisitor().visit(t, ctx, getCursor().getParentOrThrow());
     }
 
     @Override
-    public J visitBinary(J.Binary binary, P p) {
+    public J visitBinary(J.Binary binary, ExecutionContext ctx) {
         switch (binary.getOperator()) {
             case LessThan:
                 return binary.withOperator(J.Binary.Type.GreaterThanOrEqual);

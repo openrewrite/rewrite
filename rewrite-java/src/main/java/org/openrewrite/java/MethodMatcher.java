@@ -26,11 +26,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
 import org.openrewrite.java.internal.grammar.MethodSignatureParser;
 import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -64,7 +60,7 @@ import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
  * </PRE>
  */
 @SuppressWarnings("NotNullFieldNotInitialized")
-public class MethodMatcher implements InvocationMatcher {
+public class MethodMatcher {
     private static final JavaType.ShallowClass OBJECT_CLASS = JavaType.ShallowClass.build("java.lang.Object");
     private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
     private static final String ASPECTJ_DOTDOT_PATTERN = StringUtils.aspectjNameToPattern("..");
@@ -214,7 +210,6 @@ public class MethodMatcher implements InvocationMatcher {
         }
     }
 
-    @Override
     public boolean matches(@Nullable Expression maybeMethod) {
         return (maybeMethod instanceof J.MethodInvocation && matches((J.MethodInvocation) maybeMethod)) ||
                 (maybeMethod instanceof J.NewClass && matches((J.NewClass) maybeMethod)) ||

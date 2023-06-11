@@ -60,10 +60,6 @@ public interface Hcl extends Tree {
 
     <H extends Hcl> H withPrefix(Space prefix);
 
-    default <H extends Hcl> H withTemplate(SourceTemplate<Hcl, HclCoordinates> template, HclCoordinates coordinates, Object... parameters) {
-        return template.withTemplate(this, coordinates, parameters);
-    }
-
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -424,7 +420,9 @@ public interface Hcl extends Tree {
             Object value = attr.getValue() instanceof Literal ?
                     ((Literal) attr.getValue()).getValueSource() : null;
             if (attr.getValue() instanceof QuotedTemplate) {
-                Cursor root = new Cursor(null, HclParser.builder().build().parse("").get(0));
+                Cursor root = new Cursor(null, HclParser.builder().build().parse("")
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Could not parse as HCL")));
                 StringBuilder valueBuilder = new StringBuilder();
                 for (Expression expr : ((QuotedTemplate) attr.getValue()).getExpressions()) {
                     valueBuilder.append(expr.print(root));

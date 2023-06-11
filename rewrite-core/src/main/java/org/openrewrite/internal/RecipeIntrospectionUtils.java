@@ -16,7 +16,9 @@
 package org.openrewrite.internal;
 
 import org.openrewrite.*;
-import org.openrewrite.config.*;
+import org.openrewrite.config.ColumnDescriptor;
+import org.openrewrite.config.DataTableDescriptor;
+import org.openrewrite.config.RecipeIntrospectionException;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -32,29 +34,6 @@ import static java.util.Collections.emptyList;
 
 @SuppressWarnings("unused")
 public class RecipeIntrospectionUtils {
-    @Nullable
-    public static TreeVisitor<?, ExecutionContext> recipeApplicableTest(Recipe recipe) {
-        try {
-            Method getVisitor = recipe.getClass().getDeclaredMethod("getApplicableTest");
-            getVisitor.setAccessible(true);
-            //noinspection unchecked
-            return (TreeVisitor<?, ExecutionContext>) getVisitor.invoke(recipe);
-        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ignored) {
-            return null;
-        }
-    }
-
-    @Nullable
-    public static TreeVisitor<?, ExecutionContext> recipeSingleSourceApplicableTest(Recipe recipe) {
-        try {
-            Method getVisitor = recipe.getClass().getDeclaredMethod("getSingleSourceApplicableTest");
-            getVisitor.setAccessible(true);
-            //noinspection unchecked
-            return (TreeVisitor<?, ExecutionContext>) getVisitor.invoke(recipe);
-        } catch (NoSuchMethodException | InvocationTargetException | IllegalAccessException ignored) {
-            return null;
-        }
-    }
 
     public static TreeVisitor<?, ExecutionContext> recipeVisitor(Recipe recipe) {
         try {

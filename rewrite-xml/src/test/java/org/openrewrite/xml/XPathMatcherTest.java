@@ -17,6 +17,7 @@ package org.openrewrite.xml;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.xml.tree.Xml;
@@ -27,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class XPathMatcherTest {
 
-    private final Xml.Document xmlDoc = new XmlParser().parse(
+    private final SourceFile xmlDoc = new XmlParser().parse(
       """
         <?xml version="1.0" encoding="UTF-8"?>
         <dependencies>
@@ -40,9 +41,9 @@ class XPathMatcherTest {
             </dependency>
         </dependencies>
         """
-    ).get(0);
+    ).toList().get(0);
 
-    private final Xml.Document pomXml = new XmlParser().parse(
+    private final SourceFile pomXml = new XmlParser().parse(
       """
         <project>
           <groupId>com.mycompany.app</groupId>
@@ -61,9 +62,10 @@ class XPathMatcherTest {
               </plugin>
             </plugins>
           </build>
-        </project> 
+        </project>
         """
-    ).get(0);
+    ).toList().get(0);
+
 
     @Test
     void matchAbsolute() {
@@ -107,12 +109,12 @@ class XPathMatcherTest {
           pomXml)).isFalse();
     }
 
-    private boolean match(String xpath, Xml.Document x) {
+    private boolean match(String xpath, SourceFile x) {
         XPathMatcher matcher = new XPathMatcher(xpath);
         return !TreeVisitor.collect(new XmlVisitor<>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if(matcher.matches(getCursor())) {
+                if (matcher.matches(getCursor())) {
                     return SearchResult.found(tag);
                 }
                 return super.visitTag(tag, ctx);
@@ -120,7 +122,7 @@ class XPathMatcherTest {
 
             @Override
             public Xml visitAttribute(Xml.Attribute attribute, ExecutionContext ctx) {
-                if(matcher.matches(getCursor())) {
+                if (matcher.matches(getCursor())) {
                     return SearchResult.found(attribute);
                 }
                 return super.visitAttribute(attribute, ctx);

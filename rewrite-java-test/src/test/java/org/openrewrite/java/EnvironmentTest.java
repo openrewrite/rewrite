@@ -47,11 +47,11 @@ class EnvironmentTest {
         var styles = env.listStyles();
         var intelliJStyle = styles.stream()
           .filter(s -> s.getName().equals(IntelliJ.defaults().getName()))
-            .findAny()
-              .orElseThrow();
+          .findAny()
+          .orElseThrow();
         assertThat(intelliJStyle)
-            .as("Environment should be able to find and activate the IntelliJ style")
-            .isNotNull();
+          .as("Environment should be able to find and activate the IntelliJ style")
+          .isNotNull();
     }
 }
 
@@ -67,5 +67,10 @@ class MixedConstructorRecipe extends Recipe {
     @Override
     public String getDisplayName() {
         return "Mixed constructor";
+    }
+
+    @Override
+    public String getDescription() {
+        return "A recipe with more than one constructor, with one marked as the primary.";
     }
 }

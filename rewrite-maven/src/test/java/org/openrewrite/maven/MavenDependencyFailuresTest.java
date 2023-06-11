@@ -17,11 +17,7 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.ParseExceptionResult;
-import org.openrewrite.Recipe;
-import org.openrewrite.DocumentExample;
+import org.openrewrite.*;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.table.MavenMetadataFailures;

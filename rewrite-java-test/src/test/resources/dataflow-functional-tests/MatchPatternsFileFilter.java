@@ -16,9 +16,8 @@
 
 package org.jsonschema2pojo.maven;
 
-import static java.lang.String.*;
-import static java.util.Arrays.*;
-import static java.util.regex.Pattern.*;
+import org.apache.maven.shared.utils.io.DirectoryScanner;
+import org.apache.maven.shared.utils.io.MatchPatterns;
 
 import java.io.File;
 import java.io.FileFilter;
@@ -26,8 +25,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.apache.maven.shared.utils.io.DirectoryScanner;
-import org.apache.maven.shared.utils.io.MatchPatterns;
+import static java.lang.String.format;
+import static java.util.Arrays.asList;
+import static java.util.regex.Pattern.quote;
 
 /**
  * <p>A file filter that supports include and exclude patterns.</p>
@@ -123,7 +123,7 @@ public class MatchPatternsFileFilter implements FileFilter {
     String relativePath(File file) throws IOException {
         String canonicalPath = file.getCanonicalPath();
         if (!canonicalPath.startsWith(sourceDirectory)) {
-            throw new IOException(format("the path %s is not a decendent of the basedir %s", canonicalPath, sourceDirectory));
+            throw new IOException(format("the path %s is not a descendent of the basedir %s", canonicalPath, sourceDirectory));
         }
         return canonicalPath.substring(sourceDirectory.length()).replaceAll("^" + quote(File.separator), "");
     }

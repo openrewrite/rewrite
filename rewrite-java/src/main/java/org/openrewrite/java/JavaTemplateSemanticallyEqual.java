@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import lombok.Value;
 import lombok.With;
 import org.antlr.v4.runtime.*;
+import org.openrewrite.Cursor;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
@@ -41,19 +42,19 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         List<J> matchedParameters;
     }
 
-    static TemplateMatchResult matchesTemplate(JavaTemplate template, J input) {
+    static TemplateMatchResult matchesTemplate(JavaTemplate template, Cursor input) {
         JavaCoordinates coordinates;
-        if (input instanceof Expression) {
-            coordinates = ((Expression) input).getCoordinates().replace();
-        } else if (input instanceof Statement) {
-            coordinates = ((Statement) input).getCoordinates().replace();
+        if (input.getValue() instanceof Expression) {
+            coordinates = ((Expression) input.getValue()).getCoordinates().replace();
+        } else if (input.getValue() instanceof Statement) {
+            coordinates = ((Statement) input.getValue()).getCoordinates().replace();
         } else {
             throw new IllegalArgumentException("Only expressions and statements can be matched against a template: " + input.getClass());
         }
 
         J[] parameters = createTemplateParameters(template.getCode());
         try {
-            J templateTree = template.withTemplate(input, coordinates, parameters);
+            J templateTree = template.apply(input, coordinates, (Object[]) parameters);
             return matchTemplate(templateTree, input);
         } catch (RuntimeException e) {
             // FIXME this is just a workaround, as template matching finds many new corner cases in `JavaTemplate` which we need to fix
@@ -124,9 +125,9 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         return parameters.toArray(new J[0]);
     }
 
-    private static TemplateMatchResult matchTemplate(J templateTree, J tree) {
+    private static TemplateMatchResult matchTemplate(J templateTree, Cursor cursor) {
         JavaTemplateSemanticallyEqualVisitor semanticallyEqualVisitor = new JavaTemplateSemanticallyEqualVisitor();
-        semanticallyEqualVisitor.visit(templateTree, tree);
+        semanticallyEqualVisitor.visit(templateTree, cursor.getValue(), cursor.getParentOrThrow());
         return new TemplateMatchResult(semanticallyEqualVisitor.isEqual(), semanticallyEqualVisitor.matchedParameters);
     }
 

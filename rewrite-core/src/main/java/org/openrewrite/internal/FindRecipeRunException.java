@@ -39,6 +39,7 @@ public class FindRecipeRunException extends TreeVisitor<Tree, Integer> {
         if (nearestTree == null) {
             return null;
         } else if (tree == nearestTree) {
+            stopAfterPreVisit();
             return Markup.error(tree, vt);
         }
         return tree;

@@ -21,14 +21,12 @@ import com.fasterxml.jackson.databind.JsonNode;
 import lombok.AccessLevel;
 import lombok.Value;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.MavenXmlMapper;
 
 import java.util.Collections;
 import java.util.List;
 
-@Incubating(since = "7.22.0")
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Value
 public class Plugin {
@@ -67,7 +65,6 @@ public class Plugin {
     }
 
     @Nullable
-    @Incubating(since = "7.22.0")
     public String getConfigurationStringValue(String path) {
         JsonNode current = configuration;
         if (!path.isEmpty()) {
@@ -83,7 +80,6 @@ public class Plugin {
     }
 
     @Nullable
-    @Incubating(since = "7.22.0")
     public <T> T getConfiguration(String path, Class<T> configClass) {
         JsonNode current = configuration;
         if (!path.isEmpty()) {
@@ -105,7 +101,6 @@ public class Plugin {
         }
     }
 
-    @Incubating(since = "7.22.0")
     public <T> List<T> getConfigurationList(String path, Class<T> elementClass) {
         JsonNode current = configuration;
         if (!path.isEmpty()) {

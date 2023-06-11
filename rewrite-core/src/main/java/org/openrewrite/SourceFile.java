@@ -16,7 +16,6 @@
 package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 

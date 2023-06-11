@@ -17,12 +17,7 @@ package org.openrewrite.maven.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.Applicability;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Scope;
 
@@ -33,12 +28,12 @@ import static org.openrewrite.Validated.notBlank;
 public class DoesNotIncludeDependency extends Recipe {
 
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob.",
+            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
             example = "com.google.guava")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob.",
+            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
             example = "guava")
     String artifactId;
 
@@ -69,7 +64,7 @@ public class DoesNotIncludeDependency extends Recipe {
     }
 
     @Override
-    public Validated validate() {
+    public Validated<Object> validate() {
         return super.validate()
                 .and(notBlank("groupId", groupId).and(notBlank("artifactId", artifactId)))
                 .and(Validated.test("scope", "scope is a valid Maven scope", scope,
@@ -78,7 +73,7 @@ public class DoesNotIncludeDependency extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Applicability.not(Applicability.or(dependencyInsightVisitors()));
+        return Preconditions.not(Preconditions.or(dependencyInsightVisitors()));
     }
 
     @SuppressWarnings("unchecked")

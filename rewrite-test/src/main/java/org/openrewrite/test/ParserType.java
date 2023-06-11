@@ -25,7 +25,7 @@ class ParserTypeUtils {
     private ParserTypeUtils() {
     }
 
-    public static Class<SourceFile> parserType(Parser<?> parser) {
+    public static Class<SourceFile> parserType(Parser parser) {
         return parserType(parser.getClass());
     }
 

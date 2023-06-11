@@ -18,10 +18,9 @@ package org.openrewrite.java;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.PathUtils;
-import org.openrewrite.config.CompositeRecipe;
-import org.openrewrite.DocumentExample;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
@@ -270,8 +269,6 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void simpleName() {
         rewriteRun(
-          java(a1),
-          java(a2),
           java(
             """
               import a.A1;
@@ -283,7 +280,9 @@ class ChangeTypeTest implements RewriteTest {
                             
               public class B extends A2 {}
               """
-          )
+          ),
+          java(a1),
+          java(a2)
         );
     }
 
@@ -411,9 +410,10 @@ class ChangeTypeTest implements RewriteTest {
     @Test
     void classDecl() {
         rewriteRun(
-          spec -> spec.recipe(new CompositeRecipe()
-            .doNext(new ChangeType("a.A1", "a.A2", true))
-            .doNext(new ChangeType("I1", "I2", true))),
+          spec -> spec.recipes(
+            new ChangeType("a.A1", "a.A2", true),
+            new ChangeType("I1", "I2", true)
+          ),
           java(a1),
           java(a2),
           java("public interface I1 {}"),
@@ -637,14 +637,14 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               import a.A1;
-              
+                            
               public class B {
                  A1 a = (A1) null;
               }
               """,
             """
               import a.A2;
-              
+                            
               public class B {
                  A2 a = (A2) null;
               }
@@ -1291,8 +1291,8 @@ class ChangeTypeTest implements RewriteTest {
               }
               """,
             spec -> spec.path("a/b/NoMatch.java").afterRecipe(cu -> {
-              assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("a/b/NoMatch.java");
-              assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.Target")).isTrue();
+                assertThat(PathUtils.separatorsToUnix(cu.getSourcePath().toString())).isEqualTo("a/b/NoMatch.java");
+                assertThat(TypeUtils.isOfClassType(cu.getClasses().get(0).getType(), "x.y.Target")).isTrue();
             })
           )
         );
@@ -1330,15 +1330,15 @@ class ChangeTypeTest implements RewriteTest {
           java(
             """
               package a.b;
-              
+                            
               import java.util.List;
-              
+                            
               class Original {
               }
               """,
             """
               import java.util.List;
-              
+                            
               class Target {
               }
               """

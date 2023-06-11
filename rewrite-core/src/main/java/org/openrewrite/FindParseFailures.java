@@ -17,8 +17,11 @@ package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.table.ParseFailures;
+
+import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -37,10 +40,11 @@ public class FindParseFailures extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Tree visitSourceFile(SourceFile sourceFile, ExecutionContext ctx) {
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 return sourceFile.getMarkers().findFirst(ParseExceptionResult.class)
                         .<Tree>map(exceptionResult -> {
                             failures.insertRow(ctx, new ParseFailures.Row(

@@ -16,10 +16,10 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
-import org.openrewrite.DocumentExample;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
@@ -198,6 +198,31 @@ class ChangeFieldNameTest implements RewriteTest {
                   class Nested {
                       Object collection = Test.this.list;
                       Object collection2 = A.this.collection;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dontChangeFieldsInConstructor() {
+        rewriteRun(
+          spec -> spec.recipe(changeFieldName("Test", "a", "b")),
+          java(
+            """
+              class Test {
+                  String a;
+                  public Test(String a) {
+                      this.a = a;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  String b;
+                  public Test(String a) {
+                      this.b = a;
                   }
               }
               """

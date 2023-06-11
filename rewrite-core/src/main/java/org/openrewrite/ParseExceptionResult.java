@@ -30,7 +30,7 @@ public class ParseExceptionResult implements Marker {
     UUID id;
     String message;
 
-    public static ParseExceptionResult build(Parser<?> parser, Throwable t) {
+    public static ParseExceptionResult build(Parser parser, Throwable t) {
         return new ParseExceptionResult(randomId(), ExceptionUtils.sanitizeStackTrace(t, parser.getClass()));
     }
 }

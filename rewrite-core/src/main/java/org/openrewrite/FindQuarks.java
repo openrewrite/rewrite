@@ -17,8 +17,11 @@ package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.quark.Quark;
+
+import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -30,14 +33,15 @@ public class FindQuarks extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find instances of type `Quark`.";
+        return "`Quark` source files are pointers to the existence of a file without capturing any of the contents of the file.";
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Tree visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 if (sourceFile instanceof Quark) {
                     return SearchResult.found(sourceFile);
                 }
