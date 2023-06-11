@@ -43,6 +43,7 @@ public class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTe
     private final J.CompilationUnit goatCu = JavaParser.fromJavaVersion().build()
       .parse(goat)
       .findFirst()
+      .map(J.CompilationUnit.class::cast)
       .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
 
     @Override

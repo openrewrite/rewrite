@@ -121,7 +121,6 @@ public class JavaSourceSet implements SourceSet {
     ) {
         List<JavaType.FullyQualified> types = new ArrayList<>();
         if (fullTypeInformation) {
-
             @Language("java")
             String[] typeStubs = typeStubsFor(packagesToTypes);
 
@@ -133,7 +132,8 @@ public class JavaSourceSet implements SourceSet {
                     .classpath(classpath)
                     .build();
 
-            jp.parse(noRecursiveJavaSourceSet, typeStubs).forEach(cu -> {
+            jp.parse(noRecursiveJavaSourceSet, typeStubs).forEach(sourceFile -> {
+                J.CompilationUnit cu = (J.CompilationUnit) sourceFile;
                 if (!cu.getClasses().isEmpty()) {
                     J.Block body = cu.getClasses().get(0).getBody();
                     for (Statement s : body.getStatements()) {

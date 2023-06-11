@@ -224,7 +224,7 @@ public interface RewriteTest extends SourceSpecs {
         Map<SourceFile, SourceSpec<?>> specBySourceFile = new LinkedHashMap<>(sourceSpecs.length);
         for (Map.Entry<Parser.Builder, List<SourceSpec<?>>> sourceSpecsForParser : sourceSpecsByParser.entrySet()) {
             Map<SourceSpec<?>, Parser.Input> inputs = new LinkedHashMap<>(sourceSpecsForParser.getValue().size());
-            Parser<?> parser = sourceSpecsForParser.getKey().build();
+            Parser parser = sourceSpecsForParser.getKey().build();
             for (SourceSpec<?> sourceSpec : sourceSpecsForParser.getValue()) {
                 if (sourceSpec.before == null) {
                     continue;

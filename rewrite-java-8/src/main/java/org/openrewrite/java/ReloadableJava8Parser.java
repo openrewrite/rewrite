@@ -29,6 +29,8 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.ParseError;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -134,7 +136,7 @@ class ReloadableJava8Parser implements JavaParser {
     }
 
     @Override
-    public Stream<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 
         if (classpath != null) { // override classpath
@@ -149,28 +151,22 @@ class ReloadableJava8Parser implements JavaParser {
             }
         }
 
-        @SuppressWarnings("ConstantConditions") LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = acceptedInputs(sourceFiles).stream()
+        @SuppressWarnings("ConstantConditions") LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = acceptedInputs(sourceFiles)
                 .collect(Collectors.toMap(
                         Function.identity(),
-                        input -> MetricsHelper.successTags(
-                                        Timer.builder("rewrite.parse")
-                                                .description("The time spent by the JDK in parsing and tokenizing the source file")
-                                                .tag("file.type", "Java")
-                                                .tag("step", "(1) JDK parsing"))
-                                .register(Metrics.globalRegistry)
-                                .record(() -> {
-                                    try {
-                                        return compiler.parse(new Java8ParserInputFileObject(input, ctx));
-                                    } catch (IllegalStateException e) {
-                                        if ("endPosTable already set".equals(e.getMessage())) {
-                                            throw new IllegalStateException(
-                                                    "Call reset() on JavaParser before parsing another set of source files that " +
-                                                    "have some of the same fully qualified names. Source file [" +
-                                                    input.getPath() + "]\n[\n" + StringUtils.readFully(input.getSource(ctx), getCharset(ctx)) + "\n]", e);
-                                        }
-                                        throw e;
-                                    }
-                                }),
+                        input -> {
+                            try {
+                                return compiler.parse(new Java8ParserInputFileObject(input, ctx));
+                            } catch (IllegalStateException e) {
+                                if ("endPosTable already set".equals(e.getMessage())) {
+                                    throw new IllegalStateException(
+                                            "Call reset() on JavaParser before parsing another set of source files that " +
+                                            "have some of the same fully qualified names. Source file [" +
+                                            input.getPath() + "]\n[\n" + StringUtils.readFully(input.getSource(ctx), getCharset(ctx)) + "\n]", e);
+                                }
+                                throw e;
+                            }
+                        },
                         (e2, e1) -> e1, LinkedHashMap::new));
 
         try {
@@ -182,41 +178,26 @@ class ReloadableJava8Parser implements JavaParser {
             ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
         }
 
-        return cus.entrySet().stream()
-                .map(cuByPath -> {
-                    Timer.Sample sample = Timer.start();
-                    Input input = cuByPath.getKey();
-                    try {
-                        ReloadableJava8ParserVisitor parser = new ReloadableJava8ParserVisitor(
-                                input.getRelativePath(relativeTo),
-                                input.getFileAttributes(),
-                                input.getSource(ctx),
-                                styles,
-                                typeCache,
-                                ctx,
-                                context);
-                        J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
-                        sample.stop(MetricsHelper.successTags(
-                                        Timer.builder("rewrite.parse")
-                                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
-                                                .tag("file.type", "Java")
-                                                .tag("step", "(3) Map to Rewrite AST"))
-                                .register(Metrics.globalRegistry));
-                        parsingListener.parsed(input, cu);
-                        return cu;
-                    } catch (Throwable t) {
-                        sample.stop(MetricsHelper.errorTags(
-                                        Timer.builder("rewrite.parse")
-                                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
-                                                .tag("file.type", "Java")
-                                                .tag("step", "(3) Map to Rewrite AST"), t)
-                                .register(Metrics.globalRegistry));
-                        ParsingExecutionContextView.view(ctx).parseFailure(input, relativeTo, this, t);
-                        ctx.getOnError().accept(t);
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull);
+        return cus.entrySet().stream().map(cuByPath -> {
+            Input input = cuByPath.getKey();
+            try {
+                ReloadableJava8ParserVisitor parser = new ReloadableJava8ParserVisitor(
+                        input.getRelativePath(relativeTo),
+                        input.getFileAttributes(),
+                        input.getSource(ctx),
+                        styles,
+                        typeCache,
+                        ctx,
+                        context);
+                J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
+                cuByPath.setValue(null); // allow memory used by this JCCompilationUnit to be released
+                parsingListener.parsed(input, cu);
+                return (SourceFile) cu;
+            } catch (Throwable t) {
+                ctx.getOnError().accept(t);
+                return ParseError.build(this, input, relativeTo, ctx, t);
+            }
+        });
     }
 
     @Override
@@ -271,7 +252,7 @@ class ReloadableJava8Parser implements JavaParser {
         }
 
         public void reset(Collection<URI> uris) {
-            for (Iterator<JavaFileObject> itr = sourceMap.keySet().iterator(); itr.hasNext();) {
+            for (Iterator<JavaFileObject> itr = sourceMap.keySet().iterator(); itr.hasNext(); ) {
                 JavaFileObject f = itr.next();
                 if (uris.contains(f.toUri())) {
                     itr.remove();

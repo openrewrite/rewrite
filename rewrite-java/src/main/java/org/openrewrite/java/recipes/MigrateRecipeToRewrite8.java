@@ -46,10 +46,6 @@ public class MigrateRecipeToRewrite8 extends Recipe {
     private static final AnnotationMatcher OVERRIDE_ANNOTATION_MATCHER = new AnnotationMatcher("@java.lang.Override");
     private static final MethodMatcher VISIT_JAVA_SOURCE_FILE_METHOD_MATCHER = new MethodMatcher("org.openrewrite.java.JavaVisitor visitJavaSourceFile(..)", true);
     private static final MethodMatcher TREE_VISITOR_VISIT_METHOD_MATCHER = new MethodMatcher("org.openrewrite.TreeVisitor visit(..)", true);
-    private static final MethodMatcher APPLICABILITY_AND_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Applicability and(..)");
-    private static final MethodMatcher APPLICABILITY_OR_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Applicability or(..)");
-    private static final MethodMatcher APPLICABILITY_NOT_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Applicability not(..)");
-    private static final MethodMatcher DO_NEXT_METHOD_MATCHER = new MethodMatcher("org.openrewrite.Recipe doNext(..)");
 
     @Nullable
     private static J.ParameterizedType getVisitorReturnTypeTemplate;
@@ -586,7 +582,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                                                    Collection<Path> classpath) {
         JavaParser.Builder<? extends JavaParser, ?> builder = JavaParser.fromJavaVersion().classpath(classpath);
 
-        J.CompilationUnit cu = builder.build()
+        SourceFile cu = builder.build()
                 .parse(code)
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));

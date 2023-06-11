@@ -43,10 +43,10 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         return !isValid();
     }
 
-    default <T> Validated<T> asInvalid() {
+    default <T2> Validated<T2> asInvalid() {
         if (this.isInvalid()) {
             //noinspection unchecked
-            return (Validated<T>) this;
+            return (Validated<T2>) this;
         } else {
             throw new IllegalStateException("Not an invalid value");
         }
@@ -243,6 +243,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         }
 
         @Override
+        @Nullable
         public T getValue() {
             return value;
         }
@@ -281,11 +282,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         @Override
         public boolean isValid() {
             evaluate();
-            if (value == null) {
-                return false;
-            } else {
-                return true;
-            }
+            return value != null;
         }
 
         @Override

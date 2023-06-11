@@ -15,16 +15,11 @@
  */
 package org.openrewrite.yaml;
 
-import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Timer;
 import lombok.Getter;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.FileAttributes;
-import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParsingEventListener;
@@ -54,45 +49,41 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
-public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
+public class YamlParser implements org.openrewrite.Parser {
     private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s*(@[^\n\r@]+@)");
 
     @Override
-    public Stream<Yaml.Documents> parse(@Language("yml") String... sources) {
+    public Stream<SourceFile> parse(@Language("yml") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
     @Override
-    public Stream<Yaml.Documents> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        return acceptedInputs(sourceFiles).stream()
+        return acceptedInputs(sourceFiles)
                 .map(sourceFile -> {
-                    Timer.Builder timer = Timer.builder("rewrite.parse")
-                            .description("The time spent parsing a YAML file")
-                            .tag("file.type", "YAML");
-                    Timer.Sample sample = Timer.start();
                     Path path = sourceFile.getRelativePath(relativeTo);
                     try (EncodingDetectingInputStream is = sourceFile.getSource(ctx)) {
                         Yaml.Documents yaml = parseFromInput(path, is);
-                        sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, yaml);
                         return yaml.withFileAttributes(sourceFile.getFileAttributes());
                     } catch (Throwable t) {
-                        sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
-                        ParsingExecutionContextView.view(ctx).parseFailure(sourceFile, relativeTo, this, t);
-                        ctx.getOnError().accept(new IllegalStateException(path + " " + t.getMessage(), t));
-                        return null;
+                        ctx.getOnError().accept(t);
+                        return ParseError.build(this, sourceFile, relativeTo, ctx, t);
                     }
                 })
-                .filter(Objects::nonNull)
                 .map(this::unwrapPrefixedMappings)
-                .map(docs -> {
-                    // ensure there is always at least one Document, even in an empty yaml file
-                    if (docs.getDocuments().isEmpty()) {
-                        return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY,
-                                false, new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null), null)));
+                .map(sourceFile -> {
+                    if (sourceFile instanceof Yaml.Documents) {
+                        Yaml.Documents docs = (Yaml.Documents) sourceFile;
+                        // ensure there is always at least one Document, even in an empty yaml file
+                        if (docs.getDocuments().isEmpty()) {
+                            return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY,
+                                    false, new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null), null)));
+                        }
+                        return docs;
                     }
-                    return docs;
+                    return sourceFile;
                 });
     }
 
@@ -151,7 +142,6 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                     case DocumentStart: {
                         String fmt = newLine + reader.prefix(lastEnd, event);
                         newLine = "";
-
                         document = new Yaml.Document(
                                 randomId(),
                                 fmt,
@@ -535,7 +525,10 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
         }
     }
 
-    private Yaml.Documents unwrapPrefixedMappings(Yaml.Documents y) {
+    private SourceFile unwrapPrefixedMappings(SourceFile y) {
+        if (!(y instanceof Yaml.Documents)) {
+            return y;
+        }
         //noinspection ConstantConditions
         return (Yaml.Documents) new YamlIsoVisitor<Integer>() {
             @Override
