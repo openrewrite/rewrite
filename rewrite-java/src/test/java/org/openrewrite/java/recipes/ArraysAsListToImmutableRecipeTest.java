@@ -118,16 +118,16 @@ class ArraysAsListToImmutableRecipeTest implements RewriteTest {
 				recipeSpec -> recipeSpec.expectedCyclesThatMakeChanges(0).recipe(new ArraysAsListToImmutableRecipe()),
 				java(
 						"""
-								package my.test;
-										
-								import java.util.Arrays;
-								import java.util.Collections;
-											
-								class A
-								{
-								   public static final List<String> entries = Collections.unmodifiableList(Arrays.asList("A", "B"));
-								}
-								"""
+                                package my.test;
+                                		
+                                import java.util.Arrays;
+                                import java.util.Collections;
+                                			
+                                class A
+                                {
+                                   public static final List<String> entries = Collections.unmodifiableList(Arrays.asList("A", "B"));
+                                }
+                                """
 				)
 		);
 	}

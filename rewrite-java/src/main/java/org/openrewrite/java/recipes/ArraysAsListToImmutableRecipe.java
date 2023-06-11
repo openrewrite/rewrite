@@ -34,52 +34,53 @@ import org.openrewrite.java.tree.J;
 @EqualsAndHashCode(callSuper = true)
 public class ArraysAsListToImmutableRecipe extends Recipe {
 
-  @JsonCreator
-  public ArraysAsListToImmutableRecipe() {}
-
-  @Override
-  public String getDisplayName() {
-    return "Wrap list to be unmodifiable";
-  }
-
-  @Override
-  public String getDescription() {
-    return "Return an unmodifiable list, if the method returns a modifiable list.";
-  }
-
-  @Override
-  public TreeVisitor<?, ExecutionContext> getVisitor() {
-    return new RenameFieldVisitor();
-  }
-
-  private static class RenameFieldVisitor extends JavaIsoVisitor<ExecutionContext> {
-
-    final MethodMatcher asListMatcher = new MethodMatcher("java.util.Arrays asList(..)");
-    final MethodMatcher unmodifiableListMatcher =
-        new MethodMatcher("java.util.Collections unmodifiableList(..)");
+    @JsonCreator
+    public ArraysAsListToImmutableRecipe() {
+    }
 
     @Override
-    public J.MethodInvocation visitMethodInvocation(
-        final J.MethodInvocation method, final ExecutionContext executionContext) {
-      if (asListMatcher.matches(method, true)) {
-        final J.MethodInvocation parentInvocation =
-            getCursor().getParentOrThrow().firstEnclosing(J.MethodInvocation.class);
-        if (unmodifiableListMatcher.matches(parentInvocation, true)) {
-          return super.visitMethodInvocation(method, executionContext);
-        }
-
-        J.MethodInvocation result =
-            JavaTemplate.builder("Collections.unmodifiableList(#{any()})")
-                .imports("java.util.Collections", "java.util.Arrays")
-                .contextSensitive()
-                .build()
-                .apply(getCursor(), method.getCoordinates().replace(), method);
-        maybeAddImport("java.util.Arrays");
-        maybeAddImport("java.util.Collections");
-
-        return result;
-      }
-      return super.visitMethodInvocation(method, executionContext);
+    public String getDisplayName() {
+        return "Wrap list to be unmodifiable";
     }
-  }
+
+    @Override
+    public String getDescription() {
+        return "Return an unmodifiable list, if the method returns a modifiable list.";
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new RenameFieldVisitor();
+    }
+
+    private static class RenameFieldVisitor extends JavaIsoVisitor<ExecutionContext> {
+
+        final MethodMatcher asListMatcher = new MethodMatcher("java.util.Arrays asList(..)");
+        final MethodMatcher unmodifiableListMatcher =
+                new MethodMatcher("java.util.Collections unmodifiableList(..)");
+
+        @Override
+        public J.MethodInvocation visitMethodInvocation(
+                final J.MethodInvocation method, final ExecutionContext executionContext) {
+            if (asListMatcher.matches(method, true)) {
+                final J.MethodInvocation parentInvocation =
+                        getCursor().getParentOrThrow().firstEnclosing(J.MethodInvocation.class);
+                if (unmodifiableListMatcher.matches(parentInvocation, true)) {
+                    return super.visitMethodInvocation(method, executionContext);
+                }
+
+                J.MethodInvocation result =
+                        JavaTemplate.builder("Collections.unmodifiableList(#{any()})")
+                                .imports("java.util.Collections", "java.util.Arrays")
+                                .contextSensitive()
+                                .build()
+                                .apply(getCursor(), method.getCoordinates().replace(), method);
+                maybeAddImport("java.util.Arrays");
+                maybeAddImport("java.util.Collections");
+
+                return result;
+            }
+            return super.visitMethodInvocation(method, executionContext);
+        }
+    }
 }
