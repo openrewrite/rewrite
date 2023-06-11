@@ -27,6 +27,14 @@ public class PlainTextVisitor<P> extends TreeVisitor<Tree, P> {
         return sourceFile instanceof PlainText;
     }
 
+    public boolean isAdaptableTo(@SuppressWarnings("rawtypes") Class<? extends TreeVisitor> adaptTo) {
+        if (adaptTo.isAssignableFrom(getClass())) {
+            return true;
+        }
+        Class<? extends Tree> theirs = visitorTreeType(adaptTo);
+        return theirs.equals(PlainText.class) || theirs.equals(PlainText.Snippet.class);
+    }
+
     public PlainText visitText(PlainText text, P p) {
         PlainText t = text;
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));

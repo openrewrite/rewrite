@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
@@ -31,14 +32,7 @@ class TreeAdaptabilityTest implements RewriteTest {
     void adaptParameterizedPlainTextTreeVisitor() {
         //noinspection rawtypes
         assertThat(new PlainTextVisitor() {}.isAdaptableTo(JavaVisitor.class)).isFalse();
-        assertThat(new TreeVisitor<PlainText, Integer>() {}.isAdaptableTo(JavaVisitor.class)).isFalse();
-        assertThat(new TreeVisitor<PlainText, Integer>() {}.isAdaptableTo(PlainTextVisitor.class)).isTrue();
-    }
-
-    public static class VisitLiteral<P> extends JavaIsoVisitor<P> {
-        @Override
-        public J.Literal visitLiteral(J.Literal literal, P p) {
-            return super.visitLiteral(literal, p);
-        }
+        assertThat(new TreeVisitor<PlainText,Integer > () {}.isAdaptableTo(JavaVisitor.class)).isFalse();
+        assertThat(new TreeVisitor<Tree, Integer>() {}.isAdaptableTo(PlainTextVisitor.class)).isTrue();
     }
 }
