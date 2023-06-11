@@ -50,6 +50,7 @@ import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.KotlinTypeMapping;
 import org.openrewrite.kotlin.marker.*;
 import org.openrewrite.kotlin.tree.K;
@@ -141,10 +142,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     throw new KotlinParsingException("Failed to parse declaration", e);
                 }
                 cursor = savedCursor;
-                ParseExceptionResult parseExceptionResult = new ParseExceptionResult(
-                        UUID.randomUUID(),
-                        ExceptionUtils.sanitizeStackTrace(e, KotlinParserVisitor.class));
-
                 Space prefix = whitespace();
                 String text = declaration.getSource().getLighterASTNode().toString();
                 skip(text);
@@ -155,7 +152,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         new J.Unknown.Source(
                                 randomId(),
                                 Space.EMPTY,
-                                Markers.build(singletonList(parseExceptionResult)),
+                                Markers.build(singletonList(ParseExceptionResult.build(KotlinParser.class, e)
+                                        .withTreeType(declaration.getSource().getKind().toString()))),
                                 text
                         )
                 );
@@ -667,13 +665,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                              expr = visitElement(firElement, ctx);
                         } catch (Exception e) {
                             cursor = statementCursor;
-                            ParseExceptionResult result = new ParseExceptionResult(
-                                    randomId(),
-                                    ParseFailureAnalysis.getAnalysisMessage(firElement.getSource().getKind().toString(),
-                                            cursor + 20 < source.length() ? source.substring(cursor, cursor + 20) :
-                                                    source.substring(cursor))
-                            );
-
                             Space statementPrefix = whitespace();
                             String text = firElement.getSource().getLighterASTNode().toString();
                             skip(text);
@@ -684,7 +675,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                                     new J.Unknown.Source(
                                             randomId(),
                                             EMPTY,
-                                            Markers.build(singletonList(result)),
+                                            Markers.build(singletonList(ParseExceptionResult.build(KotlinParser.class, e)
+                                                    .withTreeType(firElement.getSource().getKind().toString()))),
                                             text));
                         }
                     } else {
@@ -4367,13 +4359,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     j = (J2) visitElement(element, ctx);
                 } catch (Exception e) {
                     cursor = saveCursor;
-                    ParseExceptionResult result = new ParseExceptionResult(
-                            randomId(),
-                            ParseFailureAnalysis.getAnalysisMessage(element.getSource().getKind().toString(),
-                                    cursor + 20 < source.length() ? source.substring(cursor, cursor + 20) :
-                                            source.substring(cursor))
-                    );
-
                     Space prefix = whitespace();
                     String text = element.getSource().getLighterASTNode().toString();
                     skip(text);
@@ -4384,7 +4369,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                             new J.Unknown.Source(
                                     randomId(),
                                     EMPTY,
-                                    Markers.build(singletonList(result)),
+                                    Markers.build(singletonList(ParseExceptionResult.build(KotlinParser.class, e)
+                                            .withTreeType(element.getSource().getKind().toString()))),
                                     text));
                 }
             } else {
