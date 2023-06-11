@@ -15,26 +15,30 @@
  */
 package org.openrewrite.text;
 
-import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 
-public class PlainTextVisitor<P> extends TreeVisitor<PlainText, P> {
+public class PlainTextVisitor<P> extends TreeVisitor<Tree, P> {
 
     @Override
     public boolean isAcceptable(SourceFile sourceFile, P p) {
         return sourceFile instanceof PlainText;
     }
 
+    public boolean isAdaptableTo(@SuppressWarnings("rawtypes") Class<? extends TreeVisitor> adaptTo) {
+        if (adaptTo.isAssignableFrom(getClass())) {
+            return true;
+        }
+        Class<? extends Tree> theirs = visitorTreeType(adaptTo);
+        return theirs.equals(PlainText.class) || theirs.equals(PlainText.Snippet.class);
+    }
+
     public PlainText visitText(PlainText text, P p) {
-        PlainText t = text.withMarkers(visitMarkers(text.getMarkers(), p));
-        t = t.withSnippets(ListUtils.map(t.getSnippets(), snippet -> {
-            setCursor(new Cursor(getCursor(), snippet));
-            PlainText.Snippet s = visitSnippet(snippet, p);
-            setCursor(getCursor().getParent());
-            return s;
-        }));
+        PlainText t = text;
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        t = t.withSnippets(ListUtils.map(t.getSnippets(), s -> visitAndCast(s, p)));
         return t;
     }
 

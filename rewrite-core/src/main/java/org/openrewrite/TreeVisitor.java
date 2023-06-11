@@ -380,7 +380,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     @SuppressWarnings("rawtypes")
-    private Class<? extends Tree> visitorTreeType(Class<? extends TreeVisitor> v) {
+    protected Class<? extends Tree> visitorTreeType(Class<? extends TreeVisitor> v) {
         for (TypeVariable<? extends Class<? extends TreeVisitor>> tp : v.getTypeParameters()) {
             for (Type bound : tp.getBounds()) {
                 if (bound instanceof Class && Tree.class.isAssignableFrom((Class<?>) bound)) {
