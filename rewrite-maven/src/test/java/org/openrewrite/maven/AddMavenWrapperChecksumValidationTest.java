@@ -31,6 +31,8 @@ public class AddMavenWrapperChecksumValidationTest implements RewriteTest {
     void doNotModifyIrrelevantFiles() {
         rewriteRun(
           spec -> spec.recipe(new AddMavenWrapperChecksumValidation(
+            "3.9.1",
+            "3.2.0"
           )),
           properties(
             """
@@ -44,6 +46,8 @@ public class AddMavenWrapperChecksumValidationTest implements RewriteTest {
     void addDistributionSha256Sum() {
         rewriteRun(
           spec -> spec.recipe(new AddMavenWrapperChecksumValidation(
+            "3.9.1",
+            "3.2.0"
           )),
           properties(
             """
@@ -61,6 +65,8 @@ public class AddMavenWrapperChecksumValidationTest implements RewriteTest {
     void doNotAddDistributionSha256SumPropertyTwice() {
         rewriteRun(
           spec -> spec.recipe(new AddMavenWrapperChecksumValidation(
+            "3.9.1",
+            "3.2.0"
           )),
           properties(
             """
@@ -76,6 +82,8 @@ public class AddMavenWrapperChecksumValidationTest implements RewriteTest {
     void doNotOverwriteDistributionSha256SumPropertyTwice() {
         rewriteRun(
           spec -> spec.recipe(new AddMavenWrapperChecksumValidation(
+            "3.9.1",
+            "3.2.0"
           )),
           properties(
             """
@@ -91,6 +99,8 @@ public class AddMavenWrapperChecksumValidationTest implements RewriteTest {
     void addWrapperSha256Sum() {
         rewriteRun(
           spec -> spec.recipe(new AddMavenWrapperChecksumValidation(
+            "3.9.1",
+            "3.2.0"
           )),
           properties(
             """
@@ -108,6 +118,8 @@ public class AddMavenWrapperChecksumValidationTest implements RewriteTest {
     void doNotAddWrapperSha256SumPropertyTwice() {
         rewriteRun(
           spec -> spec.recipe(new AddMavenWrapperChecksumValidation(
+            "3.9.1",
+            "3.2.0"
           )),
           properties(
             """
@@ -123,6 +135,8 @@ public class AddMavenWrapperChecksumValidationTest implements RewriteTest {
     void doNotOverwriteWrapperSha256SumPropertyTwice() {
         rewriteRun(
           spec -> spec.recipe(new AddMavenWrapperChecksumValidation(
+            "3.9.1",
+            "3.2.0"
           )),
           properties(
             """

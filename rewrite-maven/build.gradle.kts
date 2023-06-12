@@ -36,7 +36,6 @@ dependencies {
     implementation("io.micrometer:micrometer-core:1.9.+")
 
     implementation("org.apache.commons:commons-text:latest.release")
-    implementation("commons-io:commons-io:2.12.0")
 
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-properties"))

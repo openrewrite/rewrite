@@ -18,20 +18,27 @@ package org.openrewrite.maven;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.apache.commons.io.FileUtils;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.maven.cache.LocalMavenArtifactCache;
+import org.openrewrite.maven.cache.MavenArtifactCache;
+import org.openrewrite.maven.tree.Dependency;
+import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
+import org.openrewrite.maven.utilities.MavenArtifactDownloader;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.search.FindProperties;
 import org.openrewrite.properties.tree.Properties;
 
 import java.io.File;
 import java.io.IOException;
-import java.net.URL;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 
@@ -58,6 +65,16 @@ public class AddMavenWrapperChecksumValidation extends Recipe {
     public String getDescription() {
         return "Add checksum validation to maven wrapper if used.";
     }
+
+    @Option(displayName = "Distribution version",
+            description = "Distribution version.",
+            example = "3.9.1")
+    String distributionVersion;
+
+    @Option(displayName = "Wrapper version",
+            description = "Wrapper version.",
+            example = "3.2.0")
+    String wrapperVersion;
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -115,17 +132,60 @@ public class AddMavenWrapperChecksumValidation extends Recipe {
     }
 
     private File downloadDistributionAndMarkToDelete(String distributionUrl) throws IOException {
-        File distribution = File.createTempFile("rewrite", "download");
-        FileUtils.copyURLToFile(new URL(distributionUrl), distribution, 10_000, 10_000);
+        File distribution = downloadMavenArtifact(
+                new ResolvedGroupArtifactVersion(
+                        "https://repo1.maven.org/maven2",
+                        "org.apache.maven",
+                        "apache-maven",
+                        distributionVersion,
+                        distributionVersion + "-bin"
+                ),
+                "zip"
+        );
         distribution.deleteOnExit();
         return distribution;
     }
 
     private File downloadWrapperAndMarkToDelete(String wrapperUrl) throws IOException {
-        File distribution = File.createTempFile("rewrite", "download");
-        FileUtils.copyURLToFile(new URL(wrapperUrl), distribution, 10_000, 10_000);
-        distribution.deleteOnExit();
-        return distribution;
+        File wrapper = downloadMavenArtifact(
+                new ResolvedGroupArtifactVersion(
+                        "https://repo1.maven.org/maven2",
+                        "org.apache.maven.wrapper",
+                        "maven-wrapper",
+                        wrapperVersion,
+                        null
+                ),
+                "jar"
+        );
+        wrapper.deleteOnExit();
+        return wrapper;
+    }
+
+    private File downloadMavenArtifact(final ResolvedGroupArtifactVersion rgav, String type) throws IOException {
+      final MavenArtifactCache cache = new LocalMavenArtifactCache(Files.createTempDirectory("repository"));
+      //final MavenSettings settings = new MavenSettings();
+      final MavenArtifactDownloader downloader = new MavenArtifactDownloader(cache, null, Throwable::printStackTrace);
+      final ResolvedDependency rd = new ResolvedDependency(
+              MavenRepository.MAVEN_CENTRAL,
+              rgav,
+              new Dependency(
+                      null,
+                      null,
+                      type,
+                      null,
+                      Collections.emptyList(),
+                      null
+              ),
+              Collections.emptyList(),
+              Collections.emptyList(),
+              null,
+              null,
+              false,
+              1,
+              Collections.emptyList()
+
+      );
+      return downloader.downloadArtifact(rd).toFile();
     }
 
     private Properties addPropertyToProperties(Properties mavenWrapperProperties, String name, String value) {
@@ -155,7 +215,7 @@ public class AddMavenWrapperChecksumValidation extends Recipe {
 
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         byte[] hash = digest.digest(
-                FileUtils.readFileToByteArray(file));
+                Files.readAllBytes(file.toPath()));
 
         StringBuilder hexString = new StringBuilder(2 * hash.length);
         for (byte b : hash) {

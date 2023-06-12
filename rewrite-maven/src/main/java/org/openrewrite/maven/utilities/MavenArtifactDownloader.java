@@ -86,7 +86,11 @@ public class MavenArtifactDownloader {
      */
     @Nullable
     public Path downloadArtifact(ResolvedDependency dependency) {
-        if (dependency.getRequested().getType() != null && !"jar".equals(dependency.getRequested().getType())) {
+        if (dependency.getRequested().getType() != null &&
+                !("jar".equals(dependency.getRequested().getType())
+                        || "zip".equals(dependency.getRequested().getType())
+                )
+        ) {
             return null;
         }
         return mavenArtifactCache.computeArtifact(dependency, () -> {
@@ -98,7 +102,7 @@ public class MavenArtifactDownloader {
                         dependency.getVersion() + '/' +
                         dependency.getArtifactId() + '-' +
                         (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
-                        ".jar";
+                        "." + dependency.getRequested().getType();
 
                 InputStream bodyStream;
 
