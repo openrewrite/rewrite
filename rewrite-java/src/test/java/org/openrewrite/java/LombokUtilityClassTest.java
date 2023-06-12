@@ -14,6 +14,7 @@ import static org.openrewrite.java.Assertions.java;
  * - abstract classes
  * - instantiations of changed classes
  * - constructor
+ * - public static void main
  */
 class LombokUtilityClassTest implements RewriteTest {
 
