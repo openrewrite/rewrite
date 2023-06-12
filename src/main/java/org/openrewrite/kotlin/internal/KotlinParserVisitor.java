@@ -43,7 +43,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.internal.EncodingDetectingInputStream;
-import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
@@ -55,7 +54,6 @@ import org.openrewrite.kotlin.KotlinTypeMapping;
 import org.openrewrite.kotlin.marker.*;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.table.ParseFailureAnalysis;
 
 import java.nio.charset.Charset;
 import java.nio.file.Path;
