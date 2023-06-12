@@ -33,7 +33,7 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Getter
 @With
-public class SearchResult implements Marker {
+public final class SearchResult implements Marker {
     UUID id;
 
     @EqualsAndHashCode.Include
