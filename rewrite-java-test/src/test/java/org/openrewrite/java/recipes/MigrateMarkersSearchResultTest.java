@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.recipes;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
@@ -34,7 +33,6 @@ class MigrateMarkersSearchResultTest implements RewriteTest {
     }
 
     @SuppressWarnings("all")
-    @Disabled
     @Test
     void migrate() {
         rewriteRun(
