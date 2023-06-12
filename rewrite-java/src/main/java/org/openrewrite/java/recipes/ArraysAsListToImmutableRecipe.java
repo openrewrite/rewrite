@@ -50,10 +50,10 @@ public class ArraysAsListToImmutableRecipe extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RenameFieldVisitor();
+        return new UnmodifiableListVisitor();
     }
 
-    private static class RenameFieldVisitor extends JavaIsoVisitor<ExecutionContext> {
+    private static class UnmodifiableListVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         final MethodMatcher asListMatcher = new MethodMatcher("java.util.Arrays asList(..)");
         final MethodMatcher unmodifiableListMatcher =

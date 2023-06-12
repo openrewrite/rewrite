@@ -32,8 +32,6 @@ class ArraysAsListToImmutableRecipeTest implements RewriteTest {
     void wrapArrayListToBeUnmodifiableWhenStrings() {
         rewriteRun(
           java("""
-              package my.test;
-              
               import java.util.Arrays;
               
               class A {
@@ -41,8 +39,6 @@ class ArraysAsListToImmutableRecipeTest implements RewriteTest {
               }
               """,
             """
-              package my.test;
-              
               import java.util.Arrays;
               import java.util.Collections;
               
@@ -58,8 +54,6 @@ class ArraysAsListToImmutableRecipeTest implements RewriteTest {
     void wrapArrayListToBeUnmodifiableWhenNulls() {
         rewriteRun(
           java("""
-              package my.test;
-              
               import java.util.Arrays;
               
               class A {
@@ -67,8 +61,6 @@ class ArraysAsListToImmutableRecipeTest implements RewriteTest {
               }
               """,
             """
-              package my.test;
-              
               import java.util.Arrays;
               import java.util.Collections;
               
@@ -85,8 +77,6 @@ class ArraysAsListToImmutableRecipeTest implements RewriteTest {
     void wrapArrayListToBeUnmodifiableWhenIntegers() {
         rewriteRun(
           java("""
-              package my.test;
-              
               import java.util.Arrays;
               
               class A {
@@ -94,8 +84,6 @@ class ArraysAsListToImmutableRecipeTest implements RewriteTest {
               }
               """,
             """
-              package my.test;
-              
               import java.util.Arrays;
               import java.util.Collections;
               
@@ -111,8 +99,6 @@ class ArraysAsListToImmutableRecipeTest implements RewriteTest {
     void doNotWrapIfItIsAlreadyUnmodifiable() {
         rewriteRun(
           java("""
-            package my.test;
-            
             import java.util.Arrays;
             import java.util.Collections;
             
