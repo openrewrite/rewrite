@@ -27,3 +27,4 @@ recipeList:
   - org.openrewrite.java.recipes.MigrateTestToRewrite8
   - org.openrewrite.java.recipes.MigrateMarkersSearchResult
   - org.openrewrite.java.recipes.RemoveApplicabilityTestFromYamlRecipe
+  - org.openrewrite.java.recipes.MigrateJavaTemplateToRewrite8
