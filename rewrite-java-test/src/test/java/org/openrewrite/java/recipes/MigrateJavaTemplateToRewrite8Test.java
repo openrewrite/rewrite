@@ -16,6 +16,7 @@
 package org.openrewrite.java.recipes;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -35,6 +36,7 @@ public class MigrateJavaTemplateToRewrite8Test implements RewriteTest {
     }
 
     @SuppressWarnings("all")
+    @DocumentExample
     @Test
     void regular() {
         rewriteRun(
@@ -118,8 +120,8 @@ public class MigrateJavaTemplateToRewrite8Test implements RewriteTest {
                               String param2 = "test parameter 2";
                               List<Expression> currentArgs = a.getArguments();
                               if (currentArgs == null || currentArgs.isEmpty()) {
-                                  return JavaTemplate.builder("#{}")/*[Rewrite8 migration]`contextSensitive()` could be unnecessary and can be removed, please double-check manually*/.contextSensitive()
-                                          .build().apply(/*[Rewrite8 migration] please double-check correctness of this parameter manually, it could be updateCursor() if the value is updated somewhere*/getCursor(),
+                                  return JavaTemplate.builder("#{}")/*[Rewrite8 migration] contextSensitive() could be unnecessary and can be removed, please follow the migration guide*/.contextSensitive()
+                                          .build().apply(/*[Rewrite8 migration] getCursor() could be updateCursor() if J instance is udpated in this visit method, please follow the migration guide*/getCursor(),
                                           a.getCoordinates().replaceArguments(),
                                           param1,
                                           param2);
@@ -218,9 +220,9 @@ public class MigrateJavaTemplateToRewrite8Test implements RewriteTest {
                               String param2 = "test parameter 2";
                               List<Expression> currentArgs = a.getArguments();
                               if (currentArgs == null || currentArgs.isEmpty()) {
-                                  JavaTemplate t = JavaTemplate.builder( "#{}")/*[Rewrite8 migration]`contextSensitive()` could be unnecessary and can be removed, please double-check manually*/.contextSensitive()
+                                  JavaTemplate t = JavaTemplate.builder( "#{}")/*[Rewrite8 migration] contextSensitive() could be unnecessary and can be removed, please follow the migration guide*/.contextSensitive()
                                           .build();
-                                  return t.apply(/*[Rewrite8 migration] please double-check correctness of this parameter manually, it could be updateCursor() if the value is updated somewhere*/getCursor(),
+                                  return t.apply(/*[Rewrite8 migration] getCursor() could be updateCursor() if J instance is udpated in this visit method, please follow the migration guide*/getCursor(),
                                           a.getCoordinates().replaceArguments(),
                                           param1,
                                           param2);

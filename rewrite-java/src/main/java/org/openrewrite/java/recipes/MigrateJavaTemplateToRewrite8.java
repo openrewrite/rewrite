@@ -29,6 +29,9 @@ import java.util.List;
 import java.util.Set;
 
 public class MigrateJavaTemplateToRewrite8 extends Recipe {
+    private static final String CONTEXT_SENSITIVE_COMMENT = "[Rewrite8 migration] contextSensitive() could be unnecessary and can be removed, please follow the migration guide";
+    private static final String GET_CURSOR_COMMENT = "[Rewrite8 migration] getCursor() could be updateCursor() if J instance is udpated in this visit method, please follow the migration guide";
+
     private static final MethodMatcher templateBuilderMethodMatcher = new MethodMatcher("org.openrewrite.java.JavaTemplate builder(java.lang.String)", true);
     @Nullable private static J.MethodInvocation builderTemplate = null;
     @Nullable private static J.MethodInvocation applyTemplate = null;
@@ -114,8 +117,8 @@ public class MigrateJavaTemplateToRewrite8 extends Recipe {
             //noinspection OptionalGetWithoutIsPresent
             J.CompilationUnit cu = JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()).build()
                 .parse("import org.openrewrite.java.JavaTemplate;\n" +
-                       "public class Demo {void method() {JavaTemplate.builder(\"\")/*[Rewrite8 " +
-                       "migration]`contextSensitive()` could be unnecessary and can be removed, please double-check manually*/" +
+                       "public class Demo {void method() {JavaTemplate.builder(\"\")" +
+                       "/*" + CONTEXT_SENSITIVE_COMMENT + "*/" +
                        ".contextSensitive();}}")
                 .map(J.CompilationUnit.class::cast)
                 .findFirst()
@@ -138,8 +141,9 @@ public class MigrateJavaTemplateToRewrite8 extends Recipe {
                        "    @Override\n" +
                        "    public J visitMethodInvocation(J.MethodInvocation method, Object o) {\n" +
                        "        JavaTemplate t = JavaTemplate.builder(\"\").build();\n" +
-                       "        return t.apply(/*[Rewrite8 migration] please double-check correctness of this " +
-                       "parameter manually, it could be updateCursor() if the value is updated somewhere*/getCursor(), null);\n" +
+                       "        return t.apply(" +
+                       "/*" + GET_CURSOR_COMMENT + "*/" +
+                       "getCursor(), null);\n" +
                        "    }\n" +
                        "}")
                 .map(J.CompilationUnit.class::cast)

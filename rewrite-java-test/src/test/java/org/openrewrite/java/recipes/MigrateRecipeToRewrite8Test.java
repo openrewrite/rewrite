@@ -16,6 +16,7 @@
 package org.openrewrite.java.recipes;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -35,6 +36,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
           .typeValidationOptions(TypeValidation.none());
     }
 
+    @DocumentExample("`org.openrewrite.java.JavaVisitor.visitJavaSourceFile(JavaSourceFile cu, P p)` is removed, use `org.openrewrite.java.TreeVisitor.visit(@Nullable Tree tree, P p)` instead.")
     @Test
     void deprecateVisitJavaSourceFile() {
         // language=java
@@ -145,6 +147,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
         );
     }
 
+    @DocumentExample("`getSingleSourceApplicableTest()` is removed, change to use `Preconditions` instead. And also change `getVisitor()` to be public.")
     @Test
     void getSingleSourceApplicableTestToPreconditions() {
         // language=java
