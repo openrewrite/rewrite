@@ -34,11 +34,9 @@ import org.yaml.snakeyaml.reader.StreamReader;
 import org.yaml.snakeyaml.scanner.Scanner;
 import org.yaml.snakeyaml.scanner.ScannerImpl;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -106,9 +104,8 @@ public class YamlParser implements org.openrewrite.Parser {
             yamlSourceWithVariablePlaceholders.append(yamlSource, pos, yamlSource.length());
         }
 
-        try (FormatPreservingReader reader = new FormatPreservingReader(
-                new InputStreamReader(new ByteArrayInputStream(yamlSourceWithVariablePlaceholders.toString()
-                        .getBytes(StandardCharsets.UTF_8))))) {
+        try (StringReader stringReader = new StringReader(yamlSourceWithVariablePlaceholders.toString());
+             FormatPreservingReader reader = new FormatPreservingReader(stringReader)) {
             StreamReader streamReader = new StreamReader(reader);
             Scanner scanner = new ScannerImpl(streamReader, new LoaderOptions());
             Parser parser = new ParserImpl(scanner);
