@@ -16,12 +16,15 @@
 package org.openrewrite.java.tree;
 
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaTypeSignatureBuilder;
+import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 
 public class TypeUtils {
+    private static final JavaTypeSignatureBuilder SIGNATURE_BUILDER = new DefaultJavaTypeSignatureBuilder();
     private static final JavaType.Class TYPE_OBJECT = JavaType.ShallowClass.build("java.lang.Object");
 
     private TypeUtils() {
@@ -71,16 +74,7 @@ public class TypeUtils {
                 if (type1 instanceof JavaType.Class && type2 instanceof JavaType.Class) {
                     return true;
                 } else if (type1 instanceof JavaType.Parameterized && type2 instanceof JavaType.Parameterized) {
-                    JavaType.Parameterized parameterized1 = (JavaType.Parameterized) type1;
-                    JavaType.Parameterized parameterized2 = (JavaType.Parameterized) type2;
-                    if (parameterized1.getTypeParameters().size() == parameterized2.getTypeParameters().size()) {
-                        for (int index = 0; index < parameterized1.getTypeParameters().size(); index++) {
-                            if (!isOfType(parameterized1.getTypeParameters().get(index), parameterized2.getTypeParameters().get(index))) {
-                                return false;
-                            }
-                        }
-                        return true;
-                    }
+                    return SIGNATURE_BUILDER.signature(type1).equals(SIGNATURE_BUILDER.signature(type2));
                 }
             }
         }
@@ -88,18 +82,7 @@ public class TypeUtils {
             return isOfType(((JavaType.Array) type1).getElemType(), ((JavaType.Array) type2).getElemType());
         }
         if (type1 instanceof JavaType.GenericTypeVariable && type2 instanceof JavaType.GenericTypeVariable) {
-            JavaType.GenericTypeVariable generic1 = (JavaType.GenericTypeVariable) type1;
-            JavaType.GenericTypeVariable generic2 = (JavaType.GenericTypeVariable) type2;
-            if (generic1.getBounds().size() == generic2.getBounds().size() && generic1.getVariance() == generic2.getVariance()) {
-                for (int index = 0; index < generic1.getBounds().size(); index++) {
-                    if (!isOfType(generic1.getBounds().get(index), generic2.getBounds().get(index))) {
-                        return false;
-                    }
-                }
-                return true;
-            } else {
-                return false;
-            }
+            return SIGNATURE_BUILDER.signature(type1).equals(SIGNATURE_BUILDER.signature(type2));
         }
         if (type1 instanceof JavaType.Method && type2 instanceof JavaType.Method) {
             JavaType.Method method1 = (JavaType.Method) type1;
