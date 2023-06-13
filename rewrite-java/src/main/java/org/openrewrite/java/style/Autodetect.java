@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import lombok.experimental.Delegate;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
@@ -34,7 +33,6 @@ import org.openrewrite.style.Style;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static java.util.Collections.emptySet;
 
@@ -48,13 +46,11 @@ public class Autodetect extends NamedStyles {
                 emptySet(), styles);
     }
 
-    public static Detector detect(Stream<? extends SourceFile> sourceFiles) {
-        return new Detector(sourceFiles);
+    public static Detector detector() {
+        return new Detector();
     }
 
-    public static class Detector implements Stream<SourceFile> {
-        @Delegate
-        private final Stream<SourceFile> sourceFiles;
+    public static class Detector {
 
         private final IndentStatistics indentStatistics = new IndentStatistics();
         private final SpacesStatistics spacesStatistics = new SpacesStatistics();
@@ -62,35 +58,22 @@ public class Autodetect extends NamedStyles {
         private final GeneralFormatStatistics generalFormatStatistics = new GeneralFormatStatistics();
 
         private final FindImportLayout findImportLayout = new FindImportLayout();
+        private final FindIndentJavaVisitor findIndent = new FindIndentJavaVisitor();
+        private final FindSpacesStyle findSpaces = new FindSpacesStyle();
+        private final FindWrappingAndBracesStyle findWrappingAndBraces = new FindWrappingAndBracesStyle();
+        private final FindLineFormatJavaVisitor findLineFormat = new FindLineFormatJavaVisitor();
 
-        public Detector(Stream<? extends SourceFile> sourceFiles) {
-            FindIndentJavaVisitor findIndent = new FindIndentJavaVisitor();
-            FindSpacesStyle findSpaces = new FindSpacesStyle();
-            FindWrappingAndBracesStyle findWrappingAndBraces = new FindWrappingAndBracesStyle();
-            FindLineFormatJavaVisitor findLineFormat = new FindLineFormatJavaVisitor();
-
-            this.sourceFiles = sourceFiles
-                    .map(SourceFile.class::cast)
-                    .filter(cu -> {
-                        if (cu instanceof JavaSourceFile) {
-                            findImportLayout.visitNonNull(cu, 0);
-                            findIndent.visitNonNull(cu, indentStatistics);
-                            findSpaces.visitNonNull(cu, spacesStatistics);
-                            findWrappingAndBraces.visitNonNull(cu, wrappingAndBracesStatistics);
-                            findLineFormat.visitNonNull(cu, generalFormatStatistics);
-                        }
-                        return true;
-                    });
+        public void sample(SourceFile cu) {
+            if(cu instanceof JavaSourceFile) {
+                findImportLayout.visitNonNull(cu, 0);
+                findIndent.visitNonNull(cu, indentStatistics);
+                findSpaces.visitNonNull(cu, spacesStatistics);
+                findWrappingAndBraces.visitNonNull(cu, wrappingAndBracesStatistics);
+                findLineFormat.visitNonNull(cu, generalFormatStatistics);
+            }
         }
 
         public Autodetect build() {
-            try {
-                // consume the stream if it hasn't been already
-                //noinspection ResultOfMethodCallIgnored
-                sourceFiles.count();
-            } catch (IllegalStateException ignore) {
-            }
-
             return new Autodetect(Tree.randomId(), Arrays.asList(
                     indentStatistics.getTabsAndIndentsStyle(),
                     findImportLayout.aggregate().getImportLayoutStyle(),
@@ -148,26 +131,6 @@ public class Autodetect extends NamedStyles {
             });
         }
 
-        /**
-         * Determines the most frequent indentation. Assumes that indentation is a multiple of depth, which is true for
-         * normal indentation but not usually true for continuation indents.
-         */
-        public int commonIndent() {
-            Map<Integer, Long> map = depthToSpaceIndentFrequencies.entrySet().stream()
-                    .flatMap(it -> {
-                        int depth = it.getKey().getIndentDepth();
-                        return it.getValue().entrySet()
-                                .stream()
-                                .map(charsToOccurrence -> new AbstractMap.SimpleEntry<>(
-                                        charsToOccurrence.getKey() / depth,
-                                        charsToOccurrence.getValue()));
-                    })
-                    .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, Long::sum));
-
-            return map.entrySet().stream().max(Comparator.comparingLong(Map.Entry::getValue))
-                    .map(Map.Entry::getKey)
-                    .orElse(4); // IntelliJ default
-        }
 
         /**
          * Use the provided common indentation to interpret this IndentStatistic's contents as continuation indents.
@@ -313,21 +276,6 @@ public class Autodetect extends NamedStyles {
                 .max(Map.Entry.comparingByValue())
                 .map(Map.Entry::getKey)
                 .orElse(0);
-    }
-
-    private static int getClosestEven(double num) {
-        int integerPart = (int) num;
-        if (integerPart % 2 == 0) {
-            return integerPart;
-        } else {
-            int lowerEven = integerPart - 1;
-            int upperEven = integerPart + 1;
-            if (Math.abs(num - lowerEven) < Math.abs(num - upperEven)) {
-                return lowerEven;
-            } else {
-                return upperEven;
-            }
-        }
     }
 
     private static class FindLineFormatJavaVisitor extends JavaIsoVisitor<GeneralFormatStatistics> {
