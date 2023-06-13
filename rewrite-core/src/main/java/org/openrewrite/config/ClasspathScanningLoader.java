@@ -20,6 +20,7 @@ import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
 import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
+import org.openrewrite.ScanningRecipe;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.style.NamedStyles;
 import org.slf4j.Logger;
@@ -130,22 +131,9 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 .overrideClassLoaders(classLoader)
                 .scan()) {
 
-            for (ClassInfo classInfo : result.getSubclasses(Recipe.class.getName())) {
-                Class<?> recipeClass = classInfo.loadClass();
-                if (recipeClass.getName().equals(DeclarativeRecipe.class.getName())
-                        || recipeClass.getEnclosingClass() != null
-                        // `ScanningRecipe` is an example of an abstract `Recipe` subtype
-                        || (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
-                    continue;
-                }
-                try {
-                    Recipe recipe = constructRecipe(recipeClass);
-                    recipeDescriptors.add(recipe.getDescriptor());
-                    recipes.add(recipe);
-                } catch (Throwable e) {
-                    logger.warn("Unable to configure {}", recipeClass.getName(), e);
-                }
-            }
+            configureRecipes(result, Recipe.class.getName());
+            configureRecipes(result, ScanningRecipe.class.getName());
+
             for (ClassInfo classInfo : result.getSubclasses(NamedStyles.class.getName())) {
                 Class<?> styleClass = classInfo.loadClass();
                 try {
@@ -157,6 +145,25 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 } catch (Throwable e) {
                     logger.warn("Unable to configure {}", styleClass.getName(), e);
                 }
+            }
+        }
+    }
+
+    private void configureRecipes(ScanResult result, String className) {
+        for (ClassInfo classInfo : result.getSubclasses(className)) {
+            Class<?> recipeClass = classInfo.loadClass();
+            if (recipeClass.getName().equals(DeclarativeRecipe.class.getName())
+                || recipeClass.getEnclosingClass() != null
+                // `ScanningRecipe` is an example of an abstract `Recipe` subtype
+                || (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
+                continue;
+            }
+            try {
+                Recipe recipe = constructRecipe(recipeClass);
+                recipeDescriptors.add(recipe.getDescriptor());
+                recipes.add(recipe);
+            } catch (Throwable e) {
+                logger.warn("Unable to configure {}", recipeClass.getName(), e);
             }
         }
     }
