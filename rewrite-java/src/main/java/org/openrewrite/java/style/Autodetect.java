@@ -854,8 +854,15 @@ public class Autodetect extends NamedStyles {
         }
     }
 
+    @Value
+    private static class ImportAttributes {
+        boolean isStatic;
+        String packageName;
+        String prefix;
+    }
+
     private static class FindImportLayout extends JavaIsoVisitor<Integer> {
-        private final List<List<J.Import>> importsBySourceFile = new ArrayList<>();
+        private final List<List<ImportAttributes>> importsBySourceFile = new ArrayList<>();
         private final NavigableSet<String> importedPackages = new TreeSet<>();
         private final ImportLayoutStatistics importLayoutStatistics = new ImportLayoutStatistics();
 
@@ -863,7 +870,7 @@ public class Autodetect extends NamedStyles {
             // initializes importLayoutStatistics.pkgToBlockPattern which is used in the loop that follows
             importLayoutStatistics.mapBlockPatterns(importedPackages);
 
-            for (List<J.Import> imports : importsBySourceFile) {
+            for (List<ImportAttributes> imports : importsBySourceFile) {
                 Set<ImportLayoutStatistics.Block> blocks = new LinkedHashSet<>();
 
                 importLayoutStatistics.staticAtBotCount += (imports.size() > 0 &&
@@ -879,9 +886,9 @@ public class Autodetect extends NamedStyles {
                 int javaPos = Integer.MAX_VALUE;
                 int javaxPos = Integer.MAX_VALUE;
                 Map<ImportLayoutStatistics.Block, Integer> referenceCount = new HashMap<>();
-                for (J.Import anImport : imports) {
+                for (ImportAttributes anImport : imports) {
                     previousPkgCount += previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + ".")) ? 1 : 0;
-                    boolean containsNewLine = anImport.getPrefix().getWhitespace().contains("\n\n") || anImport.getPrefix().getWhitespace().contains("\r\n\r\n");
+                    boolean containsNewLine = anImport.getPrefix().contains("\n\n") || anImport.getPrefix().contains("\r\n\r\n");
                     if (containsNewLine ||
                         i > 0 && importLayoutStatistics.pkgToBlockPattern.containsKey(anImport.getPackageName() + ".") &&
                         !previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + "."))) {
@@ -980,7 +987,9 @@ public class Autodetect extends NamedStyles {
                 }
             }
 
-            importsBySourceFile.add(cu.getImports());
+            importsBySourceFile.add(cu.getImports().stream()
+                    .map(it -> new ImportAttributes(it.isStatic(), it.getPackageName(), it.getPrefix().getWhitespace()))
+                    .collect(Collectors.toList()));
 
             return cu;
         }
