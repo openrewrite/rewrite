@@ -1,0 +1,173 @@
+package org.openrewrite.java.recipes;
+
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
+import org.openrewrite.config.Environment;
+import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
+
+import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.yaml.Assertions.yaml;
+
+public class UpdateStaticAnalysisPackageTest implements RewriteTest {
+
+    @SuppressWarnings("all")
+    @DocumentExample("Update referencing places in java file.")
+    @Test
+    void changeCleanUpToStaticanalysisForSpecificClassOnly() {
+        rewriteRun(
+          spec -> spec.recipe(
+              Environment.builder()
+                .scanRuntimeClasspath()
+                .build()
+                .activateRecipes("org.openrewrite.java.upgrade.UpdateStaticAnalysisPackage")
+            )
+            .typeValidationOptions(TypeValidation.none()),
+          java(
+            """
+              package org.openrewrite.java.migrate;
+
+              import org.openrewrite.ExecutionContext;
+              import org.openrewrite.Recipe;
+              import org.openrewrite.TreeVisitor;
+              import org.openrewrite.java.JavaVisitor;
+              import org.openrewrite.java.cleanup.SimplifyBooleanExpression;
+              import org.openrewrite.java.cleanup.UnnecessaryCatch;
+              import org.openrewrite.java.tree.J;
+
+              public class UseJavaUtilBase64 extends Recipe {
+
+                  @Override
+                  public String getDisplayName() {return "Prefer `java.util.Base64` instead of `sun.misc`";}
+
+                  @Override
+                  public String getDescription() {return "Prefer `java.util.Base64` instead of `sun.misc`.";}
+
+                  @Override
+                  public TreeVisitor<?, ExecutionContext> getVisitor() {
+                      return new JavaVisitor<ExecutionContext>() {
+                          @Override
+                          public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                              J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+
+                              // expect to change
+                              doAfterVisit(new UnnecessaryCatch(false).getVisitor());
+                              org.openrewrite.java.cleanup.UnnecessaryCatch v1 = new org.openrewrite.java.cleanup.UnnecessaryCatch(true);
+
+                              // expect no change
+                              doAfterVisit(new SimplifyBooleanExpression().getVisitor());
+                              org.openrewrite.java.cleanup.SimplifyBooleanExpression v2 = new org.openrewrite.java.cleanup.SimplifyBooleanExpression();
+                              return m;
+                          }
+                      };
+                  }
+              }
+              """,
+            """
+              package org.openrewrite.java.migrate;
+
+              import org.openrewrite.ExecutionContext;
+              import org.openrewrite.Recipe;
+              import org.openrewrite.TreeVisitor;
+              import org.openrewrite.java.JavaVisitor;
+              import org.openrewrite.java.cleanup.SimplifyBooleanExpression;
+              import org.openrewrite.java.tree.J;
+              import org.openrewrite.staticanalysis.UnnecessaryCatch;
+
+              public class UseJavaUtilBase64 extends Recipe {
+
+                  @Override
+                  public String getDisplayName() {return "Prefer `java.util.Base64` instead of `sun.misc`";}
+
+                  @Override
+                  public String getDescription() {return "Prefer `java.util.Base64` instead of `sun.misc`.";}
+
+                  @Override
+                  public TreeVisitor<?, ExecutionContext> getVisitor() {
+                      return new JavaVisitor<ExecutionContext>() {
+                          @Override
+                          public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                              J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
+
+                              // expect to change
+                              doAfterVisit(new UnnecessaryCatch(false).getVisitor());
+                              org.openrewrite.staticanalysis.UnnecessaryCatch v1 = new org.openrewrite.staticanalysis.UnnecessaryCatch(true);
+
+                              // expect no change
+                              doAfterVisit(new SimplifyBooleanExpression().getVisitor());
+                              org.openrewrite.java.cleanup.SimplifyBooleanExpression v2 = new org.openrewrite.java.cleanup.SimplifyBooleanExpression();
+                              return m;
+                          }
+                      };
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @DocumentExample("Update referencing places in yaml file.")
+    @Test
+    void changeYamlRecipeList() {
+        rewriteRun(
+          yaml("""
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.example.bank.Internal
+            displayName: org.example.bank.Internal
+            description: org.example.bank.Internal
+            recipeList:
+              - org.openrewrite.java.cleanup.AddSerialVersionUidToSerializable
+            """,
+            """
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.example.bank.Internal
+            displayName: org.example.bank.Internal
+            description: org.example.bank.Internal
+            recipeList:
+              - org.openrewrite.staticanalysis.AddSerialVersionUidToSerializable
+            """));
+    }
+
+    @Disabled
+    @DocumentExample("Update referencing places in pom.xml.")
+    @Test
+    void changePomXmlConfiguration() {
+        rewriteRun(
+          pomXml("""
+            <project>
+              <build>
+                <plugins>
+                  <plugin>
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>rewrite-maven-plugin</artifactId>
+                    <version>4.45.0</version>
+                    <configuration>
+                      <activeRecipes>
+                        <recipe>org.openrewrite.java.cleanup.AddSerialVersionUidToSerializable</recipe>
+                      </activeRecipes>
+                    </configuration>
+                  </plugin>
+                </plugins>
+              </build>
+            </project>
+            """, """
+            <project>
+              <build>
+                <plugins>
+                  <plugin>
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>rewrite-maven-plugin</artifactId>
+                    <version>4.45.0</version>
+                    <configuration>
+                      <activeRecipes>
+                        <recipe>org.openrewrite.staticanalysis.AddSerialVersionUidToSerializable</recipe>
+                      </activeRecipes>
+                    </configuration>
+                  </plugin>
+                </plugins>
+              </build>
+            </project>"""));
+    }
+}
