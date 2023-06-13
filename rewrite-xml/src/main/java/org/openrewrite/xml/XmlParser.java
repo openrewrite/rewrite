@@ -37,8 +37,7 @@ public class XmlParser implements Parser {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).map(sourceFile -> {
             Path path = sourceFile.getRelativePath(relativeTo);
-            try {
-                EncodingDetectingInputStream is = sourceFile.getSource(ctx);
+            try (EncodingDetectingInputStream is = sourceFile.getSource(ctx)) {
                 String sourceStr = is.readFully();
 
                 XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
