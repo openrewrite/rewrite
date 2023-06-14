@@ -155,6 +155,9 @@ class UpdateStaticAnalysisPackageTest implements RewriteTest {
         rewriteRun(
           pomXml("""
             <project>
+              <groupId>org.example</groupId>
+              <artifactId>foo</artifactId>
+              <version>1.0</version>
               <build>
                 <plugins>
                   <plugin>
@@ -172,6 +175,9 @@ class UpdateStaticAnalysisPackageTest implements RewriteTest {
             </project>
             """, """
             <project>
+              <groupId>org.example</groupId>
+              <artifactId>foo</artifactId>
+              <version>1.0</version>
               <build>
                 <plugins>
                   <plugin>
