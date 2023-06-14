@@ -17,15 +17,21 @@ package org.openrewrite.java.recipes;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.yaml.YamlIsoVisitor;
+import org.openrewrite.yaml.tree.Yaml;
+import org.openrewrite.yaml.tree.YamlKey;
 
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class UpdateMovedRecipe extends Recipe {
+public class UpdateMovedRecipeYaml extends Recipe {
     @Option(displayName = "The fully qualified className of recipe moved from",
         description = "The fully qualified className of recipe moved from a old package.",
         example = "org.openrewrite.java.cleanup.UnnecessaryCatch")
@@ -38,20 +44,34 @@ public class UpdateMovedRecipe extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Update moved package recipe";
+        return "Update moved package recipe in yaml file";
     }
 
     @Override
     public String getDescription() {
-        return "Update moved package recipe.";
+        return "Update moved package recipe in yaml file.";
     }
 
     @Override
-    public List<Recipe> getRecipeList() {
-        return Arrays.asList(
-            new UpdateMovedPackageClassName(oldRecipeFullyQualifiedClassName,newRecipeFullyQualifiedClassName),
-            new UpdateMovedRecipeYaml(oldRecipeFullyQualifiedClassName, newRecipeFullyQualifiedClassName),
-            new UpdateMovedRecipeXml(oldRecipeFullyQualifiedClassName, newRecipeFullyQualifiedClassName)
-        );
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new YamlIsoVisitor<ExecutionContext>() {
+            @Override
+            public Yaml.Scalar visitScalar(Yaml.Scalar scalar, ExecutionContext executionContext) {
+                List<String> keys = getCursor().getPathAsStream()
+                    .filter(Yaml.Mapping.Entry.class::isInstance)
+                    .map(Yaml.Mapping.Entry.class::cast)
+                    .map(Yaml.Mapping.Entry::getKey)
+                    .map(YamlKey::getValue)
+                    .collect(Collectors.toList());
+                Collections.reverse(keys);
+                String prop = String.join(".", keys);
+
+                if (prop.equals("recipeList")
+                    && scalar.getValue().equals(oldRecipeFullyQualifiedClassName)) {
+                    return scalar.withValue(newRecipeFullyQualifiedClassName);
+                }
+                return super.visitScalar(scalar, executionContext);
+            }
+        };
     }
 }

@@ -21,17 +21,13 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.yaml.YamlIsoVisitor;
-import org.openrewrite.yaml.tree.Yaml;
-import org.openrewrite.yaml.tree.YamlKey;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
+import org.openrewrite.xml.XPathMatcher;
+import org.openrewrite.xml.XmlVisitor;
+import org.openrewrite.xml.tree.Xml;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class UpdateMovedRecipesYaml extends Recipe {
+public class UpdateMovedRecipeXml extends Recipe {
     @Option(displayName = "The fully qualified className of recipe moved from",
         description = "The fully qualified className of recipe moved from a old package.",
         example = "org.openrewrite.java.cleanup.UnnecessaryCatch")
@@ -44,33 +40,32 @@ public class UpdateMovedRecipesYaml extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Update moved package recipe";
+        return "Update moved package recipe in pom.xml";
     }
 
     @Override
     public String getDescription() {
-        return "Update moved package recipe.";
+        return "Update moved package recipe in pom.xml.";
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new YamlIsoVisitor<ExecutionContext>() {
+        return new XmlVisitor<ExecutionContext>(){
             @Override
-            public Yaml.Scalar visitScalar(Yaml.Scalar scalar, ExecutionContext executionContext) {
-                List<String> keys = getCursor().getPathAsStream()
-                    .filter(Yaml.Mapping.Entry.class::isInstance)
-                    .map(Yaml.Mapping.Entry.class::cast)
-                    .map(Yaml.Mapping.Entry::getKey)
-                    .map(YamlKey::getValue)
-                    .collect(Collectors.toList());
-                Collections.reverse(keys);
-                String prop = String.join(".", keys);
+            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
+                return super.visitDocument(document, ctx);
+            }
 
-                if (prop.equals("recipeList")
-                    && scalar.getValue().equals(oldRecipeFullyQualifiedClassName)) {
-                    return scalar.withValue(newRecipeFullyQualifiedClassName);
+            @Override
+            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                tag = (Xml.Tag) super.visitTag(tag, ctx);
+                XPathMatcher matcher = new XPathMatcher("/project/build/plugins/plugin/configuration/activeRecipes/recipe");
+                if (matcher.matches(getCursor()) &&
+                    tag.getValue().map(s -> s.equals(oldRecipeFullyQualifiedClassName)).orElse(false)) {
+                        return tag.withValue(newRecipeFullyQualifiedClassName);
                 }
-                return super.visitScalar(scalar, executionContext);
+
+                return tag;
             }
         };
     }

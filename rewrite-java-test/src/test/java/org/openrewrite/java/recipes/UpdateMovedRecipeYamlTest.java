@@ -20,12 +20,12 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.yaml.Assertions.yaml;
 
-class UpdateMovedRecipesYamlTest implements RewriteTest {
+class UpdateMovedRecipeYamlTest implements RewriteTest {
 
     @Test
     void changeYamlRecipeList() {
         rewriteRun(
-          spec -> spec.recipe(new UpdateMovedRecipesYaml(
+          spec -> spec.recipe(new UpdateMovedRecipeYaml(
             "org.openrewrite.java.cleanup.AddSerialVersionUidToSerializable",
             "org.openrewrite.staticanalysis.AddSerialVersionUidToSerializable")),
           yaml("""

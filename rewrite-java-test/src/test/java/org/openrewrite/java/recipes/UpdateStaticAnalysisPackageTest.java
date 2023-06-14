@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.recipes;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.config.Environment;
@@ -27,7 +26,7 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.yaml.Assertions.yaml;
 
-public class UpdateStaticAnalysisPackageTest implements RewriteTest {
+class UpdateStaticAnalysisPackageTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -150,7 +149,6 @@ public class UpdateStaticAnalysisPackageTest implements RewriteTest {
             """));
     }
 
-    @Disabled
     @DocumentExample("Update referencing places in pom.xml.")
     @Test
     void changePomXmlConfiguration() {
