@@ -57,9 +57,17 @@ public class Find extends Recipe {
     @Nullable
     Boolean regex;
 
+    @Option(displayName = "File pattern",
+            description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
+                          "When not set, all source files are searched.",
+            example = "**/*.java")
+    @Nullable
+    String filePattern;
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new TreeVisitor<Tree, ExecutionContext>() {
+
+        TreeVisitor<?, ExecutionContext> visitor = new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
@@ -90,6 +98,10 @@ public class Find extends Recipe {
                 return plainText.withText("").withSnippets(snippets);
             }
         };
+        if(filePattern != null) {
+            visitor = Preconditions.check(new HasSourcePath<>(filePattern), visitor);
+        }
+        return visitor;
     }
 
 
