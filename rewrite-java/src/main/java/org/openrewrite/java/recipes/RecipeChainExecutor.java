@@ -1,3 +1,18 @@
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.java.recipes;
 
 
@@ -21,13 +36,18 @@ import java.util.Map;
 @EqualsAndHashCode(callSuper = false)
 public class RecipeChainExecutor extends Recipe {
     @Option(displayName = "preCondition recipe",
-        description = "preCondition recipe FQN and parameters. Used for yaml recipe usage only",
-        example = "org.openrewrite.text.FindAndReplace")
+        description = "preCondition recipe FQN and parameters. Used for yaml recipe usage only.",
+        example = "- org.openrewrite.text.FindAndReplace:\n" +
+                  "    find: \"1\"\n" +
+                  "    replace: \"A\"")
     Object preCondition;
 
     @Option(displayName = "Recipe list to run",
-        description = "Recipe list to run.",
-        example = "org.openrewrite.text.ChangeText")
+        description = "Recipe list to run. Used for yaml recipe usage only.",
+        example = "- org.openrewrite.text.ChangeText:\n" +
+                  "    toText: \"2\"\n" +
+                  "- org.openrewrite.text.ChangeText:\n" +
+                  "    toText: \"3\"")
     Object recipes;
 
     @Override
@@ -70,8 +90,7 @@ public class RecipeChainExecutor extends Recipe {
         }
 
         if (preConditionRecipe == null) {
-            // todo, not sure whether returning null is OK here
-            return null;
+            throw new IllegalArgumentException("Precondition has to be a valid recipe");
         }
 
         return Preconditions.check(
@@ -80,13 +99,22 @@ public class RecipeChainExecutor extends Recipe {
                 @Override
                 public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                     if (tree instanceof SourceFile) {
-                        for (Recipe r : recipesToRun) {
-                            tree = r.getVisitor().visit(tree, ctx);
-                        }
+                        tree = runRecipes(recipesToRun, tree, ctx);
                     }
                     return tree;
                 }
             }
         );
+    }
+
+    private static Tree runRecipes(List<Recipe> recipes, Tree tree, ExecutionContext ctx) {
+        for (Recipe r : recipes) {
+            if (!r.getRecipeList().isEmpty()) {
+                tree = runRecipes(r.getRecipeList(), tree, ctx);
+            } else {
+                tree = r.getVisitor().visitNonNull(tree, ctx);
+            }
+        }
+        return tree;
     }
 }
