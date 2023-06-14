@@ -38,10 +38,10 @@ import static org.openrewrite.internal.RecipeIntrospectionUtils.constructRecipe;
 public class ClasspathScanningLoader implements ResourceLoader {
     private static final Logger logger = LoggerFactory.getLogger(ClasspathScanningLoader.class);
 
-    private final List<Recipe> recipes = new ArrayList<>();
+    private final LinkedHashSet<Recipe> recipes = new LinkedHashSet<>();
     private final List<NamedStyles> styles = new ArrayList<>();
 
-    private final List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
+    private final LinkedHashSet<RecipeDescriptor> recipeDescriptors = new LinkedHashSet<>();
     private final List<CategoryDescriptor> categoryDescriptors = new ArrayList<>();
 
     private final Map<String, List<Contributor>> recipeAttributions = new HashMap<>();
@@ -104,12 +104,10 @@ public class ClasspathScanningLoader implements ResourceLoader {
         try (ScanResult scanResult = classGraph.enableMemoryMapping().scan()) {
             List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
 
-            scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) -> {
-                yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders));
-            });
-            scanResult.getResourcesWithExtension("yaml").forEachInputStreamIgnoringIOException((res, input) -> {
-                yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders));
-            });
+            scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->
+                    yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders)));
+            scanResult.getResourcesWithExtension("yaml").forEachInputStreamIgnoringIOException((res, input) ->
+                    yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders)));
             // Extract in two passes so that the full list of recipes from all sources are known when computing recipe descriptors
             // Otherwise recipes which include recipes from other sources in their recipeList will have incomplete descriptors
             for(YamlResourceLoader resourceLoader : yamlResourceLoaders) {
