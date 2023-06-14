@@ -56,11 +56,6 @@ public class UpdateMovedRecipesYaml extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
-            public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext executionContext) {
-                return super.visitMappingEntry(entry, executionContext);
-            }
-
-            @Override
             public Yaml.Scalar visitScalar(Yaml.Scalar scalar, ExecutionContext executionContext) {
                 List<String> keys = getCursor().getPathAsStream()
                     .filter(Yaml.Mapping.Entry.class::isInstance)

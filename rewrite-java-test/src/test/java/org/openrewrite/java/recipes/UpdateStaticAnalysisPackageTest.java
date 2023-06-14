@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.config.Environment;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
 
@@ -28,18 +29,22 @@ import static org.openrewrite.yaml.Assertions.yaml;
 
 public class UpdateStaticAnalysisPackageTest implements RewriteTest {
 
-    @SuppressWarnings("all")
-    @DocumentExample("Update referencing places in java file.")
-    @Test
-    void changeCleanUpToStaticanalysisForSpecificClassOnly() {
-        rewriteRun(
-          spec -> spec.recipe(
+    @Override
+    public void defaults(RecipeSpec spec) {
+          spec.recipe(
               Environment.builder()
                 .scanRuntimeClasspath()
                 .build()
                 .activateRecipes("org.openrewrite.java.upgrade.UpdateStaticAnalysisPackage")
             )
-            .typeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.none());
+    }
+
+    @SuppressWarnings("all")
+    @DocumentExample("Update referencing places in java file.")
+    @Test
+    void changeCleanUpToStaticanalysisForSpecificClassOnly() {
+        rewriteRun(
           java(
             """
               package org.openrewrite.java.migrate;
