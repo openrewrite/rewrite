@@ -51,8 +51,8 @@ class AutodetectTest implements RewriteTest {
             }
             """
         );
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
 
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
@@ -89,8 +89,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
 
@@ -132,8 +132,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
 
@@ -165,8 +165,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
 
@@ -192,8 +192,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
@@ -223,8 +223,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
@@ -255,8 +255,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
@@ -286,8 +286,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
@@ -312,8 +312,8 @@ class AutodetectTest implements RewriteTest {
             }
             """
         );
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
@@ -343,8 +343,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
@@ -373,8 +373,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
 
@@ -432,8 +432,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
 
@@ -472,8 +472,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
 
@@ -509,8 +509,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
 
@@ -530,8 +530,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
@@ -551,8 +551,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
@@ -573,8 +573,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
@@ -593,8 +593,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
@@ -614,8 +614,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
@@ -635,8 +635,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
@@ -656,8 +656,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
@@ -677,8 +677,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
@@ -698,8 +698,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
@@ -723,8 +723,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
@@ -752,8 +752,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
@@ -776,8 +776,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
@@ -797,8 +797,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
@@ -821,8 +821,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var wrappingAndBracesStyle = NamedStyles.merge(WrappingAndBracesStyle.class, singletonList(styles));
 
@@ -847,8 +847,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var wrappingAndBracesStyle = NamedStyles.merge(WrappingAndBracesStyle.class, singletonList(styles));
 
@@ -866,8 +866,8 @@ class AutodetectTest implements RewriteTest {
           "}\r\n"
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var lineFormatStyle = NamedStyles.merge(GeneralFormatStyle.class, singletonList(styles));
 
@@ -885,8 +885,8 @@ class AutodetectTest implements RewriteTest {
           "}\r\n"
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var lineFormatStyle = NamedStyles.merge(GeneralFormatStyle.class, singletonList(styles));
 
@@ -915,8 +915,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
 
@@ -966,8 +966,8 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var detector = Autodetect.detect(cus);
-        detector.count(); // terminal operation
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
         var styles = detector.build();
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
 

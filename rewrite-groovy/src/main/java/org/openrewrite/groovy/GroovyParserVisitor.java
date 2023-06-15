@@ -38,6 +38,7 @@ import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.marker.Markers;
 
 import java.math.BigDecimal;
@@ -691,6 +692,7 @@ public class GroovyParserVisitor {
 
                 Space opPrefix = whitespace();
                 boolean assignment = false;
+                boolean instanceOf = false;
                 J.AssignmentOperation.Type assignOp = null;
                 J.Binary.Type binaryOp = null;
                 G.Binary.Type gBinaryOp = null;
@@ -752,6 +754,9 @@ public class GroovyParserVisitor {
                     case ">>>":
                         binaryOp = J.Binary.Type.UnsignedRightShift;
                         break;
+                    case "instanceof":
+                        instanceOf = true;
+                        break;
                     case "=":
                         assignment = true;
                         break;
@@ -808,6 +813,10 @@ public class GroovyParserVisitor {
                 if (assignment) {
                     queue.add(new J.Assignment(randomId(), fmt, Markers.EMPTY,
                             left, JLeftPadded.build(right).withBefore(opPrefix),
+                            typeMapping.type(binary.getType())));
+                } else if (instanceOf) {
+                    queue.add(new J.InstanceOf(randomId(), fmt, Markers.EMPTY,
+                            JRightPadded.build(left).withAfter(opPrefix), right, null,
                             typeMapping.type(binary.getType())));
                 } else if (assignOp != null) {
                     queue.add(new J.AssignmentOperation(randomId(), fmt, Markers.EMPTY,

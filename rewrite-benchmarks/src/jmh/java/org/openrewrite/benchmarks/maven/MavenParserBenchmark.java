@@ -23,18 +23,16 @@ import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.cache.CompositeMavenPomCache;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
 import org.openrewrite.maven.cache.RocksdbMavenPomCache;
-import org.openrewrite.maven.tree.MavenResolutionResult;
-import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Paths;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 @Fork(1)
 @Measurement(iterations = 2)
@@ -61,7 +59,7 @@ public class MavenParserBenchmark {
         MavenExecutionContextView ctx = MavenExecutionContextView.view(new InMemoryExecutionContext());
         ctx.setPomCache(pomCache);
 
-        Optional<Xml.Document> maven = MavenParser.builder().build().parse(ctx,
+        Optional<SourceFile> maven = MavenParser.builder().build().parse(ctx,
                 "" +
                 "<project>" +
                 "  <parent>" +

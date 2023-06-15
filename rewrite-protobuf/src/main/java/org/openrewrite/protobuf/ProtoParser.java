@@ -29,6 +29,7 @@ import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 public class ProtoParser implements Parser {
@@ -37,34 +38,36 @@ public class ProtoParser implements Parser {
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).map(sourceFile -> {
-            Path path = sourceFile.getRelativePath(relativeTo);
-            try {
-                EncodingDetectingInputStream is = sourceFile.getSource(ctx);
-                String sourceStr = is.readFully();
-                Protobuf2Parser parser = new Protobuf2Parser(new CommonTokenStream(new Protobuf2Lexer(
-                        CharStreams.fromString(sourceStr))));
+                    Path path = sourceFile.getRelativePath(relativeTo);
+                    try {
+                        EncodingDetectingInputStream is = sourceFile.getSource(ctx);
+                        String sourceStr = is.readFully();
+                        Protobuf2Parser parser = new Protobuf2Parser(new CommonTokenStream(new Protobuf2Lexer(
+                                CharStreams.fromString(sourceStr))));
 
-                parser.removeErrorListeners();
-                parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
+                        parser.removeErrorListeners();
+                        parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
 
-                if (sourceStr.contains("proto3")) {
-                    return null;
-                }
+                        if (sourceStr.contains("proto3")) {
+                            return null;
+                        }
 
-                Proto.Document document = new ProtoParserVisitor(
-                        path,
-                        sourceFile.getFileAttributes(),
-                        sourceStr,
-                        is.getCharset(),
-                        is.isCharsetBomMarked()
-                ).visitProto(parser.proto());
-                parsingListener.parsed(sourceFile, document);
-                return document;
-            } catch (Throwable t) {
-                ctx.getOnError().accept(t);
-                return ParseError.build(this, sourceFile, relativeTo, ctx, t);
-            }
-        });
+                        Proto.Document document = new ProtoParserVisitor(
+                                path,
+                                sourceFile.getFileAttributes(),
+                                sourceStr,
+                                is.getCharset(),
+                                is.isCharsetBomMarked()
+                        ).visitProto(parser.proto());
+                        parsingListener.parsed(sourceFile, document);
+                        return document;
+                    } catch (Throwable t) {
+                        ctx.getOnError().accept(t);
+                        return ParseError.build(this, sourceFile, relativeTo, ctx, t);
+                    }
+                })
+                // filter out the nulls produced for `proto3` sources
+                .filter(Objects::nonNull);
     }
 
     @Override

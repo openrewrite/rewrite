@@ -16,7 +16,6 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -88,12 +87,7 @@ class PreconditionsTest implements RewriteTest {
     void checkApplicabilityAgainstOtherSourceTypes() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> Preconditions.check(
-            new PlainTextVisitor<>() {
-                @Override
-                public @Nullable PlainText visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    return super.visit(tree, ctx);
-                }
-            },
+            new PlainTextVisitor<>(),
             new PlainTextVisitor<>()
           ))),
           other("hello")
@@ -112,7 +106,7 @@ class PreconditionsTest implements RewriteTest {
     PlainTextVisitor<ExecutionContext> contains(String s) {
         return new PlainTextVisitor<>() {
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 if (text.getText().contains(s)) {
                     return SearchResult.found(text);
                 }

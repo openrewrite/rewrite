@@ -80,7 +80,7 @@ if (System.getProperty("idea.active") == null &&
 // ---------------------------------------------------------------
 
 plugins {
-    id("com.gradle.enterprise") version "3.11"
+    id("com.gradle.enterprise") version "3.13.3"
     id("com.gradle.common-custom-user-data-gradle-plugin") version "latest.release"
 }
 

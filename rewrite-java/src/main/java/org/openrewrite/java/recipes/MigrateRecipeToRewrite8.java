@@ -69,8 +69,9 @@ public class MigrateRecipeToRewrite8 extends Recipe {
     private static final String VISIT_SOURCE_FILES_COMMENT = " [Rewrite8 migration] This recipe uses the visit multiple sources method " +
                                                              "`visit(List<SourceFile> before, P p)`, " +
                                                              "needs to be migrated to use new introduced scanning recipe, " + MigrateRecipeToRewrite8.PLEASE_FOLLOW_MIGRATION_GUIDE;
-    private static final String DO_NEXT_COMMENT = " [Rewrite8 migration] Method `Recipe#doNext(..)` is removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor#doAfterVisit`, " +
+    private static final String DO_NEXT_COMMENT = " [Rewrite8 migration] Method `Recipe#doNext(..)` has been removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor#doAfterVisit`, " +
                                                   MigrateRecipeToRewrite8.PLEASE_FOLLOW_MIGRATION_GUIDE;
+    private static final String DO_AFTER_VISIT_RECIPE_COMMENT = " [Rewrite8 migration] TreeVisitor#doAfterVisit(Recipe) has been removed, it could be mistaken usage of `TreeVisitor#doAfterVisit(TreeVisitor<?, P> visitor)` here, please review code and see if it can be replaced.";
     private static final String APPLICABLE_TEST_COMMENT = " [Rewrite8 migration] Method `Recipe#getApplicableTest(..)" +
                                                           "` is deprecated and needs to be converted to a " +
                                                           "`ScanningRecipe`. Or you can use `Precondition#check()` if" +
@@ -138,6 +139,13 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                 method = super.visitMethodInvocation(method, ctx);
                 if (method.getSimpleName().equals("doNext")) {
                     return MigratedTo8.withMarker((J.MethodInvocation) commentOf(method, DO_NEXT_COMMENT));
+                }
+
+                // Add comment on removed method `TreeVisitor#doAfterVisit(Recipe)`
+                if (method.getSimpleName().equals("doAfterVisit") &&
+                    method.getArguments().size() == 1 &&
+                    TypeUtils.isAssignableTo("org.openrewrite.Recipe", method.getArguments().get(0).getType())) {
+                    return MigratedTo8.withMarker((J.MethodInvocation) commentOf(method, DO_AFTER_VISIT_RECIPE_COMMENT));
                 }
                 return method;
             }
