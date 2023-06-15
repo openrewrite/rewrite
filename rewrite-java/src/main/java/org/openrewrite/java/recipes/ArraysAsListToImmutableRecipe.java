@@ -62,25 +62,22 @@ public class ArraysAsListToImmutableRecipe extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(
                 final J.MethodInvocation method, final ExecutionContext executionContext) {
+            J.MethodInvocation result = super.visitMethodInvocation(method, executionContext);
             if (asListMatcher.matches(method, true)) {
                 final J.MethodInvocation parentInvocation =
                         getCursor().getParentOrThrow().firstEnclosing(J.MethodInvocation.class);
                 if (unmodifiableListMatcher.matches(parentInvocation, true)) {
                     return super.visitMethodInvocation(method, executionContext);
                 }
-
-                J.MethodInvocation result =
+                result =
                         JavaTemplate.builder("Collections.unmodifiableList(#{any()})")
                                 .imports("java.util.Collections", "java.util.Arrays")
                                 .contextSensitive()
                                 .build()
                                 .apply(getCursor(), method.getCoordinates().replace(), method);
-                maybeAddImport("java.util.Arrays");
                 maybeAddImport("java.util.Collections");
-
-                return result;
             }
-            return super.visitMethodInvocation(method, executionContext);
+            return result;
         }
     }
 }
