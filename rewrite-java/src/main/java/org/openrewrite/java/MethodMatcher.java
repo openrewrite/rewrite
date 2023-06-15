@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.joining;
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
@@ -60,7 +61,7 @@ import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
  * </PRE>
  */
 @SuppressWarnings("NotNullFieldNotInitialized")
-public class MethodMatcher {
+public class MethodMatcher implements SimpleMethodMatcher {
     private static final JavaType.ShallowClass OBJECT_CLASS = JavaType.ShallowClass.build("java.lang.Object");
     private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
     private static final String ASPECTJ_DOTDOT_PATTERN = StringUtils.aspectjNameToPattern("..");
@@ -115,10 +116,10 @@ public class MethodMatcher {
 
     private boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {
         return context.BANG() == null
-                && context.AND() == null
-                && context.OR() == null
-                && context.classNameOrInterface().DOTDOT().isEmpty()
-                && context.classNameOrInterface().WILDCARD().isEmpty();
+               && context.AND() == null
+               && context.OR() == null
+               && context.classNameOrInterface().DOTDOT().isEmpty()
+               && context.classNameOrInterface().WILDCARD().isEmpty();
     }
 
     private boolean isPlainIdentifier(MethodSignatureParser.SimpleNamePatternContext context) {
@@ -141,28 +142,6 @@ public class MethodMatcher {
         this(methodPattern(method), false);
     }
 
-    public boolean matches(@Nullable JavaType.Method type) {
-        if (type == null || !matchesTargetType(type.getDeclaringType())) {
-            return false;
-        }
-
-        if (methodName != null && !methodName.equals(type.getName())) {
-            return false;
-        } else if (methodName == null && !methodNamePattern.matcher(type.getName()).matches()) {
-            return false;
-        }
-
-        StringJoiner joiner = new StringJoiner(",");
-        for (JavaType javaType : type.getParameterTypes()) {
-            String s = typePattern(javaType);
-            if (s != null) {
-                joiner.add(s);
-            }
-        }
-
-        return argumentPattern.matcher(joiner.toString()).matches();
-    }
-
     public boolean matches(J.MethodDeclaration method, J.ClassDeclaration enclosing) {
         if (enclosing.getType() == null) {
             return false;
@@ -171,26 +150,23 @@ public class MethodMatcher {
         // aspectJUtils does not support matching classes separated by packages.
         // [^.]* is the product of a fully wild card match for a method. `* foo()`
         boolean matchesTargetType = (targetType == null && "[^.]*".equals(targetTypePattern.pattern()))
-                || matchesTargetType(enclosing.getType());
+                                    || matchesTargetType(enclosing.getType());
         if (!matchesTargetType) {
             return false;
         }
 
-        if (methodName != null && !(methodName.equals(method.getSimpleName())
-                || method.getMethodType() != null && methodName.equals(method.getMethodType().getName()))) {
-            return false;
-        } else if (methodName == null && !(methodNamePattern.matcher(method.getSimpleName()).matches()
-                || method.getMethodType() != null && methodNamePattern.matcher(method.getMethodType().getName()).matches())) {
+        if (method.getMethodType() != null && !matchesMethodName(method.getMethodType().getName())) {
             return false;
         }
 
-        String arguments = method.getParameters().stream()
-                .map(this::variableDeclarationsType)
-                .filter(Objects::nonNull)
-                .map(MethodMatcher::typePattern)
-                .filter(Objects::nonNull)
-                .collect(joining(","));
-        return argumentPattern.matcher(arguments).matches();
+        List<JavaType> parameterTypes =
+                method
+                        .getParameters()
+                        .stream()
+                        .map(this::variableDeclarationsType)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+        return matchesParameterTypes(parameterTypes);
     }
 
     @Nullable
@@ -210,41 +186,31 @@ public class MethodMatcher {
         }
     }
 
-    public boolean matches(@Nullable Expression maybeMethod) {
-        return (maybeMethod instanceof J.MethodInvocation && matches((J.MethodInvocation) maybeMethod)) ||
-                (maybeMethod instanceof J.NewClass && matches((J.NewClass) maybeMethod)) ||
-                (maybeMethod instanceof J.MemberReference && matches((J.MemberReference) maybeMethod));
-    }
-
-    public boolean matches(@Nullable J.MethodInvocation method) {
-        return matches(method, false);
-    }
-
     /**
      * Prefer {@link #matches(J.MethodInvocation)}, which uses the default `false` behavior for matchUnknownTypes.
      * Using matchUnknownTypes can improve Visitor resiliency for an AST with missing type information, but
      * also increases the risk of false-positive matches on unrelated MethodInvocation instances.
      */
     public boolean matches(@Nullable J.MethodInvocation method, boolean matchUnknownTypes) {
-        if(method == null) {
+        if (method == null) {
             return false;
         }
-
         if (method.getMethodType() == null) {
             return matchUnknownTypes && matchesAllowingUnknownTypes(method);
         }
+        return SimpleMethodMatcher.super.matches(method);
+    }
 
-        if (!matchesTargetType(method.getMethodType().getDeclaringType())) {
-            return false;
-        }
+    @Override
+    public boolean matchesMethodName(String methodName) {
+        return this.methodName != null && this.methodName.equals(methodName)
+               || this.methodName == null && methodNamePattern.matcher(methodName).matches();
+    }
 
-        if (methodName != null && !methodName.equals(method.getSimpleName())
-                || methodName == null && !methodNamePattern.matcher(method.getSimpleName()).matches()) {
-            return false;
-        }
-
+    @Override
+    public boolean matchesParameterTypes(List<JavaType> parameterTypes) {
         StringJoiner joiner = new StringJoiner(",");
-        for (JavaType javaType : method.getMethodType().getParameterTypes()) {
+        for (JavaType javaType : parameterTypes) {
             String s = typePattern(javaType);
             if (s != null) {
                 joiner.add(s);
@@ -255,14 +221,13 @@ public class MethodMatcher {
     }
 
     private boolean matchesAllowingUnknownTypes(J.MethodInvocation method) {
-        if (methodName != null && !methodName.equals(method.getSimpleName())
-                || methodName == null && !methodNamePattern.matcher(method.getSimpleName()).matches()) {
+        if (!matchesMethodName(method.getSimpleName())) {
             return false;
         }
 
         if (method.getSelect() != null
-                && method.getSelect() instanceof J.Identifier
-                && !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
+            && method.getSelect() instanceof J.Identifier
+            && !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
             return false;
         }
 
@@ -278,10 +243,10 @@ public class MethodMatcher {
             return targetType.equals(select.getSimpleName()) || targetType.endsWith('.' + select.getSimpleName());
         }
         return targetTypePattern.matcher(select.getSimpleName()).matches()
-            || Pattern.compile(targetTypePattern.pattern()
+               || Pattern.compile(targetTypePattern.pattern()
                         .replaceAll(".*" + Pattern.quote(ASPECTJ_DOT_PATTERN), "")
                         .replaceAll(".*" + Pattern.quote(ASPECTJ_DOTDOT_PATTERN), ""))
-                .matcher(select.getSimpleName()).matches();
+                       .matcher(select.getSimpleName()).matches();
     }
 
     private String argumentsFromExpressionTypes(J.MethodInvocation method) {
@@ -296,33 +261,7 @@ public class MethodMatcher {
         return joiner.toString();
     }
 
-    public boolean matches(J.NewClass constructor) {
-        JavaType.FullyQualified type = TypeUtils.asFullyQualified(constructor.getType());
-        if (type == null || constructor.getConstructorType() == null) {
-            return false;
-        }
-
-        if (!matchesTargetType(type) || !("<constructor>".equals(methodName)
-                || methodName == null && methodNamePattern.matcher("<constructor>").matches())) {
-            return false;
-        }
-
-        StringJoiner joiner = new StringJoiner(",");
-        for (JavaType javaType : constructor.getConstructorType().getParameterTypes()) {
-            String s = typePattern(javaType);
-            if (s != null) {
-                joiner.add(s);
-            }
-        }
-
-        return argumentPattern.matcher(joiner.toString()).matches();
-    }
-
-    public boolean matches(J.MemberReference memberReference) {
-        return matches(memberReference.getMethodType());
-    }
-
-    boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
+    public boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
         if (type == null || type instanceof JavaType.Unknown) {
             return false;
         }
@@ -366,8 +305,8 @@ public class MethodMatcher {
             hopefullyFullyQualifiedMethod = targetType + "." + methodNamePattern.pattern();
         } else {
             hopefullyFullyQualifiedMethod = targetTypePattern.pattern()
-                    .replace(ASPECTJ_DOT_PATTERN, ".")
-                    + "." + methodNamePattern.pattern();
+                                                    .replace(ASPECTJ_DOT_PATTERN, ".")
+                                            + "." + methodNamePattern.pattern();
         }
         return fieldAccess.isFullyQualifiedClassReference(hopefullyFullyQualifiedMethod);
     }
@@ -379,7 +318,7 @@ public class MethodMatcher {
                 return ((JavaType.Primitive) type).getClassName();
             }
             return ((JavaType.Primitive) type).getKeyword();
-        } else if(type instanceof JavaType.Unknown) {
+        } else if (type instanceof JavaType.Unknown) {
             return "*";
         } else if (type instanceof JavaType.FullyQualified) {
             return ((JavaType.FullyQualified) type).getFullyQualifiedName();
@@ -405,7 +344,7 @@ public class MethodMatcher {
         }
 
         return typePattern(method.getDeclaringType()) + " " +
-                method.getName() + "(" + parameters + ")";
+               method.getName() + "(" + parameters + ")";
     }
 }
 
