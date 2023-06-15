@@ -20,7 +20,6 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 
@@ -43,8 +42,8 @@ public class RemovePluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
     public J.Block visitBlock(J.Block block, ExecutionContext executionContext) {
         J.Block b = super.visitBlock(block, executionContext);
 
-        J.MethodInvocation m = getCursor().firstEnclosingOrThrow(J.MethodInvocation.class);
-        if (buildPluginsContainerMatcher.matches(m) || settingsPluginsContainerMatcher.matches(m)) {
+        J.MethodInvocation m = getCursor().firstEnclosing(J.MethodInvocation.class);
+        if (m != null && buildPluginsContainerMatcher.matches(m) || settingsPluginsContainerMatcher.matches(m)) {
             b = b.withStatements(ListUtils.map(b.getStatements(), statement -> {
                 if (!(statement instanceof J.MethodInvocation
                         || (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation))) {
@@ -89,13 +88,14 @@ public class RemovePluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
     }
 
     @Override
-    public @Nullable J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
         J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
 
         if (buildPluginsContainerMatcher.matches(m) || settingsPluginsContainerMatcher.matches(m)) {
             if (m.getArguments().get(0) instanceof J.Lambda
                     && ((J.Lambda) m.getArguments().get(0)).getBody() instanceof J.Block
                     && ((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements().isEmpty()) {
+                //noinspection DataFlowIssue
                 return null;
             }
         }

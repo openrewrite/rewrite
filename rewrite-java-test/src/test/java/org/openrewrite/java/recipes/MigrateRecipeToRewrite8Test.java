@@ -16,6 +16,7 @@
 package org.openrewrite.java.recipes;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -35,6 +36,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
           .typeValidationOptions(TypeValidation.none());
     }
 
+    @DocumentExample("`org.openrewrite.java.JavaVisitor.visitJavaSourceFile(JavaSourceFile cu, P p)` is removed, use `org.openrewrite.java.TreeVisitor.visit(@Nullable Tree tree, P p)` instead.")
     @Test
     void deprecateVisitJavaSourceFile() {
         // language=java
@@ -145,6 +147,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
         );
     }
 
+    @DocumentExample("`getSingleSourceApplicableTest()` is removed, change to use `Preconditions` instead. And also change `getVisitor()` to be public.")
     @Test
     void getSingleSourceApplicableTestToPreconditions() {
         // language=java
@@ -162,18 +165,9 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
               import org.openrewrite.java.MethodMatcher;
               import org.openrewrite.java.search.UsesMethod;
               import org.openrewrite.java.tree.*;
-              import org.openrewrite.java.PartProvider;
-
-              import java.time.Duration;
-              import java.util.ArrayList;
-              import java.util.List;
-
-              import static java.util.Collections.emptyList;
-              import static java.util.Collections.singletonList;
 
               public class ChainStringBuilderAppendCalls extends Recipe {
                   private static final MethodMatcher STRING_BUILDER_APPEND = new MethodMatcher("java.lang.StringBuilder append(String)");
-                  private static J.Binary additiveBinaryTemplate = null;
 
                   @Override
                   public String getDisplayName() {
@@ -208,18 +202,9 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
               import org.openrewrite.java.MethodMatcher;
               import org.openrewrite.java.search.UsesMethod;
               import org.openrewrite.java.tree.*;
-              import org.openrewrite.java.PartProvider;
-
-              import java.time.Duration;
-              import java.util.ArrayList;
-              import java.util.List;
-
-              import static java.util.Collections.emptyList;
-              import static java.util.Collections.singletonList;
 
               public class ChainStringBuilderAppendCalls extends Recipe {
                   private static final MethodMatcher STRING_BUILDER_APPEND = new MethodMatcher("java.lang.StringBuilder append(String)");
-                  private static J.Binary additiveBinaryTemplate = null;
 
                   @Override
                   public String getDisplayName() {
@@ -500,7 +485,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
                               String packageText = pkg.getExpression().print(getCursor()).replaceAll("\\\\s", "");
                               String lowerCase = packageText.toLowerCase();
                               if(!packageText.equals(lowerCase)) {
-                                  // [Rewrite8 migration] Method `Recipe#doNext(..)` is removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor#doAfterVisit`, please follow the migration guide here: https://to-be-written
+                                  // [Rewrite8 migration] Method `Recipe#doNext(..)` has been removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor#doAfterVisit`, please follow the migration guide here: https://to-be-written
                                   doNext(new ChangePackage(packageText, lowerCase, true));
                               }
                               return pkg;
@@ -662,4 +647,88 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doAfterVisitRecipeIsRemoved() {
+        // language=java
+        rewriteRun(
+          java(
+            """
+              package org.openrewrite.java.cleanup;
+
+              import org.openrewrite.Applicability;
+              import org.openrewrite.ExecutionContext;
+              import org.openrewrite.Recipe;
+              import org.openrewrite.TreeVisitor;
+              import org.openrewrite.internal.lang.Nullable;
+              import org.openrewrite.java.JavaIsoVisitor;
+              import org.openrewrite.java.MethodMatcher;
+              import org.openrewrite.java.search.UsesMethod;
+              import org.openrewrite.java.tree.*;
+
+              public class ChainStringBuilderAppendCalls extends Recipe {
+                  private static final MethodMatcher STRING_BUILDER_APPEND = new MethodMatcher("java.lang.StringBuilder append(String)");
+
+                  @Override
+                  public String getDisplayName() {
+                      return "Chain `StringBuilder.append()` calls";
+                  }
+
+                  @Override
+                  protected @Nullable TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
+                      return Applicability.or(new UsesMethod<>(STRING_BUILDER_APPEND),
+                          new UsesMethod<>(STRING_BUILDER_APPEND));
+                  }
+
+                  @Override
+                  protected JavaIsoVisitor<ExecutionContext> getVisitor() {
+                      return new JavaIsoVisitor<ExecutionContext>() {
+                          @Override
+                          public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                              J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                              doAfterVisit(new SimplifyBooleanExpression());
+                              return m;
+                          }
+                      };
+                  }
+              }
+              """,
+            """
+              package org.openrewrite.java.cleanup;
+
+              import org.openrewrite.*;
+              import org.openrewrite.internal.lang.Nullable;
+              import org.openrewrite.java.JavaIsoVisitor;
+              import org.openrewrite.java.MethodMatcher;
+              import org.openrewrite.java.search.UsesMethod;
+              import org.openrewrite.java.tree.*;
+
+              public class ChainStringBuilderAppendCalls extends Recipe {
+                  private static final MethodMatcher STRING_BUILDER_APPEND = new MethodMatcher("java.lang.StringBuilder append(String)");
+
+                  @Override
+                  public String getDisplayName() {
+                      return "Chain `StringBuilder.append()` calls";
+                  }
+
+                  @Override
+                  public TreeVisitor<?, ExecutionContext> getVisitor() {
+                      return Preconditions.check(
+                              Preconditions.or(new UsesMethod<>(STRING_BUILDER_APPEND),
+                                      new UsesMethod<>(STRING_BUILDER_APPEND)), new JavaIsoVisitor<ExecutionContext>() {
+                                  @Override
+                                  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                                      J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+                                      // [Rewrite8 migration] TreeVisitor#doAfterVisit(Recipe) has been removed, it could be mistaken usage of `TreeVisitor#doAfterVisit(TreeVisitor<?, P> visitor)` here, please review code and see if it can be replaced.
+                                      doAfterVisit(new SimplifyBooleanExpression());
+                                      return m;
+                                  }
+                              });
+                  }
+              }
+              """
+          )
+        );
+    }
+
 }

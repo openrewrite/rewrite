@@ -279,6 +279,7 @@ public interface Xml extends Tree {
         public static Xml.Tag build(@Language("xml") String tagSource) {
             return new XmlParser().parse(tagSource)
                     .findFirst()
+                    .map(Xml.Document.class::cast)
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as XML"))
                     .getRoot();
         }

@@ -23,6 +23,7 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -48,7 +49,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
-public interface JavaParser extends Parser<J.CompilationUnit> {
+public interface JavaParser extends Parser {
 
     /**
      * Set to <code>true</code> on an {@link ExecutionContext} supplied to parsing to skip generation of
@@ -246,7 +247,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     }
 
     @Override
-    default Stream<J.CompilationUnit> parse(ExecutionContext ctx, @Language("java") String... sources) {
+    default Stream<SourceFile> parse(ExecutionContext ctx, @Language("java") String... sources) {
         return parseInputs(
                 Arrays.stream(sources)
                         .map(sourceFile -> new Input(
@@ -260,7 +261,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     }
 
     @Override
-    default Stream<J.CompilationUnit> parse(@Language("java") String... sources) {
+    default Stream<SourceFile> parse(@Language("java") String... sources) {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         return parse(ctx, sources);
     }

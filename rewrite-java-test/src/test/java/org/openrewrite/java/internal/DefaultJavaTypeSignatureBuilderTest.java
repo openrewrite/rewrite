@@ -32,62 +32,63 @@ class DefaultJavaTypeSignatureBuilderTest implements JavaTypeSignatureBuilderTes
 
     @Language("java")
     private final String goat = StringUtils.readFully(
-            requireNonNull(DefaultJavaTypeSignatureBuilderTest.class.getResourceAsStream("/JavaTypeGoat.java")), StandardCharsets.UTF_8);
+      requireNonNull(DefaultJavaTypeSignatureBuilderTest.class.getResourceAsStream("/JavaTypeGoat.java")), StandardCharsets.UTF_8);
 
     private final J.CompilationUnit goatCu = JavaParser.fromJavaVersion()
-            .build()
-            .parse(goat)
+      .build()
+      .parse(goat)
       .findFirst()
+      .map(J.CompilationUnit.class::cast)
       .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
 
     private final JavaType.Parameterized goatCuType = requireNonNull(TypeUtils.asParameterized(goatCu
-            .getClasses()
-            .get(0)
-            .getType()));
+      .getClasses()
+      .get(0)
+      .getType()));
 
     @Override
     public String fieldSignature(String field) {
         return signatureBuilder().variableSignature(goatCuType.getType().getMembers().stream()
-                .filter(m -> m.getName().equals(field))
-                .findAny()
-                .orElseThrow());
+          .filter(m -> m.getName().equals(field))
+          .findAny()
+          .orElseThrow());
     }
 
     @Override
     public String methodSignature(String methodName) {
         return signatureBuilder().methodSignature(goatCuType.getType().getMethods().stream()
-                .filter(m -> m.getName().equals(methodName))
-                .findAny()
-                .orElseThrow());
+          .filter(m -> m.getName().equals(methodName))
+          .findAny()
+          .orElseThrow());
     }
 
     @Override
     public String constructorSignature() {
         return signatureBuilder().methodSignature(goatCuType.getType().getMethods().stream()
-                .filter(m -> m.getName().equals("<constructor>"))
-                .findAny()
-                .orElseThrow());
+          .filter(m -> m.getName().equals("<constructor>"))
+          .findAny()
+          .orElseThrow());
     }
 
     @Override
     public JavaType firstMethodParameter(String methodName) {
         return goatCuType.getType().getMethods().stream()
-                .filter(m -> m.getName().equals(methodName))
-                .map(m -> m.getParameterTypes().get(0))
-                .findAny()
-                .orElseThrow();
+          .filter(m -> m.getName().equals(methodName))
+          .map(m -> m.getParameterTypes().get(0))
+          .findAny()
+          .orElseThrow();
     }
 
     @Override
     public JavaType innerClassSignature(String innerClassSimpleName) {
         return requireNonNull(goatCu.getClasses().get(0).getBody().getStatements()
-                .stream()
-                .filter(it -> it instanceof J.ClassDeclaration)
-                .map(it -> (J.ClassDeclaration) it)
-                .filter(cd -> requireNonNull(cd.getType()).getFullyQualifiedName().endsWith("$" + innerClassSimpleName))
-                .findAny()
-                .orElseThrow()
-                .getType());
+          .stream()
+          .filter(it -> it instanceof J.ClassDeclaration)
+          .map(it -> (J.ClassDeclaration) it)
+          .filter(cd -> requireNonNull(cd.getType()).getFullyQualifiedName().endsWith("$" + innerClassSimpleName))
+          .findAny()
+          .orElseThrow()
+          .getType());
     }
 
     @Override
