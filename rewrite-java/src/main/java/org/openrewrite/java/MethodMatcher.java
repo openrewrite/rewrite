@@ -62,7 +62,6 @@ import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
  */
 @SuppressWarnings("NotNullFieldNotInitialized")
 public class MethodMatcher implements SimpleMethodMatcher {
-    private static final JavaType.ShallowClass OBJECT_CLASS = JavaType.ShallowClass.build("java.lang.Object");
     private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
     private static final String ASPECTJ_DOTDOT_PATTERN = StringUtils.aspectjNameToPattern("..");
 
@@ -114,7 +113,7 @@ public class MethodMatcher implements SimpleMethodMatcher {
         }.visit(parser.methodPattern());
     }
 
-    private boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {
+    private static boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {
         return context.BANG() == null
                && context.AND() == null
                && context.OR() == null
@@ -122,7 +121,7 @@ public class MethodMatcher implements SimpleMethodMatcher {
                && context.classNameOrInterface().WILDCARD().isEmpty();
     }
 
-    private boolean isPlainIdentifier(MethodSignatureParser.SimpleNamePatternContext context) {
+    private static boolean isPlainIdentifier(MethodSignatureParser.SimpleNamePatternContext context) {
         return context.WILDCARD().isEmpty();
     }
 
@@ -163,14 +162,14 @@ public class MethodMatcher implements SimpleMethodMatcher {
                 method
                         .getParameters()
                         .stream()
-                        .map(this::variableDeclarationsType)
+                        .map(MethodMatcher::variableDeclarationsType)
                         .filter(Objects::nonNull)
                         .collect(Collectors.toList());
         return matchesParameterTypes(parameterTypes);
     }
 
     @Nullable
-    private JavaType variableDeclarationsType(Statement v) {
+    private static JavaType variableDeclarationsType(Statement v) {
         if (v instanceof J.VariableDeclarations) {
             J.VariableDeclarations vd = (J.VariableDeclarations) v;
             List<J.VariableDeclarations.NamedVariable> variables = vd.getVariables();
@@ -187,7 +186,7 @@ public class MethodMatcher implements SimpleMethodMatcher {
     }
 
     /**
-     * Prefer {@link #matches(J.MethodInvocation)}, which uses the default `false` behavior for matchUnknownTypes.
+     * Prefer {@link #matches(MethodCall)}, which uses the default `false` behavior for matchUnknownTypes.
      * Using matchUnknownTypes can improve Visitor resiliency for an AST with missing type information, but
      * also increases the risk of false-positive matches on unrelated MethodInvocation instances.
      */
@@ -202,9 +201,15 @@ public class MethodMatcher implements SimpleMethodMatcher {
     }
 
     @Override
+    public boolean matchesTargetTypeName(String fullyQualifiedTypeName) {
+        return this.targetType != null && fullyQualifiedNamesAreEqual(this.targetType, fullyQualifiedTypeName) ||
+               this.targetType == null && this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
+    }
+
+    @Override
     public boolean matchesMethodName(String methodName) {
-        return this.methodName != null && this.methodName.equals(methodName)
-               || this.methodName == null && methodNamePattern.matcher(methodName).matches();
+        return this.methodName != null && this.methodName.equals(methodName) ||
+               this.methodName == null && this.methodNamePattern.matcher(methodName).matches();
     }
 
     @Override
@@ -225,9 +230,8 @@ public class MethodMatcher implements SimpleMethodMatcher {
             return false;
         }
 
-        if (method.getSelect() != null
-            && method.getSelect() instanceof J.Identifier
-            && !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
+        if (method.getSelect() instanceof J.Identifier &&
+            !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
             return false;
         }
 
@@ -259,36 +263,6 @@ public class MethodMatcher implements SimpleMethodMatcher {
             joiner.add(s);
         }
         return joiner.toString();
-    }
-
-    public boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
-        if (type == null || type instanceof JavaType.Unknown) {
-            return false;
-        }
-
-        if (targetType != null && fullyQualifiedNamesAreEqual(targetType, type.getFullyQualifiedName())) {
-            return true;
-        } else if (targetType == null && targetTypePattern.matcher(type.getFullyQualifiedName()).matches()) {
-            return true;
-        }
-
-        if (matchOverrides) {
-            if (!"java.lang.Object".equals(type.getFullyQualifiedName()) && matchesTargetType(OBJECT_CLASS)) {
-                return true;
-            }
-
-            if (matchesTargetType(type.getSupertype())) {
-                return true;
-            }
-
-            for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
-                if (matchesTargetType(anInterface)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
     }
 
     /**
