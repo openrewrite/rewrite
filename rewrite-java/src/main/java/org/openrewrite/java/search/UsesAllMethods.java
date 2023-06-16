@@ -20,7 +20,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.SimpleMethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
@@ -37,9 +36,9 @@ import static java.util.Objects.requireNonNull;
  */
 @RequiredArgsConstructor
 public class UsesAllMethods<P> extends JavaIsoVisitor<P> {
-    private final List<SimpleMethodMatcher> methodMatchers;
+    private final List<MethodMatcher> methodMatchers;
 
-    public UsesAllMethods(SimpleMethodMatcher... methodMatchers) {
+    public UsesAllMethods(MethodMatcher... methodMatchers) {
         this(Arrays.asList(methodMatchers));
     }
 
@@ -47,7 +46,7 @@ public class UsesAllMethods<P> extends JavaIsoVisitor<P> {
     public J visit(@Nullable Tree tree, P p) {
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
-            List<SimpleMethodMatcher> unmatched = new ArrayList<>(methodMatchers);
+            List<MethodMatcher> unmatched = new ArrayList<>(methodMatchers);
             for (JavaType.Method type : cu.getTypesInUse().getUsedMethods()) {
                 if (unmatched.removeIf(matcher -> matcher.matches(type)) && unmatched.isEmpty()) {
                     return SearchResult.found(cu);
