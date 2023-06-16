@@ -830,7 +830,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               """,
             spec -> spec.after(after -> {
                 Matcher matcher = Pattern.compile("<spring\\.version>(.+)</spring\\.version>").matcher(after);
-                assertTrue(matcher.matches());
+                assertTrue(matcher.find());
                 String springVersion = matcher.group(1);
                 assertNotEquals("5.3.4", springVersion);
                 return """
