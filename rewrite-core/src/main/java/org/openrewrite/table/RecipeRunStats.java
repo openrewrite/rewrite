@@ -22,7 +22,10 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import static java.util.Objects.requireNonNull;
@@ -36,9 +39,8 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
                 "Statistics used in analyzing the performance of recipes.");
     }
 
-    public SourceFile recordScan(Recipe recipe, Callable<SourceFile> scan) throws Exception {
-        //noinspection DataFlowIssue
-        return Timer.builder("rewrite.recipe.scan")
+    public void recordScan(Recipe recipe, Callable<SourceFile> scan) throws Exception {
+        Timer.builder("rewrite.recipe.scan")
                 .tag("name", recipe.getName())
                 .publishPercentiles(0.99)
                 .register(registry)
@@ -58,7 +60,7 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
         for (Timer editor : registry.find("rewrite.recipe.edit").timers()) {
             String recipeName = requireNonNull(editor.getId().getTag("name"));
             Timer scanner = registry.find("rewrite.recipe.scan").tag("name", recipeName).timer();
-            insertRow(ctx, new Row(
+            Row row = new Row(
                     recipeName,
                     Long.valueOf(editor.count()).intValue(),
                     scanner == null ? 0 : (long) scanner.totalTime(TimeUnit.NANOSECONDS),
@@ -66,8 +68,14 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
                     scanner == null ? 0 : (long) scanner.max(TimeUnit.NANOSECONDS),
                     (long) editor.totalTime(TimeUnit.NANOSECONDS),
                     editor.takeSnapshot().percentileValues()[0].percentile(),
-                    (long) editor.max(TimeUnit.NANOSECONDS)
-            ));
+                    (long) editor.max(TimeUnit.NANOSECONDS));
+            //noinspection DuplicatedCode
+            ctx.computeMessage(ExecutionContext.DATA_TABLES, row, ConcurrentHashMap::new, (extract, allDataTables) -> {
+                //noinspection unchecked
+                List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());
+                dataTablesOfType.add(row);
+                return allDataTables;
+            });
         }
     }
 

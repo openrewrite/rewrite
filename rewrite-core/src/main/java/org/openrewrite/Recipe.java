@@ -247,11 +247,6 @@ public abstract class Recipe implements Cloneable {
      * another cycle (or if there are no changes made in a cycle), then another will not run.
      */
     public boolean causesAnotherCycle() {
-        for (Recipe recipe : getRecipeList()) {
-            if (recipe.causesAnotherCycle()) {
-                return true;
-            }
-        }
         return false;
     }
 
@@ -267,7 +262,7 @@ public abstract class Recipe implements Cloneable {
     }
 
     /**
-     * A recipe can optionally encasulate a visitor that performs operations on a set of source files. Subclasses
+     * A recipe can optionally encapsulate a visitor that performs operations on a set of source files. Subclasses
      * of the recipe may override this method to provide an instance of a visitor that will be used when the recipe
      * is executed.
      *
@@ -289,19 +284,15 @@ public abstract class Recipe implements Cloneable {
     }
 
     public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx, int maxCycles) {
-        return run(before, ctx, new RecipeScheduler(), maxCycles, 1);
+        return run(before, ctx, maxCycles, 1);
     }
 
-    public final RecipeRun run(LargeSourceSet before,
-                               ExecutionContext ctx,
-                               RecipeScheduler recipeScheduler,
-                               int maxCycles,
-                               int minCycles) {
-        return recipeScheduler.scheduleRun(this, before, ctx, maxCycles, minCycles);
+    public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx, int maxCycles, int minCycles) {
+        return new RecipeScheduler().scheduleRun(this, before, ctx, maxCycles, minCycles);
     }
 
-    public Validated validate(ExecutionContext ctx) {
-        Validated validated = validate();
+    public Validated<Object> validate(ExecutionContext ctx) {
+        Validated<Object> validated = validate();
 
         for (Recipe recipe : getRecipeList()) {
             validated = validated.and(recipe.validate(ctx));
@@ -316,8 +307,8 @@ public abstract class Recipe implements Cloneable {
      *
      * @return A validated instance based using non-null/nullable annotations to determine which fields of the recipe are required.
      */
-    public Validated validate() {
-        Validated validated = Validated.none();
+    public Validated<Object> validate() {
+        Validated<Object> validated = Validated.none();
         List<Field> requiredFields = NullUtils.findNonNullFields(this.getClass());
         for (Field field : requiredFields) {
             try {
@@ -332,11 +323,11 @@ public abstract class Recipe implements Cloneable {
         return validated;
     }
 
-    public final Collection<Validated> validateAll() {
+    public final Collection<Validated<Object>> validateAll() {
         return validateAll(new InMemoryExecutionContext(), new ArrayList<>());
     }
 
-    private Collection<Validated> validateAll(ExecutionContext ctx, Collection<Validated> acc) {
+    private Collection<Validated<Object>> validateAll(ExecutionContext ctx, Collection<Validated<Object>> acc) {
         acc.add(validate(ctx));
         for (Recipe recipe : getRecipeList()) {
             recipe.validateAll(ctx, acc);

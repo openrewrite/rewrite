@@ -38,6 +38,7 @@ import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.marker.Markers;
 
 import java.math.BigDecimal;
@@ -502,7 +503,7 @@ public class GroovyParserVisitor {
                 params.add(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY)));
             }
 
-            JContainer<NameTree> throwz = method.getExceptions().length == 0 ? null : JContainer.build(
+            JContainer<NameTree> throws_ = method.getExceptions().length == 0 ? null : JContainer.build(
                     sourceBefore("throws"),
                     bodyVisitor.visitRightPadded(method.getExceptions(), null),
                     Markers.EMPTY
@@ -519,7 +520,7 @@ public class GroovyParserVisitor {
                     returnType,
                     new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
                     JContainer.build(beforeParen, params, Markers.EMPTY),
-                    throwz,
+                    throws_,
                     body,
                     null,
                     typeMapping.methodType(method)
@@ -691,6 +692,7 @@ public class GroovyParserVisitor {
 
                 Space opPrefix = whitespace();
                 boolean assignment = false;
+                boolean instanceOf = false;
                 J.AssignmentOperation.Type assignOp = null;
                 J.Binary.Type binaryOp = null;
                 G.Binary.Type gBinaryOp = null;
@@ -752,6 +754,9 @@ public class GroovyParserVisitor {
                     case ">>>":
                         binaryOp = J.Binary.Type.UnsignedRightShift;
                         break;
+                    case "instanceof":
+                        instanceOf = true;
+                        break;
                     case "=":
                         assignment = true;
                         break;
@@ -808,6 +813,10 @@ public class GroovyParserVisitor {
                 if (assignment) {
                     queue.add(new J.Assignment(randomId(), fmt, Markers.EMPTY,
                             left, JLeftPadded.build(right).withBefore(opPrefix),
+                            typeMapping.type(binary.getType())));
+                } else if (instanceOf) {
+                    queue.add(new J.InstanceOf(randomId(), fmt, Markers.EMPTY,
+                            JRightPadded.build(left).withAfter(opPrefix), right, null,
                             typeMapping.type(binary.getType())));
                 } else if (assignOp != null) {
                     queue.add(new J.AssignmentOperation(randomId(), fmt, Markers.EMPTY,
@@ -1286,10 +1295,10 @@ public class GroovyParserVisitor {
             J.ControlParentheses<Expression> ifCondition = new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
                     JRightPadded.build((Expression) visit(ifElse.getBooleanExpression().getExpression())).withAfter(sourceBefore(")")));
             JRightPadded<Statement> then = maybeSemicolon(visit(ifElse.getIfBlock()));
-            J.If.Else elze = ifElse.getElseBlock() instanceof EmptyStatement ? null :
+            J.If.Else else_ = ifElse.getElseBlock() instanceof EmptyStatement ? null :
                     new J.If.Else(randomId(), sourceBefore("else"), Markers.EMPTY,
                             maybeSemicolon(visit(ifElse.getElseBlock())));
-            queue.add(new J.If(randomId(), fmt, Markers.EMPTY, ifCondition, then, elze));
+            queue.add(new J.If(randomId(), fmt, Markers.EMPTY, ifCondition, then, else_));
         }
 
         @Override
@@ -1620,13 +1629,13 @@ public class GroovyParserVisitor {
         }
 
         @Override
-        public void visitReturnStatement(ReturnStatement retn) {
+        public void visitReturnStatement(ReturnStatement return_) {
             Space fmt = sourceBefore("return");
-            if (retn.getExpression() instanceof ConstantExpression && isSynthetic(retn.getExpression()) &&
-                (((ConstantExpression) retn.getExpression()).getValue() == null)) {
+            if (return_.getExpression() instanceof ConstantExpression && isSynthetic(return_.getExpression()) &&
+                (((ConstantExpression) return_.getExpression()).getValue() == null)) {
                 queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, null));
             } else {
-                queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, visit(retn.getExpression())));
+                queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, visit(return_.getExpression())));
             }
         }
 
@@ -1758,11 +1767,11 @@ public class GroovyParserVisitor {
 
             // Strangely, groovy parses the finally's block as a BlockStatement which contains another BlockStatement
             // The true contents of the block are within the first statement of this apparently pointless enclosing BlockStatement
-            JLeftPadded<J.Block> finallyy = !(node.getFinallyStatement() instanceof BlockStatement) ? null :
+            JLeftPadded<J.Block> finally_ = !(node.getFinallyStatement() instanceof BlockStatement) ? null :
                     padLeft(sourceBefore("finally"), visit(((BlockStatement) node.getFinallyStatement()).getStatements().get(0)));
 
             //noinspection ConstantConditions
-            queue.add(new J.Try(randomId(), prefix, Markers.EMPTY, resources, body, catches, finallyy));
+            queue.add(new J.Try(randomId(), prefix, Markers.EMPTY, resources, body, catches, finally_));
 
         }
 
@@ -2247,7 +2256,7 @@ public class GroovyParserVisitor {
     }
 
     /*
-       Visit the value filled in to a parameterized type, such as in a variable declaration.
+       Visit the value filled into a parameterized type, such as in a variable declaration.
        Not to be confused with the declaration of a type parameter on a class or method.
 
        Can contain a J.Identifier, as is the case in a typical variable declaration:

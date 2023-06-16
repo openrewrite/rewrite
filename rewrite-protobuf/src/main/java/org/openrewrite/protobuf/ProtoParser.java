@@ -15,15 +15,11 @@
  */
 package org.openrewrite.protobuf;
 
-import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Timer;
 import org.antlr.v4.runtime.*;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
-import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.protobuf.internal.ProtoParserVisitor;
 import org.openrewrite.protobuf.internal.grammar.Protobuf2Lexer;
@@ -36,17 +32,12 @@ import java.nio.file.Path;
 import java.util.Objects;
 import java.util.stream.Stream;
 
-public class ProtoParser implements Parser<Proto.Document> {
+public class ProtoParser implements Parser {
 
     @Override
-    public Stream<Proto.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        return acceptedInputs(sourceFiles).stream()
-                .map(sourceFile -> {
-                    Timer.Builder timer = Timer.builder("rewrite.parse")
-                            .description("The time spent parsing a Protobuf file")
-                            .tag("file.type", "Proto");
-                    Timer.Sample sample = Timer.start();
+        return acceptedInputs(sourceFiles).map(sourceFile -> {
                     Path path = sourceFile.getRelativePath(relativeTo);
                     try {
                         EncodingDetectingInputStream is = sourceFile.getSource(ctx);
@@ -68,21 +59,19 @@ public class ProtoParser implements Parser<Proto.Document> {
                                 is.getCharset(),
                                 is.isCharsetBomMarked()
                         ).visitProto(parser.proto());
-                        sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, document);
                         return document;
                     } catch (Throwable t) {
-                        sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
-                        ParsingExecutionContextView.view(ctx).parseFailure(sourceFile, relativeTo, this, t);
-                        ctx.getOnError().accept(new IllegalStateException(path + " " + t.getMessage(), t));
-                        return null;
+                        ctx.getOnError().accept(t);
+                        return ParseError.build(this, sourceFile, relativeTo, ctx, t);
                     }
                 })
+                // filter out the nulls produced for `proto3` sources
                 .filter(Objects::nonNull);
     }
 
     @Override
-    public Stream<Proto.Document> parse(@Language("protobuf") String... sources) {
+    public Stream<SourceFile> parse(@Language("protobuf") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
@@ -117,6 +106,7 @@ public class ProtoParser implements Parser<Proto.Document> {
     public static Builder builder() {
         return new Builder();
     }
+
     public static class Builder extends Parser.Builder {
 
         public Builder() {

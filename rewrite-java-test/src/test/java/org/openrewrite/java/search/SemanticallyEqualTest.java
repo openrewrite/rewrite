@@ -52,9 +52,9 @@ public class SemanticallyEqualTest  {
 
     @SuppressWarnings("OptionalGetWithoutIsPresent")
     private void assertEqual(@Language("java") String a, @Language("java") String b) {
-        J.CompilationUnit cua = javaParser.parse(a).findFirst().get();
+        J.CompilationUnit cua = (J.CompilationUnit) javaParser.parse(a).findFirst().get();
         javaParser.reset();
-        J.CompilationUnit cub = javaParser.parse(b).findFirst().get();
+        J.CompilationUnit cub = (J.CompilationUnit) javaParser.parse(b).findFirst().get();
         assertEqual(cua, cub);
     }
 

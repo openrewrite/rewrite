@@ -19,6 +19,7 @@ dependencies {
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
     testRuntimeOnly("org.apache.commons:commons-lang3:latest.release")
     testRuntimeOnly(project(":rewrite-yaml"))
+    testImplementation(project(":rewrite-maven"))
     testRuntimeOnly("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 }
 

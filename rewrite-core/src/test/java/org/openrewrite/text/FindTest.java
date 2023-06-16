@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.test.SourceSpecs.dir;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class FindTest implements RewriteTest {
@@ -27,7 +28,7 @@ class FindTest implements RewriteTest {
     @Test
     void regex() {
         rewriteRun(
-          spec -> spec.recipe(new Find("[T\\s]", true)),
+          spec -> spec.recipe(new Find("[T\\s]", true, null,null)),
           text(
             """
               This is\ttext.
@@ -42,7 +43,7 @@ class FindTest implements RewriteTest {
     @Test
     void plainText() {
       rewriteRun(
-        spec -> spec.recipe(new Find("\\s", null)),
+        spec -> spec.recipe(new Find("\\s", null,  null,null)),
         text(
           """
             This i\\s text.
@@ -50,6 +51,28 @@ class FindTest implements RewriteTest {
           """
             This i~~>\\s text.
             """
+        )
+      );
+    }
+
+    @Test
+    void caseInsensitive() {
+      rewriteRun(
+        spec -> spec.recipe(new Find("text", null,  true,"**/foo/**")),
+        dir("foo",
+          text(
+            """
+              TEXT
+              """,
+            """
+              ~~>TEXT
+              """
+          )
+        ),
+        dir("bar",
+          text("""
+            TEXT
+            """)
         )
       );
     }

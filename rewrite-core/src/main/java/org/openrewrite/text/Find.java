@@ -52,14 +52,28 @@ public class Find extends Recipe {
     String find;
 
     @Option(displayName = "Regex",
-            description = "If true, `find` will be interpreted as a Regular Expression. Default false.",
+            description = "If true, `find` will be interpreted as a Regular Expression. Default `false`.",
             required = false)
     @Nullable
     Boolean regex;
 
+    @Option(displayName = "Case Insensitive",
+            description = "If `true` the search will be insensitive to case. Default `false`.",
+            required = false)
+    @Nullable
+    Boolean caseInsensitive;
+
+    @Option(displayName = "File pattern",
+            description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
+                          "When not set, all source files are searched.",
+            example = "**/*.java")
+    @Nullable
+    String filePattern;
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new TreeVisitor<Tree, ExecutionContext>() {
+
+        TreeVisitor<?, ExecutionContext> visitor = new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
@@ -71,7 +85,11 @@ public class Find extends Recipe {
                 if (!Boolean.TRUE.equals(regex)) {
                     searchStr = Pattern.quote(searchStr);
                 }
-                Pattern pattern = Pattern.compile(searchStr);
+                int patternOptions = 0;
+                if(Boolean.TRUE.equals(caseInsensitive)) {
+                    patternOptions |= Pattern.CASE_INSENSITIVE;
+                }
+                Pattern pattern = Pattern.compile(searchStr, patternOptions);
                 Matcher matcher = pattern.matcher(plainText.getText());
                 String rawText = plainText.getText();
                 if (!matcher.find()) {
@@ -90,6 +108,10 @@ public class Find extends Recipe {
                 return plainText.withText("").withSnippets(snippets);
             }
         };
+        if(filePattern != null) {
+            visitor = Preconditions.check(new HasSourcePath<>(filePattern), visitor);
+        }
+        return visitor;
     }
 
 

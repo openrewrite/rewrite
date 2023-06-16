@@ -25,14 +25,18 @@ import java.util.function.UnaryOperator;
  * A source set that may be too large to be materialized in memory.
  * It contains operations for filtering and mapping that are optimized
  * for large repositories, though the same operations work on small repositories.
- * <br/>
- * Ordering is not guaranteed.
- * <br/>
+ * <p>
  * A large source set must always track of its initial state to be
  * able to produce {@link #getChangeset()} from that initial state
  * through any number of transformations to some end state.
  */
 public interface LargeSourceSet {
+
+    /**
+     * Called by {@link RecipeScheduler} at the beginning of a scan/generate/edit cycle.
+     */
+    default void beforeCycle() {
+    }
 
     /**
      * Maintain context about what recipe is performing an edit or generating code.
@@ -58,6 +62,12 @@ public interface LargeSourceSet {
      * @return A new source set with the new item inserted.
      */
     LargeSourceSet generate(@Nullable Collection<? extends SourceFile> ls);
+
+    /**
+     * Called by {@link RecipeScheduler} at the conclusion of a scan/generate/edit cycle.
+     */
+    default void afterCycle(boolean lastCycle) {
+    }
 
     /**
      * @return The set of changes (encompassing adds, edits, and deletions)

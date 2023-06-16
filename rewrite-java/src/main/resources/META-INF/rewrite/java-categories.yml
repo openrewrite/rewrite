@@ -20,11 +20,6 @@ packageName: org.openrewrite.java
 description: Basic building blocks for transforming Java code.
 ---
 type: specs.openrewrite.org/v1beta/category
-name: Common static analysis issues cleanup
-packageName: org.openrewrite.java.cleanup
-description: Resolve common static analysis issues discovered, apply best practices, format and cleanup Java code to ensure a consistent style is used.
----
-type: specs.openrewrite.org/v1beta/category
 name: Dataflow analysis
 packageName: org.openrewrite.java.dataflow
 description: Analysis that helps recipes understand the flow of data across a codebase.

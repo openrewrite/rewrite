@@ -46,7 +46,7 @@ public class TildeRange extends LatestRelease {
                 super.compare(currentVersion, version, lower) >= 0;
     }
 
-    public static Validated build(String pattern, @Nullable String metadataPattern) {
+    public static Validated<TildeRange> build(String pattern, @Nullable String metadataPattern) {
         Matcher matcher = TILDE_RANGE_PATTERN.matcher(pattern);
         if (!matcher.matches()) {
             return Validated.invalid("tildeRange", pattern, "not a tilde range");

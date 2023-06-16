@@ -16,12 +16,11 @@
 package org.openrewrite.java.recipes;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.JavaTemplate;
-import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.*;
+import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
@@ -53,58 +52,48 @@ public class MigrateTestToRewrite8 extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
-
-            @Override
-            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl,
-                                                            ExecutionContext executionContext) {
-                if (classDecl.getImplements() != null) {
-                    if (classDecl.getImplements().stream().noneMatch(c -> TypeUtils.isOfClassType(c.getType(), REWRITE_TEST_FQN))) {
-                        return classDecl;
-                    }
-                } else {
-                    return classDecl;
-                }
-
-                return super.visitClassDeclaration(classDecl, executionContext);
-            }
-
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method,
-                                                            ExecutionContext ctx) {
-                method = super.visitMethodInvocation(method, ctx);
-                if (RECIPE_METHOD_MATCHER.matches(method.getMethodType())) {
-                    method.getArguments();
-                    if (method.getArguments().isEmpty()) {
-                        return method;
-                    }
-                    List<Expression> recipes = flatDoNext(method.getArguments().get(0));
-                    if (recipes.size() > 1) {
-                        String argsPlaceHolders = String.join(",", Collections.nCopies(recipes.size(), "#{any()}"));
-                        JavaTemplate recipesTemplate = JavaTemplate.builder(
-                                        "#{any()}.recipes(" + argsPlaceHolders + ")")
+        return Preconditions.check(new UsesType<>(REWRITE_TEST_FQN, false),
+            new JavaIsoVisitor<ExecutionContext>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method,
+                                                                ExecutionContext ctx) {
+                    method = super.visitMethodInvocation(method, ctx);
+                    boolean isRecipeSpecRecipeMethod = "recipe".equals(method.getSimpleName()) &&
+                                                       method.getSelect() != null &&
+                                                       TypeUtils.isOfClassType(method.getSelect().getType(), "org.openrewrite.test.RecipeSpec");
+                    if (isRecipeSpecRecipeMethod) {
+                        method.getArguments();
+                        if (method.getArguments().isEmpty()) {
+                            return method;
+                        }
+                        List<Expression> recipes = flatDoNext(method.getArguments().get(0));
+                        if (recipes.size() > 1) {
+                            String argsPlaceHolders = String.join(",", Collections.nCopies(recipes.size(), "#{any()}"));
+                            JavaTemplate recipesTemplate = JavaTemplate.builder(
+                                    "#{any()}.recipes(" + argsPlaceHolders + ")")
                                 .contextSensitive()
                                 .javaParser(JavaParser.fromJavaVersion()
-                                        .classpath(JavaParser.runtimeClasspath()))
+                                    .classpath(JavaParser.runtimeClasspath()))
                                 .imports("org.openrewrite.test.RecipeSpec", "org.openrewrite.test.RewriteTest")
                                 // .imports("org.openrewrite.Preconditions")
                                 .build();
 
-                        Object[] parameters = new Object[recipes.size() + 1];
-                        parameters[0] = method.getSelect();
-                        for (int i = 0; i < recipes.size(); i++) {
-                            parameters[i + 1] = recipes.get(i);
-                        }
-                        return recipesTemplate.apply(
+                            Object[] parameters = new Object[recipes.size() + 1];
+                            parameters[0] = method.getSelect();
+                            for (int i = 0; i < recipes.size(); i++) {
+                                parameters[i + 1] = recipes.get(i);
+                            }
+
+                            return recipesTemplate.apply(
                                 getCursor(),
                                 method.getCoordinates().replace(),
                                 parameters
-                        );
+                            );
+                        }
                     }
+                    return method;
                 }
-                return method;
-            }
-        };
+            });
     }
 
     private static List<Expression> flatDoNext(Expression expression) {
@@ -115,7 +104,9 @@ public class MigrateTestToRewrite8 extends Recipe {
         }
 
         J.MethodInvocation method = (J.MethodInvocation) expression;
-        if (DO_NEXT_METHOD_MATCHER.matches(method) && method.getSelect() != null) {
+        boolean isDoNextMethod = "doNext".equals(method.getSimpleName()) &&
+                                 method.getSelect() != null;
+        if (isDoNextMethod) {
             recipes.addAll(flatDoNext(method.getSelect()));
             recipes.addAll(flatDoNext(method.getArguments().get(0)));
         }

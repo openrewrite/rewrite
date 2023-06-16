@@ -101,12 +101,12 @@ class JavaTemplateTest5Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
-              public J visitAssert(J.Assert azzert, ExecutionContext p) {
+              public J visitAssert(J.Assert assert_, ExecutionContext p) {
                   maybeAddImport("java.util.List");
                   return JavaTemplate.builder("List<String> s = null;")
                     .imports("java.util.List")
                     .build()
-                    .apply(getCursor(), azzert.getCoordinates().replace());
+                    .apply(getCursor(), assert_.getCoordinates().replace());
               }
           })),
           java(

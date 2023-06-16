@@ -123,7 +123,7 @@ public class MatchPatternsFileFilter implements FileFilter {
     String relativePath(File file) throws IOException {
         String canonicalPath = file.getCanonicalPath();
         if (!canonicalPath.startsWith(sourceDirectory)) {
-            throw new IOException(format("the path %s is not a decendent of the basedir %s", canonicalPath, sourceDirectory));
+            throw new IOException(format("the path %s is not a descendent of the basedir %s", canonicalPath, sourceDirectory));
         }
         return canonicalPath.substring(sourceDirectory.length()).replaceAll("^" + quote(File.separator), "");
     }

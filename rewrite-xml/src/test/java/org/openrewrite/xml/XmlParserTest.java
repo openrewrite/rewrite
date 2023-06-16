@@ -111,6 +111,21 @@ class XmlParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3301")
+    @Test
+    void singleQuestionMarkContent() {
+        rewriteRun(
+          xml(
+            """
+              <foo>
+                  <a><!-- comment -->a</a>
+                  <literal>List&lt;?&gt;</literal>
+              </foo>
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/145")
     @Test
     void commentBeforeContentNewline() {

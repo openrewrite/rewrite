@@ -92,7 +92,7 @@ public class MavenArtifactDownloader {
         return mavenArtifactCache.computeArtifact(dependency, () -> {
             try {
                 String uri = requireNonNull(dependency.getRepository(),
-                        String.format("Respository for dependency '%s' was null.", dependency)).getUri() + "/" +
+                        String.format("Repository for dependency '%s' was null.", dependency)).getUri() + "/" +
                         dependency.getGroupId().replace('.', '/') + '/' +
                         dependency.getArtifactId() + '/' +
                         dependency.getVersion() + '/' +

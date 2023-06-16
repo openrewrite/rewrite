@@ -1188,7 +1188,7 @@ class AddDependencyTest implements RewriteTest {
                     mavenCentral()
                 }
                 
-                def gauvaVersion = "29.0-jre"
+                def guavaVersion = "29.0-jre"
                 """,
               """
                 plugins {
@@ -1199,7 +1199,7 @@ class AddDependencyTest implements RewriteTest {
                     mavenCentral()
                 }
                 
-                def gauvaVersion = "29.0-jre"
+                def guavaVersion = "29.0-jre"
                 
                 dependencies {
                     implementation "com.google.guava:guava:${guavaVersion}"

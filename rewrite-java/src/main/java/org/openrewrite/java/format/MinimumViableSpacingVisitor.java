@@ -150,10 +150,10 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.Return visitReturn(J.Return retrn, P p) {
-        J.Return r = super.visitReturn(retrn, p);
+    public J.Return visitReturn(J.Return return_, P p) {
+        J.Return r = super.visitReturn(return_, p);
         if (r.getExpression() != null && r.getExpression().getPrefix().getWhitespace().isEmpty() &&
-            !retrn.getMarkers().findFirst(ImplicitReturn.class).isPresent()) {
+            !return_.getMarkers().findFirst(ImplicitReturn.class).isPresent()) {
             r = r.withExpression(r.getExpression().withPrefix(r.getExpression().getPrefix().withWhitespace(" ")));
         }
         return r;

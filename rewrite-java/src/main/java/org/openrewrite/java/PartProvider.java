@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
@@ -55,7 +56,7 @@ public final class PartProvider {
     private static <J2 extends J> J2 buildPart(@Language("java") String codeToProvideAPart,
                                                Class<J2> expected,
                                                JavaParser parser) {
-        J.CompilationUnit cu = parser
+        SourceFile cu = parser
                 .parse(codeToProvideAPart)
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));

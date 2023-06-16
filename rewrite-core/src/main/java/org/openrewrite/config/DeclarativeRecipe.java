@@ -55,7 +55,6 @@ public class DeclarativeRecipe extends Recipe {
 
     private final URI source;
 
-
     private final boolean causesAnotherCycle;
 
     @Override
@@ -70,7 +69,7 @@ public class DeclarativeRecipe extends Recipe {
     private final List<Recipe> recipeList = new ArrayList<>();
 
     @JsonIgnore
-    private Validated validation = Validated.test("initialization",
+    private Validated<Object> validation = Validated.test("initialization",
             "initialize(..) must be called on DeclarativeRecipe prior to use.",
             this, r -> uninitializedRecipes.isEmpty());
 
@@ -131,12 +130,12 @@ public class DeclarativeRecipe extends Recipe {
         }
     }
 
-    public void addValidation(Validated validated) {
+    public void addValidation(Validated<Object> validated) {
         validation = validation.and(validated);
     }
 
     @Override
-    public Validated validate() {
+    public Validated<Object> validate() {
         return validation;
     }
 

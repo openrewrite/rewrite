@@ -122,7 +122,7 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
                 // Apply `style.getMinimum().getAroundClass()` to classes declared in the SourceFile.
                 (classes.contains(j)) ? minimumLines(j, style.getMinimum().getAroundClass()) : j;
 
-        // style.getKeepMaximum().getInDeclarations() also sets the maximum new lines of class declaration prefixex.
+        // style.getKeepMaximum().getInDeclarations() also sets the maximum new lines of class declaration prefixes.
         j = firstClass ?
                 (hasImports ? keepMaximumLines(j, Math.max(style.getKeepMaximum().getInDeclarations(), style.getMinimum().getAfterImports())) : j) :
                 (classes.contains(j)) ? keepMaximumLines(j, style.getKeepMaximum().getInDeclarations()) : j;
@@ -147,8 +147,8 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.Import visitImport(J.Import impoort, P p) {
-        J.Import i = super.visitImport(impoort, p);
+    public J.Import visitImport(J.Import import_, P p) {
+        J.Import i = super.visitImport(import_, p);
         JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
         if (i.equals(cu.getImports().get(0)) && cu.getPackageDeclaration() == null && cu.getPrefix().equals(Space.EMPTY)) {
             i = i.withPrefix(i.getPrefix().withWhitespace(""));
