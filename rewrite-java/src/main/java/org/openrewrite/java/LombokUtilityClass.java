@@ -138,6 +138,9 @@ public class LombokUtilityClass extends Recipe {
                 final J.ClassDeclaration classDecl,
                 final AtomicBoolean shouldPerformChanges
         ) {
+            if (classDecl.hasModifier(J.Modifier.Type.Abstract)) {
+                shouldPerformChanges.set(false);
+            }
             if (classDecl.getLeadingAnnotations().stream().anyMatch(a -> "UtilityClass".equals(a.getSimpleName()))) {
                 shouldPerformChanges.set(false);
             }

@@ -26,7 +26,6 @@ import static org.openrewrite.java.Assertions.java;
  * - Interfaces
  * - Empty classes & interfaces
  * - inheritance
- * - abstract classes
  * - instantiations of changed classes
  * - constructor
  */
@@ -260,6 +259,21 @@ class LombokUtilityClassTest implements RewriteTest {
                                     public class A {
                                        public static void main(String[] args) {
                                        }
+                                    }
+                                    """
+                    )
+            );
+        }
+
+        @Test
+        void givenAbstractClass() {
+            rewriteRun(
+                    recipeSpec -> recipeSpec.recipe(new LombokUtilityClass()),
+                    java(
+                            """
+                                    public abstract class A {
+                                       public static void doSmth() {
+                                       };
                                     }
                                     """
                     )
