@@ -35,11 +35,13 @@ import org.openrewrite.properties.tree.Properties;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
@@ -185,7 +187,11 @@ public class AddMavenWrapperChecksumValidation extends Recipe {
               Collections.emptyList()
 
       );
-      return downloader.downloadArtifact(rd).toFile();
+
+      return Optional
+              .ofNullable(downloader.downloadArtifact(rd))
+              .map(Path::toFile)
+              .orElseThrow(() -> new RuntimeException("Could not download artifact " + rd.toString()));
     }
 
     private Properties addPropertyToProperties(Properties mavenWrapperProperties, String name, String value) {
@@ -210,9 +216,9 @@ public class AddMavenWrapperChecksumValidation extends Recipe {
      * @param file file
      * @return SHA256 as hex
      * @see <a href="https://www.baeldung.com/sha-256-hashing-java">source</a>
+     * @see {@link Checksum#sha256(SourceFile)}, but not a {@link SourceFile} which makes it cumbersome to refactor
      */
     private String sha256AsHex(File file) throws NoSuchAlgorithmException, IOException {
-
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         byte[] hash = digest.digest(
                 Files.readAllBytes(file.toPath()));
