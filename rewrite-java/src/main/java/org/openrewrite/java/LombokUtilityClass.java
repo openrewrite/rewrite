@@ -138,6 +138,9 @@ public class LombokUtilityClass extends Recipe {
                 final J.ClassDeclaration classDecl,
                 final AtomicBoolean shouldPerformChanges
         ) {
+            if (classDecl.getType().hasFlags(Flag.Interface)) {
+                shouldPerformChanges.set(false);
+            }
             if (classDecl.hasModifier(J.Modifier.Type.Abstract)) {
                 shouldPerformChanges.set(false);
             }
