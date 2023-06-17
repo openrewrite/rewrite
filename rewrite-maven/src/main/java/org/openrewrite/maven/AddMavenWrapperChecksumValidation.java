@@ -164,34 +164,34 @@ public class AddMavenWrapperChecksumValidation extends Recipe {
     }
 
     private File downloadMavenArtifact(final ResolvedGroupArtifactVersion rgav, String type) throws IOException {
-      final MavenArtifactCache cache = new LocalMavenArtifactCache(Files.createTempDirectory("repository"));
-      //final MavenSettings settings = new MavenSettings();
-      final MavenArtifactDownloader downloader = new MavenArtifactDownloader(cache, null, Throwable::printStackTrace);
-      final ResolvedDependency rd = new ResolvedDependency(
-              MavenRepository.MAVEN_CENTRAL,
-              rgav,
-              new Dependency(
-                      null,
-                      null,
-                      type,
-                      null,
-                      Collections.emptyList(),
-                      null
-              ),
-              Collections.emptyList(),
-              Collections.emptyList(),
-              null,
-              null,
-              false,
-              1,
-              Collections.emptyList()
+        final MavenArtifactCache cache = new LocalMavenArtifactCache(Files.createTempDirectory("repository"));
+        //final MavenSettings settings = new MavenSettings();
+        final MavenArtifactDownloader downloader = new MavenArtifactDownloader(cache, null, Throwable::printStackTrace);
+        final ResolvedDependency rd = new ResolvedDependency(
+                MavenRepository.MAVEN_CENTRAL,
+                rgav,
+                new Dependency(
+                        null,
+                        null,
+                        type,
+                        null,
+                        Collections.emptyList(),
+                        null
+                ),
+                Collections.emptyList(),
+                Collections.emptyList(),
+                null,
+                null,
+                false,
+                1,
+                Collections.emptyList()
 
-      );
+        );
 
-      return Optional
-              .ofNullable(downloader.downloadArtifact(rd))
-              .map(Path::toFile)
-              .orElseThrow(() -> new RuntimeException("Could not download artifact " + rd.toString()));
+        return Optional
+                .ofNullable(downloader.downloadArtifact(rd))
+                .map(Path::toFile)
+                .orElseThrow(() -> new RuntimeException("Could not download artifact " + rd.toString()));
     }
 
     private Properties addPropertyToProperties(Properties mavenWrapperProperties, String name, String value) {
