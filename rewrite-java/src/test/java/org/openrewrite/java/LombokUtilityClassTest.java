@@ -23,7 +23,6 @@ import static org.openrewrite.java.Assertions.java;
 
 /**
  * Cases to test:
- * - Empty classes & interfaces
  * - inheritance
  * - instantiations of changed classes
  * - constructor
