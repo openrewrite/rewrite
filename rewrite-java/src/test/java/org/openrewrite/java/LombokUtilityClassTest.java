@@ -280,7 +280,7 @@ class LombokUtilityClassTest implements RewriteTest {
         }
 
         @Test
-        void givenInteface() {
+        void givenInterface() {
             rewriteRun(
                     recipeSpec -> recipeSpec.recipe(new LombokUtilityClass()),
                     java(
@@ -289,6 +289,20 @@ class LombokUtilityClassTest implements RewriteTest {
                                        int CONST = 1;
                                        static void doSmth() {
                                        }
+                                    }
+                                    """
+                    )
+            );
+        }
+
+        // FIXME: use messaging on getCursor() to notify class of existing methods or fields?
+        @Test
+        void givenEmptyClass() {
+            rewriteRun(
+                    recipeSpec -> recipeSpec.recipe(new LombokUtilityClass()),
+                    java(
+                            """
+                                    public class A {                                    
                                     }
                                     """
                     )
