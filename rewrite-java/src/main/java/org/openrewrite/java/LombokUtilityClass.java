@@ -137,6 +137,10 @@ public class LombokUtilityClass extends Recipe {
             if (!method.hasModifier(J.Modifier.Type.Static)) {
                 shouldPerformChanges.set(false);
             }
+
+            if (method.getSimpleName().equalsIgnoreCase("main")) {
+                shouldPerformChanges.set(false);
+            }
             return super.visitMethodDeclaration(method, shouldPerformChanges);
         }
 

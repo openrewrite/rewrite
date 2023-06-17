@@ -14,7 +14,6 @@ import static org.openrewrite.java.Assertions.java;
  * - abstract classes
  * - instantiations of changed classes
  * - constructor
- * - public static void main
  */
 class LombokUtilityClassTest implements RewriteTest {
 
@@ -230,6 +229,21 @@ class LombokUtilityClassTest implements RewriteTest {
                                     public class A {
                                        public int add(final int x, final int y) {
                                           return x + y;
+                                       }
+                                    }
+                                    """
+                    )
+            );
+        }
+
+        @Test
+        void givenMain() {
+            rewriteRun(
+                    recipeSpec -> recipeSpec.recipe(new LombokUtilityClass()),
+                    java(
+                            """
+                                    public class A {
+                                       public static void main(String[] args) {
                                        }
                                     }
                                     """
