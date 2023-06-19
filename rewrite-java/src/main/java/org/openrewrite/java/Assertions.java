@@ -78,8 +78,11 @@ public class Assertions {
                             return true;
                         } else if (typeValidation.constructorInvocations() && missingType.getJ() instanceof J.NewClass) {
                             return true;
-                        } else
-                            return typeValidation.methodDeclarations() && missingType.getJ() instanceof J.MethodDeclaration;
+                        } else if (typeValidation.methodDeclarations() && missingType.getJ() instanceof J.MethodDeclaration) {
+                            return true;
+                        } else {
+                            return typeValidation.variableDeclarations() && missingType.getJ() instanceof J.VariableDeclarations.NamedVariable;
+                        }
                     })
                     .collect(Collectors.toList());
             if (!missingTypeResults.isEmpty()) {
