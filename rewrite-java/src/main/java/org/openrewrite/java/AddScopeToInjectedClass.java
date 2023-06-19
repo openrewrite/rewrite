@@ -20,7 +20,7 @@ public class AddScopeToInjectedClass extends ScanningRecipe<AddScopeToInjectedCl
 
     @Override
     public String getDescription() {
-        return "Add scope annotation to injected classes";
+        return "Add scope annotation to injected classes.";
     }
 
     private static boolean variableTypeRequiresScope(@Nullable JavaType.Variable memberVariable) {
