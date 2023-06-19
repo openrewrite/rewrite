@@ -82,6 +82,12 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Nullable
     final String repositoryUrl;
 
+    @Option(displayName = "Add if missing",
+            description = "Add a Gradle wrapper, if it's missing. Defaults to `true`.",
+            required = false)
+    @Nullable
+    final Boolean addIfMissing;
+
     @NonFinal
     transient Validated<GradleWrapper> gradleWrapperValidation;
 
@@ -156,6 +162,10 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
     @Override
     public Collection<SourceFile> generate(GradleWrapperState acc, ExecutionContext ctx) {
+        if (Boolean.FALSE.equals(addIfMissing)) {
+            return Collections.emptyList();
+        }
+
         if (!acc.needsWrapperUpdate) {
             return Collections.emptyList();
         }

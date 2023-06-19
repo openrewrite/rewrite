@@ -57,7 +57,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new UpdateGradleWrapper("7.4.2", null, null));
+        spec.recipe(new UpdateGradleWrapper("7.4.2", null, null, null));
     }
 
     @ParameterizedTest
@@ -136,6 +136,17 @@ class UpdateGradleWrapperTest implements RewriteTest {
               """,
             spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
           )
+        );
+    }
+
+    @Test
+    void dontAddMissingWrapper() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("7.x", null, null, Boolean.FALSE))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
+            .afterRecipe(run -> {
+                assertThat(run.getChangeset().getAllResults()).isEmpty();
+            })
         );
     }
 
