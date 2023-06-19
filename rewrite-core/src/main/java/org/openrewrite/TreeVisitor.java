@@ -361,8 +361,10 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return (T2) visit(tree, p);
     }
 
-    public Markers visitMarkers(Markers markers, P p) {
-        return markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> this.visitMarker(marker, p)));
+    public Markers visitMarkers(@Nullable Markers markers, P p) {
+        return markers == null ?
+                Markers.EMPTY :
+                markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> this.visitMarker(marker, p)));
     }
 
     public <M extends Marker> M visitMarker(Marker marker, P p) {
