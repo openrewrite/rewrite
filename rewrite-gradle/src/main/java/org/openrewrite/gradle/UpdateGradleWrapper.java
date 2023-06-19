@@ -77,7 +77,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
             description = "The URL of the repository to download the Gradle distribution from. Currently only supports " +
                           "repositories like services.gradle.org, not arbitrary maven or ivy repositories. " +
                           "Defaults to `https://services.gradle.org/versions/all`.",
-            example = "https://services.gradle.org/versions/all")
+            example = "https://services.gradle.org/versions/all",
+            required = false)
     @Nullable
     final String repositoryUrl;
 
