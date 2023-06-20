@@ -18,20 +18,20 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.config.Environment;
-import org.openrewrite.java.search.FindText;
+import org.openrewrite.java.search.FindComments;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Arrays;
 
 import static org.openrewrite.java.Assertions.java;
 
-class FindTextTest implements RewriteTest {
+class FindCommentsTest implements RewriteTest {
 
     @DocumentExample
     @Test
     void findText() {
         rewriteRun(
-          spec -> spec.recipe(new FindText(Arrays.asList("test", "12.*"))),
+          spec -> spec.recipe(new FindComments(Arrays.asList("test", "12.*"))),
           java(
             """
               // not this one

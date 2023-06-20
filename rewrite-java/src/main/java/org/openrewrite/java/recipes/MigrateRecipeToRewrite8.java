@@ -64,7 +64,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
     @Nullable
     private static J.MemberReference visitMemberReferenceTemplate;
 
-    public static final String MIGRATION_GUIDE_URL = "https://to-be-written";
+    public static final String MIGRATION_GUIDE_URL = "https://docs.openrewrite.org/changelog/8-1-2-release";
     private static final String PLEASE_FOLLOW_MIGRATION_GUIDE = "please follow the migration guide here: " + MigrateRecipeToRewrite8.MIGRATION_GUIDE_URL;
     private static final String VISIT_SOURCE_FILES_COMMENT = " [Rewrite8 migration] This recipe uses the visit multiple sources method " +
                                                              "`visit(List<SourceFile> before, P p)`, " +
