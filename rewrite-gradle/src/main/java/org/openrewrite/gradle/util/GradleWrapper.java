@@ -39,10 +39,10 @@ import static java.util.Objects.requireNonNull;
 
 @Value
 public class GradleWrapper {
-    static final String WRAPPER_JAR_LOCATION_RELATIVE_PATH = "gradle/wrapper/gradle-wrapper.jar";
-    static final String WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH = "gradle/wrapper/gradle-wrapper.properties";
-    static final String WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH = "gradlew";
-    static final String WRAPPER_BATCH_LOCATION_RELATIVE_PATH = "gradlew.bat";
+    public static final String WRAPPER_JAR_LOCATION_RELATIVE_PATH = "gradle/wrapper/gradle-wrapper.jar";
+    public static final String WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH = "gradle/wrapper/gradle-wrapper.properties";
+    public static final String WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH = "gradlew";
+    public static final String WRAPPER_BATCH_LOCATION_RELATIVE_PATH = "gradlew.bat";
 
     public static final Path WRAPPER_JAR_LOCATION = Paths.get(WRAPPER_JAR_LOCATION_RELATIVE_PATH);
     public static final Path WRAPPER_PROPERTIES_LOCATION = Paths.get(WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH);
