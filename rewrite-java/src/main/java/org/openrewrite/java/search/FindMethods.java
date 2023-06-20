@@ -20,10 +20,10 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaTypeMethodMatcher;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.table.MethodCalls;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
@@ -67,55 +67,10 @@ public class FindMethods extends Recipe {
     @SuppressWarnings("ConstantConditions")
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
-        return Preconditions.check(new UsesMethod<>(methodPattern, matchOverrides), new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                if (methodMatcher.matches(method)) {
-                    JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                    if (javaSourceFile != null) {
-                        methodCalls.insertRow(ctx, new MethodCalls.Row(
-                                javaSourceFile.getSourcePath().toString(),
-                                method.printTrimmed(getCursor())
-                        ));
-                    }
-                    m = SearchResult.found(m);
-                }
-                return m;
-            }
-
-            @Override
-            public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
-                J.MemberReference m = super.visitMemberReference(memberRef, ctx);
-                if (methodMatcher.matches(m.getMethodType())) {
-                    JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                    if (javaSourceFile != null) {
-                        methodCalls.insertRow(ctx, new MethodCalls.Row(
-                                javaSourceFile.getSourcePath().toString(),
-                                memberRef.printTrimmed(getCursor())
-                        ));
-                    }
-                    m = m.withReference(SearchResult.found(m.getReference()));
-                }
-                return m;
-            }
-
-            @Override
-            public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
-                J.NewClass n = super.visitNewClass(newClass, ctx);
-                if (methodMatcher.matches(newClass)) {
-                    JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                    if (javaSourceFile != null) {
-                        methodCalls.insertRow(ctx, new MethodCalls.Row(
-                                javaSourceFile.getSourcePath().toString(),
-                                newClass.printTrimmed(getCursor())
-                        ));
-                    }
-                    n = SearchResult.found(n);
-                }
-                return n;
-            }
-        });
+        return FindMethodsVisitor.createVisitor(
+                methodMatcher::matches,
+                methodCalls
+        );
     }
 
     public static Set<J> find(J j, String methodPattern) {
@@ -129,10 +84,13 @@ public class FindMethods extends Recipe {
      * @return A set of {@link J.MethodInvocation}, {@link J.MemberReference}, and {@link J.NewClass} representing calls to this method.
      */
     public static Set<J> find(J j, String methodPattern, boolean matchOverrides) {
-        FindMethods findMethods = new FindMethods(methodPattern, matchOverrides);
-        findMethods.methodCalls.setEnabled(false);
+        return find(j, new MethodMatcher(methodPattern, matchOverrides)::matches);
+    }
+
+    @Incubating(since = "8.1.3")
+    public static Set<J> find(J j, JavaTypeMethodMatcher simpleMethodMatcher) {
         return TreeVisitor.collect(
-                        findMethods.getVisitor(),
+                        FindMethodsVisitor.createVisitor(simpleMethodMatcher),
                         j,
                         new HashSet<>()
                 )
