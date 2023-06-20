@@ -485,7 +485,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
                               String packageText = pkg.getExpression().print(getCursor()).replaceAll("\\\\s", "");
                               String lowerCase = packageText.toLowerCase();
                               if(!packageText.equals(lowerCase)) {
-                                  // [Rewrite8 migration] Method `Recipe#doNext(..)` has been removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor#doAfterVisit`, please follow the migration guide here: https://to-be-written
+                                  // [Rewrite8 migration] Method `Recipe#doNext(..)` has been removed, you might want to change the recipe to be a scanning recipe, or just simply replace to use `TreeVisitor#doAfterVisit`, please follow the migration guide here: https://docs.openrewrite.org/changelog/8-1-2-release
                                   doNext(new ChangePackage(packageText, lowerCase, true));
                               }
                               return pkg;
@@ -542,7 +542,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
                       return "Fields in a `Serializable` class should either be transient or serializable";
                   }
 
-                  // [Rewrite8 migration] This recipe uses the visit multiple sources method `visit(List<SourceFile> before, P p)`, needs to be migrated to use new introduced scanning recipe, please follow the migration guide here: https://to-be-written
+                  // [Rewrite8 migration] This recipe uses the visit multiple sources method `visit(List<SourceFile> before, P p)`, needs to be migrated to use new introduced scanning recipe, please follow the migration guide here: https://docs.openrewrite.org/changelog/8-1-2-release
                   @Override
                   protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
                       return before;
@@ -628,7 +628,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
                   public String getDisplayName() {
                       return "Add RBAC rules";
                   }
-                  // [Rewrite8 migration] This getSingleSourceApplicableTest methods might have multiple returns, need manually migrate to use `Precondition#check()`, please follow the migration guide here: https://to-be-written
+                  // [Rewrite8 migration] This getSingleSourceApplicableTest methods might have multiple returns, need manually migrate to use `Precondition#check()`, please follow the migration guide here: https://docs.openrewrite.org/changelog/8-1-2-release
                   @Override
                   protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
                       if (fileMatcher != null) {

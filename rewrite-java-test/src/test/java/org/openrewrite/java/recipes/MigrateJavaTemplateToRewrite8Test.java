@@ -122,8 +122,8 @@ public class MigrateJavaTemplateToRewrite8Test implements RewriteTest {
                               String param2 = "test parameter 2";
                               List<Expression> currentArgs = a.getArguments();
                               if (currentArgs == null || currentArgs.isEmpty()) {
-                                  return JavaTemplate.builder("#{}")/*[Rewrite8 migration] contextSensitive() could be unnecessary and can be removed, please follow the migration guide*/.contextSensitive()
-                                          .build().apply(/*[Rewrite8 migration] getCursor() could be updateCursor() if J instance is udpated in this visit method, please follow the migration guide*/getCursor(),
+                                  return JavaTemplate.builder("#{}")/*[Rewrite8 migration] contextSensitive() could be unnecessary, please follow the migration guide*/.contextSensitive()
+                                          .build().apply(/*[Rewrite8 migration] getCursor() could be updateCursor() if the J instance is updated, or it should be updated to point to the correct cursor, please follow the migration guide*/getCursor(),
                                           a.getCoordinates().replaceArguments(),
                                           param1,
                                           param2);
@@ -222,9 +222,9 @@ public class MigrateJavaTemplateToRewrite8Test implements RewriteTest {
                               String param2 = "test parameter 2";
                               List<Expression> currentArgs = a.getArguments();
                               if (currentArgs == null || currentArgs.isEmpty()) {
-                                  JavaTemplate t = JavaTemplate.builder( "#{}")/*[Rewrite8 migration] contextSensitive() could be unnecessary and can be removed, please follow the migration guide*/.contextSensitive()
+                                  JavaTemplate t = JavaTemplate.builder( "#{}")/*[Rewrite8 migration] contextSensitive() could be unnecessary, please follow the migration guide*/.contextSensitive()
                                           .build();
-                                  return t.apply(/*[Rewrite8 migration] getCursor() could be updateCursor() if J instance is udpated in this visit method, please follow the migration guide*/getCursor(),
+                                  return t.apply(/*[Rewrite8 migration] getCursor() could be updateCursor() if the J instance is updated, or it should be updated to point to the correct cursor, please follow the migration guide*/getCursor(),
                                           a.getCoordinates().replaceArguments(),
                                           param1,
                                           param2);
