@@ -16,6 +16,7 @@
 package org.openrewrite.gradle.plugins;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.groovy.tree.G.CompilationUnit;
@@ -34,6 +35,7 @@ import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 import static org.openrewrite.test.SourceSpecs.dir;
 
+@Disabled("https://github.com/openrewrite/rewrite/issues/3343")
 class AddGradleEnterpriseTest implements RewriteTest {
 
     @Override

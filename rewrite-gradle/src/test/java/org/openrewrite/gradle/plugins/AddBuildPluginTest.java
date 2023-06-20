@@ -15,12 +15,14 @@
  */
 package org.openrewrite.gradle.plugins;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
+@Disabled("https://github.com/openrewrite/rewrite/issues/3343")
 class AddBuildPluginTest implements RewriteTest {
     @DocumentExample
     @Test

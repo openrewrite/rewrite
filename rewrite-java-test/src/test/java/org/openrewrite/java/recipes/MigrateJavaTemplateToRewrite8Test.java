@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.recipes;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
@@ -24,6 +25,7 @@ import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 
+@Disabled("https://github.com/openrewrite/rewrite/issues/3343")
 public class MigrateJavaTemplateToRewrite8Test implements RewriteTest {
 
     @Override

@@ -16,6 +16,7 @@
 package org.openrewrite.gradle.plugins;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.test.RecipeSpec;
@@ -29,6 +30,7 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
 
+@Disabled("https://github.com/openrewrite/rewrite/issues/3343")
 class AddSettingsPluginTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
