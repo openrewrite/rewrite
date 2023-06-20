@@ -15,11 +15,9 @@
  */
 package org.openrewrite.java.search;
 
-import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaTypeMethodMatcher;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
@@ -29,7 +27,7 @@ import org.openrewrite.marker.SearchResult;
 import static java.util.Objects.requireNonNull;
 
 public class DeclaresMethod<P> extends JavaIsoVisitor<P> {
-    private final JavaTypeMethodMatcher methodMatcher;
+    private final MethodMatcher methodMatcher;
 
     public DeclaresMethod(String methodPattern) {
         this(methodPattern, false);
@@ -44,11 +42,6 @@ public class DeclaresMethod<P> extends JavaIsoVisitor<P> {
     }
 
     public DeclaresMethod(MethodMatcher methodMatcher) {
-        this(methodMatcher::matches);
-    }
-
-    @Incubating(since = "8.1.3")
-    public DeclaresMethod(JavaTypeMethodMatcher methodMatcher) {
         this.methodMatcher = methodMatcher;
     }
 
