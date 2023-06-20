@@ -99,6 +99,29 @@ public class FindMissingTypes extends Recipe {
         }
 
         @Override
+        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+            J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
+            if (v == variable) {
+                JavaType.Variable variableType = v.getVariableType();
+                if (!isWellFormedType(variableType, seenTypes) && !isAllowedToHaveUnknownType(variable)) {
+                    v = SearchResult.found(v, "Variable type is missing or malformed");
+                } else if (variableType != null && !variableType.getName().equals(v.getSimpleName())) {
+                    v = SearchResult.found(v, "type information has a different variable name '" + variableType.getName() + "'");
+                }
+            }
+            return v;
+        }
+
+        private boolean isAllowedToHaveUnknownType(J.VariableDeclarations.NamedVariable variable) {
+            Cursor parent = getCursor().getParent();
+            while (parent != null && parent.getParent() != null && !(parent.getParentTreeCursor().getValue() instanceof J.ClassDeclaration)) {
+                parent = parent.getParentTreeCursor();
+            }
+            // If the variable is declared in a class initializer, then it's allowed to have unknown type
+            return parent != null && parent.getValue() instanceof J.Block;
+        }
+
+        @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
             // If one of the method's arguments or type parameters is missing type, then the invocation very likely will too

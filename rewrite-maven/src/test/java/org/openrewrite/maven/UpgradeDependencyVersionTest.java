@@ -25,7 +25,11 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Collections;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
@@ -824,14 +828,19 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   </dependencies>
               </project>
               """,
-            """
+            spec -> spec.after(after -> {
+                Matcher matcher = Pattern.compile("<spring\\.version>(.+)</spring\\.version>").matcher(after);
+                assertTrue(matcher.find());
+                String springVersion = matcher.group(1);
+                assertNotEquals("5.3.4", springVersion);
+                return """
               <project>
                   <groupId>org.openrewrite.example</groupId>
                   <artifactId>my-app-server</artifactId>
                   <version>1</version>
                   <properties>
                       <guava.version>28.0-jre</guava.version>
-                      <spring.version>5.3.28</spring.version>
+                      <spring.version>%s</spring.version>
                       <spring.artifact-id>spring-jdbc</spring.artifact-id>
                   </properties>
                   <dependencies>
@@ -852,7 +861,8 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                       </dependency>
                   </dependencies>
               </project>
-              """
+              """.formatted(springVersion);
+            })
           )
         );
     }

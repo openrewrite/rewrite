@@ -77,9 +77,16 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
             description = "The URL of the repository to download the Gradle distribution from. Currently only supports " +
                           "repositories like services.gradle.org, not arbitrary maven or ivy repositories. " +
                           "Defaults to `https://services.gradle.org/versions/all`.",
-            example = "https://services.gradle.org/versions/all")
+            example = "https://services.gradle.org/versions/all",
+            required = false)
     @Nullable
     final String repositoryUrl;
+
+    @Option(displayName = "Add if missing",
+            description = "Add a Gradle wrapper, if it's missing. Defaults to `true`.",
+            required = false)
+    @Nullable
+    final Boolean addIfMissing;
 
     @NonFinal
     transient Validated<GradleWrapper> gradleWrapperValidation;
@@ -155,6 +162,10 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
     @Override
     public Collection<SourceFile> generate(GradleWrapperState acc, ExecutionContext ctx) {
+        if (Boolean.FALSE.equals(addIfMissing)) {
+            return Collections.emptyList();
+        }
+
         if (!acc.needsWrapperUpdate) {
             return Collections.emptyList();
         }
@@ -226,7 +237,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             .orElse(sourceFile);
                 }
 
-                if (sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
+                if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH)) {
                     PlainText gradlew = (PlainText) setExecutable(sourceFile);
                     String gradlewText = StringUtils.readFully(requireNonNull(UpdateGradleWrapper.class.getResourceAsStream("/gradlew")),
                             sourceFile.getCharset() == null ? StandardCharsets.UTF_8 : sourceFile.getCharset());
@@ -235,7 +246,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     }
                     return gradlew;
                 }
-                if (sourceFile instanceof PlainText && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_BATCH_LOCATION)) {
+                if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_BATCH_LOCATION_RELATIVE_PATH)) {
                     PlainText gradlewBat = (PlainText) setExecutable(sourceFile);
                     String gradlewBatText = StringUtils.readFully(requireNonNull(UpdateGradleWrapper.class.getResourceAsStream("/gradlew.bat")),
                             sourceFile.getCharset() == null ? StandardCharsets.UTF_8 : sourceFile.getCharset());
@@ -244,10 +255,10 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     }
                     return gradlewBat;
                 }
-                if (sourceFile instanceof Properties.File && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_PROPERTIES_LOCATION)) {
+                if (sourceFile instanceof Properties.File && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH)) {
                     return new WrapperPropertiesVisitor(gradleWrapper).visitNonNull(sourceFile, ctx);
                 }
-                if (sourceFile instanceof Quark && equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_JAR_LOCATION)) {
+                if (sourceFile instanceof Quark && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH)) {
                     return gradleWrapper.asRemote().withId(sourceFile.getId()).withMarkers(sourceFile.getMarkers());
                 }
                 return sourceFile;

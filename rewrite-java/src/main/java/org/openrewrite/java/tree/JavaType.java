@@ -23,6 +23,7 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 
 import java.util.*;
 import java.util.function.Function;
@@ -30,7 +31,6 @@ import java.util.regex.Pattern;
 
 import static java.util.Collections.*;
 import static org.openrewrite.internal.ListUtils.nullIfEmpty;
-import static org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder.TO_STRING;
 import static org.openrewrite.java.tree.TypeUtils.unknownIfNull;
 
 @SuppressWarnings("unused")
@@ -479,7 +479,7 @@ public interface JavaType {
 
         @Override
         public String toString() {
-            return TO_STRING.signature(this);
+            return new DefaultJavaTypeSignatureBuilder().signature(this);
         }
     }
 
@@ -640,7 +640,7 @@ public interface JavaType {
 
         @Override
         public String toString() {
-            return TO_STRING.signature(this);
+            return new DefaultJavaTypeSignatureBuilder().signature(this);
         }
     }
 
@@ -709,7 +709,7 @@ public interface JavaType {
 
         @Override
         public String toString() {
-            return TO_STRING.signature(this);
+            return new DefaultJavaTypeSignatureBuilder().signature(this);
         }
 
         public enum Variance {
@@ -760,7 +760,7 @@ public interface JavaType {
 
         @Override
         public String toString() {
-            return TO_STRING.signature(this);
+            return new DefaultJavaTypeSignatureBuilder().signature(this);
         }
     }
 
@@ -1115,7 +1115,7 @@ public interface JavaType {
 
         @Override
         public String toString() {
-            return TO_STRING.methodSignature(this);
+            return new DefaultJavaTypeSignatureBuilder().methodSignature(this);
         }
 
     }
@@ -1210,7 +1210,7 @@ public interface JavaType {
 
         @Override
         public String toString() {
-            return TO_STRING.variableSignature(this);
+            return new DefaultJavaTypeSignatureBuilder().variableSignature(this);
         }
     }
 
