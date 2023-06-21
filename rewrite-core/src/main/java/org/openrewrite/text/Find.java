@@ -63,6 +63,21 @@ public class Find extends Recipe {
     @Nullable
     Boolean caseInsensitive;
 
+    @Option(displayName = "Regex Multiline Mode",
+            description = "When performing a regex search setting this to `true` allows \"^\" and \"$\" to match the beginning and end of lines, respectively. " +
+                          "When performing a regex search when this is `false` \"^\" and \"$\" will match only the beginning and ending of the entire source file, respectively." +
+                          "Has no effect when not performing a regex search. Default `false`.",
+            required = false)
+    @Nullable
+    Boolean multiline;
+
+    @Option(displayName = "Regex Dot All",
+            description = "When performing a regex search setting this to `true` allows \".\" to match line terminators." +
+                          "Has no effect when not performing a regex search. Default `false`.",
+            required = false)
+    @Nullable
+    Boolean dotAll;
+
     @Option(displayName = "File pattern",
             description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
                           "When not set, all source files are searched.",
@@ -88,6 +103,12 @@ public class Find extends Recipe {
                 int patternOptions = 0;
                 if(Boolean.TRUE.equals(caseInsensitive)) {
                     patternOptions |= Pattern.CASE_INSENSITIVE;
+                }
+                if(Boolean.TRUE.equals(multiline)) {
+                    patternOptions |= Pattern.MULTILINE;
+                }
+                if(Boolean.TRUE.equals(dotAll)) {
+                    patternOptions |= Pattern.DOTALL;
                 }
                 Pattern pattern = Pattern.compile(searchStr, patternOptions);
                 Matcher matcher = pattern.matcher(plainText.getText());
