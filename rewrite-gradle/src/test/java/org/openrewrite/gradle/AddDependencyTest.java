@@ -16,7 +16,6 @@
 package org.openrewrite.gradle;
 
 import org.intellij.lang.annotations.Language;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -37,7 +36,6 @@ import static org.openrewrite.groovy.Assertions.srcMainGroovy;
 import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.properties.Assertions.properties;
 
-@Disabled("https://github.com/openrewrite/rewrite/issues/3343")
 class AddDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {

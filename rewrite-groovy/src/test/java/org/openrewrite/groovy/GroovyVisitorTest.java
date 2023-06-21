@@ -15,7 +15,6 @@
  */
 package org.openrewrite.groovy;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.groovy.tree.G;
@@ -24,7 +23,6 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@Disabled("https://github.com/openrewrite/rewrite/issues/3343")
 class GroovyVisitorTest implements RewriteTest {
 
     @DocumentExample
