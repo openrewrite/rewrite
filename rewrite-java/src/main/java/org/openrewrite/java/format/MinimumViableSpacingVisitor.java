@@ -21,10 +21,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.ImplicitReturn;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JContainer;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 
 @RequiredArgsConstructor
 public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
@@ -130,8 +127,13 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
 
         if (m.getReturnTypeExpression() != null && m.getReturnTypeExpression().getPrefix().getWhitespace().isEmpty()) {
             if (!first) {
-                m = m.withReturnTypeExpression(m.getReturnTypeExpression()
-                        .withPrefix(m.getReturnTypeExpression().getPrefix().withWhitespace(" ")));
+                TypeTree returnTypeExpression = m.getReturnTypeExpression();
+                // If it's a J.AnnotatedType, because the first annotation has its prefix, so don't need to set the
+                // prefix again to avoid two spaces.
+                if (!(returnTypeExpression instanceof J.AnnotatedType)) {
+                    m = m.withReturnTypeExpression(returnTypeExpression
+                        .withPrefix(returnTypeExpression.getPrefix().withWhitespace(" ")));
+                }
             }
             first = false;
         }
