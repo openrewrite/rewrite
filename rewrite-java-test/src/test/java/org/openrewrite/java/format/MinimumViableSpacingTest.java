@@ -180,6 +180,21 @@ class MinimumViableSpacingTest implements RewriteTest {
                   public @Deprecated String method() {
                       return "name";
                   }
+
+                  public    @Deprecated String method2() {
+                      return "name";
+                  }
+              }
+              """,
+            """
+              class A {
+                  public @Deprecated String method() {
+                      return "name";
+                  }
+
+                  public @Deprecated String method2() {
+                      return "name";
+                  }
               }
               """
           )

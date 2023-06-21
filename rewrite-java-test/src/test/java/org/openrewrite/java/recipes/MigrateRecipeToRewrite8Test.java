@@ -121,7 +121,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
                   private static class RenameNonCompliantNames extends JavaIsoVisitor<ExecutionContext> {
 
                       @Override
-                      public  @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                      public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                           if (tree instanceof JavaSourceFile) {
                               JavaSourceFile cu = (JavaSourceFile) tree;
                               Map<J.VariableDeclarations.NamedVariable, String> renameVariablesMap = new LinkedHashMap<>();
@@ -285,7 +285,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
                   private static final String MAYBE_AUTO_FORMAT_ME = "MAYBE_AUTO_FORMAT_ME";
 
                   @Override
-                  public  @Nullable J visit(@Nullable Tree tree, P p) {
+                  public @Nullable J visit(@Nullable Tree tree, P p) {
                       if (tree instanceof JavaSourceFile) {
                           JavaSourceFile cu = (JavaSourceFile) tree;
                           JavaSourceFile c = visitAndCast(cu, p, super::visit);
@@ -390,7 +390,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
 
                       return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {
                           @Override
-                          public  @Nullable J visit(@Nullable Tree tree, ExecutionContext executionContext) {
+                          public @Nullable J visit(@Nullable Tree tree, ExecutionContext executionContext) {
                               if (tree instanceof JavaSourceFile) {
                                   JavaSourceFile cu = (JavaSourceFile) tree;
                                   doAfterVisit(new UsesType<>("javax.annotation.CheckForNull", false));
@@ -400,7 +400,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
                           }
                       }, new JavaIsoVisitor<ExecutionContext>() {
                           @Override
-                          public  @Nullable J visit(@Nullable Tree tree, ExecutionContext executionContext) {
+                          public @Nullable J visit(@Nullable Tree tree, ExecutionContext executionContext) {
                               if (tree instanceof JavaSourceFile) {
                                   JavaSourceFile cu = (JavaSourceFile) tree;
                                   JavaSourceFile c = (JavaSourceFile) super.visit(cu, executionContext);
