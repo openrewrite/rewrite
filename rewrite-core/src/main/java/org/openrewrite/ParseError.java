@@ -23,7 +23,6 @@ import org.openrewrite.marker.Markers;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.UUID;
 
 import static java.util.Collections.singletonList;
@@ -57,6 +56,11 @@ public class ParseError implements SourceFile {
         return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
     }
 
+    @Override
+    public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
+        return new ParseErrorPrinter<>();
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public SourceFile withCharset(Charset charset) {
@@ -77,7 +81,13 @@ public class ParseError implements SourceFile {
 
     @Override
     public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return true;
+        return v.isAdaptableTo(ParseErrorVisitor.class);
+    }
+
+    @Override
+    public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+        //noinspection unchecked
+        return (R) v.adapt(ParseErrorVisitor.class).visitParseError(this, p);
     }
 
     public static ParseError build(Parser parser,

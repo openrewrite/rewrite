@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.text.PlainTextParser;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import static java.nio.charset.StandardCharsets.ISO_8859_1;
@@ -37,5 +38,16 @@ class ParserTest implements RewriteTest {
                                 assertThat(txt.getCharset()).isEqualTo(ISO_8859_1))
                 )
         );
+    }
+
+    @Test
+    void canPrintParseError() {
+        ParseError pe = ParseError.build(new PlainTextParser(),
+          Parser.Input.fromString("bad file"),
+          null,
+          new InMemoryExecutionContext(),
+          new RuntimeException("bad file!!"));
+
+        assertThat(pe.printAll()).isEqualTo("bad file");
     }
 }
