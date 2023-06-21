@@ -28,7 +28,7 @@ class FindTest implements RewriteTest {
     @Test
     void regex() {
         rewriteRun(
-          spec -> spec.recipe(new Find("[T\\s]", true, null,null)),
+          spec -> spec.recipe(new Find("[T\\s]", true, null, null, null, null)),
           text(
             """
               This is\ttext.
@@ -42,38 +42,38 @@ class FindTest implements RewriteTest {
 
     @Test
     void plainText() {
-      rewriteRun(
-        spec -> spec.recipe(new Find("\\s", null,  null,null)),
-        text(
-          """
-            This i\\s text.
-            """,
-          """
-            This i~~>\\s text.
+        rewriteRun(
+          spec -> spec.recipe(new Find("\\s", null, null, null, null, null)),
+          text(
             """
-        )
-      );
+              This i\\s text.
+              """,
+            """
+              This i~~>\\s text.
+              """
+          )
+        );
     }
 
     @Test
     void caseInsensitive() {
-      rewriteRun(
-        spec -> spec.recipe(new Find("text", null,  true,"**/foo/**")),
-        dir("foo",
-          text(
-            """
-              TEXT
-              """,
-            """
-              ~~>TEXT
+        rewriteRun(
+          spec -> spec.recipe(new Find("text", null, true, null, null, "**/foo/**")),
+          dir("foo",
+            text(
               """
+                TEXT
+                """,
+              """
+                ~~>TEXT
+                """
+            )
+          ),
+          dir("bar",
+            text("""
+              TEXT
+              """)
           )
-        ),
-        dir("bar",
-          text("""
-            TEXT
-            """)
-        )
-      );
+        );
     }
 }
