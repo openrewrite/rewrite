@@ -17,6 +17,7 @@ package org.openrewrite.gradle;
 
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -58,11 +59,13 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         return "Update the version of Gradle used in an existing Gradle wrapper.";
     }
 
+    @Getter
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number.",
             example = "7.x")
     final String version;
 
+    @Getter
     @Option(displayName = "Distribution type",
             description = "The distribution of Gradle to use. \"bin\" includes Gradle binaries. " +
                           "\"all\" includes Gradle binaries, source code, and documentation. " +
@@ -73,6 +76,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Nullable
     final String distribution;
 
+    @Getter
     @Option(displayName = "Repository URL",
             description = "The URL of the repository to download the Gradle distribution from. Currently only supports " +
                           "repositories like services.gradle.org, not arbitrary maven or ivy repositories. " +
@@ -82,6 +86,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Nullable
     final String repositoryUrl;
 
+    @Getter
     @Option(displayName = "Add if missing",
             description = "Add a Gradle wrapper, if it's missing. Defaults to `true`.",
             required = false)
