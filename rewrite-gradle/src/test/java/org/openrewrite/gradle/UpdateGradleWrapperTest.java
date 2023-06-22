@@ -200,6 +200,48 @@ class UpdateGradleWrapperTest implements RewriteTest {
         );
     }
 
+    /**
+     * In Gradle 6.6+, the wrapper jar moved from `gradle-{version}/lib/plugins/gradle-plugins-{version}.jar!gradle-wrapper.jar`
+     * to `gradle-{version}/lib/gradle-wrapper-{version}.jar!gradle-wrapper.jar`.
+     */
+    @Test
+    void olderThan6_6() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper("5.6.4", null, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "4.0")))
+            .afterRecipe(run -> {
+                var gradleSh = result(run, PlainText.class, "gradlew");
+                assertThat(gradleSh.getText()).isNotBlank();
+
+                var gradleBat = result(run, PlainText.class, "gradlew.bat");
+                assertThat(gradleBat.getText()).isNotBlank();
+
+                var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
+                assertThat(PathUtils.equalIgnoringSeparators(gradleWrapperJar.getSourcePath(), WRAPPER_JAR_LOCATION)).isTrue();
+                assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-5.6.4-bin.zip"));
+                assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
+            }),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-4.0-all.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-5.6.4-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              distributionSha256Sum=1f3067073041bc44554d0efe5d402a33bc3d3c93cc39ab684f308586d732a80d
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          )
+        );
+    }
+
     private <S extends SourceFile> S result(RecipeRun run, Class<S> clazz, String endsWith) {
         return run.getChangeset().getAllResults().stream()
           .map(Result::getAfter)

@@ -119,7 +119,7 @@ public class GradleWrapper {
         return Remote.builder(
                 WRAPPER_JAR_LOCATION,
                 URI.create(distributionInfos.getDownloadUrl())
-        ).build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar", "gradle-wrapper.jar");
+        ).build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-(plugins|wrapper)-(?!shared).*\\.jar", "gradle-wrapper.jar");
     }
 
     public enum DistributionType {
