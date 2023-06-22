@@ -61,36 +61,45 @@ public class RecipeScheduler {
             // single source applicable tests so that data can be shared at the root (especially for caching
             // use cases like sharing a `JavaTypeCache` between `JavaTemplate` parsers).
             Cursor rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
+            try {
+                RecipeRunCycle cycle = new RecipeRunCycle(recipe, i, rootCursor, ctxWithWatch,
+                        recipeRunStats, sourceFileResults, errorsTable);
 
-            RecipeRunCycle cycle = new RecipeRunCycle(recipe, i, rootCursor, ctxWithWatch,
-                    recipeRunStats, sourceFileResults, errorsTable);
-
-            // pre-transformation scanning phase where there can only be modifications to capture exceptions
-            // occurring during the scanning phase
-            if (hasScanningRecipe(recipe)) {
-                after = cycle.scanSources(after, i);
-            }
-
-            // transformation phases
-            after = cycle.generateSources(after, i);
-            after = cycle.editSources(after, i);
-
-            boolean anyRecipeCausingAnotherCycle = false;
-            for (Recipe madeChanges : cycle.madeChangesInThisCycle) {
-                if (madeChanges.causesAnotherCycle()) {
-                    anyRecipeCausingAnotherCycle = true;
+                // pre-transformation scanning phase where there can only be modifications to capture exceptions
+                // occurring during the scanning phase
+                if (hasScanningRecipe(recipe)) {
+                    after = cycle.scanSources(after, i);
                 }
-            }
 
-            if (i >= minCycles &&
-                ((cycle.madeChangesInThisCycle.isEmpty() && !ctxWithWatch.hasNewMessages()) &&
-                 !anyRecipeCausingAnotherCycle)) {
-                after.afterCycle(true);
-                break;
-            }
+                // transformation phases
+                after = cycle.generateSources(after, i);
+                after = cycle.editSources(after, i);
 
-            after.afterCycle(i == maxCycles);
-            ctxWithWatch.resetHasNewMessages();
+                boolean anyRecipeCausingAnotherCycle = false;
+                for (Recipe madeChanges : cycle.madeChangesInThisCycle) {
+                    if (madeChanges.causesAnotherCycle()) {
+                        anyRecipeCausingAnotherCycle = true;
+                    }
+                }
+
+                if (i >= minCycles &&
+                    ((cycle.madeChangesInThisCycle.isEmpty() && !ctxWithWatch.hasNewMessages()) &&
+                     !anyRecipeCausingAnotherCycle)) {
+                    after.afterCycle(true);
+                    break;
+                }
+
+                after.afterCycle(i == maxCycles);
+                ctxWithWatch.resetHasNewMessages();
+            } finally {
+                // Clear any messages that were added to the root cursor during the cycle. This is important
+                // to avoid leaking memory in the case when a recipe defines a static TreeVisitor. That
+                // TreeVisitor will still contain a reference to this rootCursor and any messages in it
+                // after recipe execution completes. The pattern of holding a static TreeVisitor isn't
+                // recommended, but isn't possible for us to guard against at an API level, and so we are
+                // defensive about memory consumption here.
+                rootCursor.clearMessages();
+            }
         }
 
         recipeRunStats.flush(ctx);
