@@ -40,10 +40,7 @@ import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
-import org.openrewrite.semver.DependencyMatcher;
-import org.openrewrite.semver.LatestPatch;
-import org.openrewrite.semver.Semver;
-import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.semver.*;
 
 import java.util.*;
 
@@ -407,6 +404,10 @@ public class UpgradeDependencyVersion extends Recipe {
             return null;
         }
 
+        if (versionComparator instanceof ExactVersion) {
+            return versionComparator.upgrade(version, Collections.singletonList(newVersion)).orElse(null);
+        }
+
         try {
             MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, repositories, ctx));
             List<String> versions = new ArrayList<>();
@@ -422,7 +423,7 @@ public class UpgradeDependencyVersion extends Recipe {
         }
     }
 
-    public MavenMetadata downloadMetadata(String groupId, String artifactId, List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
+    private MavenMetadata downloadMetadata(String groupId, String artifactId, List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
         return new MavenPomDownloader(emptyMap(), ctx, null, null)
                 .downloadMetadata(new GroupArtifact(groupId, artifactId), null,
                         repositories);
