@@ -2301,13 +2301,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         Space prefix = sourceBefore("this");
-
-        return new J.Identifier(randomId(),
+        J.Identifier label = null;
+        if (thisReceiverExpression.getCalleeReference().getLabelName() != null) {
+            skip("@");
+            label = createIdentifier(thisReceiverExpression.getCalleeReference().getLabelName(), thisReceiverExpression.getCalleeReference().getBoundSymbol().getFir());
+        }
+        return new K.KThis(randomId(),
                 prefix,
                 Markers.EMPTY,
-                "this",
-                typeMapping.type(thisReceiverExpression),
-                null);
+                label,
+                typeMapping.type(thisReceiverExpression)
+        );
     }
 
     @Override

@@ -149,6 +149,20 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitKThis(K.KThis kThis, PrintOutputCapture<P> p) {
+        beforeSyntax(kThis, KSpace.Location.KTHIS_PREFIX, p);
+
+        p.append("this");
+        if (kThis.getLabel() != null) {
+            p.append("@");
+            visit(kThis.getLabel(), p);
+        }
+
+        afterSyntax(kThis, p);
+        return kThis;
+    }
+
+    @Override
     public J visitKStringValue(K.KString.Value value, PrintOutputCapture<P> p) {
         beforeSyntax(value, KSpace.Location.KSTRING_PREFIX, p);
         if (value.isEnclosedInBraces()) {

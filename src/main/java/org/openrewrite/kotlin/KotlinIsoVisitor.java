@@ -53,6 +53,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
+    public K.KThis visitKThis(K.KThis kThis, P p) {
+        return (K.KThis) super.visitKThis(kThis, p);
+    }
+
+    @Override
     public K.ListLiteral visitListLiteral(K.ListLiteral listLiteral, P p) {
         return (K.ListLiteral) super.visitListLiteral(listLiteral, p);
     }

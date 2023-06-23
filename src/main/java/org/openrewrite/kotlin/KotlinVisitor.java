@@ -104,6 +104,20 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return k;
     }
 
+    public J visitKThis(K.KThis kThis, P p) {
+        K.KThis k = kThis;
+        k = k.withPrefix(visitSpace(k.getPrefix(), KSpace.Location.KTHIS_PREFIX, p));
+        k = k.withMarkers(visitMarkers(k.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(k, p);
+        if (!(temp instanceof K.KThis)) {
+            return temp;
+        } else {
+            k = (K.KThis) temp;
+        }
+        k = k.withType(visitType(k.getType(), p));
+        return k;
+    }
+
     public J visitKStringValue(K.KString.Value value, P p) {
         K.KString.Value v = value;
         v = v.withMarkers(visitMarkers(v.getMarkers(), p));

@@ -491,4 +491,20 @@ class MethodInvocationTest implements RewriteTest {
               """)
         );
     }
+
+    @Test
+    void qualifiedThis() {
+        rewriteRun(
+          kotlin(
+            """
+              class A {
+                  inner class B {
+                      val a = this@A
+                      val b = this@B
+                  }
+              }
+              """
+          )
+        );
+    }
 }
