@@ -331,6 +331,7 @@ public class KotlinParser implements Parser {
                 new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :
                 MessageCollector.Companion.getNONE());
 
+        // TODO: Allow language version to be configurable.
         compilerConfiguration.put(LANGUAGE_VERSION_SETTINGS, new LanguageVersionSettingsImpl(LanguageVersion.KOTLIN_1_7, ApiVersion.KOTLIN_1_7));
 
         compilerConfiguration.put(USE_FIR, true);
