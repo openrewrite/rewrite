@@ -705,6 +705,10 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                         } else {
                             resolvedDeclaringType = TypeUtils.asFullyQualified(type(convertKotlinFqToJavaFq(source.getClassName().toString())));
                         }
+                    } else if (!resolvedSymbol.getFir().getOrigin().getGenerated() &&
+                            !resolvedSymbol.getFir().getOrigin().getFromSupertypes() &&
+                            !resolvedSymbol.getFir().getOrigin().getFromSource()) {
+                        resolvedDeclaringType = TypeUtils.asFullyQualified(type("kotlin.Library"));
                     }
                 } else if (resolvedSymbol.getOrigin() == FirDeclarationOrigin.Source.INSTANCE && ownerSymbol != null) {
                     if (ownerSymbol instanceof FirFileSymbol) {

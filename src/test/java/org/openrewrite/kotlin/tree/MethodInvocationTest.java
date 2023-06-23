@@ -452,4 +452,43 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/131")
+    @Test
+    void spreadArgumentMethodInvocation() {
+        rewriteRun(
+          kotlin(
+            """
+              package foo.bar
+              fun format ( vararg params : String ) { }
+              """
+          ),
+          kotlin(
+            """
+              fun test ( ) {
+                foo . bar . format ( * arrayOf ( "foo" , "bar" ) )
+              }
+              """)
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/131")
+    @Test
+    void spreadArgumentProperty() {
+        rewriteRun(
+          kotlin(
+            """
+              package foo.bar
+              fun format ( first: String, vararg params : String ) { }
+              """
+          ),
+          kotlin(
+            """
+              fun test ( ) {
+                val x = arrayOf ( "foo" , "bar" )
+                foo . bar . format ( "" , * x )
+              }
+              """)
+        );
+    }
 }

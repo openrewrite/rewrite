@@ -531,6 +531,10 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
                         } else {
                             owner = convertKotlinFqToJavaFq(source.getClassName().toString());
                         }
+                    } else if (!resolvedSymbol.getFir().getOrigin().getFromSource() &&
+                            !resolvedSymbol.getFir().getOrigin().getFromSupertypes() &&
+                            !resolvedSymbol.getFir().getOrigin().getGenerated()) {
+                        owner = "kotlin.Library";
                     }
                 } else if (resolvedSymbol.getOrigin() == FirDeclarationOrigin.Source.INSTANCE && ownerSymbol != null) {
                     if (ownerSymbol instanceof FirFileSymbol) {

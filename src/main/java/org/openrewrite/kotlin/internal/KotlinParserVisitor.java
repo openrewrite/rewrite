@@ -3527,7 +3527,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitSpreadArgumentExpression(FirSpreadArgumentExpression spreadArgumentExpression, ExecutionContext ctx) {
-        throw new UnsupportedOperationException(generateUnsupportedMessage("FirSpreadArgumentExpression"));
+        if (!spreadArgumentExpression.isSpread()) {
+            // A spread argument without a spread operator?
+            throw new UnsupportedOperationException("Only spread arguments are supported");
+        }
+        Space prefix = whitespace();
+        skip("*");
+        J j = visitElement(spreadArgumentExpression.getExpression(), ctx);
+        return j.withMarkers(j.getMarkers().addIfAbsent(new SpreadArgument(randomId(), prefix)));
     }
 
     @Override

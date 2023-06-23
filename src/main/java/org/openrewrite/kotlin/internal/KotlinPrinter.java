@@ -652,6 +652,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.append(',');
                 }
 
+                SpreadArgument spread = arg.getElement().getMarkers().findFirst(SpreadArgument.class).orElse(null);
+                if (spread != null) {
+                    KotlinPrinter.this.visitSpace(spread.getPrefix(), KSpace.Location.SPREAD_ARGUMENT_PREFIX, p);
+                    p.append("*");
+                }
                 visitRightPadded(arg, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT, p);
 
                 if (i == args.size() - 1 && !omitParensOnMethod) {
