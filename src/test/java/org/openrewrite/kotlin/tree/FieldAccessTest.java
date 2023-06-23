@@ -169,4 +169,21 @@ class FieldAccessTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/133")
+    @Test
+    void qualifiedThis() {
+        rewriteRun(
+          kotlin(
+            """
+              class A {
+                  inner class B {
+                      val a = this@A
+                      val b = this@B
+                  }
+              }
+              """
+          )
+        );
+    }
 }
