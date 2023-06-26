@@ -377,7 +377,7 @@ class VariableDeclarationTest implements RewriteTest {
           kotlin("""
             fun foo() {
                 val l = listOf ( "x" )
-                val a = l[0] !!
+                val a = l [ 0 ] !!
             }
             """)
         );
