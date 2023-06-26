@@ -371,6 +371,7 @@ class VariableDeclarationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/135")
     @Test
     void checkNonNull() {
         rewriteRun(
