@@ -34,6 +34,7 @@ import org.openrewrite.marker.Markers;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.UnaryOperator;
 
 public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
@@ -107,6 +108,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         visitSpace(binary.getAfter(), KSpace.Location.BINARY_SUFFIX, p);
         if (binary.getOperator() == K.Binary.Type.Get) {
             p.append("]");
+            Optional<CheckNotNull> maybeCheckNotNullMarker = binary.getMarkers().findFirst(CheckNotNull.class);
+            if (maybeCheckNotNullMarker.isPresent()) {
+                visitSpace(maybeCheckNotNullMarker.get().getPrefix(), Space.Location.UNKNOWN_PREFIX, p);
+                p.append("!!");
+            }
         }
         return binary;
     }

@@ -370,4 +370,17 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void nonNull() {
+        rewriteRun(
+          kotlin("""
+            fun foo() {
+                val l = listOf("x")
+                val a = l[0] !!
+            }
+            """)
+        );
+    }
+
 }
