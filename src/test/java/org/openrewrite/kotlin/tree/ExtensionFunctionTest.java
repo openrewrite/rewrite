@@ -29,7 +29,7 @@ class ExtensionFunctionTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun String.escape() = this.replace("a", "b")"
+              fun String . escape ( ) = this . replace ( "a" , "b" )"
               """
           )
         );
