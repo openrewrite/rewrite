@@ -961,7 +961,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             String operatorName = functionCall.getCalleeReference().getName().asString();
             if (isUnaryOperation(operatorName)) {
                 j = mapUnaryOperation(functionCall);
-            } else if ("contains".equals(operatorName) || "rangeTo".equals(operatorName) || "get".equals(operatorName)) {
+            } else if ("contains".equals(operatorName) || "rangeTo".equals(operatorName) || "get".equals(operatorName) || "set".equals(operatorName)) {
                 j = mapKotlinBinaryOperation(functionCall);
             } else {
                 j = mapBinaryOperation(functionCall);
@@ -1340,6 +1340,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             right = (Expression) visitElement(functionCall.getExplicitReceiver(), ctx);
 
         } else if ("get".equals(name)) {
+            // TODO: Check if the function call may be safely changed to a J.ArrayAccess. Note: must cover not null checks: `!!`.
             left = (Expression) visitElement(functionCall.getExplicitReceiver(), ctx);
 
             opPrefix = sourceBefore("[");
@@ -1348,6 +1349,38 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             right = (Expression) visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
 
             after = sourceBefore("]");
+        } else if ("set".equals(name)) {
+            // Note: the kotlin set function call is converted to a J.Assignment and may be an issue in Kotlin recipes in the future.
+            left = (Expression) visitElement(functionCall.getExplicitReceiver(), ctx);
+            left = new J.ArrayAccess(
+                    randomId(),
+                    left.getPrefix(),
+                    Markers.EMPTY,
+                    left.withPrefix(EMPTY),
+                    new J.ArrayAccess.ArrayDimension(
+                            randomId(),
+                            sourceBefore("["),
+                            Markers.EMPTY,
+                            padRight((Expression) visitElement(functionCall.getArgumentList().getArguments().get(0), ctx), sourceBefore("]"))
+                    ),
+                    typeMapping.type(typeMapping.type(functionCall.getArgumentList().getArguments().get(1))));
+
+            Space before = whitespace();
+            if (source.startsWith("=", cursor)) {
+                skip("=");
+            } else {
+                // Check for syntax de-sugaring.
+                throw new UnsupportedOperationException("Unsupported set operator type.");
+            }
+
+            return new J.Assignment(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    left,
+                    padLeft(before, (Expression) visitElement(functionCall.getArgumentList().getArguments().get(1), ctx)),
+                    typeMapping.type(functionCall.getArgumentList().getArguments().get(1))
+            );
         } else {
             left = (Expression) visitElement(functionCall.getExplicitReceiver(), ctx);
 
