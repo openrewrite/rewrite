@@ -110,7 +110,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             p.append("]");
             Optional<CheckNotNull> maybeCheckNotNullMarker = binary.getMarkers().findFirst(CheckNotNull.class);
             if (maybeCheckNotNullMarker.isPresent()) {
-                visitSpace(maybeCheckNotNullMarker.get().getPrefix(), Space.Location.UNKNOWN_PREFIX, p);
+                visitSpace(maybeCheckNotNullMarker.get().getPrefix(), KSpace.Location. CHECK_NOT_NULL_PREFIX, p);
                 p.append("!!");
             }
         }
