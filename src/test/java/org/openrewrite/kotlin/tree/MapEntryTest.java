@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -29,6 +30,21 @@ class MapEntryTest implements RewriteTest {
             """
               val a = mapOf ( 1 to "one" , 2 to "two" )
               val b = a [ 1 ]
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/136")
+    @Test
+    void mapSetFunctionCall() {
+        rewriteRun(
+          kotlin(
+            """
+              fun foo() {
+                  val a = mutableMapOf ( 1 to "one" , 2 to "two" )
+                  a [ 1 ] = "three"
+              }
               """
           )
         );
