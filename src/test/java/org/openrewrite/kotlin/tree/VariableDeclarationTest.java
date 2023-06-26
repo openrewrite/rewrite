@@ -370,4 +370,18 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/135")
+    @Test
+    void checkNonNull() {
+        rewriteRun(
+          kotlin("""
+            fun foo() {
+                val l = listOf ( "x" )
+                val a = l [ 0 ] !!
+            }
+            """)
+        );
+    }
+
 }
