@@ -372,7 +372,7 @@ class VariableDeclarationTest implements RewriteTest {
     }
 
     @Test
-    void nonNull() {
+    void checkNonNull() {
         rewriteRun(
           kotlin("""
             fun foo() {
