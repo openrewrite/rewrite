@@ -641,71 +641,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
 
             if (expr == null) {
-                Space returnPrefix = EMPTY;
-                boolean explicitReturn = false;
-
-                if (firElement instanceof FirReturnExpression) {
-                    saveCursor = cursor;
-                    returnPrefix = whitespace();
-                    if (source.startsWith("return", cursor)) {
-                        skip("return");
-                        explicitReturn = true;
-                    } else {
-                        returnPrefix = EMPTY;
-                        cursor(saveCursor);
-                    }
-                }
-
-                if (!(firElement instanceof FirReturnExpression && ((FirReturnExpression) firElement).getResult() instanceof FirUnitExpression)) {
-                    if (firElement.getSource() != null) {
-                        int statementCursor = cursor;
-                        try {
-                             expr = visitElement(firElement, ctx);
-                        } catch (Exception e) {
-                            cursor = statementCursor;
-                            Space statementPrefix = whitespace();
-                            String text = firElement.getSource().getLighterASTNode().toString();
-                            skip(text);
-                            expr = new J.Unknown(
-                                    randomId(),
-                                    statementPrefix,
-                                    Markers.EMPTY,
-                                    new J.Unknown.Source(
-                                            randomId(),
-                                            EMPTY,
-                                            Markers.build(singletonList(ParseExceptionResult.build(KotlinParser.class, e)
-                                                    .withTreeType(firElement.getSource().getKind().toString()))),
-                                            text));
-                        }
-                    } else {
-                        expr = visitElement(firElement, ctx);
-                    }
-                }
-
-                if (firElement instanceof FirReturnExpression) {
-                    if (expr == null) {
-                        expr = new K.KReturn(randomId(), new J.Return(randomId(), EMPTY, Markers.EMPTY, null), null);
-                    } else if (expr instanceof Statement && !(expr instanceof Expression)) {
-                        expr = new K.KReturn(randomId(), new J.Return(randomId(), EMPTY, Markers.EMPTY, new K.StatementExpression(randomId(), (Statement) expr)), null);
-                    } else if (expr instanceof Expression) {
-                        expr = new K.KReturn(randomId(), new J.Return(randomId(), EMPTY, Markers.EMPTY, (Expression) expr), null);
-                    }
-
-                    if (explicitReturn) {
-                        expr = expr.withPrefix(returnPrefix);
-                    } else {
-                        expr = expr.withMarkers(expr.getMarkers().addIfAbsent(new ImplicitReturn(randomId())));
-                    }
-                }
-
+                expr = visitElement(firElement, ctx);
                 if (!(expr instanceof Statement)) {
                     if (expr instanceof Expression) {
                         expr = new K.ExpressionStatement(randomId(), (Expression) expr);
                     } else {
-                        throw new IllegalArgumentException("Unexpected statement type.");
+                        throw new IllegalStateException("Unexpected expression type " + expr.getClass().getSimpleName());
                     }
                 }
-
                 i += skipImplicitDestructs;
             }
 
@@ -2051,18 +1994,24 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitReturnExpression(FirReturnExpression returnExpression, ExecutionContext ctx) {
-        if (returnExpression.getResult() instanceof FirUnitExpression) {
-            Space prefix = whitespace();
-            J.Identifier label = null;
-            if (source.startsWith("return@", cursor)) {
-                skip("return@");
+        Space prefix = whitespace();
+        J.Identifier label = null;
+        boolean explicitReturn = source.startsWith("return", cursor);
+        if (explicitReturn) {
+            skip("return");
+            if (source.startsWith("@", cursor)) {
+                skip("@");
                 label = createIdentifier(returnExpression.getTarget().getLabelName());
             }
-
-            return new K.KReturn(randomId(), new J.Return(randomId(), prefix, Markers.EMPTY, null), label);
         }
 
-        return visitElement(returnExpression.getResult(), ctx);
+        J j = null;
+        if (!(returnExpression.getResult() instanceof FirUnitExpression)) {
+            j = visitElement(returnExpression.getResult(), ctx);
+        }
+        Expression returnExpr = j == null ? null : j instanceof Statement && !(j instanceof Expression) ? new K.StatementExpression(randomId(), (Statement) j) : (Expression) j;
+        K.KReturn k = new K.KReturn(randomId(), new J.Return(randomId(), prefix, Markers.EMPTY, returnExpr), label);
+        return explicitReturn ? k : k.withMarkers(k.getMarkers().addIfAbsent(new ImplicitReturn(randomId())));
     }
 
     @Override
@@ -2078,7 +2027,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 // The identifier on a parameterized type of the FIR does not contain type information and must be added separately.
                 J.ParameterizedType parameterizedType = (J.ParameterizedType) j;
                 j = parameterizedType.withClazz(parameterizedType.getClazz().withType(type));
-
             }
             return j;
         } else {
@@ -2947,7 +2895,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         FirWhenBranch whenBranch = whenExpression.getBranches().get(0);
         J firstElement = visitElement(whenBranch, ctx);
         if (!(firstElement instanceof J.If)) {
-            throw new IllegalStateException("Implement me.");
+            throw new IllegalStateException("First element of when expression was not an if.");
         }
 
         J.If ifStatement = (J.If) firstElement;
