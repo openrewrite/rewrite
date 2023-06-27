@@ -68,4 +68,35 @@ class UsePrecompiledRegExpForReplaceAllTest implements RewriteTest {
           }
           """));
     }
+
+    @Test
+    void replaceMultipleReplaceAllOccurrencesAtDifferentLocations() {
+        rewriteRun(recipeSpec -> recipeSpec.recipe(new UsePrecompiledRegExpForReplaceAll()), java("""
+          class A {
+              public void replace(){
+                  String firstReplace = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
+                  String firstChanged = firstReplace.replaceAll("/[@]/g,", "_");
+              }
+
+              public void otherMethod(){
+                  String secondReplace = "Some other subject";
+                  String secondChanged = secondReplace.replaceAll("\\s", "_");
+              }
+          }
+          """, """
+          class A {
+              private static final java.util.regex.Pattern openRewriteReplaceAllPatternVar1 = Pattern.compile("\\s");
+              private static final java.util.regex.Pattern openRewriteReplaceAllPatternVar = Pattern.compile("/[@]/g,");
+              public void replace(){
+                  String firstReplace = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
+                  String firstChanged = openRewriteReplaceAllPatternVar.matcher(firstReplace).replaceAll("_");
+              }
+
+              public void otherMethod(){
+                  String secondReplace = "Some other subject";
+                  String secondChanged = openRewriteReplaceAllPatternVar1.matcher(secondReplace).replaceAll("_");
+              }
+          }
+          """));
+    }
 }

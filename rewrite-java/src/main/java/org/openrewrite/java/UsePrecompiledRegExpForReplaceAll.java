@@ -64,7 +64,7 @@ public class UsePrecompiledRegExpForReplaceAll extends Recipe {
             final J.Block processedBlock = super.visitBlock(block, executionContext);
             final Cursor parentOrThrow = getCursor().getParentOrThrow();
             if (parentOrThrow.getValue() instanceof J.ClassDeclaration) {
-                Object regExp = parentOrThrow.pollNearestMessage(REG_EXP_KEY);
+                final Object regExp = parentOrThrow.pollNearestMessage(REG_EXP_KEY);
                 if (regExp == null) {
                     return processedBlock;
                 }
@@ -76,7 +76,8 @@ public class UsePrecompiledRegExpForReplaceAll extends Recipe {
                                 .builder("private static final java.util.regex.Pattern " + regExpName + " = Pattern.compile(#{});")
                                 .contextSensitive()
                                 .imports("java.util.regex.Pattern")
-                                .build().apply(
+                                .build()
+                                .apply(
                                         getCursor(),
                                         processedBlock.getCoordinates().firstStatement(),
                                         regExp),
@@ -104,8 +105,9 @@ public class UsePrecompiledRegExpForReplaceAll extends Recipe {
                     JavaType.buildType(Pattern.class.getName()),
                     null);
 
-            getCursor().putMessageOnFirstEnclosing(J.ClassDeclaration.class, REG_EXP_KEY, invocation.getArguments().get(0));
-            getCursor().putMessageOnFirstEnclosing(J.ClassDeclaration.class, REG_EXP_KEY + "_NAME", regexPatternVariableName);
+            final Cursor cursor = getCursor();
+            cursor.putMessageOnFirstEnclosing(J.ClassDeclaration.class, REG_EXP_KEY, invocation.getArguments().get(0));
+            cursor.putMessageOnFirstEnclosing(J.ClassDeclaration.class, REG_EXP_KEY + "_NAME", regexPatternVariableName);
 
             return super.visitMethodInvocation(MATCHER_TEMPLATE.apply(
                     getCursor(),
