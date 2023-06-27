@@ -36,6 +36,8 @@ import java.nio.file.*;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.function.UnaryOperator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.util.GradleWrapper.*;
@@ -377,6 +379,74 @@ class UpdateGradleWrapperTest implements RewriteTest {
               """,
             spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
           )
+        );
+    }
+
+    @Test
+    void defaultsToLatestRelease() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateGradleWrapper(null, null, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
+            .afterRecipe(run -> {
+                var gradleSh = result(run, PlainText.class, "gradlew");
+                assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
+                assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);
+                assertThat(gradleSh.getFileAttributes()).isNotNull();
+                assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
+                assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
+
+                var gradleBat = result(run, PlainText.class, "gradlew.bat");
+                assertThat(gradleBat.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
+                assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT);
+
+                var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
+                assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
+                BuildTool buildTool = gradleWrapperJar.getMarkers().findFirst(BuildTool.class).get();
+                assertThat(buildTool.getVersion()).isNotEqualTo("7.4");
+                assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-" + buildTool.getVersion() + "-bin.zip"));
+                assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
+            }),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-7.4.2-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+              .after(after -> {
+                  Matcher versionMatcher = Pattern.compile("gradle-(.*?)-bin.zip").matcher(after);
+                  assertThat(versionMatcher.find()).isTrue();
+                  String gradleVersion = versionMatcher.group(1);
+                  assertThat(gradleVersion).isNotEqualTo("7.4");
+
+                  Matcher checksumMatcher = Pattern.compile("distributionSha256Sum=(.*?)").matcher(after);
+                  assertThat(checksumMatcher.find()).isTrue();
+                  String checksum = checksumMatcher.group(1);
+                  assertThat(checksum).isNotBlank();
+
+                  return """
+                    distributionBase=GRADLE_USER_HOME
+                    distributionPath=wrapper/dists
+                    distributionUrl=https\\://services.gradle.org/distributions/gradle-%s-bin.zip
+                    zipStoreBase=GRADLE_USER_HOME
+                    zipStorePath=wrapper/dists
+                    distributionSha256Sum=%s
+                    """.formatted(gradleVersion, checksum);
+              })
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
         );
     }
 

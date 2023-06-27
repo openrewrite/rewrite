@@ -65,7 +65,9 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Getter
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number.",
-            example = "7.x")
+            example = "7.x",
+            required = false)
+    @Nullable
     final String version;
 
     @Getter
