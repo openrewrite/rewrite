@@ -1137,15 +1137,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Nullable
     private FirElement getReceiver(@Nullable FirElement firElement) {
-        if (firElement == null) {
+        if (firElement == null || firElement.getSource() == null) {
             return null;
         }
 
         FirElement receiver = null;
         if (firElement instanceof FirCheckedSafeCallSubject) {
             receiver = ((FirCheckedSafeCallSubject) firElement).getOriginalReceiverRef().getValue();
-        } else if (!(firElement instanceof FirNoReceiverExpression ||
-                firElement instanceof FirThisReceiverExpression)) {
+        } else if (firElement instanceof FirThisReceiverExpression) {
+            receiver = firElement;
+        }
+        else if (!(firElement instanceof FirNoReceiverExpression)) {
             receiver = firElement;
         }
 

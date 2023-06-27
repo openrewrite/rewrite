@@ -15,21 +15,18 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class ExtensionFunctionTest implements RewriteTest {
-
-    @Disabled
     @Test
     void extensionFunction() {
         rewriteRun(
           kotlin(
             """
-              fun String . escape ( ) = this . replace ( "a" , "b" )"
+              fun String . escape ( ) = this . replace ( "a" , "b" )
               """
           )
         );
