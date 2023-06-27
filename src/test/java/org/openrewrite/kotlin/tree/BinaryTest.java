@@ -16,6 +16,8 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -271,6 +273,26 @@ class BinaryTest implements RewriteTest {
                 val b = n % 2 == 0
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/139")
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "-- n",
+      "n --"
+    })
+    void unaryOp(String op) {
+        rewriteRun(
+          kotlin(
+            """
+              fun method ( ) {
+                var n = 0
+                val a = %s == -1
+                val b = -1 == %s
+              }
+              """.formatted(op, op)
           )
         );
     }

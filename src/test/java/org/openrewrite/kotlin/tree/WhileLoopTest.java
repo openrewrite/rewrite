@@ -16,6 +16,9 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -45,6 +48,28 @@ class WhileLoopTest implements RewriteTest {
                   while ( true ) test ( )
               }
               """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/139")
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "-- len",
+      "len --"
+    })
+    void unaryOp(String op) {
+        rewriteRun(
+          kotlin(
+            """
+              fun method() {
+                  val len = 10
+                  while (%s > 0) {
+                  }
+                  while (0 < %s) {
+                  }
+              }
+              """.formatted(op, op)
           )
         );
     }
