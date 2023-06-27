@@ -231,7 +231,7 @@ class VariableDeclarationTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/76")
     @Test
-    void propertyDelegation() {
+    void delegationByLazy() {
         rewriteRun(
           kotlin(
             """
