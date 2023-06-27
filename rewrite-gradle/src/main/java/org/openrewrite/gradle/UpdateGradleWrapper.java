@@ -157,7 +157,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
                         GradleWrapper gradleWrapper = requireNonNull(createValidatedGradleWrapperValidation(ctx).getValue());
 
-                        VersionComparator versionComparator = requireNonNull(Semver.validate(version, null).getValue());
+                        VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(version) ? "latest.release" : version, null).getValue());
                         int compare = versionComparator.compare(null, buildTool.getVersion(), gradleWrapper.getVersion());
                         if (compare < 0) {
                             acc.needsWrapperUpdate = true;
