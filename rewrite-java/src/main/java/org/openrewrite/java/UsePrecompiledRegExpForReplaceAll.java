@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 import static org.openrewrite.Tree.randomId;
@@ -48,14 +49,11 @@ public class UsePrecompiledRegExpForReplaceAll extends Recipe {
     }
 
     public static class ReplaceVisitor extends JavaIsoVisitor<ExecutionContext> {
+        // use boolean flag to only process one pattern at a time
+        private final AtomicBoolean patternProcessingInProgress = new AtomicBoolean(false);
         private static final String PATTERN_VAR = "openRewriteReplaceAllPatternVar";
         private static final JavaTemplate MATCHER_TEMPLATE = JavaTemplate
                 .builder("#{any()}.matcher( #{any(java.lang.CharSequence)}).replaceAll( #{any(java.lang.String)})")
-                .contextSensitive()
-                .imports("java.util.regex.Pattern")
-                .build();
-        private static final JavaTemplate COMPILE_PATTERN_TEMPLATE = JavaTemplate
-                .builder("private static final java.util.regex.Pattern " + PATTERN_VAR + "= Pattern.compile(#{});")
                 .contextSensitive()
                 .imports("java.util.regex.Pattern")
                 .build();
@@ -70,11 +68,18 @@ public class UsePrecompiledRegExpForReplaceAll extends Recipe {
                 if (regExp == null) {
                     return processedBlock;
                 }
+                patternProcessingInProgress.set(false);
+
+                final String regExpName = parentOrThrow.pollNearestMessage(REG_EXP_KEY + "_NAME");
                 return super.visitBlock(
-                        COMPILE_PATTERN_TEMPLATE.apply(
-                                getCursor(),
-                                processedBlock.getCoordinates().firstStatement(),
-                                regExp),
+                        JavaTemplate
+                                .builder("private static final java.util.regex.Pattern " + regExpName + " = Pattern.compile(#{});")
+                                .contextSensitive()
+                                .imports("java.util.regex.Pattern")
+                                .build().apply(
+                                        getCursor(),
+                                        processedBlock.getCoordinates().firstStatement(),
+                                        regExp),
                         executionContext);
             }
             return processedBlock;
@@ -82,24 +87,30 @@ public class UsePrecompiledRegExpForReplaceAll extends Recipe {
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-            if (!REPLACE_ALL_METHOD_MATCHER.matches(method)) {
+            final boolean alreadyProcessingAPattern = patternProcessingInProgress.get();
+            if (!REPLACE_ALL_METHOD_MATCHER.matches(method) || alreadyProcessingAPattern) {
                 return super.visitMethodInvocation(method, executionContext);
             }
 
+            patternProcessingInProgress.set(true);
+
             final J.MethodInvocation invocation = super.visitMethodInvocation(method, executionContext);
-            final Object varIdentifier = new J.Identifier(
+            final String regexPatternVariableName = VariableNameUtils.generateVariableName(PATTERN_VAR, getCursor(), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER);
+            final Object regexPatternIdentifier = new J.Identifier(
                     randomId(),
                     Space.SINGLE_SPACE,
                     Markers.EMPTY,
-                    PATTERN_VAR,
+                    regexPatternVariableName,
                     JavaType.buildType(Pattern.class.getName()),
                     null);
 
             getCursor().putMessageOnFirstEnclosing(J.ClassDeclaration.class, REG_EXP_KEY, invocation.getArguments().get(0));
+            getCursor().putMessageOnFirstEnclosing(J.ClassDeclaration.class, REG_EXP_KEY + "_NAME", regexPatternVariableName);
+
             return super.visitMethodInvocation(MATCHER_TEMPLATE.apply(
                     getCursor(),
                     invocation.getCoordinates().replace(),
-                    varIdentifier, invocation.getSelect(),
+                    regexPatternIdentifier, invocation.getSelect(),
                     invocation.getArguments().get(1)), executionContext);
         }
     }
