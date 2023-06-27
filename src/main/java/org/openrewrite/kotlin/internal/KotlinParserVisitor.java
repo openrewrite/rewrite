@@ -1146,8 +1146,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             receiver = ((FirCheckedSafeCallSubject) firElement).getOriginalReceiverRef().getValue();
         } else if (firElement instanceof FirThisReceiverExpression) {
             receiver = firElement;
-        }
-        else if (!(firElement instanceof FirNoReceiverExpression)) {
+        } else if (!(firElement instanceof FirNoReceiverExpression)) {
             receiver = firElement;
         }
 
