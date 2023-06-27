@@ -726,7 +726,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         FirFunctionCall functionCall = comparisonExpression.getCompareToCall();
 
-        Expression left = (Expression) visitElement(functionCall.getExplicitReceiver(), ctx);
+        FirElement receiver = functionCall.getExplicitReceiver() != null ? functionCall.getExplicitReceiver() : functionCall.getDispatchReceiver();
+        J j = visitElement(receiver, ctx);
+        Expression left = !(j instanceof Expression) && j instanceof Statement ? new K.StatementExpression(randomId(), (Statement) j) : (Expression) j;
 
         Space opPrefix = whitespace();
         J.Binary.Type op = mapOperation(comparisonExpression.getOperation());
@@ -735,7 +737,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             throw new UnsupportedOperationException("Unsupported FirComparisonExpression argument size");
         }
 
-        Expression right = (Expression) visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
+        j = visitElement(functionCall.getArgumentList().getArguments().get(0), ctx);
+        Expression right = !(j instanceof Expression) && j instanceof Statement ? new K.StatementExpression(randomId(), (Statement) j) : (Expression) j;
         return new J.Binary(
                 randomId(),
                 prefix,
@@ -778,32 +781,39 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         FirElement left = equalityOperatorCall.getArgumentList().getArguments().get(0);
-        FirOperation op = equalityOperatorCall.getOperation();
         FirElement right = equalityOperatorCall.getArgumentList().getArguments().get(1);
-
         if (left instanceof FirWhenSubjectExpression || right instanceof FirWhenSubjectExpression) {
             return (left instanceof FirWhenSubjectExpression) ? (Expression) visitElement(right, ctx) : (Expression) visitElement(left, ctx);
         }
 
+        Space prefix = whitespace();
+        J j = visitElement(left, ctx);
+        Expression leftExpr = !(j instanceof Expression) && j instanceof Statement ? new K.StatementExpression(randomId(), (Statement) j) : (Expression) j;
+        FirOperation op = equalityOperatorCall.getOperation();
+        Space opPrefix = sourceBefore(op.getOperator());
+
+        j = visitElement(right, ctx);
+        Expression rightExpr = !(j instanceof Expression) && j instanceof Statement ? new K.StatementExpression(randomId(), (Statement) j) : (Expression) j;
+
         if (op == FirOperation.IDENTITY || op == FirOperation.NOT_IDENTITY) {
             return new K.Binary(
                     randomId(),
-                    whitespace(),
+                    prefix,
                     Markers.EMPTY,
-                    (Expression) visitElement(left, ctx),
-                    padLeft(sourceBefore(op.getOperator()), op == FirOperation.IDENTITY ? K.Binary.Type.IdentityEquals : K.Binary.Type.IdentityNotEquals),
-                    (Expression) visitElement(right, ctx),
+                    leftExpr,
+                    padLeft(opPrefix, op == FirOperation.IDENTITY ? K.Binary.Type.IdentityEquals : K.Binary.Type.IdentityNotEquals),
+                    rightExpr,
                     EMPTY,
                     typeMapping.type(equalityOperatorCall)
             );
         } else {
             return new J.Binary(
                     randomId(),
-                    whitespace(),
+                    prefix,
                     Markers.EMPTY,
-                    (Expression) visitElement(left, ctx),
-                    padLeft(sourceBefore(op.getOperator()), mapOperation(op)),
-                    (Expression) visitElement(right, ctx),
+                    leftExpr,
+                    padLeft(opPrefix, mapOperation(op)),
+                    rightExpr,
                     typeMapping.type(equalityOperatorCall));
         }
 
@@ -994,17 +1004,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
 
             if (!(functionCall instanceof FirImplicitInvokeCall)) {
-                FirElement visit = getReceiver(functionCall.getDispatchReceiver());
-                if (visit == null) {
-                    visit = getReceiver(functionCall.getExtensionReceiver());
+                FirElement receiver = getReceiver(functionCall.getExplicitReceiver());
+                if (receiver == null) {
+                    receiver = getReceiver(functionCall.getDispatchReceiver());
                 }
 
-                if (visit == null) {
-                    visit = getReceiver(functionCall.getExplicitReceiver());
-                }
-
-                if (visit != null) {
-                    Expression selectExpr = (Expression) visitElement(visit, ctx);
+                if (receiver != null) {
+                    Expression selectExpr = (Expression) visitElement(receiver, ctx);
                     Space after = whitespace();
                     if (source.startsWith(".", cursor)) {
                         skip(".");
