@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -84,6 +85,23 @@ class IfTest implements RewriteTest {
               fun method ( n : Int ) {
                   if ( n in 1 .. 4 ) {
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/140")
+    @Test
+    void returnFromIfWithoutBody() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method(n: Int): List<Int> {
+                  if (n == 0) return emptyList()
+                  if (n == 1) return listOf(1)
+                  val list = mutableListOf<Int>()
+                  return list
               }
               """
           )
