@@ -34,12 +34,12 @@ public class UsePrecompiledRegExpForReplaceAll extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return getClass().getSimpleName();
+        return "Replace `String.replaceAll` with a compiled regular expression";
     }
 
     @Override
     public String getDescription() {
-        return getClass().getSimpleName() + ".";
+        return "Replace `String.replaceAll` with a compiled regular expression.";
     }
 
     @Override
@@ -49,16 +49,17 @@ public class UsePrecompiledRegExpForReplaceAll extends Recipe {
 
     public static class ReplaceVisitor extends JavaIsoVisitor<ExecutionContext> {
         private static final String PATTERN_VAR = "openRewriteReplaceAllPatternVar";
-        JavaTemplate matcherTemplate = JavaTemplate
+        private static final JavaTemplate MATCHER_TEMPLATE = JavaTemplate
                 .builder("#{any()}.matcher( #{any(java.lang.CharSequence)}).replaceAll( #{any(java.lang.String)})")
                 .contextSensitive()
                 .imports("java.util.regex.Pattern")
                 .build();
-        JavaTemplate compilePatternTemplate = JavaTemplate
+        private static final JavaTemplate COMPILE_PATTERN_TEMPLATE = JavaTemplate
                 .builder("private static final java.util.regex.Pattern " + PATTERN_VAR + "= Pattern.compile(#{});")
                 .contextSensitive()
                 .imports("java.util.regex.Pattern")
                 .build();
+        private static final MethodMatcher REPLACE_ALL_METHOD_MATCHER = new MethodMatcher("java.lang.String replaceAll(String, String)");
 
         @Override
         public J.Block visitBlock(final J.Block block, final ExecutionContext executionContext) {
@@ -70,7 +71,7 @@ public class UsePrecompiledRegExpForReplaceAll extends Recipe {
                     return processedBlock;
                 }
                 return super.visitBlock(
-                        compilePatternTemplate.apply(
+                        COMPILE_PATTERN_TEMPLATE.apply(
                                 getCursor(),
                                 processedBlock.getCoordinates().firstStatement(),
                                 regExp),
@@ -81,14 +82,12 @@ public class UsePrecompiledRegExpForReplaceAll extends Recipe {
 
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-            J.MethodInvocation invocation = super.visitMethodInvocation(method, executionContext);
-            JavaType.Method methodType = invocation.getMethodType();
-            if (methodType == null
-                    || !"java.lang.String".equals(methodType.getDeclaringType().getFullyQualifiedName())
-                    || !"replaceAll".equals(invocation.getName().getSimpleName())) {
-                return invocation;
+            if (!REPLACE_ALL_METHOD_MATCHER.matches(method)) {
+                return super.visitMethodInvocation(method, executionContext);
             }
-            Object varIdentifier = new J.Identifier(
+
+            final J.MethodInvocation invocation = super.visitMethodInvocation(method, executionContext);
+            final Object varIdentifier = new J.Identifier(
                     randomId(),
                     Space.SINGLE_SPACE,
                     Markers.EMPTY,
@@ -97,11 +96,11 @@ public class UsePrecompiledRegExpForReplaceAll extends Recipe {
                     null);
 
             getCursor().putMessageOnFirstEnclosing(J.ClassDeclaration.class, REG_EXP_KEY, invocation.getArguments().get(0));
-            return matcherTemplate.apply(
+            return super.visitMethodInvocation(MATCHER_TEMPLATE.apply(
                     getCursor(),
                     invocation.getCoordinates().replace(),
                     varIdentifier, invocation.getSelect(),
-                    invocation.getArguments().get(1));
+                    invocation.getArguments().get(1)), executionContext);
         }
     }
 }
