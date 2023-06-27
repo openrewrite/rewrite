@@ -17,6 +17,7 @@ package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.BuildTool;
@@ -48,6 +49,10 @@ class UpdateGradleWrapperTest implements RewriteTest {
         return actual + "\n";
     };
 
+    // Gradle wrapper script text for 7.4.2
+    private static final String GRADLEW_TEXT = StringUtils.readFully(UpdateGradleWrapperTest.class.getResourceAsStream("/gradlew"));
+    private static final String GRADLEW_BAT_TEXT = StringUtils.readFully(UpdateGradleWrapperTest.class.getResourceAsStream("/gradlew.bat"));
+
     private final SourceSpecs gradlew = text("", spec -> spec.path(WRAPPER_SCRIPT_LOCATION).after(notEmpty));
     private final SourceSpecs gradlewBat = text("", spec -> spec.path(WRAPPER_BATCH_LOCATION).after(notEmpty));
     private final SourceSpecs gradleWrapperJarQuark = other("", spec -> spec.path(WRAPPER_JAR_LOCATION));
@@ -64,14 +69,14 @@ class UpdateGradleWrapperTest implements RewriteTest {
           spec -> spec.afterRecipe(run -> {
               var gradleSh = result(run, PlainText.class, "gradlew");
               assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
-              assertThat(gradleSh.getText()).isNotBlank();
+              assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);
               assertThat(gradleSh.getFileAttributes()).isNotNull();
               assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
               assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
 
               var gradleBat = result(run, PlainText.class, "gradlew.bat");
               assertThat(gradleBat.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
-              assertThat(gradleBat.getText()).isNotBlank();
+              assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT);
 
               var gradleWrapperProperties = result(run, Properties.File.class, "gradle-wrapper.properties");
               assertThat(gradleWrapperProperties.getSourcePath()).isEqualTo(WRAPPER_PROPERTIES_LOCATION);
@@ -92,14 +97,14 @@ class UpdateGradleWrapperTest implements RewriteTest {
             .afterRecipe(run -> {
               var gradleSh = result(run, PlainText.class, "gradlew");
               assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
-              assertThat(gradleSh.getText()).isNotBlank();
+              assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);
               assertThat(gradleSh.getFileAttributes()).isNotNull();
               assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
               assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
 
               var gradleBat = result(run, PlainText.class, "gradlew.bat");
               assertThat(gradleBat.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
-              assertThat(gradleBat.getText()).isNotBlank();
+              assertThat(gradleBat.getText()).isEqualTo(GRADLEW_BAT_TEXT);
 
               var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
               assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);

@@ -39,7 +39,6 @@ import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
-import java.nio.charset.StandardCharsets;
 import java.time.ZonedDateTime;
 import java.util.*;
 
@@ -252,8 +251,9 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
         FileAttributes wrapperScriptAttributes = new FileAttributes(now, now, now, true, true, true, 1L);
         if (acc.addGradleShellScript) {
+            String gradlewText = unixScript(gradleWrapper, ctx);
             PlainText gradlew = PlainText.builder()
-                    .text(StringUtils.readFully(requireNonNull(UpdateGradleWrapper.class.getResourceAsStream("/gradlew"))))
+                    .text(gradlewText)
                     .sourcePath(WRAPPER_SCRIPT_LOCATION)
                     .fileAttributes(wrapperScriptAttributes)
                     .build();
@@ -261,8 +261,9 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         }
 
         if (acc.addGradleBatchScript) {
+            String gradlewBatText = batchScript(gradleWrapper, ctx);
             PlainText gradlewBat = PlainText.builder()
-                    .text(StringUtils.readFully(requireNonNull(UpdateGradleWrapper.class.getResourceAsStream("/gradlew.bat"))))
+                    .text(gradlewBatText)
                     .sourcePath(WRAPPER_BATCH_LOCATION)
                     .fileAttributes(wrapperScriptAttributes)
                     .build();
@@ -270,7 +271,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         }
 
         if (acc.addGradleWrapperJar) {
-            gradleWrapperFiles.add(gradleWrapper.asRemote());
+            gradleWrapperFiles.add(gradleWrapper.wrapperJar());
         }
 
         return gradleWrapperFiles;
@@ -299,18 +300,16 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 }
 
                 if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH)) {
+                    String gradlewText = unixScript(gradleWrapper, ctx);
                     PlainText gradlew = (PlainText) setExecutable(sourceFile);
-                    String gradlewText = StringUtils.readFully(requireNonNull(UpdateGradleWrapper.class.getResourceAsStream("/gradlew")),
-                            sourceFile.getCharset() == null ? StandardCharsets.UTF_8 : sourceFile.getCharset());
                     if (!gradlewText.equals(gradlew.getText())) {
                         gradlew = gradlew.withText(gradlewText);
                     }
                     return gradlew;
                 }
                 if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_BATCH_LOCATION_RELATIVE_PATH)) {
+                    String gradlewBatText = batchScript(gradleWrapper, ctx);
                     PlainText gradlewBat = (PlainText) setExecutable(sourceFile);
-                    String gradlewBatText = StringUtils.readFully(requireNonNull(UpdateGradleWrapper.class.getResourceAsStream("/gradlew.bat")),
-                            sourceFile.getCharset() == null ? StandardCharsets.UTF_8 : sourceFile.getCharset());
                     if (!gradlewBatText.equals(gradlewBat.getText())) {
                         gradlewBat = gradlewBat.withText(gradlewBatText);
                     }
@@ -320,22 +319,80 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     return new WrapperPropertiesVisitor(gradleWrapper).visitNonNull(sourceFile, ctx);
                 }
                 if (sourceFile instanceof Quark && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH)) {
-                    return gradleWrapper.asRemote().withId(sourceFile.getId()).withMarkers(sourceFile.getMarkers());
+                    return gradleWrapper.wrapperJar().withId(sourceFile.getId()).withMarkers(sourceFile.getMarkers());
                 }
                 return sourceFile;
             }
         };
     }
 
-
     private static <T extends SourceFile> T setExecutable(T sourceFile) {
         FileAttributes attributes = sourceFile.getFileAttributes();
         if (attributes == null) {
             ZonedDateTime now = ZonedDateTime.now();
             return sourceFile.withFileAttributes(new FileAttributes(now, now, now, true, true, true, 1));
-        } else {
-            return sourceFile.withFileAttributes(sourceFile.getFileAttributes().withExecutable(true));
+        } else if (!attributes.isExecutable()) {
+            return sourceFile.withFileAttributes(attributes.withExecutable(true));
         }
+        return sourceFile;
+    }
+
+    private String unixScript(GradleWrapper gradleWrapper, ExecutionContext ctx) {
+        Map<String, String> binding = new HashMap<>();
+        String defaultJvmOpts = defaultJvmOpts(gradleWrapper);
+        binding.put("defaultJvmOpts", StringUtils.isNotEmpty(defaultJvmOpts) ? "'" + defaultJvmOpts + "'" : "");
+        binding.put("classpath", "$APP_HOME/gradle/wrapper/gradle-wrapper.jar");
+
+        String gradlewTemplate = StringUtils.readFully(gradleWrapper.gradlew().getInputStream(HttpSenderExecutionContextView.view(ctx).getHttpSender()));
+        return renderTemplate(gradlewTemplate, binding, "\n");
+    }
+
+    private String batchScript(GradleWrapper gradleWrapper, ExecutionContext ctx) {
+        Map<String, String> binding = new HashMap<>();
+        binding.put("defaultJvmOpts", defaultJvmOpts(gradleWrapper));
+        binding.put("classpath", "%APP_HOME%\\gradle\\wrapper\\gradle-wrapper.jar");
+
+        String gradlewBatTemplate = StringUtils.readFully(gradleWrapper.gradlewBat().getInputStream(HttpSenderExecutionContextView.view(ctx).getHttpSender()));
+        return renderTemplate(gradlewBatTemplate, binding, "\r\n");
+    }
+
+    private String defaultJvmOpts(GradleWrapper gradleWrapper) {
+        VersionComparator gradle53VersionComparator = requireNonNull(Semver.validate("[5.3,)", null).getValue());
+        VersionComparator gradle50VersionComparator = requireNonNull(Semver.validate("[5.0,)", null).getValue());
+
+        if (gradle53VersionComparator.isValid(null, gradleWrapper.getVersion())) {
+            return "\"-Xmx64m\" \"-Xms64m\"";
+        } else if (gradle50VersionComparator.isValid(null, gradleWrapper.getVersion())) {
+            return "\"-Xmx64m\"";
+        }
+        return "";
+    }
+
+    private String renderTemplate(String source, Map<String, String> parameters, String lineSeparator) {
+        Map<String, String> binding = new HashMap<>(parameters);
+        binding.put("applicationName", "Gradle");
+        binding.put("optsEnvironmentVar", "GRADLE_OPTS");
+        binding.put("exitEnvironmentVar", "GRADLE_EXIT_CONSOLE");
+        binding.put("mainClassName", "org.gradle.wrapper.GradleWrapperMain");
+        binding.put("appNameSystemProperty", "org.gradle.appname");
+        binding.put("appHomeRelativePath", "");
+        binding.put("modulePath", "");
+
+        String script = source;
+        for (Map.Entry<String, String> variable : binding.entrySet()) {
+            script = script.replace("${" + variable.getKey() + "}", variable.getValue())
+                    .replace("$" + variable.getKey(), variable.getValue());
+        }
+
+        script = script.replaceAll("(?sm)<% /\\*.*?\\*/ %>", "");
+        script = script.replaceAll("(?sm)<% if \\( mainClassName\\.startsWith\\('--module '\\) \\) \\{.*?} %>", "");
+        script = script.replaceAll("(?sm)<% if \\( appNameSystemProperty \\) \\{.*?%>(.*?)<% } %>", "$1");
+        script = script.replace("\\$", "$");
+        script = script.replaceAll("DIRNAME=\\.\\\\[\r\n]", "DIRNAME=.");
+        script = script.replace("\\\\", "\\");
+        script = script.replaceAll("\r\n|\r|\n", lineSeparator);
+
+        return script;
     }
 
     private static class WrapperPropertiesVisitor extends PropertiesVisitor<ExecutionContext> {

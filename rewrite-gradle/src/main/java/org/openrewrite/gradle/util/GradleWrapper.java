@@ -115,11 +115,25 @@ public class GradleWrapper {
 
     static final FileAttributes WRAPPER_JAR_FILE_ATTRIBUTES = new FileAttributes(null, null, null, true, true, false, 0);
 
-    public Remote asRemote() {
+    public Remote wrapperJar() {
         return Remote.builder(
                 WRAPPER_JAR_LOCATION,
                 URI.create(distributionInfos.getDownloadUrl())
         ).build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-(plugins|wrapper)-(?!shared).*\\.jar", "gradle-wrapper.jar");
+    }
+
+    public Remote gradlew() {
+        return Remote.builder(
+                WRAPPER_SCRIPT_LOCATION,
+                URI.create(distributionInfos.getDownloadUrl())
+        ).build("gradle-[^\\/]+/(?:.*/)+gradle-plugins-.*\\.jar", "org/gradle/api/internal/plugins/unixStartScript.txt");
+    }
+
+    public Remote gradlewBat() {
+        return Remote.builder(
+                WRAPPER_BATCH_LOCATION,
+                URI.create(distributionInfos.getDownloadUrl())
+        ).build("gradle-[^\\/]+/(?:.*/)+gradle-plugins-.*\\.jar", "org/gradle/api/internal/plugins/windowsStartScript.txt");
     }
 
     public enum DistributionType {
