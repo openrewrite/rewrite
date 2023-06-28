@@ -19,8 +19,10 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
 @Value
@@ -29,6 +31,7 @@ public class RemovePluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
     String pluginId;
 
     MethodMatcher buildPluginsContainerMatcher = new MethodMatcher("RewriteGradleProject plugins(..)");
+    MethodMatcher applyPluginMatcher = new MethodMatcher("RewriteGradleProject apply(..)");
     MethodMatcher settingsPluginsContainerMatcher = new MethodMatcher("RewriteSettings plugins(..)");
 
     MethodMatcher buildPluginMatcher = new MethodMatcher("PluginSpec id(..)");
@@ -97,6 +100,20 @@ public class RemovePluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                     && ((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements().isEmpty()) {
                 //noinspection DataFlowIssue
                 return null;
+            }
+        } else if(applyPluginMatcher.matches(m)) {
+            for (Expression arg : m.getArguments()) {
+                if(arg instanceof G.MapEntry) {
+                    G.MapEntry me = (G.MapEntry) arg;
+                    if(me.getKey() instanceof J.Literal && me.getValue() instanceof J.Literal) {
+                        J.Literal pluginLiteral = (J.Literal) me.getKey();
+                        J.Literal pluginIdLiteral = (J.Literal) me.getValue();
+                        if("plugin".equals(pluginLiteral.getValue()) && pluginId.equals(pluginIdLiteral.getValue())) {
+                            //noinspection DataFlowIssue
+                            return null;
+                        }
+                    }
+                }
             }
         }
 

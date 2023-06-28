@@ -59,10 +59,7 @@ public class UnnecessaryParentheses extends Recipe {
             private UnnecessaryParenthesesStyle getStyle() {
                 if (style == null) {
                     JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
-                    style = ((SourceFile) cu).getStyle(UnnecessaryParenthesesStyle.class);
-                    if (style == null) {
-                        style = Checkstyle.unnecessaryParentheses();
-                    }
+                    style = ((SourceFile) cu).getStyle(UnnecessaryParenthesesStyle.class, Checkstyle.unnecessaryParentheses());
                 }
                 return style;
             }

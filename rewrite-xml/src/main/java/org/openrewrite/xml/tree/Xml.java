@@ -618,6 +618,7 @@ public interface Xml extends Tree {
 
         Markers markers;
         Ident name;
+        @Nullable
         Ident externalId;
         List<Ident> internalSubset;
 
