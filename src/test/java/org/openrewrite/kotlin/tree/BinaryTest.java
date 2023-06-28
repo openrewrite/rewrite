@@ -277,6 +277,20 @@ class BinaryTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/149")
+    @Test
+    void explicitReceiver() {
+        rewriteRun(
+          kotlin(
+            """
+              data class Foo(val aliases: List<String>) {
+                  fun names() = listOf(canonicalName) + aliases
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/139")
     @ParameterizedTest
     @ValueSource(strings = {
