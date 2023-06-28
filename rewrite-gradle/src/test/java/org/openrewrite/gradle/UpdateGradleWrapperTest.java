@@ -69,6 +69,8 @@ class UpdateGradleWrapperTest implements RewriteTest {
     void addGradleWrapper() {
         rewriteRun(
           spec -> spec.afterRecipe(run -> {
+              assertThat(run.getChangeset().getAllResults()).hasSize(4);
+
               var gradleSh = result(run, PlainText.class, "gradlew");
               assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
               assertThat(gradleSh.getText()).isEqualTo(GRADLEW_TEXT);

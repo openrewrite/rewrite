@@ -33,11 +33,10 @@ import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.search.FindProperties;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.quark.Quark;
-import org.openrewrite.quark.QuarkVisitor;
+import org.openrewrite.remote.Remote;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.text.PlainText;
-import org.openrewrite.text.PlainTextVisitor;
 
 import java.time.ZonedDateTime;
 import java.util.*;
@@ -186,35 +185,29 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         return entry;
                     }
                 },
-                new QuarkVisitor<ExecutionContext>() {
+                new TreeVisitor<Tree, ExecutionContext>() {
                     @Override
                     public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
                         if (!super.isAcceptable(sourceFile, executionContext)) {
                             return false;
                         }
 
-                        if (equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_JAR_LOCATION)) {
+                        if ((sourceFile instanceof Quark || sourceFile instanceof Remote) &&
+                                equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_JAR_LOCATION)) {
                             acc.addGradleWrapperJar = false;
                             return true;
                         }
 
-                        return false;
-                    }
-                },
-                new PlainTextVisitor<ExecutionContext>() {
-                    @Override
-                    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
-                        if (!super.isAcceptable(sourceFile, executionContext)) {
-                            return false;
+                        if (sourceFile instanceof PlainText) {
+                            if (equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_BATCH_LOCATION)) {
+                                acc.addGradleBatchScript = false;
+                                return true;
+                            } else if (equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
+                                acc.addGradleShellScript = false;
+                                return true;
+                            }
                         }
 
-                        if (equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_BATCH_LOCATION)) {
-                            acc.addGradleBatchScript = false;
-                            return true;
-                        } else if (equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_SCRIPT_LOCATION)) {
-                            acc.addGradleShellScript = false;
-                            return true;
-                        }
                         return false;
                     }
                 }
@@ -320,7 +313,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 if (sourceFile instanceof Properties.File && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH)) {
                     return new WrapperPropertiesVisitor(gradleWrapper).visitNonNull(sourceFile, ctx);
                 }
-                if (sourceFile instanceof Quark && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH)) {
+                if ((sourceFile instanceof Quark || sourceFile instanceof Remote) && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_JAR_LOCATION_RELATIVE_PATH)) {
                     return gradleWrapper.wrapperJar().withId(sourceFile.getId()).withMarkers(sourceFile.getMarkers());
                 }
                 return sourceFile;
