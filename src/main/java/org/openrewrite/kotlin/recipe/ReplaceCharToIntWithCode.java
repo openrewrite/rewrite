@@ -49,11 +49,6 @@ public class ReplaceCharToIntWithCode extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new KotlinVisitor<ExecutionContext>() {
             @Override
-            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
-                return (K.CompilationUnit) super.visitCompilationUnit(cu, ctx);
-            }
-
-            @Override
             public J visitMethodInvocation(J.MethodInvocation method,
                                                             ExecutionContext executionContext) {
                 if (CHAR_TO_INT_METHOD_MATCHER.matches(method) && method.getSelect() != null) {
@@ -64,7 +59,6 @@ public class ReplaceCharToIntWithCode extends Recipe {
             }
         };
     }
-
 
     @SuppressWarnings("all")
     private static J.FieldAccess getCharCodeTemplate() {
