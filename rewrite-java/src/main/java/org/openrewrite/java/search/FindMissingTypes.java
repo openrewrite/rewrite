@@ -138,6 +138,18 @@ public class FindMissingTypes extends Recipe {
         }
 
         @Override
+        public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
+            J.MemberReference mr = super.visitMemberReference(memberRef, ctx);
+            JavaType.Method type = mr.getMethodType();
+            if (!isWellFormedType(type, seenTypes)) {
+                mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
+            } else if (!type.getName().equals(mr.getReference().getSimpleName()) && !type.isConstructor()) {
+                mr = SearchResult.found(mr, "type information has a different method name '" + type.getName() + "'");
+            }
+            return mr;
+        }
+
+        @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
             J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
             JavaType.Method type = md.getMethodType();
@@ -212,22 +224,23 @@ public class FindMissingTypes extends Recipe {
         private boolean isFieldAccess(J.Identifier ident) {
             J value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.FieldAccess
-                    && (ident.equals(((J.FieldAccess) value).getName()) || ident.equals(((J.FieldAccess) value).getTarget()));
+                    && (ident == ((J.FieldAccess) value).getName() ||
+                        ident == ((J.FieldAccess) value).getTarget() && !((J.FieldAccess) value).getSimpleName().equals("class"));
         }
 
         private boolean isBeingDeclared(J.Identifier ident) {
             J value = getCursor().getParentTreeCursor().getValue();
-            return value instanceof J.VariableDeclarations.NamedVariable && ident.equals(((J.VariableDeclarations.NamedVariable) value).getName());
+            return value instanceof J.VariableDeclarations.NamedVariable && ident == ((J.VariableDeclarations.NamedVariable) value).getName();
         }
 
         private boolean isParameterizedType(J.Identifier ident) {
             J value = getCursor().getParentTreeCursor().getValue();
-            return value instanceof J.ParameterizedType && ident.equals(((J.ParameterizedType) value).getClazz());
+            return value instanceof J.ParameterizedType && ident == ((J.ParameterizedType) value).getClazz();
         }
 
         private boolean isNewClass(J.Identifier ident) {
             J value = getCursor().getParentTreeCursor().getValue();
-            return value instanceof J.NewClass && ident.equals(((J.NewClass) value).getClazz());
+            return value instanceof J.NewClass && ident == ((J.NewClass) value).getClazz();
         }
 
         private boolean isTypeParameter() {
@@ -237,7 +250,8 @@ public class FindMissingTypes extends Recipe {
 
         private boolean isMemberReference(J.Identifier ident) {
             J value = getCursor().getParentTreeCursor().getValue();
-            return value instanceof J.MemberReference && ident.equals(((J.MemberReference) value).getReference());
+            return value instanceof J.MemberReference &&
+                   ident == ((J.MemberReference) value).getReference();
         }
 
         private boolean isCaseLabel() {
@@ -251,7 +265,7 @@ public class FindMissingTypes extends Recipe {
         private boolean isAnnotationField(J.Identifier ident) {
             Cursor parent = getCursor().getParent();
             return parent != null && parent.getValue() instanceof J.Assignment
-                    && (ident.equals(((J.Assignment) parent.getValue()).getVariable()) && getCursor().firstEnclosing(J.Annotation.class) != null);
+                    && (ident == ((J.Assignment) parent.getValue()).getVariable() && getCursor().firstEnclosing(J.Annotation.class) != null);
         }
 
     }
