@@ -133,8 +133,8 @@ public class RemoveUnusedImports extends Recipe {
 
                     // some class names are not handled properly by `getTypeName()`
                     // see https://github.com/openrewrite/rewrite/issues/1698 for more detail
-                    final String target = qualid.getTarget().toString();
-                    final String modifiedTarget = methodsAndFieldsByTypeName.keySet().stream()
+                    String target = qualid.getTarget().toString();
+                    String modifiedTarget = methodsAndFieldsByTypeName.keySet().stream()
                             .filter(key -> key.matches(target.replaceAll("\\.", "(\\\\\\.|\\\\\\$)")))
                             .findFirst()
                             .orElse(target);
