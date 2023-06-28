@@ -38,7 +38,10 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.charset.Charset;
-import java.nio.file.*;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -171,10 +174,14 @@ public interface JavaParser extends Parser {
                         try {
                             Path artifact = resourceTarget.toPath().resolve(Paths.get(resource.getPath()).getFileName());
                             if (!Files.exists(artifact)) {
-                                Files.copy(
-                                        requireNonNull(caller.getResourceAsStream("/" + resource.getPath())),
-                                        artifact
-                                );
+                                try {
+                                    Files.copy(
+                                            requireNonNull(caller.getResourceAsStream("/" + resource.getPath())),
+                                            artifact
+                                    );
+                                } catch (FileAlreadyExistsException ignore) {
+                                    // can happen when tests run in parallel, for example
+                                }
                             }
                             missingArtifactNames.remove(artifactName);
                             artifacts.add(artifact);
