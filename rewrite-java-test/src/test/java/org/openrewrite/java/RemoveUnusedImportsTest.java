@@ -976,8 +976,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
                     System.out.println("hello world!");              
                 }
               }
-              
-              
               """
           ),
           java(
@@ -1035,8 +1033,6 @@ class RemoveUnusedImportsTest implements RewriteTest {
                     System.out.println("hello world!");              
                 }
               }
-              
-              
               """
           ),
           java(
