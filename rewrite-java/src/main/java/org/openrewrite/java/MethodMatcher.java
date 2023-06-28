@@ -148,31 +148,11 @@ public class MethodMatcher {
     }
 
     boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
-        if (type == null || type instanceof JavaType.Unknown) {
-            return false;
-        }
-
-        if (matchesTargetTypeName(type.getFullyQualifiedName())) {
-            return true;
-        }
-
-        if (matchOverrides) {
-            if (!"java.lang.Object".equals(type.getFullyQualifiedName()) && matchesTargetType(OBJECT_CLASS)) {
-                return true;
-            }
-
-            if (matchesTargetType(type.getSupertype())) {
-                return true;
-            }
-
-            for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
-                if (matchesTargetType(anInterface)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        return TypeUtils.isOfTypeWithName(
+                        type,
+                        matchOverrides,
+                        this::matchesTargetTypeName
+                );
     }
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
