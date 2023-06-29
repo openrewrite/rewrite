@@ -65,7 +65,6 @@ import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.kotlin.internal.KotlinParserVisitor;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.style.NamedStyles;
-import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 

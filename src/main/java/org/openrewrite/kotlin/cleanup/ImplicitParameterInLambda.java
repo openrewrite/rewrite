@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.kotlin.recipe;
+package org.openrewrite.kotlin.cleanup;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
