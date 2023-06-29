@@ -3669,6 +3669,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Nullable
     @Override
     public J visitElement(@Nullable FirElement firElement, ExecutionContext ctx) {
+        if (firElement == null) {
+            return null;
+        }
+
         // FIR error elements
         if (firElement instanceof FirErrorNamedReference) {
             return visitErrorNamedReference((FirErrorNamedReference) firElement, ctx);
@@ -3895,7 +3899,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitNoReceiverExpression((FirNoReceiverExpression) firElement, ctx);
         }
 
-        throw new IllegalArgumentException("Unsupported FirElement.");
+        throw new IllegalArgumentException("Unsupported FirElement " + firElement.getClass().getName());
     }
 
     private J.Identifier createIdentifier(@Nullable String name) {
