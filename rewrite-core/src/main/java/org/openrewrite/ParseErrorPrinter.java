@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import org.openrewrite.marker.Marker;
+import org.openrewrite.tree.ParseError;
 
 public class ParseErrorPrinter<P> extends ParseErrorVisitor<PrintOutputCapture<P>> {
     @Override

@@ -25,6 +25,7 @@ import org.openrewrite.protobuf.internal.ProtoParserVisitor;
 import org.openrewrite.protobuf.internal.grammar.Protobuf2Lexer;
 import org.openrewrite.protobuf.internal.grammar.Protobuf2Parser;
 import org.openrewrite.protobuf.tree.Proto;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 

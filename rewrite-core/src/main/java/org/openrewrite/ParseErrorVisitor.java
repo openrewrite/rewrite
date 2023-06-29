@@ -15,6 +15,8 @@
  */
 package org.openrewrite;
 
+import org.openrewrite.tree.ParseError;
+
 public class ParseErrorVisitor <P> extends TreeVisitor<Tree, P> {
 
     @Override

@@ -18,6 +18,7 @@ package org.openrewrite;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainTextParser;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import static java.nio.charset.StandardCharsets.ISO_8859_1;
