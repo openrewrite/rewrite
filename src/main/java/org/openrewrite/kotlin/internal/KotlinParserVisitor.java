@@ -1365,7 +1365,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             binaryPrefix = prefix;
         }
 
-        Expression left = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
+        FirElement receiver = functionCall.getExplicitReceiver() != null ? functionCall.getExplicitReceiver() : functionCall.getDispatchReceiver();
+        Expression left = (Expression) visitElement(receiver, ctx);
 
         Space opPrefix;
         J.Binary.Type javaBinaryType;
