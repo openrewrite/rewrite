@@ -276,6 +276,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     private String coneTypeProjectionSignature(ConeTypeProjection type) {
         String typeSignature;
         StringBuilder s = new StringBuilder();
+        System.out.println(type.getClass().getName());
         if (type instanceof ConeKotlinTypeProjectionIn) {
             ConeKotlinTypeProjectionIn in = (ConeKotlinTypeProjectionIn) type;
             s.append("Generic{in ");
@@ -324,7 +325,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
             s.append(boundSigs);
             s.append("}");
         } else {
-            throw new IllegalArgumentException("Unsupported ConeTypeProjection.");
+            throw new IllegalArgumentException("Unsupported ConeTypeProjection " + type.getClass().getName());
         }
 
         return s.toString();
