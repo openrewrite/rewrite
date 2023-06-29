@@ -276,7 +276,6 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
     private String coneTypeProjectionSignature(ConeTypeProjection type) {
         String typeSignature;
         StringBuilder s = new StringBuilder();
-        System.out.println(type.getClass().getName());
         if (type instanceof ConeKotlinTypeProjectionIn) {
             ConeKotlinTypeProjectionIn in = (ConeKotlinTypeProjectionIn) type;
             s.append("Generic{in ");
