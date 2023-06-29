@@ -65,6 +65,7 @@ import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.kotlin.internal.KotlinParserVisitor;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.style.NamedStyles;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
@@ -151,7 +152,7 @@ public class KotlinParser implements Parser {
         Disposable disposable = Disposer.newDisposable();
         Map<FirSession, List<CompiledKotlinSource>> firSessionToCus;
         try {
-            firSessionToCus = parseInputsToCompilerAst(disposable, sources, relativeTo, pctx);
+            firSessionToCus = parseInputsToCompilerAst(disposable, sources, pctx);
         } catch (Exception e) {
             // TODO: associate the compiler exception to a specific source file.
             // https://github.com/openrewrite/rewrite-kotlin/issues/24
@@ -179,20 +180,18 @@ public class KotlinParser implements Parser {
                         return kcu;
                     } catch (Throwable t) {
                         ctx.getOnError().accept(t);
+                        return ParseError.build(this, compiled.getInput(), relativeTo, ctx, t);
                     }
-                    return null;
-                })
-                .filter(Objects::nonNull);
+                });
     }
 
     /**
      * @param disposable disposable to use for the compiler environment. THIS MUST BE DISPOSED BY THE CALLER.
      * @param sources    input sources to parse.
-     * @param relativeTo path to relativize input paths against.
      * @param ctx        Execution context to use for collecting parsing failures.
      * @return FirSession associated to type attributing the CompiledKotlinSources.
      */
-    Map<FirSession, List<CompiledKotlinSource>> parseInputsToCompilerAst(Disposable disposable, Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+    Map<FirSession, List<CompiledKotlinSource>> parseInputsToCompilerAst(Disposable disposable, Iterable<Input> sources, ExecutionContext ctx) {
         CompilerConfiguration compilerConfiguration = compilerConfiguration();
 
         File buildFile = null;

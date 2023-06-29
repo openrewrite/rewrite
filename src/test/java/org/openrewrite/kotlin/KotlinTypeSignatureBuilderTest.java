@@ -54,8 +54,7 @@ public class KotlinTypeSignatureBuilderTest {
           .parseInputsToCompilerAst(
             disposable,
             singletonList(new Parser.Input(Paths.get("KotlinTypeGoat.kt"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))),
-            null,
-            new ParsingExecutionContextView(new InMemoryExecutionContext(Throwable::printStackTrace)));
+                  new ParsingExecutionContextView(new InMemoryExecutionContext(Throwable::printStackTrace)));
     }
 
     @AfterAll
