@@ -80,13 +80,13 @@ public final class PrintMavenAsCycloneDxBom {
 
         //(Scope scope, String groupId, String artifactId, String version, String packaging, List<String> licenses, String bomReference, StringBuilder bom) {
         String packaging = ("war".equals(pom.getPackaging()) || "ear".equals(pom.getPackaging())) ? "application" : "library";
-
         writeComponent(
                 Scope.Compile,
                 pom.getValue(pom.getGroupId()),
                 pom.getArtifactId(),
                 pom.getValue(pom.getVersion()),
                 packaging,
+                pom.getPackaging(),
                 pom.getRequested().getLicenses(),
                 bom);
 
@@ -106,6 +106,7 @@ public final class PrintMavenAsCycloneDxBom {
                     dependency.getArtifactId(),
                     dependency.getVersion(),
                     "library",
+                    "jar",
                     dependency.getLicenses(),
                     bom);
         }
@@ -116,6 +117,7 @@ public final class PrintMavenAsCycloneDxBom {
                     dependency.getArtifactId(),
                     dependency.getVersion(),
                     "library",
+                    "jar",
                     dependency.getLicenses(),
                     bom);
         }
@@ -133,7 +135,7 @@ public final class PrintMavenAsCycloneDxBom {
     }
 
     private static void writeDependency(ResolvedDependency dependency, StringBuilder bom) {
-        String bomReference = getBomReference(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion());
+        String bomReference = getBomReference(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), "jar");
         bom.append("        <dependency ref=\"").append(bomReference).append("\">\n");
         if (dependency.getDependencies() != null) {
             for (ResolvedDependency nested : dependency.getDependencies()) {
@@ -141,7 +143,8 @@ public final class PrintMavenAsCycloneDxBom {
                         .append(getBomReference(
                                 nested.getGroupId(),
                                 nested.getArtifactId(),
-                                nested.getVersion())
+                                nested.getVersion(),
+                                "jar")
                         ).append("\"/>\n");
             }
         }
@@ -149,10 +152,10 @@ public final class PrintMavenAsCycloneDxBom {
     }
 
     private static void writeComponent(Scope scope, String groupId, String artifactId, String version,
-                                       String packaging, List<License> licenses, StringBuilder bom) {
+                                       String packaging, String mavenPackaging, List<License> licenses, StringBuilder bom) {
 
         String indent = "        ";
-        String bomReference = getBomReference(groupId, artifactId, version);
+        String bomReference = getBomReference(groupId, artifactId, version, mavenPackaging);
         bom.append(indent).append("<component bom-ref=\"").append(bomReference).append("\" type=\"").append(packaging).append("\">\n");
         bom.append(indent).append("    <group>").append(groupId).append("</group>\n");
         bom.append(indent).append("    <name>").append(artifactId).append("</name>\n");
@@ -217,7 +220,7 @@ public final class PrintMavenAsCycloneDxBom {
         }
     }
 
-    private static String getBomReference(String group, String artifactId, String version) {
-        return "pkg:maven/" + group + "/" + artifactId + "@" + version + "?type=jar";
+    private static String getBomReference(String group, String artifactId, String version, String mavenPackaging) {
+        return "pkg:maven/" + group + "/" + artifactId + "@" + version + "?type=" + mavenPackaging;
     }
 }

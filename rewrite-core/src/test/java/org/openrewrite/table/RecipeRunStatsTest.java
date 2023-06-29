@@ -53,7 +53,7 @@ public class RecipeRunStatsTest implements RewriteTest {
               },
               new PlainTextVisitor<>() {
                   @Override
-                  public PlainText preVisit(PlainText tree, ExecutionContext ctx) {
+                  public PlainText visitText(PlainText tree, ExecutionContext ctx) {
                       return tree.withText("sam");
                   }
               });

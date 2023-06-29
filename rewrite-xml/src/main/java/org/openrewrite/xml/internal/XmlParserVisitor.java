@@ -335,7 +335,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     Markers.EMPTY,
                     name,
                     externalId,
-                    internalSubset,
+                    internalSubset == null ? Collections.emptyList() : internalSubset,
                     externalSubsets,
                     beforeTagDelimiterPrefix);
         });

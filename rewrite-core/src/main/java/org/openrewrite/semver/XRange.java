@@ -74,7 +74,7 @@ public class XRange extends LatestRelease {
         return gav.group(4) == null || !gav.group(4).equals(micro);
     }
 
-    public static Validated build(String pattern, @Nullable String metadataPattern) {
+    public static Validated<XRange> build(String pattern, @Nullable String metadataPattern) {
         Matcher matcher = X_RANGE_PATTERN.matcher(pattern);
         if (!matcher.matches() || !(pattern.contains("x") || pattern.contains("X") || pattern.contains("*"))) {
             return Validated.invalid("xRange", pattern, "not an x-range");

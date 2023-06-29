@@ -24,6 +24,7 @@ import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.Collections;
 import java.util.Set;
@@ -57,8 +58,9 @@ public class MigrateMarkersSearchResult extends Recipe {
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method,
                                                             ExecutionContext executionContext) {
                 method = super.visitMethodInvocation(method, executionContext);
-                if (WITH_MARKERS_METHOD_MATCHER.matches(method)) {
-
+                if (method.getSimpleName().equals("withMarkers") &&
+                    method.getSelect() != null &&
+                    TypeUtils.isOfClassType(method.getSelect().getType(), "org.openrewrite.yaml.tree.Yaml.Mapping.Entry")) {
                     Expression select = method.getSelect();
                     if (method.getArguments().isEmpty()) {
                         return method;
@@ -67,7 +69,9 @@ public class MigrateMarkersSearchResult extends Recipe {
 
                     if (arg instanceof J.MethodInvocation) {
                         J.MethodInvocation m = (J.MethodInvocation) arg;
-                        if (SEARCH_RESULT_METHOD_MATCHER.matches(m.getMethodType())) {
+                        if (m.getSimpleName().equals("searchResult") &&
+                            m.getSelect() != null &&
+                            TypeUtils.isOfClassType(m.getSelect().getType(), "org.openrewrite.marker.Markers")) {
                             Expression text = m.getArguments().get(0);
 
                             Expression searchResultSelect = m.getSelect();
@@ -102,7 +106,6 @@ public class MigrateMarkersSearchResult extends Recipe {
 
                             return (J.MethodInvocation) MigrateRecipeToRewrite8.commentOf(method, MANUAL_CHANGE_COMMENT);
                         }
-
                     }
                     return method;
                 }

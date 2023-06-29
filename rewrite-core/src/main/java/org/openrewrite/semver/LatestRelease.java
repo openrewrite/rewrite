@@ -140,7 +140,7 @@ public class LatestRelease implements VersionComparator {
         return normalized1.compareTo(normalized2);
     }
 
-    public static Validated build(String toVersion, @Nullable String metadataPattern) {
+    public static Validated<LatestRelease> buildLatestRelease(String toVersion, @Nullable String metadataPattern) {
         return "latest.release".equalsIgnoreCase(toVersion) ?
                 Validated.valid("latestRelease", new LatestRelease(metadataPattern)) :
                 Validated.invalid("latestRelease", toVersion, "not latest release");

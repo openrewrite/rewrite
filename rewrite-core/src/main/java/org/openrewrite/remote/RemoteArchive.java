@@ -82,10 +82,14 @@ public class RemoteArchive implements Remote {
         //noinspection resource
         HttpSender.Response response = httpSender.send(httpSender.get(uri.toString()).build());
         InputStream body = response.getBody();
-        return readIntoArchive(body, paths, 0);
+        InputStream inner = readIntoArchive(body, paths, 0);
+        if (inner == null) {
+            throw new IllegalArgumentException("Unable to find path " + paths + " in zip file " + uri);
+        }
+        return inner;
     }
 
-    private InputStream readIntoArchive(InputStream body, List<String> paths, int index) {
+    private @Nullable InputStream readIntoArchive(InputStream body, List<String> paths, int index) {
         ZipInputStream zis = new ZipInputStream(body);
         Pattern pattern = Pattern.compile(paths.get(index));
 
@@ -107,14 +111,16 @@ public class RemoteArchive implements Remote {
                             }
                         };
                     } else {
-                        return readIntoArchive(zis, paths, index + 1);
+                        InputStream maybeInputStream = readIntoArchive(zis, paths, index + 1);
+                        if (maybeInputStream != null) {
+                            return maybeInputStream;
+                        }
                     }
                 }
             }
-
         } catch (IOException e) {
             throw new IllegalArgumentException("Unable to load path " + paths + " in zip file " + uri, e);
         }
-        throw new IllegalArgumentException("Unable to find path " + paths + " in zip file " + uri);
+        return null;
     }
 }

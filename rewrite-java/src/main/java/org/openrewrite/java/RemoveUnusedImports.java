@@ -134,12 +134,16 @@ public class RemoveUnusedImports extends Recipe {
                     // some class names are not handled properly by `getTypeName()`
                     // see https://github.com/openrewrite/rewrite/issues/1698 for more detail
                     String target = qualid.getTarget().toString();
-                    SortedSet<String> targetMethodsAndFields = methodsAndFieldsByTypeName.get(target);
+                    String modifiedTarget = methodsAndFieldsByTypeName.keySet().stream()
+                            .filter(key -> key.matches(target.replaceAll("\\.", "(\\\\\\.|\\\\\\$)")))
+                            .findFirst()
+                            .orElse(target);
+                    SortedSet<String> targetMethodsAndFields = methodsAndFieldsByTypeName.get(modifiedTarget);
 
                     Set<JavaType.FullyQualified> staticClasses = null;
                     for (JavaType.FullyQualified maybeStatic : typesByPackage.getOrDefault(elem.getPackageName(), emptySet())) {
-                        if(maybeStatic.getOwningClass() != null && outerType.startsWith(maybeStatic.getOwningClass().getFullyQualifiedName())) {
-                            if(staticClasses == null) {
+                        if (maybeStatic.getOwningClass() != null && outerType.startsWith(maybeStatic.getOwningClass().getFullyQualifiedName())) {
+                            if (staticClasses == null) {
                                 staticClasses = new HashSet<>();
                             }
                             staticClasses.add(maybeStatic);
@@ -169,9 +173,9 @@ public class RemoveUnusedImports extends Recipe {
 
                             if (staticClasses != null) {
                                 for (JavaType.FullyQualified fqn : staticClasses) {
-                                        anImport.imports.add(new JRightPadded<>(elem
-                                                .withQualid(qualid.withName(name.withSimpleName(fqn.getClassName().contains(".") ? fqn.getClassName().substring(fqn.getClassName().lastIndexOf(".") + 1) : fqn.getClassName())))
-                                                .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY));
+                                    anImport.imports.add(new JRightPadded<>(elem
+                                            .withQualid(qualid.withName(name.withSimpleName(fqn.getClassName().contains(".") ? fqn.getClassName().substring(fqn.getClassName().lastIndexOf(".") + 1) : fqn.getClassName())))
+                                            .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY));
                                 }
                             }
 

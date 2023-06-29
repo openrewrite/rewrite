@@ -107,6 +107,7 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
         if (dependenciesBlockMissing) {
             Statement dependenciesInvocation = GRADLE_PARSER.parse("dependencies {}")
                     .findFirst()
+                    .map(G.CompilationUnit.class::cast)
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
                     .getStatements().get(0);
             dependenciesInvocation = autoFormat(dependenciesInvocation, ctx, new Cursor(getCursor(), cu));
@@ -117,7 +118,7 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
         }
 
         if (version != null) {
-            Validated versionValidated = Semver.validate(version, versionPattern);
+            Validated<VersionComparator> versionValidated = Semver.validate(version, versionPattern);
             if (versionValidated.isValid()) {
                 versionComparator = versionValidated.getValue();
             }
@@ -261,6 +262,7 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
             }
             J.MethodInvocation addDependencyInvocation = requireNonNull((J.MethodInvocation) ((J.Return) (((J.Block) ((J.Lambda) ((J.MethodInvocation) GRADLE_PARSER.parse(codeTemplate)
                     .findFirst()
+                    .map(G.CompilationUnit.class::cast)
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"))
                     .getStatements().get(0)).getArguments().get(0)).getBody()).getStatements().get(0))).getExpression());
             addDependencyInvocation = autoFormat(addDependencyInvocation, ctx, new Cursor(getCursor(), body));

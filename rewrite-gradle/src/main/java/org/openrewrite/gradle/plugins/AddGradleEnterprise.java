@@ -21,6 +21,8 @@ import org.openrewrite.*;
 import org.openrewrite.gradle.GradleParser;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.IsSettingsGradle;
+import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
@@ -30,10 +32,14 @@ import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.BuildTool;
+import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
 import java.nio.file.Paths;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -44,6 +50,8 @@ import static org.openrewrite.gradle.plugins.AddPluginVisitor.resolvePluginVersi
 @EqualsAndHashCode(callSuper = true)
 @Incubating(since = "7.33.0")
 public class AddGradleEnterprise extends Recipe {
+    @EqualsAndHashCode.Exclude
+    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Plugin version",
             description = "An exact version number or node-style semver selector used to select the plugin version.",
@@ -127,13 +135,25 @@ public class AddGradleEnterprise extends Recipe {
                 if(containsGradleEnterpriseDsl(cu)) {
                     return cu;
                 }
+
                 boolean gradleSixOrLater = versionComparator.compare(null, buildTool.getVersion(), "6.0") >= 0;
                 if (gradleSixOrLater && cu.getSourcePath().endsWith("settings.gradle")) {
                     // Newer than 6.0 goes in settings
-                    cu = withPlugin(cu, "com.gradle.enterprise", versionComparator, ctx);
+                    Optional<GradleSettings> maybeGradleSettings = cu.getMarkers().findFirst(GradleSettings.class);
+                    if (!maybeGradleSettings.isPresent()) {
+                        return cu;
+                    }
+                    GradleSettings gradleSettings = maybeGradleSettings.get();
+                    cu = withPlugin(cu, "com.gradle.enterprise", versionComparator, gradleSettings.getPluginRepositories(), ctx);
                 } else if(!gradleSixOrLater && cu.getSourcePath().toString().equals("build.gradle")) {
                     // Older than 6.0 goes in root build.gradle only, not in build.gradle of subprojects
-                    cu = withPlugin(cu, "com.gradle.build-scan", versionComparator, ctx);
+                    Optional<GradleProject> maybeGradleProject = cu.getMarkers().findFirst(GradleProject.class);
+                    if (!maybeGradleProject.isPresent()) {
+                        return cu;
+                    }
+                    GradleProject gradleProject = maybeGradleProject.get();
+
+                    cu = withPlugin(cu, "com.gradle.build-scan", versionComparator, gradleProject.getMavenPluginRepositories(), ctx);
                 }
 
                 return cu;
@@ -141,23 +161,27 @@ public class AddGradleEnterprise extends Recipe {
         });
     }
 
-    private G.CompilationUnit withPlugin(G.CompilationUnit cu, String pluginId, VersionComparator versionComparator, ExecutionContext ctx) {
-        Optional<String> maybeNewVersion = resolvePluginVersion(pluginId, version, null, ctx);
-        if(!maybeNewVersion.isPresent()) {
-            // shouldn't happen since a non-null version was passed to resolvePluginVersion
-            return cu;
+    private G.CompilationUnit withPlugin(G.CompilationUnit cu, String pluginId, VersionComparator versionComparator, List<MavenRepository> repositories, ExecutionContext ctx) {
+        try {
+            Optional<String> maybeNewVersion = resolvePluginVersion(pluginId, "0", version, null, repositories, ctx);
+            if (!maybeNewVersion.isPresent()) {
+                // shouldn't happen since a non-null version was passed to resolvePluginVersion
+                return cu;
+            }
+            String newVersion = maybeNewVersion.get();
+            cu = (G.CompilationUnit) new AddPluginVisitor(pluginId, newVersion, null, repositories)
+                    .visitNonNull(cu, ctx);
+            cu = (G.CompilationUnit) new UpgradePluginVersion(pluginId, newVersion, null).getVisitor()
+                    .visitNonNull(cu, ctx);
+            J.MethodInvocation gradleEnterpriseInvocation = gradleEnterpriseDsl(
+                    newVersion,
+                    versionComparator,
+                    getIndent(cu),
+                    ctx);
+            return cu.withStatements(ListUtils.concat(cu.getStatements(), gradleEnterpriseInvocation));
+        } catch (MavenDownloadingException e) {
+            return e.warn(cu);
         }
-        String newVersion = maybeNewVersion.get();
-        cu = (G.CompilationUnit) new AddPluginVisitor(pluginId, newVersion, null)
-                .visitNonNull(cu, ctx);
-        cu = (G.CompilationUnit) new UpgradePluginVersion(pluginId, newVersion, null).getVisitor()
-                .visitNonNull(cu, ctx);
-        J.MethodInvocation gradleEnterpriseInvocation = gradleEnterpriseDsl(
-                newVersion,
-                versionComparator,
-                getIndent(cu),
-                ctx);
-        return cu.withStatements(ListUtils.concat(cu.getStatements(), gradleEnterpriseInvocation));
     }
 
     private static boolean containsGradleEnterpriseDsl(JavaSourceFile cu) {
@@ -227,6 +251,7 @@ public class AddGradleEnterprise extends Recipe {
         G.CompilationUnit cu = GradleParser.builder().build()
                 .parseInputs(singletonList(
                         Parser.Input.fromString(Paths.get("settings.gradle"), ge.toString())), null, ctx)
+                .map(G.CompilationUnit.class::cast)
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
 

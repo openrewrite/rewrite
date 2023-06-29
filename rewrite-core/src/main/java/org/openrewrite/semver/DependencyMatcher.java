@@ -47,7 +47,7 @@ public class DependencyMatcher {
         this.versionComparator = versionComparator;
     }
 
-    public static Validated build(String pattern) {
+    public static Validated<DependencyMatcher> build(String pattern) {
         String[] patternPieces = pattern.split(":");
         if(patternPieces.length < 2) {
             return Validated.invalid("pattern", pattern, "missing required components. Must specify at least groupId:artifactId");
@@ -57,7 +57,7 @@ public class DependencyMatcher {
         if(patternPieces.length < 3) {
             return Validated.valid("pattern", new DependencyMatcher(patternPieces[0], patternPieces[1], null));
         }
-        Validated validatedVersion;
+        Validated<? extends VersionComparator> validatedVersion;
 
         if (patternPieces[2].contains("/")) {
             String[] versionPieces = patternPieces[2].split("/");
@@ -69,7 +69,7 @@ public class DependencyMatcher {
             validatedVersion = Semver.validate(patternPieces[2], null);
         }
         if(validatedVersion.isInvalid()) {
-            return validatedVersion;
+            return validatedVersion.asInvalid();
         }
         return Validated.valid("pattern", new DependencyMatcher(patternPieces[0], patternPieces[1], validatedVersion.getValue()));
     }
