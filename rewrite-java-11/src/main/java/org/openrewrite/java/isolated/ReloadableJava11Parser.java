@@ -29,7 +29,7 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.ParseError;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
