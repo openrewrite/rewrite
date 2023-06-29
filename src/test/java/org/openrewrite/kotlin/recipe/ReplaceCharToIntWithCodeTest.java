@@ -31,7 +31,7 @@ public class ReplaceCharToIntWithCodeTest implements RewriteTest {
 
     @DocumentExample
     @Test
-    void kotlinFile() {
+    void replace() {
         rewriteRun(
           kotlin(
             """
