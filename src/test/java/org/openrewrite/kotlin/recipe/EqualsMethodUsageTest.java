@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.recipe;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
@@ -60,6 +61,61 @@ class EqualsMethodUsageTest implements RewriteTest {
             """
               fun isSame(obj1 : String, obj2: String) : Boolean {
                   val isSame = obj1 == /*comment*/ obj2
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceWithNotEqual() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method(obj1 : String, obj2: String) {
+                  val isNotSame = !obj1.equals(obj2)
+              }
+              """,
+            """
+              fun method(obj1 : String, obj2: String) {
+                  val isNotSame = obj1 != obj2
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceWithNotEqualWithComments() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method(obj1 : String, obj2: String) {
+                  val isNotSame = !obj1.equals( /*comment*/ obj2)
+              }
+              """,
+            """
+              fun method(obj1 : String, obj2: String) {
+                  val isNotSame = obj1 != /*comment*/ obj2
+              }
+              """
+          )
+        );
+    }
+
+    @Disabled("Parentheses parsing error to be fixed")
+    @Test
+    void replaceWithNotEqualInParentheses() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method(obj1 : String, obj2: String) {
+                  val isNotSame = !(obj1.equals(obj2))
+              }
+              """,
+            """
+              fun method(obj1 : String, obj2: String) {
+                  val isNotSame = obj1 != obj2
               }
               """
           )

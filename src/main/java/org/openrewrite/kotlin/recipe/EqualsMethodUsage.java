@@ -1,7 +1,23 @@
+/*
+ * Copyright 2023 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.kotlin.recipe;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import lombok.With;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -13,11 +29,15 @@ import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.marker.Marker;
 
 import java.time.Duration;
 import java.util.Collections;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+
+import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -53,9 +73,22 @@ public class EqualsMethodUsage extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new KotlinVisitor<ExecutionContext>() {
             @Override
+            public J visitUnary(J.Unary unary, ExecutionContext ctx) {
+                unary = (J.Unary) super.visitUnary(unary, ctx);
+                if (unary.getExpression() instanceof J.Binary &&
+                    replacedWithEqual.hasMarker(unary.getExpression())) {
+                    J.Binary binary = (J.Binary) unary.getExpression();
+                    if (binary.getOperator().equals(J.Binary.Type.Equal)) {
+                        return binary.withOperator(J.Binary.Type.NotEqual);
+                    }
+                }
+                return unary;
+            }
+
+            @Override
             public J visitMethodInvocation(J.MethodInvocation method,
-                                           ExecutionContext executionContext) {
-                method = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
+                                           ExecutionContext ctx) {
+                method = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if ("equals".equals(method.getSimpleName()) &&
                     method.getArguments().size() == 1 &&
                     TypeUtils.isOfClassType(method.getMethodType().getReturnType(), "kotlin.Boolean") &&
@@ -63,7 +96,7 @@ public class EqualsMethodUsage extends Recipe {
                 ) {
                     Expression lhs = method.getSelect();
                     Expression rhs = method.getArguments().get(0);
-                    return buildEqualsBinary(lhs, rhs);
+                    return replacedWithEqual.withMarker(buildEqualsBinary(lhs, rhs));
                 }
                 return method;
             }
@@ -95,4 +128,17 @@ public class EqualsMethodUsage extends Recipe {
         return equalsBinaryTemplate.withLeft(left.withPrefix(left.getPrefix())).withRight(right.withPrefix(rhsPrefix));
     }
 
+    @Value
+    @With
+    private static class replacedWithEqual implements Marker {
+        UUID id;
+
+        static <J2 extends J> J2 withMarker(J2 j) {
+            return j.withMarkers(j.getMarkers().addIfAbsent(new EqualsMethodUsage.replacedWithEqual(randomId())));
+        }
+
+        static boolean hasMarker(J j) {
+            return j.getMarkers().findFirst(EqualsMethodUsage.replacedWithEqual.class).isPresent();
+        }
+    }
 }
