@@ -15,11 +15,13 @@
  */
 package org.openrewrite.java.tree;
 
+import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 
@@ -135,6 +137,42 @@ public class TypeUtils {
             return type == JavaType.Primitive.fromKeyword(fqn);
         }
         return false;
+    }
+
+    /**
+     * @param type The declaring type of the method invocation or constructor.
+     * @param matchOverride Whether to match the {@code Object} type.
+     * @return True if the declaring type matches the criteria of this matcher.
+     */
+    @Incubating(since = "8.1.4")
+    public static boolean isOfTypeWithName(
+            @Nullable JavaType.FullyQualified type,
+            boolean matchOverride,
+            Predicate<String> matcher
+    ) {
+       if (type == null || type instanceof JavaType.Unknown) {
+           return false;
+       }
+       if (matcher.test(type.getFullyQualifiedName())) {
+           return true;
+       }
+       if (matchOverride) {
+           if (!"java.lang.Object".equals(type.getFullyQualifiedName()) &&
+               isOfTypeWithName(TYPE_OBJECT, true, matcher)) {
+               return true;
+           }
+
+           if (isOfTypeWithName(type.getSupertype(), true, matcher)) {
+               return true;
+           }
+
+           for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
+               if (isOfTypeWithName(anInterface, true, matcher)) {
+                   return true;
+               }
+           }
+       }
+       return false;
     }
 
     public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {
