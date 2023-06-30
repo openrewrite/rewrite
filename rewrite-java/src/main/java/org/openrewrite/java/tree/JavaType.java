@@ -36,6 +36,7 @@ import static org.openrewrite.java.tree.TypeUtils.unknownIfNull;
 @SuppressWarnings("unused")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
+@JsonIgnoreProperties(ignoreUnknown = true)
 public interface JavaType {
 
     FullyQualified[] EMPTY_FULLY_QUALIFIED_ARRAY = new FullyQualified[0];
