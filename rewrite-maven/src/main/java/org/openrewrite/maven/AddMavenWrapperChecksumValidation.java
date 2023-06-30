@@ -20,8 +20,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.maven.cache.LocalMavenArtifactCache;
 import org.openrewrite.maven.cache.MavenArtifactCache;
 import org.openrewrite.maven.tree.Dependency;
@@ -29,6 +27,7 @@ import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.maven.utilities.MavenArtifactDownloader;
+import org.openrewrite.properties.AddProperty;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.search.FindProperties;
 import org.openrewrite.properties.tree.Properties;
@@ -102,9 +101,10 @@ class AddMavenWrapperChecksumVisitor extends PropertiesVisitor<ExecutionContext>
 
     @Override
     public Properties visitFile(Properties.File file, ExecutionContext context) {
-        Properties mavenWrapperProperties = super.visitFile(file, context);
+        Properties.File mavenWrapperProperties = (Properties.File) super.visitFile(file, context);
 
         if (equalIgnoringSeparators(file.getSourcePath(), Paths.get(MVN_WRAPPER_MAVEN_WRAPPER_PROPERTIES))) {
+            // TODO I feel like we should instead use the URL defined in the properties for download & sha calculation
             mavenWrapperProperties = addShaForUrl(
                     mavenWrapperProperties, DISTRIBUTION_URL, DISTRIBUTION_SHA_256_SUM, this::downloadDistributionAndMarkToDelete);
             mavenWrapperProperties = addShaForUrl(
@@ -115,15 +115,15 @@ class AddMavenWrapperChecksumVisitor extends PropertiesVisitor<ExecutionContext>
     }
 
     @NotNull
-    private Properties addShaForUrl(Properties properties, String urlKey, String shaKey, Callable<File> download) {
+    private Properties.File addShaForUrl(Properties.File properties, String urlKey, String shaKey, Callable<File> download) {
         Set<Properties.Entry> urls = FindProperties.find(properties, urlKey, false);
         Set<Properties.Entry> shas = FindProperties.find(properties, shaKey, false);
         if (urls.size() == 1 && shas.isEmpty()) {
-            Properties.Entry distributionUrl = urls.stream().findFirst().get();
             try {
                 File distribution = download.call();
                 String distributionSha256Hex = sha256AsHex(distribution);
-                return addPropertyToProperties(properties, shaKey, distributionSha256Hex);
+                return (Properties.File) new AddProperty(shaKey, distributionSha256Hex, null)
+                        .getVisitor().visitFile(properties, null);
             } catch (Exception e) {
                 // NOP
             }
@@ -163,7 +163,6 @@ class AddMavenWrapperChecksumVisitor extends PropertiesVisitor<ExecutionContext>
 
     private File downloadMavenArtifact(final ResolvedGroupArtifactVersion rgav, String type) throws IOException {
         final MavenArtifactCache cache = new LocalMavenArtifactCache(Files.createTempDirectory("repository"));
-        //final MavenSettings settings = new MavenSettings();
         final MavenArtifactDownloader downloader = new MavenArtifactDownloader(cache, null, Throwable::printStackTrace);
         final ResolvedDependency rd = new ResolvedDependency(
                 MavenRepository.MAVEN_CENTRAL,
@@ -190,21 +189,6 @@ class AddMavenWrapperChecksumVisitor extends PropertiesVisitor<ExecutionContext>
                 .ofNullable(downloader.downloadArtifact(rd))
                 .map(Path::toFile)
                 .orElseThrow(() -> new RuntimeException("Could not download artifact " + rd.toString()));
-    }
-
-    private Properties addPropertyToProperties(Properties mavenWrapperProperties, String name, String value) {
-        Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, value);
-        Properties.Entry entry = new Properties.Entry(
-                Tree.randomId(),
-                "\n",
-                Markers.EMPTY,
-                name,
-                "",
-                Properties.Entry.Delimiter.EQUALS,
-                propertyValue
-        );
-        List<Properties.Content> contentList = ListUtils.concat(((Properties.File) mavenWrapperProperties).getContent(), entry);
-        return ((Properties.File) mavenWrapperProperties).withContent(contentList);
     }
 
     /**
