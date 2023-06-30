@@ -15,9 +15,7 @@
  */
 package org.openrewrite.remote;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.lang.Nullable;
@@ -26,10 +24,15 @@ import org.openrewrite.marker.Markers;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -77,16 +80,34 @@ public class RemoteArchive implements Remote {
      */
     List<String> paths;
 
+    private static Map<URI, Path> downloadCache = new HashMap<>();
+
     @Override
     public InputStream getInputStream(HttpSender httpSender) {
-        //noinspection resource
-        HttpSender.Response response = httpSender.send(httpSender.get(uri.toString()).build());
-        InputStream body = response.getBody();
-        InputStream inner = readIntoArchive(body, paths, 0);
-        if (inner == null) {
-            throw new IllegalArgumentException("Unable to find path " + paths + " in zip file " + uri);
+        try {
+            InputStream body;
+            if (downloadCache.containsKey(uri)) {
+                body = Files.newInputStream(downloadCache.get(uri));
+            } else {
+                String actualUri = uri.toString();
+                String fileName = actualUri.substring(actualUri.lastIndexOf("/") + 1);
+                try (HttpSender.Response response = httpSender.send(httpSender.get(actualUri).build())) {
+                    InputStream responseBody = response.getBody();
+                    Path localFile = Files.createTempFile(fileName, ".tmp");
+                    Files.copy(responseBody, localFile, StandardCopyOption.REPLACE_EXISTING);
+                    downloadCache.put(uri, localFile);
+                    body = Files.newInputStream(localFile);
+                }
+            }
+
+            InputStream inner = readIntoArchive(body, paths, 0);
+            if (inner == null) {
+                throw new IllegalArgumentException("Unable to find path " + paths + " in zip file " + uri);
+            }
+            return inner;
+        } catch (IOException e) {
+            throw new UncheckedIOException("Unable to download " + uri + " to temporary file", e);
         }
-        return inner;
     }
 
     private @Nullable InputStream readIntoArchive(InputStream body, List<String> paths, int index) {

@@ -20,7 +20,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
-import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.ListUtils;
@@ -97,22 +96,23 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Nullable
     final Boolean addIfMissing;
 
-    @NonFinal
     transient Validated<GradleWrapper> gradleWrapperValidation;
 
     Validated<GradleWrapper> createValidatedGradleWrapperValidation(ExecutionContext ctx) {
-        return GradleWrapper.validate(
-                ctx,
-                isBlank(version) ? "latest.release" : version,
-                distribution,
-                repositoryUrl
-        );
+        if (gradleWrapperValidation == null) {
+            gradleWrapperValidation = GradleWrapper.validate(
+                    ctx,
+                    isBlank(version) ? "latest.release" : version,
+                    distribution,
+                    repositoryUrl
+            );
+        }
+        return gradleWrapperValidation;
     }
 
     @Override
     public Validated<Object> validate(ExecutionContext ctx) {
-        gradleWrapperValidation = createValidatedGradleWrapperValidation(ctx);
-        return super.validate(ctx).and(gradleWrapperValidation);
+        return super.validate(ctx).and(createValidatedGradleWrapperValidation(ctx));
     }
 
     static class GradleWrapperState {
