@@ -324,15 +324,14 @@ public final class ListUtils {
         return ls == null || ls.isEmpty() ? null : ls;
     }
 
-    public static <T> T[] arrayOrNullIfEmpty(@Nullable List<T> list, T[] array) {
+    public static <T> T @Nullable [] arrayOrNullIfEmpty(@Nullable List<T> list, T[] array) {
         if (list == null || list.isEmpty()) {
             return null;
         }
         return list.toArray(array);
     }
 
-    @Nullable
-    public static <T> T[] nullIfEmpty(@Nullable T[] list) {
+    public static <T> T @Nullable [] nullIfEmpty(T @Nullable [] list) {
         return list == null || list.length == 0 ? null : list;
     }
 

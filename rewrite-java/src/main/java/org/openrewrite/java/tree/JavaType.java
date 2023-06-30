@@ -22,6 +22,7 @@ import lombok.With;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.Incubating;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 
@@ -129,6 +130,11 @@ public interface JavaType {
 
         public MultiCatch unsafeSet(List<JavaType> throwableTypes) {
             this.throwableTypes = arrayOrNullIfEmpty(throwableTypes, EMPTY_JAVA_TYPE_ARRAY);
+            return this;
+        }
+
+        public MultiCatch unsafeSet(JavaType[] throwableTypes) {
+            this.throwableTypes = ListUtils.nullIfEmpty(throwableTypes);
             return this;
         }
     }
@@ -500,6 +506,20 @@ public interface JavaType {
             return this;
         }
 
+        public Class unsafeSet(@Nullable JavaType[] typeParameters, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
+                               @Nullable FullyQualified[] annotations, @Nullable FullyQualified[] interfaces,
+                               @Nullable Variable[] members, @Nullable Method[] methods) {
+            //noinspection DuplicatedCode
+            this.typeParameters = ListUtils.nullIfEmpty(typeParameters);
+            this.supertype = supertype;
+            this.owningClass = owningClass;
+            this.annotations = ListUtils.nullIfEmpty(annotations);
+            this.interfaces = ListUtils.nullIfEmpty(interfaces);
+            this.members = ListUtils.nullIfEmpty(members);
+            this.methods = ListUtils.nullIfEmpty(methods);
+            return this;
+        }
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
@@ -615,6 +635,13 @@ public interface JavaType {
             assert type != this;
             this.type = unknownIfNull(type);
             this.typeParameters = arrayOrNullIfEmpty(typeParameters, EMPTY_JAVA_TYPE_ARRAY);
+            return this;
+        }
+
+        public Parameterized unsafeSet(@Nullable FullyQualified type, @Nullable JavaType[] typeParameters) {
+            assert type != this;
+            this.type = unknownIfNull(type);
+            this.typeParameters = ListUtils.nullIfEmpty(typeParameters);
             return this;
         }
 
@@ -747,6 +774,13 @@ public interface JavaType {
             this.name = name;
             this.variance = variance;
             this.bounds = arrayOrNullIfEmpty(bounds, EMPTY_JAVA_TYPE_ARRAY);
+            return this;
+        }
+
+        public GenericTypeVariable unsafeSet(String name, Variance variance, @Nullable JavaType[] bounds) {
+            this.name = name;
+            this.variance = variance;
+            this.bounds = ListUtils.nullIfEmpty(bounds);
             return this;
         }
 
@@ -1034,6 +1068,19 @@ public interface JavaType {
             return this;
         }
 
+        public Method unsafeSet(@Nullable FullyQualified declaringType,
+                                @Nullable JavaType returnType,
+                                @Nullable JavaType[] parameterTypes,
+                                @Nullable FullyQualified[] thrownExceptions,
+                                @Nullable FullyQualified[] annotations) {
+            this.declaringType = unknownIfNull(declaringType);
+            this.returnType = unknownIfNull(returnType);
+            this.parameterTypes = ListUtils.nullIfEmpty(parameterTypes);
+            this.thrownExceptions = ListUtils.nullIfEmpty(thrownExceptions);
+            this.annotations = ListUtils.nullIfEmpty(annotations);
+            return this;
+        }
+
         public boolean isConstructor() {
             return "<constructor>".equals(name);
         }
@@ -1280,6 +1327,14 @@ public interface JavaType {
             this.owner = owner;
             this.type = unknownIfNull(type);
             this.annotations = arrayOrNullIfEmpty(annotations, EMPTY_FULLY_QUALIFIED_ARRAY);
+            return this;
+        }
+
+        public Variable unsafeSet(JavaType owner, @Nullable JavaType type,
+                                  FullyQualified @Nullable [] annotations) {
+            this.owner = owner;
+            this.type = unknownIfNull(type);
+            this.annotations = ListUtils.nullIfEmpty(annotations);
             return this;
         }
 
