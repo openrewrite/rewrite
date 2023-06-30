@@ -91,6 +91,7 @@ public class RemoteArchive implements Remote {
                 HttpSender.Response response = httpSender.send(httpSender.get(uri.toString()).build());
                 return response.getBody();
             }, ctx.getOnError());
+
             if (localArchive == null) {
                 throw new IllegalStateException("Failed to download " + uri + " to artifact cache");
             }

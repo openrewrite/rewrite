@@ -15,46 +15,40 @@
  */
 package org.openrewrite.remote;
 
-import lombok.EqualsAndHashCode;
-import lombok.ToString;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.InputStream;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.util.HashMap;
-import java.util.Map;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.function.Consumer;
 
-@EqualsAndHashCode
-@ToString
 public class LocalRemoteArtifactCache implements RemoteArtifactCache {
     private final Path cacheDir;
-    private final Map<URI, Path> cache;
 
     public LocalRemoteArtifactCache(Path cacheDir) {
         if (!cacheDir.toFile().exists() && !cacheDir.toFile().mkdirs()) {
             throw new IllegalStateException("Unable to find or create remote archive cache at " + cacheDir);
         }
         this.cacheDir = cacheDir;
-        this.cache = new HashMap<>();
     }
 
     @Override
     @Nullable
     public Path get(URI uri) {
-        return cache.get(uri);
+        Path resolved = cacheDir.resolve(hashUri(uri));
+        return Files.exists(resolved) ? resolved : null;
     }
 
     @Override
     @Nullable
     public Path put(URI uri, InputStream artifactInputStream, Consumer<Throwable> onError) {
-        String artifactUri = uri.toString();
-        String artifactName = artifactUri.substring(artifactUri.lastIndexOf("/") + 1);
         try {
-            Path artifact = Files.createTempFile(cacheDir, artifactName, ".tmp");
+            Path artifact = cacheDir.resolve(hashUri(uri));
             try (InputStream is = artifactInputStream) {
                 Files.copy(is, artifact, StandardCopyOption.REPLACE_EXISTING);
             }
@@ -65,19 +59,23 @@ public class LocalRemoteArtifactCache implements RemoteArtifactCache {
         }
     }
 
-    @Override
-    public boolean containsKey(URI uri) {
-        return cache.containsKey(uri);
-    }
+    public static String hashUri(URI uri) {
+        // hash the string using SHA-256
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest(uri.toString().getBytes(StandardCharsets.UTF_8));
 
-    @Override
-    public void clear() {
-        cache.forEach((uri, artifact) -> {
-            try {
-                Files.deleteIfExists(artifact);
-            } catch (Exception ignored) {
+            StringBuilder hashStringBuilder = new StringBuilder();
+            for (byte hashByte : hashBytes) {
+                String hex = Integer.toHexString(0xff & hashByte);
+                if (hex.length() == 1) {
+                    hashStringBuilder.append('0');
+                }
+                hashStringBuilder.append(hex);
             }
-        });
-        cache.clear();
+            return hashStringBuilder.toString();
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
