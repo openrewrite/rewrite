@@ -18,6 +18,7 @@ package org.openrewrite.maven;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
@@ -43,29 +44,26 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Callable;
 
 import static org.openrewrite.PathUtils.equalIgnoringSeparators;
+import static org.openrewrite.maven.AddMavenWrapperChecksumValidation.MVN_WRAPPER_MAVEN_WRAPPER_PROPERTIES;
 
 @Value
-// @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @AllArgsConstructor
 @EqualsAndHashCode(callSuper = true)
 public class AddMavenWrapperChecksumValidation extends Recipe {
 
     public static final String MVN_WRAPPER_MAVEN_WRAPPER_PROPERTIES = ".mvn/wrapper/maven-wrapper.properties";
-    public static final String DISTRIBUTION_URL = "distributionUrl";
-    public static final String WRAPPER_URL = "wrapperUrl";
-    public static final String DISTRIBUTION_SHA_256_SUM = "distributionSha256Sum";
-    public static final String WRAPPER_SHA_256_SUM = "wrapperSha256Sum";
 
     @Override
     public String getDisplayName() {
-        return "Add checksum validation to maven wrapper";
+        return "Add Maven Wrapper checksum properties";
     }
 
     @Override
     public String getDescription() {
-        return "Add checksum validation to maven wrapper if used.";
+        return "Add checksum properties to `.mvn/wrapper/maven-wrapper.properties` for use in validation.";
     }
 
     @Option(displayName = "Distribution version",
@@ -82,58 +80,58 @@ public class AddMavenWrapperChecksumValidation extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(
                 new HasSourcePath<>(MVN_WRAPPER_MAVEN_WRAPPER_PROPERTIES),
-                new PropertiesVisitor<ExecutionContext>() {
-                    @Override
-                    public Properties visitFile(Properties.File file, ExecutionContext context) {
-                        Properties mavenWrapperProperties = super.visitFile(file, context);
-
-                        if (equalIgnoringSeparators(file.getSourcePath(), Paths.get(MVN_WRAPPER_MAVEN_WRAPPER_PROPERTIES))) {
-                            Set<Properties.Entry> distributionUrls =
-                                    FindProperties.find(mavenWrapperProperties, DISTRIBUTION_URL, false);
-                            Set<Properties.Entry> distributionSha256Hexs =
-                                    FindProperties.find(mavenWrapperProperties, DISTRIBUTION_SHA_256_SUM, false);
-
-                            if (distributionUrls.size() == 1 && distributionSha256Hexs.isEmpty()) {
-                                Properties.Entry distributionUrl = distributionUrls.stream().findFirst().get();
-
-                                try {
-                                    File distribution = downloadDistributionAndMarkToDelete(distributionUrl.getValue().getText());
-
-                                    String distributionSha256Hex = sha256AsHex(distribution);
-
-                                    mavenWrapperProperties = addPropertyToProperties(mavenWrapperProperties, DISTRIBUTION_SHA_256_SUM, distributionSha256Hex);
-                                } catch (IOException | NoSuchAlgorithmException e) {
-                                    // NOP
-                                }
-                            }
-
-
-                            Set<Properties.Entry> wrapperUrls =
-                                    FindProperties.find(mavenWrapperProperties, WRAPPER_URL, false);
-                            Set<Properties.Entry> wrapperSha256Hexs =
-                                    FindProperties.find(mavenWrapperProperties, WRAPPER_SHA_256_SUM, false);
-
-                            if (wrapperUrls.size() == 1 && wrapperSha256Hexs.isEmpty()) {
-                                Properties.Entry wrapperUrl = wrapperUrls.stream().findFirst().get();
-
-                                try {
-                                    File wrapper = downloadWrapperAndMarkToDelete(wrapperUrl.getValue().getText());
-
-                                    String wrapperSha256Hex = sha256AsHex(wrapper);
-
-                                    mavenWrapperProperties = addPropertyToProperties(mavenWrapperProperties, WRAPPER_SHA_256_SUM, wrapperSha256Hex);
-                                } catch (IOException | NoSuchAlgorithmException e) {
-                                    // NOP
-                                }
-                            }
-                        }
-
-                        return mavenWrapperProperties;
-                    }
-                });
+                new AddMavenWrapperChecksumVisitor(distributionVersion, wrapperVersion));
     }
 
-    private File downloadDistributionAndMarkToDelete(String distributionUrl) throws IOException {
+}
+
+class AddMavenWrapperChecksumVisitor extends PropertiesVisitor<ExecutionContext> {
+
+    private static final String DISTRIBUTION_URL = "distributionUrl";
+    private static final String WRAPPER_URL = "wrapperUrl";
+    private static final String DISTRIBUTION_SHA_256_SUM = "distributionSha256Sum";
+    private static final String WRAPPER_SHA_256_SUM = "wrapperSha256Sum";
+
+    private final String distributionVersion;
+    private final String wrapperVersion;
+
+    public AddMavenWrapperChecksumVisitor(String distributionVersion, String wrapperVersion) {
+        this.distributionVersion = distributionVersion;
+        this.wrapperVersion = wrapperVersion;
+    }
+
+    @Override
+    public Properties visitFile(Properties.File file, ExecutionContext context) {
+        Properties mavenWrapperProperties = super.visitFile(file, context);
+
+        if (equalIgnoringSeparators(file.getSourcePath(), Paths.get(MVN_WRAPPER_MAVEN_WRAPPER_PROPERTIES))) {
+            mavenWrapperProperties = addShaForUrl(
+                    mavenWrapperProperties, DISTRIBUTION_URL, DISTRIBUTION_SHA_256_SUM, this::downloadDistributionAndMarkToDelete);
+            mavenWrapperProperties = addShaForUrl(
+                    mavenWrapperProperties, WRAPPER_URL, WRAPPER_SHA_256_SUM, this::downloadWrapperAndMarkToDelete);
+        }
+
+        return mavenWrapperProperties;
+    }
+
+    @NotNull
+    private Properties addShaForUrl(Properties properties, String urlKey, String shaKey, Callable<File> download) {
+        Set<Properties.Entry> urls = FindProperties.find(properties, urlKey, false);
+        Set<Properties.Entry> shas = FindProperties.find(properties, shaKey, false);
+        if (urls.size() == 1 && shas.isEmpty()) {
+            Properties.Entry distributionUrl = urls.stream().findFirst().get();
+            try {
+                File distribution = download.call();
+                String distributionSha256Hex = sha256AsHex(distribution);
+                return addPropertyToProperties(properties, shaKey, distributionSha256Hex);
+            } catch (Exception e) {
+                // NOP
+            }
+        }
+        return properties;
+    }
+
+    private File downloadDistributionAndMarkToDelete() throws IOException {
         File distribution = downloadMavenArtifact(
                 new ResolvedGroupArtifactVersion(
                         "https://repo1.maven.org/maven2",
@@ -148,7 +146,7 @@ public class AddMavenWrapperChecksumValidation extends Recipe {
         return distribution;
     }
 
-    private File downloadWrapperAndMarkToDelete(String wrapperUrl) throws IOException {
+    private File downloadWrapperAndMarkToDelete() throws IOException {
         File wrapper = downloadMavenArtifact(
                 new ResolvedGroupArtifactVersion(
                         "https://repo1.maven.org/maven2",
@@ -206,8 +204,7 @@ public class AddMavenWrapperChecksumValidation extends Recipe {
                 propertyValue
         );
         List<Properties.Content> contentList = ListUtils.concat(((Properties.File) mavenWrapperProperties).getContent(), entry);
-        mavenWrapperProperties = ((Properties.File) mavenWrapperProperties).withContent(contentList);
-        return mavenWrapperProperties;
+        return ((Properties.File) mavenWrapperProperties).withContent(contentList);
     }
 
     /**
