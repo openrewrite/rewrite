@@ -205,4 +205,33 @@ class WhenTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/138")
+    @Test
+    void inParens() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method(a: Any) {
+                   val any = (if (a is Boolean) "true" else "false")
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/138")
+    @Test
+    void multipleDeSugaredParens() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method(a: Any?) {
+                  ((((if (((a)) == ((null))) return))))
+                  val r = a
+              }
+              """
+          )
+        );
+    }
 }

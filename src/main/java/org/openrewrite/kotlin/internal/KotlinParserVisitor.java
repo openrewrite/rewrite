@@ -15,10 +15,11 @@
  */
 package org.openrewrite.kotlin.internal;
 
-import org.jetbrains.kotlin.KtFakeSourceElementKind;
-import org.jetbrains.kotlin.KtLightSourceElement;
-import org.jetbrains.kotlin.KtRealPsiSourceElement;
-import org.jetbrains.kotlin.KtSourceElement;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.kotlin.*;
+import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
+import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
+import org.jetbrains.kotlin.com.intellij.psi.PsiElementVisitor;
 import org.jetbrains.kotlin.descriptors.ClassKind;
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget;
 import org.jetbrains.kotlin.fir.*;
@@ -38,7 +39,8 @@ import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitUnitTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
-import org.jetbrains.kotlin.psi.KtNameReferenceExpression;
+import org.jetbrains.kotlin.psi.*;
+import org.jetbrains.kotlin.psi.stubs.elements.KtValueArgumentListElementType;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.ParseExceptionResult;
@@ -61,7 +63,6 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 
 import static java.lang.Math.max;
 import static java.util.Collections.*;
@@ -86,22 +87,47 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private final FirSession firSession;
     private int cursor;
 
+    private final Map<Integer, ASTNode> nodes = new HashMap<>();
+
     // Associate top-level function and property declarations to the file.
     @Nullable
     private FirFile currentFile;
 
-    private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
-
-    public KotlinParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source, List<NamedStyles> styles, JavaTypeCache typeCache, FirSession firSession, ExecutionContext ctx) {
-        this.sourcePath = sourcePath;
-        this.fileAttributes = fileAttributes;
-        this.source = source.readFully();
-        this.charset = source.getCharset();
-        this.charsetBomMarked = source.isCharsetBomMarked();
+    public KotlinParserVisitor(KotlinSource kotlinSource, @Nullable Path relativeTo, List<NamedStyles> styles, JavaTypeCache typeCache, FirSession firSession, ExecutionContext ctx) {
+        this.sourcePath = kotlinSource.getInput().getRelativePath(relativeTo);
+        this.fileAttributes = kotlinSource.getInput().getFileAttributes();
+        EncodingDetectingInputStream is = kotlinSource.getInput().getSource(ctx);
+        this.source = is.readFully();
+        this.charset = is.getCharset();
+        this.charsetBomMarked = is.isCharsetBomMarked();
         this.styles = styles;
         this.typeMapping = new KotlinTypeMapping(typeCache, firSession);
         this.ctx = ctx;
         this.firSession = firSession;
+        init(kotlinSource.getKtFile());
+    }
+
+    private void init(KtFile ktFile) {
+        PsiElementVisitor v = new PsiElementVisitor() {
+            @Override
+            public void visitElement(@NotNull PsiElement element) {
+                if (!(element instanceof KtFile) && element.getTextLength() != 0) {
+                    // Set the node at the cursor to the last visited element.
+                    nodes.put(element.getTextRange().getStartOffset(), element.getNode());
+                    assert source.substring(element.getTextRange().getStartOffset(), element.getTextRange().getEndOffset()).equals(element.getText());
+                }
+
+                for (PsiElement child : element.getChildren()) {
+                    if (child != null) {
+                        visitElement(child);
+                    }
+                }
+                if (element.getNextSibling() != null) {
+                    visitElement(element.getNextSibling());
+                }
+            }
+        };
+        v.visitElement(ktFile);
     }
 
     @Override
@@ -1043,7 +1069,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             int saveCursor = cursor;
             whitespace();
             JContainer<Expression> args;
-            if (source.startsWith("(", cursor)) {
+            if (nodes.get(cursor).getElementType() instanceof KtValueArgumentListElementType) {
                 cursor(saveCursor);
                 args = mapFunctionalCallArguments(functionCall.getArgumentList().getArguments());
             } else {
@@ -1209,14 +1235,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     op = padLeft(EMPTY, J.Unary.Type.PreDecrement);
                     expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
                 } else {
-                    // Both pre and post unary operations exist in a block with multiple AST elements: the property and unary operation.
-                    // The J.Unary objects are all created here instead of interpreting the statements in visitBlock.
-                    // The PRE operations have access to the correct property name, but the POST operations are set to "<unary>".
-                    // So, we extract the name from the source based on the post operator.
-                    int saveCursor = cursor;
-                    String opName = sourceBefore("--").getWhitespace().trim();
-                    cursor(saveCursor);
-
+                    String opName = nodes.get(cursor).getFirstChildNode().getText();
                     expr = createIdentifier(opName);
                     op = padLeft(sourceBefore("--"), J.Unary.Type.PostDecrement);
                 }
@@ -1227,14 +1246,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     op = padLeft(EMPTY, J.Unary.Type.PreIncrement);
                     expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
                 } else {
-                    // Both pre and post unary operations exist in a block with multiple AST elements: the property and unary operation.
-                    // The J.Unary objects are all created here instead of interpreting the statements in visitBlock.
-                    // The PRE operations have access to the correct property name, but the POST operations are set to "<unary>".
-                    // So, we extract the name from the source based on the post operator.
-                    int saveCursor = cursor;
-                    String opName = sourceBefore("++").getWhitespace().trim();
-                    cursor(saveCursor);
-
+                    String opName = nodes.get(cursor).getFirstChildNode().getText();
                     expr = createIdentifier(opName);
                     op = padLeft(sourceBefore("++"), J.Unary.Type.PostIncrement);
                 }
@@ -3669,6 +3681,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
      * @param ctx        N/A. The FirVisitor requires a second parameter that is generally used for DataFlow analysis.
      * @return {@link J}
      */
+    @SuppressWarnings("UnstableApiUsage")
     @Nullable
     @Override
     public J visitElement(@Nullable FirElement firElement, ExecutionContext ctx) {
@@ -3676,6 +3689,31 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return null;
         }
 
+        int saveCursor = cursor;
+        Space prefix = whitespace();
+        ASTNode node = nodes.get(cursor);
+        if (node != null) {
+            switch (node.getElementType().getDebugName()) {
+                case "PARENTHESIZED":
+                    if (node.getTextRange().getEndOffset() >= firElement.getSource().getEndOffset()) {
+                        return wrapInParens(firElement, prefix, ctx);
+                    }
+                case "REFERENCE_EXPRESSION":
+                    if ("POSTFIX_EXPRESSION".equals(node.getTreeParent().getElementType().getDebugName()) && firElement instanceof FirBlock) {
+                        firElement = ((FirBlock) firElement).getStatements().get(1);
+                    }
+                    break;
+                case "OPERATION_REFERENCE":
+                    if ("PREFIX_EXPRESSION".equals(node.getTreeParent().getElementType().getDebugName()) && firElement instanceof FirBlock) {
+                        firElement = ((FirBlock) firElement).getStatements().get(0);
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        cursor = saveCursor;
         // FIR error elements
         if (firElement instanceof FirErrorNamedReference) {
             return visitErrorNamedReference((FirErrorNamedReference) firElement, ctx);
@@ -3903,6 +3941,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         throw new IllegalArgumentException("Unsupported FirElement " + firElement.getClass().getName());
+    }
+
+    @SuppressWarnings("unchecked")
+    private <J2 extends J> J wrapInParens(FirElement firElement, Space prefix, ExecutionContext ctx) {
+        skip("(");
+        return new J.Parentheses<>(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                (JRightPadded<J2>) padRight(visitElement(firElement, ctx), sourceBefore(")"))
+        );
     }
 
     private J.Identifier createIdentifier(@Nullable String name) {

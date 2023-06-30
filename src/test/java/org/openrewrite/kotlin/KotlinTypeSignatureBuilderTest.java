@@ -17,7 +17,6 @@ package org.openrewrite.kotlin;
 
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
-import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.*;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -26,14 +25,12 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.kotlin.internal.CompiledSource;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,19 +39,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class KotlinTypeSignatureBuilderTest {
     private static final String goat = StringUtils.readFully(KotlinTypeSignatureBuilderTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
 
-    private static Disposable disposable = Disposer.newDisposable();
-    private static Map<FirSession, List<CompiledKotlinSource>> cu = new LinkedHashMap<>();
+    private static final Disposable disposable = Disposer.newDisposable();
+    private static CompiledSource compiledSource = null;
 
     @BeforeAll
     static void beforeAll() {
-        disposable = Disposer.newDisposable();
-        cu = KotlinParser.builder()
-          .logCompilationWarningsAndErrors(true)
-          .build()
-          .parseInputsToCompilerAst(
-            disposable,
-            singletonList(new Parser.Input(Paths.get("KotlinTypeGoat.kt"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))),
-                  new ParsingExecutionContextView(new InMemoryExecutionContext(Throwable::printStackTrace)));
+        compiledSource = KotlinParser.builder()
+                .logCompilationWarningsAndErrors(true)
+                .moduleName("test")
+                .build()
+                .parse(singletonList(new Parser.Input(Paths.get("KotlinTypeGoat.kt"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))), disposable,
+                        new ParsingExecutionContextView(new InMemoryExecutionContext(Throwable::printStackTrace)));
     }
 
     @AfterAll
@@ -63,11 +58,11 @@ public class KotlinTypeSignatureBuilderTest {
     }
 
     public KotlinTypeSignatureBuilder signatureBuilder() {
-        return new KotlinTypeSignatureBuilder(cu.keySet().iterator().next());
+        return new KotlinTypeSignatureBuilder(compiledSource.getFirSession());
     }
 
     private FirFile getCompiledSource() {
-        return cu.values().iterator().next().get(0).getFirFile();
+        return compiledSource.getSources().iterator().next().getFirFile();
     }
 
     public String constructorSignature() {
