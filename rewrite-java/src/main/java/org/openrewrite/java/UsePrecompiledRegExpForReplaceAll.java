@@ -51,7 +51,7 @@ public class UsePrecompiledRegExpForReplaceAll extends Recipe {
     public static class ReplaceVisitor extends JavaIsoVisitor<ExecutionContext> {
         // use boolean flag to only process one pattern at a time
         private final AtomicBoolean patternProcessingInProgress = new AtomicBoolean(false);
-        private static final String PATTERN_VAR = "openRewriteReplaceAllPatternVar";
+        private static final String PATTERN_VAR = "openRewriteReplaceAllPattern";
         private static final JavaTemplate MATCHER_TEMPLATE = JavaTemplate
                 .builder("#{any()}.matcher( #{any(java.lang.CharSequence)}).replaceAll( #{any(java.lang.String)})")
                 .contextSensitive()

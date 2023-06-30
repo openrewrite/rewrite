@@ -33,10 +33,10 @@ class UsePrecompiledRegExpForReplaceAllTest implements RewriteTest {
           }
           """, """
           class A {
-              private static final java.util.regex.Pattern openRewriteReplaceAllPatternVar = Pattern.compile("/[@]/g,");
+              private static final java.util.regex.Pattern openRewriteReplaceAllPattern = Pattern.compile("/[@]/g,");
               public void replace(){
                   String init = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
-                  String changed = openRewriteReplaceAllPatternVar.matcher(init).replaceAll("_");
+                  String changed = openRewriteReplaceAllPattern.matcher(init).replaceAll("_");
               }
           }
           """));
@@ -56,14 +56,14 @@ class UsePrecompiledRegExpForReplaceAllTest implements RewriteTest {
           }
           """, """
           class A {
-              private static final java.util.regex.Pattern openRewriteReplaceAllPatternVar1 = Pattern.compile("\\s");
-              private static final java.util.regex.Pattern openRewriteReplaceAllPatternVar = Pattern.compile("/[@]/g,");
+              private static final java.util.regex.Pattern openRewriteReplaceAllPattern1 = Pattern.compile("\\s");
+              private static final java.util.regex.Pattern openRewriteReplaceAllPattern = Pattern.compile("/[@]/g,");
               public void replace(){
                   String firstReplace = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
-                  String firstChanged = openRewriteReplaceAllPatternVar.matcher(firstReplace).replaceAll("_");
+                  String firstChanged = openRewriteReplaceAllPattern.matcher(firstReplace).replaceAll("_");
 
                   String secondReplace = "Some other subject";
-                  String secondChanged = openRewriteReplaceAllPatternVar1.matcher(secondReplace).replaceAll("_");
+                  String secondChanged = openRewriteReplaceAllPattern1.matcher(secondReplace).replaceAll("_");
               }
           }
           """));
@@ -85,16 +85,66 @@ class UsePrecompiledRegExpForReplaceAllTest implements RewriteTest {
           }
           """, """
           class A {
-              private static final java.util.regex.Pattern openRewriteReplaceAllPatternVar1 = Pattern.compile("\\s");
-              private static final java.util.regex.Pattern openRewriteReplaceAllPatternVar = Pattern.compile("/[@]/g,");
+              private static final java.util.regex.Pattern openRewriteReplaceAllPattern1 = Pattern.compile("\\s");
+              private static final java.util.regex.Pattern openRewriteReplaceAllPattern = Pattern.compile("/[@]/g,");
               public void replace(){
                   String firstReplace = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
-                  String firstChanged = openRewriteReplaceAllPatternVar.matcher(firstReplace).replaceAll("_");
+                  String firstChanged = openRewriteReplaceAllPattern.matcher(firstReplace).replaceAll("_");
               }
 
               public void otherMethod(){
                   String secondReplace = "Some other subject";
-                  String secondChanged = openRewriteReplaceAllPatternVar1.matcher(secondReplace).replaceAll("_");
+                  String secondChanged = openRewriteReplaceAllPattern1.matcher(secondReplace).replaceAll("_");
+              }
+          }
+          """));
+    }
+
+    @Test
+    void replaceReplaceWithinAStreamMapLambda() {
+        rewriteRun(recipeSpec -> recipeSpec.recipe(new UsePrecompiledRegExpForReplaceAll()), java("""
+          import java.util.List;
+          import java.util.stream.Stream;
+
+          class A {
+              public void replace(){
+                  final var strings = Stream.of("One", "Two", "Three", "Four");
+                  final var result = strings.map(value -> value.replaceAll("/[@]/g,", "_")).toList();
+              }
+          }
+          """, """
+          import java.util.List;
+          import java.util.stream.Stream;
+
+          class A {
+              private static final java.util.regex.Pattern openRewriteReplaceAllPattern = Pattern.compile("/[@]/g,");
+              public void replace(){
+                  final var strings = Stream.of("One", "Two", "Three", "Four");
+                  final var result = strings.map(value -> openRewriteReplaceAllPattern.matcher(value).replaceAll("_")).toList();
+              }
+          }
+          """));
+    }
+
+    @Test
+    void replaceReplaceWithinAOptionMapLambda() {
+        rewriteRun(recipeSpec -> recipeSpec.recipe(new UsePrecompiledRegExpForReplaceAll()), java("""
+          import java.util.Optional;
+
+          class A {
+              public void replace(){
+                  final var optionalString = Optional.of("Bob is a Bird... Bob is a Plane... Bob is Superman!");
+                  final var result = optionalString.map(value -> value.replaceAll("/[@]/g,", "_")).orElse("");
+              }
+          }
+          """, """
+          import java.util.Optional;
+
+          class A {
+              private static final java.util.regex.Pattern openRewriteReplaceAllPattern = Pattern.compile("/[@]/g,");
+              public void replace(){
+                  final var optionalString = Optional.of("Bob is a Bird... Bob is a Plane... Bob is Superman!");
+                  final var result = optionalString.map(value -> openRewriteReplaceAllPattern.matcher(value).replaceAll("_")).orElse("");
               }
           }
           """));
