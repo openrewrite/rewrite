@@ -241,9 +241,12 @@ public class BlockStatementTemplateGenerator {
             before.append("Object o = ");
             after.append(";");
             after.append("\n}}");
-        } else if (!(j instanceof J.Import) && !(j instanceof J.Package)) {
+        } else if (j instanceof J.MethodDeclaration) {
             before.insert(0, "class Template {\n");
             after.append("\n}");
+        } else if (!(j instanceof J.Import) && !(j instanceof J.Package)) {
+            before.insert(0, "class Template {{\n");
+            after.append("\n}}");
         }
         before.insert(0, EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
         for (String anImport : imports) {
