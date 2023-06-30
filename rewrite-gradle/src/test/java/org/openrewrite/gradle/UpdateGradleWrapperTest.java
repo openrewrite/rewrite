@@ -457,7 +457,9 @@ class UpdateGradleWrapperTest implements RewriteTest {
     private boolean isValidWrapperJar(Remote gradleWrapperJar) {
         try {
             Path testWrapperJar = Files.createTempFile("gradle-wrapper", "jar");
-            try (InputStream is = gradleWrapperJar.getInputStream(new HttpUrlConnectionSender(Duration.ofSeconds(5), Duration.ofSeconds(5)))) {
+            ExecutionContext ctx = new InMemoryExecutionContext();
+            HttpSenderExecutionContextView.view(ctx).setHttpSender(new HttpUrlConnectionSender(Duration.ofSeconds(5), Duration.ofSeconds(5)));
+            try (InputStream is = gradleWrapperJar.getInputStream(ctx)) {
                 Files.copy(is, testWrapperJar, StandardCopyOption.REPLACE_EXISTING);
                 try (FileSystem fs = FileSystems.newFileSystem(testWrapperJar)) {
                     return Files.exists(fs.getPath("org/gradle/cli/CommandLineParser.class"));

@@ -338,7 +338,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         binding.put("defaultJvmOpts", StringUtils.isNotEmpty(defaultJvmOpts) ? "'" + defaultJvmOpts + "'" : "");
         binding.put("classpath", "$APP_HOME/gradle/wrapper/gradle-wrapper.jar");
 
-        String gradlewTemplate = StringUtils.readFully(gradleWrapper.gradlew().getInputStream(HttpSenderExecutionContextView.view(ctx).getHttpSender()));
+        String gradlewTemplate = StringUtils.readFully(gradleWrapper.gradlew().getInputStream(ctx));
         return renderTemplate(gradlewTemplate, binding, "\n");
     }
 
@@ -347,7 +347,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         binding.put("defaultJvmOpts", defaultJvmOpts(gradleWrapper));
         binding.put("classpath", "%APP_HOME%\\gradle\\wrapper\\gradle-wrapper.jar");
 
-        String gradlewBatTemplate = StringUtils.readFully(gradleWrapper.gradlewBat().getInputStream(HttpSenderExecutionContextView.view(ctx).getHttpSender()));
+        String gradlewBatTemplate = StringUtils.readFully(gradleWrapper.gradlewBat().getInputStream(ctx));
         return renderTemplate(gradlewBatTemplate, binding, "\r\n");
     }
 

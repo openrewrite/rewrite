@@ -19,7 +19,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
+import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
@@ -60,7 +62,8 @@ public class RemoteFile implements Remote {
     }
 
     @Override
-    public InputStream getInputStream(HttpSender httpSender) {
+    public InputStream getInputStream(ExecutionContext ctx) {
+        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
         //noinspection resource
         return httpSender.get(uri.toString()).send().getBody();
     }

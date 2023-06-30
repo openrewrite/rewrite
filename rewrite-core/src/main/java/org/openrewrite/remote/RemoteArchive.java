@@ -15,9 +15,13 @@
  */
 package org.openrewrite.remote;
 
-import lombok.*;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import lombok.With;
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
+import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.marker.Markers;
@@ -29,10 +33,7 @@ import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
@@ -80,26 +81,21 @@ public class RemoteArchive implements Remote {
      */
     List<String> paths;
 
-    private static Map<URI, Path> downloadCache = new HashMap<>();
-
     @Override
-    public InputStream getInputStream(HttpSender httpSender) {
+    public InputStream getInputStream(ExecutionContext ctx) {
+        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
+        RemoteArtifactCache cache = RemoteExecutionContextView.view(ctx).getArtifactCache();
         try {
-            InputStream body;
-            if (downloadCache.containsKey(uri)) {
-                body = Files.newInputStream(downloadCache.get(uri));
-            } else {
-                String actualUri = uri.toString();
-                String fileName = actualUri.substring(actualUri.lastIndexOf("/") + 1);
-                try (HttpSender.Response response = httpSender.send(httpSender.get(actualUri).build())) {
-                    InputStream responseBody = response.getBody();
-                    Path localFile = Files.createTempFile(fileName, ".tmp");
-                    Files.copy(responseBody, localFile, StandardCopyOption.REPLACE_EXISTING);
-                    downloadCache.put(uri, localFile);
-                    body = Files.newInputStream(localFile);
-                }
+            Path localArchive = cache.compute(uri, () -> {
+                //noinspection resource
+                HttpSender.Response response = httpSender.send(httpSender.get(uri.toString()).build());
+                return response.getBody();
+            }, ctx.getOnError());
+            if (localArchive == null) {
+                throw new IllegalStateException("Failed to download " + uri + " to artifact cache");
             }
 
+            InputStream body = Files.newInputStream(localArchive);
             InputStream inner = readIntoArchive(body, paths, 0);
             if (inner == null) {
                 throw new IllegalArgumentException("Unable to find path " + paths + " in zip file " + uri);

@@ -19,8 +19,6 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.ipc.http.HttpSender;
-import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.Markers;
 
 import java.io.InputStream;
@@ -71,13 +69,15 @@ public interface Remote extends SourceFile {
     /**
      * Download the remote file
      *
-     * @param httpSender used to download the file represented by this Remote
+     * @param ctx used to download the file represented by this Remote
      */
-    InputStream getInputStream(HttpSender httpSender);
+    InputStream getInputStream(ExecutionContext ctx);
 
     @Override
     default <P> String printAll(P p) {
-        return StringUtils.readFully(getInputStream(new HttpUrlConnectionSender()), StandardCharsets.UTF_8);
+        ExecutionContext ctx = p instanceof ExecutionContext ? (ExecutionContext) p :
+                new InMemoryExecutionContext();
+        return StringUtils.readFully(getInputStream(ctx), StandardCharsets.UTF_8);
     }
 
     @Override
@@ -116,8 +116,7 @@ public interface Remote extends SourceFile {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 ExecutionContext ctx = p.getContext() instanceof ExecutionContext ? (ExecutionContext) p.getContext() :
                         new InMemoryExecutionContext();
-                HttpSender sender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
-                p.append(StringUtils.readFully(getInputStream(sender), StandardCharsets.UTF_8));
+                p.append(StringUtils.readFully(getInputStream(ctx), StandardCharsets.UTF_8));
                 return sourceFile;
             }
         };
