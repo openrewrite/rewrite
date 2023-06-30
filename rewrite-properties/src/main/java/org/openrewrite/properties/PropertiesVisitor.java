@@ -33,7 +33,7 @@ public class PropertiesVisitor<P> extends TreeVisitor<Properties, P> {
         return "properties";
     }
 
-    public Properties visitFile(Properties.File file, P p) {
+    public Properties.File visitFile(Properties.File file, P p) {
         Properties.File f = file;
         f = f.withMarkers(visitMarkers(f.getMarkers(), p));
         f = f.withContent(ListUtils.map(f.getContent(), c -> (Properties.Content) visit(c, p)));

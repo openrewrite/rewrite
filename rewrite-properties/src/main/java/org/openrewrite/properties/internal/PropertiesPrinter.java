@@ -27,7 +27,7 @@ import java.util.function.UnaryOperator;
 public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P>> {
 
     @Override
-    public Properties visitFile(Properties.File file, PrintOutputCapture<P> p) {
+    public Properties.File visitFile(Properties.File file, PrintOutputCapture<P> p) {
         beforeSyntax(file, p);
         visit(file.getContent(), p);
         p.append(file.getEof());
