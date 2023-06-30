@@ -117,7 +117,7 @@ public interface JavaParser extends Parser {
 
         nextArtifact:
         for (String artifactName : artifactNamesWithVersions) {
-            Pattern jarPattern = Pattern.compile(artifactName + "-?.*\\.jar$");
+            Pattern jarPattern = Pattern.compile("[/\\\\]" + artifactName + "-?.*\\.jar$");
             File[] extracted = resourceTarget.listFiles();
             if (extracted != null) {
                 for (File file : extracted) {
