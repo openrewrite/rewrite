@@ -24,14 +24,11 @@ import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
 import org.eclipse.jgit.lib.*;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markers;
-import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;

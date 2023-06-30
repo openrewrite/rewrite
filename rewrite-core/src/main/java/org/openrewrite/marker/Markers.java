@@ -22,7 +22,6 @@ import lombok.With;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -44,6 +43,9 @@ public class Markers {
     List<Marker> markers;
 
     public static Markers build(Collection<? extends Marker> markers) {
+        if (markers.isEmpty()) {
+            return EMPTY;
+        }
         List<Marker> markerList;
         if (markers instanceof List) {
             //noinspection unchecked
@@ -52,7 +54,7 @@ public class Markers {
             markerList = new ArrayList<>(markers.size());
             markerList.addAll(markers);
         }
-        return markers.isEmpty() ? EMPTY : new Markers(randomId(), markerList);
+        return new Markers(randomId(), markerList);
     }
 
     /**

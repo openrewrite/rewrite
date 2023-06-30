@@ -21,7 +21,6 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.ChangePropertyValue;
 import org.openrewrite.properties.PropertiesParser;
-import org.openrewrite.properties.tree.Properties;
 
 import java.nio.file.Paths;
 import java.util.Collection;
@@ -50,6 +49,13 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
     @Nullable
     Boolean overwrite;
 
+    @Option(displayName = "File pattern",
+            description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
+                    "When not set, all source files are searched.",
+            example = "**/*.properties")
+    @Nullable
+    String filePattern;
+
     @Override
     public String getDisplayName() {
         return "Add Gradle property";
@@ -76,18 +82,26 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
-                if (sourceFile.getSourcePath().endsWith(Paths.get("gradle.properties"))) {
+                if (filePattern != null) {
+                    if (new FindSourceFiles(filePattern).getVisitor().visitNonNull(tree, ctx) != tree &&
+                            sourceFile.getSourcePath().endsWith("gradle.properties")) {
+                        acc.hasGradleProperties = true;
+                    }
+                } else if (sourceFile.getSourcePath().endsWith("gradle.properties")) {
                     acc.hasGradleProperties = true;
-                } else if (IsBuildGradle.matches(sourceFile.getSourcePath())) {
+                }
+
+                if (IsBuildGradle.matches(sourceFile.getSourcePath())) {
                     acc.isGradleProject = true;
                 }
+
                 return tree;
             }
         };
     }
 
     @Override
-    public Collection<Properties.File> generate(NeedsProperty acc, ExecutionContext ctx) {
+    public Collection<? extends SourceFile> generate(NeedsProperty acc, ExecutionContext ctx) {
         if (!acc.hasGradleProperties) {
             return PropertiesParser.builder().build()
                     .parseInputs(singletonList(Parser.Input.fromString(Paths.get("gradle.properties"),
@@ -103,7 +117,18 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
-                if (sourceFile.getSourcePath().endsWith(Paths.get("gradle.properties"))) {
+                if (filePattern != null) {
+                    if (new FindSourceFiles(filePattern).getVisitor().visitNonNull(sourceFile, ctx) != sourceFile &&
+                            sourceFile.getSourcePath().endsWith("gradle.properties")) {
+                        Tree t = !Boolean.TRUE.equals(overwrite) ?
+                                sourceFile :
+                                new ChangePropertyValue(key, value, null, false, null)
+                                        .getVisitor().visitNonNull(sourceFile, ctx);
+                        return new org.openrewrite.properties.AddProperty(key, value, null)
+                                .getVisitor()
+                                .visitNonNull(t, ctx);
+                    }
+                } else if (sourceFile.getSourcePath().endsWith("gradle.properties")) {
                     Tree t = !Boolean.TRUE.equals(overwrite) ?
                             sourceFile :
                             new ChangePropertyValue(key, value, null, false, null)

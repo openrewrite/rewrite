@@ -19,9 +19,10 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
 @Value
@@ -30,6 +31,7 @@ public class RemovePluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
     String pluginId;
 
     MethodMatcher buildPluginsContainerMatcher = new MethodMatcher("RewriteGradleProject plugins(..)");
+    MethodMatcher applyPluginMatcher = new MethodMatcher("RewriteGradleProject apply(..)");
     MethodMatcher settingsPluginsContainerMatcher = new MethodMatcher("RewriteSettings plugins(..)");
 
     MethodMatcher buildPluginMatcher = new MethodMatcher("PluginSpec id(..)");
@@ -43,8 +45,8 @@ public class RemovePluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
     public J.Block visitBlock(J.Block block, ExecutionContext executionContext) {
         J.Block b = super.visitBlock(block, executionContext);
 
-        J.MethodInvocation m = getCursor().firstEnclosingOrThrow(J.MethodInvocation.class);
-        if (buildPluginsContainerMatcher.matches(m) || settingsPluginsContainerMatcher.matches(m)) {
+        J.MethodInvocation m = getCursor().firstEnclosing(J.MethodInvocation.class);
+        if (m != null && buildPluginsContainerMatcher.matches(m) || settingsPluginsContainerMatcher.matches(m)) {
             b = b.withStatements(ListUtils.map(b.getStatements(), statement -> {
                 if (!(statement instanceof J.MethodInvocation
                         || (statement instanceof J.Return && ((J.Return) statement).getExpression() instanceof J.MethodInvocation))) {
@@ -89,14 +91,29 @@ public class RemovePluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
     }
 
     @Override
-    public @Nullable J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
         J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
 
         if (buildPluginsContainerMatcher.matches(m) || settingsPluginsContainerMatcher.matches(m)) {
             if (m.getArguments().get(0) instanceof J.Lambda
                     && ((J.Lambda) m.getArguments().get(0)).getBody() instanceof J.Block
                     && ((J.Block) ((J.Lambda) m.getArguments().get(0)).getBody()).getStatements().isEmpty()) {
+                //noinspection DataFlowIssue
                 return null;
+            }
+        } else if(applyPluginMatcher.matches(m)) {
+            for (Expression arg : m.getArguments()) {
+                if(arg instanceof G.MapEntry) {
+                    G.MapEntry me = (G.MapEntry) arg;
+                    if(me.getKey() instanceof J.Literal && me.getValue() instanceof J.Literal) {
+                        J.Literal pluginLiteral = (J.Literal) me.getKey();
+                        J.Literal pluginIdLiteral = (J.Literal) me.getValue();
+                        if("plugin".equals(pluginLiteral.getValue()) && pluginId.equals(pluginIdLiteral.getValue())) {
+                            //noinspection DataFlowIssue
+                            return null;
+                        }
+                    }
+                }
             }
         }
 

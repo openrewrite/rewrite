@@ -30,15 +30,15 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 class AddGradleEnterpriseTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new AddGradleEnterprise("3.x", null, null, null, null, null));
+        spec.beforeRecipe(withToolingApi())
+                .recipe(new AddGradleEnterprise("3.x", null, null, null, null, null));
     }
 
     private static Consumer<SourceSpec<CompilationUnit>> interpolateResolvedVersion(@Language("groovy") String after) {
@@ -153,17 +153,15 @@ class AddGradleEnterpriseTest implements RewriteTest {
           settingsGradle(
             """
               plugins {
-                  id 'org.openrewrite' version '1'
               }
-                            
+              
               rootProject.name = 'my-project'
               """,
             interpolateResolvedVersion("""
               plugins {
-                  id 'org.openrewrite' version '1'
                   id 'com.gradle.enterprise' version '%s'
               }
-                            
+              
               rootProject.name = 'my-project'
               """
             )

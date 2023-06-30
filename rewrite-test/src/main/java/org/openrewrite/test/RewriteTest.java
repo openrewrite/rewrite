@@ -52,7 +52,8 @@ public interface RewriteTest extends SourceSpecs {
     }
 
     static AdHocRecipe toRecipe() {
-        return new AdHocRecipe(null, null, null, () -> Recipe.NOOP, null, null, null);
+        return new AdHocRecipe(null, null, null,
+                TreeVisitor::noop, null, null, null);
     }
 
     static AdHocRecipe toRecipe(Function<Recipe, TreeVisitor<?, ExecutionContext>> visitor) {
@@ -224,7 +225,7 @@ public interface RewriteTest extends SourceSpecs {
         Map<SourceFile, SourceSpec<?>> specBySourceFile = new LinkedHashMap<>(sourceSpecs.length);
         for (Map.Entry<Parser.Builder, List<SourceSpec<?>>> sourceSpecsForParser : sourceSpecsByParser.entrySet()) {
             Map<SourceSpec<?>, Parser.Input> inputs = new LinkedHashMap<>(sourceSpecsForParser.getValue().size());
-            Parser<?> parser = sourceSpecsForParser.getKey().build();
+            Parser parser = sourceSpecsForParser.getKey().build();
             for (SourceSpec<?> sourceSpec : sourceSpecsForParser.getValue()) {
                 if (sourceSpec.before == null) {
                     continue;
