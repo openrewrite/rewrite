@@ -54,6 +54,7 @@ import org.openrewrite.kotlin.KotlinTypeMapping;
 import org.openrewrite.kotlin.marker.*;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.style.NamedStyles;
 
 import java.nio.charset.Charset;
 import java.nio.file.Path;
@@ -79,6 +80,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private final String source;
     private final Charset charset;
     private final boolean charsetBomMarked;
+    private final List<NamedStyles> styles;
     private final KotlinTypeMapping typeMapping;
     private final ExecutionContext ctx;
     private final FirSession firSession;
@@ -90,12 +92,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
-    public KotlinParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source, JavaTypeCache typeCache, FirSession firSession, ExecutionContext ctx) {
+    public KotlinParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source, List<NamedStyles> styles, JavaTypeCache typeCache, FirSession firSession, ExecutionContext ctx) {
         this.sourcePath = sourcePath;
         this.fileAttributes = fileAttributes;
         this.source = source.readFully();
         this.charset = source.getCharset();
         this.charsetBomMarked = source.isCharsetBomMarked();
+        this.styles = styles;
         this.typeMapping = new KotlinTypeMapping(typeCache, firSession);
         this.ctx = ctx;
         this.firSession = firSession;
@@ -162,7 +165,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return new K.CompilationUnit(
                 randomId(),
                 Space.EMPTY,
-                Markers.EMPTY,
+                Markers.build(styles),
                 sourcePath,
                 fileAttributes,
                 charset.name(),

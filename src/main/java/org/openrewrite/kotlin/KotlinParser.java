@@ -65,6 +65,7 @@ import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.kotlin.internal.KotlinParserVisitor;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.style.NamedStyles;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
@@ -168,6 +169,7 @@ public class KotlinParser implements Parser {
                                 compiled.getInput().getRelativePath(relativeTo),
                                 compiled.getInput().getFileAttributes(),
                                 compiled.getInput().getSource(ctx),
+                                styles,
                                 typeCache,
                                 firSession,
                                 ctx
