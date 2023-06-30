@@ -156,10 +156,6 @@ public interface RewriteTest extends SourceSpecs {
                 .as("A recipe must be specified")
                 .isNotNull();
 
-        assertThat(recipe.validate().failures())
-                .as("Recipe validation must have no failures")
-                .isEmpty();
-
         if (!(recipe instanceof AdHocRecipe) && !(recipe instanceof CompositeRecipe) &&
             testClassSpec.serializationValidation &&
             testMethodSpec.serializationValidation) {
@@ -200,6 +196,11 @@ public interface RewriteTest extends SourceSpecs {
         for (SourceSpec<?> s : sourceSpecs) {
             s.customizeExecutionContext.accept(executionContext);
         }
+        List<Validated<Object>> validations = new ArrayList<>();
+        recipe.validateAll(executionContext, validations);
+        assertThat(validations)
+                .as("Recipe validation must have no failures")
+                .noneMatch(Validated::isInvalid);
 
         Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
         List<Parser.Builder> methodSpecParsers = testMethodSpec.parsers;

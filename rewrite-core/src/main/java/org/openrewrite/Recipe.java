@@ -84,11 +84,6 @@ public abstract class Recipe implements Cloneable {
         public String getDescription() {
             return "Default no-op test, does nothing.";
         }
-
-        @Override
-        public TreeVisitor<?, ExecutionContext> getVisitor() {
-            return TreeVisitor.noop();
-        }
     }
 
     /**
@@ -320,7 +315,7 @@ public abstract class Recipe implements Cloneable {
         return validateAll(new InMemoryExecutionContext(), new ArrayList<>());
     }
 
-    private Collection<Validated<Object>> validateAll(ExecutionContext ctx, Collection<Validated<Object>> acc) {
+    public Collection<Validated<Object>> validateAll(ExecutionContext ctx, Collection<Validated<Object>> acc) {
         acc.add(validate(ctx));
         for (Recipe recipe : getRecipeList()) {
             recipe.validateAll(ctx, acc);
