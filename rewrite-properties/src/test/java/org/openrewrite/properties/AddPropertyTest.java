@@ -144,12 +144,9 @@ class AddPropertyTest implements RewriteTest {
             "true",
             null
           )),
-          // document current behaviour or excess preceding newlines added to empty files; ought to be rare but still
           properties(
             "",
             """
-              
-              
               management.metrics.enable.process.files=true
               """
           )

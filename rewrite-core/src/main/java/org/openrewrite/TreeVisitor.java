@@ -362,7 +362,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     public Markers visitMarkers(@Nullable Markers markers, P p) {
-        return markers == null ?
+        return markers == null || markers == Markers.EMPTY ?
                 Markers.EMPTY :
                 markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> this.visitMarker(marker, p)));
     }

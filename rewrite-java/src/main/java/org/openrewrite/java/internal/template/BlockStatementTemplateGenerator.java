@@ -214,11 +214,12 @@ public class BlockStatementTemplateGenerator {
         if (contextSensitive) {
             contextTemplate(cursor, prior, before, after, insertionPoint, mode);
         } else {
-            contextFreeTemplate(prior, before, after);
+            contextFreeTemplate(cursor, prior, before, after);
         }
     }
 
-    private void contextFreeTemplate(J j, StringBuilder before, StringBuilder after) {
+    @SuppressWarnings("DataFlowIssue")
+    private void contextFreeTemplate(Cursor cursor, J j, StringBuilder before, StringBuilder after) {
         if (j instanceof J.ClassDeclaration) {
             // While not impossible to handle, reaching this point is likely to be a mistake.
             // Without context a class declaration can include no imports, package, or outer class.
@@ -241,9 +242,12 @@ public class BlockStatementTemplateGenerator {
             before.append("Object o = ");
             after.append(";");
             after.append("\n}}");
-        } else if (!(j instanceof J.Import) && !(j instanceof J.Package)) {
+        } else if (j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations && cursor.getValue() instanceof J.Block && cursor.getParent().getValue() instanceof J.ClassDeclaration) {
             before.insert(0, "class Template {\n");
             after.append("\n}");
+        } else if (!(j instanceof J.Import) && !(j instanceof J.Package)) {
+            before.insert(0, "class Template {{\n");
+            after.append("\n}}");
         }
         before.insert(0, EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
         for (String anImport : imports) {

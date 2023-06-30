@@ -61,7 +61,6 @@ public class SimplifyBooleanReturn extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
             private final JavaTemplate notIfConditionReturn = JavaTemplate.builder("return !(#{any(boolean)});")
-                    .contextSensitive()
                     .build();
 
             @Override

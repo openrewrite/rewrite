@@ -62,6 +62,44 @@ class JavaTemplateContextFreeTest implements RewriteTest {
           ));
     }
 
+    @Test
+    void replaceField() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitVariableDeclarations(J.VariableDeclarations vd, ExecutionContext ctx) {
+                  if (vd.getVariables().size() == 1 && vd.getVariables().get(0).getSimpleName().equals("i")) {
+                      return JavaTemplate.apply("Integer i = 2;", getCursor(), vd.getCoordinates().replace());
+                  }
+                  return super.visitVariableDeclarations(vd, ctx);
+              }
+          })),
+          java(
+            """
+              class Test {
+                  private Integer i = 1;
+                  void m() {
+                      Integer i = 1;
+                      Object o = new Object() {
+                          private final Integer i = 1;
+                      };
+                  }
+              }
+              """,
+            """
+              class Test {
+                  Integer i = 2;
+                  void m() {
+                      Integer i = 2;
+                      Object o = new Object() {
+                          Integer i = 2;
+                      };
+                  }
+              }
+              """
+          ));
+    }
+
     @SuppressWarnings("UnusedAssignment")
     @Test
     void genericsAndAnyParameters() {
