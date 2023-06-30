@@ -92,4 +92,15 @@ class FindAndReplaceTest implements RewriteTest {
           text("test", "tested")
         );
     }
+
+    @Test
+    void testTemplateSyntaxInContentShouldNotFails() {
+        String find = "This is text ${dynamic}.";
+        String replace = "This is text ${dynamic}. Stuff";
+        rewriteRun(
+          spec -> spec.recipe(new FindAndReplace(find, replace, null, null, null, null, null)).cycles(1),
+          text(find, replace)
+        );
+    }
+
 }
