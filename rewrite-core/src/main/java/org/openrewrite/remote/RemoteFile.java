@@ -24,12 +24,14 @@ import org.openrewrite.FileAttributes;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
-import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.marker.Markers;
 
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.UUID;
 
@@ -56,15 +58,22 @@ public class RemoteFile implements Remote {
     String description;
 
     @Override
-    public <P> byte[] printAllAsBytes(P p) {
-        //noinspection resource
-        return new HttpUrlConnectionSender().get(uri.toString()).send().getBodyAsBytes();
-    }
-
-    @Override
     public InputStream getInputStream(ExecutionContext ctx) {
         HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
-        //noinspection resource
-        return httpSender.get(uri.toString()).send().getBody();
+        RemoteArtifactCache cache = RemoteExecutionContextView.view(ctx).getArtifactCache();
+        try {
+            Path localFile = cache.compute(uri, () -> {
+                //noinspection resource
+                HttpSender.Response response = httpSender.get(uri.toString()).send();
+                return response.getBody();
+            }, ctx.getOnError());
+            if (localFile == null) {
+                throw new IllegalStateException("Failed to download " + uri + " to artifact cache");
+            }
+
+            return Files.newInputStream(localFile);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Unable to download " + uri + " to temporary file", e);
+        }
     }
 }
