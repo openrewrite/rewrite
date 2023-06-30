@@ -387,12 +387,14 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
             return existing;
         }
 
-        List<String> paramNames = null;
+        String[] paramNames = null;
         if (!methodSymbol.params().isEmpty()) {
-            paramNames = new ArrayList<>(methodSymbol.params().size());
-            for (Symbol.VarSymbol p : methodSymbol.params()) {
+            paramNames = new String[methodSymbol.params().size()];
+            com.sun.tools.javac.util.List<Symbol.VarSymbol> params = methodSymbol.params();
+            for (int i = 0; i < params.size(); i++) {
+                Symbol.VarSymbol p = params.get(i);
                 String s = p.name.toString();
-                paramNames.add(s);
+                paramNames[i] = s;
             }
         }
 
@@ -481,12 +483,14 @@ class ReloadableJava17TypeMapping implements JavaTypeMapping<Tree> {
                 return existing;
             }
 
-            List<String> paramNames = null;
+            String[] paramNames = null;
             if (!methodSymbol.params().isEmpty()) {
-                paramNames = new ArrayList<>(methodSymbol.params().size());
-                for (Symbol.VarSymbol p : methodSymbol.params()) {
+                paramNames = new String[methodSymbol.params().size()];
+                com.sun.tools.javac.util.List<Symbol.VarSymbol> params = methodSymbol.params();
+                for (int i = 0; i < params.size(); i++) {
+                    Symbol.VarSymbol p = params.get(i);
                     String s = p.name.toString();
-                    paramNames.add(s);
+                    paramNames[i] = s;
                 }
             }
             List<String> defaultValues = null;

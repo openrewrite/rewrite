@@ -21,10 +21,9 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.ImplicitReturn;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JContainer;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
+
+import java.util.List;
 
 @RequiredArgsConstructor
 public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
@@ -130,8 +129,20 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
 
         if (m.getReturnTypeExpression() != null && m.getReturnTypeExpression().getPrefix().getWhitespace().isEmpty()) {
             if (!first) {
-                m = m.withReturnTypeExpression(m.getReturnTypeExpression()
-                        .withPrefix(m.getReturnTypeExpression().getPrefix().withWhitespace(" ")));
+                TypeTree returnTypeExpression = m.getReturnTypeExpression();
+                // If it's a J.AnnotatedType, because the first annotation has its prefix, so don't need to set the
+                // prefix for the return type again to avoid two spaces, instead, we need to trim the prefix of the 1st
+                // annotation to be single space.
+                if (returnTypeExpression instanceof J.AnnotatedType) {
+                    J.AnnotatedType annotatedType = (J.AnnotatedType) returnTypeExpression;
+                    List<J.Annotation> annotations = ListUtils.mapFirst(annotatedType.getAnnotations(), annotation ->
+                        annotation.withPrefix(annotation.getPrefix().withWhitespace(" "))
+                    );
+                    m = m.withReturnTypeExpression(annotatedType.withAnnotations(annotations));
+                } else {
+                    m = m.withReturnTypeExpression(returnTypeExpression
+                        .withPrefix(returnTypeExpression.getPrefix().withWhitespace(" ")));
+                }
             }
             first = false;
         }

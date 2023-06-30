@@ -65,13 +65,6 @@ public abstract class Recipe implements Cloneable {
         return getClass().getName();
     }
 
-    public static final TreeVisitor<?, ExecutionContext> NOOP = new TreeVisitor<Tree, ExecutionContext>() {
-        @Override
-        public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-            return tree;
-        }
-    };
-
     private transient RecipeDescriptor descriptor;
 
     @Nullable
@@ -94,7 +87,7 @@ public abstract class Recipe implements Cloneable {
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
-            return NOOP;
+            return TreeVisitor.noop();
         }
     }
 
@@ -269,7 +262,7 @@ public abstract class Recipe implements Cloneable {
      * @return A tree visitor that will perform operations associated with the recipe.
      */
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return NOOP;
+        return TreeVisitor.noop();
     }
 
     public void addDataTable(DataTable<?> dataTable) {

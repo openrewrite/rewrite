@@ -409,7 +409,8 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
         @Override
         public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
-            if (marker instanceof Semicolon) {
+            //noinspection deprecation
+            if (marker instanceof Semicolon || marker instanceof org.openrewrite.java.marker.Semicolon) {
                 p.append(';');
             }
             return super.visitMarker(marker, p);

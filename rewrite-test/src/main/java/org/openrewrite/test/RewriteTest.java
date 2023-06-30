@@ -52,7 +52,8 @@ public interface RewriteTest extends SourceSpecs {
     }
 
     static AdHocRecipe toRecipe() {
-        return new AdHocRecipe(null, null, null, () -> Recipe.NOOP, null, null, null);
+        return new AdHocRecipe(null, null, null,
+                TreeVisitor::noop, null, null, null);
     }
 
     static AdHocRecipe toRecipe(Function<Recipe, TreeVisitor<?, ExecutionContext>> visitor) {

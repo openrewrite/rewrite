@@ -343,6 +343,13 @@ public class Cursor {
         return messages == null ? null : (T) messages.remove(key);
     }
 
+    public void clearMessages() {
+        if (messages != null) {
+            messages.clear();
+            messages = null;
+        }
+    }
+
     /**
      * Creates a cursor at the same position, but with its own messages that can't influence
      * the messages of the cursor that was forked.

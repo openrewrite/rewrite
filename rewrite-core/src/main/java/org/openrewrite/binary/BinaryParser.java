@@ -16,7 +16,7 @@
 package org.openrewrite.binary;
 
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.ParseError;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;

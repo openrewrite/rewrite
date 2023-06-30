@@ -19,7 +19,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.marker.DotResult;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -47,8 +47,8 @@ public class PrintMavenAsDot extends Recipe {
             @Override
             public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 MavenResolutionResult mrr = getResolutionResult();
-                if (!document.getMarkers().findFirst(DotResult.class).isPresent()) {
-                    return document.withMarkers(document.getMarkers().add(new DotResult(Tree.randomId(), dot(mrr))));
+                if (!document.getMarkers().findFirst(SearchResult.class).isPresent()) {
+                    return document.withMarkers(document.getMarkers().add(new SearchResult(Tree.randomId(), dot(mrr))));
                 }
                 return super.visitDocument(document, ctx);
             }

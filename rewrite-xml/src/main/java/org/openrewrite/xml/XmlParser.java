@@ -21,6 +21,7 @@ import org.openrewrite.Parser;
 import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 import org.openrewrite.xml.internal.XmlParserVisitor;
@@ -37,8 +38,7 @@ public class XmlParser implements Parser {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).map(sourceFile -> {
             Path path = sourceFile.getRelativePath(relativeTo);
-            try {
-                EncodingDetectingInputStream is = sourceFile.getSource(ctx);
+            try (EncodingDetectingInputStream is = sourceFile.getSource(ctx)) {
                 String sourceStr = is.readFully();
 
                 XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(

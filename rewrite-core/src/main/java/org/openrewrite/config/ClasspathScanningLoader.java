@@ -20,6 +20,7 @@ import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
 import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
+import org.openrewrite.ScanningRecipe;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.style.NamedStyles;
 import org.slf4j.Logger;
@@ -37,10 +38,10 @@ import static org.openrewrite.internal.RecipeIntrospectionUtils.constructRecipe;
 public class ClasspathScanningLoader implements ResourceLoader {
     private static final Logger logger = LoggerFactory.getLogger(ClasspathScanningLoader.class);
 
-    private final List<Recipe> recipes = new ArrayList<>();
+    private final LinkedHashSet<Recipe> recipes = new LinkedHashSet<>();
     private final List<NamedStyles> styles = new ArrayList<>();
 
-    private final List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
+    private final LinkedHashSet<RecipeDescriptor> recipeDescriptors = new LinkedHashSet<>();
     private final List<CategoryDescriptor> categoryDescriptors = new ArrayList<>();
 
     private final Map<String, List<Contributor>> recipeAttributions = new HashMap<>();
@@ -103,12 +104,10 @@ public class ClasspathScanningLoader implements ResourceLoader {
         try (ScanResult scanResult = classGraph.enableMemoryMapping().scan()) {
             List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
 
-            scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) -> {
-                yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders));
-            });
-            scanResult.getResourcesWithExtension("yaml").forEachInputStreamIgnoringIOException((res, input) -> {
-                yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders));
-            });
+            scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->
+                    yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders)));
+            scanResult.getResourcesWithExtension("yaml").forEachInputStreamIgnoringIOException((res, input) ->
+                    yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders)));
             // Extract in two passes so that the full list of recipes from all sources are known when computing recipe descriptors
             // Otherwise recipes which include recipes from other sources in their recipeList will have incomplete descriptors
             for(YamlResourceLoader resourceLoader : yamlResourceLoaders) {
@@ -130,22 +129,9 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 .overrideClassLoaders(classLoader)
                 .scan()) {
 
-            for (ClassInfo classInfo : result.getSubclasses(Recipe.class.getName())) {
-                Class<?> recipeClass = classInfo.loadClass();
-                if (recipeClass.getName().equals(DeclarativeRecipe.class.getName())
-                        || recipeClass.getEnclosingClass() != null
-                        // `ScanningRecipe` is an example of an abstract `Recipe` subtype
-                        || (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
-                    continue;
-                }
-                try {
-                    Recipe recipe = constructRecipe(recipeClass);
-                    recipeDescriptors.add(recipe.getDescriptor());
-                    recipes.add(recipe);
-                } catch (Throwable e) {
-                    logger.warn("Unable to configure {}", recipeClass.getName(), e);
-                }
-            }
+            configureRecipes(result, Recipe.class.getName());
+            configureRecipes(result, ScanningRecipe.class.getName());
+
             for (ClassInfo classInfo : result.getSubclasses(NamedStyles.class.getName())) {
                 Class<?> styleClass = classInfo.loadClass();
                 try {
@@ -157,6 +143,25 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 } catch (Throwable e) {
                     logger.warn("Unable to configure {}", styleClass.getName(), e);
                 }
+            }
+        }
+    }
+
+    private void configureRecipes(ScanResult result, String className) {
+        for (ClassInfo classInfo : result.getSubclasses(className)) {
+            Class<?> recipeClass = classInfo.loadClass();
+            if (recipeClass.getName().equals(DeclarativeRecipe.class.getName())
+                || recipeClass.getEnclosingClass() != null
+                // `ScanningRecipe` is an example of an abstract `Recipe` subtype
+                || (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
+                continue;
+            }
+            try {
+                Recipe recipe = constructRecipe(recipeClass);
+                recipeDescriptors.add(recipe.getDescriptor());
+                recipes.add(recipe);
+            } catch (Throwable e) {
+                logger.warn("Unable to configure {}", recipeClass.getName(), e);
             }
         }
     }

@@ -19,7 +19,6 @@ import org.openrewrite.Validated;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.Scanner;
 import java.util.regex.Matcher;
 
 import static java.lang.Integer.parseInt;
@@ -72,14 +71,21 @@ public class LatestRelease implements VersionComparator {
 
     static long countVersionParts(String version) {
         long count = 0;
-        Scanner scanner = new Scanner(version);
-        scanner.useDelimiter("[.\\-$]");
-        while (scanner.hasNext()) {
-            String part = scanner.next();
-            if (part.isEmpty() || !Character.isDigit(part.charAt(0))) {
-                break;
+        int len = version.length();
+        int lastSepIdx = -1;
+        for (int i = 0; i < len; i++) {
+            char c = version.charAt(i);
+            if (c == '.' || c == '-' || c == '$') {
+                if (lastSepIdx == i - 1) {
+                    return count;
+                }
+                lastSepIdx = i;
+            } else if (lastSepIdx == i - 1) {
+                if (!Character.isDigit(c)) {
+                    break;
+                }
+                count++;
             }
-            count++;
         }
         return count;
     }

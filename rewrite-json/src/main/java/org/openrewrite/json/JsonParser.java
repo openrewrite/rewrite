@@ -24,6 +24,7 @@ import org.openrewrite.json.internal.JsonParserVisitor;
 import org.openrewrite.json.internal.grammar.JSON5Lexer;
 import org.openrewrite.json.internal.grammar.JSON5Parser;
 import org.openrewrite.json.tree.Json;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
