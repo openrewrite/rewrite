@@ -33,6 +33,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiFunction;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
@@ -141,7 +142,7 @@ public class RecipeScheduler {
         public LargeSourceSet scanSources(LargeSourceSet sourceSet, int cycle) {
             return mapForRecipeRecursively(sourceSet, (recipeStack, sourceFile) -> {
                 Recipe recipe = recipeStack.peek();
-                if (recipe.maxCycles() < cycle || !recipe.validate(ctx).isValid()) {
+                if (recipe.maxCycles() < cycle) {
                     return sourceFile;
                 }
 
@@ -175,7 +176,7 @@ public class RecipeScheduler {
             while (!allRecipesStack.isEmpty()) {
                 Stack<Recipe> recipeStack = allRecipesStack.pop();
                 Recipe recipe = recipeStack.peek();
-                if (recipe.maxCycles() < cycle || !recipe.validate(ctx).isValid()) {
+                if (recipe.maxCycles() < cycle) {
                     continue;
                 }
 
@@ -200,7 +201,7 @@ public class RecipeScheduler {
         public LargeSourceSet editSources(LargeSourceSet sourceSet, int cycle) {
             return mapForRecipeRecursively(sourceSet, (recipeStack, sourceFile) -> {
                 Recipe recipe = recipeStack.peek();
-                if (recipe.maxCycles() < cycle || !recipe.validate(ctx).isValid()) {
+                if (recipe.maxCycles() < cycle) {
                     return sourceFile;
                 }
 
@@ -344,7 +345,10 @@ public class RecipeScheduler {
         }
 
         private void recurseRecipeList(Stack<Stack<Recipe>> allRecipesStack, Stack<Recipe> recipeStack) {
-            List<Recipe> recipeList = recipeLists.computeIfAbsent(recipeStack.peek(), Recipe::getRecipeList);
+            List<Recipe> recipeList = recipeLists.computeIfAbsent(
+                    recipeStack.peek(),
+                    r -> r.getRecipeList().stream().filter(r1 -> r1.validate(ctx).isValid()).collect(Collectors.toList())
+            );
             for (int i = recipeList.size() - 1; i >= 0; i--) {
                 Recipe r = recipeList.get(i);
                 if (ctx.getMessage(PANIC) != null) {
