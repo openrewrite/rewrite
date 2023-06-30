@@ -16,7 +16,6 @@
 package org.openrewrite.xml.style;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.experimental.Delegate;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
@@ -29,7 +28,6 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static java.util.Collections.emptySet;
 import static java.util.function.Function.identity;
@@ -45,37 +43,25 @@ public class Autodetect extends NamedStyles {
                 emptySet(), styles);
     }
 
-    public static Detector detect(Stream<? extends SourceFile> sourceFiles) {
-        return new Detector(sourceFiles);
+    public static Detector detector() {
+        return new Detector();
     }
 
-    public static class Detector implements Stream<SourceFile> {
-        @Delegate
-        private final Stream<SourceFile> sourceFiles;
+    public static class Detector {
 
         private final IndentStatistics indentStatistics = new IndentStatistics();
         private final GeneralFormatStatistics generalFormatStatistics = new GeneralFormatStatistics();
+        private final FindIndentXmlVisitor findIndentXmlVisitor = new FindIndentXmlVisitor();
+        private final FindLineFormatJavaVisitor findLineFormatJavaVisitor = new FindLineFormatJavaVisitor();
 
-        public Detector(Stream<? extends SourceFile> sourceFiles) {
-            this.sourceFiles = sourceFiles
-                    .map(SourceFile.class::cast)
-                    .filter(xml -> {
-                        if (xml instanceof Xml.Document) {
-                            new FindIndentXmlVisitor().visit(xml, indentStatistics);
-                            new FindLineFormatJavaVisitor().visit(xml, generalFormatStatistics);
-                        }
-                        return true;
-                    });
+        public void sample(SourceFile xml) {
+            if(xml instanceof Xml.Document) {
+                findIndentXmlVisitor.visit(xml, indentStatistics);
+                findLineFormatJavaVisitor.visit(xml, generalFormatStatistics);
+            }
         }
 
         public Autodetect build() {
-            try {
-                // consume the stream if it hasn't been already
-                //noinspection ResultOfMethodCallIgnored
-                sourceFiles.count();
-            } catch (IllegalStateException ignore) {
-            }
-
             return new Autodetect(Tree.randomId(), Arrays.asList(
                     indentStatistics.getTabsAndIndentsStyle(),
                     generalFormatStatistics.getFormatStyle()));
@@ -110,9 +96,6 @@ public class Autodetect extends NamedStyles {
 
         private TabsAndIndentsStyle getTabsAndIndentsStyle() {
             boolean useTabs = !isIndentedWithSpaces();
-
-            Map.Entry<Integer, Long> i1 = null;
-            Map.Entry<Integer, Long> i2 = null;
 
             int indent = TabsAndIndentsStyle.DEFAULT.getIndentSize();
             long indentCount = 0;
@@ -219,7 +202,6 @@ public class Autodetect extends NamedStyles {
                         if (spaceIndent > 0) {
                             tabIndent = 0;
                             spaceIndent = 0;
-                            mixed = true;
                             break;
                         }
                         tabIndent++;

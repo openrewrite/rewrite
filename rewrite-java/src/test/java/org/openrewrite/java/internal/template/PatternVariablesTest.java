@@ -83,6 +83,7 @@ class PatternVariablesTest {
                     """.replace("$condition", condition);
             J.CompilationUnit cu = parser.parse(source)
                     .findFirst()
+                    .map(J.CompilationUnit.class::cast)
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
             J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
             @SuppressWarnings("DataFlowIssue") J.If ifStatement = (J.If) method.getBody().getStatements().get(0);
@@ -146,6 +147,7 @@ class PatternVariablesTest {
                     """.replace("$statement", statement);
             J.CompilationUnit cu = parser.parse(source)
                     .findFirst()
+                    .map(J.CompilationUnit.class::cast)
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
             J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
             //noinspection DataFlowIssue

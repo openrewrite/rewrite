@@ -35,7 +35,7 @@ import static org.openrewrite.Tree.randomId;
 
 @EqualsAndHashCode(callSuper = true)
 @Value
-public class FindText extends Recipe {
+public class FindComments extends Recipe {
 
     @Option(displayName = "Text patterns",
             description = "A list of regular expressions to search for.",
@@ -44,16 +44,17 @@ public class FindText extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Find text";
+        return "Find within comments and literals";
     }
 
     @Override
     public String getDescription() {
-        return "Find occurrences of regular expression based patterns in comments and literals.";
+        return "Find regular expression matches within comments and literals. \"Literals\" includes string literals, " +
+               "character literals, and numeric literals.";
     }
 
     @Override
-    public Validated validate() {
+    public Validated<Object> validate() {
         return super.validate().and(Validated.test(
                 "patterns",
                 "Patterns must be compilable regular expressions",

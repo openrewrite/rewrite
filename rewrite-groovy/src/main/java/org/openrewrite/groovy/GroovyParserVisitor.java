@@ -38,6 +38,7 @@ import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.marker.Markers;
 
 import java.math.BigDecimal;
@@ -75,6 +76,12 @@ public class GroovyParserVisitor {
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     @SuppressWarnings("RegExpSimplifiable")
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
+
+    /**
+     * Elements within GString expressions which omit curly braces have column positions which are incorrect.
+     * The column positions act like there *is* a curly brace.
+     */
+    private int columnOffset;
 
     public GroovyParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source, JavaTypeCache typeCache, ExecutionContext ctx) {
         this.sourcePath = sourcePath;
@@ -691,6 +698,7 @@ public class GroovyParserVisitor {
 
                 Space opPrefix = whitespace();
                 boolean assignment = false;
+                boolean instanceOf = false;
                 J.AssignmentOperation.Type assignOp = null;
                 J.Binary.Type binaryOp = null;
                 G.Binary.Type gBinaryOp = null;
@@ -752,6 +760,9 @@ public class GroovyParserVisitor {
                     case ">>>":
                         binaryOp = J.Binary.Type.UnsignedRightShift;
                         break;
+                    case "instanceof":
+                        instanceOf = true;
+                        break;
                     case "=":
                         assignment = true;
                         break;
@@ -808,6 +819,10 @@ public class GroovyParserVisitor {
                 if (assignment) {
                     queue.add(new J.Assignment(randomId(), fmt, Markers.EMPTY,
                             left, JLeftPadded.build(right).withBefore(opPrefix),
+                            typeMapping.type(binary.getType())));
+                } else if (instanceOf) {
+                    queue.add(new J.InstanceOf(randomId(), fmt, Markers.EMPTY,
+                            JRightPadded.build(left).withAfter(opPrefix), right, null,
                             typeMapping.type(binary.getType())));
                 } else if (assignOp != null) {
                     queue.add(new J.AssignmentOperation(randomId(), fmt, Markers.EMPTY,
@@ -1101,7 +1116,11 @@ public class GroovyParserVisitor {
                 }
                 value = text.substring(delimiterLength, text.length() - delimiterLength);
             } else if (expression.isNullExpression()) {
-                text = "null";
+                if(source.startsWith("null", cursor)) {
+                    text = "null";
+                } else {
+                    text = "";
+                }
                 jType = JavaType.Primitive.Null;
             } else {
                 ctx.getOnError().accept(new IllegalStateException("Unexpected constant type " + type));
@@ -1327,8 +1346,13 @@ public class GroovyParserVisitor {
                     boolean inCurlies = source.charAt(cursor) == '{';
                     if (inCurlies) {
                         cursor++;
+                    } else {
+                        columnOffset--;
                     }
                     strings.add(new G.GString.Value(randomId(), Markers.EMPTY, visit(e),  inCurlies ? sourceBefore("}") : Space.EMPTY, inCurlies));
+                    if(!inCurlies) {
+                        columnOffset++;
+                    }
                 } else if (e instanceof ConstantExpression) {
                     ConstantExpression cs = (ConstantExpression) e;
                     // The sub-strings within a GString have no delimiters of their own, confusing visitConstantExpression()
@@ -2120,7 +2144,7 @@ public class GroovyParserVisitor {
         }
         int lineCount = node.getLastLineNumber() - node.getLineNumber();
         if (lineCount == 0) {
-            return node.getLastColumnNumber() - node.getColumnNumber();
+            return node.getLastColumnNumber() - node.getColumnNumber() + columnOffset;
         }
         int linesSoFar = 0;
         int length = 0;
@@ -2136,7 +2160,7 @@ public class GroovyParserVisitor {
 
             length++;
 
-            if (finalLineChars == node.getLastColumnNumber()) {
+            if (finalLineChars == node.getLastColumnNumber() + columnOffset) {
                 return length;
             }
         }

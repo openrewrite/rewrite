@@ -43,7 +43,7 @@ public class HyphenRange extends LatestRelease {
                 super.compare(currentVersion, version, lower) >= 0;
     }
 
-    public static Validated build(String pattern, @Nullable String metadataPattern) {
+    public static Validated<HyphenRange> build(String pattern, @Nullable String metadataPattern) {
         Matcher matcher = HYPHEN_RANGE_PATTERN.matcher(pattern);
         if (!matcher.matches()) {
             return Validated.invalid("hyphenRange", pattern, "not a hyphen range");

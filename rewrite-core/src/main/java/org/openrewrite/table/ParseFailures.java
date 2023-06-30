@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.lang.Nullable;
 
 @JsonIgnoreType
 public class ParseFailures extends DataTable<ParseFailures.Row> {
@@ -31,8 +32,27 @@ public class ParseFailures extends DataTable<ParseFailures.Row> {
 
     @Value
     public static class Row {
+        @Column(displayName = "Parser", description = "The parser implementation that failed.")
+        String parser;
+
         @Column(displayName = "Source path", description = "The file that failed to parse.")
         String sourcePath;
+
+        @Column(displayName = "Exception type", description = "The class name of the exception that produce the parse failure.")
+        @Nullable
+        String exceptionType;
+
+        @Column(displayName = "Tree type", description = "The type of the tree element that was being parsed " +
+                                                         "when the failure occurred. This can refer either to the intended " +
+                                                         "target OpenRewrite Tree type or a parser or compiler internal tree " +
+                                                         "type that we couldn't determine how to map.")
+        @Nullable
+        String treeType;
+
+        @Column(displayName = "Snippet",
+                description = "The code snippet that the failure occurred on. Omitted when the parser fails on the whole file.")
+        @Nullable
+        String snippet;
 
         @Column(displayName = "Stack trace", description = "The stack trace of the failure.")
         String stackTrace;

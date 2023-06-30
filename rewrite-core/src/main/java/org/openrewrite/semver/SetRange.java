@@ -47,7 +47,7 @@ public class SetRange extends LatestRelease {
 
     }
 
-    public static Validated build(String pattern, @Nullable String metadataPattern) {
+    public static Validated<SetRange> build(String pattern, @Nullable String metadataPattern) {
         Matcher matcher = SET_RANGE_PATTERN.matcher(pattern);
         if (!matcher.matches()) {
             return Validated.invalid("setRange", pattern, "not a set range");

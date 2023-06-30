@@ -65,13 +65,6 @@ public abstract class Recipe implements Cloneable {
         return getClass().getName();
     }
 
-    public static final TreeVisitor<?, ExecutionContext> NOOP = new TreeVisitor<Tree, ExecutionContext>() {
-        @Override
-        public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-            return tree;
-        }
-    };
-
     private transient RecipeDescriptor descriptor;
 
     @Nullable
@@ -94,7 +87,7 @@ public abstract class Recipe implements Cloneable {
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
-            return NOOP;
+            return TreeVisitor.noop();
         }
     }
 
@@ -269,7 +262,7 @@ public abstract class Recipe implements Cloneable {
      * @return A tree visitor that will perform operations associated with the recipe.
      */
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return NOOP;
+        return TreeVisitor.noop();
     }
 
     public void addDataTable(DataTable<?> dataTable) {
@@ -291,8 +284,8 @@ public abstract class Recipe implements Cloneable {
         return new RecipeScheduler().scheduleRun(this, before, ctx, maxCycles, minCycles);
     }
 
-    public Validated validate(ExecutionContext ctx) {
-        Validated validated = validate();
+    public Validated<Object> validate(ExecutionContext ctx) {
+        Validated<Object> validated = validate();
 
         for (Recipe recipe : getRecipeList()) {
             validated = validated.and(recipe.validate(ctx));
@@ -307,8 +300,8 @@ public abstract class Recipe implements Cloneable {
      *
      * @return A validated instance based using non-null/nullable annotations to determine which fields of the recipe are required.
      */
-    public Validated validate() {
-        Validated validated = Validated.none();
+    public Validated<Object> validate() {
+        Validated<Object> validated = Validated.none();
         List<Field> requiredFields = NullUtils.findNonNullFields(this.getClass());
         for (Field field : requiredFields) {
             try {
@@ -323,11 +316,11 @@ public abstract class Recipe implements Cloneable {
         return validated;
     }
 
-    public final Collection<Validated> validateAll() {
+    public final Collection<Validated<Object>> validateAll() {
         return validateAll(new InMemoryExecutionContext(), new ArrayList<>());
     }
 
-    private Collection<Validated> validateAll(ExecutionContext ctx, Collection<Validated> acc) {
+    private Collection<Validated<Object>> validateAll(ExecutionContext ctx, Collection<Validated<Object>> acc) {
         acc.add(validate(ctx));
         for (Recipe recipe : getRecipeList()) {
             recipe.validateAll(ctx, acc);

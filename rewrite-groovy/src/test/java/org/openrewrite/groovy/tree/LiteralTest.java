@@ -33,14 +33,14 @@ class LiteralTest implements RewriteTest {
     @Test
     void string() {
         rewriteRun(
-          groovy("def a = 'hello'")
+          groovy("'hello'")
         );
     }
 
     @Test
     void nullValue() {
         rewriteRun(
-          groovy("def a = null")
+          groovy("null")
         );
     }
 
@@ -56,8 +56,8 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def template = \"""
-                  Hi
+              \"""
+                  " Hi "
               \"""
               """
           )
@@ -69,7 +69,7 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def fooPattern = /.*foo.*/
+              /.*"foo".*/
               """
           )
         );
@@ -80,7 +80,7 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-              def s = "uid: ${UUID.randomUUID()}"
+              "uid: ${ UUID.randomUUID() } "
                """
           )
         );
@@ -99,14 +99,29 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
-    void gStringPropertyAccessNoCurlyBraces() {
+    void gStringMultiPropertyAccess() {
         rewriteRun(
-          groovy(
-            """
-              def person = [name: 'sam']
-              def s = \""" ${person.name} \"""
-              """
-          )
+          groovy("""
+            "$System.env.BAR_BAZ"
+            """)
+        );
+    }
+
+    @Test
+    void emptyGString() {
+        rewriteRun(
+          groovy("""
+            "${}"
+            """)
+        );
+    }
+
+    @Test
+    void nestedGString() {
+        rewriteRun(
+          groovy("""
+            " ${ " ${ " " } " } "
+            """)
         );
     }
 

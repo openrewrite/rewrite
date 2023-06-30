@@ -18,6 +18,7 @@ package org.openrewrite.gradle;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.internal.DefaultImportsCustomizer;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
@@ -31,7 +32,7 @@ import java.util.List;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-public class GradleParser implements Parser<G.CompilationUnit> {
+public class GradleParser implements Parser {
     private final GroovyParser buildParser;
     private final GroovyParser settingsParser;
 
@@ -54,7 +55,7 @@ public class GradleParser implements Parser<G.CompilationUnit> {
     }
 
     @Override
-    public Stream<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         return StreamSupport.stream(sources.spliterator(), false)
                 .flatMap(source -> {
                     if (source.getPath().endsWith("settings.gradle")) {

@@ -153,7 +153,7 @@ interface ScriptHandlerSpec extends ScriptHandler {
 }
 
 abstract class RewriteGradleProject extends groovy.lang.Script implements Project {
-    Map ext;
+    Map ext
 
     // It would be more correct for ext to delegate to ExtraPropertiesExtension, but StaticTypeCheckingVisitor has problems with that
     abstract void buildscript(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=ScriptHandlerSpec) Closure cl)
@@ -182,4 +182,6 @@ abstract class RewriteGradleProject extends groovy.lang.Script implements Projec
     abstract <T extends Task> T task(String name, Class<T> type)
     abstract <T extends Task> T task(String name, Class<T> type, Object... constructorArgs)
     abstract <T extends Task> T task(String name, Class<T> type, Action<? super T> configuration)
+
+    abstract void apply(Map<String, String> args)
 }

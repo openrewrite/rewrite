@@ -70,16 +70,21 @@ public class Assertions {
             List<FindMissingTypes.MissingTypeResult> missingTypeResults = FindMissingTypes.findMissingTypes(sf);
             missingTypeResults = missingTypeResults.stream()
                     .filter(missingType -> {
-                        if (typeValidation.identifiers() && missingType.getJ() instanceof J.Identifier) {
+                        if (missingType.getJ() instanceof J.Identifier) {
+                            return typeValidation.identifiers();
+                        } else if (missingType.getJ() instanceof J.ClassDeclaration) {
+                            return typeValidation.classDeclarations();
+                        } else if (missingType.getJ() instanceof J.MethodInvocation || missingType.getJ() instanceof J.MemberReference) {
+                            return typeValidation.methodInvocations();
+                        } else if (missingType.getJ() instanceof J.NewClass) {
+                            return typeValidation.constructorInvocations();
+                        } else if (missingType.getJ() instanceof J.MethodDeclaration) {
+                            return typeValidation.methodDeclarations();
+                        } else if (missingType.getJ() instanceof J.VariableDeclarations.NamedVariable) {
+                            return typeValidation.variableDeclarations();
+                        } else {
                             return true;
-                        } else if (typeValidation.classDeclarations() && missingType.getJ() instanceof J.ClassDeclaration) {
-                            return true;
-                        } else if (typeValidation.methodInvocations() && missingType.getJ() instanceof J.MethodInvocation) {
-                            return true;
-                        } else if (typeValidation.constructorInvocations() && missingType.getJ() instanceof J.NewClass) {
-                            return true;
-                        } else
-                            return typeValidation.methodDeclarations() && missingType.getJ() instanceof J.MethodDeclaration;
+                        }
                     })
                     .collect(Collectors.toList());
             if (!missingTypeResults.isEmpty()) {

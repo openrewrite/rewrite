@@ -20,6 +20,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.gradle.toolingapi.OpenRewriteModel;
 import org.openrewrite.gradle.toolingapi.OpenRewriteModelBuilder;
 import org.openrewrite.gradle.util.GradleWrapper;
@@ -87,7 +88,7 @@ public class Assertions {
                     }
 
                     if (version != null) {
-                        GradleWrapper gradleWrapper = requireNonNull(GradleWrapper.validate(new InMemoryExecutionContext(), version, distribution, null, null).getValue());
+                        GradleWrapper gradleWrapper = requireNonNull(GradleWrapper.validate(new InMemoryExecutionContext(), version, distribution, null).getValue());
                         Files.createDirectories(projectDir.resolve("gradle/wrapper/"));
                         Files.write(projectDir.resolve(GradleWrapper.WRAPPER_PROPERTIES_LOCATION), ("distributionBase=GRADLE_USER_HOME\n" +
                                 "distributionPath=wrapper/dists\n" +
@@ -95,7 +96,7 @@ public class Assertions {
                                 "distributionSha256Sum=" + gradleWrapper.getDistributionChecksum().getHexValue() + "\n" +
                                 "zipStoreBase=GRADLE_USER_HOME\n" +
                                 "zipStorePath=wrapper/dists").getBytes(StandardCharsets.UTF_8), StandardOpenOption.CREATE_NEW);
-                        Files.write(projectDir.resolve(GradleWrapper.WRAPPER_JAR_LOCATION), gradleWrapper.asRemote().printAllAsBytes(), StandardOpenOption.CREATE_NEW);
+                        Files.write(projectDir.resolve(GradleWrapper.WRAPPER_JAR_LOCATION), gradleWrapper.wrapperJar().printAllAsBytes(), StandardOpenOption.CREATE_NEW);
                         Path gradleSh = projectDir.resolve(GradleWrapper.WRAPPER_SCRIPT_LOCATION);
                         Files.copy(requireNonNull(UpdateGradleWrapper.class.getResourceAsStream("/gradlew")), gradleSh);
                         OperatingSystemProvenance current = OperatingSystemProvenance.current();
@@ -109,10 +110,18 @@ public class Assertions {
 
                     for (int i = 0; i < sourceFiles.size(); i++) {
                         SourceFile sourceFile = sourceFiles.get(i);
-                        if (sourceFile.getSourcePath().toString().endsWith(".gradle") && !sourceFile.getSourcePath().endsWith("settings.gradle")) {
-                            OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile(), tempDirectory.resolve(sourceFile.getSourcePath()).toFile());
-                            GradleProject gradleProject = GradleProject.fromToolingModel(model.gradleProject());
-                            sourceFiles.set(i, sourceFile.withMarkers(sourceFile.getMarkers().add(gradleProject)));
+                        if (sourceFile.getSourcePath().toString().endsWith(".gradle")) {
+                            if (sourceFile.getSourcePath().endsWith("settings.gradle")) {
+                                OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(tempDirectory.resolve(sourceFile.getSourcePath()).getParent().toFile(), null);
+                                if (model.gradleSettings() != null) {
+                                    GradleSettings gradleSettings = GradleSettings.fromToolingModel(model.gradleSettings());
+                                    sourceFiles.set(i, sourceFile.withMarkers(sourceFile.getMarkers().add(gradleSettings)));
+                                }
+                            } else {
+                                OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(projectDir.toFile(), tempDirectory.resolve(sourceFile.getSourcePath()).toFile());
+                                GradleProject gradleProject = GradleProject.fromToolingModel(model.gradleProject());
+                                sourceFiles.set(i, sourceFile.withMarkers(sourceFile.getMarkers().add(gradleProject)));
+                            }
                         }
                     }
                 } finally {
