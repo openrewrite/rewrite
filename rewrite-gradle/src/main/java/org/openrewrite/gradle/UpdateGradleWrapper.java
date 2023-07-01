@@ -65,7 +65,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Getter
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "Defaults to latest release if not specified.",
+                          "Defaults to the latest release if not specified.",
             example = "7.x",
             required = false)
     @Nullable
@@ -110,6 +110,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
     @NonFinal
     transient GradleWrapper gradleWrapper;
+
     private GradleWrapper getGradleWrapper(ExecutionContext ctx) {
         if(gradleWrapper == null) {
             HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
@@ -338,7 +339,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         binding.put("defaultJvmOpts", StringUtils.isNotEmpty(defaultJvmOpts) ? "'" + defaultJvmOpts + "'" : "");
         binding.put("classpath", "$APP_HOME/gradle/wrapper/gradle-wrapper.jar");
 
-        String gradlewTemplate = StringUtils.readFully(gradleWrapper.gradlew().getInputStream(HttpSenderExecutionContextView.view(ctx).getHttpSender()));
+        String gradlewTemplate = StringUtils.readFully(gradleWrapper.gradlew().getInputStream(ctx));
         return renderTemplate(gradlewTemplate, binding, "\n");
     }
 
@@ -347,7 +348,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         binding.put("defaultJvmOpts", defaultJvmOpts(gradleWrapper));
         binding.put("classpath", "%APP_HOME%\\gradle\\wrapper\\gradle-wrapper.jar");
 
-        String gradlewBatTemplate = StringUtils.readFully(gradleWrapper.gradlewBat().getInputStream(HttpSenderExecutionContextView.view(ctx).getHttpSender()));
+        String gradlewBatTemplate = StringUtils.readFully(gradleWrapper.gradlewBat().getInputStream(ctx));
         return renderTemplate(gradlewBatTemplate, binding, "\r\n");
     }
 
