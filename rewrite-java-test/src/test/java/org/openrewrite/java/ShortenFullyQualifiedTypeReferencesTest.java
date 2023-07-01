@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -67,7 +68,7 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               """,
             """
               import java.util.Map;
-              
+                            
               class T {
                   Map.Entry<String, String> mapEntry;
               }
@@ -142,6 +143,35 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
                   List<List<String>> list;
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void equalType() {
+        rewriteRun(
+          java(
+            //language=java
+            """
+              import java.util.List;
+                            
+              class T {
+                  java.util.List list;
+              }
+              """,
+            """
+              import java.util.List;
+                            
+              class T {
+                  List list;
+              }
+              """,
+            spec -> spec.mapBeforeRecipe(cu -> (J.CompilationUnit) new JavaIsoVisitor<>() {
+                @Override
+                public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, Object o) {
+                    return multiVariable.withType(JavaType.ShallowClass.build("java.util.List"));
+                }
+            }.visit(cu, 0))
           )
         );
     }
@@ -356,6 +386,35 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
 
               class T {
                   <String> void m(java.lang.String s, List<String> list) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void qualifiedMethodReference() {
+        rewriteRun(
+          java(
+            //language=java
+            """
+              import java.util.Collection;
+              import java.util.function.Function;
+
+              class T {
+                  Function<Collection<?>, Integer> m() {
+                      return java.util.Collection::size;
+                  }
+              }
+              """,
+            """
+              import java.util.Collection;
+              import java.util.function.Function;
+
+              class T {
+                  Function<Collection<?>, Integer> m() {
+                      return Collection::size;
                   }
               }
               """
