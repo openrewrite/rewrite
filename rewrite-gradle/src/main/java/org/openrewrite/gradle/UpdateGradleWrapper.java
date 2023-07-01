@@ -20,11 +20,13 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesParser;
@@ -62,7 +64,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
     @Getter
     @Option(displayName = "New version",
-            description = "An exact version number or node-style semver selector used to select the version number.",
+            description = "An exact version number or node-style semver selector used to select the version number. " +
+                          "Defaults to the latest release if not specified.",
             example = "7.x",
             required = false)
     @Nullable
@@ -96,23 +99,25 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     @Nullable
     final Boolean addIfMissing;
 
-    transient Validated<GradleWrapper> gradleWrapperValidation;
-
-    Validated<GradleWrapper> createValidatedGradleWrapperValidation(ExecutionContext ctx) {
-        if (gradleWrapperValidation == null) {
-            gradleWrapperValidation = GradleWrapper.validate(
-                    ctx,
-                    isBlank(version) ? "latest.release" : version,
-                    distribution,
-                    repositoryUrl
-            );
+    @Override
+    public Validated<Object> validate() {
+        Validated<Object> validated = super.validate();
+        if (version != null) {
+            validated = validated.and(Semver.validate(version, null));
         }
-        return gradleWrapperValidation;
+        return validated;
     }
 
-    @Override
-    public Validated<Object> validate(ExecutionContext ctx) {
-        return super.validate(ctx).and(createValidatedGradleWrapperValidation(ctx));
+    @NonFinal
+    transient GradleWrapper gradleWrapper;
+
+    private GradleWrapper getGradleWrapper(ExecutionContext ctx) {
+        if(gradleWrapper == null) {
+            HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
+            gradleWrapper = GradleWrapper.create(
+                    distribution, version, repositoryUrl,httpSender);
+        }
+        return gradleWrapper;
     }
 
     static class GradleWrapperState {
@@ -154,19 +159,16 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             return false;
                         }
 
-                        GradleWrapper gradleWrapper = requireNonNull(createValidatedGradleWrapperValidation(ctx).getValue());
+                        GradleWrapper gradleWrapper = getGradleWrapper(ctx);
 
                         VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(version) ? "latest.release" : version, null).getValue());
                         int compare = versionComparator.compare(null, buildTool.getVersion(), gradleWrapper.getVersion());
+                        // maybe we want to update the distribution type or url
                         if (compare < 0) {
                             acc.needsWrapperUpdate = true;
                             acc.updatedMarker = buildTool.withVersion(gradleWrapper.getVersion());
                             return true;
-                        } else if (compare == 0) {
-                            // maybe we want to update the distribution type or url
-                            return true;
-                        }
-                        return false;
+                        } else return compare == 0;
                     }
 
                     @Override
@@ -175,7 +177,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                             return entry;
                         }
 
-                        GradleWrapper gradleWrapper = requireNonNull(createValidatedGradleWrapperValidation(ctx).getValue());
+                        GradleWrapper gradleWrapper = getGradleWrapper(ctx);
 
                         // Typical example: https://services.gradle.org/distributions/gradle-7.4-all.zip
                         String currentDistributionUrl = entry.getValue().getText();
@@ -227,7 +229,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         List<SourceFile> gradleWrapperFiles = new ArrayList<>();
         ZonedDateTime now = ZonedDateTime.now();
 
-        GradleWrapper gradleWrapper = requireNonNull(gradleWrapperValidation.getValue());
+        GradleWrapper gradleWrapper = getGradleWrapper(ctx);
 
         if (acc.addGradleWrapperProperties) {
             //noinspection UnusedProperty
@@ -279,7 +281,6 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         }
 
         return new TreeVisitor<Tree, ExecutionContext>() {
-            final GradleWrapper gradleWrapper = requireNonNull(gradleWrapperValidation.getValue());
 
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
