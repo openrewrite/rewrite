@@ -31,7 +31,7 @@ dependencies {
 
     compileOnly("org.rocksdb:rocksdbjni:latest.release")
     compileOnly(project(":rewrite-yaml"))
-    compileOnly(project(":rewrite-properties"))
+    implementation(project(":rewrite-properties"))
 
     implementation("io.micrometer:micrometer-core:1.9.+")
 
