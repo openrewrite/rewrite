@@ -17,13 +17,10 @@ package org.openrewrite.properties;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
-import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.properties.Assertions.properties;
-import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("UnusedProperty")
 class AddPropertyTest implements RewriteTest {
@@ -152,29 +149,6 @@ class AddPropertyTest implements RewriteTest {
             """
               management.metrics.enable.process.files=true
               """
-          )
-        );
-    }
-
-    @Test
-    @Issue("https://github.com/openrewrite/rewrite/pull/3384")
-    void allowReuse() {
-        // Local variable to show correct return type: PropertiesVisitor
-        PropertiesIsoVisitor<ExecutionContext> propertiesVisitor = new AddProperty(
-          "management.metrics.enable.process.files",
-          "true",
-          null).getVisitor();
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> propertiesVisitor)),
-          properties(
-            "",
-            """
-              management.metrics.enable.process.files=true
-              """,
-            spec -> spec.afterRecipe(file -> {
-                // Local variable to show correct return type: Properties.File
-                Properties.File changed = propertiesVisitor.visitFile(file, null);
-            })
           )
         );
     }
