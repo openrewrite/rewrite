@@ -38,7 +38,7 @@ class Issue3026Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new PropertiesVisitor<>() {
               @Override
-              public Properties.File visitFile(Properties.File file, ExecutionContext ctx) {
+              public Properties visitFile(Properties.File file, ExecutionContext ctx) {
                   List<Properties.Content> content = file.getContent();
                   if (content.size() != 1) {
                       return file;

@@ -59,11 +59,11 @@ public class AddProperty extends Recipe {
     }
 
     @Override
-    public PropertiesVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
-            public Properties.File visitFile(Properties.File file, ExecutionContext executionContext) {
-                Properties.File p = super.visitFile(file, executionContext);
+            public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
+                Properties.File p = (Properties.File) super.visitFile(file, executionContext);
                 if (!StringUtils.isBlank(property) && !StringUtils.isBlank(value)) {
                     Set<Properties.Entry> properties = FindProperties.find(p, property, false);
                     if (properties.isEmpty()) {

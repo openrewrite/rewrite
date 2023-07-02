@@ -60,8 +60,8 @@ public class DeleteProperty extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
-            public Properties.File visitFile(Properties.File file, ExecutionContext executionContext) {
-                Properties.File f = super.visitFile(file, executionContext);
+            public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
+                Properties.File f = (Properties.File) super.visitFile(file, executionContext);
 
                 String prefix = null;
                 List<Properties.Content> contents = f.getContent();
