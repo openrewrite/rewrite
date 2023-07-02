@@ -160,7 +160,7 @@ class AddPropertyTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/pull/3384")
     void allowReuse() {
         // Local variable to show correct return type: PropertiesVisitor
-        PropertiesVisitor<ExecutionContext> propertiesVisitor = new AddProperty(
+        PropertiesIsoVisitor<ExecutionContext> propertiesVisitor = new AddProperty(
           "management.metrics.enable.process.files",
           "true",
           null).getVisitor();
