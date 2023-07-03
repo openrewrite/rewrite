@@ -192,15 +192,17 @@ class WhenTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun method(i: Any) {
+              package foo.bar
+              import java.util.List
+              fun method ( i : Any ) {
                   val lhs = true
                   val rhs = true
-                  when (i) {
-                      1, (lhs && rhs || isTrue()) -> {
+                  when ( i ) {
+                      1, ( lhs && rhs || isTrue() ) -> {
                       }
                   }
               }
-              fun isTrue() = true
+              fun isTrue ( ) = true
               """
           )
         );
@@ -212,8 +214,8 @@ class WhenTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun method(a: Any) {
-                   val any = (if (a is Boolean) "true" else "false")
+              fun method ( a : Any ) {
+                   val any = ( if ( a is Boolean ) "true" else "false" )
               }
               """
           )
@@ -226,8 +228,8 @@ class WhenTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun method(a: Any?) {
-                  ((((if (((a)) == ((null))) return))))
+              fun method ( a : Any? ) {
+                  ( ( ( ( if ( ( ( a ) ) == ( ( null ) ) ) return ) ) ) )
                   val r = a
               }
               """

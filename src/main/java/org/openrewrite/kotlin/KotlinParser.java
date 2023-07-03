@@ -41,12 +41,14 @@ import org.jetbrains.kotlin.com.intellij.openapi.project.Project;
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
 import org.jetbrains.kotlin.com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.kotlin.com.intellij.psi.FileViewProvider;
+import org.jetbrains.kotlin.com.intellij.psi.PsiFile;
 import org.jetbrains.kotlin.com.intellij.psi.PsiManager;
 import org.jetbrains.kotlin.com.intellij.psi.SingleRootFileViewProvider;
 import org.jetbrains.kotlin.com.intellij.testFramework.LightVirtualFile;
 import org.jetbrains.kotlin.config.*;
 import org.jetbrains.kotlin.diagnostics.DiagnosticReporterFactory;
 import org.jetbrains.kotlin.diagnostics.impl.BaseDiagnosticsCollector;
+import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
@@ -154,11 +156,17 @@ public class KotlinParser implements Parser {
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         ParsingEventListener parsingListener = pctx.getParsingListener();
 
-        CompiledSource compilerCus;
         Disposable disposable = Disposer.newDisposable();
-        compilerCus = parse(acceptedInputs(sources).collect(Collectors.toList()), disposable, pctx);
-
-        disposable.dispose();
+        CompiledSource compilerCus;
+        try {
+            compilerCus = parse(acceptedInputs(sources).collect(Collectors.toList()), disposable, pctx);
+        } catch (Exception e) {
+            // TODO: associate the compiler exception to a specific source file.
+            // https://github.com/openrewrite/rewrite-kotlin/issues/24
+            return Stream.empty();
+        }
+        Disposer.dispose(disposable);
+        FirSession firSession = compilerCus.getFirSession();
         return compilerCus.getSources().stream()
                 .map(compiled -> {
                     try {
@@ -167,7 +175,7 @@ public class KotlinParser implements Parser {
                                 relativeTo,
                                 styles,
                                 typeCache,
-                                compilerCus.getFirSession(),
+                                firSession,
                                 ctx
                         );
 
@@ -363,8 +371,9 @@ public class KotlinParser implements Parser {
                     PsiManager.getInstance(environment.getProject()),
                     vFile
             );
-            KtFile file = (KtFile) fileViewProvider.getPsi(KotlinLanguage.INSTANCE);
-            cus.add(new KotlinSource(source, file, null));
+            PsiFile file = fileViewProvider.getPsi(KotlinLanguage.INSTANCE);
+            KotlinSource kotlinSource = new KotlinSource(source, file);
+            cus.add(kotlinSource);
             platformSources.add(new KtVirtualFileSourceFile(vFile));
         }
 

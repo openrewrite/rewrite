@@ -87,7 +87,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private final FirSession firSession;
     private int cursor;
 
-    private final Map<Integer, ASTNode> nodes = new HashMap<>();
+    private Map<Integer, ASTNode> nodes;
 
     // Associate top-level function and property declarations to the file.
     @Nullable
@@ -104,30 +104,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         this.typeMapping = new KotlinTypeMapping(typeCache, firSession);
         this.ctx = ctx;
         this.firSession = firSession;
-        init(kotlinSource.getKtFile());
-    }
-
-    private void init(KtFile ktFile) {
-        PsiElementVisitor v = new PsiElementVisitor() {
-            @Override
-            public void visitElement(@NotNull PsiElement element) {
-                if (!(element instanceof KtFile) && element.getTextLength() != 0) {
-                    // Set the node at the cursor to the last visited element.
-                    nodes.put(element.getTextRange().getStartOffset(), element.getNode());
-                    assert source.substring(element.getTextRange().getStartOffset(), element.getTextRange().getEndOffset()).equals(element.getText());
-                }
-
-                for (PsiElement child : element.getChildren()) {
-                    if (child != null) {
-                        visitElement(child);
-                    }
-                }
-                if (element.getNextSibling() != null) {
-                    visitElement(element.getNextSibling());
-                }
-            }
-        };
-        v.visitElement(ktFile);
+        this.nodes = kotlinSource.getNodes();
     }
 
     @Override
@@ -3698,6 +3675,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     if (node.getTextRange().getEndOffset() >= firElement.getSource().getEndOffset()) {
                         return wrapInParens(firElement, prefix, ctx);
                     }
+                    break;
                 case "REFERENCE_EXPRESSION":
                     if ("POSTFIX_EXPRESSION".equals(node.getTreeParent().getElementType().getDebugName()) && firElement instanceof FirBlock) {
                         firElement = ((FirBlock) firElement).getStatements().get(1);
