@@ -170,19 +170,24 @@ public interface Remote extends SourceFile {
             return this;
         }
 
+        public Builder checksum(Checksum checksum) {
+            this.checksum = checksum;
+            return this;
+        }
+
         public RemoteFile build() {
-            return new RemoteFile(id, sourcePath, markers, uri, charset, charsetBomMarked, fileAttributes, description);
+            return new RemoteFile(id, sourcePath, markers, uri, charset, charsetBomMarked, fileAttributes, description, checksum);
         }
 
         public RemoteArchive build(Path path) {
             return new RemoteArchive(id, sourcePath, markers, uri, charset, charsetBomMarked, fileAttributes, description,
                     Arrays.asList(path.toString().replace("/", "\\/").replace(".", "\\.")
-                            .split("!")));
+                            .split("!")), checksum);
         }
 
         public RemoteArchive build(String... paths) {
             return new RemoteArchive(id, sourcePath, markers, uri, charset, charsetBomMarked, fileAttributes, description,
-                    Arrays.asList(paths));
+                    Arrays.asList(paths), checksum);
         }
     }
 }

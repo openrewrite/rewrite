@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.Checksum;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.HttpSenderExecutionContextView;
@@ -80,6 +81,9 @@ public class RemoteArchive implements Remote {
      * </pre>
      */
     List<String> paths;
+
+    @Nullable
+    Checksum checksum;
 
     @Override
     public InputStream getInputStream(ExecutionContext ctx) {
