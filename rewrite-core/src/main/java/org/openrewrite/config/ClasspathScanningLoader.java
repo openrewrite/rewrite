@@ -22,11 +22,11 @@ import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
 import org.openrewrite.ScanningRecipe;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.NamedStyles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Modifier;
 import java.nio.file.Path;
@@ -50,7 +50,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     /**
      * Construct a ClasspathScanningLoader scans the runtime classpath of the current java process for recipes
      *
-     * @param properties Yaml placeholder properties
+     * @param properties     Yaml placeholder properties
      * @param acceptPackages Limit scan to specified packages
      */
     public ClasspathScanningLoader(Properties properties, String[] acceptPackages) {
@@ -64,7 +64,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     /**
      * Construct a ClasspathScanningLoader scans the provided classload for recipes
      *
-     * @param properties Yaml placeholder properties
+     * @param properties  Yaml placeholder properties
      * @param classLoader Limit scan to classes loadable by this classloader
      */
     public ClasspathScanningLoader(Properties properties, ClassLoader classLoader) {
@@ -110,14 +110,14 @@ public class ClasspathScanningLoader implements ResourceLoader {
                     yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders)));
             // Extract in two passes so that the full list of recipes from all sources are known when computing recipe descriptors
             // Otherwise recipes which include recipes from other sources in their recipeList will have incomplete descriptors
-            for(YamlResourceLoader resourceLoader : yamlResourceLoaders) {
+            for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
                 recipes.addAll(resourceLoader.listRecipes());
                 categoryDescriptors.addAll(resourceLoader.listCategoryDescriptors());
                 styles.addAll(resourceLoader.listStyles());
                 recipeAttributions.putAll(resourceLoader.listContributors());
                 recipeExamples.putAll(resourceLoader.listRecipeExamples());
             }
-            for(YamlResourceLoader resourceLoader : yamlResourceLoaders) {
+            for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
                 recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes, recipeAttributions, recipeExamples));
             }
         }
@@ -136,7 +136,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 Class<?> styleClass = classInfo.loadClass();
                 try {
                     Constructor<?> constructor = RecipeIntrospectionUtils.getZeroArgsConstructor(styleClass);
-                    if(constructor != null) {
+                    if (constructor != null) {
                         constructor.setAccessible(true);
                         styles.add((NamedStyles) constructor.newInstance());
                     }
