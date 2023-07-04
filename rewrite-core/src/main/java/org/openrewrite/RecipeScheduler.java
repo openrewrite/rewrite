@@ -221,6 +221,7 @@ public class RecipeScheduler {
                         return sourceFile;
                     }
 
+                    ctx.putCurrentRecipe(recipe);
                     TreeVisitor<?, ExecutionContext> visitor = recipe.getVisitor();
                     // set root cursor as it is required by the `ScanningRecipe#isAcceptable()`
                     visitor.setCursor(rootCursor);
