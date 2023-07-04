@@ -54,7 +54,7 @@ public class LocalRemoteArtifactCache implements RemoteArtifactCache {
             }
             Files.move(artifact, cacheDir.resolve(hashUri(uri)), StandardCopyOption.ATOMIC_MOVE,
                     StandardCopyOption.REPLACE_EXISTING);
-            return artifact;
+            return cacheDir.resolve(hashUri(uri));
         } catch (Exception e) {
             onError.accept(e);
             return null;

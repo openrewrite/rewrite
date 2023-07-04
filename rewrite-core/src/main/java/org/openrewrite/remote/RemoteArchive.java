@@ -107,7 +107,7 @@ public class RemoteArchive implements Remote {
             }
             return inner;
         } catch (IOException e) {
-            throw new UncheckedIOException("Unable to download " + uri + " to temporary file", e);
+            throw new UncheckedIOException("Unable to download " + uri + " to file", e);
         }
     }
 
