@@ -68,13 +68,15 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
     String artifactId;
 
     @Option(displayName = "New version",
-            description = "An exact version number or node-style semver selector used to select the version number.",
+            description = "An exact version number or node-style semver selector used to select the version number. " +
+                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                          "the current version is a valid semantic version.",
             example = "29.X")
     String newVersion;
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                          "Setting 'newVersion' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
