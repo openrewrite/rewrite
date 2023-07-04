@@ -18,6 +18,7 @@ package org.openrewrite.maven.utilities;
 import lombok.Value;
 import org.openrewrite.Checksum;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
@@ -41,21 +42,21 @@ import static java.util.Objects.requireNonNull;
 @Value
 public class MavenWrapper {
     public static final String ASF_LICENSE_HEADER = "# Licensed to the Apache Software Foundation (ASF) under one\n" +
-            "# or more contributor license agreements.  See the NOTICE file\n" +
-            "# distributed with this work for additional information\n" +
-            "# regarding copyright ownership.  The ASF licenses this file\n" +
-            "# to you under the Apache License, Version 2.0 (the\n" +
-            "# \"License\"); you may not use this file except in compliance\n" +
-            "# with the License.  You may obtain a copy of the License at\n" +
-            "# \n" +
-            "#   http://www.apache.org/licenses/LICENSE-2.0\n" +
-            "# \n" +
-            "# Unless required by applicable law or agreed to in writing,\n" +
-            "# software distributed under the License is distributed on an\n" +
-            "# \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY\n" +
-            "# KIND, either express or implied.  See the License for the\n" +
-            "# specific language governing permissions and limitations\n" +
-            "# under the License.\n";
+                                                    "# or more contributor license agreements.  See the NOTICE file\n" +
+                                                    "# distributed with this work for additional information\n" +
+                                                    "# regarding copyright ownership.  The ASF licenses this file\n" +
+                                                    "# to you under the Apache License, Version 2.0 (the\n" +
+                                                    "# \"License\"); you may not use this file except in compliance\n" +
+                                                    "# with the License.  You may obtain a copy of the License at\n" +
+                                                    "# \n" +
+                                                    "#   http://www.apache.org/licenses/LICENSE-2.0\n" +
+                                                    "# \n" +
+                                                    "# Unless required by applicable law or agreed to in writing,\n" +
+                                                    "# software distributed under the License is distributed on an\n" +
+                                                    "# \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY\n" +
+                                                    "# KIND, either express or implied.  See the License for the\n" +
+                                                    "# specific language governing permissions and limitations\n" +
+                                                    "# under the License.\n";
     public static final String WRAPPER_DOWNLOADER_LOCATION_RELATIVE_PATH = ".mvn/wrapper/MavenWrapperDownloader.java";
     public static final String WRAPPER_JAR_LOCATION_RELATIVE_PATH = ".mvn/wrapper/maven-wrapper.jar";
     public static final String WRAPPER_PROPERTIES_LOCATION_RELATIVE_PATH = ".mvn/wrapper/maven-wrapper.properties";
@@ -98,7 +99,7 @@ public class MavenWrapper {
                 new LatestRelease(null) :
                 requireNonNull(Semver.validate(distributionVersion, null).getValue());
 
-        MavenRepository repository = repositoryUrl == null ?
+        MavenRepository repository = StringUtils.isBlank(repositoryUrl) ?
                 MavenRepository.MAVEN_CENTRAL :
                 MavenRepository.builder()
                         .uri(repositoryUrl)
@@ -191,14 +192,14 @@ public class MavenWrapper {
 
     private static String getDownloadUriFor(MavenRepository repository, GroupArtifact ga, String version, @Nullable String classifier, String extension) {
         return repository.getUri() +
-                "/" +
-                ga.getGroupId().replace(".", "/") +
-                "/" +
-                ga.getArtifactId() +
-                "/" +
-                version +
-                "/" +
-                ga.getArtifactId() + "-" + version + (classifier == null ? "" : "-" + classifier) + "." + extension;
+               "/" +
+               ga.getGroupId().replace(".", "/") +
+               "/" +
+               ga.getArtifactId() +
+               "/" +
+               version +
+               "/" +
+               ga.getArtifactId() + "-" + version + (classifier == null ? "" : "-" + classifier) + "." + extension;
     }
 
     public enum DistributionType {

@@ -48,10 +48,12 @@ public class LocalRemoteArtifactCache implements RemoteArtifactCache {
     @Nullable
     public Path put(URI uri, InputStream artifactInputStream, Consumer<Throwable> onError) {
         try {
-            Path artifact = cacheDir.resolve(hashUri(uri));
+            Path artifact = cacheDir.resolve(hashUri(uri) + ".tmp");
             try (InputStream is = artifactInputStream) {
                 Files.copy(is, artifact, StandardCopyOption.REPLACE_EXISTING);
             }
+            Files.move(artifact, cacheDir.resolve(hashUri(uri)), StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING);
             return artifact;
         } catch (Exception e) {
             onError.accept(e);

@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.remote.Remote;
@@ -62,7 +63,7 @@ public class GradleWrapper {
                 new LatestRelease(null) :
                 requireNonNull(Semver.validate(version, null).getValue());
 
-        String gradleVersionsUrl = (repositoryUrl == null) ? "https://services.gradle.org/versions/all" : repositoryUrl;
+        String gradleVersionsUrl = (StringUtils.isBlank(repositoryUrl)) ? "https://services.gradle.org/versions/all" : repositoryUrl;
         try (HttpSender.Response resp = httpSender.send(httpSender.get(gradleVersionsUrl).build())) {
             if (resp.isSuccessful()) {
                 List<GradleVersion> allVersions = new ObjectMapper()
