@@ -242,7 +242,9 @@ public class BlockStatementTemplateGenerator {
             before.append("Object o = ");
             after.append(";");
             after.append("\n}}");
-        } else if (j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations && cursor.getValue() instanceof J.Block && cursor.getParent().getValue() instanceof J.ClassDeclaration) {
+        } else if ((j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations || j instanceof J.Block)
+                   && cursor.getValue() instanceof J.Block
+                   && (cursor.getParent().getValue() instanceof J.ClassDeclaration || cursor.getParent().getValue() instanceof J.NewClass)) {
             before.insert(0, "class Template {\n");
             after.append("\n}");
         } else if (!(j instanceof J.Import) && !(j instanceof J.Package)) {
