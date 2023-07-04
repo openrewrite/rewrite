@@ -192,15 +192,46 @@ class WhenTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun method(i: Any) {
+              package foo.bar
+              import java.util.List
+              fun method ( i : Any ) {
                   val lhs = true
                   val rhs = true
-                  when (i) {
-                      1, (lhs && rhs || isTrue()) -> {
+                  when ( i ) {
+                      1, ( lhs && rhs || isTrue() ) -> {
                       }
                   }
               }
-              fun isTrue() = true
+              fun isTrue ( ) = true
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/138")
+    @Test
+    void inParens() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method ( a : Any ) {
+                   val any = ( if ( a is Boolean ) "true" else "false" )
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/138")
+    @Test
+    void multipleDeSugaredParens() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method ( a : Any? ) {
+                  ( ( ( ( if ( ( ( a ) ) == ( ( null ) ) ) return ) ) ) )
+                  val r = a
+              }
               """
           )
         );

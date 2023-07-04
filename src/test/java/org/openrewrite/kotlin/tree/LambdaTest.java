@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -76,7 +77,7 @@ class LambdaTest implements RewriteTest {
           kotlin(
             """
               fun method ( ) {
-                  val lambda: suspend ( ) -> Int = suspend { 1 }
+                  val lambda : suspend ( ) -> Int = suspend { 1 }
               }
               """
           )
@@ -90,7 +91,7 @@ class LambdaTest implements RewriteTest {
           kotlin(
             """
               fun method ( ) {
-                  val lambda: suspend ( Int ) -> Int = { number : Int -> number * number }
+                  val lambda : suspend ( Int ) -> Int = { number : Int -> number * number }
               }
               """
           )
@@ -116,9 +117,9 @@ class LambdaTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun method() {
-                  val list = listOf(1, 2, 3)
-                  list.filterIndexed { index, _ -> index % 2 == 0 }
+              fun method ( ) {
+                  val list = listOf ( 1 , 2 , 3 )
+                  list . filterIndexed { index , _ -> index % 2 == 0 }
               }
               """
           )
@@ -134,7 +135,7 @@ class LambdaTest implements RewriteTest {
               package foo
               class Bar {
                   companion object {
-                      fun bar(e: Any) {
+                      fun bar ( e : Any ) {
                       }
                   }
               }
@@ -144,7 +145,7 @@ class LambdaTest implements RewriteTest {
             """
               import foo.Bar
               fun test() {
-                  val a = Bar.bar {
+                  val a = Bar . bar {
                       _ : Any? ->
                   }
               }
@@ -162,7 +163,7 @@ class LambdaTest implements RewriteTest {
               package foo
               class Bar {
                   companion object {
-                      fun bar(e: Any) {
+                      fun bar ( e : Any ) {
                       }
                   }
               }
@@ -172,8 +173,8 @@ class LambdaTest implements RewriteTest {
             """
               import foo.Bar
               fun test() {
-                  val a = Bar.bar {
-                      _ : kotlin.Int? ->
+                  val a = Bar . bar {
+                      _ : kotlin . Int? ->
                   }
               }
               """

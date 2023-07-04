@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,14 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.kotlin;
+package org.openrewrite.kotlin.internal;
 
 import lombok.Value;
-import org.jetbrains.kotlin.fir.declarations.FirFile;
-import org.openrewrite.Parser;
+import org.jetbrains.kotlin.fir.FirSession;
+
+import java.util.Collection;
 
 @Value
-public class CompiledKotlinSource {
-    Parser.Input input;
-    FirFile firFile;
+public class CompiledSource {
+    FirSession firSession;
+    Collection<KotlinSource> sources;
 }

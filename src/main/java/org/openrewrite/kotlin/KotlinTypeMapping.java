@@ -66,14 +66,12 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
     private final KotlinTypeSignatureBuilder signatureBuilder;
     private final JavaTypeCache typeCache;
     private final FirSession firSession;
-    private final JavaReflectionTypeMapping reflectionTypeMapping;
 
 
     public KotlinTypeMapping(JavaTypeCache typeCache, FirSession firSession) {
         this.signatureBuilder = new KotlinTypeSignatureBuilder(firSession);
         this.typeCache = typeCache;
         this.firSession = firSession;
-        this.reflectionTypeMapping = new JavaReflectionTypeMapping(typeCache);
     }
 
     @SuppressWarnings("ConstantConditions")
