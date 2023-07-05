@@ -136,7 +136,7 @@ public class SimpleFileServer extends AbstractTestServer {
             String coapRootPath = config.pathRoot;
 
             if (0 <= coapRootPath.indexOf('/')) {
-                LOG.error("{} don't use '/'! Only one path segement for coap root allowed!", coapRootPath);
+                LOG.error("{} don't use '/'! Only one path segment for coap root allowed!", coapRootPath);
                 return;
             }
 

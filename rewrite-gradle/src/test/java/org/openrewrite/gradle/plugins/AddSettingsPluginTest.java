@@ -28,11 +28,13 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.withToolingApi;
 
 class AddSettingsPluginTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null));
+        spec.beforeRecipe(withToolingApi())
+                .recipe(new AddSettingsPlugin("com.gradle.enterprise", "3.11.x", null));
     }
 
     @Test
@@ -77,18 +79,16 @@ class AddSettingsPluginTest implements RewriteTest {
           settingsGradle(
             """
               plugins {
-                  id 'org.openrewrite' version '1'
               }
-                            
+              
               rootProject.name = 'my-project'
               """,
             interpolateResolvedVersion(
               """
               plugins {
-                  id 'org.openrewrite' version '1'
                   id 'com.gradle.enterprise' version '%s'
               }
-                                    
+              
               rootProject.name = 'my-project'
               """
             )

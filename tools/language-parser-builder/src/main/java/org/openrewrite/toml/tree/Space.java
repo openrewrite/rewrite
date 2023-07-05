@@ -48,8 +48,13 @@ public class Space {
 
     @JsonCreator
     public static Space build(@Nullable String whitespace) {
-        if (whitespace == null || whitespace.isEmpty()) {
-            return Space.EMPTY;
+        if (comments.isEmpty()) {
+            if (whitespace == null || whitespace.isEmpty()) {
+                return Space.EMPTY;
+            } else if (whitespace.length() <= 100) {
+                //noinspection StringOperationCanBeSimplified
+                return flyweights.computeIfAbsent(new String(whitespace), k -> new Space(whitespace, comments));
+            }
         }
         return flyweights.computeIfAbsent(whitespace, k -> new Space(whitespace));
     }

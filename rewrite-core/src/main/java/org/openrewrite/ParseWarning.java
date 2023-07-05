@@ -30,7 +30,7 @@ public class ParseWarning implements Marker {
     UUID id;
     String message;
 
-    public static ParseWarning build(Parser<?> parser, Throwable t) {
+    public static ParseWarning build(Parser parser, Throwable t) {
         return new ParseWarning(randomId(), ExceptionUtils.sanitizeStackTrace(t, parser.getClass()));
     }
 }

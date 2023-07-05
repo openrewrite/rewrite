@@ -167,4 +167,37 @@ class MinimumViableSpacingTest implements RewriteTest {
           )
         );
     }
+
+    // This test can not be reproduced by running MinimumViableSpacingVisitor only, so using `AutoFormat` recipe here.
+    @Issue("https://github.com/openrewrite/rewrite/issues/3346")
+    @Test
+    void annotatedReturnTypeExpression() {
+        rewriteRun(
+          spec -> spec.recipe(new AutoFormat()),
+          java(
+            """
+              class A {
+                  public @Deprecated String method() {
+                      return "name";
+                  }
+
+                  public    @Deprecated String method2() {
+                      return "name";
+                  }
+              }
+              """,
+            """
+              class A {
+                  public @Deprecated String method() {
+                      return "name";
+                  }
+
+                  public @Deprecated String method2() {
+                      return "name";
+                  }
+              }
+              """
+          )
+        );
+    }
 }

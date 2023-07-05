@@ -19,7 +19,12 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.gradle.IsBuildGradle;
+import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
+
+import java.util.Optional;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -56,6 +61,19 @@ public class AddBuildPlugin extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new IsBuildGradle<>(), new AddPluginVisitor(pluginId, version, versionPattern));
+        return Preconditions.check(
+                new IsBuildGradle<>(),
+                new GroovyIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                        Optional<GradleProject> maybeGradleProject = cu.getMarkers().findFirst(GradleProject.class);
+                        if (!maybeGradleProject.isPresent()) {
+                            return cu;
+                        }
+
+                        GradleProject gradleProject = maybeGradleProject.get();
+                        return (G.CompilationUnit) new AddPluginVisitor(pluginId, version, versionPattern, gradleProject.getMavenPluginRepositories()).visitNonNull(cu, ctx);
+                    }
+                });
     }
 }

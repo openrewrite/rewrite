@@ -24,14 +24,11 @@ import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
 import org.eclipse.jgit.lib.*;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markers;
-import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -87,27 +84,6 @@ public class Result {
                 .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe " +
                                                              "reported making a change"))
                 .getRecipes());
-    }
-
-    public List<Throwable> getRecipeErrors() {
-        List<Throwable> exceptions = new ArrayList<>();
-        new TreeVisitor<Tree, Integer>() {
-            @Nullable
-            @Override
-            public Tree visit(@Nullable Tree tree, Integer p) {
-                if (tree != null) {
-                    try {
-                        Method getMarkers = tree.getClass().getDeclaredMethod("getMarkers");
-                        Markers markers = (Markers) getMarkers.invoke(tree);
-                        markers.findFirst(Markup.Error.class)
-                                .ifPresent(e -> exceptions.add(e.getException()));
-                    } catch (Throwable ignored) {
-                    }
-                }
-                return super.visit(tree, p);
-            }
-        }.visit(after, 0);
-        return exceptions;
     }
 
     /**

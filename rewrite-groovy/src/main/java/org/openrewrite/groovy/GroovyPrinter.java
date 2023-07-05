@@ -231,8 +231,8 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
-        public J visitImport(J.Import impoort, PrintOutputCapture<P> p) {
-            J.Import i = (J.Import) super.visitImport(impoort, p);
+        public J visitImport(J.Import import_, PrintOutputCapture<P> p) {
+            J.Import i = (J.Import) super.visitImport(import_, p);
             JLeftPadded<J.Identifier> alias = i.getPadding().getAlias();
             if (alias == null) {
                 return i;
@@ -371,16 +371,16 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
-        public J visitReturn(J.Return retrn, PrintOutputCapture<P> p) {
-            if (retrn.getMarkers().findFirst(ImplicitReturn.class).isPresent() ||
-                retrn.getMarkers().findFirst(org.openrewrite.java.marker.ImplicitReturn.class).isPresent()) {
-                visitSpace(retrn.getPrefix(), Space.Location.RETURN_PREFIX, p);
-                visitMarkers(retrn.getMarkers(), p);
-                visit(retrn.getExpression(), p);
-                afterSyntax(retrn, p);
-                return retrn;
+        public J visitReturn(J.Return return_, PrintOutputCapture<P> p) {
+            if (return_.getMarkers().findFirst(ImplicitReturn.class).isPresent() ||
+                return_.getMarkers().findFirst(org.openrewrite.java.marker.ImplicitReturn.class).isPresent()) {
+                visitSpace(return_.getPrefix(), Space.Location.RETURN_PREFIX, p);
+                visitMarkers(return_.getMarkers(), p);
+                visit(return_.getExpression(), p);
+                afterSyntax(return_, p);
+                return return_;
             }
-            return super.visitReturn(retrn, p);
+            return super.visitReturn(return_, p);
         }
 
         protected void visitStatement(@Nullable JRightPadded<Statement> paddedStat, JRightPadded.Location location, PrintOutputCapture<P> p) {
@@ -409,7 +409,8 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
 
         @Override
         public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
-            if (marker instanceof Semicolon) {
+            //noinspection deprecation
+            if (marker instanceof Semicolon || marker instanceof org.openrewrite.java.marker.Semicolon) {
                 p.append(';');
             }
             return super.visitMarker(marker, p);

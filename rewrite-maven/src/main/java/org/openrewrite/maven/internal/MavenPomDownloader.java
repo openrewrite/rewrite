@@ -45,6 +45,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
@@ -123,10 +124,12 @@ public class MavenPomDownloader {
         this.projectPoms = projectPoms;
         this.projectPomsByGav = projectPomsByGav(projectPoms);
         this.httpSender = httpSender;
+        this.ctx = MavenExecutionContextView.view(ctx);
         this.sendRequest = Retry.decorateCheckedFunction(
                 mavenDownloaderRetry,
                 request -> {
                     int responseCode;
+                    long start = System.nanoTime();
                     try (HttpSender.Response response = httpSender.send(request)) {
                         if (response.isSuccessful()) {
                             return response.getBodyAsBytes();
@@ -134,10 +137,11 @@ public class MavenPomDownloader {
                         responseCode = response.getCode();
                     } catch (Throwable t) {
                         throw new HttpSenderResponseException(t, null);
+                    } finally {
+                        this.ctx.recordResolutionTime(Duration.ofNanos(System.nanoTime() - start));
                     }
                     throw new HttpSenderResponseException(null, responseCode);
                 });
-        this.ctx = MavenExecutionContextView.view(ctx);
         this.mavenCache = this.ctx.getPomCache();
     }
 
@@ -253,7 +257,7 @@ public class MavenPomDownloader {
                     try {
                         MavenMetadata derivedMeta = deriveMetadata(gav, repo);
                         if (derivedMeta != null) {
-                            Counter.builder("rewrite.maven.derived.metatdata")
+                            Counter.builder("rewrite.maven.derived.metadata")
                                     .tag("repositoryUri", repo.getUri())
                                     .tag("group", gav.getGroupId())
                                     .tag("artifact", gav.getArtifactId())

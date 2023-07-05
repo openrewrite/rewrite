@@ -22,8 +22,6 @@ import org.openrewrite.java.tree.JavaType;
 import java.util.*;
 
 public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder {
-    public static final DefaultJavaTypeSignatureBuilder TO_STRING = new DefaultJavaTypeSignatureBuilder();
-
     @Nullable
     private Set<String> typeVariableNameStack;
 

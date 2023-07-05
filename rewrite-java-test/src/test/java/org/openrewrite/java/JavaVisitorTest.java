@@ -18,11 +18,9 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -74,40 +72,6 @@ class JavaVisitorTest implements RewriteTest {
                   }
                   void doSomething() {}
                   void removeMethod() {}
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void thrownExceptionsAreSpecific() {
-        rewriteRun(
-          spec -> spec
-            .executionContext(new InMemoryExecutionContext())
-            .afterRecipe(run -> assertThat(run.getChangeset().getAllResults().get(0).getRecipeErrors())
-              .singleElement()
-              .satisfies(t -> assertThat(t.getMessage()).containsSubsequence("A.java", "A", "allTheThings"))
-            )
-            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-                @Override
-                public J.Literal visitLiteral(final J.Literal literal, final ExecutionContext executionContext) {
-                    throw new IllegalStateException("boom");
-                }
-            })),
-          java(
-            """
-              class A {
-                  void allTheThings() {
-                      String var = "qwe";
-                  }
-              }
-              """,
-            """
-              class A {
-                  void allTheThings() {
-                      String var = /*~~(boom)~~>*/"qwe";
-                  }
               }
               """
           )

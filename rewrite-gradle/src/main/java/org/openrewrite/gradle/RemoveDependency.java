@@ -115,9 +115,9 @@ public class RemoveDependency extends Recipe {
             }
 
             @Override
-            public @Nullable J visitReturn(J.Return retrn, ExecutionContext ctx) {
-                boolean dependencyInvocation = retrn.getExpression() instanceof J.MethodInvocation && dependencyDsl.matches((J.MethodInvocation) retrn.getExpression());
-                J.Return r = (J.Return) super.visitReturn(retrn, ctx);
+            public @Nullable J visitReturn(J.Return return_, ExecutionContext ctx) {
+                boolean dependencyInvocation = return_.getExpression() instanceof J.MethodInvocation && dependencyDsl.matches((J.MethodInvocation) return_.getExpression());
+                J.Return r = (J.Return) super.visitReturn(return_, ctx);
                 if (dependencyInvocation && r.getExpression() == null) {
                     return null;
                 }

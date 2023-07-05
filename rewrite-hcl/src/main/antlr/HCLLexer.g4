@@ -165,7 +165,7 @@ mode HEREDOC;
 H_NEWLINE                         : '\n' -> type(NEWLINE);
 
 H_TEMPLATE_INTERPOLATION_START    : '${' {leftCurlyStack.push(CurlyType.INTERPOLATION);} -> type(TEMPLATE_INTERPOLATION_START), pushMode(DEFAULT_MODE);
-//H_TEMPLATE_DIRECTIVE_START        : '%{' -> type(TEMPLATE_DIRECIVE_START), pushMode(DEFAULT_MODE);
+//H_TEMPLATE_DIRECTIVE_START        : '%{' -> type(TEMPLATE_DIRECTIVE_START), pushMode(DEFAULT_MODE);
 
 HTemplateLiteral : HTemplateLiteralChar+
 {

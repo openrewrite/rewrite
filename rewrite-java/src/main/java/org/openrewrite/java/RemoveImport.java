@@ -114,51 +114,51 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
 
             boolean keepImport = !force && (typeUsed || !otherTypesInPackageUsed.isEmpty() && type.endsWith(".*"));
             AtomicReference<Space> spaceForNextImport = new AtomicReference<>();
-            c = c.withImports(ListUtils.flatMap(c.getImports(), impoort -> {
+            c = c.withImports(ListUtils.flatMap(c.getImports(), import_ -> {
                 if (spaceForNextImport.get() != null) {
-                    impoort = impoort.withPrefix(spaceForNextImport.get());
+                    import_ = import_.withPrefix(spaceForNextImport.get());
                     spaceForNextImport.set(null);
                 }
 
-                String typeName = impoort.getTypeName();
-                if (impoort.isStatic()) {
-                    String imported = impoort.getQualid().getSimpleName();
+                String typeName = import_.getTypeName();
+                if (import_.isStatic()) {
+                    String imported = import_.getQualid().getSimpleName();
                     if (TypeUtils.fullyQualifiedNamesAreEqual(typeName + "." + imported, type) && (force || !methodsAndFieldsUsed.contains(imported))) {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections.emptySet
-                        spaceForNextImport.set(impoort.getPrefix());
+                        spaceForNextImport.set(import_.getPrefix());
                         return null;
                     } else if ("*".equals(imported) && (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type)
                             || TypeUtils.fullyQualifiedNamesAreEqual(typeName + type.substring(type.lastIndexOf('.')), type))) {
                         if (methodsAndFieldsUsed.isEmpty() && otherMethodsAndFieldsInTypeUsed.isEmpty()) {
-                            spaceForNextImport.set(impoort.getPrefix());
+                            spaceForNextImport.set(import_.getPrefix());
                             return null;
-                        } else if (!isPackageAlwaysFolded(importLayoutStyle.getPackagesToFold(), impoort) &&
+                        } else if (!isPackageAlwaysFolded(importLayoutStyle.getPackagesToFold(), import_) &&
                                 methodsAndFieldsUsed.size() + otherMethodsAndFieldsInTypeUsed.size() < importLayoutStyle.getNameCountToUseStarImport()) {
                             methodsAndFieldsUsed.addAll(otherMethodsAndFieldsInTypeUsed);
-                            return unfoldStarImport(impoort, methodsAndFieldsUsed);
+                            return unfoldStarImport(import_, methodsAndFieldsUsed);
                         }
                     } else if (TypeUtils.fullyQualifiedNamesAreEqual(typeName, type) && !methodsAndFieldsUsed.contains(imported)) {
                         // e.g. remove java.util.Collections.emptySet when type is java.util.Collections
-                        spaceForNextImport.set(impoort.getPrefix());
+                        spaceForNextImport.set(import_.getPrefix());
                         return null;
                     }
                 } else if (!keepImport && TypeUtils.fullyQualifiedNamesAreEqual(typeName, type)) {
-                    if (impoort.getPrefix().isEmpty() || impoort.getPrefix().getLastWhitespace().chars().filter(s -> s == '\n').count() > 1) {
-                        spaceForNextImport.set(impoort.getPrefix());
+                    if (import_.getPrefix().isEmpty() || import_.getPrefix().getLastWhitespace().chars().filter(s -> s == '\n').count() > 1) {
+                        spaceForNextImport.set(import_.getPrefix());
                     }
                     return null;
-                } else if (!keepImport && impoort.getPackageName().equals(owner) &&
-                        "*".equals(impoort.getClassName()) &&
-                        !isPackageAlwaysFolded(importLayoutStyle.getPackagesToFold(), impoort) &&
+                } else if (!keepImport && import_.getPackageName().equals(owner) &&
+                        "*".equals(import_.getClassName()) &&
+                        !isPackageAlwaysFolded(importLayoutStyle.getPackagesToFold(), import_) &&
                         otherTypesInPackageUsed.size() < importLayoutStyle.getClassCountToUseStarImport()) {
                     if (otherTypesInPackageUsed.isEmpty()) {
-                        spaceForNextImport.set(impoort.getPrefix());
+                        spaceForNextImport.set(import_.getPrefix());
                         return null;
                     } else {
-                        return unfoldStarImport(impoort, otherTypesInPackageUsed);
+                        return unfoldStarImport(import_, otherTypesInPackageUsed);
                     }
                 }
-                return impoort;
+                return import_;
             }));
 
             if (c != cu && c.getPackageDeclaration() == null && c.getImports().isEmpty() &&

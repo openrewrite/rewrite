@@ -37,7 +37,6 @@ import java.lang.reflect.TypeVariable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -327,7 +326,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 throw e;
             }
 
-            throw new RecipeRunException(e, getCursor(), describeLocation(getCursor()));
+            throw new RecipeRunException(e, getCursor());
         }
 
         //noinspection unchecked
@@ -362,8 +361,10 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return (T2) visit(tree, p);
     }
 
-    public Markers visitMarkers(Markers markers, P p) {
-        return markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> this.visitMarker(marker, p)));
+    public Markers visitMarkers(@Nullable Markers markers, P p) {
+        return markers == null || markers == Markers.EMPTY ?
+                Markers.EMPTY :
+                markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> this.visitMarker(marker, p)));
     }
 
     public <M extends Marker> M visitMarker(Marker marker, P p) {
@@ -381,7 +382,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     @SuppressWarnings("rawtypes")
-    private Class<? extends Tree> visitorTreeType(Class<? extends TreeVisitor> v) {
+    protected Class<? extends Tree> visitorTreeType(Class<? extends TreeVisitor> v) {
         for (TypeVariable<? extends Class<? extends TreeVisitor>> tp : v.getTypeParameters()) {
             for (Type bound : tp.getBounds()) {
                 if (bound instanceof Class && Tree.class.isAssignableFrom((Class<?>) bound)) {
@@ -417,15 +418,6 @@ public abstract class TreeVisitor<T extends Tree, P> {
             throw new IllegalArgumentException(getClass().getSimpleName() + " must be adaptable to " + adaptTo.getName() + ".");
         }
         return TreeVisitorAdapter.adapt(this, adaptTo);
-    }
-
-    @Nullable
-    protected String describeLocation(Cursor cursor) {
-        SourceFile sourceFile = cursor.firstEnclosing(SourceFile.class);
-        if (sourceFile == null) {
-            return null;
-        }
-        return sourceFile.getSourcePath().toString();
     }
 
     /**

@@ -45,6 +45,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     public MergeYamlVisitor(Yaml scope, @Language("yml") String yamlString, boolean acceptTheirs, @Nullable String objectIdentifyingProperty) {
         this(scope, new YamlParser().parse(yamlString)
                 .findFirst()
+                .map(Yaml.Documents.class::cast)
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as YAML"))
                 .getDocuments().get(0).getBlock(), acceptTheirs, objectIdentifyingProperty);
     }

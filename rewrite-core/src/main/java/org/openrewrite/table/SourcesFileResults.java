@@ -51,9 +51,13 @@ public class SourcesFileResults extends DataTable<SourcesFileResults.Row> {
                 description = "An estimated effort that a developer to fix manually instead of using this recipe," +
                               " in unit of seconds.")
         Long estimatedTimeSaving;
+
+        @Column(displayName = "Cycle",
+                description = "The recipe cycle in which the change was made.")
+        int cycle;
     }
 
-    public static SourcesFileResults build(Changeset changeset, ExecutionContext ctx) {
+    public static SourcesFileResults build(Changeset changeset, int cycle, ExecutionContext ctx) {
         SourcesFileResults resultsTable = new SourcesFileResults(Recipe.noop());
         for (Result result : changeset.getAllResults()) {
             Stack<RecipeDescriptor[]> recipeStack = new Stack<>();
@@ -70,7 +74,8 @@ public class SourcesFileResults extends DataTable<SourcesFileResults.Row> {
                         result.getAfter() == null ? "" : result.getAfter().getSourcePath().toString(),
                         recipeThatMadeChange[0] == null ? "" : recipeThatMadeChange[0].getName(),
                         recipeThatMadeChange[1].getName(),
-                        result.getTimeSavings() == null ? 0 : result.getTimeSavings().getSeconds()
+                        result.getTimeSavings() == null ? 0 : result.getTimeSavings().getSeconds(),
+                        cycle
                 ));
                 for (int i = recipeThatMadeChange[1].getRecipeList().size() - 1; i >= 0; i--) {
                     RecipeDescriptor rd = recipeThatMadeChange[1].getRecipeList().get(i);

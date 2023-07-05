@@ -63,11 +63,6 @@ public class ChangeMethodName extends Recipe {
     }
 
     @Override
-    public boolean causesAnotherCycle() {
-        return true;
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JavaIsoVisitor<ExecutionContext> condition = new JavaIsoVisitor<ExecutionContext>() {
             @Override

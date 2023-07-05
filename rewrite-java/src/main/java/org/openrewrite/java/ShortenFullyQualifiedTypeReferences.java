@@ -20,10 +20,8 @@ import org.openrewrite.Recipe;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
+import org.openrewrite.java.tree.*;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -54,6 +52,7 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
             final Map<String, JavaType> usedTypes = new HashMap<>();
+            final JavaTypeSignatureBuilder signatureBuilder = new DefaultJavaTypeSignatureBuilder();
 
             private void ensureInitialized() {
                 if (!usedTypes.isEmpty()) {
@@ -114,7 +113,8 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
                     ensureInitialized();
 
                     String simpleName = fieldAccess.getSimpleName();
-                    if (type.equals(usedTypes.get(simpleName))) {
+                    JavaType usedType = usedTypes.get(simpleName);
+                    if (type == usedType || signatureBuilder.signature(type).equals(signatureBuilder.signature(usedType))) {
                         return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
                     } else if (!usedTypes.containsKey(simpleName)) {
                         String fullyQualifiedName = ((JavaType.FullyQualified) type).getFullyQualifiedName();

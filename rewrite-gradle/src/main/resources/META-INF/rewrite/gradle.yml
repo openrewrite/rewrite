@@ -31,6 +31,7 @@ recipeList:
   - org.openrewrite.gradle.AddProperty:
       key: org.gradle.caching
       value: true
+      filePattern: gradle.properties
 ---
 type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.gradle.EnableGradleParallelExecution
@@ -40,3 +41,4 @@ recipeList:
   - org.openrewrite.gradle.AddProperty:
       key: org.gradle.parallel
       value: true
+      filePattern: gradle.properties

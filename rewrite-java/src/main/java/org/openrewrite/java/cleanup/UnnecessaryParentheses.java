@@ -59,10 +59,7 @@ public class UnnecessaryParentheses extends Recipe {
             private UnnecessaryParenthesesStyle getStyle() {
                 if (style == null) {
                     JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
-                    style = ((SourceFile) cu).getStyle(UnnecessaryParenthesesStyle.class);
-                    if (style == null) {
-                        style = Checkstyle.unnecessaryParentheses();
-                    }
+                    style = ((SourceFile) cu).getStyle(UnnecessaryParenthesesStyle.class, Checkstyle.unnecessaryParentheses());
                 }
                 return style;
             }
@@ -142,8 +139,8 @@ public class UnnecessaryParentheses extends Recipe {
             }
 
             @Override
-            public J visitReturn(J.Return retrn, ExecutionContext ctx) {
-                J.Return rtn = (J.Return) super.visitReturn(retrn, ctx);
+            public J visitReturn(J.Return return_, ExecutionContext ctx) {
+                J.Return rtn = (J.Return) super.visitReturn(return_, ctx);
                 if (getStyle().getExpr() && rtn.getExpression() instanceof J.Parentheses) {
                     rtn = (J.Return) new UnwrapParentheses<>((J.Parentheses<?>) rtn.getExpression()).visitNonNull(rtn, ctx, getCursor().getParentOrThrow());
                 }

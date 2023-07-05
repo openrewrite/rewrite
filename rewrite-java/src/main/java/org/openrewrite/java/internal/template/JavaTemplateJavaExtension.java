@@ -372,8 +372,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             JavaType.Method type = m.getMethodType();
                             if (type != null) {
                                 List<JavaType.FullyQualified> newThrows = new ArrayList<>();
-                                List<NameTree> throwz = (m.getThrows() == null) ? emptyList() : m.getThrows();
-                                for (NameTree t : throwz) {
+                                List<NameTree> throws_ = (m.getThrows() == null) ? emptyList() : m.getThrows();
+                                for (NameTree t : throws_) {
                                     J.Identifier exceptionIdent = (J.Identifier) t;
                                     newThrows.add((JavaType.FullyQualified) exceptionIdent.getType());
                                 }
@@ -431,6 +431,15 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                     return m;
                 }
                 return maybeReplaceStatement(method, J.class, 0);
+            }
+
+            @Override
+            public J visitNewClass(J.NewClass newClass, Integer p) {
+                if (newClass.isScope(insertionPoint)) {
+                    // allow a `J.NewClass` to also be replaced by an expression
+                    return maybeReplaceStatement(newClass, J.class, p);
+                }
+                return super.visitNewClass(newClass, p);
             }
 
             @Override

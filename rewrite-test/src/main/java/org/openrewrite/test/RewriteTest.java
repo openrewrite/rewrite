@@ -22,7 +22,6 @@ import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
-import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
@@ -53,7 +52,8 @@ public interface RewriteTest extends SourceSpecs {
     }
 
     static AdHocRecipe toRecipe() {
-        return new AdHocRecipe(null, null, null, () -> Recipe.NOOP, null, null, null);
+        return new AdHocRecipe(null, null, null,
+                TreeVisitor::noop, null, null, null);
     }
 
     static AdHocRecipe toRecipe(Function<Recipe, TreeVisitor<?, ExecutionContext>> visitor) {
@@ -156,10 +156,6 @@ public interface RewriteTest extends SourceSpecs {
                 .as("A recipe must be specified")
                 .isNotNull();
 
-        assertThat(recipe.validate().failures())
-                .as("Recipe validation must have no failures")
-                .isEmpty();
-
         if (!(recipe instanceof AdHocRecipe) && !(recipe instanceof CompositeRecipe) &&
             testClassSpec.serializationValidation &&
             testMethodSpec.serializationValidation) {
@@ -189,9 +185,6 @@ public interface RewriteTest extends SourceSpecs {
             }
         }
 
-        RecipeSchedulerCheckingExpectedCycles recipeSchedulerCheckingExpectedCycles =
-                new RecipeSchedulerCheckingExpectedCycles(expectedCyclesThatMakeChanges);
-
         ExecutionContext executionContext;
         if (testMethodSpec.getExecutionContext() != null) {
             executionContext = testMethodSpec.getExecutionContext();
@@ -203,6 +196,11 @@ public interface RewriteTest extends SourceSpecs {
         for (SourceSpec<?> s : sourceSpecs) {
             s.customizeExecutionContext.accept(executionContext);
         }
+        List<Validated<Object>> validations = new ArrayList<>();
+        recipe.validateAll(executionContext, validations);
+        assertThat(validations)
+                .as("Recipe validation must have no failures")
+                .noneMatch(Validated::isInvalid);
 
         Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
         List<Parser.Builder> methodSpecParsers = testMethodSpec.parsers;
@@ -228,7 +226,7 @@ public interface RewriteTest extends SourceSpecs {
         Map<SourceFile, SourceSpec<?>> specBySourceFile = new LinkedHashMap<>(sourceSpecs.length);
         for (Map.Entry<Parser.Builder, List<SourceSpec<?>>> sourceSpecsForParser : sourceSpecsByParser.entrySet()) {
             Map<SourceSpec<?>, Parser.Input> inputs = new LinkedHashMap<>(sourceSpecsForParser.getValue().size());
-            Parser<?> parser = sourceSpecsForParser.getKey().build();
+            Parser parser = sourceSpecsForParser.getKey().build();
             for (SourceSpec<?> sourceSpec : sourceSpecsForParser.getValue()) {
                 if (sourceSpec.before == null) {
                     continue;
@@ -322,13 +320,12 @@ public interface RewriteTest extends SourceSpecs {
         } else if (testClassSpec.getSourceSet() != null) {
             lss = testClassSpec.getSourceSet().apply(runnableSourceFiles);
         } else {
-            lss = new InMemoryLargeSourceSet(runnableSourceFiles);
+            lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles);
         }
 
         RecipeRun recipeRun = recipe.run(
                 lss,
                 recipeExecutionContext,
-                recipeSchedulerCheckingExpectedCycles,
                 cycles,
                 expectedCyclesThatMakeChanges + 1
         );
@@ -426,7 +423,8 @@ public interface RewriteTest extends SourceSpecs {
         for (Map.Entry<SourceFile, SourceSpec<?>> specForSourceFile : specBySourceFile.entrySet()) {
             SourceSpec<?> sourceSpec = specForSourceFile.getValue();
             for (Result result : allResults) {
-                if (result.getBefore() == specForSourceFile.getKey()) {
+                if ((result.getBefore() == null && specForSourceFile.getKey() == null) ||
+                    (result.getBefore() != null && result.getBefore().getId().equals(specForSourceFile.getKey().getId()))) {
                     if (result.getAfter() != null) {
                         String expectedAfter = sourceSpec.after == null ? null :
                                 sourceSpec.after.apply(result.getAfter().printAll(out.clone()));
@@ -531,8 +529,6 @@ public interface RewriteTest extends SourceSpecs {
                      + "\" that was not expected.");
             }
         }
-
-        recipeSchedulerCheckingExpectedCycles.verify();
     }
 
     default void rewriteRun(SourceSpec<?>... sources) {

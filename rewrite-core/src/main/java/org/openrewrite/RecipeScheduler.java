@@ -40,9 +40,6 @@ import static org.openrewrite.Recipe.PANIC;
 
 public class RecipeScheduler {
 
-    public void afterCycle(LargeSourceSet sourceSet) {
-    }
-
     public RecipeRun scheduleRun(Recipe recipe,
                                  LargeSourceSet sourceSet,
                                  ExecutionContext ctx,
@@ -54,34 +51,55 @@ public class RecipeScheduler {
         SourcesFileErrors errorsTable = new SourcesFileErrors(Recipe.noop());
         SourcesFileResults sourceFileResults = new SourcesFileResults(Recipe.noop());
 
-        LargeSourceSet acc = sourceSet;
-        LargeSourceSet after = acc;
+        LargeSourceSet after = sourceSet;
 
         for (int i = 1; i <= maxCycles; i++) {
+            ctxWithWatch.putCycle(i);
+            after.beforeCycle();
+
             // this root cursor is shared by all `TreeVisitor` instances used created from `getVisitor` and
             // single source applicable tests so that data can be shared at the root (especially for caching
             // use cases like sharing a `JavaTypeCache` between `JavaTemplate` parsers).
             Cursor rootCursor = new Cursor(null, Cursor.ROOT_VALUE);
+            try {
+                RecipeRunCycle cycle = new RecipeRunCycle(recipe, i, rootCursor, ctxWithWatch,
+                        recipeRunStats, sourceFileResults, errorsTable);
 
-            RecipeRunCycle cycle = new RecipeRunCycle(recipe, rootCursor, ctxWithWatch,
-                    recipeRunStats, sourceFileResults, errorsTable);
+                // pre-transformation scanning phase where there can only be modifications to capture exceptions
+                // occurring during the scanning phase
+                if (hasScanningRecipe(recipe)) {
+                    after = cycle.scanSources(after, i);
+                }
 
-            // pre-transformation scanning phase where there can only be modifications to capture exceptions
-            // occurring during the scanning phase
-            after = cycle.scanSources(after, i);
+                // transformation phases
+                after = cycle.generateSources(after, i);
+                after = cycle.editSources(after, i);
 
-            // transformation phases
-            after = cycle.generateSources(after, i);
-            after = cycle.editSources(after, i);
+                boolean anyRecipeCausingAnotherCycle = false;
+                for (Recipe madeChanges : cycle.madeChangesInThisCycle) {
+                    if (madeChanges.causesAnotherCycle()) {
+                        anyRecipeCausingAnotherCycle = true;
+                    }
+                }
 
-            if (i >= minCycles &&
-                ((after == acc && !ctxWithWatch.hasNewMessages()) || !recipe.causesAnotherCycle())) {
-                break;
+                if (i >= minCycles &&
+                    ((cycle.madeChangesInThisCycle.isEmpty() && !ctxWithWatch.hasNewMessages()) &&
+                     !anyRecipeCausingAnotherCycle)) {
+                    after.afterCycle(true);
+                    break;
+                }
+
+                after.afterCycle(i == maxCycles);
+                ctxWithWatch.resetHasNewMessages();
+            } finally {
+                // Clear any messages that were added to the root cursor during the cycle. This is important
+                // to avoid leaking memory in the case when a recipe defines a static TreeVisitor. That
+                // TreeVisitor will still contain a reference to this rootCursor and any messages in it
+                // after recipe execution completes. The pattern of holding a static TreeVisitor isn't
+                // recommended, but isn't possible for us to guard against at an API level, and so we are
+                // defensive about memory consumption here.
+                rootCursor.clearMessages();
             }
-
-            afterCycle(after);
-            acc = after;
-            ctxWithWatch.resetHasNewMessages();
         }
 
         recipeRunStats.flush(ctx);
@@ -92,10 +110,23 @@ public class RecipeScheduler {
         );
     }
 
+    private boolean hasScanningRecipe(Recipe recipe) {
+        if (recipe instanceof ScanningRecipe) {
+            return true;
+        }
+        for (Recipe r : recipe.getRecipeList()) {
+            if (hasScanningRecipe(r)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @RequiredArgsConstructor
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     static class RecipeRunCycle {
         Recipe recipe;
+        int cycle;
         Cursor rootCursor;
         ExecutionContext ctx;
         RecipeRunStats recipeRunStats;
@@ -105,11 +136,12 @@ public class RecipeScheduler {
 
         long cycleStartTime = System.nanoTime();
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean();
+        List<Recipe> madeChangesInThisCycle = new ArrayList<>();
 
         public LargeSourceSet scanSources(LargeSourceSet sourceSet, int cycle) {
             return mapForRecipeRecursively(sourceSet, (recipeStack, sourceFile) -> {
                 Recipe recipe = recipeStack.peek();
-                if (recipe.maxCycles() < cycle || !recipe.validate(ctx).isValid()) {
+                if (recipe.maxCycles() < cycle) {
                     return sourceFile;
                 }
 
@@ -143,7 +175,7 @@ public class RecipeScheduler {
             while (!allRecipesStack.isEmpty()) {
                 Stack<Recipe> recipeStack = allRecipesStack.pop();
                 Recipe recipe = recipeStack.peek();
-                if (recipe.maxCycles() < cycle || !recipe.validate(ctx).isValid()) {
+                if (recipe.maxCycles() < cycle) {
                     continue;
                 }
 
@@ -152,20 +184,23 @@ public class RecipeScheduler {
                     ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
                     sourceSet.setRecipe(recipeStack);
                     List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), generatedInThisCycle, ctx));
-                    generatedInThisCycle.addAll(generated);
                     generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
-                    acc = acc.generate(generated);
+                    generatedInThisCycle.addAll(generated);
+                    if (!generated.isEmpty()) {
+                        madeChangesInThisCycle.add(recipe);
+                    }
                 }
                 recurseRecipeList(allRecipesStack, recipeStack);
             }
 
+            acc = acc.generate(generatedInThisCycle);
             return acc;
         }
 
         public LargeSourceSet editSources(LargeSourceSet sourceSet, int cycle) {
             return mapForRecipeRecursively(sourceSet, (recipeStack, sourceFile) -> {
                 Recipe recipe = recipeStack.peek();
-                if (recipe.maxCycles() < cycle || !recipe.validate(ctx).isValid()) {
+                if (recipe.maxCycles() < cycle) {
                     return sourceFile;
                 }
 
@@ -199,6 +234,7 @@ public class RecipeScheduler {
                     });
 
                     if (after != sourceFile) {
+                        madeChangesInThisCycle.add(recipeStack.peek());
                         recordSourceFileResult(sourceFile, after, recipeStack, ctx);
                         if (sourceFile.getMarkers().findFirst(Generated.class).isPresent()) {
                             // skip edits made to generated source files so that they don't show up in a diff
@@ -223,7 +259,7 @@ public class RecipeScheduler {
             Long effortSeconds = (recipe.getEstimatedEffortPerOccurrence() == null) ? 0L : recipe.getEstimatedEffortPerOccurrence().getSeconds();
             String parentName = "";
             boolean hierarchical = recipeStack.size() > 1;
-            if(hierarchical) {
+            if (hierarchical) {
                 parentName = recipeStack.get(recipeStack.size() - 2).getName();
             }
             String recipeName = recipe.getName();
@@ -232,19 +268,20 @@ public class RecipeScheduler {
                     afterPath,
                     parentName,
                     recipeName,
-                    effortSeconds));
-            if(hierarchical) {
+                    effortSeconds,
+                    cycle));
+            if (hierarchical) {
                 recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
             }
         }
 
         private void recordSourceFileResult(@Nullable String beforePath, @Nullable String afterPath, List<Recipe> recipeStack, Long effortSeconds, ExecutionContext ctx) {
-            if(recipeStack.size() <= 1) {
+            if (recipeStack.size() <= 1) {
                 // No reason to record the synthetic root recipe which contains the recipe run
                 return;
             }
             String parentName;
-            if(recipeStack.size() == 2) {
+            if (recipeStack.size() == 2) {
                 // Record the parent name as blank rather than CompositeRecipe when the parent is the synthetic root recipe
                 parentName = "";
             } else {
@@ -256,7 +293,8 @@ public class RecipeScheduler {
                     afterPath,
                     parentName,
                     recipe.getName(),
-                    effortSeconds));
+                    effortSeconds,
+                    cycle));
             recordSourceFileResult(beforePath, afterPath, recipeStack.subList(0, recipeStack.size() - 1), effortSeconds, ctx);
         }
 

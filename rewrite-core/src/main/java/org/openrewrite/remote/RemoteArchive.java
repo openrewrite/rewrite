@@ -19,15 +19,20 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.Checksum;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
+import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.marker.Markers;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
@@ -77,15 +82,36 @@ public class RemoteArchive implements Remote {
      */
     List<String> paths;
 
+    @Nullable
+    Checksum checksum;
+
     @Override
-    public InputStream getInputStream(HttpSender httpSender) {
-        //noinspection resource
-        HttpSender.Response response = httpSender.send(httpSender.get(uri.toString()).build());
-        InputStream body = response.getBody();
-        return readIntoArchive(body, paths, 0);
+    public InputStream getInputStream(ExecutionContext ctx) {
+        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getLargeFileHttpSender();
+        RemoteArtifactCache cache = RemoteExecutionContextView.view(ctx).getArtifactCache();
+        try {
+            Path localArchive = cache.compute(uri, () -> {
+                //noinspection resource
+                HttpSender.Response response = httpSender.send(httpSender.get(uri.toString()).build());
+                return response.getBody();
+            }, ctx.getOnError());
+
+            if (localArchive == null) {
+                throw new IllegalStateException("Failed to download " + uri + " to artifact cache");
+            }
+
+            InputStream body = Files.newInputStream(localArchive);
+            InputStream inner = readIntoArchive(body, paths, 0);
+            if (inner == null) {
+                throw new IllegalArgumentException("Unable to find path " + paths + " in zip file " + uri);
+            }
+            return inner;
+        } catch (IOException e) {
+            throw new UncheckedIOException("Unable to download " + uri + " to file", e);
+        }
     }
 
-    private InputStream readIntoArchive(InputStream body, List<String> paths, int index) {
+    private @Nullable InputStream readIntoArchive(InputStream body, List<String> paths, int index) {
         ZipInputStream zis = new ZipInputStream(body);
         Pattern pattern = Pattern.compile(paths.get(index));
 
@@ -107,14 +133,16 @@ public class RemoteArchive implements Remote {
                             }
                         };
                     } else {
-                        return readIntoArchive(zis, paths, index + 1);
+                        InputStream maybeInputStream = readIntoArchive(zis, paths, index + 1);
+                        if (maybeInputStream != null) {
+                            return maybeInputStream;
+                        }
                     }
                 }
             }
-
         } catch (IOException e) {
             throw new IllegalArgumentException("Unable to load path " + paths + " in zip file " + uri, e);
         }
-        throw new IllegalArgumentException("Unable to find path " + paths + " in zip file " + uri);
+        return null;
     }
 }

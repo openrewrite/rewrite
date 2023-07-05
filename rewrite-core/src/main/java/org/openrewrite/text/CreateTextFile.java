@@ -80,10 +80,10 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
     }
 
     @Override
-    public Collection<PlainText> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
+    public Collection<SourceFile> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
         if(shouldCreate.get()) {
             return new PlainTextParser().parse(fileContents)
-                    .map(brandNewFile -> brandNewFile.withSourcePath(Paths.get(relativeFileName)))
+                    .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
                     .collect(Collectors.toList());
         }
         return emptyList();
@@ -93,18 +93,9 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
     public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean created) {
         Path path = Paths.get(relativeFileName);
         return new PlainTextVisitor<ExecutionContext>() {
-
-            @Override
-            public @Nullable PlainText visit(@Nullable Tree tree, ExecutionContext executionContext) {
-                if(created.get()) {
-                    return (PlainText) tree;
-                }
-                return super.visit(tree, executionContext);
-            }
-
             @Override
             public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                if (path.toString().equals(text.getSourcePath().toString()) && Boolean.TRUE.equals(overwriteExisting)) {
+                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.toString().equals(text.getSourcePath().toString())) {
                     return text.withText(fileContents);
                 }
                 return text;

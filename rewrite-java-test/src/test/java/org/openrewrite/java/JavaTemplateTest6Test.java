@@ -296,7 +296,7 @@ class JavaTemplateTest6Test implements RewriteTest {
               assertThat(type).isNotNull();
               var paramTypes = type.getParameterTypes();
               assertThat(paramTypes.get(0))
-                .as("The method declaration's type's genericSignature first argument should have have type 'java.util.List'")
+                .as("The method declaration's type's genericSignature first argument should have type 'java.util.List'")
                 .matches(tType -> tType instanceof JavaType.FullyQualified &&
                                   TypeUtils.asFullyQualified(tType).getFullyQualifiedName().equals("java.util.List"));
 

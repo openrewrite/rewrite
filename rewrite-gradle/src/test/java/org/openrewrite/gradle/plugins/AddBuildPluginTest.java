@@ -17,11 +17,18 @@ package org.openrewrite.gradle.plugins;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.withToolingApi;
 
 class AddBuildPluginTest implements RewriteTest {
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.beforeRecipe(withToolingApi());
+    }
+
     @DocumentExample
     @Test
     void addPluginWithoutVersionToNewBlock() {

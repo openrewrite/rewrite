@@ -15,17 +15,16 @@
  */
 package org.openrewrite.hcl;
 
-import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Timer;
 import org.antlr.v4.runtime.*;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.hcl.internal.HclParserVisitor;
 import org.openrewrite.hcl.internal.grammar.HCLLexer;
 import org.openrewrite.hcl.internal.grammar.HCLParser;
 import org.openrewrite.hcl.tree.Hcl;
 import org.openrewrite.internal.EncodingDetectingInputStream;
-import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
@@ -35,10 +34,9 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Stream;
 
-public class HclParser implements Parser<Hcl.ConfigFile> {
+public class HclParser implements Parser {
     private final List<NamedStyles> styles;
 
     private HclParser(List<NamedStyles> styles) {
@@ -46,47 +44,38 @@ public class HclParser implements Parser<Hcl.ConfigFile> {
     }
 
     @Override
-    public Stream<Hcl.ConfigFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        return acceptedInputs(sourceFiles).stream()
-                .map(sourceFile -> {
-                    Timer.Builder timer = Timer.builder("rewrite.parse")
-                            .description("The time spent parsing an HCL file")
-                            .tag("file.type", "HCL");
-                    Timer.Sample sample = Timer.start();
-                    try {
-                        EncodingDetectingInputStream is = sourceFile.getSource(ctx);
-                        String sourceStr = is.readFully();
+        return acceptedInputs(sourceFiles).map(sourceFile -> {
+            try {
+                EncodingDetectingInputStream is = sourceFile.getSource(ctx);
+                String sourceStr = is.readFully();
 
-                        HCLLexer lexer = new HCLLexer(CharStreams.fromString(sourceStr));
-                        lexer.removeErrorListeners();
-                        lexer.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
+                HCLLexer lexer = new HCLLexer(CharStreams.fromString(sourceStr));
+                lexer.removeErrorListeners();
+                lexer.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
 
-                        HCLParser parser = new HCLParser(new CommonTokenStream(lexer));
-                        parser.removeErrorListeners();
-                        parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
+                HCLParser parser = new HCLParser(new CommonTokenStream(lexer));
+                parser.removeErrorListeners();
+                parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
 
-                        Hcl.ConfigFile configFile = (Hcl.ConfigFile) new HclParserVisitor(
-                                sourceFile.getRelativePath(relativeTo),
-                                sourceStr,
-                                is.getCharset(),
-                                is.isCharsetBomMarked(),
-                                sourceFile.getFileAttributes()
-                        ).visitConfigFile(parser.configFile());
+                Hcl.ConfigFile configFile = (Hcl.ConfigFile) new HclParserVisitor(
+                        sourceFile.getRelativePath(relativeTo),
+                        sourceStr,
+                        is.getCharset(),
+                        is.isCharsetBomMarked(),
+                        sourceFile.getFileAttributes()
+                ).visitConfigFile(parser.configFile());
 
-                        configFile = configFile.withMarkers(Markers.build(styles));
+                configFile = configFile.withMarkers(Markers.build(styles));
 
-                        sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
-                        parsingListener.parsed(sourceFile, configFile);
-                        return configFile;
-                    } catch (Throwable t) {
-                        sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
-                        ParsingExecutionContextView.view(ctx).parseFailure(sourceFile, relativeTo, this, t);
-                        ctx.getOnError().accept(t);
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull);
+                parsingListener.parsed(sourceFile, configFile);
+                return (SourceFile) configFile;
+            } catch (Throwable t) {
+                ctx.getOnError().accept(t);
+                return ParseError.build(this, sourceFile, relativeTo, ctx, t);
+            }
+        });
     }
 
     @Override
