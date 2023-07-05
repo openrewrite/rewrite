@@ -121,6 +121,33 @@ class UsesTypeTest implements RewriteTest {
         );
     }
 
+    /**
+     * Type wildcards are greedy.
+     */
+    @Test
+    void usesRecursiveTypeWildcard() {
+        rewriteRun(
+          spec ->
+            spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java..*", false))),
+          java(
+            """
+              import java.io.File;
+              import static java.util.Collections.singleton;
+                            
+              class Test {
+              }
+              """,
+            """
+              /*~~>*/import java.io.File;
+              import static java.util.Collections.singleton;
+                            
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void usesFullyQualifiedReference() {
         rewriteRun(
@@ -250,6 +277,27 @@ class UsesTypeTest implements RewriteTest {
                   public void foo() {
                       Collections.copy(Collections.emptyList(), Collections.emptyList());
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void findNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.Map.Entry", false))),
+          java(
+            """
+              import java.util.Map.Entry;
+              
+              class Test {
+              }
+              """,
+            """
+              /*~~>*/import java.util.Map.Entry;
+              
+              class Test {
               }
               """
           )

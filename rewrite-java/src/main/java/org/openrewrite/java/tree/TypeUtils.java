@@ -41,7 +41,7 @@ public class TypeUtils {
     public static boolean fullyQualifiedNamesAreEqual(@Nullable String fqn1, @Nullable String fqn2) {
         if (fqn1 != null && fqn2 != null) {
             return fqn1.equals(fqn2) || fqn1.length() == fqn2.length()
-                                        && fqn1.replace("$", ".").equals(fqn2.replace("$", "."));
+                                        && fqn1.replace('$', '.').equals(fqn2.replace('$', '.'));
         }
         return fqn1 == null && fqn2 == null;
     }
@@ -231,7 +231,7 @@ public class TypeUtils {
                     }
                 }
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
-                return to.equals(classFrom.getFullyQualifiedName()) ||
+                return fullyQualifiedNamesAreEqual(to, classFrom.getFullyQualifiedName()) ||
                        isAssignableTo(to, classFrom.getSupertype()) ||
                        classFrom.getInterfaces().stream().anyMatch(i -> isAssignableTo(to, i));
             } else if (from instanceof JavaType.GenericTypeVariable) {

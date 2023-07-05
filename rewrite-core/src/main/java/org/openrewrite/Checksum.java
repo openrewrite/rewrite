@@ -85,15 +85,15 @@ public class Checksum {
         }
     }
 
-    public static SourceFile md5(SourceFile sourceFile) {
-        return checksum(sourceFile, "MD5");
+    public static SourceFile md5(SourceFile sourceFile, ExecutionContext ctx) {
+        return checksum(sourceFile, "MD5", ctx);
     }
 
-    public static SourceFile sha256(SourceFile sourceFile) {
-        return checksum(sourceFile, "SHA-256");
+    public static SourceFile sha256(SourceFile sourceFile, ExecutionContext ctx) {
+        return checksum(sourceFile, "SHA-256", ctx);
     }
 
-    public static SourceFile checksum(SourceFile sourceFile, @Nullable String algorithm) {
+    public static SourceFile checksum(SourceFile sourceFile, @Nullable String algorithm, ExecutionContext ctx) {
         if(algorithm == null) {
             return sourceFile;
         }
@@ -102,7 +102,7 @@ public class Checksum {
             MessageDigest md = MessageDigest.getInstance(algorithm);
             InputStream is;
             if (sourceFile instanceof Remote) {
-                is = ((Remote) sourceFile).getInputStream(new InMemoryExecutionContext());
+                is = ((Remote) sourceFile).getInputStream(ctx);
             } else {
                 is = Files.newInputStream(sourceFile.getSourcePath());
             }

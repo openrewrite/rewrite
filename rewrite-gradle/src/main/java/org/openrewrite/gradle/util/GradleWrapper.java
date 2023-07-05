@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.remote.Remote;
@@ -53,7 +54,7 @@ public class GradleWrapper {
     String version;
     DistributionInfos distributionInfos;
 
-    public static GradleWrapper create(@Nullable String distributionTypeName, @Nullable String version, @Nullable String repositoryUrl, HttpSender httpSender) {
+    public static GradleWrapper create(@Nullable String distributionTypeName, @Nullable String version, @Nullable String repositoryUrl, ExecutionContext ctx) {
         DistributionType distributionType = Arrays.stream(DistributionType.values())
                 .filter(dt -> dt.name().equalsIgnoreCase(distributionTypeName))
                 .findAny()
@@ -62,7 +63,8 @@ public class GradleWrapper {
                 new LatestRelease(null) :
                 requireNonNull(Semver.validate(version, null).getValue());
 
-        String gradleVersionsUrl = (repositoryUrl == null) ? "https://services.gradle.org/versions/all" : repositoryUrl;
+        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getLargeFileHttpSender();
+        String gradleVersionsUrl = (StringUtils.isBlank(repositoryUrl)) ? "https://services.gradle.org/versions/all" : repositoryUrl;
         try (HttpSender.Response resp = httpSender.send(httpSender.get(gradleVersionsUrl).build())) {
             if (resp.isSuccessful()) {
                 List<GradleVersion> allVersions = new ObjectMapper()
