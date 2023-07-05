@@ -28,16 +28,16 @@ class WhenTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun method ( i : Int ) : String {
-                  when ( i ) {
-                      1 -> return "1"
-                      2 -> return "2"
-                      else -> {
-                          return "42"
-                      }
-                  }
+              class A {
+                val a = 1
+                fun method() {
+                    val a = A()
+                    val b = a
+                }
               }
-              """
+              """, spec -> spec.afterRecipe(cu -> {
+                System.out.println();
+            })
           )
         );
     }

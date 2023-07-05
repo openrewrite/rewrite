@@ -19,7 +19,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElementVisitor;
 import org.jetbrains.kotlin.com.intellij.psi.PsiFile;
@@ -33,7 +32,7 @@ import java.util.*;
 @Getter
 public class KotlinSource {
     Parser.Input input;
-    Map<Integer, ASTNode> nodes; // Maybe replace with PsiTree?
+    Map<Integer, Node> nodes;
 
     @Setter
     FirFile firFile;
@@ -45,8 +44,8 @@ public class KotlinSource {
     }
 
     // Map the PsiFile ahead of time so that the Disposable may be disposed early and free up memory.
-    private Map<Integer, ASTNode> map(@Nullable PsiFile psiFile) {
-        Map<Integer, ASTNode> result = new HashMap<>();
+    private Map<Integer, Node> map(@Nullable PsiFile psiFile) {
+        Map<Integer, Node> result = new HashMap<>();
         if (psiFile == null) {
             return result;
         }
@@ -58,7 +57,10 @@ public class KotlinSource {
             public void visitElement(@NotNull PsiElement element) {
                 if (!(element instanceof KtFile) && element.getTextLength() != 0) {
                     // Set the node at the cursor to the last visited element.
-                    result.put(element.getTextRange().getStartOffset(), element.getNode());
+                    //noinspection UnstableApiUsage
+                    result.put(element.getTextRange().getStartOffset(), new Node(element.getTextRange().getEndOffset(),
+                            element.getNode().getTreeParent().getElementType().getDebugName(),
+                            element.getNode().getElementType().getDebugName()));
                     assert source.substring(element.getTextRange().getStartOffset(), element.getTextRange().getEndOffset()).equals(element.getText());
                 }
 
@@ -75,5 +77,12 @@ public class KotlinSource {
         };
         v.visitElement(psiFile);
         return result;
+    }
+
+    @Value
+    public static class Node {
+        int endOffset;
+        String parentName;
+        String name;
     }
 }
