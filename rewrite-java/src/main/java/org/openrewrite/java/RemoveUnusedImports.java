@@ -26,6 +26,7 @@ import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.function.Predicate;
 
 import static java.util.Collections.emptySet;
 import static org.openrewrite.java.style.ImportLayoutStyle.isPackageAlwaysFolded;
@@ -135,7 +136,7 @@ public class RemoveUnusedImports extends Recipe {
                     // see https://github.com/openrewrite/rewrite/issues/1698 for more detail
                     String target = qualid.getTarget().toString();
                     String modifiedTarget = methodsAndFieldsByTypeName.keySet().stream()
-                            .filter(key -> key.matches(target.replaceAll("\\.", "(\\\\\\.|\\\\\\$)")))
+                            .filter(classPathMatcher(target))
                             .findFirst()
                             .orElse(target);
                     SortedSet<String> targetMethodsAndFields = methodsAndFieldsByTypeName.get(modifiedTarget);
@@ -228,7 +229,7 @@ public class RemoveUnusedImports extends Recipe {
                         if ("*".equals(elem.getQualid().getSimpleName())) {
                             return elem.getPackageName().equals(c.getPackageName());
                         }
-                        return elem.getTypeName().equals(c.getFullyQualifiedName());
+                        return classPathMatcher(c.getFullyQualifiedName()).test(elem.getTypeName());
                     })) {
                         anImport.used = false;
                         changed = true;
@@ -283,6 +284,10 @@ public class RemoveUnusedImports extends Recipe {
 
             return cu;
         }
+    }
+
+    private static Predicate<String> classPathMatcher(final String target){
+        return (s) -> s.matches(target.replaceAll("[\\.\\$]", "(\\\\\\.|\\\\\\$)"));
     }
 
     private static String packageKey(String packageName, String className) {
