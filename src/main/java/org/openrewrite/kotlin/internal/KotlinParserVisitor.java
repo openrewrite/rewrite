@@ -83,7 +83,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private final FirSession firSession;
     private int cursor;
 
-    private Map<Integer, ASTNode> nodes;
+    private final Map<Integer, KotlinSource.Node> nodes;
 
     // Associate top-level function and property declarations to the file.
     @Nullable
@@ -3670,21 +3670,21 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         int saveCursor = cursor;
         Space prefix = whitespace();
-        ASTNode node = nodes.get(cursor);
+        KotlinSource.Node node = nodes.get(cursor);
         if (node != null) {
-            switch (node.getElementType().getDebugName()) {
+            switch (node.getName()) {
                 case "PARENTHESIZED":
-                    if (node.getTextRange().getEndOffset() >= firElement.getSource().getEndOffset()) {
+                    if (node.getEndOffset() >= firElement.getSource().getEndOffset()) {
                         return wrapInParens(firElement, prefix, ctx);
                     }
                     break;
                 case "REFERENCE_EXPRESSION":
-                    if ("POSTFIX_EXPRESSION".equals(node.getTreeParent().getElementType().getDebugName()) && firElement instanceof FirBlock) {
+                    if ("POSTFIX_EXPRESSION".equals(node.getParentName()) && firElement instanceof FirBlock) {
                         firElement = ((FirBlock) firElement).getStatements().get(1);
                     }
                     break;
                 case "OPERATION_REFERENCE":
-                    if ("PREFIX_EXPRESSION".equals(node.getTreeParent().getElementType().getDebugName()) && firElement instanceof FirBlock) {
+                    if ("PREFIX_EXPRESSION".equals(node.getParentName()) && firElement instanceof FirBlock) {
                         firElement = ((FirBlock) firElement).getStatements().get(0);
                     }
                     break;
