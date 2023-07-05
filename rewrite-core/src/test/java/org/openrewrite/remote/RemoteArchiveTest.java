@@ -38,7 +38,8 @@ class RemoteArchiveTest {
     void gradleWrapper(String version) throws Exception {
         URL distributionUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("gradle-" + version + "-bin.zip"));
         ExecutionContext ctx = new InMemoryExecutionContext();
-        HttpSenderExecutionContextView.view(ctx).setHttpSender(new MockHttpSender(distributionUrl::openStream));
+        HttpSenderExecutionContextView.view(ctx)
+          .setLargeFileHttpSender(new MockHttpSender(distributionUrl::openStream));
 
         RemoteArchive remoteArchive = Remote
           .builder(
