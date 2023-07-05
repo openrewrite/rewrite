@@ -24,7 +24,9 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElementVisitor;
 import org.jetbrains.kotlin.com.intellij.psi.PsiFile;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
+import org.jetbrains.kotlin.psi.KtElement;
 import org.jetbrains.kotlin.psi.KtFile;
+import org.jetbrains.kotlin.psi.KtVisitorVoid;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 
@@ -56,22 +58,17 @@ public class KotlinSource {
         PsiElementVisitor v = new PsiElementVisitor() {
             @Override
             public void visitElement(@NotNull PsiElement element) {
-                if (!(element instanceof KtFile) && element.getTextLength() != 0) {
-                    // Set the node at the cursor to the last visited element.
-                    //noinspection UnstableApiUsage
-                    result.put(element.getTextRange().getStartOffset(), new Node(element.getTextRange().getEndOffset(),
-                            element.getNode().getTreeParent().getElementType().getDebugName(),
-                            element.getNode().getElementType().getDebugName()));
-                    assert source.substring(element.getTextRange().getStartOffset(), element.getTextRange().getEndOffset()).equals(element.getText());
+                if (!visited.add(element)) {
+                    return;
                 }
 
                 for (PsiElement child : element.getChildren()) {
-                    if (visited.add(child)) {
+                    if (child instanceof KtElement) {
                         visitElement(child);
                     }
                 }
 
-                if (element.getNextSibling() != null && visited.add(element.getNextSibling())) {
+                if (element.getNextSibling() != null) {
                     visitElement(element.getNextSibling());
                 }
             }
