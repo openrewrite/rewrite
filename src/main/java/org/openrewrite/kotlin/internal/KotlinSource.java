@@ -44,7 +44,6 @@ public class KotlinSource {
         this.input = input;
         psiTree = psiFile != null ? new PsiTree(psiFile, input.getSource(new InMemoryExecutionContext()).readFully()) : null;
         this.nodes = map(psiFile);
-        psiTree.findByCursor(40);
     }
 
     // Map the PsiFile ahead of time so that the Disposable may be disposed early and free up memory.
@@ -56,9 +55,6 @@ public class KotlinSource {
 
         String source = input.getSource(new InMemoryExecutionContext()).readFully();
         Set<PsiElement> visited = Collections.newSetFromMap(new IdentityHashMap<>());
-
-        System.out.println(PsiTreePrinter.printPsiTree(psiFile));
-        System.out.println(PsiTreePrinter.printPsiTree(psiTree));
 
         PsiElementVisitor v = new PsiElementVisitor() {
             @Override
