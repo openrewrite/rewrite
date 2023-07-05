@@ -17,8 +17,6 @@ package org.openrewrite.kotlin.internal;
 
 import lombok.Getter;
 import lombok.Setter;
-import lombok.Value;
-import lombok.experimental.NonFinal;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
@@ -27,7 +25,6 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiElementVisitor;
 import org.jetbrains.kotlin.com.intellij.psi.PsiFile;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.psi.KtFile;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 
@@ -37,6 +34,7 @@ import java.util.*;
 public class KotlinSource {
     Parser.Input input;
     Map<Integer, ASTNode> nodes; // Maybe replace with PsiTree?
+    PsiTree psiTree;
 
     @Setter
     FirFile firFile;
@@ -44,7 +42,9 @@ public class KotlinSource {
     public KotlinSource(Parser.Input input,
                         @Nullable PsiFile psiFile) {
         this.input = input;
+        psiTree = psiFile != null ? new PsiTree(psiFile, input.getSource(new InMemoryExecutionContext()).readFully()) : null;
         this.nodes = map(psiFile);
+        psiTree.findByCursor(40);
     }
 
     // Map the PsiFile ahead of time so that the Disposable may be disposed early and free up memory.
@@ -56,6 +56,10 @@ public class KotlinSource {
 
         String source = input.getSource(new InMemoryExecutionContext()).readFully();
         Set<PsiElement> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+
+        System.out.println(PsiTreePrinter.printPsiTree(psiFile));
+        System.out.println(PsiTreePrinter.printPsiTree(psiTree));
+
         PsiElementVisitor v = new PsiElementVisitor() {
             @Override
             public void visitElement(@NotNull PsiElement element) {
@@ -78,5 +82,9 @@ public class KotlinSource {
         };
         v.visitElement(psiFile);
         return result;
+    }
+
+    private String printPsiElement(PsiElement element) {
+        return element.getTextRange() + " " + element.getNode().getElementType();
     }
 }
