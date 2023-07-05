@@ -27,13 +27,23 @@ import java.util.regex.Pattern;
 import static java.util.Objects.requireNonNull;
 
 public class UsesType<P> extends JavaIsoVisitor<P> {
+
+    @Nullable
+    private final String fullyQualifiedType;
+    @Nullable
     private final Pattern typePattern;
 
     @Nullable
     private final Boolean includeImplicit;
 
     public UsesType(String fullyQualifiedType, @Nullable Boolean includeImplicit) {
-        this.typePattern = Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedType));
+        if (fullyQualifiedType.contains("*")) {
+            this.fullyQualifiedType = null;
+            this.typePattern = Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedType));
+        } else {
+            this.fullyQualifiedType = fullyQualifiedType;
+            this.typePattern = null;
+        }
         this.includeImplicit = includeImplicit;
     }
 
@@ -87,7 +97,8 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
             return c;
         }
 
-        if (TypeUtils.isAssignableTo(typePattern, type)) {
+        if (typePattern != null && TypeUtils.isAssignableTo(typePattern, type)
+            || fullyQualifiedType != null && TypeUtils.isAssignableTo(fullyQualifiedType, type)) {
             return SearchResult.found(c);
         }
 
