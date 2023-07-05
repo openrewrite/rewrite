@@ -132,12 +132,12 @@ public class MavenWrapper {
             Remote wrapperJar = (Remote) Checksum.sha256(Remote.builder(
                     WRAPPER_JAR_LOCATION,
                     URI.create(resolvedWrapperUri)
-            ).build());
+            ).build(), ctx);
 
             Remote mavenDistribution = (Remote) Checksum.sha256(Remote.builder(
                     Paths.get(""),
                     URI.create(resolvedDistributionUri)
-            ).build());
+            ).build(), ctx);
 
             return new MavenWrapper(
                     resolvedWrapperVersion,
