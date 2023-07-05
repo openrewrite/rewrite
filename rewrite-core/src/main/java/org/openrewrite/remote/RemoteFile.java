@@ -63,7 +63,7 @@ public class RemoteFile implements Remote {
 
     @Override
     public InputStream getInputStream(ExecutionContext ctx) {
-        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
+        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getLargeFileHttpSender();
         RemoteArtifactCache cache = RemoteExecutionContextView.view(ctx).getArtifactCache();
         try {
             Path localFile = cache.compute(uri, () -> {

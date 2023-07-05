@@ -87,7 +87,7 @@ public class RemoteArchive implements Remote {
 
     @Override
     public InputStream getInputStream(ExecutionContext ctx) {
-        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
+        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getLargeFileHttpSender();
         RemoteArtifactCache cache = RemoteExecutionContextView.view(ctx).getArtifactCache();
         try {
             Path localArchive = cache.compute(uri, () -> {
