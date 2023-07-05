@@ -34,7 +34,6 @@ import java.util.*;
 public class KotlinSource {
     Parser.Input input;
     Map<Integer, ASTNode> nodes; // Maybe replace with PsiTree?
-    PsiTree psiTree;
 
     @Setter
     FirFile firFile;
@@ -42,7 +41,6 @@ public class KotlinSource {
     public KotlinSource(Parser.Input input,
                         @Nullable PsiFile psiFile) {
         this.input = input;
-        psiTree = psiFile != null ? new PsiTree(psiFile, input.getSource(new InMemoryExecutionContext()).readFully()) : null;
         this.nodes = map(psiFile);
     }
 
@@ -55,7 +53,6 @@ public class KotlinSource {
 
         String source = input.getSource(new InMemoryExecutionContext()).readFully();
         Set<PsiElement> visited = Collections.newSetFromMap(new IdentityHashMap<>());
-
         PsiElementVisitor v = new PsiElementVisitor() {
             @Override
             public void visitElement(@NotNull PsiElement element) {
@@ -78,9 +75,5 @@ public class KotlinSource {
         };
         v.visitElement(psiFile);
         return result;
-    }
-
-    private String printPsiElement(PsiElement element) {
-        return element.getTextRange() + " " + element.getNode().getElementType();
     }
 }

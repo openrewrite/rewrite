@@ -26,6 +26,14 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
 
+/**
+ * Internal util class to present a PSI tree to help developers to debug or trouble-shooting.
+ * An example usage :
+ * <code>
+ *      PsiTree psiTree = new PsiTree(psiFile, input.getSource(new InMemoryExecutionContext()).readFully());
+ *      System.out.println(PsiTreePrinter.printPsiTree(psiTree));
+ * </code>
+ */
 @Data
 public class PsiTree {
     private PsiFile psiFile;

@@ -19,6 +19,9 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.jetbrains.kotlin.com.intellij.openapi.util.TextRange;
 
+/**
+ * Internal util class to present a PSI token to help developers to debug or trouble-shooting.
+ */
 @EqualsAndHashCode
 @Data
 public class PsiToken {
