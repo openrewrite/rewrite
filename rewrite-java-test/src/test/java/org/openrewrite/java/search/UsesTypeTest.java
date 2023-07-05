@@ -282,4 +282,25 @@ class UsesTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void findNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.Map.Entry", false))),
+          java(
+            """
+              import java.util.Map.Entry;
+              
+              class Test {
+              }
+              """,
+            """
+              /*~~>*/import java.util.Map.Entry;
+              
+              class Test {
+              }
+              """
+          )
+        );
+    }
 }
