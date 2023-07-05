@@ -112,10 +112,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     transient GradleWrapper gradleWrapper;
 
     private GradleWrapper getGradleWrapper(ExecutionContext ctx) {
-        if(gradleWrapper == null) {
-            HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
-            gradleWrapper = GradleWrapper.create(
-                    distribution, version, repositoryUrl,httpSender);
+        if (gradleWrapper == null) {
+            gradleWrapper = GradleWrapper.create(distribution, version, repositoryUrl, ctx);
         }
         return gradleWrapper;
     }
@@ -195,7 +193,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         }
 
                         if ((sourceFile instanceof Quark || sourceFile instanceof Remote) &&
-                                equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_JAR_LOCATION)) {
+                            equalIgnoringSeparators(sourceFile.getSourcePath(), WRAPPER_JAR_LOCATION)) {
                             acc.addGradleWrapperJar = false;
                             return true;
                         }

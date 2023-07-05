@@ -106,6 +106,7 @@ public class MavenWrapper {
                         .releases(true)
                         .snapshots(true)
                         .build();
+
         List<MavenRepository> repositories = Collections.singletonList(repository);
         try {
             GroupArtifact wrapperDistributionGroupArtifact = new GroupArtifact("org.apache.maven.wrapper", "maven-wrapper-distribution");
@@ -191,14 +192,10 @@ public class MavenWrapper {
     }
 
     private static String getDownloadUriFor(MavenRepository repository, GroupArtifact ga, String version, @Nullable String classifier, String extension) {
-        return repository.getUri() +
-               "/" +
-               ga.getGroupId().replace(".", "/") +
-               "/" +
-               ga.getArtifactId() +
-               "/" +
-               version +
-               "/" +
+        return repository.getUri() + "/" +
+               ga.getGroupId().replace(".", "/") + "/" +
+               ga.getArtifactId() + "/" +
+               version + "/" +
                ga.getArtifactId() + "-" + version + (classifier == null ? "" : "-" + classifier) + "." + extension;
     }
 

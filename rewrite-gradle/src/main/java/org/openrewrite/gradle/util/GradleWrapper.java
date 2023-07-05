@@ -54,7 +54,7 @@ public class GradleWrapper {
     String version;
     DistributionInfos distributionInfos;
 
-    public static GradleWrapper create(@Nullable String distributionTypeName, @Nullable String version, @Nullable String repositoryUrl, HttpSender httpSender) {
+    public static GradleWrapper create(@Nullable String distributionTypeName, @Nullable String version, @Nullable String repositoryUrl, ExecutionContext ctx) {
         DistributionType distributionType = Arrays.stream(DistributionType.values())
                 .filter(dt -> dt.name().equalsIgnoreCase(distributionTypeName))
                 .findAny()
@@ -63,6 +63,7 @@ public class GradleWrapper {
                 new LatestRelease(null) :
                 requireNonNull(Semver.validate(version, null).getValue());
 
+        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getLargeFileHttpSender();
         String gradleVersionsUrl = (StringUtils.isBlank(repositoryUrl)) ? "https://services.gradle.org/versions/all" : repositoryUrl;
         try (HttpSender.Response resp = httpSender.send(httpSender.get(gradleVersionsUrl).build())) {
             if (resp.isSuccessful()) {
