@@ -15,11 +15,8 @@
  */
 package org.openrewrite.kotlin.internal;
 
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.*;
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
-import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
-import org.jetbrains.kotlin.com.intellij.psi.PsiElementVisitor;
 import org.jetbrains.kotlin.descriptors.ClassKind;
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget;
 import org.jetbrains.kotlin.fir.*;
@@ -40,7 +37,6 @@ import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitUnitTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
 import org.jetbrains.kotlin.psi.*;
-import org.jetbrains.kotlin.psi.stubs.elements.KtValueArgumentListElementType;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.ParseExceptionResult;
@@ -1046,7 +1042,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             int saveCursor = cursor;
             whitespace();
             JContainer<Expression> args;
-            if (nodes.get(cursor).getElementType() instanceof KtValueArgumentListElementType) {
+            if (source.startsWith("(", cursor)) {
                 cursor(saveCursor);
                 args = mapFunctionalCallArguments(functionCall.getArgumentList().getArguments());
             } else {
@@ -1212,7 +1208,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     op = padLeft(EMPTY, J.Unary.Type.PreDecrement);
                     expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
                 } else {
-                    String opName = nodes.get(cursor).getFirstChildNode().getText();
+                    int saveCursor = cursor;
+                    String opName = sourceBefore("--").getWhitespace().trim();
+                    cursor(saveCursor);
+
                     expr = createIdentifier(opName);
                     op = padLeft(sourceBefore("--"), J.Unary.Type.PostDecrement);
                 }
@@ -1223,7 +1222,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     op = padLeft(EMPTY, J.Unary.Type.PreIncrement);
                     expr = (Expression) visitElement(functionCall.getDispatchReceiver(), ctx);
                 } else {
-                    String opName = nodes.get(cursor).getFirstChildNode().getText();
+                    int saveCursor = cursor;
+                    String opName = sourceBefore("++").getWhitespace().trim();
+                    cursor(saveCursor);
+
                     expr = createIdentifier(opName);
                     op = padLeft(sourceBefore("++"), J.Unary.Type.PostIncrement);
                 }
