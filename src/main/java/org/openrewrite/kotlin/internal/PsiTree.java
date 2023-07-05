@@ -105,8 +105,9 @@ public class PsiTree {
     private static Node toNode(PsiElement psiElement, Node parentNode) {
         return new Node(psiElement.getTextRange(), psiElement.getNode().getElementType().toString(), parentNode, psiElement);
     }
+
     private static Node toTree(PsiElement psiElement, Node parentNode) {
-        Node node = toNode(psiElement, parentNode); // new Node(psiElement.getTextRange(), psiElement.getNode().getElementType().toString(), parentNode, psiElement);
+        Node node = toNode(psiElement, parentNode);
         for (PsiElement childPsiElement: psiElement.getChildren()) {
             Node childNode = toTree(childPsiElement, node);
             node.getChildNodes().add(childNode);
@@ -173,13 +174,9 @@ public class PsiTree {
             token.setType(iElementType.toString());
 
             if (preToken != null) {
-
-
                 preToken.setText(sourceCode.substring(preToken.getRange().getStartOffset(), tokenStart));
-                // preToken.getRange().
                 TextRange newRange = new TextRange(preToken.getRange().getStartOffset(), tokenStart);
                 preToken.setRange(newRange);
-                // preToken.getRange().setEnd(tokenStart);
             }
             tokens.add(token);
             tokenOffSetMap.put(token.getRange().getStartOffset(), token);
