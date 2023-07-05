@@ -17,6 +17,7 @@ package org.openrewrite.kotlin.internal;
 
 import lombok.Getter;
 import lombok.Setter;
+import lombok.Value;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
