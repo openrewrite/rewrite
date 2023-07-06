@@ -52,7 +52,7 @@ public class EqualsMethodUsage extends Recipe {
     @Override
     public String getDescription() {
         return "In Kotlin, `==` means structural equality and `!=` structural inequality and both map to the left-side " +
-               "term’s `equals()` function. It is, therefore, redundant to call equals() as a function. Also, `==` and `!=`" +
+               "term’s `equals()` function. It is, therefore, redundant to call `equals()` as a function. Also, `==` and `!=`" +
                " are more general than `equals()` and `!equals()` because it allows either of both operands to be null.\n" +
                "Developers using `equals()` instead of `==` or `!=` is often the result of adapting styles from other " +
                "languages like Java, where `==` means reference equality and `!=` means reference inequality.\n" +
