@@ -20,13 +20,12 @@ import lombok.Setter;
 import lombok.Value;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElementVisitor;
 import org.jetbrains.kotlin.com.intellij.psi.PsiFile;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
-import org.jetbrains.kotlin.psi.KtElement;
 import org.jetbrains.kotlin.psi.KtFile;
-import org.jetbrains.kotlin.psi.KtVisitorVoid;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 
@@ -35,7 +34,7 @@ import java.util.*;
 @Getter
 public class KotlinSource {
     Parser.Input input;
-    Map<Integer, Node> nodes;
+    Map<Integer, ASTNode> nodes; // Maybe replace with PsiTree?
 
     @Setter
     FirFile firFile;
@@ -47,8 +46,8 @@ public class KotlinSource {
     }
 
     // Map the PsiFile ahead of time so that the Disposable may be disposed early and free up memory.
-    private Map<Integer, Node> map(@Nullable PsiFile psiFile) {
-        Map<Integer, Node> result = new HashMap<>();
+    private Map<Integer, ASTNode> map(@Nullable PsiFile psiFile) {
+        Map<Integer, ASTNode> result = new HashMap<>();
         if (psiFile == null) {
             return result;
         }
@@ -58,29 +57,24 @@ public class KotlinSource {
         PsiElementVisitor v = new PsiElementVisitor() {
             @Override
             public void visitElement(@NotNull PsiElement element) {
-                if (!visited.add(element)) {
-                    return;
+                if (!(element instanceof KtFile) && element.getTextLength() != 0) {
+                    // Set the node at the cursor to the last visited element.
+                    result.put(element.getTextRange().getStartOffset(), element.getNode());
+                    assert source.substring(element.getTextRange().getStartOffset(), element.getTextRange().getEndOffset()).equals(element.getText());
                 }
 
                 for (PsiElement child : element.getChildren()) {
-                    if (child instanceof KtElement) {
+                    if (visited.add(child)) {
                         visitElement(child);
                     }
                 }
 
-                if (element.getNextSibling() != null) {
+                if (element.getNextSibling() != null && visited.add(element.getNextSibling())) {
                     visitElement(element.getNextSibling());
                 }
             }
         };
         v.visitElement(psiFile);
         return result;
-    }
-
-    @Value
-    public static class Node {
-        int endOffset;
-        String parentName;
-        String name;
     }
 }
