@@ -405,12 +405,9 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         }
 
         if (!classifier.getTypeParameters().isEmpty()) {
-            if (!(signature.contains("<") && signature.contains(">"))) {
-                throw new IllegalStateException("Signature " + signature + " does not contain type parameters in classType().");
-            }
-            JavaType.FullyQualified fq = typeCache.get(signature);
-            if (fq != null && !(fq instanceof JavaType.Parameterized)) {
-                throw new IllegalStateException("JavaType$Parameterized was not returned for signature " + signature + " in classType().");
+            JavaType.FullyQualified jfq = typeCache.get(signature);
+            if (jfq instanceof JavaType.Class) {
+                throw new IllegalStateException("Expected JavaType.Parameterized for signature : " + signature);
             }
             JavaType.Parameterized pt = typeCache.get(signature);
             if (pt == null) {
