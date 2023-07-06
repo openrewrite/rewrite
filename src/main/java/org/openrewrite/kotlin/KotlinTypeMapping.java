@@ -47,7 +47,6 @@ import org.jetbrains.kotlin.name.StandardClassIds;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMapping;
-import org.openrewrite.java.internal.JavaReflectionTypeMapping;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -305,6 +304,11 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         }
 
         if (!firClass.getTypeParameters().isEmpty()) {
+            JavaType.FullyQualified jfq = typeCache.get(signature);
+            if (jfq instanceof JavaType.Class) {
+                throw new IllegalStateException("Expected JavaType.Parameterized for signature : " + signature);
+            }
+
             JavaType.Parameterized pt = typeCache.get(signature);
             if (pt == null) {
                 pt = new JavaType.Parameterized(null, null, null);
