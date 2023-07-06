@@ -17,7 +17,6 @@ package org.openrewrite.kotlin.internal;
 
 import lombok.Getter;
 import lombok.Setter;
-import lombok.Value;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
@@ -25,8 +24,7 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElementVisitor;
 import org.jetbrains.kotlin.com.intellij.psi.PsiFile;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
-import org.jetbrains.kotlin.psi.KtFile;
-import org.openrewrite.InMemoryExecutionContext;
+import org.jetbrains.kotlin.psi.KtElement;
 import org.openrewrite.Parser;
 
 import java.util.*;
@@ -52,24 +50,23 @@ public class KotlinSource {
             return result;
         }
 
-        String source = input.getSource(new InMemoryExecutionContext()).readFully();
         Set<PsiElement> visited = Collections.newSetFromMap(new IdentityHashMap<>());
         PsiElementVisitor v = new PsiElementVisitor() {
             @Override
             public void visitElement(@NotNull PsiElement element) {
-                if (!(element instanceof KtFile) && element.getTextLength() != 0) {
-                    // Set the node at the cursor to the last visited element.
-                    result.put(element.getTextRange().getStartOffset(), element.getNode());
-                    assert source.substring(element.getTextRange().getStartOffset(), element.getTextRange().getEndOffset()).equals(element.getText());
+                if (!visited.add(element)) {
+                    return;
                 }
 
+                result.put(element.getTextRange().getStartOffset(), element.getNode());
+
                 for (PsiElement child : element.getChildren()) {
-                    if (visited.add(child)) {
+                    if (child instanceof KtElement) {
                         visitElement(child);
                     }
                 }
 
-                if (element.getNextSibling() != null && visited.add(element.getNextSibling())) {
+                if (element.getNextSibling() != null) {
                     visitElement(element.getNextSibling());
                 }
             }
