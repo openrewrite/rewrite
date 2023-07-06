@@ -2391,7 +2391,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             FirElement target = expression instanceof FirSmartCastExpression ?
                     ((FirSmartCastExpression) expression).getOriginalExpression() :
                     expression;
-            element = (Expression) visitElement(target, ctx);
+            J j = visitElement(target, ctx);
+            if (j instanceof Statement) {
+                element = new K.StatementExpression(randomId(), (Statement) j);
+            } else {
+                element = (Expression) j;
+            }
         }
 
         Space after;

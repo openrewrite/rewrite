@@ -52,4 +52,18 @@ class TryCatchTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void tryAsAVariable() {
+        rewriteRun(
+          kotlin(
+            """
+              val throwable: Throwable? = try {
+              } catch (caught: Throwable) {
+                 caught
+              } as? Throwable
+              """
+          )
+        );
+    }
 }
