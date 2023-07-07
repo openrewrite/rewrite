@@ -208,10 +208,7 @@ public class MavenPomDownloader {
         }
 
         Timer.Sample sample = Timer.start();
-        Timer.Builder timer = Timer.builder("rewrite.maven.download")
-                .tag("group.id", gav.getGroupId())
-                .tag("artifact.id", gav.getArtifactId())
-                .tag("type", "metadata");
+        Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "metadata");
 
         MavenMetadata mavenMetadata = null;
         Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, null);
@@ -480,10 +477,7 @@ public class MavenPomDownloader {
         Collection<MavenRepository> normalizedRepos = distinctNormalizedRepositories(repositories, containingPom, gav.getVersion());
 
         Timer.Sample sample = Timer.start();
-        Timer.Builder timer = Timer.builder("rewrite.maven.download")
-                .tag("group.id", gav.getGroupId())
-                .tag("artifact.id", gav.getArtifactId())
-                .tag("type", "pom");
+        Timer.Builder timer = Timer.builder("rewrite.maven.download").tag("type", "pom");
 
         Map<MavenRepository, String> repositoryResponses = new LinkedHashMap<>();
         String versionMaybeDatedSnapshot = datedSnapshotVersion(gav, containingPom, repositories, ctx);
