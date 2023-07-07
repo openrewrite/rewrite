@@ -18,9 +18,7 @@ package org.openrewrite.kotlin.internal;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
 import org.jetbrains.kotlin.com.intellij.psi.PsiFile;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 public class PsiTreePrinter {
     private static final String TAB = "    ";
@@ -47,18 +45,18 @@ public class PsiTreePrinter {
     public static String printPsiTree(PsiTree psiTree) {
         StringBuilder sb = new StringBuilder();
 
-        // 0. Source code
-        sb.append("------------").append("\n");
-        sb.append("Source code with index").append("\n");
-        sb.append(printIndexedSourceCode(psiTree.getSource())).append("\n");
-
-        // 1. print Tokens
+        // 0. print Tokens
         sb.append("------------").append("\n");
         sb.append("PSI Tokens").append("\n");
         for (int i = 0; i < psiTree.getTokens().size(); i++) {
             PsiToken t = psiTree.getTokens().get(i);
             sb.append(i).append(": ").append(t).append("\n");
         }
+
+        // 1. Source code
+        sb.append("------------").append("\n");
+        sb.append("Source code with index").append("\n");
+        sb.append(printIndexedSourceCode(psiTree.getSource())).append("\n");
 
         // 2. print AST
         PsiTreePrinter treePrinter = new PsiTreePrinter();
@@ -74,7 +72,7 @@ public class PsiTreePrinter {
         line.append(leftPadding(depth));
         line.append(" ")
             .append(psiElement.getTextRange())
-            .append(" | Type:")
+            .append(" | ")
             .append(psiElement.getNode().getElementType())
             .append(" | Text: \"")
             .append(truncate(psiElement.getText()).replace("\n", "\\n"))
@@ -91,7 +89,7 @@ public class PsiTreePrinter {
         line.append(leftPadding(depth));
         line.append(" ")
             .append(node.getRange())
-            .append(" | Type:")
+            .append(" | ")
             .append(node.getType())
             .append(" | Text: \"")
             .append(truncate(node.getPsiElement().getText()).replace("\n", "\\n"))
@@ -107,15 +105,26 @@ public class PsiTreePrinter {
         int count = 0;
         String[] lines = sourceCode.split("\n");
         StringBuilder result = new StringBuilder();
+        Queue<Integer> digits = new ArrayDeque<>();
 
         for (String line : lines) {
             StringBuilder spacesSb = new StringBuilder();
             for (int i = 0; i < line.length(); i++) {
                 if (count % 10 == 0) {
-                    spacesSb.append((count / 10) % 10);
+                    String numStr = Integer.toString(count);
+                    for (int j = 0; j < numStr.length(); j++) {
+                        char c = numStr.charAt(j);
+                        int digit = Character.getNumericValue(c);
+                        digits.add(digit);
+                    }
+                }
+
+                if (!digits.isEmpty()) {
+                    spacesSb.append(digits.poll()) ;
                 } else {
                     spacesSb.append(" ");
                 }
+
                 count++;
             }
 
