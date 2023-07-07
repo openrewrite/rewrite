@@ -37,6 +37,22 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
+    void multipleFileScope() {
+        rewriteRun(
+          kotlin(
+            """
+              @file : A ( "1" )
+              @file : A ( "2" )
+              @file : A ( "3" )
+
+              @Repeatable
+              annotation class A ( val s : String )
+              """
+          )
+        );
+    }
+
+    @Test
     void annotationWithDefaultArgument() {
         rewriteRun(
           kotlin(

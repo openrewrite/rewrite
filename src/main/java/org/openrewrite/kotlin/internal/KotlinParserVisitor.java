@@ -112,12 +112,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitFile(FirFile file, ExecutionContext ctx) {
         currentFile = file;
 
-//        List<J.Annotation> annotations = null;
-//        if (getCurrentPsiNode() instanceof KtFile) {
-//            KtFileAnnotationList annotationList = PsiTreeUtil.findChildOfType(getCurrentPsiNode(), KtFileAnnotationList.class);
-//            annotations = mapFileAnnotations(annotationList);
-//        }
-        List<J.Annotation> annotations = mapAnnotations(file.getAnnotations());
+        List<J.Annotation> annotations = null;
+
+        PsiElement currentPsiNode = getCurrentPsiNode();
+        if (currentPsiNode instanceof KtAnnotationEntry) {
+            currentPsiNode = PsiTreeUtil.getParentOfType(currentPsiNode, KtFileAnnotationList.class);
+            annotations = mapFileAnnotations((KtFileAnnotationList) currentPsiNode, file.getAnnotations());
+        } else if (currentPsiNode instanceof KtFile) {
+            KtFileAnnotationList annotationList = PsiTreeUtil.findChildOfType(getCurrentPsiNode(), KtFileAnnotationList.class);
+            annotations = mapFileAnnotations(annotationList, file.getAnnotations());
+        }
 
         JRightPadded<J.Package> paddedPkg = null;
         if (!file.getPackageDirective().getPackageFqName().isRoot()) {
@@ -1115,15 +1119,25 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Nullable
-    private List<J.Annotation> mapFileAnnotations(@Nullable KtFileAnnotationList annotationList) {
+    private List<J.Annotation> mapFileAnnotations(@Nullable KtFileAnnotationList annotationList, List<FirAnnotation> firAnnotations) {
         if (annotationList == null) {
             return null;
         }
 
-        System.out.println();
+        Map<Integer, FirAnnotation> annotationsMap = new HashMap<>();
+        for (FirAnnotation annotation : firAnnotations) {
+            annotationsMap.put(annotation.getSource().getStartOffset(), annotation);
+        }
+
         List<J.Annotation> annotations = new ArrayList<>(annotationList.getChildren().length);
         for (PsiElement annotation : annotationList.getChildren()) {
             // convert KtAnnotation to J.Annotation
+            if (annotationsMap.containsKey(annotation.getTextRange().getStartOffset())) {
+                J.Annotation ann = (J.Annotation) visitElement(annotationsMap.get(annotation.getTextRange().getStartOffset()), null);
+                annotations.add(ann);
+            } else {
+                throw new UnsupportedOperationException("Unexpected missing annotation.");
+            }
         }
 
         return annotations;
