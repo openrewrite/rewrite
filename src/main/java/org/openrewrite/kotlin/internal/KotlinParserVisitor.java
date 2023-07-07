@@ -17,6 +17,8 @@ package org.openrewrite.kotlin.internal;
 
 import org.jetbrains.kotlin.*;
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
+import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
+import org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.kotlin.descriptors.ClassKind;
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget;
 import org.jetbrains.kotlin.fir.*;
@@ -107,6 +109,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitFile(FirFile file, ExecutionContext ctx) {
         currentFile = file;
 
+//        List<J.Annotation> annotations = null;
+//        if (getCurrentPsiNode() instanceof KtFile) {
+//            KtFileAnnotationList annotationList = PsiTreeUtil.findChildOfType(getCurrentPsiNode(), KtFileAnnotationList.class);
+//            annotations = mapFileAnnotations(annotationList);
+//        }
         List<J.Annotation> annotations = mapAnnotations(file.getAnnotations());
 
         JRightPadded<J.Package> paddedPkg = null;
@@ -1102,6 +1109,21 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         return receiver;
+    }
+
+    @Nullable
+    private List<J.Annotation> mapFileAnnotations(@Nullable KtFileAnnotationList annotationList) {
+        if (annotationList == null) {
+            return null;
+        }
+
+        System.out.println();
+        List<J.Annotation> annotations = new ArrayList<>(annotationList.getChildren().length);
+        for (PsiElement annotation : annotationList.getChildren()) {
+            // convert KtAnnotation to J.Annotation
+        }
+
+        return annotations;
     }
 
     private JContainer<Expression> mapFunctionalCallArguments(List<FirExpression> firExpressions) {
@@ -4349,6 +4371,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             throw new IllegalStateException("Unexpected null source ... fix me.");
         }
         return t.getSource().getEndOffset();
+    }
+
+    @Nullable
+    private PsiElement getCurrentPsiNode() {
+        if (nodes.containsKey(cursor)) {
+            return nodes.get(cursor).getPsi();
+        }
+        return null;
     }
 
     @SuppressWarnings("unchecked")
