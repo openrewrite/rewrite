@@ -83,7 +83,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private final FirSession firSession;
     private int cursor;
 
-    private Map<Integer, ASTNode> nodes;
+    private final Map<Integer, ASTNode> nodes;
 
     // Associate top-level function and property declarations to the file.
     @Nullable

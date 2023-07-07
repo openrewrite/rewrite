@@ -66,7 +66,7 @@ public class KotlinSource {
                     }
                 }
 
-                if (element.getNextSibling() != null) {
+                if (element.getNextSibling() instanceof KtElement) {
                     visitElement(element.getNextSibling());
                 }
             }
