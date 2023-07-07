@@ -22,6 +22,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
+@SuppressWarnings({"RemoveEmptyClassBody", "RedundantVisibilityModifier"})
 class ClassDeclarationTest implements RewriteTest {
 
     @Test
@@ -377,6 +378,24 @@ class ClassDeclarationTest implements RewriteTest {
                       arg()
                   }
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void mixedAnnotationsAndModifiers() {
+        rewriteRun(
+          kotlin(
+            """
+              @Repeatable
+              annotation class A (val s : String )
+              """
+          ),
+          kotlin(
+            """
+              open @A ( "1" ) public @A ( "2" ) class TestA
+              @A ( "1" ) open @A ( "2" ) public class TestB
               """
           )
         );

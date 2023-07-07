@@ -18,6 +18,7 @@ package org.openrewrite.kotlin.internal;
 import org.jetbrains.kotlin.*;
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
+import org.jetbrains.kotlin.com.intellij.psi.impl.source.tree.LeafPsiElement;
 import org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.kotlin.descriptors.ClassKind;
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget;
@@ -38,7 +39,9 @@ import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitUnitTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
+import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
 import org.jetbrains.kotlin.psi.*;
+import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.ParseExceptionResult;
@@ -3301,21 +3304,18 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
         Markers markers = Markers.EMPTY;
 
-        // Not used until it's possible to handle K.Modifiers.
-        List<J> modifiers = emptyList();
-
-        ClassKind classKind = regularClass.getClassKind();
-        String stopWord;
-        if (ClassKind.INTERFACE == classKind) {
-            stopWord = "interface";
-        } else if (ClassKind.OBJECT == classKind) {
-            stopWord = "object";
-        } else {
-            stopWord = "class";
+        List<J.Modifier> modifiers = emptyList();
+        PsiElement currentNode = getCurrentPsiNode();
+        if (currentNode instanceof KtAnnotationEntry) {
+            currentNode = PsiTreeUtil.getParentOfType(currentNode, KtModifierList.class);
         }
 
-        List<J.Annotation> leadingAnnotation = mapModifiers(regularClass.getAnnotations(), stopWord);
-        List<J.Annotation> kindAnnotations = emptyList();
+        List<J.Annotation> kindAnnotations = new ArrayList<>();
+        if (currentNode instanceof KtModifierList) {
+            modifiers = mapModifierList((KtModifierList) currentNode, regularClass.getAnnotations(), kindAnnotations);
+        }
+
+        ClassKind classKind = regularClass.getClassKind();
 
         J.ClassDeclaration.Kind kind;
         if (ClassKind.INTERFACE == classKind) {
@@ -3329,12 +3329,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         J.Identifier name;
-        if (ClassKind.OBJECT == classKind && leadingAnnotation.stream().anyMatch(a -> a.getAnnotationType() instanceof J.Identifier && "companion".equals(((J.Identifier) a.getAnnotationType()).getSimpleName()))) {
+        if (ClassKind.OBJECT == classKind && kindAnnotations.stream().anyMatch(a -> a.getAnnotationType() instanceof J.Identifier && "companion".equals(((J.Identifier) a.getAnnotationType()).getSimpleName()))) {
             name = new J.Identifier(
                     randomId(),
-                    prefix,
+                    EMPTY,
                     Markers.EMPTY,
-                    regularClass.getName().asString(),
+                    "",
                     null,
                     null
             );
@@ -3369,13 +3369,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
         }
 
+        List<J.Annotation> leadingAnnotation = new ArrayList<>();
         int saveCursor = cursor;
         Space before = whitespace();
         JContainer<Statement> primaryConstructor = null;
         boolean inlineConstructor = (source.startsWith("internal", cursor) || source.startsWith("constructor", cursor) || source.startsWith("(", cursor)) && firPrimaryConstructor != null;
         if (inlineConstructor) {
             if (source.startsWith("internal", cursor)) {
-                J.Annotation annotation = convertToAnnotation(mapModifier(before, emptyList()));
+                cursor = saveCursor;
+                J.Annotation annotation = mapKModifierToAnnotation("internal");
                 annotation = annotation.withMarkers(annotation.getMarkers().addIfAbsent(new ExplicitInlineConstructor(randomId())));
                 annotation = annotation.withMarkers(annotation.getMarkers().addIfAbsent(new Modifier(randomId())));
                 leadingAnnotation.add(annotation);
@@ -3507,7 +3509,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 prefix,
                 markers,
                 leadingAnnotation,
-                emptyList(), // Requires a K view to add K specific modifiers. Modifiers specific to Kotlin are added as annotations for now.
+                modifiers,
                 kind,
                 name,
                 typeParams,
@@ -3517,6 +3519,41 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 null,
                 body,
                 (JavaType.FullyQualified) typeMapping.type(regularClass));
+    }
+
+    private List<J.Modifier> mapModifierList(KtModifierList currentNode, List<FirAnnotation> annotations, List<J.Annotation> lastAnnotations) {
+        Map<Integer, FirAnnotation> annotationsMap = new HashMap<>();
+        for (FirAnnotation annotation : annotations) {
+            annotationsMap.put(annotation.getSource().getStartOffset(), annotation);
+        }
+
+        List<J.Modifier> modifiers = new ArrayList<>();
+        List<J.Annotation> currentAnnotations = new ArrayList<>();
+        Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(currentNode).iterator();
+        while (iterator.hasNext()) {
+            PsiElement it = iterator.next();
+            if (it instanceof LeafPsiElement && it.getNode().getElementType() instanceof KtModifierKeywordToken) {
+                if (isJModifier(it.getText())) {
+                    modifiers.add(mapToJModifier(it.getText(), currentAnnotations));
+                    currentAnnotations = new ArrayList<>();
+                } else {
+                    currentAnnotations.add(mapKModifierToAnnotation(it.getText()));
+                }
+            } else if (it instanceof KtAnnotationEntry) {
+                if (annotationsMap.containsKey(it.getTextRange().getStartOffset())) {
+                    J.Annotation annotation = (J.Annotation) visitElement(annotationsMap.get(it.getTextRange().getStartOffset()), null);
+                    currentAnnotations.add(annotation);
+                } else {
+                    throw new UnsupportedOperationException("Annotation not found");
+                }
+            }
+        }
+
+        if (!currentAnnotations.isEmpty()) {
+            lastAnnotations.addAll(currentAnnotations);
+        }
+
+        return modifiers;
     }
 
     @Override
@@ -4232,6 +4269,56 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     private boolean isDelimiter(char c) {
         return c == '(' || c == ')' || c == '{' || c == '}' || c == '<' || c == '>' || c == ':' || c == '.' || c == ',';
+    }
+
+    private boolean isJModifier(String modifier) {
+        switch (modifier) {
+            case "public":
+            case "protected":
+            case "private":
+            case "final":
+            case "abstract":
+                return true;
+        }
+        return false;
+    }
+
+    private J.Annotation mapKModifierToAnnotation(String kModifier) {
+        Space prefix = whitespace();
+        J.Identifier name = createIdentifier(kModifier);
+        return new J.Annotation(
+                randomId(),
+                prefix,
+                Markers.EMPTY.addIfAbsent(new Modifier(randomId())),
+                name,
+                JContainer.empty());
+    }
+
+    private J.Modifier mapToJModifier(String text, List<J.Annotation> annotations) {
+        Space prefix = whitespace();
+
+        J.Modifier.Type type;
+        switch (text) {
+            case "public":
+                type = J.Modifier.Type.Public;
+                break;
+            case "protected":
+                type = J.Modifier.Type.Protected;
+                break;
+            case "private":
+                type = J.Modifier.Type.Private;
+                break;
+            case "final":
+                type = J.Modifier.Type.Final;
+                break;
+            case "abstract":
+                type = J.Modifier.Type.Abstract;
+                break;
+            default:
+                throw new IllegalArgumentException("Unknown modifier " + text);
+        }
+        skip(text);
+        return new J.Modifier(randomId(), prefix, Markers.EMPTY, type, annotations);
     }
 
     @Nullable
