@@ -45,7 +45,7 @@ public class KotlinSource {
 
     // Map the PsiFile ahead of time so that the Disposable may be disposed early and free up memory.
     private Map<Integer, ASTNode> map(@Nullable PsiFile psiFile) {
-        Map<Integer, ASTNode> result = new HashMap<>();
+        Map<Integer, ASTNode> result = new LinkedHashMap<>();
         if (psiFile == null) {
             return result;
         }
