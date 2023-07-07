@@ -144,31 +144,28 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
         public Builder imports(String... fullyQualifiedTypeNames) {
             for (String typeName : fullyQualifiedTypeNames) {
-                if (shouldAddImport(typeName)) {
-                    this.imports.add("import " + typeName + ";\n");
-                }
+                validateImport(typeName);
+                this.imports.add("import " + typeName + ";\n");
             }
             return this;
         }
 
         public Builder staticImports(String... fullyQualifiedMemberTypeNames) {
             for (String typeName : fullyQualifiedMemberTypeNames) {
-                if (shouldAddImport(typeName)) {
-                    this.imports.add("import static " + typeName + ";\n");
-                }
+                validateImport(typeName);
+                this.imports.add("import static " + typeName + ";\n");
             }
             return this;
         }
 
-        private boolean shouldAddImport(String typeName) {
+        private void validateImport(String typeName) {
             if (StringUtils.isBlank(typeName)) {
-                return false;
+                throw new IllegalArgumentException("Imports must not be blank");
             } else if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
                 throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include an \"import \" or \"static \" prefix");
             } else if (typeName.endsWith(";") || typeName.endsWith("\n")) {
                 throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include a suffixed terminator");
             }
-            return true;
         }
 
         public Builder javaParser(JavaParser.Builder<?, ?> javaParser) {
