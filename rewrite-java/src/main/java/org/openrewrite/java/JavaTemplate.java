@@ -144,9 +144,8 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
         public Builder imports(String... fullyQualifiedTypeNames) {
             for (String typeName : fullyQualifiedTypeNames) {
-                if (shouldAddImport(typeName)) {
-                    this.imports.add("import " + typeName + ";\n");
-                }
+                validateImport(typeName);
+                this.imports.add("import " + typeName + ";\n");
             }
             return this;
         }
