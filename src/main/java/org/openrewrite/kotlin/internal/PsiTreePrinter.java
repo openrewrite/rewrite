@@ -33,10 +33,11 @@ public class PsiTreePrinter {
         outputLines = new ArrayList<>();
     }
 
-    public static String printPsiTree(PsiFile psiFile) {
+    public static String printPsiFile(PsiFile psiFile) {
         PsiTreePrinter treePrinter = new PsiTreePrinter();
         StringBuilder sb = new StringBuilder();
-        sb.append("Raw PSI AST").append("\n");
+        sb.append("------------").append("\n");
+        sb.append("PSI File").append("\n");
         treePrinter.printNode(psiFile, 1);
         sb.append(String.join("\n", treePrinter.outputLines));
         return sb.toString();
@@ -54,8 +55,6 @@ public class PsiTreePrinter {
         }
 
         // 1. Source code
-        sb.append("------------").append("\n");
-        sb.append("Source code with index").append("\n");
         sb.append(printIndexedSourceCode(psiTree.getSource())).append("\n");
 
         // 2. print AST
@@ -74,6 +73,8 @@ public class PsiTreePrinter {
             .append(psiElement.getTextRange())
             .append(" | ")
             .append(psiElement.getNode().getElementType())
+            .append(" | ")
+            .append(psiElement.getClass().getSimpleName())
             .append(" | Text: \"")
             .append(truncate(psiElement.getText()).replace("\n", "\\n"))
             .append("\"");
@@ -101,10 +102,12 @@ public class PsiTreePrinter {
         }
     }
 
-    private static String printIndexedSourceCode(String sourceCode) {
+    public static String printIndexedSourceCode(String sourceCode) {
         int count = 0;
         String[] lines = sourceCode.split("\n");
-        StringBuilder result = new StringBuilder();
+        StringBuilder sb = new StringBuilder();
+        sb.append("------------").append("\n");
+        sb.append("Source code with index:").append("\n\n");
         Queue<Integer> digits = new ArrayDeque<>();
 
         for (String line : lines) {
@@ -128,13 +131,13 @@ public class PsiTreePrinter {
                 count++;
             }
 
-            result.append(line)
+            sb.append(line)
                 .append("\n")
                 .append(spacesSb)
                 .append("\n");
             count++;
         }
-        return result.toString();
+        return sb.toString();
     }
 
     /**
