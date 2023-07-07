@@ -587,6 +587,17 @@ public class JsonPathMatcher {
                 if ("&&".equals(operator) &&
                         ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) &&
                                 (rhs != null && (!(rhs instanceof List) || !((List<Object>) rhs).isEmpty())))) {
+                    // Return the result of the evaluated expression.
+                    if (lhs instanceof Yaml) {
+                        return rhs;
+                    } else if (rhs instanceof Yaml) {
+                        return lhs;
+                    }
+
+                    // Return the result of the expression that has the fewest matches.
+                    if (lhs instanceof List && rhs instanceof List && ((List<?>) lhs).size() != ((List<?>) rhs).size()) {
+                        return ((List<?>) lhs).size() < ((List<?>) rhs).size() ? lhs : rhs;
+                    }
                     return scopeOfLogicalOp;
                 } else if ("||".equals(operator) &&
                         ((lhs != null && (!(lhs instanceof List) || !((List<Object>) lhs).isEmpty())) ||
