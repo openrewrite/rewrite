@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.internal;
 
+import org.jetbrains.kotlin.com.intellij.openapi.util.TextRange;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
 import org.jetbrains.kotlin.com.intellij.psi.PsiFile;
 
@@ -33,12 +34,26 @@ public class PsiTreePrinter {
         outputLines = new ArrayList<>();
     }
 
-    public static String printPsiFile(PsiFile psiFile) {
+    public static String printPsiFileSkeleton(PsiFile psiFile) {
         PsiTreePrinter treePrinter = new PsiTreePrinter();
         StringBuilder sb = new StringBuilder();
         sb.append("------------").append("\n");
-        sb.append("PSI File").append("\n");
+        sb.append("PSI File Skeleton").append("\n");
+        Set<TextRange> covered =  new HashSet<>();
+        collectCovered(psiFile, covered);
         treePrinter.printNode(psiFile, 1);
+        sb.append(String.join("\n", treePrinter.outputLines));
+        return sb.toString();
+    }
+
+    public static String printPsiFileAll(PsiFile psiFile) {
+        PsiTreePrinter treePrinter = new PsiTreePrinter();
+        StringBuilder sb = new StringBuilder();
+        sb.append("------------").append("\n");
+        sb.append("PSI File All").append("\n");
+        Set<TextRange> covered =  new HashSet<>();
+        collectCovered(psiFile, covered);
+        treePrinter.printNode(psiFile, 1, covered, false);
         sb.append(String.join("\n", treePrinter.outputLines));
         return sb.toString();
     }
@@ -80,8 +95,60 @@ public class PsiTreePrinter {
             .append("\"");
         connectToLatestSibling(depth);
         outputLines.add(line);
+
         for (PsiElement childNode : psiElement.getChildren()) {
             printNode(childNode, depth + 1);
+        }
+    }
+
+    private void printNode(PsiElement psiElement, int depth, Set<TextRange> covered, boolean isExtendedNode) {
+        StringBuilder line = new StringBuilder();
+        line.append(leftPadding(depth));
+        line.append(" ")
+            .append(psiElement.getTextRange())
+            .append(isExtendedNode ? " [E]" : "")
+            .append(" | ")
+            .append(psiElement.getNode().getElementType())
+            .append(" | ")
+            .append(psiElement.getClass().getSimpleName())
+            .append(" | Text: \"")
+            .append(truncate(psiElement.getText()).replace("\n", "\\n"))
+            .append("\"");
+        connectToLatestSibling(depth);
+        outputLines.add(line);
+
+        for (PsiElement childNode : psiElement.getChildren()) {
+            List<PsiElement> preSiblings = new ArrayList<>();
+            PsiElement prevSibling = childNode.getPrevSibling();
+            while (prevSibling != null && covered.add(prevSibling.getTextRange())) {
+                preSiblings.add(prevSibling);
+                prevSibling = prevSibling.getPrevSibling();
+            }
+            Collections.reverse(preSiblings);
+
+            for (PsiElement p : preSiblings) {
+                printNode(p, depth + 1, covered, true);
+            }
+
+            printNode(childNode, depth + 1, covered, false);
+
+            List<PsiElement> nextSiblings = new ArrayList<>();
+            PsiElement nextSibling = childNode.getNextSibling();
+            while (nextSibling != null && covered.add(nextSibling.getTextRange())) {
+                nextSiblings.add(nextSibling);
+                nextSibling = nextSibling.getNextSibling();
+            }
+
+            for (PsiElement n : nextSiblings) {
+                printNode(n, depth + 1, covered, true);
+            }
+        }
+    }
+
+    private static void collectCovered(PsiElement psiElement, Set<TextRange> covered) {
+        covered.add(psiElement.getTextRange());
+        for (PsiElement childNode : psiElement.getChildren()) {
+            collectCovered(childNode, covered);
         }
     }
 
