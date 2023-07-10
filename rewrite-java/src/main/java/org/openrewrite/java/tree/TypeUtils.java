@@ -46,6 +46,10 @@ public class TypeUtils {
         return fqn1 == null && fqn2 == null;
     }
 
+    public static Predicate<String> fullyQualifiedNamesAreEqualAsPredicate (@Nullable String fqn1) {
+        return (fqn2) -> fullyQualifiedNamesAreEqual(fqn1, fqn2);
+    }
+
     /**
      * Returns true if the JavaTypes are of the same type.
      * {@link JavaType.Parameterized} will be checked for both the FQN and each of the parameters.

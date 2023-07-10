@@ -1072,6 +1072,72 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3275")
+    @Test
+    void doesNotRemoveReferencedClassesBeingUsedAsParameters() {
+        rewriteRun(
+          java(
+            """
+              package com.Source.mine;
+
+              public class A {
+                  public static final short SHORT1 = (short)1;
+                  
+                  public short getShort1() {
+                    return SHORT1;
+                  } 
+              }
+              """
+          ),
+          java(
+            """
+              package com.test;
+
+              import com.Source.mine.A;
+              
+              class Test {
+                  void f(A classA) {
+                    classA.getShort1();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3275")
+    @Test
+    void doesNotRemoveReferencedClassesBeingUsedAsParametersUnusualPackageName() {
+        rewriteRun(
+          java(
+            """
+              package com.Source.$;
+
+              public class A {
+                  public static final short SHORT1 = (short)1;
+
+                  public short getShort1() {
+                    return SHORT1;
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.test;
+
+              import com.Source.$.A;
+
+              class Test {
+                  void f(A classA) {
+                    classA.getShort1();
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void removeImportUsedAsLambdaParameter() {
         rewriteRun(
