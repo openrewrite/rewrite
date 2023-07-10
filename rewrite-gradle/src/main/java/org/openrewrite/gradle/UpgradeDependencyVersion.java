@@ -70,7 +70,8 @@ public class UpgradeDependencyVersion extends Recipe {
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
                           "You can also use `latest.release` for the latest available version and `latest.patch` if " +
-                          "the current version is a valid semantic version.",
+                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors)",
             example = "29.X")
     String newVersion;
 
