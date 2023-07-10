@@ -102,6 +102,41 @@ class AnnotationTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/156")
     @Test
+    void annotationUseSiteTargetAnnotationOnly() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class A (val s : String)
+              class TestA {
+                  @get : A("1")
+                  @set : A("2")
+                  var name: String = ""
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/156")
+    @Test
+    void annotationUseSiteTargetMixedModifierAndAnnotation() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class A (val s : String)
+              class TestA {
+                  @get : A("1")
+                  public
+                  @set : A("2")
+                  var name: String = ""
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/156")
+    @Test
     void annotationUseSiteTarget() {
         rewriteRun(
           kotlin(
@@ -123,4 +158,5 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
 }

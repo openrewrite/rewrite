@@ -1641,13 +1641,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             modifiers = mapModifierList((KtModifierList) currentNode, firAnnotations, annotations);
         }
 
-        List<FirAnnotation> mapAnnotations = new ArrayList<>(property.getAnnotations());
-        // Note: it might be possible to have annotations on both the property associated to the getter
-        // AND the getter itself. In that case, we to use a single list to avoid duplicates and add
-        // the target annotations to the appropriate LST element.
-        if (property.getGetter() != null && !property.getGetter().getAnnotations().isEmpty()) {
-            mapAnnotations.addAll(property.getGetter().getAnnotations());
-        }
+        annotations.addAll(mapModifiers(new ArrayList<>(), property.getName().asString()));
 
         J.VariableDeclarations receiver = null;
         if (property.getReceiverTypeRef() != null) {
