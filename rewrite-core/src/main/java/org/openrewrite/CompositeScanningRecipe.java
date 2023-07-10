@@ -15,11 +15,6 @@
  */
 package org.openrewrite;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.ScanningRecipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.AbstractMap;
@@ -81,6 +76,7 @@ public abstract class CompositeScanningRecipe<T, R extends ScanningRecipe<RT>, R
         }
     }
 
+    @SuppressWarnings("unused")
     protected Collection<? extends SourceFile> generatez(T acc, Collection<SourceFile> generatedInThisCycle, ExecutionContext ctx) {
         return generatez(acc, ctx);
     }
@@ -99,6 +95,7 @@ public abstract class CompositeScanningRecipe<T, R extends ScanningRecipe<RT>, R
         }
     }
 
+    @SuppressWarnings("unused")
     protected Collection<? extends SourceFile> generatez(T acc, ExecutionContext ctx) {
         return Collections.emptyList();
     }
@@ -118,6 +115,7 @@ public abstract class CompositeScanningRecipe<T, R extends ScanningRecipe<RT>, R
         };
     }
 
+    @SuppressWarnings("unused")
     protected TreeVisitor<?, ExecutionContext> getVisitorz(T acc) {
         return TreeVisitor.noop();
     }
