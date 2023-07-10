@@ -55,10 +55,13 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    @SuppressWarnings("ForLoopReplaceableByForEach")
     public Space visitSpace(Space space, Space.Location loc, PrintOutputCapture<P> p) {
         p.append(space.getWhitespace());
 
-        for (Comment comment : space.getComments()) {
+        List<Comment> comments = space.getComments();
+        for (int i = 0; i < comments.size(); i++) {
+            Comment comment = comments.get(i);
             visitMarkers(comment.getMarkers(), p);
             comment.printComment(getCursor(), p);
             p.append(comment.getSuffix());
@@ -1137,15 +1140,19 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         beforeSyntax(j.getPrefix(), j.getMarkers(), loc, p);
     }
 
+    @SuppressWarnings("ForLoopReplaceableByForEach")
     protected void beforeSyntax(Space prefix, Markers markers, @Nullable Space.Location loc, PrintOutputCapture<P> p) {
-        for (Marker marker : markers.getMarkers()) {
+        List<Marker> markersList = markers.getMarkers();
+        for (int i = 0; i < markersList.size(); i++) {
+            Marker marker = markersList.get(i);
             p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
         }
         if (loc != null) {
             visitSpace(prefix, loc, p);
         }
         visitMarkers(markers, p);
-        for (Marker marker : markers.getMarkers()) {
+        for (int i = 0; i < markersList.size(); i++) {
+            Marker marker = markersList.get(i);
             p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
         }
     }
@@ -1154,8 +1161,11 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         afterSyntax(j.getMarkers(), p);
     }
 
+    @SuppressWarnings("ForLoopReplaceableByForEach")
     protected void afterSyntax(Markers markers, PrintOutputCapture<P> p) {
-        for (Marker marker : markers.getMarkers()) {
+        List<Marker> markersMarkers = markers.getMarkers();
+        for (int i = 0; i < markersMarkers.size(); i++) {
+            Marker marker = markersMarkers.get(i);
             p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
         }
     }

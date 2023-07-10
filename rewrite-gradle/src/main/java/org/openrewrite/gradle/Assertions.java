@@ -90,8 +90,7 @@ public class Assertions {
                     }
 
                     if (version != null) {
-                        HttpSender httpSender = HttpSenderExecutionContextView.view(new InMemoryExecutionContext()).getHttpSender();
-                        GradleWrapper gradleWrapper = GradleWrapper.create(distribution, version, null,httpSender);
+                        GradleWrapper gradleWrapper = GradleWrapper.create(distribution, version, null, new InMemoryExecutionContext());
                         Files.createDirectories(projectDir.resolve("gradle/wrapper/"));
                         Files.write(projectDir.resolve(GradleWrapper.WRAPPER_PROPERTIES_LOCATION), ("distributionBase=GRADLE_USER_HOME\n" +
                                 "distributionPath=wrapper/dists\n" +
