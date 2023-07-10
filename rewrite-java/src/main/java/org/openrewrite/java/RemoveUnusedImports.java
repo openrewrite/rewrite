@@ -30,6 +30,7 @@ import java.util.function.Predicate;
 
 import static java.util.Collections.emptySet;
 import static org.openrewrite.java.style.ImportLayoutStyle.isPackageAlwaysFolded;
+import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqualAsPredicate;
 
 /**
  * This recipe will remove any imports for types that are not referenced within the compilation unit. This recipe
@@ -136,7 +137,7 @@ public class RemoveUnusedImports extends Recipe {
                     // see https://github.com/openrewrite/rewrite/issues/1698 for more detail
                     String target = qualid.getTarget().toString();
                     String modifiedTarget = methodsAndFieldsByTypeName.keySet().stream()
-                            .filter(classPathMatcher(target))
+                            .filter(fullyQualifiedNamesAreEqualAsPredicate(target))
                             .findFirst()
                             .orElse(target);
                     SortedSet<String> targetMethodsAndFields = methodsAndFieldsByTypeName.get(modifiedTarget);
@@ -229,7 +230,7 @@ public class RemoveUnusedImports extends Recipe {
                         if ("*".equals(elem.getQualid().getSimpleName())) {
                             return elem.getPackageName().equals(c.getPackageName());
                         }
-                        return classPathMatcher(c.getFullyQualifiedName()).test(elem.getTypeName());
+                        return fullyQualifiedNamesAreEqualAsPredicate(c.getFullyQualifiedName()).test(elem.getTypeName());
                     })) {
                         anImport.used = false;
                         changed = true;
@@ -284,10 +285,6 @@ public class RemoveUnusedImports extends Recipe {
 
             return cu;
         }
-    }
-
-    private static Predicate<String> classPathMatcher(final String target){
-        return (s) -> s.matches(target.replaceAll("[\\.\\$]", "(\\\\\\.|\\\\\\$)"));
     }
 
     private static String packageKey(String packageName, String className) {
