@@ -165,9 +165,8 @@ public class KotlinParser implements Parser {
             // https://github.com/openrewrite/rewrite-kotlin/issues/24
             return Stream.empty();
         }
-        Disposer.dispose(disposable);
         FirSession firSession = compilerCus.getFirSession();
-        return compilerCus.getSources().stream()
+        Stream<SourceFile> cus = compilerCus.getSources().stream()
                 .map(compiled -> {
                     try {
                         KotlinParserVisitor mappingVisitor = new KotlinParserVisitor(
@@ -187,6 +186,9 @@ public class KotlinParser implements Parser {
                         return ParseError.build(this, compiled.getInput(), relativeTo, ctx, t);
                     }
                 });
+
+        Disposer.dispose(disposable);
+        return cus;
     }
 
     @Override

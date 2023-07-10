@@ -227,6 +227,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         if (annotationCall.getUseSiteTarget() == AnnotationUseSiteTarget.PROPERTY_GETTER) {
             skip("get");
             markers = markers.addIfAbsent(new AnnotationCallSite(randomId(), "get", sourceBefore(":")));
+        } else if (annotationCall.getUseSiteTarget() == AnnotationUseSiteTarget.PROPERTY_SETTER) {
+            skip("set");
+            markers = markers.addIfAbsent(new AnnotationCallSite(randomId(), "set", sourceBefore(":")));
         }
 
         J.Identifier name = (J.Identifier) visitElement(annotationCall.getCalleeReference(), ctx);
@@ -1623,7 +1626,21 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
         Markers markers = Markers.EMPTY;
 
-        List<J> modifiers = emptyList();
+        List<J.Modifier> modifiers = emptyList();
+        PsiElement currentNode = getCurrentPsiNode();
+        if (currentNode instanceof KtAnnotationEntry) {
+            currentNode = PsiTreeUtil.getParentOfType(currentNode, KtModifierList.class);
+        }
+
+        List<J.Annotation> annotations = new ArrayList<>();
+        if (currentNode instanceof KtModifierList) {
+            List<FirAnnotation> firAnnotations = new ArrayList<>(property.getAnnotations().size());
+            firAnnotations.addAll(property.getAnnotations());
+            firAnnotations.addAll(property.getGetter() != null ? property.getGetter().getAnnotations() : emptyList());
+            firAnnotations.addAll(property.getSetter() != null ? property.getSetter().getAnnotations() : emptyList());
+            modifiers = mapModifierList((KtModifierList) currentNode, firAnnotations, annotations);
+        }
+
         List<FirAnnotation> mapAnnotations = new ArrayList<>(property.getAnnotations());
         // Note: it might be possible to have annotations on both the property associated to the getter
         // AND the getter itself. In that case, we to use a single list to avoid duplicates and add
@@ -1631,8 +1648,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         if (property.getGetter() != null && !property.getGetter().getAnnotations().isEmpty()) {
             mapAnnotations.addAll(property.getGetter().getAnnotations());
         }
-
-        List<J.Annotation> annotations = mapModifiers(mapAnnotations, property.getName().asString());
 
         J.VariableDeclarations receiver = null;
         if (property.getReceiverTypeRef() != null) {
@@ -1914,7 +1929,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 prefix,
                 markers,
                 annotations,
-                emptyList(),
+                modifiers,
                 typeExpression,
                 null,
                 emptyList(),
