@@ -106,27 +106,10 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
+              @Repeatable
               annotation class A (val s : String)
               class TestA {
                   @get : A("1")
-                  @set : A("2")
-                  var name: String = ""
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/156")
-    @Test
-    void annotationUseSiteTargetMixedModifierAndAnnotation() {
-        rewriteRun(
-          kotlin(
-            """
-              annotation class A (val s : String)
-              class TestA {
-                  @get : A("1")
-                  public
                   @set : A("2")
                   var name: String = ""
               }
@@ -139,15 +122,22 @@ class AnnotationTest implements RewriteTest {
     @Test
     void annotationUseSiteTarget() {
         rewriteRun(
+          kotlin("""
+              @Repeatable
+              annotation class A (val s : String)
+          """),
           kotlin(
             """
-              annotation class A (val s : String)
               class TestA {
                   @get : A("1")
                   public
                   @set : A("2")
                   var name: String = ""
               }
+              """
+          ),
+          kotlin(
+            """
               class TestB {
                   public
                   @get : A("1")

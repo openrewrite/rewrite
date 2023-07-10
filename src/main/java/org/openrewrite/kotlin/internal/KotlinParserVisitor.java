@@ -1641,7 +1641,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             modifiers = mapModifierList((KtModifierList) currentNode, firAnnotations, annotations);
         }
 
-        annotations.addAll(mapModifiers(new ArrayList<>(), property.getName().asString()));
+        if (property.isVal()) {
+            annotations.add(mapKModifierToAnnotation("val"));
+        } else if (property.isVar()) {
+            annotations.add(mapKModifierToAnnotation("var"));
+        }
 
         J.VariableDeclarations receiver = null;
         if (property.getReceiverTypeRef() != null) {
