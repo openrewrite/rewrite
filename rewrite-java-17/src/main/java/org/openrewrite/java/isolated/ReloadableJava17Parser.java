@@ -30,7 +30,6 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.tree.ParseError;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
@@ -41,6 +40,7 @@ import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
@@ -329,8 +329,8 @@ public class ReloadableJava17Parser implements JavaParser {
         public Iterable<JavaFileObject> list(Location location, String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
             if (StandardLocation.CLASS_PATH.equals(location)) {
                 Iterable<JavaFileObject> listed = super.list(location, packageName, kinds, recurse);
-                return Stream.concat(
-                        classByteClasspath.stream()
+                return classByteClasspath.isEmpty() ? listed
+                        : Stream.concat(classByteClasspath.stream()
                                 .filter(jfo -> jfo.getPackage().equals(packageName)),
                         StreamSupport.stream(listed.spliterator(), false)
                 ).collect(toList());
