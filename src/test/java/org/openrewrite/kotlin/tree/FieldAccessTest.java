@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
+@SuppressWarnings("RedundantNullableReturnType")
 class FieldAccessTest implements RewriteTest {
 
     @Test
@@ -138,7 +139,7 @@ class FieldAccessTest implements RewriteTest {
           })),
           kotlin(
             """
-              val pattern = java.util.regex.Pattern.compile(".*")
+              val pattern = java . util . regex . Pattern . compile ( ".*" )
               """
           )
         );

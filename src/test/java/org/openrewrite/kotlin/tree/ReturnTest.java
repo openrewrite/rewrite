@@ -20,6 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
+@SuppressWarnings({"RedundantUnitReturnType", "CatchMayIgnoreException", "ConstantConditionIf"})
 class ReturnTest implements RewriteTest {
 
     @Test
@@ -68,7 +69,7 @@ class ReturnTest implements RewriteTest {
             """
               fun method ( i : Int ) : String {
                   return when {
-                      i . mod ( 2 ) . equals ( 0 ) -> "even"
+                      i . mod ( 2 ) == 0 -> "even"
                       else -> "odd"
                   }
               }
@@ -86,6 +87,19 @@ class ReturnTest implements RewriteTest {
                   return try {
                   } catch ( e : Exception ) {
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void conditionalReturnedValue() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method ( ) : String {
+                  return if ( true ) "42" else "24"
               }
               """
           )

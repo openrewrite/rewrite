@@ -21,6 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
+@SuppressWarnings({"RedundantVisibilityModifier", "PropertyName", "RedundantNullableReturnType", "UnusedReceiverParameter"})
 class MethodInvocationTest implements RewriteTest {
 
     @Test
@@ -489,6 +490,18 @@ class MethodInvocationTest implements RewriteTest {
                 foo . bar . format ( "" , * x )
               }
               """)
+        );
+    }
+
+    @Test
+    void conditionalArgument() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method ( s : String ) { }
+              val x = method ( if ( true ) "foo" else "bar" )
+              """
+          )
         );
     }
 }

@@ -78,7 +78,7 @@ class LabelTest implements RewriteTest {
               fun test ( ) {
                   var i = 0
                   labeled@ do {
-                      i++
+                      i ++
                       break@labeled
                   } while ( i < 10 )
               }
@@ -93,7 +93,7 @@ class LabelTest implements RewriteTest {
           kotlin(
             """
               fun test ( ) {
-                  labeled@ for (i in 1..10) {
+                  labeled@ for ( i in 1 .. 10 ) {
                       break@labeled
                   }
               }

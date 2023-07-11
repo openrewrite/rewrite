@@ -20,6 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
+@SuppressWarnings({"KotlinConstantConditions", "ConstantConditionIf"})
 class AssignmentOperationTest implements RewriteTest {
 
     @Test
@@ -72,6 +73,20 @@ class AssignmentOperationTest implements RewriteTest {
               fun method ( ) {
                 var n = 0
                 n /= 5
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void conditionalAssignment() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method ( ) {
+                var n = 84
+                n /= if (true) 42 else 21
               }
               """
           )

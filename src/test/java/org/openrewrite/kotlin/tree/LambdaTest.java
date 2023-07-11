@@ -16,12 +16,12 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
+@SuppressWarnings("RemoveRedundantQualifierName")
 class LambdaTest implements RewriteTest {
 
     @Test
@@ -62,7 +62,7 @@ class LambdaTest implements RewriteTest {
                   abstract fun fields ( ) : List < Pair < String , Any ? > >
                   
                   fun inputValues ( ) : List < Pair < String , Any ? > > {
-                      return fields ( ) .filter { ( k , _ ) -> ! defaults . contains ( k ) }
+                      return fields ( ) . filter { ( k , _ ) -> ! defaults . contains ( k ) }
                   }
               }
               """
@@ -104,8 +104,8 @@ class LambdaTest implements RewriteTest {
           kotlin(
             """
               fun method() {
-                  val list = listOf(1, 2, 3)
-                  list.filterIndexed { index, ignored -> index % 2 == 0 }
+                  val list = listOf ( 1 , 2 , 3 )
+                  list . filterIndexed { index , ignored -> index % 2 == 0 }
               }
               """
           )

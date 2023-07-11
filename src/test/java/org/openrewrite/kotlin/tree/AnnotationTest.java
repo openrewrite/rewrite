@@ -15,14 +15,14 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-@SuppressWarnings("RedundantVisibilityModifier")
+@SuppressWarnings({"RedundantSuppression", "RedundantNullableReturnType"})
 class AnnotationTest implements RewriteTest {
 
     @Test
@@ -150,7 +150,7 @@ class AnnotationTest implements RewriteTest {
         );
     }
 
-    @Disabled("FirValueParameter is supposed to have FirAnnotation somewhere but didn't find it")
+    @ExpectedToFail("FirValueParameter is supposed to have FirAnnotation somewhere but didn't find it")
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/173")
     @Test
     void constructorParameterWithAnnotation() {
@@ -163,6 +163,19 @@ class AnnotationTest implements RewriteTest {
                   val bar : String
                   ) {
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void conditionalParameter() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class A ( val s : String )
+              @A( if ( true ) "1" else "2" )
+              class Test
               """
           )
         );

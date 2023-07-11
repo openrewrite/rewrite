@@ -50,7 +50,7 @@ class ImportTest implements RewriteTest {
             """
               package a.b
               class Target {
-                  inline fun method() {}
+                  inline fun method ( ) { }
               }
               """
           ),

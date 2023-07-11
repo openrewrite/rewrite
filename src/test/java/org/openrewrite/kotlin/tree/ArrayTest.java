@@ -68,4 +68,27 @@ class ArrayTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void conditionalArraySize() {
+        rewriteRun(
+          kotlin(
+            """
+              val arr = IntArray ( if (true) else 1 )
+              """
+          )
+        );
+    }
+
+    @Test
+    void conditionalArrayAccess() {
+        rewriteRun(
+          kotlin(
+            """
+              val arr = IntArray ( 1 )
+              val a = arr [ if (true) 0 else 1 ]
+              """
+          )
+        );
+    }
 }

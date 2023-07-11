@@ -20,6 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
+@SuppressWarnings({"ControlFlowWithEmptyBody", "RemoveForLoopIndices"})
 class ForLoopTest implements RewriteTest {
 
     @Test
@@ -62,7 +63,7 @@ class ForLoopTest implements RewriteTest {
           kotlin(
             """
               fun method ( ) {
-                  for ( i in 1..42 ) {
+                  for ( i in 1 .. 42 ) {
                       println ( i )
                   }
               }

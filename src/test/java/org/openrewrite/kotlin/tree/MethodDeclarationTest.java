@@ -21,6 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
+@SuppressWarnings({"UnusedReceiverParameter", "RedundantSuspendModifier"})
 class MethodDeclarationTest implements RewriteTest {
 
     @Test
@@ -140,7 +141,7 @@ class MethodDeclarationTest implements RewriteTest {
     @Test
     void genericTypeParameters() {
         rewriteRun(
-          kotlin("fun <T : Number > method ( type : T ) { }")
+          kotlin("fun < T : Number > method ( type : T ) { }")
         );
     }
 
@@ -205,7 +206,7 @@ class MethodDeclarationTest implements RewriteTest {
               suspend fun example (
                 title : String ,
                 verifyUnique : suspend ( String ) -> Boolean
-              ) : String = TODO()
+              ) : String = TODO ( )
               """
           )
         );

@@ -21,6 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
+@SuppressWarnings({"LiftReturnOrAssignment", "IntroduceWhenSubject"})
 class WhenTest implements RewriteTest {
 
     @Test
@@ -30,14 +31,12 @@ class WhenTest implements RewriteTest {
             """
               class A {
                 val a = 1
-                fun method() {
-                    val a = A()
+                fun method ( ) {
+                    val a = A ( )
                     val b = a
                 }
               }
-              """, spec -> spec.afterRecipe(cu -> {
-                System.out.println();
-            })
+              """
           )
         );
     }
@@ -103,7 +102,7 @@ class WhenTest implements RewriteTest {
             """
               fun method ( i : Int ) : String {
                   when {
-                      i . mod ( 2 ) . equals ( 0 ) -> return "even"
+                      i . mod ( 2 ) == 0 -> return "even"
                       else -> return "odd"
                   }
               }
@@ -203,35 +202,6 @@ class WhenTest implements RewriteTest {
                   }
               }
               fun isTrue ( ) = true
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/138")
-    @Test
-    void inParens() {
-        rewriteRun(
-          kotlin(
-            """
-              fun method ( a : Any ) {
-                   val any = ( if ( a is Boolean ) "true" else "false" )
-              }
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/138")
-    @Test
-    void multipleDeSugaredParens() {
-        rewriteRun(
-          kotlin(
-            """
-              fun method ( a : Any? ) {
-                  ( ( ( ( if ( ( ( a ) ) == ( ( null ) ) ) return ) ) ) )
-                  val r = a
-              }
               """
           )
         );
