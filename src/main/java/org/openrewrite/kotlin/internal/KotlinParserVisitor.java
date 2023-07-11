@@ -39,6 +39,7 @@ import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitUnitTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
+import org.jetbrains.kotlin.lexer.KtKeywordToken;
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
@@ -1621,6 +1622,31 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 typeMapping.type(namedArgumentExpression.getTypeRef()));
     }
 
+    /**
+     * Check whether the giving property AST Node has `val` or `var` modifier.
+     * @param propertyNode the property AST Node to check
+     * @return `val` or `var` if the property node has `val` or `var` modifier. otherwise return null.
+     */
+    @Nullable
+    private static String getValOrVarModifier(@Nullable PsiElement propertyNode) {
+        if (propertyNode == null) {
+            return null;
+        }
+        Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(propertyNode).iterator();
+        while (iterator.hasNext()) {
+            PsiElement it = iterator.next();
+            if (it instanceof LeafPsiElement &&
+                it.getNode().getElementType() instanceof KtKeywordToken
+            ) {
+                String keyword = ((KtKeywordToken) it.getNode().getElementType()).getValue();
+                if (keyword.equals("val") || keyword.equals("var")) {
+                    return keyword;
+                }
+            }
+        }
+        return null;
+    }
+
     @Override
     public J visitProperty(FirProperty property, ExecutionContext ctx) {
         Space prefix = whitespace();
@@ -1628,6 +1654,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<J.Modifier> modifiers = emptyList();
         PsiElement currentNode = getCurrentPsiNode();
+        PsiElement propertyNode = (currentNode instanceof KtProperty) ? currentNode : PsiTreeUtil.getParentOfType(currentNode, KtProperty.class);
+
         if (currentNode instanceof KtAnnotationEntry) {
             currentNode = PsiTreeUtil.getParentOfType(currentNode, KtModifierList.class);
         }
@@ -1641,13 +1669,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             modifiers = mapModifierList((KtModifierList) currentNode, firAnnotations, annotations);
         }
 
-        String propertySource = property.getSource().getLighterASTNode().toString().trim();
-        if (propertySource.contains("val ") || propertySource.contains("var ")) {
-            if (property.isVal()) {
-                annotations.add(mapKModifierToAnnotation("val"));
-            } else if (property.isVar()) {
-                annotations.add(mapKModifierToAnnotation("var"));
-            }
+        String maybeValOrVarModifier = getValOrVarModifier(propertyNode);
+        if (maybeValOrVarModifier != null) {
+            annotations.add(mapKModifierToAnnotation(maybeValOrVarModifier));
         }
 
         J.VariableDeclarations receiver = null;
