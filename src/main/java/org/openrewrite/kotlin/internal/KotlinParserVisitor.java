@@ -1636,8 +1636,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         while (iterator.hasNext()) {
             PsiElement it = iterator.next();
             if (it instanceof LeafPsiElement &&
-                it.getNode().getElementType() instanceof KtKeywordToken
-            ) {
+                it.getNode().getElementType() instanceof KtKeywordToken) {
                 String keyword = ((KtKeywordToken) it.getNode().getElementType()).getValue();
                 if (keyword.equals("val") || keyword.equals("var")) {
                     return keyword;
@@ -1654,7 +1653,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<J.Modifier> modifiers = emptyList();
         PsiElement currentNode = getCurrentPsiNode();
-        PsiElement propertyNode = null;
+        PsiElement propertyNode;
         if ("<destruct>".equals(property.getName().toString())) {
             propertyNode = (currentNode instanceof KtDestructuringDeclaration) ? currentNode : PsiTreeUtil.getParentOfType(currentNode, KtDestructuringDeclaration.class);
         } else {
