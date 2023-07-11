@@ -56,7 +56,6 @@ import org.jetbrains.kotlin.modules.Module;
 import org.jetbrains.kotlin.modules.TargetId;
 import org.jetbrains.kotlin.platform.CommonPlatforms;
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms;
-import org.jetbrains.kotlin.psi.KtFile;
 import org.jetbrains.kotlin.utils.PathUtil;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
@@ -165,6 +164,7 @@ public class KotlinParser implements Parser {
             // https://github.com/openrewrite/rewrite-kotlin/issues/24
             return Stream.empty();
         }
+
         FirSession firSession = compilerCus.getFirSession();
         Stream<SourceFile> cus = compilerCus.getSources().stream()
                 .map(compiled -> {
@@ -186,7 +186,6 @@ public class KotlinParser implements Parser {
                         return ParseError.build(this, compiled.getInput(), relativeTo, ctx, t);
                     }
                 });
-
         Disposer.dispose(disposable);
         return cus;
     }
