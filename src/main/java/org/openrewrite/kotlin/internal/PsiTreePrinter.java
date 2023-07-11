@@ -17,12 +17,14 @@ package org.openrewrite.kotlin.internal;
 
 import org.jetbrains.kotlin.com.intellij.openapi.util.TextRange;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
 
 import java.util.*;
 
 public class PsiTreePrinter {
     private static final String TAB = "    ";
-    private static final String ELEMENT_PREFIX = "\\----";
+    private static final String ELEMENT_PREFIX = "\\---";
     private static final char BRANCH_CONTINUE_CHAR = '|';
     private static final char BRANCH_END_CHAR = '\\';
     private static final int CONTENT_MAX_LENGTH = 200;
@@ -33,11 +35,19 @@ public class PsiTreePrinter {
         outputLines = new ArrayList<>();
     }
 
-    public static String printPsiFileSkeleton(PsiElement psiElement) {
+    public static String print(PsiElement psiElement) {
+        return printPsiTree(psiElement);
+    }
+
+    public static String print(Parser.Input input) {
+        return printIndexedSourceCode(input.getSource(new InMemoryExecutionContext()).readFully());
+    }
+
+    public static String printPsiTreeSkeleton(PsiElement psiElement) {
         PsiTreePrinter treePrinter = new PsiTreePrinter();
         StringBuilder sb = new StringBuilder();
         sb.append("------------").append("\n");
-        sb.append("PSI Element Skeleton").append("\n");
+        sb.append("PSI Tree Skeleton").append("\n");
         Set<TextRange> covered =  new HashSet<>();
         collectCovered(psiElement, covered);
         treePrinter.printNode(psiElement, 1);
@@ -45,15 +55,53 @@ public class PsiTreePrinter {
         return sb.toString();
     }
 
-    public static String printPsiFileAll(PsiElement psiElement) {
+    public static String printPsiTree(PsiElement psiElement) {
         PsiTreePrinter treePrinter = new PsiTreePrinter();
         StringBuilder sb = new StringBuilder();
         sb.append("------------").append("\n");
-        sb.append("PSI Element All").append("\n");
+        sb.append("PSI Tree All").append("\n");
         Set<TextRange> covered =  new HashSet<>();
         collectCovered(psiElement, covered);
         treePrinter.printNode(psiElement, 1, covered, false);
         sb.append(String.join("\n", treePrinter.outputLines));
+        return sb.toString();
+    }
+
+    public static String printIndexedSourceCode(String sourceCode) {
+        int count = 0;
+        String[] lines = sourceCode.split("\n");
+        StringBuilder sb = new StringBuilder();
+        sb.append("------------").append("\n");
+        sb.append("Source code with index:").append("\n\n");
+        Queue<Integer> digits = new ArrayDeque<>();
+
+        for (String line : lines) {
+            StringBuilder spacesSb = new StringBuilder();
+            for (int i = 0; i < line.length(); i++) {
+                if (count % 10 == 0) {
+                    String numStr = Integer.toString(count);
+                    for (int j = 0; j < numStr.length(); j++) {
+                        char c = numStr.charAt(j);
+                        int digit = Character.getNumericValue(c);
+                        digits.add(digit);
+                    }
+                }
+
+                if (!digits.isEmpty()) {
+                    spacesSb.append(digits.poll()) ;
+                } else {
+                    spacesSb.append(" ");
+                }
+
+                count++;
+            }
+
+            sb.append(line)
+                .append("\n")
+                .append(spacesSb)
+                .append("\n");
+            count++;
+        }
         return sb.toString();
     }
 
@@ -83,8 +131,7 @@ public class PsiTreePrinter {
     private void printNode(PsiElement psiElement, int depth) {
         StringBuilder line = new StringBuilder();
         line.append(leftPadding(depth));
-        line.append(" ")
-            .append(psiElement.getTextRange())
+        line.append(psiElement.getTextRange())
             .append(" | ")
             .append(psiElement.getNode().getElementType())
             .append(" | ")
@@ -103,8 +150,7 @@ public class PsiTreePrinter {
     private void printNode(PsiElement psiElement, int depth, Set<TextRange> covered, boolean isExtendedNode) {
         StringBuilder line = new StringBuilder();
         line.append(leftPadding(depth));
-        line.append(" ")
-            .append(psiElement.getTextRange())
+        line.append(psiElement.getTextRange())
             .append(isExtendedNode ? " [E]" : "")
             .append(" | ")
             .append(psiElement.getNode().getElementType())
@@ -166,44 +212,6 @@ public class PsiTreePrinter {
         for (PsiTree.Node childNode : node.getChildNodes()) {
             printNode(childNode, depth + 1);
         }
-    }
-
-    public static String printIndexedSourceCode(String sourceCode) {
-        int count = 0;
-        String[] lines = sourceCode.split("\n");
-        StringBuilder sb = new StringBuilder();
-        sb.append("------------").append("\n");
-        sb.append("Source code with index:").append("\n\n");
-        Queue<Integer> digits = new ArrayDeque<>();
-
-        for (String line : lines) {
-            StringBuilder spacesSb = new StringBuilder();
-            for (int i = 0; i < line.length(); i++) {
-                if (count % 10 == 0) {
-                    String numStr = Integer.toString(count);
-                    for (int j = 0; j < numStr.length(); j++) {
-                        char c = numStr.charAt(j);
-                        int digit = Character.getNumericValue(c);
-                        digits.add(digit);
-                    }
-                }
-
-                if (!digits.isEmpty()) {
-                    spacesSb.append(digits.poll()) ;
-                } else {
-                    spacesSb.append(" ");
-                }
-
-                count++;
-            }
-
-            sb.append(line)
-                .append("\n")
-                .append(spacesSb)
-                .append("\n");
-            count++;
-        }
-        return sb.toString();
     }
 
     /**
