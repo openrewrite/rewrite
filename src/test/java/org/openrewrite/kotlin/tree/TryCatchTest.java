@@ -58,8 +58,8 @@ class TryCatchTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              val throwable: Throwable? = try {
-              } catch (caught: Throwable) {
+              val throwable : Throwable? = try {
+              } catch ( caught : Throwable ) {
                  caught
               } as? Throwable
               """

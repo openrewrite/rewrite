@@ -21,6 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
+@SuppressWarnings({"RedundantExplicitType", "KotlinConstantConditions", "ControlFlowWithEmptyBody", "CascadeIf", "LiftReturnOrAssignment"})
 class IfTest implements RewriteTest {
 
     @Test
@@ -97,11 +98,41 @@ class IfTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun method(n: Int): List<Int> {
-                  if (n == 0) return emptyList()
-                  if (n == 1) return listOf(1)
-                  val list = mutableListOf<Int>()
+              fun method ( n : Int ) : List < Int > {
+                  if ( n == 0 ) return emptyList ( )
+                  if ( n == 1 ) return listOf ( 1 )
+                  val list = mutableListOf < Int > ( )
                   return list
+              }
+              """
+          )
+        );
+    }
+
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/138")
+    @Test
+    void inParens() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method ( a : Any ) {
+                   val any = ( if ( a is Boolean ) "true" else "false" )
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/138")
+    @Test
+    void multipleDeSugaredParens() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method ( a : Any? ) {
+                  ( ( ( ( if ( ( ( a ) ) == ( ( null ) ) ) return ) ) ) )
+                  val r = a
               }
               """
           )

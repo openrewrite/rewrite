@@ -65,4 +65,19 @@ class MethodReferenceTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void conditionalFieldReference() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test ( val a : Int , val b : Int )
+              fun method ( ) {
+                  val l = listOf ( Test ( 42 , 24 ) )
+                  l . map { if ( true ) Test :: a else Test :: b }
+              }
+              """
+          )
+        );
+    }
 }

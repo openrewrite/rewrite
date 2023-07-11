@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-@SuppressWarnings({"RemoveEmptyClassBody", "RedundantVisibilityModifier"})
+@SuppressWarnings({"RemoveEmptyClassBody", "RedundantVisibilityModifier", "SortModifiers", "ClassName"})
 class ClassDeclarationTest implements RewriteTest {
 
     @Test
@@ -30,7 +30,7 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              package some.package.name
+              package some.other.name
               class A { }
               class B { }
               """
@@ -198,7 +198,7 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void explicitInlineConstructor() {
         rewriteRun(
-          kotlin("class Test internal constructor ()")
+          kotlin("class Test internal constructor ( )")
         );
     }
 
@@ -277,9 +277,9 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin(
             """
               sealed class InvalidField {
-                abstract val field: String
+                abstract val field : String
               }
-              data class InvalidEmail( val errors : List<String> ) : InvalidField ( ) {
+              data class InvalidEmail ( val errors : List < String > ) : InvalidField ( ) {
                 override val field : String = "email"
               }
               """
@@ -296,7 +296,7 @@ class ClassDeclarationTest implements RewriteTest {
               sealed interface InvalidField {
                 val field : String
               }
-              data class InvalidEmail( val errors : List<String> ) : InvalidField {
+              data class InvalidEmail ( val errors : List < String > ) : InvalidField {
                 override val field : String = "email"
               }
               """
@@ -327,7 +327,7 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin("""
             class Test {
                 init {
-                    println( "Hello, world!" )
+                    println ( "Hello, world!" )
                 }
             }
             """)
@@ -373,9 +373,9 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              abstract class Test(arg: Test.() -> Unit = {}) {
+              abstract class Test ( arg : Test . ( ) -> Unit = { } ) {
                   init {
-                      arg()
+                      arg ( )
                   }
               }
               """
@@ -389,7 +389,7 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin(
             """
               @Repeatable
-              annotation class A (val s : String )
+              annotation class A ( val s : String )
               """
           ),
           kotlin(

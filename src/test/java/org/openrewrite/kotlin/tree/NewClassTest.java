@@ -25,7 +25,7 @@ class NewClassTest implements RewriteTest {
     @Test
     void multipleParameters() {
         rewriteRun(
-          kotlin("class Test(val a: Int, val b: Int)"),
+          kotlin("class Test ( val a : Int , val b : Int )"),
           kotlin("val t = Test ( 1 , 2 )")
         );
     }
@@ -87,6 +87,14 @@ class NewClassTest implements RewriteTest {
               val type : a . b . Test . Inner = a . b . Test . Inner ( )
               """
           )
+        );
+    }
+
+    @Test
+    void conditionalConstructorArg() {
+        rewriteRun(
+          kotlin("class Test ( val a : Int )"),
+          kotlin("val t = Test ( if ( true ) 4 else 2 )")
         );
     }
 }

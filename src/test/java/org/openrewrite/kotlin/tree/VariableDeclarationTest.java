@@ -16,11 +16,13 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
+@SuppressWarnings({"UnusedReceiverParameter", "PropertyName", "RemoveCurlyBracesFromTemplate", "UnnecessaryStringEscape", "RedundantGetter"})
 class VariableDeclarationTest implements RewriteTest {
 
     @Test
@@ -103,7 +105,7 @@ class VariableDeclarationTest implements RewriteTest {
               val a = "Hello"
               val b = "World"
               val c = "${a} ${b}!"
-                          
+              
               val after = 0
               """
           )
@@ -118,13 +120,15 @@ class VariableDeclarationTest implements RewriteTest {
               val a = "Hello"
               val b = "World"
               val c = "$a $b!"
-                          
+              
               val after = 0
               """
           )
         );
     }
 
+    @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/172")
     @Test
     void propertyAccessor() {
         rewriteRun(
@@ -134,14 +138,16 @@ class VariableDeclarationTest implements RewriteTest {
                   val value = 10
               }
               val a = Test ( )
-              val b = "${a.value}"
-                          
+              val b = " ${ a . value }"
+              
               val after = 0
               """
           )
         );
     }
 
+    @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/172")
     @Test
     void multipleFieldAccess() {
         rewriteRun(
@@ -153,9 +159,9 @@ class VariableDeclarationTest implements RewriteTest {
                       val innerValue = 10
                   }
               }
-                          
+              
               val a = Test ( )
-              val b = "${a.testValue.innerValue}"
+              val b = "${ a . testValue . innerValue }"
               """
           )
         );
@@ -192,7 +198,7 @@ class VariableDeclarationTest implements RewriteTest {
           kotlin(
             """
               package org.foo
-              class Test<T>
+              class Test < T >
               """
           ),
           kotlin(
@@ -251,7 +257,7 @@ class VariableDeclarationTest implements RewriteTest {
             """
               val first : String = "1"
               val second : Int = 2
-                         
+              
               val l = listOf ( "foo" to first , "bar" to second )
               """
           )
@@ -264,7 +270,7 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              val t = SomeInput.Test
+              val t = SomeInput . Test
               """
           )
         );
@@ -277,14 +283,14 @@ class VariableDeclarationTest implements RewriteTest {
           kotlin(
             """
               class StringValue {
-                  val value: String = ""
+                  val value : String = ""
               }
               """
           ),
           kotlin(
             """
-              fun method(input : Any) {
-                  val split = (input as StringValue).value.split("-").toTypedArray()
+              fun method ( input : Any ) {
+                  val split = ( input as StringValue ) . value . split ( "-" ) . toTypedArray ( )
               }
               """
           )
@@ -320,13 +326,14 @@ class VariableDeclarationTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("RedundantSetter")
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/93")
     @Test
     void setter() {
         rewriteRun(
           kotlin(
             """
-              var s: String = ""
+              var s : String = ""
                   set ( value ) {
                       field = value
                   }
