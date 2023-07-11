@@ -54,6 +54,7 @@ public class UsesMethod<P> extends JavaIsoVisitor<P> {
                     return SearchResult.found(cu);
                 }
             }
+            return (J) tree;
         }
         return super.visit(tree, p);
     }
