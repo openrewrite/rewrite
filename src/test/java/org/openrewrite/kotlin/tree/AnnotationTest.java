@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -149,4 +150,21 @@ class AnnotationTest implements RewriteTest {
         );
     }
 
+    @Disabled("FirValueParameter is supposed to have FirAnnotation somewhere but didn't find it")
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/173")
+    @Test
+    void constructorParameterWithAnnotation() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Ann
+              class Example(
+                  @get : Ann
+                  val bar : String
+                  ) {
+              }
+              """
+          )
+        );
+    }
 }
