@@ -21,6 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
+@SuppressWarnings("RedundantVisibilityModifier")
 class AnnotationTest implements RewriteTest {
 
     @Test
@@ -98,4 +99,54 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/156")
+    @Test
+    void annotationUseSiteTargetAnnotationOnly() {
+        rewriteRun(
+          kotlin(
+            """
+              @Repeatable
+              annotation class A (val s : String)
+              class TestA {
+                  @get : A("1")
+                  @set : A("2")
+                  var name: String = ""
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/156")
+    @Test
+    void annotationUseSiteTarget() {
+        rewriteRun(
+          kotlin("""
+              @Repeatable
+              annotation class A (val s : String)
+          """),
+          kotlin(
+            """
+              class TestA {
+                  @get : A("1")
+                  public
+                  @set : A("2")
+                  var name: String = ""
+              }
+              """
+          ),
+          kotlin(
+            """
+              class TestB {
+                  public
+                  @get : A("1")
+                  @set : A("2")
+                  var name: String = ""
+              }
+              """
+          )
+        );
+    }
+
 }

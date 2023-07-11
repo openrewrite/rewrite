@@ -813,11 +813,12 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
             beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
             visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
-            visit(multiVariable.getLeadingAnnotations(), p);
+
             for (J.Modifier m : multiVariable.getModifiers()) {
                 visitModifier(m, p);
             }
 
+            visit(multiVariable.getLeadingAnnotations(), p);
             boolean containsTypeReceiver = multiVariable.getMarkers().findFirst(ReceiverType.class).isPresent();
             // This may be changed after K.VariableDeclaration is added and getters and setters exist on the model.
             // The implicit receiver should be added to the first position of the methods.

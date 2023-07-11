@@ -644,6 +644,45 @@ public interface K extends J {
         }
     }
 
+//    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+//    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+//    @Data
+//    final class AnnotationCallSite implements K, Statement {
+//
+//        @With
+//        @EqualsAndHashCode.Include
+//        UUID id;
+//
+//        @With
+//        Space prefix;
+//
+//        @With
+//        Markers markers;
+//
+//        @With
+//        @Nullable
+//        JRightPadded<J.Identifier> name;
+//
+//        @With
+//        J.Annotation annotation;
+//
+//        @Override
+//        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+//            return v.visitAnnotationCallSite(this, p);
+//        }
+//
+//        @Override
+//        @Transient
+//        public CoordinateBuilder.Statement getCoordinates() {
+//            return new CoordinateBuilder.Statement(this);
+//        }
+//
+//        @Override
+//        public String toString() {
+//            return withPrefix(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
+//        }
+//    }
+
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
