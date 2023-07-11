@@ -1623,7 +1623,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     /**
-     * Check whether the giving property AST Node has `val` or `var` modifier.
+     * Check whether the giving property (include destructing) AST Node has `val` or `var` modifier.
      * @param propertyNode the property AST Node to check
      * @return `val` or `var` if the property node has `val` or `var` modifier. otherwise return null.
      */
@@ -1654,10 +1654,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<J.Modifier> modifiers = emptyList();
         PsiElement currentNode = getCurrentPsiNode();
-        PsiElement propertyNode = (currentNode instanceof KtProperty) ? currentNode : PsiTreeUtil.getParentOfType(currentNode, KtProperty.class);
-        property.getName();
+        PsiElement propertyNode = null;
         if ("<destruct>".equals(property.getName().toString())) {
             propertyNode = (currentNode instanceof KtDestructuringDeclaration) ? currentNode : PsiTreeUtil.getParentOfType(currentNode, KtDestructuringDeclaration.class);
+        } else {
+            propertyNode = (currentNode instanceof KtProperty) ? currentNode : PsiTreeUtil.getParentOfType(currentNode, KtProperty.class);
         }
 
         if (currentNode instanceof KtAnnotationEntry) {
