@@ -53,15 +53,16 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
 
     @Option(displayName = "Existing file strategy",
             description = "Determines behavior if a file exists at this location prior to Rewrite execution.\n\n"
-                          + "- `continue`: append new content to existing file contents. If existing file is not plaintext, recipe does nothing.\n"
-                          + "- `replace`: remove existing content from file.\n"
-                          + "- `leave`: *(default)* do nothing. Existing file is fully preserved.\n\n"
+                          + "- `Continue`: append new content to existing file contents. If existing file is not plaintext, recipe does nothing.\n"
+                          + "- `Replace`: remove existing content from file.\n"
+                          + "- `Leave`: *(default)* do nothing. Existing file is fully preserved.\n\n"
                           + "Note: this only affects the first interaction with the specified file per Rewrite execution.\n"
                           + "Subsequent instances of this recipe in the same Rewrite execution will always append.",
-            valid = {"continue", "replace", "leave"},
+            valid = {"Continue", "Replace", "Leave"},
             required = false)
     @Nullable Strategy existingFileStrategy;
-    public enum Strategy { CONTINUE, REPLACE, LEAVE }
+
+    public enum Strategy {Continue, Replace, Leave}
 
     @Override
     public String getDisplayName() {
@@ -104,9 +105,9 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
         String preamble = this.preamble != null ? this.preamble + maybeNewline : "";
 
         boolean exists = fileExists.get();
-        if(!exists) {
+        if (!exists) {
             for (SourceFile generated : generatedInThisCycle) {
-                if(generated.getSourcePath().toString().equals(Paths.get(relativeFileName).toString())) {
+                if (generated.getSourcePath().toString().equals(Paths.get(relativeFileName).toString())) {
                     exists = true;
                     break;
                 }
@@ -133,13 +134,13 @@ public class AppendToTextFile extends ScanningRecipe<AtomicBoolean> {
                     String preamble = AppendToTextFile.this.preamble != null ? AppendToTextFile.this.preamble + maybeNewline : "";
 
                     PlainText existingPlainText = (PlainText) sourceFile;
-                    switch (existingFileStrategy != null ? existingFileStrategy : Strategy.LEAVE) {
-                        case CONTINUE:
-                            if(!maybeNewline.isEmpty() && !existingPlainText.getText().endsWith(maybeNewline)) {
+                    switch (existingFileStrategy != null ? existingFileStrategy : Strategy.Leave) {
+                        case Continue:
+                            if (!maybeNewline.isEmpty() && !existingPlainText.getText().endsWith(maybeNewline)) {
                                 content = maybeNewline + content;
                             }
                             return existingPlainText.withText(existingPlainText.getText() + content);
-                        case REPLACE:
+                        case Replace:
                             return existingPlainText.withText(preamble + content);
                     }
                 }
