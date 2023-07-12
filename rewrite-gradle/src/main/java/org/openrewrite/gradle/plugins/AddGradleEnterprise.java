@@ -94,8 +94,8 @@ public class AddGradleEnterprise extends Recipe {
                     "When set to `failure` the plugin will only publish build scans when the build fails. " +
                     "When omitted scans will be published only when the `--scan` option is passed to the build.",
             required = false,
-            valid = {"always", "failure"},
-            example = "always")
+            valid = {"Always", "Failure"},
+            example = "Always")
     @Nullable
     PublishCriteria publishCriteria;
 
