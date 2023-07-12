@@ -57,11 +57,11 @@ public class Find extends Recipe {
     @Nullable
     Boolean regex;
 
-    @Option(displayName = "Case Insensitive",
-            description = "If `true` the search will be insensitive to case. Default `false`.",
+    @Option(displayName = "Case sensitive",
+            description = "If `true` the search will be sensitive to case. Default `false`.",
             required = false)
     @Nullable
-    Boolean caseInsensitive;
+    Boolean caseSensitive;
 
     @Option(displayName = "Regex Multiline Mode",
             description = "When performing a regex search setting this to `true` allows \"^\" and \"$\" to match the beginning and end of lines, respectively. " +
@@ -101,7 +101,7 @@ public class Find extends Recipe {
                     searchStr = Pattern.quote(searchStr);
                 }
                 int patternOptions = 0;
-                if(Boolean.TRUE.equals(caseInsensitive)) {
+                if(!Boolean.TRUE.equals(caseSensitive)) {
                     patternOptions |= Pattern.CASE_INSENSITIVE;
                 }
                 if(Boolean.TRUE.equals(multiline)) {
