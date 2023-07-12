@@ -781,7 +781,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             beforeSyntax(typeParam, Space.Location.TYPE_PARAMETERS_PREFIX, p);
             visit(typeParam.getAnnotations(), p);
             visit(typeParam.getName(), p);
-            visitContainer(":", typeParam.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, "&", "", p);
+            Implicit implicit = typeParam.getMarkers().findFirst(Implicit.class).orElse(null);
+            visitContainer(implicit == null ? ":" : "", typeParam.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, "&", "", p);
             afterSyntax(typeParam, p);
             return typeParam;
         }

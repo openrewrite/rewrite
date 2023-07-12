@@ -57,4 +57,18 @@ class EnumTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void semiColon() {
+        rewriteRun(
+          kotlin(
+            """
+              enum class A {
+                  B , C ,
+                  D ;
+              }
+              """
+          )
+        );
+    }
 }
