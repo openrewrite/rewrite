@@ -306,6 +306,9 @@ public class YamlParser implements org.openrewrite.Parser {
 
                         AliasEvent alias = (AliasEvent) event;
                         Yaml.Anchor anchor = anchors.get(alias.getAnchor());
+                        if (anchor == null) {
+                            throw new UnsupportedOperationException("Unknown anchor: " + alias.getAnchor());
+                        }
                         BlockBuilder builder = blockStack.peek();
                         builder.push(new Yaml.Alias(randomId(), fmt, Markers.EMPTY, anchor));
                         lastEnd = event.getEndMark().getIndex();
