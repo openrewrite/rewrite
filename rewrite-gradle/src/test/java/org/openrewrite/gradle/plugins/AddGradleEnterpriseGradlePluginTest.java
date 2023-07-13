@@ -33,12 +33,12 @@ import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.test.SourceSpecs.dir;
 
-class AddGradleEnterpriseTest implements RewriteTest {
+class AddGradleEnterpriseGradlePluginTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-                .recipe(new AddGradleEnterprise("3.x", null, null, null, null, null));
+                .recipe(new AddGradleEnterpriseGradlePlugin("3.x", null, null, null, null, null));
     }
 
     private static Consumer<SourceSpec<CompilationUnit>> interpolateResolvedVersion(@Language("groovy") String after) {
@@ -174,7 +174,7 @@ class AddGradleEnterpriseTest implements RewriteTest {
     void withConfigurationInSettings() {
         rewriteRun(
           spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
-            .recipe(new AddGradleEnterprise("3.x", "https://ge.sam.com/", true, true, true, AddGradleEnterprise.PublishCriteria.Always)),
+            .recipe(new AddGradleEnterpriseGradlePlugin("3.x", "https://ge.sam.com/", true, true, true, AddGradleEnterpriseGradlePlugin.PublishCriteria.Always)),
           buildGradle(
             ""
           ),
@@ -206,7 +206,7 @@ class AddGradleEnterpriseTest implements RewriteTest {
     void withConfigurationOldInputCapture() {
         rewriteRun(
           spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
-            .recipe(new AddGradleEnterprise("3.6", null, null, true, null, null)),
+            .recipe(new AddGradleEnterpriseGradlePlugin("3.6", null, null, true, null, null)),
           buildGradle(
             ""
           ),

@@ -67,9 +67,9 @@ public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleE
                                                                         "  <artifactId>gradle-enterprise-maven-extension</artifactId>\n" +
                                                                         "</extension>";
 
-    @Option(displayName = "Plugin version",
-            description = "An exact version number or node-style semver selector used to select the gradle-enterprise-maven-extension version.",
-            example = "1.x")
+    @Option(displayName = "Extension version",
+            description = "A maven-compatible version number to select the gradle-enterprise-maven-extension version.",
+            example = "1.17.4")
     @Nullable
     String version;
 
@@ -79,8 +79,8 @@ public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleE
     String server;
 
     @Option(displayName = "Allow untrusted server",
-            description = "When set to `true` the plugin will be configured to allow unencrypted http connections with the server. " +
-                          "If set to `false` or omitted, the plugin will refuse to communicate without transport layer security enabled.",
+            description = "When set to `true` the extension will be configured to allow unencrypted http connections with the server. " +
+                          "If set to `false` or omitted, the extension will refuse to communicate without transport layer security enabled.",
             required = false,
             example = "true")
     @Nullable
@@ -127,12 +127,12 @@ public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleE
 
     @Override
     public String getDisplayName() {
-        return "Add Gradle Enterprise Maven Extension to maven projects";
+        return "Add Gradle Enterprise Maven extension to maven projects";
     }
 
     @Override
     public String getDescription() {
-        return "To integrate gradle enterprise maven extension into maven projects, ensure that the " +
+        return "To integrate Gradle Enterprise Maven extension into maven projects, ensure that the " +
                "`gradle-enterprise-maven-extension` is added to the `.mvn/extensions.xml` file if not already present. " +
                "Additionally, configure the extension by adding the `.mvn/gradle-enterprise.xml` configuration file.";
     }
