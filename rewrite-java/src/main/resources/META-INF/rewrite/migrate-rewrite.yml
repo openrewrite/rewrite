@@ -375,3 +375,6 @@ recipeList:
   - org.openrewrite.java.recipes.UpdateMovedRecipe:
       oldRecipeFullyQualifiedClassName: org.openrewrite.java.cleanup.WriteOctalValuesAsDecimal
       newRecipeFullyQualifiedClassName: org.openrewrite.staticanalysis.WriteOctalValuesAsDecimal
+  - org.openrewrite.java.recipes.UpdateMovedRecipe:
+      oldRecipeFullyQualifiedClassName: org.openrewrite.gradle.plugins.AddGradleEnterprise
+      newRecipeFullyQualifiedClassName: org.openrewrite.gradle.plugins.AddGradleEnterpriseGradlePlugin
