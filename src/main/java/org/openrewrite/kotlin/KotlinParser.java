@@ -135,7 +135,7 @@ public class KotlinParser implements Parser {
                             String pkg = packageMatcher.find() ? packageMatcher.group(1).replace('.', '/') + "/" : "";
 
                             String className = Optional.ofNullable(simpleName.apply(sourceFile))
-                                    .orElse(Long.toString(System.nanoTime())) + ".kt";
+                                                       .orElse(Long.toString(System.nanoTime())) + ".kt";
 
                             Path path = Paths.get(pkg + className);
                             return new Input(
@@ -166,28 +166,34 @@ public class KotlinParser implements Parser {
         }
 
         FirSession firSession = compilerCus.getFirSession();
-        Stream<SourceFile> cus = compilerCus.getSources().stream()
-                .map(compiled -> {
-                    try {
-                        KotlinParserVisitor mappingVisitor = new KotlinParserVisitor(
-                                compiled,
-                                relativeTo,
-                                styles,
-                                typeCache,
-                                firSession,
-                                ctx
-                        );
+        return Stream.concat(
+                        compilerCus.getSources().stream()
+                                .map(compiled -> {
+                                    try {
+                                        KotlinParserVisitor mappingVisitor = new KotlinParserVisitor(
+                                                compiled,
+                                                relativeTo,
+                                                styles,
+                                                typeCache,
+                                                firSession,
+                                                ctx
+                                        );
 
-                        SourceFile kcu = (SourceFile) mappingVisitor.visitFile(compiled.getFirFile(), new InMemoryExecutionContext());
-                        parsingListener.parsed(compiled.getInput(), kcu);
-                        return kcu;
-                    } catch (Throwable t) {
-                        ctx.getOnError().accept(t);
-                        return ParseError.build(this, compiled.getInput(), relativeTo, ctx, t);
-                    }
-                });
-        Disposer.dispose(disposable);
-        return cus;
+                                        SourceFile kcu = (SourceFile) mappingVisitor.visitFile(compiled.getFirFile(), new InMemoryExecutionContext());
+                                        parsingListener.parsed(compiled.getInput(), kcu);
+                                        return kcu;
+                                    } catch (Throwable t) {
+                                        ctx.getOnError().accept(t);
+                                        return ParseError.build(this, compiled.getInput(), relativeTo, ctx, t);
+                                    }
+                                }),
+                        Stream.generate(() -> {
+                                    // The disposable should be disposed of exactly once after all sources have been parsed
+                                    Disposer.dispose(disposable);
+                                    return (SourceFile) null;
+                                })
+                                .limit(1))
+                .filter(Objects::nonNull);
     }
 
     @Override
