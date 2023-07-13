@@ -49,7 +49,7 @@ import static org.openrewrite.gradle.plugins.AddPluginVisitor.resolvePluginVersi
 @Value
 @EqualsAndHashCode(callSuper = true)
 @Incubating(since = "7.33.0")
-public class AddGradleEnterprise extends Recipe {
+public class AddGradleEnterpriseGradlePlugin extends Recipe {
     @EqualsAndHashCode.Exclude
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
@@ -106,12 +106,12 @@ public class AddGradleEnterprise extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Add the Gradle Enterprise plugin";
+        return "Add the Gradle Enterprise Gradle plugin";
     }
 
     @Override
     public String getDescription() {
-        return "Add the Gradle Enterprise plugin to settings.gradle files.";
+        return "Add the Gradle Enterprise Gradle plugin to settings.gradle files.";
     }
 
     @Override
