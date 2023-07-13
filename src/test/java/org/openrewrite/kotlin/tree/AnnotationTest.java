@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -150,7 +149,6 @@ class AnnotationTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("FirValueParameter is supposed to have FirAnnotation somewhere but didn't find it")
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/173")
     @Test
     void constructorParameterWithAnnotation() {
@@ -163,6 +161,19 @@ class AnnotationTest implements RewriteTest {
                   val bar : String
                   ) {
               }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/173")
+    @Test
+    void getUseSiteOnConstructorParams() {
+        rewriteRun(
+          kotlin("@Repeatable annotation class A"),
+          kotlin(
+            """
+              class Example( @get : A @set : A var foo: String, @get : A val bar: String)
               """
           )
         );

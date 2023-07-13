@@ -17,6 +17,7 @@ package org.openrewrite.kotlin.internal;
 
 import org.jetbrains.kotlin.*;
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
+import org.jetbrains.kotlin.com.intellij.openapi.util.TextRange;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.tree.LeafPsiElement;
 import org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil;
@@ -90,6 +91,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private int cursor;
 
     private final Map<Integer, ASTNode> nodes;
+    private final Map<TextRange, FirProperty> generatedFirProperties;
 
     // Associate top-level function and property declarations to the file.
     @Nullable
@@ -107,11 +109,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         this.ctx = ctx;
         this.firSession = firSession;
         this.nodes = kotlinSource.getNodes();
+        this.generatedFirProperties = new HashMap<>();
     }
 
     @Override
     public J visitFile(FirFile file, ExecutionContext ctx) {
         currentFile = file;
+        generatedFirProperties.clear();
 
         List<J.Annotation> annotations = null;
 
@@ -2727,11 +2731,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitValueParameter(FirValueParameter valueParameter, ExecutionContext ctx) {
         Space prefix = whitespace();
-
-        List<J> modifiers = emptyList();
         Markers markers = Markers.EMPTY;
 
-        List<J.Annotation> annotations = mapModifiers(valueParameter.getAnnotations(), valueParameter.getName().asString());
+        TextRange range = new TextRange(valueParameter.getSource().getStartOffset(), valueParameter.getSource().getEndOffset());
+        List<FirAnnotation> firAnnotations = valueParameter.getAnnotations();
+        if (generatedFirProperties.containsKey(range)) {
+            FirProperty generatedFirProperty = generatedFirProperties.get(range);
+            firAnnotations.addAll(generatedFirProperty.getGetter() != null ? generatedFirProperty.getGetter().getAnnotations() : emptyList());
+            firAnnotations.addAll(generatedFirProperty.getSetter() != null ? generatedFirProperty.getSetter().getAnnotations() : emptyList());
+        }
+
+        List<J.Annotation> annotations = mapModifiers(firAnnotations, valueParameter.getName().asString());
 
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1); // adjust size if necessary
         Space namePrefix = EMPTY;
@@ -3451,6 +3461,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 jcEnums.add(declaration);
             } else if (declaration instanceof FirPrimaryConstructor) {
                 firPrimaryConstructor = (FirPrimaryConstructor) declaration;
+            } else if (declaration instanceof FirProperty &&
+                       declaration.getSource() != null &&
+                       declaration.getSource().getKind() instanceof KtFakeSourceElementKind.PropertyFromParameter) {
+                TextRange range = new TextRange(declaration.getSource().getStartOffset(), declaration.getSource().getEndOffset());
+                generatedFirProperties.put(range, (FirProperty) declaration);
             } else {
                 // We aren't interested in the generated values.
                 if (ClassKind.ENUM_CLASS == classKind && declaration.getSource() != null &&
