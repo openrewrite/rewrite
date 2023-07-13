@@ -1640,15 +1640,19 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<J.Modifier> modifiers = emptyList();
         PsiElement currentNode = getCurrentPsiNode();
-        PsiElement propertyNode;
-        if ("<destruct>".equals(property.getName().toString())) {
-            propertyNode = (currentNode instanceof KtDestructuringDeclaration) ? currentNode : PsiTreeUtil.getParentOfType(currentNode, KtDestructuringDeclaration.class);
-        } else {
-            propertyNode = (currentNode instanceof KtProperty) ? currentNode : PsiTreeUtil.getParentOfType(currentNode, KtProperty.class);
-        }
-
         if (currentNode instanceof KtAnnotationEntry) {
             currentNode = PsiTreeUtil.getParentOfType(currentNode, KtModifierList.class);
+        }
+
+        PsiElement parentNode = currentNode;
+        if (currentNode != null &&
+            !(currentNode instanceof KtProperty) &&
+            !(currentNode instanceof KtDestructuringDeclaration) &&
+            !(currentNode instanceof KtParameter)) {
+            parentNode = currentNode.getParent();
+            if (parentNode == null || parentNode.getTextRange().getStartOffset() != currentNode.getTextRange().getStartOffset()) {
+                parentNode = currentNode;
+            }
         }
 
         List<J.Annotation> annotations = new ArrayList<>();
@@ -1660,7 +1664,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             modifiers = mapModifierList((KtModifierList) currentNode, firAnnotations, annotations);
         }
 
-        String maybeValOrVarModifier = getValOrVarModifier(propertyNode);
+        String maybeValOrVarModifier = getValOrVarModifier(parentNode);
         if (maybeValOrVarModifier != null) {
             annotations.add(mapKModifierToAnnotation(maybeValOrVarModifier));
         }
