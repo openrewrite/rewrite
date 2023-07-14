@@ -1531,7 +1531,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         String packageName = firImport.getImportedFqName() == null ? "" : firImport.isAllUnder() ?
                 firImport.getImportedFqName().asString() + ".*" :
                 firImport.getImportedFqName().asString();
-        J.FieldAccess qualid = TypeTree.build(packageName).withPrefix(space);
+        J.FieldAccess qualid = packageName.contains(".") ? TypeTree.build(packageName).withPrefix(space) :
+                // Kotlin allows methods to be imported directly, so we need to create a fake field access to fit into J.Import.
+                new J.FieldAccess(
+                        randomId(),
+                        EMPTY,
+                        Markers.EMPTY,
+                        new J.Empty(randomId(), EMPTY, Markers.EMPTY),
+                        padLeft(EMPTY, createIdentifier(packageName).withPrefix(space)),
+                        null);
+
         skip(qualid.toString());
         JLeftPadded<J.Identifier> alias = null;
         if (firImport.getAliasName() != null) {

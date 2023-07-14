@@ -485,7 +485,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 }
                 visit(qualid.getName(), p);
             } else {
-                visit(import_.getQualid(), p);
+                if (import_.getQualid().getTarget() instanceof J.Empty) {
+                    visit(import_.getQualid().getName(), p);
+                } else {
+                    visit(import_.getQualid(), p);
+                }
             }
             JLeftPadded<J.Identifier> alias = import_.getPadding().getAlias();
             if(alias != null) {

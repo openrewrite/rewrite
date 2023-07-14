@@ -16,10 +16,12 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
+@SuppressWarnings("UnusedReceiverParameter")
 class ImportTest implements RewriteTest {
 
     @Test
@@ -62,6 +64,15 @@ class ImportTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/158")
+    @Test
+    void methodName() {
+        rewriteRun(
+          kotlin("fun <T : Any> Class<T>.createInstance() {}"),
+          kotlin("import createInstance")
         );
     }
 
