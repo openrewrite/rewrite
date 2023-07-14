@@ -17,6 +17,7 @@ package org.openrewrite.kotlin.internal;
 
 import org.jetbrains.kotlin.com.intellij.openapi.util.TextRange;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
+import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 
@@ -50,7 +51,7 @@ public class PsiTreePrinter {
         sb.append("PSI Tree Skeleton").append("\n");
         Set<TextRange> covered =  new HashSet<>();
         collectCovered(psiElement, covered);
-        treePrinter.printNode(psiElement, 1);
+        treePrinter.printSkeletonNode(psiElement, 1);
         sb.append(String.join("\n", treePrinter.outputLines));
         return sb.toString();
     }
@@ -60,9 +61,7 @@ public class PsiTreePrinter {
         StringBuilder sb = new StringBuilder();
         sb.append("------------").append("\n");
         sb.append("PSI Tree All").append("\n");
-        Set<TextRange> covered =  new HashSet<>();
-        collectCovered(psiElement, covered);
-        treePrinter.printNode(psiElement, 1, covered, false);
+        treePrinter.printNode(psiElement, 1);
         sb.append(String.join("\n", treePrinter.outputLines));
         return sb.toString();
     }
@@ -128,65 +127,43 @@ public class PsiTreePrinter {
         return sb.toString();
     }
 
-    private void printNode(PsiElement psiElement, int depth) {
-        StringBuilder line = new StringBuilder();
-        line.append(leftPadding(depth));
-        line.append(psiElement.getTextRange())
+    private String toString(PsiElement psiElement) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(psiElement.getTextRange())
             .append(" | ")
             .append(psiElement.getNode().getElementType())
             .append(" | ")
             .append(psiElement.getClass().getSimpleName())
             .append(" | Text: \"")
-            .append(truncate(psiElement.getText()).replace("\n", "\\n"))
+            .append(truncate(psiElement.getText()).replace("\n", "\\n").replace("\r", "\\r"))
             .append("\"");
+        return sb.toString();
+    }
+
+    private void printSkeletonNode(PsiElement psiElement, int depth) {
+        StringBuilder line = new StringBuilder();
+        line.append(leftPadding(depth))
+            .append(toString(psiElement));
         connectToLatestSibling(depth);
         outputLines.add(line);
 
         for (PsiElement childNode : psiElement.getChildren()) {
-            printNode(childNode, depth + 1);
+            printSkeletonNode(childNode, depth + 1);
         }
     }
 
-    private void printNode(PsiElement psiElement, int depth, Set<TextRange> covered, boolean isExtendedNode) {
+    private void printNode(PsiElement psiElement, int depth) {
         StringBuilder line = new StringBuilder();
-        line.append(leftPadding(depth));
-        line.append(psiElement.getTextRange())
-            .append(isExtendedNode ? " [E]" : "")
-            .append(" | ")
-            .append(psiElement.getNode().getElementType())
-            .append(" | ")
-            .append(psiElement.getClass().getSimpleName())
-            .append(" | Text: \"")
-            .append(truncate(psiElement.getText()).replace("\n", "\\n"))
-            .append("\"");
+        line.append(leftPadding(depth))
+            .append(toString(psiElement));
         connectToLatestSibling(depth);
         outputLines.add(line);
 
-        for (PsiElement childNode : psiElement.getChildren()) {
-            List<PsiElement> preSiblings = new ArrayList<>();
-            PsiElement prevSibling = childNode.getPrevSibling();
-            while (prevSibling != null && covered.add(prevSibling.getTextRange())) {
-                preSiblings.add(prevSibling);
-                prevSibling = prevSibling.getPrevSibling();
-            }
-            Collections.reverse(preSiblings);
-
-            for (PsiElement p : preSiblings) {
-                printNode(p, depth + 1, covered, true);
-            }
-
-            printNode(childNode, depth + 1, covered, false);
-
-            List<PsiElement> nextSiblings = new ArrayList<>();
-            PsiElement nextSibling = childNode.getNextSibling();
-            while (nextSibling != null && covered.add(nextSibling.getTextRange())) {
-                nextSiblings.add(nextSibling);
-                nextSibling = nextSibling.getNextSibling();
-            }
-
-            for (PsiElement n : nextSiblings) {
-                printNode(n, depth + 1, covered, true);
-            }
+        PsiUtilsKt.getAllChildren(psiElement);
+        Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(psiElement).iterator();
+        while (iterator.hasNext()) {
+            PsiElement it = iterator.next();
+            printNode(it, depth + 1);
         }
     }
 
