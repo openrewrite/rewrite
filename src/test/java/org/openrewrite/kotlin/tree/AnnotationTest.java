@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -236,4 +237,33 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Disabled
+    @Test
+    void receiverAnnotationUseSiteTarget() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Ann
+              fun @receiver : Ann String.myExtension() { }
+              """
+          )
+        );
+    }
+
+    @Test
+    void setParamAnnotationUseSiteTarget() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class A
+              class Example {
+                  @setparam : A
+                  var name: String = ""
+              }
+              """
+          )
+        );
+    }
+
 }

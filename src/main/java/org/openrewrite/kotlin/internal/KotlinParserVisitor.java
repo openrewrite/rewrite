@@ -239,6 +239,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         } else if (annotationCall.getUseSiteTarget() == AnnotationUseSiteTarget.FIELD) {
             skip("field");
             markers = markers.addIfAbsent(new AnnotationCallSite(randomId(), "field", sourceBefore(":")));
+        } else if (annotationCall.getUseSiteTarget() == AnnotationUseSiteTarget.SETTER_PARAMETER) {
+            skip("setparam");
+            markers = markers.addIfAbsent(new AnnotationCallSite(randomId(), "setparam", sourceBefore(":")));
         }
 
         J.Identifier name = (J.Identifier) visitElement(annotationCall.getCalleeReference(), ctx);
@@ -1666,11 +1669,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<J.Annotation> annotations = new ArrayList<>();
         if (currentNode instanceof KtModifierList) {
-            List<FirAnnotation> firAnnotations = new ArrayList<>(property.getAnnotations().size());
-            firAnnotations.addAll(property.getAnnotations());
-            firAnnotations.addAll(property.getGetter() != null ? property.getGetter().getAnnotations() : emptyList());
-            firAnnotations.addAll(property.getSetter() != null ? property.getSetter().getAnnotations() : emptyList());
-            modifiers = mapModifierList((KtModifierList) currentNode, firAnnotations, annotations);
+            modifiers = mapModifierList((KtModifierList) currentNode, collectFirAnnotations(property), annotations);
         }
 
         String maybeValOrVarModifier = getValOrVarModifier(parentNode);
@@ -1840,18 +1839,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     boolean hasAnnotationBeforeAccessors = maybeModifier.isPresent();
                     List<J.Annotation> annos = new ArrayList<>();
                     if (hasAnnotationBeforeAccessors) {
-                        List<FirAnnotation> firAnnotations = new ArrayList<>(property.getAnnotations().size() +
-                                (property.getGetter() != null ? property.getGetter().getAnnotations().size() : 0) +
-                                (property.getSetter() != null ? property.getSetter().getAnnotations().size() : 0));
-                        firAnnotations.addAll(property.getAnnotations());
-                        if (property.getGetter() != null) {
-                            firAnnotations.addAll(property.getGetter().getAnnotations());
-                        }
-
-                        if (property.getSetter() != null) {
-                            firAnnotations.addAll(property.getSetter().getAnnotations());
-                        }
-                        mapModifierList(maybeModifier.get(), firAnnotations, annos);
+                        mapModifierList(maybeModifier.get(), collectFirAnnotations(property), annos);
                     }
 
                     Space accessorPrefix = whitespace();
@@ -1962,6 +1950,28 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private boolean isValidSetter(@Nullable FirPropertyAccessor setter) {
         return setter != null && !(setter instanceof FirDefaultPropertySetter) &&
                 (setter.getSource() == null || !(setter.getSource().getKind() instanceof KtFakeSourceElementKind));
+    }
+
+    private List<FirAnnotation> collectFirAnnotations(FirProperty property) {
+        List<FirAnnotation> firAnnotations = new ArrayList<>(property.getAnnotations().size() + 3);
+        firAnnotations.addAll(property.getAnnotations());
+
+        if (property.getGetter() != null) {
+            firAnnotations.addAll(property.getGetter().getAnnotations());
+        }
+
+        if (property.getSetter() != null) {
+            FirPropertyAccessor setter = property.getSetter();
+            firAnnotations.addAll(setter.getAnnotations());
+
+            if (!setter.getValueParameters().isEmpty()) {
+                setter.getValueParameters().forEach(vp ->
+                    firAnnotations.addAll(vp.getAnnotations())
+                );
+            }
+        }
+
+        return firAnnotations;
     }
 
     @Nullable
@@ -2760,10 +2770,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         TextRange range = new TextRange(valueParameter.getSource().getStartOffset(), valueParameter.getSource().getEndOffset());
         List<FirAnnotation> firAnnotations = valueParameter.getAnnotations();
         if (generatedFirProperties.containsKey(range)) {
-            FirProperty generatedFirProperty = generatedFirProperties.get(range);
-            firAnnotations.addAll(generatedFirProperty.getAnnotations());
-            firAnnotations.addAll(generatedFirProperty.getGetter() != null ? generatedFirProperty.getGetter().getAnnotations() : emptyList());
-            firAnnotations.addAll(generatedFirProperty.getSetter() != null ? generatedFirProperty.getSetter().getAnnotations() : emptyList());
+            firAnnotations.addAll(collectFirAnnotations(generatedFirProperties.get(range)));
         }
 
         List<J.Annotation> annotations = mapModifiers(firAnnotations, valueParameter.getName().asString());
