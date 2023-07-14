@@ -70,7 +70,7 @@ public class ReplaceStringLiteralWithConstant extends Recipe {
     }
 
     public String getLiteralValue() {
-        if (this.literalValue == null) {
+        if (this.literalValue == null && this.fullyQualifiedConstantName != null) {
             try {
                 this.literalValue = (String) getConstantValueByFullyQualifiedName(this.fullyQualifiedConstantName);
             } catch (ClassNotFoundException | IllegalAccessException | NoSuchFieldException e) {
