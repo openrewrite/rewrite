@@ -159,16 +159,15 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 || (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
                 continue;
             }
-            Timer.Builder builder = Timer.builder("rewrite.scan.configure.recipe")
-                    .tags("recipe", recipeClass.getName());
+            Timer.Builder builder = Timer.builder("rewrite.scan.configure.recipe");
             Timer.Sample sample = Timer.start();
             try {
                 Recipe recipe = constructRecipe(recipeClass);
                 recipeDescriptors.add(recipe.getDescriptor());
                 recipes.add(recipe);
-                MetricsHelper.successTags(builder);
+                MetricsHelper.successTags(builder.tags("recipe", "elided"));
             } catch (Throwable e) {
-                MetricsHelper.errorTags(builder, e);
+                MetricsHelper.errorTags(builder.tags("recipe", recipeClass.getName()), e);
                 logger.warn("Unable to configure {}", recipeClass.getName(), e);
             } finally {
                 sample.stop(builder.register(Metrics.globalRegistry));
