@@ -198,8 +198,31 @@ class AnnotationTest implements RewriteTest {
           kotlin(
             """
               annotation class Ann
-              class Example(@get : Ann val bar : String,
-                            @param : Ann val quux : String)
+              class Example(@param : Ann val quux : String)
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldAnnotation() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Ann
+              class Example(@field:Ann val foo : String)
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldAnnotationAtTop() {
+        rewriteRun(
+          kotlin(
+            """
+              @file:JvmName("Foo")
+              package org.jetbrains.demo
               """
           )
         );

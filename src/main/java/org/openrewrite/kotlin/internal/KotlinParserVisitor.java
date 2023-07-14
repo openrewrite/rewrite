@@ -236,6 +236,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         } else if (annotationCall.getUseSiteTarget() == AnnotationUseSiteTarget.CONSTRUCTOR_PARAMETER) {
             skip("param");
             markers = markers.addIfAbsent(new AnnotationCallSite(randomId(), "param", sourceBefore(":")));
+        } else if (annotationCall.getUseSiteTarget() == AnnotationUseSiteTarget.FIELD) {
+            skip("field");
+            markers = markers.addIfAbsent(new AnnotationCallSite(randomId(), "field", sourceBefore(":")));
         }
 
         J.Identifier name = (J.Identifier) visitElement(annotationCall.getCalleeReference(), ctx);
