@@ -18,9 +18,12 @@ package org.openrewrite.config;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
 import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
 import org.openrewrite.ScanningRecipe;
+import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.NamedStyles;
@@ -156,12 +159,19 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 || (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
                 continue;
             }
+            Timer.Builder builder = Timer.builder("rewrite.scan.configure.recipe")
+                    .tags("recipe", recipeClass.getName());
+            Timer.Sample sample = Timer.start();
             try {
                 Recipe recipe = constructRecipe(recipeClass);
                 recipeDescriptors.add(recipe.getDescriptor());
                 recipes.add(recipe);
+                MetricsHelper.successTags(builder);
             } catch (Throwable e) {
+                MetricsHelper.errorTags(builder, e);
                 logger.warn("Unable to configure {}", recipeClass.getName(), e);
+            } finally {
+                sample.stop(builder.register(Metrics.globalRegistry));
             }
         }
     }
