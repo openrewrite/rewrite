@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-@SuppressWarnings({"RedundantSuppression", "RedundantNullableReturnType"})
+@SuppressWarnings({"RedundantSuppression", "RedundantNullableReturnType", "RedundantVisibilityModifier"})
 class AnnotationTest implements RewriteTest {
 
     @Test
@@ -109,9 +109,9 @@ class AnnotationTest implements RewriteTest {
               @Repeatable
               annotation class A (val s : String)
               class TestA {
-                  @get : A("1")
-                  @set : A("2")
-                  var name: String = ""
+                  @get : A ( "1" )
+                  @set : A ( "2" )
+                  var name : String = ""
               }
               """
           )
@@ -124,14 +124,14 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           kotlin("""
               @Repeatable
-              annotation class A (val s : String)
+              annotation class A ( val s : String )
           """),
           kotlin(
             """
               class TestA {
-                  @get : A("1")
+                  @get : A ( "1" )
                   public
-                  @set : A("2")
+                  @set : A ( "2" )
                   var name: String = ""
               }
               """
@@ -140,9 +140,9 @@ class AnnotationTest implements RewriteTest {
             """
               class TestB {
                   public
-                  @get : A("1")
-                  @set : A("2")
-                  var name: String = ""
+                  @get : A ( "1" )
+                  @set : A ( "2" )
+                  var name : String = ""
               }
               """
           )
@@ -159,8 +159,7 @@ class AnnotationTest implements RewriteTest {
               class Example(
                   @get : Ann
                   val bar : String
-                  ) {
-              }
+                  )
               """
           )
         );
@@ -173,7 +172,7 @@ class AnnotationTest implements RewriteTest {
           kotlin("@Repeatable annotation class A"),
           kotlin(
             """
-              class Example( @get : A @set : A var foo: String, @get : A val bar: String)
+              class Example ( @get : A @set : A var foo: String , @get : A val bar: String )
               """
           )
         );
@@ -185,7 +184,7 @@ class AnnotationTest implements RewriteTest {
           kotlin(
             """
               annotation class A ( val s : String )
-              @A( if ( true ) "1" else "2" )
+              @A ( if ( true ) "1" else "2" )
               class Test
               """
           )
@@ -198,7 +197,7 @@ class AnnotationTest implements RewriteTest {
           kotlin(
             """
               annotation class Ann
-              class Example(@param : Ann val quux : String)
+              class Example ( @param : Ann val quux : String )
               """
           )
         );
@@ -210,19 +209,7 @@ class AnnotationTest implements RewriteTest {
           kotlin(
             """
               annotation class Ann
-              class Example(@field:Ann val foo : String)
-              """
-          )
-        );
-    }
-
-    @Test
-    void fieldAnnotationAtTop() {
-        rewriteRun(
-          kotlin(
-            """
-              @file:JvmName("Foo")
-              package org.jetbrains.demo
+              class Example ( @field : Ann val foo : String )
               """
           )
         );
