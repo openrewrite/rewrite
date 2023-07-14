@@ -2402,18 +2402,26 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
         cursor += delimiter.length();
         List<J> values = new ArrayList<>(stringConcatenationCall.getArgumentList().getArguments().size());
-        for (FirExpression e : stringConcatenationCall.getArgumentList().getArguments()) {
+        List<FirExpression> arguments = stringConcatenationCall.getArgumentList().getArguments();
+        for (int i = 0; i < arguments.size(); i++) {
+            FirExpression e = arguments.get(i);
+            int savedCursor = cursor;
+            Space before = whitespace();
             if (source.startsWith("$", cursor)) {
                 skip("$");
                 boolean inBraces = source.startsWith("{", cursor);
                 if (inBraces) {
                     skip("{");
                 }
-                values.add(new K.KString.Value(randomId(), Markers.EMPTY, visitElement(e, ctx), inBraces));
-                if (inBraces) {
-                    skip("}");
+
+                if (e instanceof FirConstExpression) {
+                    // Skip generated whitespace expression so that it's added to the prefix of the reference.
+                    i += 1;
+                    e = arguments.get(i);
                 }
+                values.add(new K.KString.Value(randomId(), before, Markers.EMPTY, visitElement(e, ctx), inBraces ? sourceBefore("}") : EMPTY, inBraces));
             } else {
+                cursor = savedCursor;
                 values.add(visitElement(e, ctx));
             }
         }
