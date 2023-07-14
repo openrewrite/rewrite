@@ -52,6 +52,13 @@ public class UnnecessaryParentheses extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaVisitor<ExecutionContext>() {
+
+            @Override
+            public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
+                // Causes problems on other languages like JavaScript
+                return sourceFile instanceof J.CompilationUnit;
+            }
+
             private static final String UNNECESSARY_PARENTHESES_MESSAGE = "unnecessaryParenthesesUnwrapTarget";
 
             transient UnnecessaryParenthesesStyle style;
