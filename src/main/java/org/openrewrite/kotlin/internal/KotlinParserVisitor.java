@@ -227,14 +227,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         if (annotationCall.getUseSiteTarget() == AnnotationUseSiteTarget.FILE) {
             skip("file");
             markers = markers.addIfAbsent(new AnnotationCallSite(randomId(), "file", sourceBefore(":")));
-        }
-
-        if (annotationCall.getUseSiteTarget() == AnnotationUseSiteTarget.PROPERTY_GETTER) {
+        } else if (annotationCall.getUseSiteTarget() == AnnotationUseSiteTarget.PROPERTY_GETTER) {
             skip("get");
             markers = markers.addIfAbsent(new AnnotationCallSite(randomId(), "get", sourceBefore(":")));
         } else if (annotationCall.getUseSiteTarget() == AnnotationUseSiteTarget.PROPERTY_SETTER) {
             skip("set");
             markers = markers.addIfAbsent(new AnnotationCallSite(randomId(), "set", sourceBefore(":")));
+        } else if (annotationCall.getUseSiteTarget() == AnnotationUseSiteTarget.CONSTRUCTOR_PARAMETER) {
+            skip("param");
+            markers = markers.addIfAbsent(new AnnotationCallSite(randomId(), "param", sourceBefore(":")));
         }
 
         J.Identifier name = (J.Identifier) visitElement(annotationCall.getCalleeReference(), ctx);
@@ -2741,6 +2742,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<FirAnnotation> firAnnotations = valueParameter.getAnnotations();
         if (generatedFirProperties.containsKey(range)) {
             FirProperty generatedFirProperty = generatedFirProperties.get(range);
+            firAnnotations.addAll(generatedFirProperty.getAnnotations());
             firAnnotations.addAll(generatedFirProperty.getGetter() != null ? generatedFirProperty.getGetter().getAnnotations() : emptyList());
             firAnnotations.addAll(generatedFirProperty.getSetter() != null ? generatedFirProperty.getSetter().getAnnotations() : emptyList());
         }

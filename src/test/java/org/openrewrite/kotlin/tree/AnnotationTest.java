@@ -191,4 +191,17 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void paramAnnotation() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Ann
+              class Example(@get : Ann val bar : String,
+                            @param : Ann val quux : String)
+              """
+          )
+        );
+    }
 }
