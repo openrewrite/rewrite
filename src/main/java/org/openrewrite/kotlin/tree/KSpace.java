@@ -27,6 +27,7 @@ public class KSpace {
         IS_NULLABLE_PREFIX,
         KRETURN_PREFIX,
         KSTRING_PREFIX,
+        KSTRING_SUFFIX,
         KTHIS_PREFIX,
         LIST_LITERAL_PREFIX,
         LIST_LITERAL_ELEMENTS,

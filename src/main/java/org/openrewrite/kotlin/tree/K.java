@@ -582,20 +582,11 @@ public interface K extends J {
         @With
         public static final class Value implements K {
             UUID id;
+            Space prefix;
             Markers markers;
             J tree;
+            Space after;
             boolean enclosedInBraces;
-
-            @Override
-            public <J2 extends J> J2 withPrefix(Space space) {
-                //noinspection unchecked
-                return (J2) this;
-            }
-
-            @Override
-            public Space getPrefix() {
-                return Space.EMPTY;
-            }
 
             @Override
             public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {

@@ -178,6 +178,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
         visit(value.getTree(), p);
         if (value.isEnclosedInBraces()) {
+            visitSpace(value.getAfter(), KSpace.Location.KSTRING_SUFFIX, p);
             p.append('}');
         }
         afterSyntax(value, p);

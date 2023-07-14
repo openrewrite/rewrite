@@ -127,7 +127,6 @@ class VariableDeclarationTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/172")
     @Test
     void propertyAccessor() {
@@ -138,7 +137,7 @@ class VariableDeclarationTest implements RewriteTest {
                   val value = 10
               }
               val a = Test ( )
-              val b = " ${ a . value }"
+              val b = " ${   a . value   }"
               
               val after = 0
               """
@@ -146,7 +145,6 @@ class VariableDeclarationTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/172")
     @Test
     void multipleFieldAccess() {
@@ -161,7 +159,7 @@ class VariableDeclarationTest implements RewriteTest {
               }
               
               val a = Test ( )
-              val b = "${ a . testValue . innerValue }"
+              val b = "${   a . testValue . innerValue   }"
               """
           )
         );
