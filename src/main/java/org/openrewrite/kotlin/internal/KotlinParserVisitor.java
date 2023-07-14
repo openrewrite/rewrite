@@ -1868,6 +1868,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     }
 
                     J.MethodDeclaration m = (J.MethodDeclaration) visitElement(firPropertyAccessor, ctx);
+                    m = m.withPrefix(accessorPrefix);
                     if (receiver != null) {
                         m = m.withParameters(ListUtils.concat(receiver, m.getParameters()));
                     }
