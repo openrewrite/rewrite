@@ -1615,6 +1615,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     /**
      * Check whether the giving property (include destructing) AST Node has `val` or `var` modifier.
+     *
      * @param propertyNode the property AST Node to check
      * @return `val` or `var` if the property node has `val` or `var` modifier. otherwise return null.
      */
@@ -1627,7 +1628,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         while (iterator.hasNext()) {
             PsiElement it = iterator.next();
             if (it instanceof LeafPsiElement &&
-                it.getNode().getElementType() instanceof KtKeywordToken) {
+                    it.getNode().getElementType() instanceof KtKeywordToken) {
                 String keyword = ((KtKeywordToken) it.getNode().getElementType()).getValue();
                 if (keyword.equals("val") || keyword.equals("var")) {
                     return keyword;
@@ -1644,15 +1645,19 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<J.Modifier> modifiers = emptyList();
         PsiElement currentNode = getCurrentPsiNode();
+        PsiElement propertyNode = currentNode instanceof KtProperty ? currentNode :
+                PsiTreeUtil.getParentOfType(currentNode, KtProperty.class);
+        List<PsiElement> propertyNodeChildren = propertyNode != null ? Arrays.asList(propertyNode.getChildren()) : emptyList();
+
         if (currentNode instanceof KtAnnotationEntry) {
             currentNode = PsiTreeUtil.getParentOfType(currentNode, KtModifierList.class);
         }
 
         PsiElement parentNode = currentNode;
         if (currentNode != null &&
-            !(currentNode instanceof KtProperty) &&
-            !(currentNode instanceof KtDestructuringDeclaration) &&
-            !(currentNode instanceof KtParameter)) {
+                !(currentNode instanceof KtProperty) &&
+                !(currentNode instanceof KtDestructuringDeclaration) &&
+                !(currentNode instanceof KtParameter)) {
             parentNode = currentNode.getParent();
             if (parentNode == null || parentNode.getTextRange().getStartOffset() != currentNode.getTextRange().getStartOffset()) {
                 parentNode = currentNode;
@@ -1819,64 +1824,59 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 if (expressions == null) {
                     expressions = new ArrayList<>(2);
                 }
-
-                int saveCursor = cursor;
-                whitespace();
-
-                String methodName = source.substring(cursor, cursor + 3);
-                switch (methodName) {
-                    case "get":
-                        cursor(saveCursor);
-                        if (isValidGetter(property.getGetter())) {
-                            getter = (J.MethodDeclaration) visitElement(property.getGetter(), ctx);
-                            if (receiver != null) {
-                                getter = getter.withParameters(ListUtils.concat(receiver, getter.getParameters()));
-                            }
-                            expressions.add(getter);
-                        }
-                        break;
-                    case "set":
-                        cursor(saveCursor);
-                        if (isValidSetter(property.getSetter())) {
-                            setter = (J.MethodDeclaration) visitElement(property.getSetter(), ctx);
-                            if (receiver != null) {
-                                setter = setter.withParameters(ListUtils.concat(receiver, setter.getParameters()));
-                            }
-                            expressions.add(setter);
-                        }
-                        break;
-                    default:
-                        cursor(saveCursor);
-                        break;
+                List<KtPropertyAccessor> accessors = propertyNodeChildren.stream()
+                        .filter(KtPropertyAccessor.class::isInstance)
+                        .map(KtPropertyAccessor.class::cast)
+                        .collect(toList());
+                if (accessors.size() > 2) {
+                    throw new RuntimeException("Detected oversized explicit property accessors from a property, should have setter/getter only");
                 }
-                saveCursor = cursor;
-                whitespace();
 
-                methodName = source.substring(cursor, cursor + 3);
-                switch (methodName) {
-                    case "get":
-                        cursor(saveCursor);
-                        if (isValidGetter(property.getGetter())) {
-                            getter = (J.MethodDeclaration) visitElement(property.getGetter(), ctx);
-                            if (receiver != null) {
-                                getter = getter.withParameters(ListUtils.concat(receiver, getter.getParameters()));
-                            }
-                            expressions.add(getter);
+                for (KtPropertyAccessor ktPropertyAccessor : accessors) {
+                    Optional<KtDeclarationModifierList> maybeModifier = Arrays.stream(ktPropertyAccessor.getChildren())
+                            .filter(KtDeclarationModifierList.class::isInstance)
+                            .map(KtDeclarationModifierList.class::cast)
+                            .findFirst();
+                    boolean hasAnnotationBeforeAccessors = maybeModifier.isPresent();
+                    List<J.Annotation> annos = new ArrayList<>();
+                    if (hasAnnotationBeforeAccessors) {
+                        List<FirAnnotation> firAnnotations = new ArrayList<>(property.getAnnotations().size() +
+                                (property.getGetter() != null ? property.getGetter().getAnnotations().size() : 0) +
+                                (property.getSetter() != null ? property.getSetter().getAnnotations().size() : 0));
+                        firAnnotations.addAll(property.getAnnotations());
+                        if (property.getGetter() != null) {
+                            firAnnotations.addAll(property.getGetter().getAnnotations());
                         }
-                        break;
-                    case "set":
-                        cursor(saveCursor);
-                        if (isValidSetter(property.getSetter())) {
-                            setter = (J.MethodDeclaration) visitElement(property.getSetter(), ctx);
-                            if (receiver != null) {
-                                setter = setter.withParameters(ListUtils.concat(receiver, setter.getParameters()));
-                            }
-                            expressions.add(setter);
+
+                        if (property.getSetter() != null) {
+                            firAnnotations.addAll(property.getSetter().getAnnotations());
                         }
-                        break;
-                    default:
-                        cursor(saveCursor);
-                        break;
+                        mapModifierList(maybeModifier.get(), firAnnotations, annos);
+                    }
+
+                    Space accessorPrefix = whitespace();
+                    LeafPsiElement accessorNode = getGetterOrSetterNode(ktPropertyAccessor);
+                    if (accessorNode == null) {
+                        throw new RuntimeException("a ktPropertyAccessor node should have get or set");
+                    }
+
+                    FirPropertyAccessor firPropertyAccessor = null;
+                    if (accessorNode.getText().equals("get")) {
+                        firPropertyAccessor = property.getGetter();
+                    } else if (accessorNode.getText().equals("set")) {
+                        firPropertyAccessor = property.getSetter();
+                    }
+
+                    J.MethodDeclaration m = (J.MethodDeclaration) visitElement(firPropertyAccessor, ctx);
+                    if (receiver != null) {
+                        m = m.withParameters(ListUtils.concat(receiver, m.getParameters()));
+                    }
+                    if (hasAnnotationBeforeAccessors) {
+                        m = m.withLeadingAnnotations(annos)
+                            .withName(m.getName().withPrefix(accessorPrefix))
+                            .withPrefix(EMPTY);
+                    }
+                    expressions.add(m);
                 }
             } else if (isValidGetter(property.getGetter()) && !isValidSetter(property.getSetter())) {
                 if (expressions == null) {
@@ -1952,6 +1952,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 variables);
     }
 
+
     private boolean isValidGetter(@Nullable FirPropertyAccessor getter) {
         return getter != null && !(getter instanceof FirDefaultPropertyGetter) &&
                 (getter.getSource() == null || !(getter.getSource().getKind() instanceof KtFakeSourceElementKind));
@@ -1960,6 +1961,20 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     private boolean isValidSetter(@Nullable FirPropertyAccessor setter) {
         return setter != null && !(setter instanceof FirDefaultPropertySetter) &&
                 (setter.getSource() == null || !(setter.getSource().getKind() instanceof KtFakeSourceElementKind));
+    }
+
+    @Nullable
+    private LeafPsiElement getGetterOrSetterNode(KtPropertyAccessor accessor) {
+        Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(accessor).iterator();
+        while (iterator.hasNext()) {
+            PsiElement psiElement = iterator.next();
+            if (psiElement instanceof LeafPsiElement &&
+                    (psiElement.getText().equals("get") || psiElement.getText().equals("set"))) {
+                return (LeafPsiElement) psiElement;
+            }
+        }
+
+        return null;
     }
 
     @Override
@@ -3471,8 +3486,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             } else if (declaration instanceof FirPrimaryConstructor) {
                 firPrimaryConstructor = (FirPrimaryConstructor) declaration;
             } else if (declaration instanceof FirProperty &&
-                       declaration.getSource() != null &&
-                       declaration.getSource().getKind() instanceof KtFakeSourceElementKind.PropertyFromParameter) {
+                    declaration.getSource() != null &&
+                    declaration.getSource().getKind() instanceof KtFakeSourceElementKind.PropertyFromParameter) {
                 TextRange range = new TextRange(declaration.getSource().getStartOffset(), declaration.getSource().getEndOffset());
                 generatedFirProperties.put(range, (FirProperty) declaration);
             } else {
@@ -3907,9 +3922,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return visitErrorResolvedQualifier((FirErrorResolvedQualifier) firElement, ctx);
         } else if (firElement instanceof FirErrorTypeRef) {
             return visitErrorTypeRef((FirErrorTypeRef) firElement, ctx);
-        }
-
-        else if (firElement instanceof FirAnnotationCall) {
+        } else if (firElement instanceof FirAnnotationCall) {
             return visitAnnotationCall((FirAnnotationCall) firElement, ctx);
         } else if (firElement instanceof FirAnonymousFunction) {
             return visitAnonymousFunction((FirAnonymousFunction) firElement, ctx);
@@ -4616,7 +4629,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J2 j2 = null;
         if (j instanceof Statement && !(j instanceof Expression)) {
             j2 = (J2) new K.StatementExpression(randomId(), (Statement) j);
-        } else if (j != null){
+        } else if (j != null) {
             j2 = (J2) j;
         }
 

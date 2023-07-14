@@ -179,6 +179,28 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
+    void annotationOnExplicitGetter() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class A
+              class Test {
+                  public var stringRepresentation : String = ""
+                      @A
+                      // comment
+                      get ( ) = field
+
+                      @A
+                      set ( value ) {
+                          field = value
+                      }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void conditionalParameter() {
         rewriteRun(
           kotlin(
