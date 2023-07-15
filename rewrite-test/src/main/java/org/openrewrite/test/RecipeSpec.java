@@ -116,6 +116,7 @@ public class RecipeSpec {
 
     public RecipeSpec recipe(InputStream yaml, String... activeRecipes) {
         return recipe(Environment.builder()
+                .scanRuntimeClasspath() // Slow but required to find recipe classes the yaml recipe may depend on
                 .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties()))
                 .build()
                 .activateRecipes(activeRecipes));
