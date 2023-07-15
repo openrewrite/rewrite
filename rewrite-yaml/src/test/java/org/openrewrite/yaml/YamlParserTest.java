@@ -15,35 +15,41 @@
  */
 package org.openrewrite.yaml;
 
-import org.assertj.core.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.SourceFile;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.stream.Stream;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class YamlParserTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "Breaking Changes",
-      "Breaking Changes 🛠"
+      "b",
+      "🛠",
+      "🛠🛠",
+      "🛠 🛠"
     })
     void parseYamlWithUnicode(String input) {
-        Stream<SourceFile> yamlSources = YamlParser.builder().build().parse("title: %s\n".formatted(input));
+        Stream<SourceFile> yamlSources = YamlParser.builder().build().parse("a: %s\n".formatted(input));
         SourceFile sourceFile = yamlSources.findFirst().get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+
         Yaml.Documents documents = (Yaml.Documents) sourceFile;
         Yaml.Document document = documents.getDocuments().get(0);
 
         // Assert that end is parsed correctly
-        Assertions.assertThat(document.getEnd().getPrefix()).isEqualTo("\n");
+        assertThat(document.getEnd().getPrefix()).isEqualTo("\n");
 
         // Assert that the title is parsed correctly
         Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
         Yaml.Mapping.Entry entry = mapping.getEntries().get(0);
         Yaml.Scalar title = (Yaml.Scalar) entry.getValue();
-        Assertions.assertThat(title.getValue()).isEqualTo(input);
+        assertThat(title.getValue()).isEqualTo(input);
     }
 
 }
