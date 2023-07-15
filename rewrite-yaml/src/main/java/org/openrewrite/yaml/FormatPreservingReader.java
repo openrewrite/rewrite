@@ -37,7 +37,6 @@ class FormatPreservingReader extends Reader {
         this.delegate = delegate;
     }
 
-    // VisibleForTesting
     String prefix(int lastEnd, int startIndex) {
         assert lastEnd <= startIndex;
 
@@ -78,7 +77,11 @@ class FormatPreservingReader extends Reader {
         if (read > 0) {
             buffer.ensureCapacity(buffer.size() + read);
             for (int i = 0; i < read; i++) {
-                buffer.add(cbuf[i]);
+                char e = cbuf[i];
+                if (Character.UnicodeBlock.of(e) != Character.UnicodeBlock.BASIC_LATIN && i % 2 == 0) {
+                    bufferIndex--;
+                }
+                buffer.add(e);
             }
         }
         return read;
