@@ -31,8 +31,10 @@ class YamlParserTest {
     @ValueSource(strings = {
       "b",
       "🛠",
+      "prefix 🛠",
       "🛠🛠",
-      "🛠 🛠"
+      "🛠 🛠",
+      "🛠 suffix"
     })
     void parseYamlWithUnicode(String input) {
         Stream<SourceFile> yamlSources = YamlParser.builder().build().parse("a: %s\n".formatted(input));
@@ -49,6 +51,7 @@ class YamlParserTest {
         Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
         Yaml.Mapping.Entry entry = mapping.getEntries().get(0);
         Yaml.Scalar title = (Yaml.Scalar) entry.getValue();
+        assertThat(title.getPrefix()).isEqualTo(" ");
         assertThat(title.getValue()).isEqualTo(input);
     }
 
