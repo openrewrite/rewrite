@@ -407,10 +407,11 @@ class UpdateMavenWrapperTest implements RewriteTest {
 
                 var mavenWrapperJar = result(run, Remote.class, "maven-wrapper.jar");
                 assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
-                //noinspection OptionalGetWithoutIsPresent
-                BuildTool buildTool = mavenWrapperJar.getMarkers().findFirst(BuildTool.class).get();
-                assertThat(buildTool.getVersion()).isNotEqualTo("3.8.0");
-                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/" + buildTool.getVersion() + "/maven-wrapper-" + buildTool.getVersion() + ".jar"));
+                Matcher wrapperVersionMatcher = Pattern.compile("maven-wrapper-(.*?)\\.jar").matcher(mavenWrapperJar.getUri().toString());
+                assertThat(wrapperVersionMatcher.find()).isTrue();
+                String wrapperVersion = wrapperVersionMatcher.group(1);
+                assertThat(wrapperVersion).isNotEqualTo("3.1.1");
+                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/" + wrapperVersion + "/maven-wrapper-" + wrapperVersion + ".jar"));
                 assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
             }),
           properties(
@@ -422,7 +423,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
               """),
             spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
               .after(after -> {
-                  Matcher distributionVersionMatcher = Pattern.compile("apache-maven-(.*?)-bin.zip").matcher(after);
+                  Matcher distributionVersionMatcher = Pattern.compile("apache-maven-(.*?)-bin\\.zip").matcher(after);
                   assertThat(distributionVersionMatcher.find()).isTrue();
                   String mavenDistributionVersion = distributionVersionMatcher.group(1);
                   assertThat(mavenDistributionVersion).isNotEqualTo("3.8.0");
@@ -432,7 +433,7 @@ class UpdateMavenWrapperTest implements RewriteTest {
                   String distributionChecksum = distributionChecksumMatcher.group(1);
                   assertThat(distributionChecksum).isNotBlank();
 
-                  Matcher wrapperVersionMatcher = Pattern.compile("maven-wrapper-(.*?).jar").matcher(after);
+                  Matcher wrapperVersionMatcher = Pattern.compile("maven-wrapper-(.*?)\\.jar").matcher(after);
                   assertThat(wrapperVersionMatcher.find()).isTrue();
                   String wrapperVersion = wrapperVersionMatcher.group(1);
                   assertThat(wrapperVersion).isNotEqualTo("3.1.1");
@@ -442,12 +443,12 @@ class UpdateMavenWrapperTest implements RewriteTest {
                   String wrapperChecksum = wrapperChecksumMatcher.group(1);
                   assertThat(wrapperChecksum).isNotBlank();
 
-                  return """
+                  return withLicenseHeader("""
                     distributionUrl=https\\://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/%s/apache-maven-%s-bin.zip
                     wrapperUrl=https\\://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/%s/maven-wrapper-%s.jar
                     distributionSha256Sum=%s
                     wrapperSha256Sum=%s
-                    """.formatted(mavenDistributionVersion, mavenDistributionVersion, wrapperVersion, wrapperVersion, distributionChecksum, wrapperChecksum);
+                    """.formatted(mavenDistributionVersion, mavenDistributionVersion, wrapperVersion, wrapperVersion, distributionChecksum, wrapperChecksum));
               })
           ),
           mvnw,
