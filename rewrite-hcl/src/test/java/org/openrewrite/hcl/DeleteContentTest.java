@@ -16,12 +16,14 @@
 package org.openrewrite.hcl;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.hcl.Assertions.hcl;
 
 class DeleteContentTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void deleteBlock() {
         rewriteRun(

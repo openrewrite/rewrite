@@ -17,22 +17,6 @@
  */
 package org.owasp.dependencycheck.analyzer;
 
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileFilter;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
-import javax.annotation.concurrent.ThreadSafe;
-
 import org.apache.commons.compress.archivers.ArchiveEntry;
 import org.apache.commons.compress.archivers.ArchiveInputStream;
 import org.apache.commons.compress.archivers.cpio.CpioArchiveInputStream;
@@ -49,7 +33,6 @@ import org.apache.commons.compress.utils.IOUtils;
 import org.eclipse.packager.rpm.RpmTag;
 import org.eclipse.packager.rpm.parse.RpmInputStream;
 import org.owasp.dependencycheck.Engine;
-import static org.owasp.dependencycheck.analyzer.AbstractNpmAnalyzer.shouldProcess;
 import org.owasp.dependencycheck.analyzer.exception.AnalysisException;
 import org.owasp.dependencycheck.analyzer.exception.ArchiveExtractionException;
 import org.owasp.dependencycheck.analyzer.exception.UnexpectedAnalysisException;
@@ -58,9 +41,16 @@ import org.owasp.dependencycheck.exception.InitializationException;
 import org.owasp.dependencycheck.utils.FileFilterBuilder;
 import org.owasp.dependencycheck.utils.FileUtils;
 import org.owasp.dependencycheck.utils.Settings;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import javax.annotation.concurrent.ThreadSafe;
+import java.io.*;
+import java.nio.file.Path;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.owasp.dependencycheck.analyzer.AbstractNpmAnalyzer.shouldProcess;
 
 /**
  * <p>
@@ -282,7 +272,7 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
      *
      * @param dependency the dependency being analyzed
      * @param engine the engine doing the analysis
-     * @param scanDepth the current scan depth; extracctAndAnalyze is recursive
+     * @param scanDepth the current scan depth; extractAndAnalyze is recursive
      * and will, be default, only go 3 levels deep
      * @throws AnalysisException thrown if there is a problem analyzing the
      * dependencies
@@ -488,7 +478,7 @@ public class ArchiveAnalyzer extends AbstractFileTypeAnalyzer {
                 } else if ("rpm".equals(archiveExt)) {
                     rin = new RpmInputStream(fis);
                     //return of getTag is not used - but the call is a
-                    //necassary step in reading from the stream
+                    //necessary step in reading from the stream
                     rin.getPayloadHeader().getTag(RpmTag.NAME);
                     cain = new CpioArchiveInputStream(rin);
                     extractArchive(cain, destination, engine);

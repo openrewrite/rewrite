@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
@@ -25,18 +26,27 @@ import java.util.Arrays;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class RecipeSchedulerTest implements RewriteTest {
+class RecipeSchedulerTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void exceptionsCauseResult() {
         rewriteRun(
           spec -> spec
             .executionContext(new InMemoryExecutionContext())
             .recipe(new BoomRecipe())
-            .afterRecipe(run -> assertThat(run.getResults().get(0).getRecipeErrors())
-              .singleElement()
-              .satisfies(t -> assertThat(t.getMessage())
-                .matches("Exception while visiting project file 'file\\.txt', caused by: org\\.openrewrite\\.BoomException: boom, at org\\.openrewrite\\.BoomRecipe\\$1\\.visitText\\(RecipeSchedulerTest\\.java:\\d+\\)"))
+            .afterRecipe(run -> {
+                  SourceFile after = run.getChangeset().getAllResults().get(0).getAfter();
+                  assertThat(after).isNotNull();
+                  assertThat(after.getMarkers().findFirst(Markup.Error.class))
+                    .hasValueSatisfying(err -> {
+                        assertThat(err.getMessage()).isEqualTo("boom");
+                        assertThat(err.getDetail())
+                          .matches("org.openrewrite.BoomException: boom" +
+                                   "\\s+org.openrewrite.BoomRecipe\\$1.visitText\\(RecipeSchedulerTest.java:\\d+\\)" +
+                                   "\\s+org.openrewrite.BoomRecipe\\$1.visitText\\(RecipeSchedulerTest.java:\\d+\\)");
+                    });
+              }
             ),
           text(
             "hello",
@@ -58,7 +68,7 @@ class BoomRecipe extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new PlainTextVisitor<>() {
             @Override
             public PlainText visitText(PlainText text, ExecutionContext executionContext) {

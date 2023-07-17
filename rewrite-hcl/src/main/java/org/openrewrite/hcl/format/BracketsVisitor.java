@@ -18,11 +18,7 @@ package org.openrewrite.hcl.format;
 import org.openrewrite.Tree;
 import org.openrewrite.hcl.HclIsoVisitor;
 import org.openrewrite.hcl.style.BracketsStyle;
-import org.openrewrite.hcl.tree.BodyContent;
-import org.openrewrite.hcl.tree.Expression;
-import org.openrewrite.hcl.tree.Hcl;
-import org.openrewrite.hcl.tree.HclContainer;
-import org.openrewrite.hcl.tree.Space;
+import org.openrewrite.hcl.tree.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 

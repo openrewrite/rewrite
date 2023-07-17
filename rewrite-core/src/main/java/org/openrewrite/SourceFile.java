@@ -16,7 +16,6 @@
 package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
@@ -56,6 +55,11 @@ public interface SourceFile extends Tree {
     @Nullable
     default <S extends Style> S getStyle(Class<S> style) {
         return NamedStyles.merge(style, getMarkers().findAll(NamedStyles.class));
+    }
+
+    default <S extends Style> S getStyle(Class<S> style, S defaultStyle) {
+        S s = getStyle(style);
+        return s == null ? defaultStyle : s;
     }
 
     default <P> byte[] printAllAsBytes(P p) {

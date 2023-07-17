@@ -27,6 +27,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.maven.Assertions.pomXml;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class AddDependencyTest implements RewriteTest {
 
@@ -75,6 +76,43 @@ class AddDependencyTest implements RewriteTest {
                                 <groupId>doesnotexist</groupId>
                                 <artifactId>doesnotexist</artifactId>
                                 <version>1</version>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void systemScope() {
+        rewriteRun(
+          spec -> spec
+            .recipe(addDependency("doesnotexist:doesnotexist:1", "com.google.common.math.IntMath", "system")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            pomXml(
+              """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                    </project>
+                """,
+              """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>doesnotexist</groupId>
+                                <artifactId>doesnotexist</artifactId>
+                                <version>1</version>
+                                <scope>system</scope>
                             </dependency>
                         </dependencies>
                     </project>
@@ -160,10 +198,8 @@ class AddDependencyTest implements RewriteTest {
 
     @Test
     void addDependencyWithClassifier() {
-        AddDependency addDep = new AddDependency(
-          "io.netty", "netty-tcnative-boringssl-static", "2.0.54.Final", null, "compile", true,
-          "com.google.common.math.IntMath", null, "linux-x86_64", false, null
-        );
+        AddDependency addDep = new AddDependency("io.netty", "netty-tcnative-boringssl-static", "2.0.54.Final", null,
+          "compile", true, "com.google.common.math.IntMath", null, "linux-x86_64", false, null, null);
         rewriteRun(
           spec -> spec.recipe(addDep),
           mavenProject(
@@ -275,7 +311,7 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void doNotAddBecauseAlreadyTransitive() {
         rewriteRun(
-          spec -> spec.recipe(addDependency("org.junit.jupiter:junit-jupiter-api:5.x", "org.junit.jupiter.api.*")),
+          spec -> spec.recipe(addDependency("org.junit.jupiter:junit-jupiter-api:5.x", "org.junit.jupiter.api.*", true)),
           mavenProject(
             "project",
             srcTestJava(
@@ -312,10 +348,8 @@ class AddDependencyTest implements RewriteTest {
     @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
     void semverSelector(String onlyIfUsing) {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency(
-            "com.google.guava", "guava", "29.x", "-jre",
-            null, false, onlyIfUsing, null, null, false, null
-          )),
+          spec -> spec.recipe(new AddDependency("com.google.guava", "guava", "29.x", "-jre", null, false, onlyIfUsing,
+            null, null, false, null, null)),
           mavenProject(
             "project",
             srcMainJava(
@@ -554,11 +588,8 @@ class AddDependencyTest implements RewriteTest {
     @Test
     void useRequestedVersionInUseByOtherMembersOfTheFamily() {
         rewriteRun(
-          spec -> spec.recipe(new AddDependency(
-            "com.fasterxml.jackson.module", "jackson-module-afterburner", "2.10.5",
-            null, null, false, "com.fasterxml.jackson.databind.*",
-            null, null, null, "com.fasterxml.*"
-          )),
+          spec -> spec.recipe(new AddDependency("com.fasterxml.jackson.module", "jackson-module-afterburner", "2.10.5",
+            null, null, false, "com.fasterxml.jackson.databind.*", null, null, null, "com.fasterxml.*", null)),
           mavenProject(
             "project",
             srcMainJava(
@@ -798,15 +829,159 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void rawVisitorDoesNotDuplicate() {
+        rewriteRun(
+          spec -> spec.recipe(
+            toRecipe()
+              .withDisplayName("Add dependency")
+              .withName("Uses AddDependencyVisitor directly to validate that it will not add a dependency multiple times")
+              .withGetVisitor(() -> new AddDependencyVisitor(
+                "com.google.guava",
+                "guava",
+                "29.0-jre",
+                null,
+                "test",
+                null,
+                null,
+                null,
+                null,
+                null
+              ))
+          ),
+          mavenProject("project",
+            srcTestJava(
+              java(usingGuavaIntMath)
+            ),
+            pomXml(
+              """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>29.0-jre</version>
+                                <scope>test</scope>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void noCompileScopeDependency() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("jakarta.xml.bind:jakarta.xml.bind-api:latest.release", "com.google.common.math.IntMath", true)),
+          mavenProject(
+            "project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            pomXml(
+              """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>org.springframework.samples</groupId>
+                      <artifactId>spring-petclinic</artifactId>
+                      <version>2.7.3</version>
+                    
+                      <parent>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-parent</artifactId>
+                        <version>3.0.5</version>
+                      </parent>
+                      <name>petclinic</name>
+                    
+                      <properties>
+                        <jakarta-servlet.version>5.0.0</jakarta-servlet.version>
+                    
+                        <java.version>17</java.version>
+                        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+                        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+                    
+                        <webjars-bootstrap.version>5.1.3</webjars-bootstrap.version>
+                        <webjars-font-awesome.version>4.7.0</webjars-font-awesome.version>
+                    
+                        <jacoco.version>0.8.8</jacoco.version>
+                    
+                      </properties>
+                    
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-data-jpa</artifactId>
+                        </dependency>
+                      </dependencies>
+                    
+                    </project>
+                """,
+              """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>org.springframework.samples</groupId>
+                      <artifactId>spring-petclinic</artifactId>
+                      <version>2.7.3</version>
+                    
+                      <parent>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-parent</artifactId>
+                        <version>3.0.5</version>
+                      </parent>
+                      <name>petclinic</name>
+                    
+                      <properties>
+                        <jakarta-servlet.version>5.0.0</jakarta-servlet.version>
+                    
+                        <java.version>17</java.version>
+                        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+                        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+                    
+                        <webjars-bootstrap.version>5.1.3</webjars-bootstrap.version>
+                        <webjars-font-awesome.version>4.7.0</webjars-font-awesome.version>
+                    
+                        <jacoco.version>0.8.8</jacoco.version>
+                    
+                      </properties>
+                    
+                      <dependencies>
+                        <dependency>
+                          <groupId>jakarta.xml.bind</groupId>
+                          <artifactId>jakarta.xml.bind-api</artifactId>
+                        </dependency>
+                        <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-data-jpa</artifactId>
+                        </dependency>
+                      </dependencies>
+                    
+                    </project>
+                """
+            )
+          )
+        );
+    }
+
     private AddDependency addDependency(String gav, String onlyIfUsing) {
-        return addDependency(gav, onlyIfUsing, null);
+        return addDependency(gav, onlyIfUsing, null, null);
+    }
+
+    private AddDependency addDependency(String gav, String onlyIfUsing, Boolean acceptTransitive) {
+        return addDependency(gav, onlyIfUsing, null, acceptTransitive);
     }
 
     private AddDependency addDependency(String gav, String onlyIfUsing, @Nullable String scope) {
+        return addDependency(gav, onlyIfUsing, scope, null);
+    }
+
+    private AddDependency addDependency(String gav, String onlyIfUsing, @Nullable String scope, @Nullable Boolean acceptTransitive) {
         String[] gavParts = gav.split(":");
-        return new AddDependency(
-          gavParts[0], gavParts[1], gavParts[2], null, scope, true,
-          onlyIfUsing, null, null, false, null
-        );
+        return new AddDependency(gavParts[0], gavParts[1], gavParts[2], null, scope, true, onlyIfUsing, null, null,
+          false, null, acceptTransitive);
     }
 }

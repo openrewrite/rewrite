@@ -16,6 +16,7 @@
 package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -30,17 +31,18 @@ class FindFieldsOfTypeTest implements RewriteTest {
           spec -> spec.recipe(new FindFieldsOfType("java.io.File")),
           java(
             """
-                  import java.io.*;
-                  public class Test {
-                      public static void main(String[] args) {
-                          File f = new File("/dev/null");
-                      }
+              import java.io.*;
+              public class Test {
+                  public static void main(String[] args) {
+                      File f = new File("/dev/null");
                   }
+              }
               """
           )
         );
     }
 
+    @DocumentExample
     @Test
     void findPrivateNonInheritedField() {
         rewriteRun(

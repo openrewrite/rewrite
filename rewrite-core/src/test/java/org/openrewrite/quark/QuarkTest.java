@@ -16,24 +16,25 @@
 package org.openrewrite.quark;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
+import static java.util.Objects.requireNonNull;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.other;
 
-public class QuarkTest implements RewriteTest {
+class QuarkTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void renderMarkersOnQuarks() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new TreeVisitor<>() {
               @Override
-              public Tree visitSourceFile(SourceFile sourceFile, ExecutionContext ctx) {
+              public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                  SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                   return SearchResult.found(sourceFile);
               }
           })),

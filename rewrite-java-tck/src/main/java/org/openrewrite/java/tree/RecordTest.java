@@ -23,7 +23,19 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 
 @MinimumJava17
-public class RecordTest implements RewriteTest {
+class RecordTest implements RewriteTest {
+
+    @Test
+    void emptyRecord() {
+        rewriteRun(
+          java(
+            """
+              public record JavaRecord() {
+              }
+              """
+          )
+        );
+    }
 
     @Test
     void javaRecord() {

@@ -15,18 +15,14 @@
  */
 package org.openrewrite.yaml;
 
-import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Timer;
 import lombok.Getter;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.FileAttributes;
-import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 import org.openrewrite.yaml.tree.Yaml;
@@ -39,63 +35,55 @@ import org.yaml.snakeyaml.reader.StreamReader;
 import org.yaml.snakeyaml.scanner.Scanner;
 import org.yaml.snakeyaml.scanner.ScannerImpl;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
-public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
+public class YamlParser implements org.openrewrite.Parser {
     private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s*(@[^\n\r@]+@)");
 
     @Override
-    public List<Yaml.Documents> parse(@Language("yml") String... sources) {
+    public Stream<SourceFile> parse(@Language("yml") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
     @Override
-    public List<Yaml.Documents> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        return acceptedInputs(sourceFiles).stream()
+        return acceptedInputs(sourceFiles)
                 .map(sourceFile -> {
-                    Timer.Builder timer = Timer.builder("rewrite.parse")
-                            .description("The time spent parsing a YAML file")
-                            .tag("file.type", "YAML");
-                    Timer.Sample sample = Timer.start();
                     Path path = sourceFile.getRelativePath(relativeTo);
                     try (EncodingDetectingInputStream is = sourceFile.getSource(ctx)) {
                         Yaml.Documents yaml = parseFromInput(path, is);
-                        sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
                         parsingListener.parsed(sourceFile, yaml);
-                        yaml.withFileAttributes(sourceFile.getFileAttributes());
-                        return yaml;
+                        return yaml.withFileAttributes(sourceFile.getFileAttributes());
                     } catch (Throwable t) {
-                        sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
-                        ParsingExecutionContextView.view(ctx).parseFailure(sourceFile, relativeTo, this, t);
-                        ctx.getOnError().accept(new IllegalStateException(path + " " + t.getMessage(), t));
-                        return null;
+                        ctx.getOnError().accept(t);
+                        return ParseError.build(this, sourceFile, relativeTo, ctx, t);
                     }
                 })
-                .filter(Objects::nonNull)
                 .map(this::unwrapPrefixedMappings)
-                .map(docs -> {
-                    // ensure there is always at least one Document, even in an empty yaml file
-                    if (docs.getDocuments().isEmpty()) {
-                        return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY,
-                                false, new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null), null)));
+                .map(sourceFile -> {
+                    if (sourceFile instanceof Yaml.Documents) {
+                        Yaml.Documents docs = (Yaml.Documents) sourceFile;
+                        // ensure there is always at least one Document, even in an empty yaml file
+                        if (docs.getDocuments().isEmpty()) {
+                            return docs.withDocuments(singletonList(new Yaml.Document(randomId(), "", Markers.EMPTY,
+                                    false, new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null), null)));
+                        }
+                        return docs;
                     }
-                    return docs;
-                })
-                .collect(toList());
+                    return sourceFile;
+                });
     }
 
     private Yaml.Documents parseFromInput(Path sourceFile, EncodingDetectingInputStream source) {
@@ -117,9 +105,8 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
             yamlSourceWithVariablePlaceholders.append(yamlSource, pos, yamlSource.length());
         }
 
-        try (FormatPreservingReader reader = new FormatPreservingReader(
-                new InputStreamReader(new ByteArrayInputStream(yamlSourceWithVariablePlaceholders.toString()
-                        .getBytes(StandardCharsets.UTF_8))))) {
+        try (StringReader stringReader = new StringReader(yamlSourceWithVariablePlaceholders.toString());
+             FormatPreservingReader reader = new FormatPreservingReader(stringReader)) {
             StreamReader streamReader = new StreamReader(reader);
             Scanner scanner = new ScannerImpl(streamReader, new LoaderOptions());
             Parser parser = new ParserImpl(scanner);
@@ -153,7 +140,6 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                     case DocumentStart: {
                         String fmt = newLine + reader.prefix(lastEnd, event);
                         newLine = "";
-
                         document = new Yaml.Document(
                                 randomId(),
                                 fmt,
@@ -169,7 +155,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                         String fmt = newLine + reader.prefix(lastEnd, event);
                         newLine = "";
 
-                        MappingStartEvent mappingStartEvent = (MappingStartEvent)event;
+                        MappingStartEvent mappingStartEvent = (MappingStartEvent) event;
                         Yaml.Anchor anchor = null;
                         if (mappingStartEvent.getAnchor() != null) {
                             anchor = buildYamlAnchor(reader, lastEnd, fmt, mappingStartEvent.getAnchor(), event.getEndMark().getIndex(), false);
@@ -191,7 +177,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                             startBracePrefix = fullPrefix.substring(startIndex, openingBraceIndex);
                             lastEnd = event.getEndMark().getIndex();
                         }
-                        blockStack.push(new MappingBuilder(fmt,startBracePrefix, anchor));
+                        blockStack.push(new MappingBuilder(fmt, startBracePrefix, anchor));
                         break;
                     }
                     case Scalar: {
@@ -289,7 +275,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                         String fmt = newLine + reader.prefix(lastEnd, event);
                         newLine = "";
 
-                        SequenceStartEvent sse = (SequenceStartEvent)event;
+                        SequenceStartEvent sse = (SequenceStartEvent) event;
                         Yaml.Anchor anchor = null;
                         if (sse.getAnchor() != null) {
                             anchor = buildYamlAnchor(reader, lastEnd, fmt, sse.getAnchor(), event.getEndMark().getIndex(), false);
@@ -320,6 +306,9 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
 
                         AliasEvent alias = (AliasEvent) event;
                         Yaml.Anchor anchor = anchors.get(alias.getAnchor());
+                        if (anchor == null) {
+                            throw new UnsupportedOperationException("Unknown anchor: " + alias.getAnchor());
+                        }
                         BlockBuilder builder = blockStack.peek();
                         builder.push(new Yaml.Alias(randomId(), fmt, Markers.EMPTY, anchor));
                         lastEnd = event.getEndMark().getIndex();
@@ -366,7 +355,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
         if (!isForScalar) {
             prefix = (prefixStart > -1 && eventPrefix.length() > prefixStart + 1) ? eventPrefix.substring(prefixStart + 1) : "";
         }
-        return new Yaml.Anchor(randomId(), prefix, postFix.toString(), Markers.EMPTY,anchorKey);
+        return new Yaml.Anchor(randomId(), prefix, postFix.toString(), Markers.EMPTY, anchorKey);
     }
 
     /**
@@ -537,7 +526,10 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
         }
     }
 
-    private Yaml.Documents unwrapPrefixedMappings(Yaml.Documents y) {
+    private SourceFile unwrapPrefixedMappings(SourceFile y) {
+        if (!(y instanceof Yaml.Documents)) {
+            return y;
+        }
         //noinspection ConstantConditions
         return (Yaml.Documents) new YamlIsoVisitor<Integer>() {
             @Override
@@ -572,6 +564,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
     public static Builder builder() {
         return new Builder();
     }
+
     public static class Builder extends org.openrewrite.Parser.Builder {
 
         public Builder() {

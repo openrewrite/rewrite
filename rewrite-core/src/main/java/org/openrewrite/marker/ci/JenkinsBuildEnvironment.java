@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.GitProvenance;
 
 import java.util.UUID;
 import java.util.function.UnaryOperator;
@@ -61,5 +62,10 @@ public class JenkinsBuildEnvironment implements BuildEnvironment {
                 environment.apply("GIT_LOCAL_BRANCH"),
                 environment.apply("GIT_BRANCH")
         );
+    }
+
+    @Override
+    public GitProvenance buildGitProvenance() throws IncompleteGitConfigException {
+        throw new IncompleteGitConfigException();
     }
 }

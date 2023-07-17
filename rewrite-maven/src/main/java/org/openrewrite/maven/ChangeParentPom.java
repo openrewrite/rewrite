@@ -15,17 +15,15 @@
  */
 package org.openrewrite.maven;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.*;
+import org.openrewrite.maven.tree.MavenMetadata;
+import org.openrewrite.maven.tree.Parent;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.maven.utilities.RetainVersions;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
@@ -39,6 +37,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
@@ -97,39 +96,48 @@ public class ChangeParentPom extends Recipe {
     @Option(displayName = "Allow version downgrades",
             description = "If the new parent has the same group/artifact, this flag can be used to only upgrade the " +
                           "version if the target version is newer than the current.",
-            example = "false",
             required = false)
     @Nullable
-    boolean allowVersionDowngrades;
+    Boolean allowVersionDowngrades;
 
     @Option(displayName = "Retain versions",
-            description = "Accepts a list of GAVs. For each GAV, if it is a project direct dependency, and it is removed "
-                    + "from dependency management in the new parent pom, then it will be retained with an explicit version. "
-                    + "The version can be omitted from the GAV to use the old value from dependency management",
-            example = "- com.jcraft:jsch",
+            description = "Accepts a list of GAVs. For each GAV, if it is a project direct dependency, and it is removed " +
+                          "from dependency management in the new parent pom, then it will be retained with an explicit version. " +
+                          "The version can be omitted from the GAV to use the old value from dependency management",
+            example = "com.jcraft:jsch",
             required = false)
+    @Nullable
     List<String> retainVersions;
 
-    @Deprecated
-    public ChangeParentPom(String oldGroupId, @Nullable String newGroupId, String oldArtifactId, @Nullable String newArtifactId, String newVersion, @Nullable String versionPattern, @Nullable Boolean allowVersionDowngrades) {
-        this(oldGroupId, newGroupId, oldArtifactId, newArtifactId, newVersion, versionPattern, allowVersionDowngrades, null);
-    }
-
-    @JsonCreator
-    public ChangeParentPom(String oldGroupId, @Nullable String newGroupId, String oldArtifactId, @Nullable String newArtifactId, String newVersion, @Nullable String versionPattern, @Nullable Boolean allowVersionDowngrades, @Nullable List<String> retainVersions) {
-        this.oldGroupId = oldGroupId;
-        this.newGroupId = newGroupId;
-        this.oldArtifactId = oldArtifactId;
-        this.newArtifactId = newArtifactId;
-        this.newVersion = newVersion;
-        this.versionPattern = versionPattern;
-        this.allowVersionDowngrades = allowVersionDowngrades != null && allowVersionDowngrades;
-        this.retainVersions = retainVersions == null ? new ArrayList<>() : retainVersions;
+    @Override
+    public Validated<Object> validate() {
+        Validated<Object> validated = super.validate();
+        //noinspection ConstantConditions
+        if (newVersion != null) {
+            validated = validated.and(Semver.validate(newVersion, versionPattern));
+        }
+        if (retainVersions != null) {
+            for (int i = 0; i < retainVersions.size(); i++) {
+                String retainVersion = retainVersions.get(i);
+                validated = validated.and(Validated.test(
+                        String.format("retainVersions[%d]", i),
+                        "did not look like a two-or-three-part GAV",
+                        retainVersion,
+                        maybeGav -> {
+                            int gavParts = maybeGav.split(":").length;
+                            return gavParts == 2 || gavParts == 3;
+                        }));
+            }
+        }
+        return validated;
     }
 
     @Override
-    protected MavenVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new MavenVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
+        assert versionComparator != null;
+
+        return Preconditions.check(new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
                 Parent parent = getResolutionResult().getPom().getRequested().getParent();
@@ -140,36 +148,7 @@ public class ChangeParentPom extends Recipe {
                 }
                 return document;
             }
-        };
-    }
-
-    @Override
-    public Validated validate() {
-        Validated validated = super.validate();
-        //noinspection ConstantConditions
-        if (newVersion != null) {
-            validated = validated.and(Semver.validate(newVersion, versionPattern));
-        }
-        for (int i = 0; i < retainVersions.size(); i++) {
-            String retainVersion = retainVersions.get(i);
-            validated = validated.and(Validated.test(
-                    String.format("retainVersions[%d]", i),
-                    "did not look like a two-or-three-part GAV",
-                    retainVersion,
-                    maybeGav -> {
-                        int gavParts = maybeGav.split(":").length;
-                        return gavParts == 2 || gavParts == 3;
-                    }));
-        }
-        return validated;
-    }
-
-    @Override
-    public MavenVisitor<ExecutionContext> getVisitor() {
-        VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
-        assert versionComparator != null;
-
-        return new MavenIsoVisitor<ExecutionContext>() {
+        }, new MavenIsoVisitor<ExecutionContext>() {
             @Nullable
             private Collection<String> availableVersions;
 
@@ -205,12 +184,12 @@ public class ChangeParentPom extends Recipe {
 
                                 if (changeParentTagVisitors.size() > 0) {
                                     retainVersions();
-                                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, retainVersions));
+                                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, retainVersions).getVisitor());
                                     for (XmlVisitor<ExecutionContext> visitor : changeParentTagVisitors) {
                                         doAfterVisit(visitor);
                                     }
                                     maybeUpdateModel();
-                                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null));
+                                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null).getVisitor());
                                 }
                             }
                         } catch (MavenDownloadingException e) {
@@ -222,23 +201,26 @@ public class ChangeParentPom extends Recipe {
             }
 
             private void retainVersions() {
-                for (Recipe retainVersionRecipe : RetainVersions.plan(this, retainVersions)) {
-                    doAfterVisit(retainVersionRecipe);
+                for (Recipe retainVersionRecipe : RetainVersions.plan(this, retainVersions == null ?
+                        emptyList() : retainVersions)) {
+                    doAfterVisit(retainVersionRecipe.getVisitor());
                 }
             }
 
             private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion,
                                                                 ExecutionContext ctx) throws MavenDownloadingException {
+                String finalCurrentVersion = !Semver.isVersion(currentVersion) ? "0.0.0" : currentVersion;
+
                 if (availableVersions == null) {
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                     availableVersions = mavenMetadata.getVersioning().getVersions().stream()
-                            .filter(v -> versionComparator.isValid(currentVersion, v))
-                            .filter(v -> allowVersionDowngrades || versionComparator.compare(currentVersion, currentVersion, v) < 0)
+                            .filter(v -> versionComparator.isValid(finalCurrentVersion, v))
+                            .filter(v -> Boolean.TRUE.equals(allowVersionDowngrades) || versionComparator.compare(finalCurrentVersion, finalCurrentVersion, v) < 0)
                             .collect(Collectors.toList());
                 }
-                return allowVersionDowngrades ? availableVersions.stream().max((v1, v2) -> versionComparator.compare(currentVersion, v1, v2)) : versionComparator.upgrade(currentVersion, availableVersions);
+                return Boolean.TRUE.equals(allowVersionDowngrades) ? availableVersions.stream().max((v1, v2) -> versionComparator.compare(finalCurrentVersion, v1, v2)) : versionComparator.upgrade(finalCurrentVersion, availableVersions);
             }
-        };
+        });
     }
 }
 

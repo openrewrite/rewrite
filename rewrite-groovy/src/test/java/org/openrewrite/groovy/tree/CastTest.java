@@ -16,6 +16,7 @@
 package org.openrewrite.groovy.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
@@ -43,6 +44,25 @@ class CastTest implements RewriteTest {
             """
               String foo = null as String
               String bar = foo
+              """
+          )
+        );
+    }
+
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/2885")
+    @Test
+    void arrayCast() {
+        rewriteRun(
+          groovy(
+            """
+              def foo(String[][] a) {
+              }
+              def r = [["foo"], ["bar"]] as String  [/**/][
+               // comment
+              ]
+              foo(r)
+              foo((String [ ] [ ] )r)
               """
           )
         );

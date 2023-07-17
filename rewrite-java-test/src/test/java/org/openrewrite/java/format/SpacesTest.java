@@ -16,6 +16,7 @@
 package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaParser;
@@ -59,6 +60,7 @@ class SpacesTest implements RewriteTest {
           )));
     }
 
+    @DocumentExample
     @Test
     void beforeParensMethodDeclarationTrue() {
         rewriteRun(
@@ -702,20 +704,20 @@ class SpacesTest implements RewriteTest {
           spaces(style -> style.withAroundOperators(style.getAroundOperators().withLogical(false))),
           java(
             """
-                  class Test {
-                      void foo() {
-                          boolean x = true && false;
-                          boolean y = true || false;
-                      }
+              class Test {
+                  void foo() {
+                      boolean x = true && false;
+                      boolean y = true || false;
                   }
+              }
               """,
             """
-                  class Test {
-                      void foo() {
-                          boolean x = true&&false;
-                          boolean y = true||false;
-                      }
+              class Test {
+                  void foo() {
+                      boolean x = true&&false;
+                      boolean y = true||false;
                   }
+              }
               """
           )
         );
@@ -1399,22 +1401,22 @@ class SpacesTest implements RewriteTest {
           spaces(style -> style.withBeforeLeftBrace(style.getBeforeLeftBrace().withElseLeftBrace(true))),
           java(
             """
-                  class Test {
-                      public void foo() {
-                          if (true) {
-                          } else{
-                          }
+              class Test {
+                  public void foo() {
+                      if (true) {
+                      } else{
                       }
                   }
+              }
               """,
             """
-                  class Test {
-                      public void foo() {
-                          if (true) {
-                          } else {
-                          }
+              class Test {
+                  public void foo() {
+                      if (true) {
+                      } else {
                       }
                   }
+              }
               """
           )
         );

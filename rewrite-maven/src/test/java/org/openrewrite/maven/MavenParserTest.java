@@ -258,6 +258,34 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
+    void parentVersionRange() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.managed.test</groupId>
+                  <artifactId>a</artifactId>
+                  <version>1.0.0</version>
+                  <parent>
+                      <groupId>com.fasterxml.jackson</groupId>
+                      <artifactId>jackson-parent</artifactId>
+                      <version>[2.9.1,2.10.0)</version>
+                  </parent>
+                  <dependencies>
+                      <dependency>
+                          <groupId>junit</groupId>
+                          <artifactId>junit</artifactId>
+                          <version>4.11</version>
+                      </dependency>
+                  </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void guava25() {
         rewriteRun(
           pomXml(
@@ -899,7 +927,7 @@ class MavenParserTest implements RewriteTest {
                         </dependencies>
                     </project>
                 """
-            ).get(0);
+            ).findFirst().orElseThrow(() -> new IllegalArgumentException("Could not parse as XML"));
 
             assertThat(mockRepo.getRequestCount())
               .as("The mock repository received no requests. Applying mirrors is probably broken")
@@ -1574,108 +1602,107 @@ class MavenParserTest implements RewriteTest {
     }
 
     @Test
-    public void cannotWidenScopeOfTransitiveDependency() {
+    void cannotWidenScopeOfTransitiveDependency() {
         rewriteRun(
-
           pomXml(
-                """
-                <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>demo</artifactId>
-                  <version>1.0.0</version>
-                  <dependencyManagement>
-                    <dependencies>
-                      <dependency>
-                        <groupId>org.hamcrest</groupId>
-                        <artifactId>hamcrest</artifactId>
-                        <version>2.1</version>
-                        <scope>compile</scope>
-                      </dependency>
-                    </dependencies>
-                  </dependencyManagement>
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo</artifactId>
+                <version>1.0.0</version>
+                <dependencyManagement>
                   <dependencies>
                     <dependency>
-                      <groupId>org.apache.logging.log4j</groupId>
-                      <artifactId>log4j-to-slf4j</artifactId>
-                      <version>2.17.2</version>
+                      <groupId>org.hamcrest</groupId>
+                      <artifactId>hamcrest</artifactId>
+                      <version>2.1</version>
+                      <scope>compile</scope>
                     </dependency>
                   </dependencies>
-                </project>
-                """,
-                spec -> spec.afterRecipe(pomXml -> {
-                    MavenResolutionResult result = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                    List<ResolvedDependency> foundDependencies = result.findDependencies("org.hamcrest", "hamcrest", null);
-                    assertThat(foundDependencies).hasSize(0);
-                })
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.apache.logging.log4j</groupId>
+                    <artifactId>log4j-to-slf4j</artifactId>
+                    <version>2.17.2</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(pomXml -> {
+                MavenResolutionResult result = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                List<ResolvedDependency> foundDependencies = result.findDependencies("org.hamcrest", "hamcrest", null);
+                assertThat(foundDependencies).hasSize(0);
+            })
           )
         );
     }
 
     @Test
-    public void cannotWidenScopeOfImplicitTransitiveDependency() {
+    void cannotWidenScopeOfImplicitTransitiveDependency() {
         rewriteRun(
-            pomXml(
-                """
-                <project>
-                  <groupId>com.example</groupId>
-                  <artifactId>demo</artifactId>
-                  <version>1.0.0</version>
-                  <dependencyManagement>
-                    <dependencies>
-                      <dependency>
-                        <groupId>org.junit.vintage</groupId>
-                        <artifactId>junit-vintage-engine</artifactId>
-                        <version>5.7.2</version>
-                        <scope>compile</scope>
-                      </dependency>
-                    </dependencies>
-                  </dependencyManagement>
+          pomXml(
+            """
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo</artifactId>
+                <version>1.0.0</version>
+                <dependencyManagement>
                   <dependencies>
                     <dependency>
-                      <groupId>org.apache.logging.log4j</groupId>
-                      <artifactId>log4j-to-slf4j</artifactId>
-                      <version>2.17.2</version>
+                      <groupId>org.junit.vintage</groupId>
+                      <artifactId>junit-vintage-engine</artifactId>
+                      <version>5.7.2</version>
+                      <scope>compile</scope>
                     </dependency>
                   </dependencies>
-                </project>
-                """,
-                spec -> spec.afterRecipe(pomXml -> {
-                    MavenResolutionResult result = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
-                    List<ResolvedDependency> foundDependencies = result.findDependencies("org.junit.vintage", "junit-vintage-engine", null);
-                    assertThat(foundDependencies).hasSize(0);
-                })
-            )
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.apache.logging.log4j</groupId>
+                    <artifactId>log4j-to-slf4j</artifactId>
+                    <version>2.17.2</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(pomXml -> {
+                MavenResolutionResult result = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
+                List<ResolvedDependency> foundDependencies = result.findDependencies("org.junit.vintage", "junit-vintage-engine", null);
+                assertThat(foundDependencies).hasSize(0);
+            })
+          )
         );
     }
 
     @Test
-    public void canNarrowScopeOfImplicitTransitiveDependency() {
+    void canNarrowScopeOfImplicitTransitiveDependency() {
         rewriteRun(
           pomXml(
             """
-            <project>
-              <groupId>com.example</groupId>
-              <artifactId>demo</artifactId>
-              <version>1.0.0</version>
-              <dependencyManagement>
+              <project>
+                <groupId>com.example</groupId>
+                <artifactId>demo</artifactId>
+                <version>1.0.0</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.apache.logging.log4j</groupId>
+                      <artifactId>log4j-api</artifactId>
+                      <version>2.17.2</version>
+                      <scope>test</scope>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
                 <dependencies>
                   <dependency>
                     <groupId>org.apache.logging.log4j</groupId>
-                    <artifactId>log4j-api</artifactId>
+                    <artifactId>log4j-to-slf4j</artifactId>
                     <version>2.17.2</version>
-                    <scope>test</scope>
                   </dependency>
                 </dependencies>
-              </dependencyManagement>
-              <dependencies>
-                <dependency>
-                  <groupId>org.apache.logging.log4j</groupId>
-                  <artifactId>log4j-to-slf4j</artifactId>
-                  <version>2.17.2</version>
-                </dependency>
-              </dependencies>
-            </project>
-            """,
+              </project>
+              """,
             spec -> spec.afterRecipe(pomXml -> {
                 MavenResolutionResult result = pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
                 List<ResolvedDependency> foundDependencies = result.findDependencies("org.apache.logging.log4j", "log4j-api", null);
@@ -1687,7 +1714,7 @@ class MavenParserTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
-    public void ciFriendlyVersionWithoutExplicitProperty() {
+    void ciFriendlyVersionWithoutExplicitProperty() {
         rewriteRun(pomXml("""
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -1704,7 +1731,7 @@ class MavenParserTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
-    public void ciFriendlyVersionWithParent() {
+    void ciFriendlyVersionWithParent() {
         rewriteRun(pomXml("""
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -1743,7 +1770,7 @@ class MavenParserTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
-    public void canConnectProjectPomsWhenUsingCiFriendlyVersions() {
+    void canConnectProjectPomsWhenUsingCiFriendlyVersions() {
         rewriteRun(pomXml("""
           <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -1864,7 +1891,7 @@ class MavenParserTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/2049")
-    public void ciFriendlyVersionsStillWorkAfterUpdateMavenModel() {
+    void ciFriendlyVersionsStillWorkAfterUpdateMavenModel() {
         rewriteRun(
           spec -> spec.recipe(new UpgradeDependencyVersion("junit", "junit", "4.1", null, null, null)),
           pomXml("""

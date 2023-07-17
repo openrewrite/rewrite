@@ -26,7 +26,7 @@ import java.io.Serializable;
  * Every model object that is transferred via the tooling API must implement {@link Serializable}, including
  * certain maven model objects that are shared by rewrite-gradle.
  */
-public class OpenRewriteModelSerializableTest {
+class OpenRewriteModelSerializableTest {
 
     @Test
     void mavenRepository() throws IOException {

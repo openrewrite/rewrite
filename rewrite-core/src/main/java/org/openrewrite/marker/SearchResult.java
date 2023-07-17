@@ -18,9 +18,11 @@ package org.openrewrite.marker;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
@@ -31,7 +33,7 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Getter
 @With
-public class SearchResult implements Marker {
+public final class SearchResult implements Marker {
     UUID id;
 
     @EqualsAndHashCode.Include
@@ -49,6 +51,54 @@ public class SearchResult implements Marker {
         }
         return t.withMarkers(t.getMarkers().computeByType(new SearchResult(randomId(), description),
                 (s1, s2) -> s1 == null ? s2 : s1));
+    }
+
+    /**
+     * Merge the description of two search results into a single search result with a unified description.
+     * <p>
+     * If the there already exists a search result with the same description, the existing search result is returned.
+     */
+    @Incubating(since = "8.0.0")
+    public static <T extends Tree> T mergingFound(@Nullable T t, String description) {
+        return mergingFound(t, description, ", ");
+    }
+
+    /**
+     * Merge the description of two search results into a single search result with a unified description.
+     * <p>
+     * If the there already exists a search result with the same description, the existing search result is returned.
+     *
+     * @param delimiter The delimiter to use when merging descriptions.
+     */
+    @Incubating(since = "8.0.0")
+    public static <T extends Tree> T mergingFound(@Nullable T t, String description, String delimiter) {
+        Objects.requireNonNull(delimiter, "delimiter must not be null");
+        if (t == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+        return t.withMarkers(t.getMarkers().computeByType(new SearchResult(randomId(), description),
+                (s1, s2) -> {
+                    if (s1 == null) {
+                        return s2;
+                    }
+                    if (s2 == null) {
+                        return s1;
+                    }
+                    if (s1.getDescription() == null) {
+                        return s2;
+                    }
+                    if (s2.getDescription() == null) {
+                        return s1;
+                    }
+                    if (s1.getDescription().equals(s2.getDescription()) ||
+                        s1.getDescription().startsWith(s2.getDescription() + delimiter) ||
+                        s1.getDescription().contains(delimiter + s2.getDescription() + delimiter) ||
+                        s1.getDescription().endsWith(s2.getDescription())) {
+                        return s1;
+                    }
+                    return s1.withDescription(s1.getDescription() + delimiter + s2.getDescription());
+                }));
     }
 
     /**

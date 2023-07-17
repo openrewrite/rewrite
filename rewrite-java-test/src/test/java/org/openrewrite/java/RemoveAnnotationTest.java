@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -40,6 +41,7 @@ class RemoveAnnotationTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void removeAnnotation() {
         rewriteRun(
@@ -53,6 +55,78 @@ class RemoveAnnotationTest implements RewriteTest {
                   @Deprecated
                   void test() {
                       @Deprecated int n;
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              public class Test {
+                  void test() {
+                      int n;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/105")
+    void removeFullyQualifiedJavaLangAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@java.lang.Deprecated")),
+          java(
+            """
+              import java.util.List;
+
+              @java.lang.Deprecated
+              public class Test {
+                  @java.lang.Deprecated
+                  void test() {
+                      @java.lang.Deprecated int n;
+                  }
+              }
+              """,
+            """
+              import java.util.List;
+
+              public class Test {
+                  void test() {
+                      int n;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/105")
+    void removeFullyQualifiedCustomAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@org.b.ThirdAnnotation")),
+          java(
+            """
+              package org.b;
+                          
+              import java.lang.annotation.Target;
+              import static java.lang.annotation.ElementType.*;
+                          
+              @Target({TYPE, FIELD, METHOD, PARAMETER, CONSTRUCTOR, LOCAL_VARIABLE})
+              public @interface ThirdAnnotation {
+              }
+              """
+          ),
+          java(
+            """
+              import java.util.List;
+
+              @org.b.ThirdAnnotation
+              public class Test {
+                  @org.b.ThirdAnnotation
+                  void test() {
+                      @org.b.ThirdAnnotation int n;
                   }
               }
               """,

@@ -18,6 +18,7 @@ package org.openrewrite.properties.search;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -26,6 +27,7 @@ import static org.openrewrite.properties.Assertions.properties;
 @SuppressWarnings("UnusedProperty")
 class FindPropertiesTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void findProperty() {
         rewriteRun(
@@ -67,6 +69,26 @@ class FindPropertiesTest implements RewriteTest {
     void exactMatch() {
         rewriteRun(
           spec -> spec.recipe(new FindProperties("acme.my-project.person.first-name", false)),
+          properties(
+            """
+              acme.my-project.person.first-name=example
+              acme.myProject.person.firstName=example
+              acme.my_project.person.first_name=example
+              """,
+            """
+              acme.my-project.person.first-name=~~>example
+              acme.myProject.person.firstName=example
+              acme.my_project.person.first_name=example
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/1168")
+    void globMatch() {
+        rewriteRun(
+          spec -> spec.recipe(new FindProperties("acme.my-project.*", false)),
           properties(
             """
               acme.my-project.person.first-name=example

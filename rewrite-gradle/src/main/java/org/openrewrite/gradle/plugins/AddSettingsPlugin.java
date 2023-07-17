@@ -17,12 +17,14 @@ package org.openrewrite.gradle.plugins;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.gradle.IsSettingsGradle;
+import org.openrewrite.gradle.marker.GradleSettings;
+import org.openrewrite.groovy.GroovyIsoVisitor;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
+
+import java.util.Optional;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -56,12 +58,20 @@ public class AddSettingsPlugin extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsSettingsGradle<>();
-    }
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(
+                new IsSettingsGradle<>(),
+                new GroovyIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                        Optional<GradleSettings> maybeGradleSettings = cu.getMarkers().findFirst(GradleSettings.class);
+                        if (!maybeGradleSettings.isPresent()) {
+                            return cu;
+                        }
 
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new AddPluginVisitor(pluginId, version, versionPattern);
+                        GradleSettings gradleSettings = maybeGradleSettings.get();
+                        return (G.CompilationUnit) new AddPluginVisitor(pluginId, version, versionPattern, gradleSettings.getPluginRepositories()).visitNonNull(cu, ctx);
+                    }
+                });
     }
 }

@@ -21,6 +21,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.java.UseStaticImport;
 
 import java.util.concurrent.TimeUnit;
@@ -35,7 +36,8 @@ public class UseStaticImportBenchmark {
 
     @Benchmark
     public void useStaticImport(JavaCompilationUnitState state) {
-        new UseStaticImport("java.util.List remove(..)").run(state.getSourceFiles());
+        new UseStaticImport("java.util.List remove(..)")
+                .run(state.getSourceSet(), new InMemoryExecutionContext());
     }
 
     public static void main(String[] args) throws RunnerException {

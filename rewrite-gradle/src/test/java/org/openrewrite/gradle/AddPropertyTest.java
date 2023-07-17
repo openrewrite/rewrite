@@ -21,12 +21,13 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.properties.Assertions.properties;
+import static org.openrewrite.test.SourceSpecs.dir;
 
-public class AddPropertyTest implements RewriteTest {
+class AddPropertyTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new AddProperty("org.gradle.caching", "true", true));
+        spec.recipe(new AddProperty("org.gradle.caching", "true", true, null));
     }
 
     @Test
@@ -74,6 +75,33 @@ public class AddPropertyTest implements RewriteTest {
               org.gradle.caching=true
               """,
             spec -> spec.path("gradle.properties")
+          )
+        );
+    }
+
+    @Test
+    void addOnlyToSpecifiedFilePattern() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty("org.gradle.caching", "true", null, "gradle.properties")),
+          buildGradle("plugins { id 'java' }"),
+          properties(
+            "",
+            """
+              org.gradle.caching=true
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          dir("project1",
+            properties(
+              "",
+              spec -> spec.path("gradle.properties")
+            )
+          ),
+          dir("project2",
+            properties(
+              "",
+              spec -> spec.path("gradle.properties")
+            )
           )
         );
     }

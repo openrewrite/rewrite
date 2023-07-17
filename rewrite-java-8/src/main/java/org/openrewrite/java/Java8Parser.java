@@ -16,21 +16,21 @@
 package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.marker.JavaSourceSet;
-import org.openrewrite.java.tree.J;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
-import java.util.List;
+import java.util.stream.Stream;
 
 public class Java8Parser implements JavaParser {
     private final JavaParser delegate;
@@ -40,7 +40,7 @@ public class Java8Parser implements JavaParser {
     }
 
     @Override
-    public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return delegate.parseInputs(sourceFiles, relativeTo, ctx);
     }
 
@@ -51,18 +51,14 @@ public class Java8Parser implements JavaParser {
     }
 
     @Override
+    public JavaParser reset(Collection<URI> cus) {
+        delegate.reset(cus);
+        return this;
+    }
+
+    @Override
     public void setClasspath(Collection<Path> classpath) {
         delegate.setClasspath(classpath);
-    }
-
-    @Override
-    public void setSourceSet(String sourceSet) {
-        delegate.setSourceSet(sourceSet);
-    }
-
-    @Override
-    public JavaSourceSet getSourceSet(ExecutionContext ctx) {
-        return delegate.getSourceSet(ctx);
     }
 
     public static Builder builder() {

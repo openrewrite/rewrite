@@ -18,24 +18,30 @@ package org.openrewrite.marker.ci;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.marker.GitProvenance;
 
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.marker.OsProvenance.hostname;
+import static org.openrewrite.marker.OperatingSystemProvenance.hostname;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class TravisBuildEnvironment implements BuildEnvironment {
     @With
     UUID id;
-
     String buildNumber;
     String buildId;
     String buildUrl;
     String host;
     String job;
+    String branch;
+    String commit;
+
+    String repoSlug;
+
+    String tag;
 
     public static TravisBuildEnvironment build(UnaryOperator<String> environment) {
         return new TravisBuildEnvironment(
@@ -44,7 +50,17 @@ public class TravisBuildEnvironment implements BuildEnvironment {
                 environment.apply("TRAVIS_BUILD_ID"),
                 environment.apply("TRAVIS_BUILD_WEB_URL"),
                 hostname(),
-                environment.apply("TRAVIS_REPO_SLUG")
+                environment.apply("TRAVIS_REPO_SLUG"),
+                environment.apply("TRAVIS_BRANCH"),
+                environment.apply("TRAVIS_COMMIT"),
+                environment.apply("TRAVIS_REPO_SLUG"),
+                environment.apply("TRAVIS_TAG")
         );
+    }
+
+    @Override
+    public GitProvenance buildGitProvenance() throws IncompleteGitConfigException {
+        //travis generates the .config directory and it is not possible to obtain the clone URL from any env
+        throw new IncompleteGitConfigException();
     }
 }

@@ -15,75 +15,55 @@
  */
 package org.openrewrite.maven;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.Validated;
+import lombok.Value;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.semver.Semver;
 
-import java.util.ArrayList;
 import java.util.List;
 
+@Value
 @EqualsAndHashCode(callSuper = true)
 public class UpgradeParentVersion extends Recipe {
-
-    @Deprecated
-    public UpgradeParentVersion(String groupId, String artifactId, String newVersion, @Nullable String versionPattern) {
-        this(groupId, artifactId, newVersion, versionPattern, null);
-    }
-
-    @JsonCreator
-    public UpgradeParentVersion(String groupId, String artifactId, String newVersion, @Nullable String versionPattern, @Nullable List<String> retainVersions) {
-        this.groupId = groupId;
-        this.artifactId = artifactId;
-        this.newVersion = newVersion;
-        this.versionPattern = versionPattern;
-        this.retainVersions = retainVersions == null ? new ArrayList<>() : retainVersions;
-        changeParentPom = new ChangeParentPom(groupId, null, artifactId, null, newVersion, versionPattern, false, this.retainVersions);
-    }
 
     @Option(displayName = "Group",
             description = "The first part of a dependency coordinate 'org.springframework.boot:spring-boot-parent:VERSION'.",
             example = "org.springframework.boot")
     @Getter
-    private final String groupId;
+    String groupId;
 
     @Option(displayName = "Artifact",
             description = "The second part of a dependency coordinate 'org.springframework.boot:spring-boot-parent:VERSION'.",
             example = "spring-boot-parent")
     @Getter
-    private final String artifactId;
+    String artifactId;
 
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number.",
             example = "29.X")
     @Getter
-    private final String newVersion;
+    String newVersion;
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Getter
     @Nullable
-    private final String versionPattern;
+    String versionPattern;
 
     @Option(displayName = "Retain versions",
-            description = "Accepts a list of GAVs. For each GAV, if it is a project direct dependency, and it is removed "
-                    + "from dependency management in the new parent pom, then it will be retained with an explicit version. "
-                    + "The version can be omitted from the GAV to use the old value from dependency management",
-            example = "- com.jcraft:jsch",
+            description = "Accepts a list of GAVs. For each GAV, if it is a project direct dependency, and it is removed " +
+                          "from dependency management in the new parent pom, then it will be retained with an explicit version. " +
+                          "The version can be omitted from the GAV to use the old value from dependency management",
+            example = "com.jcraft:jsch",
             required = false)
     @Getter
+    @Nullable
     List<String> retainVersions;
-
-    @EqualsAndHashCode.Exclude
-    private final ChangeParentPom changeParentPom;
 
     @Override
     public String getDisplayName() {
@@ -96,8 +76,8 @@ public class UpgradeParentVersion extends Recipe {
     }
 
     @Override
-    public Validated validate() {
-        Validated validated = super.validate();
+    public Validated<Object> validate() {
+        Validated<Object> validated = super.validate();
         //noinspection ConstantConditions
         if (newVersion != null) {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
@@ -106,12 +86,12 @@ public class UpgradeParentVersion extends Recipe {
     }
 
     @Override
-    protected MavenVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return changeParentPom.getSingleSourceApplicableTest();
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return changeParentPom().getVisitor();
     }
 
-    @Override
-    public MavenVisitor<ExecutionContext> getVisitor() {
-        return changeParentPom.getVisitor();
+    private ChangeParentPom changeParentPom() {
+        return new ChangeParentPom(groupId, null, artifactId, null, newVersion,
+                versionPattern, false, retainVersions);
     }
 }

@@ -110,11 +110,12 @@ public class VersionRequirement {
                                     Version lower, upper;
                                     if (range.bounds().boundedLower() != null) {
                                         Iterator<TerminalNode> versionIter = range.bounds().boundedLower().Version().iterator();
-                                        lower = toVersion(versionIter.next());
+                                        lower = versionIter.hasNext() ? toVersion(versionIter.next()) : null;
                                         upper = versionIter.hasNext() ? toVersion(versionIter.next()) : null;
                                     } else if (range.bounds().unboundedLower() != null) {
+                                        TerminalNode upperVersionNode = range.bounds().unboundedLower().Version();
                                         lower = null;
-                                        upper = toVersion(range.bounds().unboundedLower().Version());
+                                        upper = upperVersionNode != null ? toVersion(upperVersionNode) : null;
                                     } else {
                                         lower = toVersion(range.bounds().exactly().Version());
                                         upper = toVersion(range.bounds().exactly().Version());

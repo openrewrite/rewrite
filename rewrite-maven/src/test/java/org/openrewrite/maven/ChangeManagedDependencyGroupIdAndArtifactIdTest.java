@@ -16,12 +16,15 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 
-public class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
+class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void changeManagedDependencyGroupIdAndArtifactId() {
         rewriteRun(
@@ -99,23 +102,10 @@ public class ChangeManagedDependencyGroupIdAndArtifactIdTest implements RewriteT
                   </dependencyManagement>
               </project>
               """,
-            """
-              <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>jakarta.activation</groupId>
-                              <artifactId>jakarta.activation-api</artifactId>
-                              <version>2.1.1</version>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-              </project>
-              """
+            spec -> spec.after(pom -> {
+                assertThat(pom).containsPattern("<version>2.1.(\\d+)</version>");
+                return pom;
+            })
           )
         );
     }

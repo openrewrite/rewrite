@@ -36,10 +36,10 @@ import java.util.function.Supplier;
 
 public class JavaAIEditor {
     private static final ObjectMapper mapper = JsonMapper.builder()
-        .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
-        .build()
-        .registerModule(new ParameterNamesModule())
-        .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+            .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+            .build()
+            .registerModule(new ParameterNamesModule())
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     private final Supplier<Cursor> cursor;
     private final HttpSender http;
@@ -54,18 +54,20 @@ public class JavaAIEditor {
     public <J2 extends Statement> J2 edit(J2 j, String instruction) {
         String input = j.printTrimmed(cursor.get());
         try (HttpSender.Response raw = http
-            .post("https://api.openai.com/v1/edits")
-            .withHeader("Authorization", "Bearer " + ctx.getOpenapiToken().trim())
-            .withContent("application/json", mapper.writeValueAsBytes(new CodeEditRequest(instruction, input)))
-            .send()) {
+                .post("https://api.openai.com/v1/edits")
+                .withHeader("Authorization", "Bearer " + ctx.getOpenapiToken().trim())
+                .withContent("application/json", mapper.writeValueAsBytes(new CodeEditRequest(instruction, input)))
+                .send()) {
 
             CodeEditResponse response = mapper.readValue(raw.getBodyAsBytes(), CodeEditResponse.class);
             if (response.getError() != null) {
                 return Markup.warn(j, new IllegalStateException("Code edit failed: " + response.getError()));
             }
 
-            return j.withTemplate(JavaTemplate.builder(cursor, response.getChoices().get(0).getText()).build(),
-                j.getCoordinates().replace());
+            return JavaTemplate.builder(response.getChoices().get(0).getText())
+                    .contextSensitive()
+                    .build()
+                    .apply(cursor.get(), j.getCoordinates().replace());
         } catch (IOException e) {
             return Markup.warn(j, e);
         }

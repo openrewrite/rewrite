@@ -17,21 +17,23 @@ package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
 
-import java.time.Duration;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import static java.util.Objects.requireNonNull;
+
 /**
  * Passes messages between individual visitors or parsing operations and allows errors to be propagated
  * back to the process controlling parsing or recipe execution.
  */
 public interface ExecutionContext {
+    String CURRENT_CYCLE = "org.openrewrite.currentCycle";
     String CURRENT_RECIPE = "org.openrewrite.currentRecipe";
-    String UNCAUGHT_EXCEPTION_COUNT = "org.openrewrite.uncaughtExceptionCount";
     String DATA_TABLES = "org.openrewrite.dataTables";
+    String RUN_TIMEOUT = "org.openrewrite.runTimeout";
 
     @Incubating(since = "7.20.0")
     default ExecutionContext addObserver(TreeObserver.Subscription observer) {
@@ -74,6 +76,7 @@ public interface ExecutionContext {
 
     default <T> T getMessage(String key, @Nullable T defaultValue) {
         T t = getMessage(key);
+        //noinspection DataFlowIssue
         return t == null ? defaultValue : t;
     }
 
@@ -88,27 +91,11 @@ public interface ExecutionContext {
         putMessage(CURRENT_RECIPE, recipe);
     }
 
-    default Recipe getCurrentRecipe() {
-        //noinspection ConstantConditions
-        return getMessage(CURRENT_RECIPE);
-    }
-
-    default int incrementAndGetUncaughtExceptionCount() {
-        int count = getMessage(UNCAUGHT_EXCEPTION_COUNT, 0) + 1;
-        putMessage(UNCAUGHT_EXCEPTION_COUNT, count);
-        return count;
-    }
-
     Consumer<Throwable> getOnError();
 
     BiConsumer<Throwable, ExecutionContext> getOnTimeout();
 
-    /**
-     * @param inputs The number of inputs to the run. Allows the duration to be scaled to the number of inputs.
-     * @return The maximum duration a run (e.g. parse operation, recipe run) can take.
-     */
-    @Incubating(since = "7.3.0")
-    default Duration getRunTimeout(int inputs) {
-        return Duration.ofHours(2);
+    default int getCycle() {
+        return requireNonNull(getMessage(CURRENT_CYCLE));
     }
 }

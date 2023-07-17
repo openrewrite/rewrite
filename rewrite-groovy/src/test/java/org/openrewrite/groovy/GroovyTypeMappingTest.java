@@ -18,6 +18,7 @@ package org.openrewrite.groovy;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeMappingTest;
@@ -46,7 +47,9 @@ class GroovyTypeMappingTest implements JavaTypeMappingTest {
           .logCompilationWarningsAndErrors(true)
           .build()
           .parse(new InMemoryExecutionContext(), goat)
-          .get(0)
+          .findFirst()
+          .map(G.CompilationUnit.class::cast)
+          .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"))
           .getClasses()
           .get(0)
           .getType()
@@ -62,7 +65,9 @@ class GroovyTypeMappingTest implements JavaTypeMappingTest {
               def a = "hi"
               """
           )
-          .get(0)
+          .findFirst()
+          .map(G.CompilationUnit.class::cast)
+          .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"))
           .getStatements()
           .get(0);
 

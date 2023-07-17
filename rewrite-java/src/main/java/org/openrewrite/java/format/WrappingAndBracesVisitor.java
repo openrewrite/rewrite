@@ -20,7 +20,10 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.Statement;
 
 import java.util.List;
 
@@ -44,7 +47,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     public Statement visitStatement(Statement statement, P p) {
         Statement j = super.visitStatement(statement, p);
         J parentTree = getCursor().getParentTreeCursor().getValue();
-        if (parentTree instanceof J.Block) {
+        if (parentTree instanceof J.Block && !(j instanceof J.EnumValueSet)) {
+            // for `J.EnumValueSet` the prefix is on the enum constants
             if (!j.getPrefix().getWhitespace().contains("\n")) {
                 j = j.withPrefix(withNewline(j.getPrefix()));
             }
@@ -113,8 +117,8 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.If.Else visitElse(J.If.Else elze, P p) {
-        J.If.Else e = super.visitElse(elze, p);
+    public J.If.Else visitElse(J.If.Else else_, P p) {
+        J.If.Else e = super.visitElse(else_, p);
         boolean hasBody = e.getBody() instanceof J.Block || e.getBody() instanceof J.If;
         if (hasBody) {
             if (style.getIfStatement().getElseOnNewLine() && !e.getPrefix().getWhitespace().contains("\n")) {

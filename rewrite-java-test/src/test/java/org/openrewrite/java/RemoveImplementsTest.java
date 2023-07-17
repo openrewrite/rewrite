@@ -16,12 +16,14 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
 class RemoveImplementsTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void removeBasic() {
         rewriteRun(

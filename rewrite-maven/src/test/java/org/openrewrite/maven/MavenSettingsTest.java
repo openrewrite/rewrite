@@ -596,10 +596,10 @@ class MavenSettingsTest {
 
             var mergedSettings = userSettings.merge(baseSettings);
 
-            assertThat(mergedSettings.getProfiles().getProfiles().size()).isEqualTo(2);
-            assertThat(mergedSettings.getActiveProfiles().getActiveProfiles().size()).isEqualTo(2);
-            assertThat(mergedSettings.getMirrors().getMirrors().size()).isEqualTo(2);
-            assertThat(mergedSettings.getServers().getServers().size()).isEqualTo(2);
+            assertThat(mergedSettings.getProfiles().getProfiles()).hasSize(2);
+            assertThat(mergedSettings.getActiveProfiles().getActiveProfiles()).hasSize(2);
+            assertThat(mergedSettings.getMirrors().getMirrors()).hasSize(2);
+            assertThat(mergedSettings.getServers().getServers()).hasSize(2);
         }
 
         @Test
@@ -645,15 +645,15 @@ class MavenSettingsTest {
 
             var mergedSettings = userSettings.merge(baseSettings);
 
-            assertThat(mergedSettings.getProfiles().getProfiles().size()).isEqualTo(1);
+            assertThat(mergedSettings.getProfiles().getProfiles()).hasSize(1);
             assertThat(mergedSettings.getProfiles().getProfiles().get(0).getRepositories().getRepositories().get(0).getSnapshots()).isNull();
-            assertThat(mergedSettings.getActiveProfiles().getActiveProfiles().size()).isEqualTo(1);
-            assertThat(mergedSettings.getMirrors().getMirrors().size()).isEqualTo(1);
+            assertThat(mergedSettings.getActiveProfiles().getActiveProfiles()).hasSize(1);
+            assertThat(mergedSettings.getMirrors().getMirrors()).hasSize(1);
 
             assertThat(mergedSettings.getMirrors().getMirrors().get(0).getUrl())
               .isEqualTo("http://downloads.planetmirror.com/pub/maven3000");
 
-            assertThat(mergedSettings.getServers().getServers().size()).isEqualTo(1);
+            assertThat(mergedSettings.getServers().getServers()).hasSize(1);
             assertThat(mergedSettings.getServers().getServers().get(0))
               .hasFieldOrPropertyWithValue("username", "foo")
               .hasFieldOrPropertyWithValue("password", null);

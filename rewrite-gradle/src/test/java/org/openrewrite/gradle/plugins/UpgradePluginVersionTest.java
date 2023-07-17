@@ -16,12 +16,42 @@
 package org.openrewrite.gradle.plugins;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.gradle.Assertions.settingsGradle;
+import static org.openrewrite.gradle.Assertions.*;
+import static org.openrewrite.gradle.Assertions.buildGradle;
 
-public class UpgradePluginVersionTest implements RewriteTest {
+class UpgradePluginVersionTest implements RewriteTest {
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.beforeRecipe(withToolingApi());
+    }
 
+    @DocumentExample("Upgrading a build plugin")
+    @Test
+    void upgradePlugin() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "latest.patch", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'org.openrewrite.rewrite' version '5.40.0'
+                  id 'com.github.johnrengelman.shadow' version '6.1.0'
+              }
+              """,
+            """
+              plugins {
+                  id 'org.openrewrite.rewrite' version '5.40.6'
+                  id 'com.github.johnrengelman.shadow' version '6.1.0'
+              }
+              """
+          )
+        );
+    }
+
+    @DocumentExample("Upgrading a settings plugin")
     @Test
     void upgradeGradleSettingsPlugin() {
         rewriteRun(
@@ -29,12 +59,50 @@ public class UpgradePluginVersionTest implements RewriteTest {
           settingsGradle(
             """
               plugins {
-                  id 'com.gradle.enterprise' version '3.10.0'
+                  id 'com.gradle.enterprise' version '3.10'
               }
               """,
             """
               plugins {
                   id 'com.gradle.enterprise' version '3.10.3'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradePluginGlob() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.*", "5.40.X", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'org.openrewrite.rewrite' version '5.40.0'
+              }
+              """,
+            """
+              plugins {
+                  id 'org.openrewrite.rewrite' version '5.40.6'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void exactVersionDoesNotHaveToBeResolvable() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", "999.0", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'org.openrewrite.rewrite' version '5.34.0'
+              }
+              """,
+            """
+              plugins {
+                  id 'org.openrewrite.rewrite' version '999.0'
               }
               """
           )

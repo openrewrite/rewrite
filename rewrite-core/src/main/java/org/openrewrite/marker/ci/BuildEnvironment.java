@@ -16,6 +16,7 @@
 package org.openrewrite.marker.ci;
 
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.marker.Marker;
 
 import java.util.function.UnaryOperator;
@@ -24,11 +25,14 @@ public interface BuildEnvironment extends Marker {
 
     @Nullable
     static BuildEnvironment build(UnaryOperator<String> environment) {
-        if (environment.apply("BUILD_NUMBER") != null && environment.apply("JOB_NAME") != null) {
+        if (environment.apply("CUSTOM_CI") != null) {
+            return CustomBuildEnvironment.build(environment);
+        } else if (environment.apply("BUILD_NUMBER") != null && environment.apply("JOB_NAME") != null) {
             return JenkinsBuildEnvironment.build(environment);
         } else if (environment.apply("GITLAB_CI") != null) {
             return GitlabBuildEnvironment.build(environment);
-        } else if (environment.apply("CI") != null && environment.apply("GITHUB_ACTION") != null && environment.apply("GITHUB_RUN_ID") != null) {
+        } else if (environment.apply("CI") != null && environment.apply("GITHUB_ACTION") != null
+                && environment.apply("GITHUB_RUN_ID") != null) {
             return GithubActionsBuildEnvironment.build(environment);
         } else if (environment.apply("DRONE") != null) {
             return DroneBuildEnvironment.build(environment);
@@ -37,7 +41,10 @@ public interface BuildEnvironment extends Marker {
         } else if (environment.apply("TRAVIS") != null) {
             return TravisBuildEnvironment.build(environment);
         }
-
         return null;
     }
+
+    GitProvenance buildGitProvenance() throws IncompleteGitConfigException;
+
+
 }

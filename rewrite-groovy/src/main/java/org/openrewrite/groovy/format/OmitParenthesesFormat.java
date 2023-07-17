@@ -15,23 +15,26 @@
  */
 package org.openrewrite.groovy.format;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.groovy.style.OmitParenthesesStyle;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+
+import java.util.Optional;
+
+import static java.util.Objects.requireNonNull;
 
 public class OmitParenthesesFormat extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Tabs and indents";
+        return "Stylize Groovy code to omit parentheses";
     }
 
     @Override
     public String getDescription() {
-        return "Format tabs and indents in Java code.";
+        return "Omit parentheses for last argument lambdas in Groovy code.";
     }
 
     @Override
@@ -41,15 +44,15 @@ public class OmitParenthesesFormat extends Recipe {
 
     private static class OmitParenthesesFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-            OmitParenthesesStyle style = ((SourceFile) cu).getStyle(OmitParenthesesStyle.class);
-            if (style == null) {
-                style = OmitParenthesesStyle.DEFAULT;
+        public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            if (tree instanceof JavaSourceFile) {
+                SourceFile cu = (SourceFile) requireNonNull(tree);
+                OmitParenthesesStyle style = Optional.ofNullable(cu.getStyle(OmitParenthesesStyle.class)).orElse(OmitParenthesesStyle.DEFAULT);
+                if (style.getLastArgumentLambda()) {
+                    doAfterVisit(new OmitParenthesesForLastArgumentLambda().getVisitor());
+                }
             }
-            if(style.getLastArgumentLambda()) {
-                doAfterVisit(new OmitParenthesesForLastArgumentLambda().getVisitor());
-            }
-            return cu;
+            return super.visit(tree, ctx);
         }
     }
 }

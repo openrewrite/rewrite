@@ -71,18 +71,13 @@ public class ChangeDependencyArtifactId extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsBuildGradle<>();
-    }
-
-    @Override
-    public Validated validate() {
+    public Validated<Object> validate() {
         return super.validate().and(DependencyMatcher.build(groupId + ":" + artifactId));
     }
 
     @Override
-    public GroovyVisitor<ExecutionContext> getVisitor() {
-        return new GroovyVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(groupId + ":" + artifactId).getValue());
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
 
@@ -94,15 +89,43 @@ public class ChangeDependencyArtifactId extends Recipe {
                 }
 
                 List<Expression> depArgs = m.getArguments();
+                if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
+                    m = updateDependency(m);
+                } else if (depArgs.get(0) instanceof J.MethodInvocation &&
+                        (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
+                                ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
+                    m = m.withArguments(ListUtils.map(depArgs, platform -> updateDependency((J.MethodInvocation) platform)));
+                }
+
+                return m;
+            }
+
+            private J.MethodInvocation updateDependency(J.MethodInvocation m) {
+                List<Expression> depArgs = m.getArguments();
                 if (depArgs.get(0) instanceof J.Literal) {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
                     if (gav != null) {
-                        Dependency dependency = new DependencyStringNotationConverter().parse(gav);
+                        Dependency dependency = DependencyStringNotationConverter.parse(gav);
                         if (!newArtifactId.equals(dependency.getArtifactId()) &&
                                 ((dependency.getVersion() == null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) ||
                                         (dependency.getVersion() != null && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion())))) {
                             Dependency newDependency = dependency.withArtifactId(newArtifactId);
                             m = m.withArguments(ListUtils.mapFirst(m.getArguments(), arg -> ChangeStringLiteral.withStringValue((J.Literal) arg, newDependency.toStringNotation())));
+                        }
+                    }
+                } else if (depArgs.get(0) instanceof G.GString) {
+                    List<J> strings = ((G.GString) depArgs.get(0)).getStrings();
+                    if (strings.size() >= 2 &&
+                            strings.get(0) instanceof J.Literal) {
+                        Dependency dependency = DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
+                        if (!newArtifactId.equals(dependency.getArtifactId())
+                                && depMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                            dependency = dependency.withArtifactId(newArtifactId);
+                            String replacement = dependency.toStringNotation();
+                            m = m.withArguments(ListUtils.mapFirst(depArgs, arg -> {
+                                G.GString gString = (G.GString) arg;
+                                return gString.withStrings(ListUtils.mapFirst(gString.getStrings(), l -> ((J.Literal) l).withValue(replacement).withValueSource(replacement)));
+                            }));
                         }
                     }
                 } else if (depArgs.get(0) instanceof G.MapEntry) {
@@ -158,6 +181,6 @@ public class ChangeDependencyArtifactId extends Recipe {
 
                 return m;
             }
-        };
+        });
     }
 }

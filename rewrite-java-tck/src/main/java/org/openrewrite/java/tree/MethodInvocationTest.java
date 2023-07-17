@@ -22,7 +22,6 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.tree.TypeUtils.asFullyQualified;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ConstantConditions")
@@ -51,11 +50,11 @@ class MethodInvocationTest implements RewriteTest {
           })),
           java(
             """
-                  public class A {
-                      Integer m = foo ( 0, 1, 2 );
-                  
-                      public Integer foo(Integer n, Integer... ns) { return n; }
-                  }
+              public class A {
+                  Integer m = foo ( 0, 1, 2 );
+              
+                  public Integer foo(Integer n, Integer... ns) { return n; }
+              }
               """
           )
         );

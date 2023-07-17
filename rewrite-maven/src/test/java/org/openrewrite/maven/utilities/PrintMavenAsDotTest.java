@@ -17,6 +17,7 @@ package org.openrewrite.maven.utilities;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -29,6 +30,7 @@ public class PrintMavenAsDotTest implements RewriteTest {
         spec.recipe(new PrintMavenAsDot());
     }
 
+    @DocumentExample
     @Test
     void dot() {
         rewriteRun(

@@ -15,8 +15,8 @@
  */
 package org.openrewrite.config;
 
+import lombok.RequiredArgsConstructor;
 import org.openrewrite.Recipe;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -26,10 +26,9 @@ import java.util.List;
  * A recipe that exists only to wrap other recipes.
  * Anonymous recipe classes aren't serializable/deserializable so use this, or another named type, instead
  */
+@RequiredArgsConstructor
 public class CompositeRecipe extends Recipe {
-
-    private static final Duration DEFAULT_ESTIMATED_EFFORT = Duration.ofMinutes(5);
-    private Duration estimatedEffortPerOccurrence;
+    private final List<Recipe> recipeList;
 
     @Override
     public String getDisplayName() {
@@ -37,27 +36,18 @@ public class CompositeRecipe extends Recipe {
     }
 
     @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        if (estimatedEffortPerOccurrence == null) {
-            long total = 0;
-            for (Recipe recipe : getRecipeList()) {
-                if (isNonzero(recipe.getEstimatedEffortPerOccurrence())) {
-                    // Duration arithmetic has poor performance, and this code gets hit a lot with deeply-nested recipes
-                    total += recipe.getEstimatedEffortPerOccurrence().toMillis();
-                }
-            }
-
-            if (total == 0) {
-                return DEFAULT_ESTIMATED_EFFORT;
-            }
-
-            estimatedEffortPerOccurrence = Duration.ofMillis(total);
-        }
-        return estimatedEffortPerOccurrence;
+    public String getDescription() {
+        return "A recipe that consists of a list of other recipes.";
     }
 
-    private static boolean isNonzero(@Nullable Duration estimatedEffortPerOccurrence) {
-        return estimatedEffortPerOccurrence != null && !estimatedEffortPerOccurrence.equals(Duration.ZERO);
+    @Override
+    public Duration getEstimatedEffortPerOccurrence() {
+        return null;
+    }
+
+    @Override
+    public List<Recipe> getRecipeList() {
+        return recipeList;
     }
 
     @Override

@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
@@ -27,17 +28,16 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"StringOperationCanBeSimplified", "ConstantConditions"})
-public class JavaTemplateTest2Test implements RewriteTest {
+class JavaTemplateTest2Test implements RewriteTest {
 
     private final Recipe replaceToStringWithLiteralRecipe = toRecipe(() -> new JavaVisitor<>() {
         private final MethodMatcher toString = new MethodMatcher("java.lang.String toString()");
-        private final JavaTemplate t = JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}").build();
 
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J mi = super.visitMethodInvocation(method, ctx);
             if (mi instanceof J.MethodInvocation && toString.matches((J.MethodInvocation) mi)) {
-                return mi.withTemplate(t, ((J.MethodInvocation) mi).getCoordinates().replace(),
+                return JavaTemplate.apply("#{any(java.lang.String)}", getCursor(), ((J.MethodInvocation) mi).getCoordinates().replace(),
                   ((J.MethodInvocation) mi).getSelect());
             }
             return mi;
@@ -79,6 +79,7 @@ public class JavaTemplateTest2Test implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void chainedMethodInvocationsAsNewClassArgument2() {
         rewriteRun(
@@ -179,20 +180,19 @@ public class JavaTemplateTest2Test implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
-                  var nc = super.visitNewClass(newClass, ctx);
                   var md = getCursor().firstEnclosing(J.MethodDeclaration.class);
                   if (md != null && md.getSimpleName().equals("createBis")) {
-                      return nc;
+                      return newClass;
                   }
                   if (newClass.getType() != null &&
                       TypeUtils.asFullyQualified(newClass.getType()).getFullyQualifiedName().equals("java.io.ByteArrayInputStream") &&
                       !newClass.getArguments().isEmpty()) {
-                      nc = nc.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "createBis(#{anyArray()})").build(),
-                        newClass.getCoordinates().replace(), newClass.getArguments().get(0)
-                      );
+                      return JavaTemplate.builder("createBis(#{anyArray()})")
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), newClass.getCoordinates().replace(), newClass.getArguments().get(0));
                   }
-                  return nc;
+                  return newClass;
               }
           })),
           java(
@@ -251,11 +251,8 @@ public class JavaTemplateTest2Test implements RewriteTest {
               @Override
               public J visitIdentifier(J.Identifier identifier, ExecutionContext p) {
                   if (identifier.getSimpleName().equals("f")) {
-                      return identifier.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "#{any(java.io.File)}.getCanonicalFile().toPath()").build(),
-                        identifier.getCoordinates().replace(),
-                        identifier
-                      );
+                      return JavaTemplate.apply("#{any(java.io.File)}.getCanonicalFile().toPath()",
+                        getCursor(), identifier.getCoordinates().replace(), identifier);
                   }
                   return identifier;
               }
@@ -349,7 +346,6 @@ public class JavaTemplateTest2Test implements RewriteTest {
                       String string  = asString();
                       return new Integer(string.toString());
                   }
-
               }
               """,
             """
@@ -372,7 +368,6 @@ public class JavaTemplateTest2Test implements RewriteTest {
                       String string  = asString();
                       return new Integer(string);
                   }
-
               }
               """
           )
@@ -451,5 +446,4 @@ public class JavaTemplateTest2Test implements RewriteTest {
           )
         );
     }
-
 }

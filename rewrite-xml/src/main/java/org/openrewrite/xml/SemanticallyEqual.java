@@ -15,7 +15,6 @@
  */
 package org.openrewrite.xml;
 
-import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
@@ -29,7 +28,6 @@ import static java.util.stream.Collectors.toList;
  * Recursively check the equality of XML tags and attributes.
  * Ignores comments. Ignores the order of attributes.
  */
-@Incubating(since = "7.17.0")
 public class SemanticallyEqual {
 
     private SemanticallyEqual() {
@@ -70,6 +68,10 @@ public class SemanticallyEqual {
                 return null;
             }
             Xml.Tag otherTag = (Xml.Tag)other;
+            if (!tag.getName().equals(otherTag.getName())) {
+                areEqual = false;
+                return null;
+            }
             if(tag.getAttributes().size() != otherTag.getAttributes().size()) {
                 areEqual = false;
                 return null;

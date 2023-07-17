@@ -15,9 +15,12 @@
  */
 package org.openrewrite.marker;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.With;
+import lombok.experimental.NonFinal;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.RecipeScheduler;
@@ -50,10 +53,18 @@ public interface Markup extends Marker {
     }
 
     static <T extends Tree> T error(T t, Throwable throwable) {
+        if (ExceptionUtils.containsCircularReferences(throwable)) {
+            throwable = new Exception(throwable.getMessage());
+            throwable.setStackTrace(throwable.getStackTrace());
+        }
         return markup(t, new Markup.Error(randomId(), throwable));
     }
 
     static <T extends Tree> T warn(T t, Throwable throwable) {
+        if (ExceptionUtils.containsCircularReferences(throwable)) {
+            throwable = new Exception(throwable.getMessage());
+            throwable.setStackTrace(throwable.getStackTrace());
+        }
         return markup(t, new Markup.Warn(randomId(), throwable));
     }
 
@@ -78,72 +89,56 @@ public interface Markup extends Marker {
     }
 
     @Value
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
     @With
     class Error implements Markup {
         UUID id;
-        Throwable exception;
 
-        @Override
-        public String getMessage() {
-            return getCause().getMessage();
+        @EqualsAndHashCode.Include
+        String message;
+
+        @EqualsAndHashCode.Include
+        String detail;
+
+        public Error(UUID id, Throwable exception) {
+            this.id = id;
+            Throwable cause = exception instanceof RecipeRunException ? exception.getCause() : exception;
+            this.message = cause.getMessage();
+            this.detail = ExceptionUtils.sanitizeStackTrace(cause, RecipeScheduler.class);
         }
 
-        @Override
-        @NonNull
-        public String getDetail() {
-            return ExceptionUtils.sanitizeStackTrace(getCause(), RecipeScheduler.class);
-        }
-
-        private Throwable getCause() {
-            return exception instanceof RecipeRunException ? exception.getCause() : exception;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Error error = (Error) o;
-            return getDetail().equals(error.getDetail());
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(getDetail());
+        @JsonCreator
+        public Error(UUID id, String message, String detail) {
+            this.id = id;
+            this.message = message;
+            this.detail = detail;
         }
     }
 
     @Value
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
     @With
     class Warn implements Markup {
         UUID id;
-        Throwable exception;
 
-        @Override
-        public String getMessage() {
-            return getCause().getMessage();
+        @EqualsAndHashCode.Include
+        String message;
+
+        @EqualsAndHashCode.Include
+        String detail;
+
+        public Warn(UUID id, Throwable exception) {
+            this.id = id;
+            Throwable cause = exception instanceof RecipeRunException ? exception.getCause() : exception;
+            this.message = cause.getMessage();
+            this.detail = ExceptionUtils.sanitizeStackTrace(cause, RecipeScheduler.class);
         }
 
-        @Override
-        @NonNull
-        public String getDetail() {
-            return ExceptionUtils.sanitizeStackTrace(getCause(), RecipeScheduler.class);
-        }
-
-        private Throwable getCause() {
-            return exception instanceof RecipeRunException ? exception.getCause() : exception;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Warn error = (Warn) o;
-            return getDetail().equals(error.getDetail());
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(getDetail());
+        @JsonCreator
+        public Warn(UUID id, String message, String detail) {
+            this.id = id;
+            this.message = message;
+            this.detail = detail;
         }
     }
 
@@ -159,7 +154,6 @@ public interface Markup extends Marker {
         @EqualsAndHashCode.Include
         @Nullable
         String detail;
-
 
         @Override
         public String getMessage() {

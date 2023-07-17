@@ -17,8 +17,10 @@ package org.openrewrite.json;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.json.tree.Json;
 import org.openrewrite.marker.Markers;
 
@@ -37,14 +39,6 @@ public class ChangeValue extends Recipe {
             example = "'Deployment'")
     String value;
 
-    @Incubating(since = "7.11.0")
-    @Option(displayName = "Optional file matcher",
-            description = "Matching files will be modified. This is a glob expression.",
-            required = false,
-            example = "**/application-*.json")
-    @Nullable
-    String fileMatcher;
-
     @Override
     public String getDisplayName() {
         return "Change value";
@@ -56,15 +50,7 @@ public class ChangeValue extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        if (fileMatcher != null) {
-            return new HasSourcePath<>(fileMatcher);
-        }
-        return null;
-    }
-
-    @Override
-    public JsonVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         JsonPathMatcher matcher = new JsonPathMatcher(oldKeyPath);
         return new JsonIsoVisitor<ExecutionContext>() {
             @Override

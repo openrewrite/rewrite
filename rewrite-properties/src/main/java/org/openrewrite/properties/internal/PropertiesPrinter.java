@@ -30,7 +30,7 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
     public Properties visitFile(Properties.File file, PrintOutputCapture<P> p) {
         beforeSyntax(file, p);
         visit(file.getContent(), p);
-        p.out.append(file.getEof());
+        p.append(file.getEof());
         afterSyntax(file, p);
         return file;
     }
@@ -38,13 +38,13 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
     @Override
     public Properties visitEntry(Properties.Entry entry, PrintOutputCapture<P> p) {
         beforeSyntax(entry, p);
-        p.out.append(entry.getKey())
+        p.append(entry.getKey())
                 .append(entry.getBeforeEquals());
         if (entry.getDelimiter() != Properties.Entry.Delimiter.NONE) {
-            p.out.append(entry.getDelimiter().getCharacter());
+            p.append(entry.getDelimiter().getCharacter());
         }
         beforeSyntax(entry.getValue().getPrefix(), entry.getValue().getMarkers(), p);
-        p.out.append(entry.getValue().getText());
+        p.append(entry.getValue().getText());
         afterSyntax(entry.getValue().getMarkers(), p);
         afterSyntax(entry, p);
         return entry;
@@ -53,8 +53,12 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
     @Override
     public Properties visitComment(Properties.Comment comment, PrintOutputCapture<P> p) {
         beforeSyntax(comment, p);
-        p.out.append(comment.getDelimiter().getCharacter());
-        p.out.append(comment.getMessage());
+        if (comment.getDelimiter() == null) {
+            p.append('#');
+        } else {
+            p.append(comment.getDelimiter().getCharacter());
+        }
+        p.append(comment.getMessage());
         afterSyntax(comment, p);
         return comment;
     }
@@ -68,12 +72,12 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
 
     private void beforeSyntax(String prefix, Markers markers, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), PROPERTIES_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), PROPERTIES_MARKER_WRAPPER));
         }
-        p.out.append(prefix);
+        p.append(prefix);
         visitMarkers(markers, p);
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), PROPERTIES_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), PROPERTIES_MARKER_WRAPPER));
         }
     }
 
@@ -83,7 +87,7 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<PrintOutputCapture<P
 
     private void afterSyntax(Markers markers, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), PROPERTIES_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), PROPERTIES_MARKER_WRAPPER));
         }
     }
 }

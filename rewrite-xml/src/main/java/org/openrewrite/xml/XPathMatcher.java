@@ -16,12 +16,15 @@
 package org.openrewrite.xml;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.xml.search.FindTags;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -73,17 +76,47 @@ public class XPathMatcher {
             return expression.startsWith("/") || path.size() - pathIndex <= 1;
         } else if (expression.startsWith("/")) {
             Collections.reverse(path);
-
             String[] parts = expression.substring(1).split("/");
+
+            if (parts.length > path.size() + 1) {
+                return false;
+            }
+
             for (int i = 0; i < parts.length; i++) {
                 String part = parts[i];
+
+                Xml.Tag tag = i < path.size() ? path.get(i) : null;
+                String partName;
+
+                // to support conditional tags like `plugin[artifactId='maven-compiler-plugin']`
+                String regex =  "([-\\w]+)\\[([-\\w]+)='([-\\w]+)'\\]";
+                Pattern pattern = Pattern.compile(regex);
+                Matcher matcher = pattern.matcher(part);
+                if (tag != null && matcher.matches()) {
+                    String name = matcher.group(1);
+                    String subTag = matcher.group(2);
+                    String subTagValue = matcher.group(3);
+
+                    boolean matchCondition =
+                        FindTags.find(tag, subTag).stream().anyMatch(t ->
+                            t.getValue().map(v -> v.equals(subTagValue)).orElse(false)
+                        );
+                    if (!matchCondition) {
+                        return false;
+                    }
+                    partName = name;
+                } else {
+                    partName = part;
+                }
+
+
                 if (part.startsWith("@")) {
                     return cursor.getValue() instanceof Xml.Attribute &&
                             (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1)) ||
                                     "*".equals(part.substring(1)));
                 }
 
-                if (path.size() < i + 1 || (!path.get(i).getName().equals(part) && !"*".equals(part))) {
+                if (path.size() < i + 1 || (!tag.getName().equals(partName) && !"*".equals(part))) {
                     return false;
                 }
             }

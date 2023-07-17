@@ -17,7 +17,10 @@ package org.openrewrite.properties;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
@@ -46,7 +49,6 @@ public class DeleteProperty extends Recipe {
             example = "management.metrics.binders.files.enabled or management.metrics.*")
     String propertyKey;
 
-    @Incubating(since = "7.17.0")
     @Option(displayName = "Use relaxed binding",
             description = "Whether to match the `propertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
                     "rules. Default is `true`. Set to `false`  to use exact matching.",
@@ -54,32 +56,18 @@ public class DeleteProperty extends Recipe {
     @Nullable
     Boolean relaxedBinding;
 
-    @Option(displayName = "Optional file matcher",
-            description = "Matching files will be modified. This is a glob expression.",
-            required = false,
-            example = "**/application-*.properties")
-    @Nullable
-    String fileMatcher;
-
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        if (fileMatcher != null) {
-            return new HasSourcePath<>(fileMatcher);
-        }
-        return null;
-    }
-
-    @Override
-    public PropertiesVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
             public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
                 Properties.File f = (Properties.File) super.visitFile(file, executionContext);
 
                 String prefix = null;
-                List<Properties.Content> fileContent = new ArrayList<>();
-                for (int i = 0; i < f.getContent().size(); i++) {
-                    Properties.Content content = f.getContent().get(i);
+                List<Properties.Content> contents = f.getContent();
+                List<Properties.Content> newContents = new ArrayList<>();
+                for (int i = 0; i < contents.size(); i++) {
+                    Properties.Content content = contents.get(i);
                     if (content instanceof Properties.Entry && isMatch(((Properties.Entry) content).getKey())) {
                         if (i == 0) {
                             prefix = ((Properties.Entry) content).getPrefix();
@@ -89,11 +77,11 @@ public class DeleteProperty extends Recipe {
                             content = (Properties.Content) content.withPrefix(prefix);
                             prefix = null;
                         }
-                        fileContent.add(content);
+                        newContents.add(content);
                     }
                 }
 
-                return f.getContent().size() == fileContent.size() ? f : f.withContent(fileContent);
+                return contents.size() == newContents.size() ? f : f.withContent(newContents);
             }
 
             private boolean isMatch(String key) {

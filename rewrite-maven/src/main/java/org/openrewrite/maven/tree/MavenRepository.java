@@ -124,10 +124,12 @@ public class MavenRepository implements Serializable {
             this.releases = Boolean.toString(releases);
             return this;
         }
+
         public Builder releases(String releases) {
             this.releases = releases;
             return this;
         }
+
         public Builder snapshots(boolean snapshots) {
             this.snapshots = Boolean.toString(snapshots);
             return this;
@@ -136,6 +138,35 @@ public class MavenRepository implements Serializable {
         public Builder snapshots(String snapshots) {
             this.snapshots = snapshots;
             return this;
+        }
+
+        public Builder username(String username) {
+            if (username.startsWith("${env.")) {
+                this.username = resolveEnvironmentProperty(username);
+                return this;
+            }
+
+            this.username = username;
+            return this;
+        }
+
+        public Builder password(String password) {
+            if (password.startsWith("${env.")) {
+                this.password = resolveEnvironmentProperty(password);
+                return this;
+            }
+
+            this.password = password;
+            return this;
+        }
+
+        @Nullable
+        private static String resolveEnvironmentProperty(@Nullable String rawProperty) {
+            if (rawProperty == null) {
+                return null;
+            }
+            String propertyName = rawProperty.replace("${env.", "").replace("}", "");
+            return System.getenv(propertyName);
         }
     }
 }

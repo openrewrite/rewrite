@@ -27,7 +27,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-public class GradleJavaTemplateTest implements RewriteTest {
+class GradleJavaTemplateTest implements RewriteTest {
 
     @Test
     @Disabled("work in progress")
@@ -36,13 +36,10 @@ public class GradleJavaTemplateTest implements RewriteTest {
             @Override
             public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
                 if (block.getStatements().isEmpty()) {
-                    return block.withTemplate(
-                      JavaTemplate
-                        .builder(this::getCursor, "implementation(\"com.google.guava:guava:latest.release\")")
-                        .doBeforeParseTemplate(System.out::println)
-                        .build(),
-                      block.getCoordinates().replace()
-                    );
+                    return JavaTemplate.builder("implementation(\"com.google.guava:guava:latest.release\")")
+                      .contextSensitive()
+                      .build()
+                      .apply(getCursor(), block.getCoordinates().replace());
                 }
                 return super.visitBlock(block, ctx);
             }

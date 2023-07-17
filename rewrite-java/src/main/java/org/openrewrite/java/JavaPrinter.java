@@ -55,10 +55,13 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    @SuppressWarnings("ForLoopReplaceableByForEach")
     public Space visitSpace(Space space, Space.Location loc, PrintOutputCapture<P> p) {
         p.append(space.getWhitespace());
 
-        for (Comment comment : space.getComments()) {
+        List<Comment> comments = space.getComments();
+        for (int i = 0; i < comments.size(); i++) {
+            Comment comment = comments.get(i);
             visitMarkers(comment.getMarkers(), p);
             comment.printComment(getCursor(), p);
             p.append(comment.getSuffix());
@@ -184,13 +187,13 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitAssert(Assert azzert, PrintOutputCapture<P> p) {
-        beforeSyntax(azzert, Space.Location.ASSERT_PREFIX, p);
+    public J visitAssert(Assert assert_, PrintOutputCapture<P> p) {
+        beforeSyntax(assert_, Space.Location.ASSERT_PREFIX, p);
         p.append("assert");
-        visit(azzert.getCondition(), p);
-        visitLeftPadded(":", azzert.getDetail(), JLeftPadded.Location.ASSERT_DETAIL, p);
-        afterSyntax(azzert, p);
-        return azzert;
+        visit(assert_.getCondition(), p);
+        visitLeftPadded(":", assert_.getDetail(), JLeftPadded.Location.ASSERT_DETAIL, p);
+        afterSyntax(assert_, p);
+        return assert_;
     }
 
     @Override
@@ -382,8 +385,14 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             }
 
             if (getCursor().getValue() instanceof Case) {
-                Object aSwitch = getCursor().dropParentUntil(c -> c instanceof Switch || c instanceof SwitchExpression)
-                        .getValue();
+                Object aSwitch =
+                        getCursor()
+                                .dropParentUntil(
+                                        c -> c instanceof Switch ||
+                                                c instanceof SwitchExpression ||
+                                                c == Cursor.ROOT_VALUE
+                                )
+                                .getValue();
                 if (aSwitch instanceof J.SwitchExpression) {
                     Case aCase = getCursor().getValue();
                     if (!(aCase.getBody() instanceof J.Block)) {
@@ -407,36 +416,36 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitCase(Case caze, PrintOutputCapture<P> p) {
-        beforeSyntax(caze, Space.Location.CASE_PREFIX, p);
-        Expression elem = caze.getExpressions().get(0);
+    public J visitCase(Case case_, PrintOutputCapture<P> p) {
+        beforeSyntax(case_, Space.Location.CASE_PREFIX, p);
+        Expression elem = case_.getExpressions().get(0);
         if (!(elem instanceof Identifier) || !((Identifier) elem).getSimpleName().equals("default")) {
             p.append("case");
         }
-        visitContainer("", caze.getPadding().getExpressions(), JContainer.Location.CASE_EXPRESSION, ",", "", p);
-        visitSpace(caze.getPadding().getStatements().getBefore(), Space.Location.CASE, p);
-        p.append(caze.getType() == Case.Type.Statement ? ":" : "->");
-        visitStatements(caze.getPadding().getStatements().getPadding()
+        visitContainer("", case_.getPadding().getExpressions(), JContainer.Location.CASE_EXPRESSION, ",", "", p);
+        visitSpace(case_.getPadding().getStatements().getBefore(), Space.Location.CASE, p);
+        p.append(case_.getType() == Case.Type.Statement ? ":" : "->");
+        visitStatements(case_.getPadding().getStatements().getPadding()
                 .getElements(), JRightPadded.Location.CASE, p);
-        if (caze.getBody() instanceof Statement) {
+        if (case_.getBody() instanceof Statement) {
             //noinspection unchecked
-            visitStatement((JRightPadded<Statement>) (JRightPadded<?>) caze.getPadding().getBody(),
+            visitStatement((JRightPadded<Statement>) (JRightPadded<?>) case_.getPadding().getBody(),
                     JRightPadded.Location.CASE_BODY, p);
         } else {
-            visitRightPadded(caze.getPadding().getBody(), JRightPadded.Location.CASE_BODY, ";", p);
+            visitRightPadded(case_.getPadding().getBody(), JRightPadded.Location.CASE_BODY, ";", p);
         }
-        afterSyntax(caze, p);
-        return caze;
+        afterSyntax(case_, p);
+        return case_;
     }
 
     @Override
-    public J visitCatch(Try.Catch catzh, PrintOutputCapture<P> p) {
-        beforeSyntax(catzh, Space.Location.CATCH_PREFIX, p);
+    public J visitCatch(Try.Catch catch_, PrintOutputCapture<P> p) {
+        beforeSyntax(catch_, Space.Location.CATCH_PREFIX, p);
         p.append("catch");
-        visit(catzh.getParameter(), p);
-        visit(catzh.getBody(), p);
-        afterSyntax(catzh, p);
-        return catzh;
+        visit(catch_.getParameter(), p);
+        visit(catch_.getBody(), p);
+        afterSyntax(catch_, p);
+        return catch_;
     }
 
     @Override
@@ -524,12 +533,12 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitElse(If.Else elze, PrintOutputCapture<P> p) {
-        beforeSyntax(elze, Space.Location.ELSE_PREFIX, p);
+    public J visitElse(If.Else else_, PrintOutputCapture<P> p) {
+        beforeSyntax(else_, Space.Location.ELSE_PREFIX, p);
         p.append("else");
-        visitStatement(elze.getPadding().getBody(), JRightPadded.Location.IF_ELSE, p);
-        afterSyntax(elze, p);
-        return elze;
+        visitStatement(else_.getPadding().getBody(), JRightPadded.Location.IF_ELSE, p);
+        afterSyntax(else_, p);
+        return else_;
     }
 
     public J visitEmpty(J.Empty empty, PrintOutputCapture<P> p) {
@@ -539,12 +548,12 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitEnumValue(EnumValue enoom, PrintOutputCapture<P> p) {
-        beforeSyntax(enoom, Space.Location.ENUM_VALUE_PREFIX, p);
-        visit(enoom.getAnnotations(), p);
-        visit(enoom.getName(), p);
-        NewClass initializer = enoom.getInitializer();
-        if (enoom.getInitializer() != null) {
+    public J visitEnumValue(EnumValue enum_, PrintOutputCapture<P> p) {
+        beforeSyntax(enum_, Space.Location.ENUM_VALUE_PREFIX, p);
+        visit(enum_.getAnnotations(), p);
+        visit(enum_.getName(), p);
+        NewClass initializer = enum_.getInitializer();
+        if (enum_.getInitializer() != null) {
             visitSpace(initializer.getPrefix(), Space.Location.NEW_CLASS_PREFIX, p);
             visitSpace(initializer.getNew(), Space.Location.NEW_PREFIX, p);
             if (!initializer.getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class).isPresent()) {
@@ -552,8 +561,8 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             }
             visit(initializer.getBody(), p);
         }
-        afterSyntax(enoom, p);
-        return enoom;
+        afterSyntax(enum_, p);
+        return enum_;
     }
 
     @Override
@@ -628,16 +637,16 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitImport(J.Import impoort, PrintOutputCapture<P> p) {
-        beforeSyntax(impoort, Space.Location.IMPORT_PREFIX, p);
+    public J visitImport(J.Import import_, PrintOutputCapture<P> p) {
+        beforeSyntax(import_, Space.Location.IMPORT_PREFIX, p);
         p.append("import");
-        if (impoort.isStatic()) {
-            visitSpace(impoort.getPadding().getStatic().getBefore(), Space.Location.STATIC_IMPORT, p);
+        if (import_.isStatic()) {
+            visitSpace(import_.getPadding().getStatic().getBefore(), Space.Location.STATIC_IMPORT, p);
             p.append("static");
         }
-        visit(impoort.getQualid(), p);
-        afterSyntax(impoort, p);
-        return impoort;
+        visit(import_.getQualid(), p);
+        afterSyntax(import_, p);
+        return import_;
     }
 
     @Override
@@ -901,32 +910,32 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
-    public J visitReturn(Return retrn, PrintOutputCapture<P> p) {
-        beforeSyntax(retrn, Space.Location.RETURN_PREFIX, p);
+    public J visitReturn(Return return_, PrintOutputCapture<P> p) {
+        beforeSyntax(return_, Space.Location.RETURN_PREFIX, p);
         p.append("return");
-        visit(retrn.getExpression(), p);
-        afterSyntax(retrn, p);
-        return retrn;
+        visit(return_.getExpression(), p);
+        afterSyntax(return_, p);
+        return return_;
     }
 
     @Override
-    public J visitSwitch(Switch switzh, PrintOutputCapture<P> p) {
-        beforeSyntax(switzh, Space.Location.SWITCH_PREFIX, p);
+    public J visitSwitch(Switch switch_, PrintOutputCapture<P> p) {
+        beforeSyntax(switch_, Space.Location.SWITCH_PREFIX, p);
         p.append("switch");
-        visit(switzh.getSelector(), p);
-        visit(switzh.getCases(), p);
-        afterSyntax(switzh, p);
-        return switzh;
+        visit(switch_.getSelector(), p);
+        visit(switch_.getCases(), p);
+        afterSyntax(switch_, p);
+        return switch_;
     }
 
     @Override
-    public J visitSwitchExpression(SwitchExpression switzh, PrintOutputCapture<P> p) {
-        beforeSyntax(switzh, Space.Location.SWITCH_EXPRESSION_PREFIX, p);
+    public J visitSwitchExpression(SwitchExpression switch_, PrintOutputCapture<P> p) {
+        beforeSyntax(switch_, Space.Location.SWITCH_EXPRESSION_PREFIX, p);
         p.append("switch");
-        visit(switzh.getSelector(), p);
-        visit(switzh.getCases(), p);
-        afterSyntax(switzh, p);
-        return switzh;
+        visit(switch_.getSelector(), p);
+        visit(switch_.getCases(), p);
+        afterSyntax(switch_, p);
+        return switch_;
     }
 
     @Override
@@ -1051,6 +1060,22 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitUnknown(J.Unknown unknown, PrintOutputCapture<P> p) {
+        beforeSyntax(unknown, Space.Location.UNKNOWN_PREFIX, p);
+        visit(unknown.getSource(), p);
+        afterSyntax(unknown, p);
+        return unknown;
+    }
+
+    @Override
+    public J visitUnknownSource(J.Unknown.Source source, PrintOutputCapture<P> p) {
+        beforeSyntax(source, Space.Location.UNKNOWN_SOURCE_PREFIX, p);
+        p.append(source.getText());
+        afterSyntax(source, p);
+        return source;
+    }
+
+    @Override
     public J visitVariable(VariableDeclarations.NamedVariable variable, PrintOutputCapture<P> p) {
         beforeSyntax(variable, Space.Location.VARIABLE_PREFIX, p);
         visit(variable.getName(), p);
@@ -1101,7 +1126,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     public J visitYield(Yield yield, PrintOutputCapture<P> p) {
         beforeSyntax(yield, Space.Location.YIELD_PREFIX, p);
         if (!yield.isImplicit()) {
-            p.out.append("yield");
+            p.append("yield");
         }
         visit(yield.getValue(), p);
         afterSyntax(yield, p);
@@ -1115,16 +1140,20 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         beforeSyntax(j.getPrefix(), j.getMarkers(), loc, p);
     }
 
+    @SuppressWarnings("ForLoopReplaceableByForEach")
     protected void beforeSyntax(Space prefix, Markers markers, @Nullable Space.Location loc, PrintOutputCapture<P> p) {
-        for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
+        List<Marker> markersList = markers.getMarkers();
+        for (int i = 0; i < markersList.size(); i++) {
+            Marker marker = markersList.get(i);
+            p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
         }
         if (loc != null) {
             visitSpace(prefix, loc, p);
         }
         visitMarkers(markers, p);
-        for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
+        for (int i = 0; i < markersList.size(); i++) {
+            Marker marker = markersList.get(i);
+            p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
         }
     }
 
@@ -1132,9 +1161,12 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         afterSyntax(j.getMarkers(), p);
     }
 
+    @SuppressWarnings("ForLoopReplaceableByForEach")
     protected void afterSyntax(Markers markers, PrintOutputCapture<P> p) {
-        for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
+        List<Marker> markersMarkers = markers.getMarkers();
+        for (int i = 0; i < markersMarkers.size(); i++) {
+            Marker marker = markersMarkers.get(i);
+            p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
         }
     }
 }

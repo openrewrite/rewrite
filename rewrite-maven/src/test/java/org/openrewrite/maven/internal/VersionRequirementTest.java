@@ -59,4 +59,10 @@ class VersionRequirementTest {
           .resolve(this::available))
           .isEqualTo("2");
     }
+
+    @Test
+    void emptyUnboundedRange() throws MavenDownloadingException {
+        assertThat(VersionRequirement.fromVersion("(,)", 0).resolve(this::available))
+                .isEqualTo("10");
+    }
 }

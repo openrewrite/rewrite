@@ -16,8 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.style.NamedStyles;
@@ -27,7 +26,7 @@ import org.openrewrite.test.RewriteTest;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.java.Assertions.*;
 
 class OrderImportsTest implements RewriteTest {
 
@@ -58,6 +57,7 @@ class OrderImportsTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void foldIntoStar() {
         rewriteRun(
@@ -622,21 +622,38 @@ class OrderImportsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/2965")
+    @Test
+    void importReferencedByRecordComponentOnly() {
+        rewriteRun(
+          spec -> spec.recipe(new OrderImports(true)),
+          version(java(
+            """
+              import java.util.List;
+              import java.util.UUID;
+              
+              record T(List<UUID> uuids) {
+              }
+              """
+          ), 17)
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/859")
     @Test
     void doNotFoldPackageWithJavaLangClassNames() {
-        ExecutionContext ctx = new InMemoryExecutionContext();
-        ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, false);
         rewriteRun(
-          spec -> spec.executionContext(ctx),
-          java(
-            """
-              import kotlin.DeepRecursiveFunction;
-              import kotlin.Function;
-              import kotlin.Lazy;
-              import kotlin.Pair;
-              import kotlin.String;
+          spec -> spec.beforeRecipe(addTypesToSourceSet("main")),
+          srcMainJava(
+            java(
               """
+                import kotlin.DeepRecursiveFunction;
+                import kotlin.Function;
+                import kotlin.Lazy;
+                import kotlin.Pair;
+                import kotlin.String;
+                """
+            )
           )
         );
     }

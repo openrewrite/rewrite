@@ -159,6 +159,10 @@ public interface G extends J {
                     .collect(Collectors.toList());
         }
 
+        public G.CompilationUnit withImports(List<Import> imports) {
+            return getPadding().withImports(JRightPadded.withElements(this.getPadding().getImports(), imports));
+        }
+
         @Transient
         public List<ClassDeclaration> getClasses() {
             return statements.stream()
@@ -169,8 +173,13 @@ public interface G extends J {
         }
 
         @Override
+        public JavaSourceFile withClasses(List<ClassDeclaration> classes) {
+            return getPadding().withClasses(JRightPadded.withElements(this.getPadding().getClasses(), classes));
+        }
+
+        @Override
         public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
-            return v.visitJavaSourceFile(this, p);
+            return v.visitCompilationUnit(this, p);
         }
 
         @Override
@@ -226,6 +235,28 @@ public interface G extends J {
             }
 
             @Transient
+            public List<JRightPadded<J.ClassDeclaration>> getClasses() {
+                //noinspection unchecked
+                return t.statements.stream()
+                        .filter(s -> s.getElement() instanceof J.ClassDeclaration)
+                        .map(s -> (JRightPadded<J.ClassDeclaration>) (Object) s)
+                        .collect(Collectors.toList());
+            }
+
+            public G.CompilationUnit withClasses(List<JRightPadded<ClassDeclaration>> classes) {
+                List<JRightPadded<Statement>> statements = t.statements.stream()
+                        .filter(s -> !(s.getElement() instanceof J.ClassDeclaration))
+                        .collect(Collectors.toList());
+
+                //noinspection unchecked
+                statements.addAll(0, classes.stream()
+                        .map(i -> (JRightPadded<Statement>) (Object) i)
+                        .collect(Collectors.toList()));
+
+                return t.getPadding().getClasses() == classes ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
+            }
+
+            @Transient
             @Override
             public List<JRightPadded<Import>> getImports() {
                 //noinspection unchecked
@@ -237,9 +268,15 @@ public interface G extends J {
 
             @Override
             public G.CompilationUnit withImports(List<JRightPadded<Import>> imports) {
-                // TODO implement me!
-                return t;
-//                return t.imports == imports ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.packageDeclaration, imports, t.classes, t.eof);
+                List<JRightPadded<Statement>> statements = t.statements.stream()
+                        .filter(s -> !(s.getElement() instanceof J.Import))
+                        .collect(Collectors.toList());
+                //noinspection unchecked
+                statements.addAll(0, imports.stream()
+                        .map(i -> (JRightPadded<Statement>) (Object) i)
+                        .collect(Collectors.toList()));
+
+                return t.getPadding().getImports() == imports ? t : new G.CompilationUnit(t.id, t.shebang, t.prefix, t.markers, t.sourcePath, t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.packageDeclaration, statements, t.eof);
             }
 
             public List<JRightPadded<Statement>> getStatements() {
@@ -257,7 +294,7 @@ public interface G extends J {
      * Unlike Java, Groovy allows expressions to appear anywhere Statements do.
      * Rather than re-define versions of the many J types that implement Expression to also implement Statement,
      * just wrap such expressions.
-     *
+     * <p>
      * Has no state or behavior of its own aside from the Expression it wraps.
      */
     @SuppressWarnings("unchecked")
@@ -411,7 +448,6 @@ public interface G extends J {
             }
         }
     }
-
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -601,6 +637,7 @@ public interface G extends J {
             UUID id;
             Markers markers;
             J tree;
+            Space after;
             boolean enclosedInBraces;
 
             @Override
@@ -612,6 +649,10 @@ public interface G extends J {
             @Override
             public Space getPrefix() {
                 return Space.EMPTY;
+            }
+
+            public Space getAfter() {
+                return after == null ? Space.EMPTY : after;
             }
 
             @Override
@@ -630,7 +671,7 @@ public interface G extends J {
 
         @Nullable
         @NonFinal
-        transient WeakReference<G.Binary.Padding> padding;
+        transient WeakReference<Padding> padding;
 
         @With
         @EqualsAndHashCode.Include
@@ -679,19 +720,19 @@ public interface G extends J {
         public enum Type {
             Find,
             Match,
-
+            In,
             Access
         }
 
-        public G.Binary.Padding getPadding() {
-            G.Binary.Padding p;
+        public Padding getPadding() {
+            Padding p;
             if (this.padding == null) {
-                p = new G.Binary.Padding(this);
+                p = new Padding(this);
                 this.padding = new WeakReference<>(p);
             } else {
                 p = this.padding.get();
                 if (p == null || p.t != this) {
-                    p = new G.Binary.Padding(this);
+                    p = new Padding(this);
                     this.padding = new WeakReference<>(p);
                 }
             }
@@ -708,6 +749,94 @@ public interface G extends J {
 
             public G.Binary withOperator(JLeftPadded<G.Binary.Type> operator) {
                 return t.operator == operator ? t : new G.Binary(t.id, t.prefix, t.markers, t.left, operator, t.right, t.after, t.type);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @Data
+    final class Range implements G, Expression {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        Expression from;
+
+        JLeftPadded<Boolean> inclusive;
+
+        public boolean getInclusive() {
+            return inclusive.getElement();
+        }
+
+        public Range withInclusive(boolean inclusive) {
+            return getPadding().withInclusive(this.inclusive.withElement(inclusive));
+        }
+
+        @With
+        Expression to;
+
+        @Override
+        public JavaType getType() {
+            return from.getType();
+        }
+
+        @Override
+        public Range withType(@Nullable JavaType type) {
+            return new Range(null, id, prefix, markers, from.withType(type), inclusive,
+                    to.withType(type));
+        }
+
+        @Override
+        public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
+            return v.visitRange(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Range t;
+
+            public JLeftPadded<Boolean> getInclusive() {
+                return t.inclusive;
+            }
+
+            public Range withInclusive(JLeftPadded<Boolean> inclusive) {
+                return t.inclusive == inclusive ? t : new Range(t.id, t.prefix, t.markers, t.from, inclusive, t.to);
             }
         }
     }

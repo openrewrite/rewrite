@@ -51,41 +51,51 @@ public class NoStaticImport extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(methodPattern);
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesMethod<>(methodPattern), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                if (methodMatcher.matches(m) && m.getSelect() == null) {
-                    if (m.getMethodType() != null) {
-                        JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
-
-                        RemoveImport<ExecutionContext> op = new RemoveImport<>(receiverType.getFullyQualifiedName() + "." + method.getSimpleName(),
-                                true);
-                        if (!getAfterVisit().contains(op)) {
-                            doAfterVisit(op);
-                        }
-
-                        maybeAddImport(receiverType.getFullyQualifiedName());
-                        m = m.withSelect(new J.Identifier(Tree.randomId(),
-                                Space.EMPTY,
-                                Markers.EMPTY,
-                                receiverType.getClassName(),
-                                receiverType,
-                                null)
-                        );
+                if (methodMatcher.matches(m) && m.getSelect() == null && m.getMethodType() != null) {
+                    // Do not replace calls to super() in constructors
+                    if (m.getName().getSimpleName().equals("super")) {
+                        return m;
                     }
 
-                }
+                    JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
+                    RemoveImport<ExecutionContext> op = new RemoveImport<>(receiverType.getFullyQualifiedName() + "." + method.getSimpleName(), true);
+                    if (!getAfterVisit().contains(op)) {
+                        doAfterVisit(op);
+                    }
 
+                    J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
+                    // Do not replace if method is in java.lang.Object
+                    if ("java.lang.Object".equals(receiverType.getFullyQualifiedName()) ||
+                            // Do not replace when we can not determine the enclosing class, such as in build.gradle files
+                            enclosingClass == null || enclosingClass.getType() == null ||
+                            // Do not replace if receiverType is the same as surrounding class
+                            enclosingClass.getType().equals(receiverType) ||
+                            // Do not replace if method is in a wrapping outer class; not looking up more than one level
+                            enclosingClass.getType().getOwningClass() != null && enclosingClass.getType().getOwningClass().equals(receiverType) ||
+                            // Do not replace if class extends receiverType
+                            enclosingClass.getType().getSupertype() != null && enclosingClass.getType().getSupertype().equals(receiverType)
+
+                    ) {
+                        return m;
+                    }
+
+                    // Change method invocation to use fully qualified name
+                    maybeAddImport(receiverType.getFullyQualifiedName());
+                    m = m.withSelect(new J.Identifier(Tree.randomId(),
+                            Space.EMPTY,
+                            Markers.EMPTY,
+                            receiverType.getClassName(),
+                            receiverType,
+                            null));
+                }
                 return m;
             }
-        };
+        });
     }
 }

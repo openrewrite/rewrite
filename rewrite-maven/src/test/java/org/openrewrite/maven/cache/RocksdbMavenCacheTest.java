@@ -26,7 +26,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class RocksdbMavenCacheTest {
+class RocksdbMavenCacheTest {
 
     @Test
     void invalidateCacheOnModelChange(@TempDir Path tempDir) throws Exception {

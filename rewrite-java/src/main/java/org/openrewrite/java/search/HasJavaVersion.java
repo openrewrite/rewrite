@@ -18,8 +18,10 @@ package org.openrewrite.java.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaVersion;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.semver.Semver;
@@ -30,10 +32,18 @@ import static java.util.Objects.requireNonNull;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class HasJavaVersion extends Recipe {
+
     @Option(displayName = "Java version",
             description = "An exact version number or node-style semver selector used to select the version number.",
-            example = "29.X")
+            example = "17.X")
     String version;
+
+    @Option(displayName = "Version check against target compatibility",
+            description = "The source and target compatibility versions can be different. This option allows you to " +
+                          "check against the target compatibility version instead of the source compatibility version.",
+            example = "17.X")
+    @Nullable
+    Boolean checkTargetCompatibility;
 
     @Override
     public String getDisplayName() {
@@ -48,8 +58,8 @@ public class HasJavaVersion extends Recipe {
 
     @SuppressWarnings("ConstantConditions")
     @Override
-    public Validated validate() {
-        Validated validated = super.validate();
+    public Validated<Object> validate() {
+        Validated<Object> validated = super.validate();
         if (version != null) {
             validated = validated.and(Semver.validate(version, null));
         }
@@ -61,11 +71,18 @@ public class HasJavaVersion extends Recipe {
         VersionComparator versionComparator = requireNonNull(Semver.validate(version, null).getValue());
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext ctx) {
-                return cu.getMarkers().findFirst(JavaVersion.class)
-                        .filter(version -> versionComparator.isValid(null, Integer.toString(version.getMajorVersion())))
-                        .map(version -> SearchResult.found(cu))
-                        .orElse(cu);
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    return cu.getMarkers().findFirst(JavaVersion.class)
+                            .filter(version -> versionComparator.isValid(null, Integer.toString(
+                                    Boolean.TRUE.equals(checkTargetCompatibility) ?
+                                            version.getMajorReleaseVersion() :
+                                            version.getMajorVersion())))
+                            .map(version -> SearchResult.found(cu))
+                            .orElse(cu);
+                }
+                return (J) tree;
             }
         };
     }

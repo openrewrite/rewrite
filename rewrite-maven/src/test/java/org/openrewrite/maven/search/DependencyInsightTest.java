@@ -16,6 +16,7 @@
 package org.openrewrite.maven.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -27,7 +28,7 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void doesNotMatchTestScope() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("*guava*", "*", "compile")),
+          spec -> spec.recipe(new DependencyInsight("*guava*", "*", "compile", null)),
           pomXml(
             """
               <project>
@@ -48,10 +49,11 @@ class DependencyInsightTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void findDependency() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("*guava*", "*", "compile")),
+          spec -> spec.recipe(new DependencyInsight("*guava*", "*", "compile", null)),
           pomXml(
             """
               <project>
@@ -88,7 +90,7 @@ class DependencyInsightTest implements RewriteTest {
     @Test
     void findDependencyTransitively() {
         rewriteRun(
-          spec -> spec.recipe(new DependencyInsight("*", "*simpleclient*", "compile")),
+          spec -> spec.recipe(new DependencyInsight("*", "*simpleclient*", "compile", null)),
           pomXml(
             """
               <project>
@@ -111,6 +113,29 @@ class DependencyInsightTest implements RewriteTest {
                 <version>1</version>
                 <dependencies>
                   <!--~~(io.prometheus:simpleclient_common:0.9.0)~~>--><dependency>
+                      <groupId>io.micrometer</groupId>
+                      <artifactId>micrometer-registry-prometheus</artifactId>
+                      <version>1.6.3</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void onlyDirect() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("*", "*simpleclient*", "compile", true)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
                       <groupId>io.micrometer</groupId>
                       <artifactId>micrometer-registry-prometheus</artifactId>
                       <version>1.6.3</version>

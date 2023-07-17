@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-@SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessarySemicolon"})
+@SuppressWarnings({"GroovyUnusedAssignment", "GrUnnecessarySemicolon", "UnnecessaryQualifiedReference"})
 class BinaryTest implements RewriteTest {
 
     @Test
@@ -31,6 +31,18 @@ class BinaryTest implements RewriteTest {
             """
               int n = 0;
               boolean b = n == 0;
+              """
+          )
+        );
+    }
+
+    @Test
+    void in() {
+        rewriteRun(
+          groovy(
+            """
+              def a = []
+              boolean b = 42 in a;
               """
           )
         );
@@ -126,6 +138,15 @@ class BinaryTest implements RewriteTest {
               a ^= 1
               """
           )
+        );
+    }
+
+    @Test
+    void instanceOf() {
+        rewriteRun(
+          groovy("""
+            def isString = "" instanceof java.lang.String
+            """)
         );
     }
 }

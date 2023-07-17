@@ -19,11 +19,13 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
 
 class ChangeDependencyConfigurationTest implements RewriteTest {
+    @DocumentExample
     @Test
     void worksWithEmptyStringConfig() {
         rewriteRun(
@@ -272,6 +274,41 @@ class ChangeDependencyConfigurationTest implements RewriteTest {
                   implementation group: "org.eclipse.jetty", name: "jetty-servlet", version: "9.4.9.v20180320", ext: "jar"
                   implementation group: 'org.eclipse.jetty', name: 'jetty-servlet', version: '9.4.9.v20180320', classifier: 'tests', ext: 'jar'
                   implementation group: "org.eclipse.jetty", name: "jetty-servlet", version: "9.4.9.v20180320", classifier: "tests", ext: "jar"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void worksForProjectDependencies() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependencyConfiguration("*", "*", "implementation", null)),
+          buildGradle(
+            """
+              dependencies {
+                  compile project(":a")
+                  compile "org.openrewrite:rewrite-core:7.40.0"
+                  compile "org.openrewrite:rewrite-core:7.40.0", {
+                    exclude name: "foo"
+                  }
+                  compile group: "org.openrewrite", name: "rewrite-core", version: "7.40.0"
+                  compile group: "org.openrewrite", name: "rewrite-core", version: "7.40.0", {
+                    exclude name: "foo"
+                  }
+              }
+              """,
+            """
+              dependencies {
+                  implementation project(":a")
+                  implementation "org.openrewrite:rewrite-core:7.40.0"
+                  implementation "org.openrewrite:rewrite-core:7.40.0", {
+                    exclude name: "foo"
+                  }
+                  implementation group: "org.openrewrite", name: "rewrite-core", version: "7.40.0"
+                  implementation group: "org.openrewrite", name: "rewrite-core", version: "7.40.0", {
+                    exclude name: "foo"
+                  }
               }
               """
           )

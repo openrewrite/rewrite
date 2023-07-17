@@ -15,15 +15,20 @@
  */
 package org.openrewrite;
 
-import java.nio.file.FileSystems;
+import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.Nullable;
+
+import java.io.File;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 public class PathUtils {
     private PathUtils() {}
 
-    private static final String UNIX_SEPARATOR = "/";
+    private static final char UNIX_SEPARATOR = '/';
 
-    private static final String WINDOWS_SEPARATOR = "\\";
+    private static final char WINDOWS_SEPARATOR = '\\';
 
     /**
      * Compare two paths, returning true if they indicate the same path, regardless of separators.
@@ -44,17 +49,172 @@ public class PathUtils {
     }
 
     public static String separatorsToUnix(String path) {
-        return path.contains(WINDOWS_SEPARATOR) ? path.replace(WINDOWS_SEPARATOR, UNIX_SEPARATOR) : path;
+        return path.replace(WINDOWS_SEPARATOR, UNIX_SEPARATOR);
     }
 
     public static String separatorsToWindows(String path) {
-        return path.contains(UNIX_SEPARATOR) ? path.replace(UNIX_SEPARATOR, WINDOWS_SEPARATOR) : path;
+        return path.replace(UNIX_SEPARATOR, WINDOWS_SEPARATOR);
     }
 
     public static String separatorsToSystem(String path) {
-        if(FileSystems.getDefault().getSeparator().equals(WINDOWS_SEPARATOR)) {
+        if (File.separatorChar == WINDOWS_SEPARATOR) {
             return separatorsToWindows(path);
         }
         return separatorsToUnix(path);
+    }
+
+    public static boolean matchesGlob(@Nullable Path path, @Nullable String globPattern) {
+        if ("**".equals(globPattern)) {
+            return true;
+        }
+        if (globPattern == null) {
+            return false;
+        }
+        if (path == null) {
+            return false;
+        }
+        String relativePath = path.toString();
+        if (relativePath.isEmpty() && globPattern.isEmpty()) {
+            return true;
+        }
+
+        return matchesGlob(globPattern, relativePath);
+    }
+
+    private static boolean matchesGlob(String pattern, String path) {
+        String[] pattTokens = tokenize(pattern);
+        String[] pathTokens = tokenize(path);
+        int pattIdxStart = 0;
+        int pattIdxEnd = pattTokens.length - 1;
+        int pathIdxStart = 0;
+        int pathIdxEnd = pathTokens.length - 1;
+
+        // Process characters before first **
+        while (pattIdxStart <= pattIdxEnd && pathIdxStart <= pathIdxEnd) {
+            if ("**".equals(pattTokens[pattIdxStart])) {
+                break;
+            }
+            if (!StringUtils.matchesGlob(pathTokens[pathIdxStart], pattTokens[pattIdxStart])) {
+                return false;
+            }
+            pattIdxStart++;
+            pathIdxStart++;
+        }
+        if (pathIdxStart > pathIdxEnd) {
+            // Path exhausted
+            if (pattIdxStart > pattIdxEnd) {
+                return !isFileSeparator(pattern.charAt(pattern.length() - 1));
+            }
+            if (pattIdxStart == pattIdxEnd && pattTokens[pattIdxStart].equals("*") && isFileSeparator(path.charAt(path.length() - 1))) {
+                return true;
+            }
+            for (int i = pattIdxStart; i <= pattIdxEnd; i++) {
+                if (!pattTokens[i].equals("**")) {
+                    return false;
+                }
+            }
+            return true;
+        } else if (pattIdxStart > pattIdxEnd) {
+            // Path not exhausted, but pattern is. Failure.
+            return false;
+        }
+
+        // Process characters after last **
+        while (pattIdxStart <= pattIdxEnd && pathIdxStart <= pathIdxEnd) {
+            if ("**".equals(pattTokens[pattIdxEnd])) {
+                break;
+            }
+            if (!StringUtils.matchesGlob(pathTokens[pathIdxEnd], pattTokens[pattIdxEnd])) {
+                return false;
+            }
+            if (pattIdxEnd == (pattTokens.length - 1)
+                    && (isFileSeparator(pattern.charAt(pattern.length() - 1)) ^ isFileSeparator(path.charAt(path.length() - 1)))) {
+                return false;
+            }
+            pattIdxEnd--;
+            pathIdxEnd--;
+        }
+        if (pathIdxStart > pathIdxEnd) {
+            // Path exhausted
+            for (int i = pattIdxStart; i < pattIdxEnd; i++) {
+                if (!pattTokens[i].equals("**")) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        while (pattIdxStart != pattIdxEnd && pathIdxStart <= pathIdxEnd) {
+            int patIdxTmp = -1;
+            for (int i = pattIdxStart + 1; i <= pattIdxEnd; i++) {
+                if (pattTokens[i].equals("**")) {
+                    patIdxTmp = i;
+                    break;
+                }
+            }
+            if (patIdxTmp == pattIdxStart + 1) {
+                // **/** situation, so skip one
+                pattIdxStart++;
+                continue;
+            }
+            // Find the pattern between pattIdxStart & pattIdxTmp in path between
+            // pathIdxStart & pathIdxEnd
+            int patLength = (patIdxTmp - pattIdxStart - 1);
+            int strLength = (pathIdxEnd - pathIdxStart + 1);
+            int foundIdx = -1;
+            strLoop:
+            for (int i = 0; i <= strLength - patLength; i++) {
+                for (int j = 0; j < patLength; j++) {
+                    if (!StringUtils.matchesGlob(pathTokens[pathIdxStart + i + j], pattTokens[pattIdxStart + j + 1])) {
+                        continue strLoop;
+                    }
+                }
+                foundIdx = pathIdxStart + i;
+                break;
+            }
+
+            if (foundIdx == -1) {
+                return false;
+            }
+            pattIdxStart = patIdxTmp;
+            pathIdxStart = foundIdx + patLength;
+        }
+
+        for (int i = pattIdxStart; i <= pattIdxEnd; i++) {
+            if (!pattTokens[i].equals("**")) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static String[] tokenize(String path) {
+        List<String> tokens = new ArrayList<>();
+        int pathIdxStart = 0;
+        int pathIdxTmp = 0;
+        int pathIdxEnd = path.length() - 1;
+        while (pathIdxTmp <= pathIdxEnd) {
+            if (isFileSeparator(path.charAt(pathIdxTmp))) {
+                tokens.add(path.substring(pathIdxStart, pathIdxTmp));
+                pathIdxStart = pathIdxTmp + 1;
+            }
+            pathIdxTmp++;
+        }
+        if (pathIdxStart == 0) {
+            tokens.add(path);
+        } else if (pathIdxStart != pathIdxTmp) {
+            tokens.add(path.substring(pathIdxStart, pathIdxTmp));
+        }
+        return tokens.toArray(new String[0]);
+    }
+
+    private static boolean isFileSeparator(char ch) {
+        return isFileSeparator(false, ch);
+    }
+
+    private static boolean isFileSeparator(boolean strict, char ch) {
+        return strict
+                ? ch == File.separatorChar
+                : ch == UNIX_SEPARATOR || ch == WINDOWS_SEPARATOR;
     }
 }

@@ -8,6 +8,7 @@ dependencies {
     implementation(project(":rewrite-test"))
 
     testImplementation("io.github.classgraph:classgraph:latest.release")
+    testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
     testRuntimeOnly(project(":rewrite-java-17"))
     testRuntimeOnly("junit:junit:4.13.2") {
         because("Used for RemoveUnneededAssertionTest")
@@ -16,6 +17,10 @@ dependencies {
     testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly("org.mapstruct:mapstruct:latest.release")
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
+    testRuntimeOnly("org.apache.commons:commons-lang3:latest.release")
+    testRuntimeOnly(project(":rewrite-yaml"))
+    testImplementation(project(":rewrite-maven"))
+    testRuntimeOnly("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 }
 
 tasks.withType<Javadoc> {

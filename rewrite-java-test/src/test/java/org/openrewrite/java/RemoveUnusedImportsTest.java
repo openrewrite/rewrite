@@ -17,10 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Issue;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
@@ -157,6 +154,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void removeNamedImport() {
         rewriteRun(
@@ -961,6 +959,185 @@ class RemoveUnusedImportsTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/1698")
+    @Test
+    void correctlyRemoveImportsFromInternalClasses() {
+        rewriteRun(
+          java(
+            """
+              package com.Source.A;
+              
+              public class B {
+                public enum Enums {
+                    B1, B2
+                }
+
+                public static void helloWorld() {
+                    System.out.println("hello world!");              
+                }
+              }
+              """
+          ),
+          java(
+            """
+              package com.test;
+
+              import static com.Source.A.B.Enums.B1;
+              import static com.Source.A.B.Enums.B2;
+              import static com.Source.A.B.helloWorld;
+              
+              class Test {
+                  public static void main(String[] args) {
+                    var uniqueCount = B1;
+                    helloWorld();
+                  }
+              }
+              """,
+            """
+              package com.test;
+
+              import static com.Source.A.B.Enums.B1;
+              import static com.Source.A.B.helloWorld;
+              
+              class Test {
+                  public static void main(String[] args) {
+                    var uniqueCount = B1;
+                    helloWorld();
+                  }              
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1698")
+    @Test
+    void correctlyRemoveImportsFromNestedInternalClasses() {
+        rewriteRun(
+          java(
+            """
+              package com.Source.A;
+              
+              public class B {
+                public enum Enums {
+                    B1, B2
+                }
+                
+                public static class C {
+                    public enum Enums {
+                        C1, C2
+                    }
+                }
+
+                public static void helloWorld() {
+                    System.out.println("hello world!");              
+                }
+              }
+              """
+          ),
+          java(
+            """
+              package com.test;
+
+              import static com.Source.A.B.Enums.B1;
+              import static com.Source.A.B.Enums.B2;
+              import static com.Source.A.B.C.Enums.C1;
+              import static com.Source.A.B.C.Enums.C2;
+              import static com.Source.A.B.helloWorld;
+              
+              class Test {
+                  public static void main(String[] args) {
+                    var uniqueCount = B1;
+                    var uniqueCountNested = C1;
+                    helloWorld();
+                  }
+              }
+              """,
+            """
+              package com.test;
+
+              import static com.Source.A.B.Enums.B1;
+              import static com.Source.A.B.C.Enums.C1;
+              import static com.Source.A.B.helloWorld;
+              
+              class Test {
+                  public static void main(String[] args) {
+                    var uniqueCount = B1;
+                    var uniqueCountNested = C1;
+                    helloWorld();
+                  }              
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3275")
+    @Test
+    void doesNotRemoveReferencedClassesBeingUsedAsParameters() {
+        rewriteRun(
+          java(
+            """
+              package com.Source.mine;
+
+              public class A {
+                  public static final short SHORT1 = (short)1;
+                  
+                  public short getShort1() {
+                    return SHORT1;
+                  } 
+              }
+              """
+          ),
+          java(
+            """
+              package com.test;
+
+              import com.Source.mine.A;
+              
+              class Test {
+                  void f(A classA) {
+                    classA.getShort1();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3275")
+    @Test
+    void doesNotRemoveReferencedClassesBeingUsedAsParametersUnusualPackageName() {
+        rewriteRun(
+          java(
+            """
+              package com.Source.$;
+
+              public class A {
+                  public static final short SHORT1 = (short)1;
+
+                  public short getShort1() {
+                    return SHORT1;
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.test;
+
+              import com.Source.$.A;
+
+              class Test {
+                  void f(A classA) {
+                    classA.getShort1();
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void removeImportUsedAsLambdaParameter() {
         rewriteRun(
@@ -1198,6 +1375,117 @@ class RemoveUnusedImportsTest implements RewriteTest {
                  List<String> l = List.of("c","b","a");
                  Iterator<Short> i = emptyIterator();
                  Entry<String, Integer> entry;
+              }
+              """
+          )
+        );
+    }
+
+    // If multiple packages have conflicting class names,
+    // so have to explicitly import the specific class to avoid ambiguity.
+    @Test
+    void multiplePackagesHaveConflictingClassNames() {
+        rewriteRun(
+          java(
+            """
+              package org.b;
+              public class Pair<K, V> {
+                  K key;
+                  V value;
+              }
+              """
+          ),
+          java(
+            """
+              package org.b;
+              public class Table<T> { }
+              """
+          ),
+          java(
+            """
+              package org.c;
+              public class Pair<K, V> {
+                  K key;
+                  V value;
+              }
+              """
+          ),
+          java(
+            """
+              package org.c;
+              public class Table<T> { }
+              """
+          ),
+          java(
+            """
+              package org.b;
+              public class B1 { }
+              """
+          ),
+          java(
+            """
+              package org.b;
+              public class B2 { }
+              """
+          ),
+          java(
+            """
+              package org.b;
+              public class B3 { }
+              """
+          ),
+          java(
+            """
+              package org.b;
+              public class B4 { }
+              """
+          ),
+          java(
+            """
+              package org.c;
+              public class C1 {}
+              """
+          ),
+          java(
+            """
+              package org.c;
+              public class C2 {}
+              """
+          ),
+          java(
+            """
+              package org.c;
+              public class C3 {}
+              """
+          ),
+          java(
+            """
+              package org.c;
+              public class C4 {}
+              """
+          ),
+          java(
+            """
+              package org.a;
+
+              import org.b.*;
+              import org.b.Pair;
+              import org.c.*;
+              import org.c.Table;
+
+              class A {
+                  void method() {
+                      Pair<String, String > pair = new Pair<>();
+                      Table<String> table = new Table<>();
+                      B1 b1 = new B1();
+                      B2 b2 = new B2();
+                      B3 b3 = new B3();
+                      B4 b4 = new B4();
+                      C1 c1 = new C1();
+                      C2 c2 = new C2();
+                      C3 c3 = new C3();
+                      C4 c4 = new C4();
+                  }
               }
               """
           )

@@ -17,10 +17,16 @@ package org.openrewrite.properties;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.NameCaseConvention;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
+
+import java.util.Objects;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -32,31 +38,27 @@ public class ChangePropertyValue extends Recipe {
     String propertyKey;
 
     @Option(displayName = "New value",
-            description = "The new value to be used for key specified by `propertyKey`.",
-            example = "false")
+            description = "The new value to be used for key specified by `propertyKey`.")
     String newValue;
 
     @Option(displayName = "Old value",
-            example = "true",
             required = false,
             description = "Only change the property value if it matches the configured `oldValue`.")
     @Nullable
     String oldValue;
 
-    @Incubating(since = "7.17.0")
+    @Option(displayName = "Regex",
+            description = "Default false. If enabled, `oldValue` will be interpreted as a Regular Expression, and capture group contents will be available in `newValue`",
+            required = false)
+    @Nullable
+    Boolean regex;
+
     @Option(displayName = "Use relaxed binding",
             description = "Whether to match the `propertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
                     "rules. Default is `true`. Set to `false`  to use exact matching.",
             required = false)
     @Nullable
     Boolean relaxedBinding;
-
-    @Option(displayName = "Optional file matcher",
-            description = "Matching files will be modified. This is a glob expression.",
-            required = false,
-            example = "'**/application-*.properties'")
-    @Nullable
-    String fileMatcher;
 
     @Override
     public String getDisplayName() {
@@ -66,14 +68,6 @@ public class ChangePropertyValue extends Recipe {
     @Override
     public String getDescription() {
         return "Change a property value leaving the key intact.";
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        if (fileMatcher != null) {
-            return new HasSourcePath<>(fileMatcher);
-        }
-        return null;
     }
 
     @Override
@@ -88,11 +82,28 @@ public class ChangePropertyValue extends Recipe {
         @Override
         public Properties visitEntry(Properties.Entry entry, P p) {
             if (!Boolean.FALSE.equals(relaxedBinding) ? NameCaseConvention.equalsRelaxedBinding(entry.getKey(), propertyKey) : entry.getKey().equals(propertyKey)) {
-                if (oldValue == null ? !entry.getValue().getText().equals(newValue) : oldValue.equals(entry.getValue().getText())) {
-                    entry = entry.withValue(entry.getValue().withText(newValue));
+                if (matchesOldValue(entry.getValue())) {
+                    Properties.Value updatedValue = updateValue(entry.getValue());
+                    if (updatedValue != null) {
+                        entry = entry.withValue(updatedValue);
+                    }
                 }
             }
             return super.visitEntry(entry, p);
+        }
+
+        @Nullable // returns null if value should not change
+        private Properties.Value updateValue(Properties.Value value) {
+            Properties.Value updatedValue = value.withText(Boolean.TRUE.equals(regex)
+                    ? value.getText().replaceAll(Objects.requireNonNull(oldValue), newValue) : newValue);
+            return updatedValue.getText().equals(value.getText()) ? null : updatedValue;
+        }
+
+        private boolean matchesOldValue(Properties.Value value) {
+            return StringUtils.isNullOrEmpty(oldValue) ||
+                    (Boolean.TRUE.equals(regex)
+                            ? value.getText().matches(oldValue)
+                            : value.getText().equals(oldValue));
         }
     }
 

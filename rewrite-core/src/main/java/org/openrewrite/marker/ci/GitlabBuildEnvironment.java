@@ -18,12 +18,13 @@ package org.openrewrite.marker.ci;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.internal.StringUtils;
+import org.openrewrite.marker.GitProvenance;
 
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.marker.OsProvenance.hostname;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -35,14 +36,30 @@ public class GitlabBuildEnvironment implements BuildEnvironment {
     String buildUrl;
     String host;
     String job;
+    String ciRepositoryUrl;
+    String ciCommitRefName;
+    String ciCommitSha;
 
     public static GitlabBuildEnvironment build(UnaryOperator<String> environment) {
         return new GitlabBuildEnvironment(
                 randomId(),
                 environment.apply("CI_BUILD_ID"),
                 environment.apply("CI_JOB_URL"),
-                hostname(),
-                environment.apply("CI_BUILD_NAME")
+                environment.apply("CI_SERVER_HOST"),
+                environment.apply("CI_BUILD_NAME"),
+                environment.apply("CI_REPOSITORY_URL"),
+                environment.apply("CI_COMMIT_REF_NAME"),
+                environment.apply("CI_COMMIT_SHA")
         );
+    }
+
+    @Override
+    public GitProvenance buildGitProvenance() throws IncompleteGitConfigException {
+        if (StringUtils.isBlank(ciRepositoryUrl)
+                || StringUtils.isBlank(ciCommitRefName)
+                || StringUtils.isBlank(ciCommitSha)) {
+            throw new IncompleteGitConfigException();
+        }
+        return new GitProvenance(UUID.randomUUID(), ciRepositoryUrl, ciCommitRefName, ciCommitSha, null, null);
     }
 }

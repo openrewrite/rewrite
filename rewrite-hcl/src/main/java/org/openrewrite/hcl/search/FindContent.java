@@ -20,8 +20,8 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.hcl.HclIsoVisitor;
-import org.openrewrite.hcl.HclVisitor;
 import org.openrewrite.hcl.JsonPathMatcher;
 import org.openrewrite.hcl.tree.BodyContent;
 import org.openrewrite.marker.SearchResult;
@@ -47,7 +47,7 @@ public class FindContent extends Recipe {
     }
 
     @Override
-    public HclVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         JsonPathMatcher pathMatcher = new JsonPathMatcher(contentPath);
         return new HclIsoVisitor<ExecutionContext>() {
             @Override

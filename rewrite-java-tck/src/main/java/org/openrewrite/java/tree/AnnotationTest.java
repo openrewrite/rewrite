@@ -203,13 +203,13 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  package annotation.fun;
-                  import java.lang.annotation.*;
-                          
-                  @Target({ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD, ElementType.TYPE_USE})
-                  @Retention(RetentionPolicy.RUNTIME)
-                  public @interface Nullable {
-                  }
+              package annotation.fun;
+              import java.lang.annotation.*;
+                      
+              @Target({ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD, ElementType.TYPE_USE})
+              @Retention(RetentionPolicy.RUNTIME)
+              public @interface Nullable {
+              }
               """,
             SourceSpec::skip
           ),

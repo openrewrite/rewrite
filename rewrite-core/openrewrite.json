@@ -1,0 +1,205 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OpenRewrite Resource",
+  "description": "Contains OpenRewrite resource descriptors like recipes and styles",
+  "type": "object",
+  "properties": {
+    "type": {
+      "description": "Identifies the resource type",
+      "enum": [
+        "specs.openrewrite.org/v1beta/recipe",
+        "specs.openrewrite.org/v1beta/style",
+        "specs.openrewrite.org/v1beta/category",
+        "specs.openrewrite.org/v1beta/example"
+      ],
+      "default": "specs.openrewrite.org/v1beta/recipe"
+    }
+  },
+  "required": [
+    "type"
+  ],
+
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "specs.openrewrite.org/v1beta/recipe"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "type": {
+            "const": "specs.openrewrite.org/v1beta/recipe"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "tags": {
+            "$ref": "#/$defs/tags"
+          },
+          "estimatedEffortPerOccurrence": {
+            "type": "string",
+            "format": "duration"
+          },
+          "causesAnotherCycle": {
+            "type": "boolean",
+            "default": false
+          },
+          "recipeList": {
+            "$ref": "#/$defs/recipeList"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "specs.openrewrite.org/v1beta/category"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "type": {
+            "const": "specs.openrewrite.org/v1beta/category"
+          },
+          "name": {
+            "type": "string"
+          },
+          "packageName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "tags": {
+            "$ref": "#/$defs/tags"
+          },
+          "root": {
+            "type": "boolean",
+            "default": false
+          },
+          "priority": {
+            "type": "integer",
+            "default": 0
+          }
+        },
+        "required": [
+          "packageName"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "specs.openrewrite.org/v1beta/style"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "type": {
+            "const": "specs.openrewrite.org/v1beta/style"
+          },
+          "name": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "tags": {
+            "$ref": "#/$defs/tags"
+          },
+          "styleConfigs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/style"
+            }
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "specs.openrewrite.org/v1beta/example"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "type": {
+            "const": "specs.openrewrite.org/v1beta/example"
+          },
+          "recipe": {
+            "type": "string"
+          },
+          "before": {
+            "type": "string"
+          },
+          "after": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  ],
+  "$defs": {
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "recipeList": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/recipe"
+      }
+    },
+    "recipe": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object"
+        }
+      ]
+    },
+    "style": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "object"
+        }
+      ]
+    }
+  }
+}

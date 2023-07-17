@@ -26,19 +26,17 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
 import org.openrewrite.java.internal.grammar.MethodSignatureParser;
 import org.openrewrite.java.internal.grammar.MethodSignatureParserBaseVisitor;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.StringJoiner;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.joining;
+import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
 
 /**
  * This class accepts an AspectJ method pattern and is used to identify methods that match the expression. The
@@ -63,15 +61,26 @@ import static java.util.stream.Collectors.joining;
  * </PRE>
  */
 @SuppressWarnings("NotNullFieldNotInitialized")
-@Getter
 public class MethodMatcher {
+    private static final JavaType.ShallowClass OBJECT_CLASS = JavaType.ShallowClass.build("java.lang.Object");
+    private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
+    private static final String ASPECTJ_DOTDOT_PATTERN = StringUtils.aspectjNameToPattern("..");
+
+    @Getter
     private Pattern targetTypePattern;
+    @Getter
     private Pattern methodNamePattern;
+    @Getter
     private Pattern argumentPattern;
+    @Nullable
+    private String targetType;
+    @Nullable
+    private String methodName;
 
     /**
      * Whether to match overridden forms of the method on subclasses of {@link #targetTypePattern}.
      */
+    @Getter
     private final boolean matchOverrides;
 
     public MethodMatcher(String signature, @Nullable Boolean matchOverrides) {
@@ -87,15 +96,34 @@ public class MethodMatcher {
         new MethodSignatureParserBaseVisitor<Void>() {
             @Override
             public Void visitMethodPattern(MethodSignatureParser.MethodPatternContext ctx) {
-                targetTypePattern = Pattern.compile(new TypeVisitor().visitTargetTypePattern(ctx.targetTypePattern()));
-                methodNamePattern = Pattern.compile(ctx.simpleNamePattern().children.stream()
+                MethodSignatureParser.TargetTypePatternContext targetTypePatternContext = ctx.targetTypePattern();
+                String pattern = new TypeVisitor().visitTargetTypePattern(targetTypePatternContext);
+                targetTypePattern = Pattern.compile(new TypeVisitor().visitTargetTypePattern(targetTypePatternContext));
+                targetType = isPlainIdentifier(targetTypePatternContext)
+                        ? pattern.replace(ASPECTJ_DOT_PATTERN, ".").replace("\\", "")
+                        : null;
+                pattern = ctx.simpleNamePattern().children.stream()
                         .map(c -> StringUtils.aspectjNameToPattern(c.toString()))
-                        .collect(joining("")));
+                        .collect(joining(""));
+                methodNamePattern = Pattern.compile(pattern);
+                methodName = isPlainIdentifier(ctx.simpleNamePattern()) ? pattern : null;
                 argumentPattern = Pattern.compile(new FormalParameterVisitor().visitFormalParametersPattern(
                         ctx.formalParametersPattern()));
                 return null;
             }
         }.visit(parser.methodPattern());
+    }
+
+    private static boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {
+        return context.BANG() == null
+                && context.AND() == null
+                && context.OR() == null
+                && context.classNameOrInterface().DOTDOT().isEmpty()
+                && context.classNameOrInterface().WILDCARD().isEmpty();
+    }
+
+    private static boolean isPlainIdentifier(MethodSignatureParser.SimpleNamePatternContext context) {
+        return context.WILDCARD().isEmpty();
     }
 
     public MethodMatcher(J.MethodDeclaration method, boolean matchOverrides) {
@@ -114,24 +142,60 @@ public class MethodMatcher {
         this(methodPattern(method), false);
     }
 
-    public boolean matches(@Nullable JavaType.Method type) {
-        if (type == null) {
-            return false;
-        }
+    private boolean matchesTargetTypeName(String fullyQualifiedTypeName) {
+        return this.targetType != null && fullyQualifiedNamesAreEqual(this.targetType, fullyQualifiedTypeName) ||
+               this.targetType == null && this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
+    }
 
-        if (!matchesTargetType(type.getDeclaringType()) || !methodNamePattern.matcher(type.getName()).matches()) {
-            return false;
-        }
+    boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
+        return TypeUtils.isOfTypeWithName(
+                        type,
+                        matchOverrides,
+                        this::matchesTargetTypeName
+                );
+    }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
+    private boolean matchesMethodName(String methodName) {
+        return this.methodName != null && this.methodName.equals(methodName)
+               || this.methodName == null && methodNamePattern.matcher(methodName).matches();
+    }
+
+    private boolean matchesParameterTypes(List<JavaType> parameterTypes) {
         StringJoiner joiner = new StringJoiner(",");
-        for (JavaType javaType : type.getParameterTypes()) {
+        for (JavaType javaType : parameterTypes) {
             String s = typePattern(javaType);
             if (s != null) {
                 joiner.add(s);
             }
         }
-
         return argumentPattern.matcher(joiner.toString()).matches();
+    }
+
+    public boolean matches(@Nullable JavaType.Method type) {
+        if (type == null) {
+            return false;
+        }
+        if (!matchesTargetType(type.getDeclaringType())) {
+            return false;
+        }
+
+        if (!matchesMethodName(type.getName())) {
+            return false;
+        }
+
+        return matchesParameterTypes(type.getParameterTypes());
+    }
+
+    public boolean matches(@Nullable MethodCall methodCall) {
+        if (methodCall == null) {
+            return false;
+        }
+        return matches(methodCall.getMethodType());
+    }
+
+    public boolean matches(@Nullable Expression maybeMethod) {
+        return maybeMethod instanceof MethodCall && matches((MethodCall) maybeMethod);
     }
 
     public boolean matches(J.MethodDeclaration method, J.ClassDeclaration enclosing) {
@@ -141,27 +205,28 @@ public class MethodMatcher {
 
         // aspectJUtils does not support matching classes separated by packages.
         // [^.]* is the product of a fully wild card match for a method. `* foo()`
-        boolean matchesTargetType = "[^.]*".equals(targetTypePattern.toString()) || matchesTargetType(enclosing.getType());
-        if(!matchesTargetType) {
+        boolean matchesTargetType = (targetType == null && "[^.]*".equals(targetTypePattern.pattern()))
+                || matchesTargetType(enclosing.getType());
+        if (!matchesTargetType) {
             return false;
         }
 
-        boolean matchesMethodName = methodNamePattern.matcher(method.getSimpleName()).matches() ||
-                // match constructors
-                (method.getMethodType() != null && methodNamePattern.matcher(method.getMethodType().getName()).matches());
+        if (method.getMethodType() != null && !matchesMethodName(method.getMethodType().getName())) {
+            return false;
+        }
 
-        String arguments = method.getParameters().stream()
-                .map(this::variableDeclarationsType)
-                .filter(Objects::nonNull)
-                .map(MethodMatcher::typePattern)
-                .filter(Objects::nonNull)
-                .collect(joining(","));
-        return matchesMethodName &&
-                argumentPattern.matcher(arguments).matches();
+        List<JavaType> parameterTypes =
+                method
+                        .getParameters()
+                        .stream()
+                        .map(MethodMatcher::variableDeclarationsType)
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+        return matchesParameterTypes(parameterTypes);
     }
 
     @Nullable
-    private JavaType variableDeclarationsType(Statement v) {
+    private static JavaType variableDeclarationsType(Statement v) {
         if (v instanceof J.VariableDeclarations) {
             J.VariableDeclarations vd = (J.VariableDeclarations) v;
             List<J.VariableDeclarations.NamedVariable> variables = vd.getVariables();
@@ -177,23 +242,13 @@ public class MethodMatcher {
         }
     }
 
-    public boolean matches(@Nullable Expression maybeMethod) {
-        return (maybeMethod instanceof J.MethodInvocation && matches((J.MethodInvocation) maybeMethod)) ||
-                (maybeMethod instanceof J.NewClass && matches((J.NewClass) maybeMethod)) ||
-                (maybeMethod instanceof J.MemberReference && matches((J.MemberReference) maybeMethod));
-    }
-
-    public boolean matches(@Nullable J.MethodInvocation method) {
-        return matches(method, false);
-    }
-
     /**
-     * Prefer {@link #matches(J.MethodInvocation)}, which uses the default `false` behavior for matchUnknownTypes.
+     * Prefer {@link #matches(MethodCall)}, which uses the default `false` behavior for matchUnknownTypes.
      * Using matchUnknownTypes can improve Visitor resiliency for an AST with missing type information, but
      * also increases the risk of false-positive matches on unrelated MethodInvocation instances.
      */
     public boolean matches(@Nullable J.MethodInvocation method, boolean matchUnknownTypes) {
-        if(method == null) {
+        if (method == null) {
             return false;
         }
 
@@ -201,23 +256,11 @@ public class MethodMatcher {
             return matchUnknownTypes && matchesAllowingUnknownTypes(method);
         }
 
-        if (!matchesTargetType(method.getMethodType().getDeclaringType()) || !methodNamePattern.matcher(method.getSimpleName()).matches()) {
-            return false;
-        }
-
-        StringJoiner joiner = new StringJoiner(",");
-        for (JavaType javaType : method.getMethodType().getParameterTypes()) {
-            String s = typePattern(javaType);
-            if (s != null) {
-                joiner.add(s);
-            }
-        }
-
-        return argumentPattern.matcher(joiner.toString()).matches();
+        return matches(method.getMethodType());
     }
 
     private boolean matchesAllowingUnknownTypes(J.MethodInvocation method) {
-        if (!methodNamePattern.matcher(method.getSimpleName()).matches()) {
+        if (!matchesMethodName(method.getSimpleName())) {
             return false;
         }
 
@@ -235,10 +278,13 @@ public class MethodMatcher {
     }
 
     private boolean matchesSelectBySimpleNameAlone(J.Identifier select) {
+        if (targetType != null) {
+            return targetType.equals(select.getSimpleName()) || targetType.endsWith('.' + select.getSimpleName());
+        }
         return targetTypePattern.matcher(select.getSimpleName()).matches()
-            || Pattern.compile(targetTypePattern.toString()
-                        .replaceAll(".*" + Pattern.quote(StringUtils.aspectjNameToPattern(".")), "")
-                        .replaceAll(".*" + Pattern.quote(StringUtils.aspectjNameToPattern("..")), ""))
+            || Pattern.compile(targetTypePattern.pattern()
+                        .replaceAll(".*" + Pattern.quote(ASPECTJ_DOT_PATTERN), "")
+                        .replaceAll(".*" + Pattern.quote(ASPECTJ_DOTDOT_PATTERN), ""))
                 .matcher(select.getSimpleName()).matches();
     }
 
@@ -254,59 +300,6 @@ public class MethodMatcher {
         return joiner.toString();
     }
 
-    public boolean matches(J.NewClass constructor) {
-        JavaType.FullyQualified type = TypeUtils.asFullyQualified(constructor.getType());
-        if (type == null || constructor.getConstructorType() == null) {
-            return false;
-        }
-
-        if (!matchesTargetType(type) || !methodNamePattern.matcher("<constructor>").matches()) {
-            return false;
-        }
-
-        StringJoiner joiner = new StringJoiner(",");
-        for (JavaType javaType : constructor.getConstructorType().getParameterTypes()) {
-            String s = typePattern(javaType);
-            if (s != null) {
-                joiner.add(s);
-            }
-        }
-
-        return argumentPattern.matcher(joiner.toString()).matches();
-    }
-
-    public boolean matches(J.MemberReference memberReference) {
-        return matches(memberReference.getMethodType());
-    }
-
-    boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
-        if (type == null || type instanceof JavaType.Unknown) {
-            return false;
-        }
-
-        if (targetTypePattern.matcher(type.getFullyQualifiedName()).matches()) {
-            return true;
-        }
-
-        if (matchOverrides) {
-            if (!"java.lang.Object".equals(type.getFullyQualifiedName()) && matchesTargetType(JavaType.ShallowClass.build("java.lang.Object"))) {
-                return true;
-            }
-
-            if (matchesTargetType(type.getSupertype())) {
-                return true;
-            }
-
-            for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
-                if (matchesTargetType(anInterface)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
     /**
      * Evaluate whether this MethodMatcher and the specified FieldAccess are describing the same type or not.
      * Known limitation/bug: MethodMatchers can have patterns/wildcards like "com.*.Bar" instead of something
@@ -316,7 +309,14 @@ public class MethodMatcher {
      * @param fieldAccess A J.FieldAccess that hopefully has the same fully qualified type as this matcher.
      */
     public boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess) {
-        String hopefullyFullyQualifiedMethod = this.getTargetTypePattern().pattern().replaceAll(Pattern.quote(StringUtils.aspectjNameToPattern(".")), ".") + "." + this.getMethodNamePattern().pattern();
+        String hopefullyFullyQualifiedMethod;
+        if (targetType != null) {
+            hopefullyFullyQualifiedMethod = targetType + "." + methodNamePattern.pattern();
+        } else {
+            hopefullyFullyQualifiedMethod = targetTypePattern.pattern()
+                    .replace(ASPECTJ_DOT_PATTERN, ".")
+                    + "." + methodNamePattern.pattern();
+        }
         return fieldAccess.isFullyQualifiedClassReference(hopefullyFullyQualifiedMethod);
     }
 
@@ -387,13 +387,16 @@ class TypeVisitor extends MethodSignatureParserBaseVisitor<String> {
 }
 
 /**
- * The wildcard .. indicates zero or more parameters, so:
- *
- * <code>execution(void m(..))</code>
+ * The wildcard {@code ..} indicates zero or more parameters, so:
+ * <ul>
+ * <li>{@code execution(void m(..))}
  * picks out execution join points for void methods named m, of any number of arguments, while
- *
- * <code>execution(void m(.., int))</code>
+ * </li>
+ * <li>
+ * {@code execution(void m(.., int))}
  * picks out execution join points for void methods named m whose last parameter is of type int.
+ * </li>
+ * </ul>
  */
 class FormalParameterVisitor extends MethodSignatureParserBaseVisitor<String> {
     private final List<Argument> arguments = new ArrayList<>();

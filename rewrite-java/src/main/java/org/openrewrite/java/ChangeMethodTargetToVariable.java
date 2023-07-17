@@ -17,9 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Flag;
@@ -73,13 +71,14 @@ public class ChangeMethodTargetToVariable extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(methodPattern, matchOverrides);
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new ChangeMethodTargetToVariableVisitor(new MethodMatcher(methodPattern, matchOverrides), JavaType.ShallowClass.build(variableType));
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(
+                new UsesMethod<>(methodPattern, matchOverrides),
+                new ChangeMethodTargetToVariableVisitor(
+                        new MethodMatcher(methodPattern, matchOverrides),
+                        JavaType.ShallowClass.build(variableType)
+                )
+        );
     }
 
     private class ChangeMethodTargetToVariableVisitor extends JavaIsoVisitor<ExecutionContext> {

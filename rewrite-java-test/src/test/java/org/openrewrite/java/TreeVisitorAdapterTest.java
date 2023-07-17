@@ -31,14 +31,17 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class TreeVisitorAdapterTest {
+class TreeVisitorAdapterTest {
 
     @Test
     void adapter() {
         AtomicInteger n = new AtomicInteger();
         //noinspection unchecked
         JavaVisitor<Integer> jv = TreeVisitorAdapter.adapt(new Adaptable(n), JavaVisitor.class);
-        J.CompilationUnit cu = JavaParser.fromJavaVersion().build().parse("class Test {}").get(0);
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build().parse("class Test {}")
+          .findFirst()
+          .map(J.CompilationUnit.class::cast)
+          .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
         jv.visit(cu, 0);
         assertThat(n.get()).isEqualTo(4);
     }
@@ -65,7 +68,10 @@ public class TreeVisitorAdapterTest {
               }
           }
         );
-        J.CompilationUnit cu = JavaParser.fromJavaVersion().build().parse("class Test {}").get(0);
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build().parse("class Test {}")
+          .findFirst()
+          .map(J.CompilationUnit.class::cast)
+          .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
         jv.visit(cu, 0);
         assertThat(n.get()).isEqualTo(
           /* Adaptable preVisit */ 4 +
@@ -75,7 +81,10 @@ public class TreeVisitorAdapterTest {
 
     @Test
     void findUncaught() {
-        J.CompilationUnit cu = JavaParser.fromJavaVersion().build().parse("class Test {}").get(0);
+        J.CompilationUnit cu = JavaParser.fromJavaVersion().build().parse("class Test {}")
+          .findFirst()
+          .map(J.CompilationUnit.class::cast)
+          .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
 
         AtomicReference<RecipeRunException> e = new AtomicReference<>();
         new JavaVisitor<Integer>() {

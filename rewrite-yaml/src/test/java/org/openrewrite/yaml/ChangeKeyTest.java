@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.yaml;;
+package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -27,7 +28,7 @@ class ChangeKeyTest implements RewriteTest {
     @Test
     void simpleChangeRootKey() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeKey("$.description", "newDescription", null)),
+          spec -> spec.recipe(new ChangeKey("$.description", "newDescription")),
           yaml(
             """
               id: something
@@ -43,10 +44,11 @@ class ChangeKeyTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void changeNestedKey() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeKey("$.metadata.name", "name2", null)),
+          spec -> spec.recipe(new ChangeKey("$.metadata.name", "name2")),
           yaml(
             """
                   apiVersion: v1
@@ -67,7 +69,7 @@ class ChangeKeyTest implements RewriteTest {
     @Test
     void changeRelativeKey() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeKey(".name", "name2", null)),
+          spec -> spec.recipe(new ChangeKey(".name", "name2")),
           yaml(
             """
                   apiVersion: v1
@@ -88,7 +90,7 @@ class ChangeKeyTest implements RewriteTest {
     @Test
     void changeSequenceKeyByWildcard() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeKey("$.subjects[*].kind", "kind2", null)),
+          spec -> spec.recipe(new ChangeKey("$.subjects[*].kind", "kind2")),
           yaml(
             """
                   subjects:
@@ -107,7 +109,7 @@ class ChangeKeyTest implements RewriteTest {
     @Test
     void changeSequenceKeyByExactMatch() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeKey("$.subjects[?(@.kind == 'ServiceAccount')].kind", "kind2", null)),
+          spec -> spec.recipe(new ChangeKey("$.subjects[?(@.kind == 'ServiceAccount')].kind", "kind2")),
           yaml(
             """
                   subjects:
@@ -128,21 +130,11 @@ class ChangeKeyTest implements RewriteTest {
     }
 
     @Test
-    void changeOnlyMatchingFile() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeKey("$.description", "newDescription", "**/a.yml")),
-          yaml("description: desc", "newDescription: desc", spec -> spec.path("a.yml")),
-          yaml("description: desc", spec -> spec.path("b.yml"))
-        );
-    }
-
-    @Test
     void relocatesPropertyWithVariableInfix() {
         rewriteRun(
           spec -> spec.recipe(new ChangeKey(
             "\\$.spring.security.saml2.relyingparty.registration.*[?(@.identityprovider)]",
-            "assertingparty",
-            null
+            "assertingparty"
           )),
           yaml(
             """

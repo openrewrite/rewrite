@@ -31,10 +31,10 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitBlock(Proto.Block block, PrintOutputCapture<P> p) {
         beforeSyntax(block, p);
-        p.out.append('{');
+        p.append('{');
         visitStatements(block.getPadding().getStatements(), p);
         visitSpace(block.getEnd(), p);
-        p.out.append('}');
+        p.append('}');
         afterSyntax(block, p);
         return block;
     }
@@ -42,7 +42,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitConstant(Proto.Constant constant, PrintOutputCapture<P> p) {
         beforeSyntax(constant, p);
-        p.out.append(constant.getValueSource());
+        p.append(constant.getValueSource());
         afterSyntax(constant, p);
         return constant;
     }
@@ -67,7 +67,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitEnum(Proto.Enum anEnum, PrintOutputCapture<P> p) {
         beforeSyntax(anEnum, p);
-        p.out.append("enum");
+        p.append("enum");
         visit(anEnum.getName(), p);
         visit(anEnum.getBody(), p);
         afterSyntax(anEnum, p);
@@ -78,7 +78,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     public Proto visitEnumField(Proto.EnumField enumField, PrintOutputCapture<P> p) {
         beforeSyntax(enumField, p);
         visitRightPadded(enumField.getPadding().getName(), p);
-        p.out.append('=');
+        p.append('=');
         visit(enumField.getNumber(), p);
         visitContainer("[", enumField.getPadding().getOptions(), "]", p);
         afterSyntax(enumField, p);
@@ -88,7 +88,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitExtend(Proto.Extend extend, PrintOutputCapture<P> p) {
         beforeSyntax(extend, p);
-        p.out.append("extend");
+        p.append("extend");
         visitFullIdentifier(extend.getName(), p);
         visitBlock(extend.getBody(), p);
         afterSyntax(extend, p);
@@ -98,9 +98,9 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitExtensionName(Proto.ExtensionName extensionName, PrintOutputCapture<P> p) {
         beforeSyntax(extensionName, p);
-        p.out.append('(');
+        p.append('(');
         visitRightPadded(extensionName.getPadding().getExtension(), p);
-        p.out.append(')');
+        p.append(')');
         afterSyntax(extensionName, p);
         return extensionName;
     }
@@ -111,7 +111,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
         visit(field.getLabel(), p);
         visit(field.getType(), p);
         visitRightPadded(field.getPadding().getName(), p);
-        p.out.append('=');
+        p.append('=');
         visit(field.getNumber(), p);
         visitContainer("[", field.getPadding().getOptions(), "]", p);
         afterSyntax(field, p);
@@ -123,7 +123,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
         beforeSyntax(identifier, p);
         visitRightPadded(identifier.getPadding().getTarget(), p);
         if (identifier.getTarget() != null) {
-            p.out.append('.');
+            p.append('.');
         }
         visit(identifier.getName(), p);
         afterSyntax(identifier, p);
@@ -133,7 +133,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitIdentifier(Proto.Identifier identifier, PrintOutputCapture<P> p) {
         beforeSyntax(identifier, p);
-        p.out.append(identifier.getName());
+        p.append(identifier.getName());
         afterSyntax(identifier, p);
         return identifier;
     }
@@ -141,7 +141,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitImport(Proto.Import anImport, PrintOutputCapture<P> p) {
         beforeSyntax(anImport, p);
-        p.out.append("import");
+        p.append("import");
         visit(anImport.getModifier(), p);
         visitRightPadded(anImport.getPadding().getName(), p);
         afterSyntax(anImport, p);
@@ -151,7 +151,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitKeyword(Proto.Keyword keyword, PrintOutputCapture<P> p) {
         beforeSyntax(keyword, p);
-        p.out.append(keyword.getKeyword());
+        p.append(keyword.getKeyword());
         afterSyntax(keyword, p);
         return keyword;
     }
@@ -159,15 +159,15 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitMapField(Proto.MapField mapField, PrintOutputCapture<P> p) {
         beforeSyntax(mapField, p);
-        p.out.append("map");
+        p.append("map");
         visitSpace(mapField.getPadding().getMap().getAfter(), p);
-        p.out.append('<');
+        p.append('<');
         visitRightPadded(mapField.getPadding().getKeyType(), p);
-        p.out.append(',');
+        p.append(',');
         visitRightPadded(mapField.getPadding().getValueType(), p);
-        p.out.append('>');
+        p.append('>');
         visitRightPadded(mapField.getPadding().getName(), p);
-        p.out.append('=');
+        p.append('=');
         visit(mapField.getNumber(), p);
         visitContainer("[", mapField.getPadding().getOptions(), "]", p);
         afterSyntax(mapField, p);
@@ -177,7 +177,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitMessage(Proto.Message message, PrintOutputCapture<P> p) {
         beforeSyntax(message, p);
-        p.out.append("message");
+        p.append("message");
         visit(message.getName(), p);
         visit(message.getBody(), p);
         afterSyntax(message, p);
@@ -187,7 +187,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitOneOf(Proto.OneOf oneOf, PrintOutputCapture<P> p) {
         beforeSyntax(oneOf, p);
-        p.out.append("oneof");
+        p.append("oneof");
         visit(oneOf.getName(), p);
         visit(oneOf.getFields(), p);
         afterSyntax(oneOf, p);
@@ -198,7 +198,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     public Proto visitOption(Proto.Option option, PrintOutputCapture<P> p) {
         beforeSyntax(option, p);
         visitRightPadded(option.getPadding().getName(), p);
-        p.out.append('=');
+        p.append('=');
         visit(option.getAssignment(), p);
         afterSyntax(option, p);
         return option;
@@ -207,9 +207,9 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitOptionDeclaration(Proto.OptionDeclaration optionDeclaration, PrintOutputCapture<P> p) {
         beforeSyntax(optionDeclaration, p);
-        p.out.append("option");
+        p.append("option");
         visitRightPadded(optionDeclaration.getPadding().getName(), p);
-        p.out.append('=');
+        p.append('=');
         visit(optionDeclaration.getAssignment(), p);
         afterSyntax(optionDeclaration, p);
         return optionDeclaration;
@@ -218,7 +218,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitPackage(Proto.Package aPackage, PrintOutputCapture<P> p) {
         beforeSyntax(aPackage, p);
-        p.out.append("package");
+        p.append("package");
         visit(aPackage.getName(), p);
         afterSyntax(aPackage, p);
         return aPackage;
@@ -227,7 +227,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitPrimitive(Proto.Primitive primitive, PrintOutputCapture<P> p) {
         beforeSyntax(primitive, p);
-        p.out.append(primitive.getType().toString().toLowerCase());
+        p.append(primitive.getType().toString().toLowerCase());
         afterSyntax(primitive, p);
         return primitive;
     }
@@ -237,7 +237,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
         beforeSyntax(range, p);
         visitRightPadded(range.getPadding().getFrom(), p);
         if (range.getTo() != null) {
-            p.out.append("to");
+            p.append("to");
             visit(range.getTo(), p);
         }
         afterSyntax(range, p);
@@ -247,7 +247,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitReserved(Proto.Reserved reserved, PrintOutputCapture<P> p) {
         beforeSyntax(reserved, p);
-        p.out.append("reserved");
+        p.append("reserved");
         visitContainer("", reserved.getPadding().getReservations(), "", p);
         afterSyntax(reserved, p);
         return reserved;
@@ -256,7 +256,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitRpc(Proto.Rpc rpc, PrintOutputCapture<P> p) {
         beforeSyntax(rpc, p);
-        p.out.append("rpc");
+        p.append("rpc");
         visit(rpc.getName(), p);
         visit(rpc.getRequest(), p);
         visit(rpc.getReturns(), p);
@@ -269,13 +269,13 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitRpcInOut(Proto.RpcInOut rpcInOut, PrintOutputCapture<P> p) {
         beforeSyntax(rpcInOut, p);
-        p.out.append('(');
+        p.append('(');
         if (rpcInOut.getStream() != null) {
             visitSpace(rpcInOut.getStream().getPrefix(), p);
-            p.out.append("stream");
+            p.append("stream");
         }
         visitRightPadded(rpcInOut.getPadding().getType(), p);
-        p.out.append(')');
+        p.append(')');
         afterSyntax(rpcInOut, p);
         return rpcInOut;
     }
@@ -283,7 +283,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitService(Proto.Service service, PrintOutputCapture<P> p) {
         beforeSyntax(service, p);
-        p.out.append("service");
+        p.append("service");
         visit(service.getName(), p);
         visit(service.getBody(), p);
         afterSyntax(service, p);
@@ -293,9 +293,9 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitStringLiteral(Proto.StringLiteral stringLiteral, PrintOutputCapture<P> p) {
         beforeSyntax(stringLiteral, p);
-        p.out.append(stringLiteral.isSingleQuote() ? '\'' : '"');
-        p.out.append(stringLiteral.getLiteral());
-        p.out.append(stringLiteral.isSingleQuote() ? '\'' : '"');
+        p.append(stringLiteral.isSingleQuote() ? '\'' : '"');
+        p.append(stringLiteral.getLiteral());
+        p.append(stringLiteral.isSingleQuote() ? '\'' : '"');
         afterSyntax(stringLiteral, p);
         return stringLiteral;
     }
@@ -303,25 +303,25 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
     @Override
     public Proto visitSyntax(Proto.Syntax syntax, PrintOutputCapture<P> p) {
         beforeSyntax(syntax, p);
-        p.out.append("syntax");
+        p.append("syntax");
         visitSpace(syntax.getKeywordSuffix(), p);
-        p.out.append('=');
+        p.append('=');
         visitRightPadded(syntax.getPadding().getLevel(), p);
-        p.out.append(';');
+        p.append(';');
         afterSyntax(syntax, p);
         return syntax;
     }
 
     public Space visitSpace(Space space, PrintOutputCapture<P> p) {
-        p.out.append(space.getWhitespace());
+        p.append(space.getWhitespace());
         for (Comment comment : space.getComments()) {
             visitMarkers(comment.getMarkers(), p);
             if (comment.isMultiline()) {
-                p.out.append("/*").append(comment.getText()).append("*/");
+                p.append("/*").append(comment.getText()).append("*/");
             } else {
-                p.out.append("//").append(comment.getText());
+                p.append("//").append(comment.getText());
             }
-            p.out.append(comment.getSuffix());
+            p.append(comment.getSuffix());
         }
         return space;
     }
@@ -343,7 +343,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
             visit(node.getElement(), p);
             visitSpace(node.getAfter(), p);
             if (i < nodes.size() - 1) {
-                p.out.append(',');
+                p.append(',');
             }
         }
     }
@@ -386,12 +386,12 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
 
     private void beforeSyntax(Space prefix, Markers markers, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), PROTO_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), PROTO_MARKER_WRAPPER));
         }
         visitSpace(prefix, p);
         visitMarkers(markers, p);
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), PROTO_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), PROTO_MARKER_WRAPPER));
         }
     }
 
@@ -401,7 +401,7 @@ public class ProtoPrinter<P> extends ProtoVisitor<PrintOutputCapture<P>> {
 
     private void afterSyntax(Markers markers, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), PROTO_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), PROTO_MARKER_WRAPPER));
         }
     }
 }

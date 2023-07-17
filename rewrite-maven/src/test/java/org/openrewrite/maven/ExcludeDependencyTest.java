@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -28,6 +29,7 @@ class ExcludeDependencyTest implements RewriteTest {
         spec.recipe(new ExcludeDependency("org.junit.vintage", "junit-vintage-engine", null));
     }
 
+    @DocumentExample
     @Test
     void excludeJUnitVintageEngineSpringBoot2_3() {
         rewriteRun(

@@ -18,9 +18,8 @@ package org.openrewrite.marker;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
-import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.Tree;
 
 import java.util.*;
 
@@ -31,5 +30,11 @@ public class RecipesThatMadeChanges implements Marker {
     @EqualsAndHashCode.Include
     UUID id;
 
-    Collection<Stack<Recipe>> recipes;
+    Collection<List<Recipe>> recipes;
+
+    public static RecipesThatMadeChanges create(List<Recipe> recipeStack) {
+        List<List<Recipe>> recipeStackList = new ArrayList<>(1);
+        recipeStackList.add(recipeStack);
+        return new RecipesThatMadeChanges(Tree.randomId(), recipeStackList);
+    }
 }

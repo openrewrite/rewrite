@@ -15,13 +15,15 @@
  */
 package org.openrewrite.maven;
 
-import lombok.*;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import lombok.With;
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
@@ -29,9 +31,10 @@ import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+
+import static java.util.Objects.requireNonNull;
 
 
 /**
@@ -44,17 +47,17 @@ import java.util.regex.Pattern;
  */
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class AddDependency extends Recipe {
+public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     @EqualsAndHashCode.Exclude
-    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+    transient MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "com.google.guava")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "guava")
     String artifactId;
 
@@ -65,7 +68,7 @@ public class AddDependency extends Recipe {
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                    "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -73,7 +76,7 @@ public class AddDependency extends Recipe {
 
     @Option(displayName = "Scope",
             description = "A scope to use when it is not what can be inferred from usage. Most of the time this will be left empty, but " +
-                    "is used when adding a runtime, provided, or import dependency.",
+                          "is used when adding a runtime, provided, or import dependency.",
             example = "runtime",
             valid = {"import", "runtime", "provided"},
             required = false)
@@ -82,7 +85,6 @@ public class AddDependency extends Recipe {
 
     @Option(displayName = "Releases only",
             description = "Whether to exclude snapshots from consideration when using a semver selector",
-            example = "true",
             required = false)
     @Nullable
     Boolean releasesOnly;
@@ -109,7 +111,6 @@ public class AddDependency extends Recipe {
 
     @Option(displayName = "Optional",
             description = "Set the value of the `<optional>` tag. No `<optional>` tag will be added when this is `null`.",
-            example = "true",
             required = false)
     @Nullable
     Boolean optional;
@@ -119,16 +120,23 @@ public class AddDependency extends Recipe {
      */
     @Option(displayName = "Family pattern",
             description = "A pattern, applied to groupIds, used to determine which other dependencies should have aligned version numbers. " +
-                    "Accepts '*' as a wildcard character.",
+                          "Accepts '*' as a wildcard character.",
             example = "com.fasterxml.jackson*",
             required = false)
     @Nullable
     @With
     String familyPattern;
 
+    @Option(displayName = "Accept transitive",
+            description = "Default false. If enabled, the dependency will not be added if it is already on the classpath as a transitive dependency.",
+            example = "true",
+            required = false)
+    @Nullable
+    Boolean acceptTransitive;
+
     @Override
-    public Validated validate() {
-        Validated validated = super.validate();
+    public Validated<Object> validate() {
+        Validated<Object> validated = super.validate();
         //noinspection ConstantConditions
         if (version != null) {
             validated = validated.or(Semver.validate(version, versionPattern));
@@ -143,84 +151,86 @@ public class AddDependency extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Add a maven dependency to a `pom.xml` file in the correct scope based on where it is used.";
+        return "Add a Maven dependency to a `pom.xml` file in the correct scope based on where it is used.";
+    }
+
+    public static class Scanned {
+        boolean usingType;
+        Map<JavaProject, String> scopeByProject = new HashMap<>();
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
-        return new UsesType<>(onlyIfUsing);
+    public Scanned getInitialValue(ExecutionContext ctx) {
+        return new Scanned();
     }
 
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        Map<JavaProject, String> scopeByProject = new HashMap<>();
-        for (SourceFile source : before) {
-            source.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
-                    source.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
-                        if (source != new UsesType<>(onlyIfUsing).visit(source, ctx)) {
-                            scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
-                                    scope /* a compile scope dependency will also be available in test source set */ :
-                                    "test".equals(sourceSet.getName()) ? "test" : "compile"
-                            );
-                        }
-                    }));
-        }
-
-        if (scopeByProject.isEmpty()) {
-            return before;
-        }
-
-        Pattern familyPatternCompiled = this.familyPattern == null ? null : Pattern.compile(this.familyPattern.replace("*", ".*"));
-
-        return ListUtils.map(before, s -> s.getMarkers().findFirst(JavaProject.class)
-                .map(javaProject -> (Tree) new MavenVisitor<ExecutionContext>() {
-                    @Override
-                    public Xml visitTag(Xml.Tag tag, ExecutionContext executionContext) {
-                        if(isDependencyTag() &&
-                           groupId.equals(tag.getChildValue("groupId").orElse(null)) &&
-                           artifactId.equals(tag.getChildValue("artifactId").orElse(null)) &&
-                           (scope == null || scope.equals(tag.getChildValue("scope").orElse(null)))) {
-                            getCursor().putMessageOnFirstEnclosing(Xml.Document.class, "alreadyHasDependency", true);
-                        }
-                        return super.visitTag(tag, executionContext);
-                    }
-
-                    @Override
-                    public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                        Xml maven = super.visitDocument(document, executionContext);
-
-                        String maybeScope = scopeByProject.get(javaProject);
-                        if (maybeScope == null) {
-                            return maven;
-                        }
-
-                        if(getCursor().getMessage("alreadyHasDependency", false)) {
-                            return maven;
-                        }
-
-                        //If the dependency is already in scope, no need to continue.
-                        for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Compile)) {
-                            if (d.isDirect() && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
-                                return maven;
-                            }
-                        }
-
-                        String resolvedScope = scope == null ? maybeScope : scope;
-                        Scope resolvedScopeEnum = Scope.fromName(resolvedScope);
-                        if (resolvedScopeEnum == Scope.Provided || resolvedScopeEnum == Scope.Test) {
-                            for (ResolvedDependency d : getResolutionResult().getDependencies().get(resolvedScopeEnum)) {
-                                if (groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
-                                    return maven;
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Scanned acc) {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                if (tree instanceof JavaSourceFile) {
+                    boolean sourceFileUsesType = sourceFile != new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx);
+                    acc.usingType |= sourceFileUsesType;
+                    sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
+                            sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
+                                if (sourceFileUsesType) {
+                                    acc.scopeByProject.compute(javaProject, (jp, scope) -> "compile".equals(scope) ?
+                                            scope /* a `compile` scope dependency will also be available in test source set */ :
+                                            "test".equals(sourceSet.getName()) ? "test" : "compile"
+                                    );
                                 }
-                            }
-                        }
+                            }));
+                }
+                return sourceFile;
+            }
+        };
+    }
 
-                        return new AddDependencyVisitor(
-                                groupId, artifactId, version, versionPattern, resolvedScope, releasesOnly,
-                                type, classifier, optional, familyPatternCompiled, metadataFailures).visitNonNull(s, ctx);
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Scanned acc) {
+        return Preconditions.check(acc.usingType && !acc.scopeByProject.isEmpty(), new MavenVisitor<ExecutionContext>() {
+            @Nullable
+            final Pattern familyPatternCompiled = familyPattern == null ? null : Pattern.compile(familyPattern.replace("*", ".*"));
+
+            @Override
+            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
+                Xml maven = super.visitDocument(document, ctx);
+
+                JavaProject javaProject = document.getMarkers().findFirst(JavaProject.class).orElse(null);
+                String maybeScope = javaProject == null ? null : acc.scopeByProject.get(javaProject);
+                if (maybeScope == null) {
+                    return maven;
+                }
+
+                // If the dependency is already in compile scope it will be available everywhere, no need to continue
+                for (ResolvedDependency d : getResolutionResult().getDependencies().get(Scope.Compile)) {
+                    if (hasAcceptableTransitivity(d)
+                        && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                        return maven;
                     }
-                }.visit(s, ctx))
-                .map(SourceFile.class::cast)
-                .orElse(s)
-        );
+                }
+
+                String resolvedScope = scope == null ? maybeScope : scope;
+                Scope resolvedScopeEnum = Scope.fromName(resolvedScope);
+                if (resolvedScopeEnum == Scope.Provided || resolvedScopeEnum == Scope.Test) {
+                    for (ResolvedDependency d : getResolutionResult().getDependencies().get(resolvedScopeEnum)) {
+                        if (hasAcceptableTransitivity(d)
+                            && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                            return maven;
+                        }
+                    }
+                }
+
+                return new AddDependencyVisitor(
+                        groupId, artifactId, version, versionPattern, resolvedScope, releasesOnly,
+                        type, classifier, optional, familyPatternCompiled, metadataFailures).visitNonNull(document, ctx);
+            }
+        });
+    }
+
+    private boolean hasAcceptableTransitivity(ResolvedDependency d) {
+        return d.isDirect() || Boolean.TRUE.equals(acceptTransitive);
     }
 }

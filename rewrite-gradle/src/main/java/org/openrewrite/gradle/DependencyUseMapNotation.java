@@ -16,15 +16,21 @@
 package org.openrewrite.gradle;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.gradle.util.Dependency;
+import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.groovy.tree.G;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -44,14 +50,9 @@ public class DependencyUseMapNotation extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new IsBuildGradle<>();
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
-        return new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, context);
@@ -76,20 +77,31 @@ public class DependencyUseMapNotation extends Recipe {
                 if (dependencyString == null) {
                     return m;
                 }
-                String[] gav = dependencyString.split(":");
-                G.MapEntry groupEntry = mapEntry("group", gav[0])
+                Dependency dependency = DependencyStringNotationConverter.parse(dependencyString);
+                List<Expression> arguments = new ArrayList<>();
+                arguments.add(mapEntry("group", dependency.getGroupId())
                         .withMarkers(arg.getMarkers())
-                        .withPrefix(arg.getPrefix());
-                G.MapEntry artifactEntry = mapEntry("name", gav[1])
-                        .withMarkers(arg.getMarkers());
-                G.MapEntry versionEntry = mapEntry("version", gav[2])
-                        .withMarkers(arg.getMarkers());
+                        .withPrefix(arg.getPrefix()));
+                arguments.add(mapEntry("name", dependency.getArtifactId())
+                        .withMarkers(arg.getMarkers()));
+                if (dependency.getVersion() != null) {
+                    arguments.add(mapEntry("version", dependency.getVersion())
+                            .withMarkers(arg.getMarkers()));
+                }
+                if (dependency.getClassifier() != null) {
+                    arguments.add(mapEntry("classifier", dependency.getClassifier())
+                            .withMarkers(arg.getMarkers()));
+                }
+                if (dependency.getExt() != null) {
+                    arguments.add(mapEntry("ext", dependency.getExt())
+                            .withMarkers(arg.getMarkers()));
+                }
 
                 Expression lastArg = m.getArguments().get(m.getArguments().size() - 1);
                 if (lastArg instanceof J.Lambda) {
-                    m = m.withArguments(Arrays.asList(groupEntry, artifactEntry, versionEntry, lastArg));
+                    m = m.withArguments(ListUtils.concat(arguments, lastArg));
                 } else {
-                    m = m.withArguments(Arrays.asList(groupEntry, artifactEntry, versionEntry));
+                    m = m.withArguments(arguments);
                 }
 
                 return updateTypeForMapArgument(m);
@@ -146,7 +158,7 @@ public class DependencyUseMapNotation extends Recipe {
                 mtype = mtype.withParameterTypes(singletonList(JavaType.ShallowClass.build("java.util.Map")));
                 return m.withMethodType(mtype);
             }
-        };
+        });
     }
 
     private static G.MapEntry mapEntry(String key, String value) {

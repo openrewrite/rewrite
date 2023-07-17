@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.*;
 
-public class HasSourceSetTest implements RewriteTest {
+class HasSourceSetTest implements RewriteTest {
 
     @Test
     void main() {

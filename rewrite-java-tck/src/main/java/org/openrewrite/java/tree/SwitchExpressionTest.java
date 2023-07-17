@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
 @MinimumJava17
-public class SwitchExpressionTest implements RewriteTest {
+class SwitchExpressionTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2550")
     @Test

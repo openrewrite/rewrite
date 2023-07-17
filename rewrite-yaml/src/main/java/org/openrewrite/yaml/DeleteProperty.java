@@ -17,19 +17,23 @@ package org.openrewrite.yaml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import lombok.With;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Deque;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Spliterators.spliteratorUnknownSize;
 import static java.util.stream.StreamSupport.stream;
+import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -43,26 +47,16 @@ public class DeleteProperty extends Recipe {
     @Option(displayName = "Coalesce",
             description = "(Deprecated: in a future version, this recipe will always use the `false` behavior)"
                     + " Simplify nested map hierarchies into their simplest dot separated property form.",
-            example = "true",
             required = false)
     @Nullable
     Boolean coalesce;
 
-    @Incubating(since = "7.17.0")
     @Option(displayName = "Use relaxed binding",
             description = "Whether to match the `propertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
                     "rules. Default is `true`. Set to `false`  to use exact matching.",
             required = false)
     @Nullable
     Boolean relaxedBinding;
-
-    @Incubating(since = "7.8.0")
-    @Option(displayName = "Optional file matcher",
-            description = "Matching files will be modified. This is a glob expression.",
-            required = false,
-            example = "**/application-*.yml")
-    @Nullable
-    String fileMatcher;
 
     @Override
     public String getDisplayName() {
@@ -76,15 +70,7 @@ public class DeleteProperty extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        if (fileMatcher != null) {
-            return new HasSourcePath<>(fileMatcher);
-        }
-        return null;
-    }
-
-    @Override
-    public YamlVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new YamlIsoVisitor<ExecutionContext>() {
 
             @Override
@@ -129,27 +115,60 @@ public class DeleteProperty extends Recipe {
         }
 
         @Override
+        public Yaml visitSequence(Yaml.Sequence sequence, P p) {
+            sequence = (Yaml.Sequence) super.visitSequence(sequence, p);
+            List<Yaml.Sequence.Entry> entries = sequence.getEntries();
+            entries = ListUtils.map(entries, entry -> ToBeRemoved.hasMarker(entry) ? null : entry);
+            return entries.isEmpty() ? ToBeRemoved.withMarker(sequence) : sequence.withEntries(entries);
+        }
+
+        @Override
+        public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
+            entry = (Yaml.Sequence.Entry) super.visitSequenceEntry(entry, p);
+            if (entry.getBlock() instanceof Yaml.Mapping) {
+                Yaml.Mapping m = (Yaml.Mapping) entry.getBlock();
+                if (ToBeRemoved.hasMarker(m)) {
+                    return ToBeRemoved.withMarker(entry);
+                }
+            }
+            return entry;
+        }
+
+        @Override
         public Yaml visitMapping(Yaml.Mapping mapping, P p) {
             Yaml.Mapping m = (Yaml.Mapping) super.visitMapping(mapping, p);
 
             boolean changed = false;
             List<Yaml.Mapping.Entry> entries = new ArrayList<>();
             String deletedPrefix = null;
+            int count = 0;
             for (Yaml.Mapping.Entry entry : m.getEntries()) {
+                if (ToBeRemoved.hasMarker(entry.getValue())) {
+                    changed = true;
+                    continue;
+                }
+
                 if (entry == scope || (entry.getValue() instanceof Yaml.Mapping && ((Yaml.Mapping) entry.getValue()).getEntries().isEmpty())) {
                     deletedPrefix = entry.getPrefix();
                     changed = true;
                 } else {
                     if (deletedPrefix != null) {
-                        entry = entry.withPrefix(deletedPrefix);
+                        if (count == 0 && containsOnlyWhitespace(entry.getPrefix())) {
+                            // do this only if the entry will be the first element
+                            entry = entry.withPrefix(deletedPrefix);
+                        }
                         deletedPrefix = null;
                     }
                     entries.add(entry);
+                    count++;
                 }
             }
 
             if (changed) {
                 m = m.withEntries(entries);
+                if (entries.isEmpty()) {
+                    m = ToBeRemoved.withMarker(m);
+                }
 
                 if (getCursor().getParentOrThrow().getValue() instanceof Yaml.Document) {
                     Yaml.Document document = getCursor().getParentOrThrow().getValue();
@@ -162,4 +181,30 @@ public class DeleteProperty extends Recipe {
         }
     }
 
+    private static boolean containsOnlyWhitespace(String str) {
+        if (str == null || str.isEmpty()) {
+            return false;
+        }
+
+        for (int i = 0; i < str.length(); i++) {
+            char c = str.charAt(i);
+            if (!Character.isWhitespace(c)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    @Value
+    @With
+    private static class ToBeRemoved implements Marker {
+        UUID id;
+        static <Y2 extends Yaml> Y2 withMarker(Y2 y) {
+            return y.withMarkers(y.getMarkers().addIfAbsent(new ToBeRemoved(randomId())));
+        }
+        static boolean hasMarker(Yaml y) {
+            return y.getMarkers().findFirst(ToBeRemoved.class).isPresent();
+        }
+    }
 }

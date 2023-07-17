@@ -22,6 +22,8 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
+import org.openrewrite.maven.tree.ResolvedDependency;
+import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.maven.tree.Version;
 import org.openrewrite.semver.ExactVersion;
 import org.openrewrite.semver.LatestRelease;
@@ -32,6 +34,8 @@ import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
@@ -84,10 +88,37 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
     }
 
     @Override
+    public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext executionContext) {
+        if (isDependencyTag() &&
+                groupId.equals(tag.getChildValue("groupId").orElse(null)) &&
+                artifactId.equals(tag.getChildValue("artifactId").orElse(null)) &&
+                Scope.fromName(scope) == Scope.fromName(tag.getChildValue("scope").orElse(null))) {
+            getCursor().putMessageOnFirstEnclosing(Xml.Document.class, "alreadyHasDependency", true);
+            return tag;
+        }
+        return super.visitTag(tag, executionContext);
+    }
+
+
+    @Override
     public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
         Xml.Document maven = super.visitDocument(document, executionContext);
 
-        Validated versionValidation = Semver.validate(version, versionPattern);
+        if(getCursor().getMessage("alreadyHasDependency", false)) {
+            return document;
+        }
+
+        Scope resolvedScope = scope == null ? Scope.Compile : Scope.fromName(scope);
+        Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult().getDependencies();
+        if (dependencies.containsKey(resolvedScope)) {
+            for (ResolvedDependency d : dependencies.get(resolvedScope)) {
+                if (d.isDirect() && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                    return maven;
+                }
+            }
+        }
+
+        Validated<VersionComparator> versionValidation = Semver.validate(version, versionPattern);
         if (versionValidation.isValid()) {
             versionComparator = versionValidation.getValue();
         }

@@ -21,10 +21,7 @@ import lombok.With;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
@@ -100,9 +97,15 @@ public class JRightPadded<T> {
         }
     }
 
-    public static <T> List<T> getElements(List<JRightPadded<T>> ls) {
-        List<T> list = new ArrayList<>();
+    public static <T> List<T> getElements(@Nullable List<JRightPadded<T>> ls) {
+        if (ls == null) {
+            return Collections.emptyList();
+        }
+        List<T> list = new ArrayList<>(ls.size());
         for (JRightPadded<T> l : ls) {
+            if (l == null) {
+                continue;
+            }
             T elem = l.getElement();
             list.add(elem);
         }
@@ -110,17 +113,17 @@ public class JRightPadded<T> {
     }
 
     @Nullable
-    public static <T> JRightPadded<T> withElement(@Nullable JRightPadded<T> before, @Nullable T elements) {
+    public static <T> JRightPadded<T> withElement(@Nullable JRightPadded<T> before, @Nullable T element) {
         if (before == null) {
-            if (elements == null) {
+            if (element == null) {
                 return null;
             }
-            return new JRightPadded<>(elements, Space.EMPTY, Markers.EMPTY);
+            return new JRightPadded<>(element, Space.EMPTY, Markers.EMPTY);
         }
-        if (elements == null) {
+        if (element == null) {
             return null;
         }
-        return before.withElement(elements);
+        return before.withElement(element);
     }
 
     public static <J2 extends J> List<JRightPadded<J2>> withElements(List<JRightPadded<J2>> before, List<J2> elements) {
@@ -136,6 +139,8 @@ public class JRightPadded<T> {
             if (!hasChanges) {
                 return before;
             }
+        } else if (elements.isEmpty()) {
+            return Collections.emptyList();
         }
 
         List<JRightPadded<J2>> after = new ArrayList<>(elements.size());
@@ -143,8 +148,8 @@ public class JRightPadded<T> {
                 .toMap(j -> j.getElement().getId(), Function.identity()));
 
         for (J2 t : elements) {
-            if (beforeById.get(t.getId()) != null) {
-                JRightPadded<J2> found = beforeById.get(t.getId());
+            JRightPadded<J2> found;
+            if ((found = beforeById.get(t.getId())) != null) {
                 after.add(found.withElement(t));
             } else {
                 after.add(new JRightPadded<>(t, Space.EMPTY, Markers.EMPTY));

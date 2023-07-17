@@ -723,13 +723,13 @@ class JavadocTest implements RewriteTest {
         rewriteRun(
           java(
             """
-                  class Test {
-                      /**
-                       * {@link ListenerUtils#getExceptionFromHeader(ConsumerRecord, String, LogAccessor)}
-                       */
-                      void test() {
-                      }
+              class Test {
+                  /**
+                   * {@link ListenerUtils#getExceptionFromHeader(ConsumerRecord, String, LogAccessor)}
+                   */
+                  void test() {
                   }
+              }
               """
           )
         );

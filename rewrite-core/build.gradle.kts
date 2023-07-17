@@ -8,8 +8,7 @@ plugins {
 dependencies {
     compileOnly("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 
-    implementation("de.danielbechler:java-object-diff:latest.release")
-    implementation("org.apache.ant:ant:latest.release")
+    implementation("org.openrewrite.tools:java-object-diff:latest.release")
 
     implementation("io.quarkus.gizmo:gizmo:1.0.+")
 
@@ -32,7 +31,7 @@ dependencies {
     testImplementation("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 }
 
-tasks.withType<ShadowJar> {
+val shadowJar = tasks.named<ShadowJar>("shadowJar") {
     dependencies {
         include(dependency("org.eclipse.jgit:"))
     }
@@ -44,5 +43,6 @@ tasks.withType<ShadowJar> {
 }
 
 tasks.named<Test>("test").configure {
-    classpath = files(tasks.named<ShadowJar>("shadowJar"), sourceSets.test.get().output, configurations.testRuntimeClasspath)
+    dependsOn(shadowJar)
+    classpath = files(shadowJar, sourceSets.test.get().output, configurations.testRuntimeClasspath)
 }

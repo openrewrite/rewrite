@@ -16,6 +16,7 @@
 package org.openrewrite.groovy;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.java.DeleteStatement;
@@ -28,6 +29,7 @@ import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class DeleteStatementTest implements RewriteTest {
+    @DocumentExample
     @Test
     void deleteStatement() {
         rewriteRun(

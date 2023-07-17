@@ -18,14 +18,16 @@ package org.openrewrite.gradle.search;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.withToolingApi;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class FindGradleProjectTest implements RewriteTest {
+class FindGradleProjectTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -36,7 +38,8 @@ public class FindGradleProjectTest implements RewriteTest {
     @EnumSource(FindGradleProject.SearchCriteria.class)
     void isGradleGroovyProject(FindGradleProject.SearchCriteria criteria) {
         rewriteRun(
-          spec -> spec.recipe(new FindGradleProject(criteria)),
+          spec -> spec.beforeRecipe(withToolingApi())
+            .recipe(new FindGradleProject(criteria)),
           buildGradle(
             """
               plugins {
@@ -52,6 +55,7 @@ public class FindGradleProjectTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void isGradleKotlinProject() {
         rewriteRun(

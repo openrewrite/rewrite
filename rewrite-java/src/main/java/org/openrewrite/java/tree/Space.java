@@ -34,6 +34,7 @@ import static java.util.Collections.emptyList;
 @EqualsAndHashCode
 public class Space {
     public static final Space EMPTY = new Space("", emptyList());
+    public static final Space SINGLE_SPACE = new Space(" ", emptyList());
 
     private final List<Comment> comments;
 
@@ -46,6 +47,9 @@ public class Space {
      * So use flyweights to avoid storing many instances of functionally identical spaces
      */
     private static final Map<String, Space> flyweights = new WeakHashMap<>();
+    static {
+        flyweights.put(" ", SINGLE_SPACE);
+    }
 
     private Space(@Nullable String whitespace, List<Comment> comments) {
         this.comments = comments;
@@ -57,8 +61,10 @@ public class Space {
         if (comments.isEmpty()) {
             if (whitespace == null || whitespace.isEmpty()) {
                 return Space.EMPTY;
+            } else if (whitespace.length() <= 100) {
+                //noinspection StringOperationCanBeSimplified
+                return flyweights.computeIfAbsent(new String(whitespace), k -> new Space(whitespace, comments));
             }
-            return flyweights.computeIfAbsent(whitespace, k -> new Space(whitespace, comments));
         }
         return new Space(whitespace, comments);
     }
@@ -338,6 +344,7 @@ public class Space {
         IF_PREFIX,
         IF_THEN_SUFFIX,
         IMPLEMENTS,
+        IMPORT_ALIAS_PREFIX,
         PERMITS,
         IMPLEMENTS_SUFFIX,
         IMPORT_PREFIX,
@@ -410,6 +417,8 @@ public class Space {
         TYPE_PARAMETER_SUFFIX,
         UNARY_OPERATOR,
         UNARY_PREFIX,
+        UNKNOWN_PREFIX,
+        UNKNOWN_SOURCE_PREFIX,
         VARARGS,
         VARIABLE_DECLARATIONS_PREFIX,
         VARIABLE_INITIALIZER,

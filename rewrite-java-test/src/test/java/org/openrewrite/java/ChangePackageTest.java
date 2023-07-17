@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -67,6 +68,30 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               package org.openrewrite.internal;
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @DocumentExample
+    @Test
+    void renameUsingSimplePackageName() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage(
+            "org.openrewrite",
+            "openrewrite",
+            false
+          )),
+          java(
+            """
+              import org.openrewrite.Foo;
+              class Test {
+              }
+              """,
+            """
+              import openrewrite.Foo;
               class Test {
               }
               """
@@ -271,23 +296,21 @@ class ChangePackageTest implements RewriteTest {
           java(testClassBefore, testClassAfter),
           java(
             """
-                  import org.openrewrite.Test;
-                  
-                  public class A {
-                      Test a;
-                  }
+              import org.openrewrite.Test;
+                            
+              public class A {
+                  Test a;
+              }
               """,
             """
-                  import org.openrewrite.test.Test;
-                  
-                  public class A {
-                      Test a;
-                  }
+              import org.openrewrite.test.Test;
+                            
+              public class A {
+                  Test a;
+              }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(TypeUtils.asFullyQualified(cu.getTypesInUse().getVariables().iterator().next().getType()).
-                  getFullyQualifiedName()).isEqualTo("org.openrewrite.test.Test");
-            })
+            spec -> spec.afterRecipe(cu -> assertThat(TypeUtils.asFullyQualified(cu.getTypesInUse().getVariables().iterator().next().getType()).
+              getFullyQualifiedName()).isEqualTo("org.openrewrite.test.Test"))
           )
         );
     }
@@ -528,6 +551,206 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3200")
+    void annotationArgument() {
+        rewriteRun(
+          java("""
+              package org.openrewrite;
+              public class Argument {}
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              package com.acme;
+              
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+              
+              @Target({ElementType.TYPE, ElementType.METHOD})
+              @Retention(RetentionPolicy.RUNTIME)
+              public @interface Test {
+                  Class<?> value();
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import com.acme.Test;
+              import org.openrewrite.Argument;
+              public class ATest {
+                  @Test(Argument.class)
+                  void method() {}
+              }
+              """,
+            """
+              import com.acme.Test;
+              import org.openrewrite.test.Argument;
+              public class ATest {
+                  @Test(Argument.class)
+                  void method() {}
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.findType("org.openrewrite.Argument")).isEmpty();
+                assertThat(cu.findType("org.openrewrite.test.Argument")).isNotEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3200")
+    void annotationArgumentNamed() {
+        rewriteRun(
+          java("""
+              package org.openrewrite;
+              public class Argument {}
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              package com.acme;
+                            
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+                            
+              @Target({ElementType.TYPE, ElementType.METHOD})
+              @Retention(RetentionPolicy.RUNTIME)
+              public @interface Test {
+                  Class<?> named();
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import com.acme.Test;
+              import org.openrewrite.Argument;
+              public class ATest {
+                  @Test(named = Argument.class)
+                  void method() {}
+              }
+              """,
+            """
+              import com.acme.Test;
+              import org.openrewrite.test.Argument;
+              public class ATest {
+                  @Test(named = Argument.class)
+                  void method() {}
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.findType("org.openrewrite.Argument")).isEmpty();
+                assertThat(cu.findType("org.openrewrite.test.Argument")).isNotEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3200")
+    void annotationArgumentFullyQualified() {
+        rewriteRun(
+          java("""
+              package org.openrewrite;
+              public class Argument {}
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              package com.acme;
+                            
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+                            
+              @Target({ElementType.TYPE, ElementType.METHOD})
+              @Retention(RetentionPolicy.RUNTIME)
+              public @interface Test {
+                  Class<?> value();
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import com.acme.Test;
+              public class ATest {
+                  @Test(org.openrewrite.Argument.class)
+                  void method() {}
+              }
+              """,
+            """
+              import com.acme.Test;
+              public class ATest {
+                  @Test(org.openrewrite.test.Argument.class)
+                  void method() {}
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.findType("org.openrewrite.Argument")).isEmpty();
+                assertThat(cu.findType("org.openrewrite.test.Argument")).isNotEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3200")
+    void annotationArgumentNamedFullyQualified() {
+        rewriteRun(
+          java("""
+              package org.openrewrite;
+              public class Argument {}
+              """,
+            SourceSpec::skip),
+          java(
+            """
+              package com.acme;
+                            
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+                            
+              @Target({ElementType.TYPE, ElementType.METHOD})
+              @Retention(RetentionPolicy.RUNTIME)
+              public @interface Test {
+                  Class<?> named();
+              }
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              import com.acme.Test;
+              public class ATest {
+                  @Test(named = org.openrewrite.Argument.class)
+                  void method() {}
+              }
+              """,
+            """
+              import com.acme.Test;
+              public class ATest {
+                  @Test(named = org.openrewrite.test.Argument.class)
+                  void method() {}
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.findType("org.openrewrite.Argument")).isEmpty();
+                assertThat(cu.findType("org.openrewrite.test.Argument")).isNotEmpty();
+            })
+          )
+        );
+    }
+
+    @Test
     void array() {
         rewriteRun(
           java(testClassBefore, testClassAfter),
@@ -748,6 +971,20 @@ class ChangePackageTest implements RewriteTest {
               }
               """,
             spec -> spec.afterRecipe(cu -> assertThat(cu.findType("org.openrewrite.Procedure")).isEmpty())
+          )
+        );
+    }
+
+    @Test
+    void typeInNestedPackageInheritingFromTypeInBasePackage() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackage("java.util", "util", null)),
+          java(
+            """
+              import java.util.concurrent.ConcurrentHashMap;
+              public class Test {
+              }
+              """
           )
         );
     }
@@ -1019,13 +1256,13 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               import org.openrewrite.Test;
-              public class Test {
+              public class A {
                   Class<?> clazz = Test.class;
               }
               """,
             """
               import org.openrewrite.test.Test;
-              public class Test {
+              public class A {
                   Class<?> clazz = Test.class;
               }
               """,

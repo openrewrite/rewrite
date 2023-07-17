@@ -17,7 +17,6 @@ package org.openrewrite.xml.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
 
 /**
  * Ensures that whitespace is on the outermost AST element possible.
@@ -30,7 +29,7 @@ public class NormalizeFormat extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Move whitespace to the outermost AST element possible.";
+        return "Move whitespace to the outermost LST element possible.";
     }
 
     @Override

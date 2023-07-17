@@ -16,6 +16,7 @@
 package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -23,27 +24,28 @@ import static org.openrewrite.java.Assertions.java;
 @SuppressWarnings("RedundantOperationOnEmptyContainer")
 class FindMethodsTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void findConstructors() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("A <constructor>(String)", false, null)),
+          spec -> spec.recipe(new FindMethods("A <constructor>(String)", false)),
           java(
             """
-                  class Test {
-                      A a = new A("test");
-                  }
+              class Test {
+                  A a = new A("test");
+              }
               """,
             """
-                  class Test {
-                      A a = /*~~>*/new A("test");
-                  }
+              class Test {
+                  A a = /*~~>*/new A("test");
+              }
               """
           ),
           java(
             """
-                  class A {
-                      public A(String s) {}
-                  }
+              class A {
+                  public A(String s) {}
+              }
               """
           )
         );
@@ -52,7 +54,7 @@ class FindMethodsTest implements RewriteTest {
     @Test
     void findMethodReferences() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("A singleArg(String)", false, null)),
+          spec -> spec.recipe(new FindMethods("A singleArg(String)", false)),
           java(
             """
               class Test {
@@ -83,7 +85,7 @@ class FindMethodsTest implements RewriteTest {
     @Test
     void findOverriddenMethodReferences() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("java.util.Collection isEmpty()", true, null)),
+          spec -> spec.recipe(new FindMethods("java.util.Collection isEmpty()", true)),
           java(
             """
               class Test {
@@ -106,7 +108,7 @@ class FindMethodsTest implements RewriteTest {
     @Test
     void findStaticMethodCalls() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("java.util.Collections emptyList()", false, null)),
+          spec -> spec.recipe(new FindMethods("java.util.Collections emptyList()", false)),
           java(
             """
               import java.util.Collections;
@@ -127,7 +129,7 @@ class FindMethodsTest implements RewriteTest {
     @Test
     void findStaticallyImportedMethodCalls() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("java.util.Collections emptyList()", false, null)),
+          spec -> spec.recipe(new FindMethods("java.util.Collections emptyList()", false)),
           java(
             """
               import static java.util.Collections.emptyList;
@@ -148,7 +150,7 @@ class FindMethodsTest implements RewriteTest {
     @Test
     void matchVarargs() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("A foo(String, Object...)", false, null)),
+          spec -> spec.recipe(new FindMethods("A foo(String, Object...)", false)),
           java(
             """
               public class B {
@@ -178,7 +180,7 @@ class FindMethodsTest implements RewriteTest {
     @Test
     void matchOnInnerClass() {
         rewriteRun(
-          spec -> spec.recipe(new FindMethods("B.C foo()", false, null)),
+          spec -> spec.recipe(new FindMethods("B.C foo()", false)),
           java(
             """
               public class A {
@@ -197,36 +199,9 @@ class FindMethodsTest implements RewriteTest {
           ),
           java(
             """
-                  public class B {
-                     public static class C {
-                         public void foo() {}
-                     }
-                  }
-              """
-          )
-        );
-    }
-
-    @Test
-    void findDataFlowFromSource() {
-        rewriteRun(
-          spec -> spec.recipe(new FindMethods("java.util.Collections emptyList()", false, "data")),
-          java(
-            """
-              import static java.util.Collections.emptyList;
-              public class A {
-                 void test() {
-                     Object o = emptyList();
-                     System.out.println(o);
-                 }
-              }
-              """,
-            """
-              import static java.util.Collections.emptyList;
-              public class A {
-                 void test() {
-                     Object o = /*~~>*/emptyList();
-                     System.out.println(/*~~>*/o);
+              public class B {
+                 public static class C {
+                     public void foo() {}
                  }
               }
               """

@@ -29,7 +29,6 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenDownloadingException;
-import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.*;
 import org.rocksdb.*;
 

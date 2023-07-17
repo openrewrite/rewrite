@@ -29,13 +29,13 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     public Yaml visitDocument(Yaml.Document document, PrintOutputCapture<P> p) {
         beforeSyntax(document, p);
         if (document.isExplicit()) {
-            p.out.append("---");
+            p.append("---");
         }
         visit(document.getBlock(), p);
         if (document.getEnd() != null) {
-            p.out.append(document.getEnd().getPrefix());
+            p.append(document.getEnd().getPrefix());
             if (document.getEnd().isExplicit()) {
-                p.out.append("...");
+                p.append("...");
             }
         }
         afterSyntax(document, p);
@@ -52,13 +52,13 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, PrintOutputCapture<P> p) {
-        p.out.append(entry.getPrefix());
+        p.append(entry.getPrefix());
         if (entry.isDash()) {
-            p.out.append('-');
+            p.append('-');
         }
         visit(entry.getBlock(), p);
         if (entry.getTrailingCommaPrefix() != null) {
-            p.out.append(entry.getTrailingCommaPrefix()).append(',');
+            p.append(entry.getTrailingCommaPrefix()).append(',');
         }
         afterSyntax(entry, p);
         return entry;
@@ -71,11 +71,11 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
             visit(sequence.getAnchor(), p);
         }
         if (sequence.getOpeningBracketPrefix() != null) {
-            p.out.append(sequence.getOpeningBracketPrefix()).append('[');
+            p.append(sequence.getOpeningBracketPrefix()).append('[');
         }
         Yaml result = super.visitSequence(sequence, p);
         if (sequence.getClosingBracketPrefix() != null) {
-            p.out.append(sequence.getClosingBracketPrefix()).append(']');
+            p.append(sequence.getClosingBracketPrefix()).append(']');
         }
 
         afterSyntax(result, p);
@@ -86,7 +86,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, PrintOutputCapture<P> p) {
         beforeSyntax(entry, p);
         visit(entry.getKey(), p);
-        p.out.append(entry.getBeforeMappingValueIndicator()).append(':');
+        p.append(entry.getBeforeMappingValueIndicator()).append(':');
         visit(entry.getValue(), p);
         afterSyntax(entry, p);
         return entry;
@@ -99,11 +99,11 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
             visit(mapping.getAnchor(), p);
         }
         if (mapping.getOpeningBracePrefix() != null) {
-            p.out.append(mapping.getOpeningBracePrefix()).append('{');
+            p.append(mapping.getOpeningBracePrefix()).append('{');
         }
         Yaml result = super.visitMapping(mapping, p);
         if (mapping.getClosingBracePrefix() != null) {
-            p.out.append(mapping.getClosingBracePrefix()).append('}');
+            p.append(mapping.getClosingBracePrefix()).append('}');
         }
         afterSyntax(result, p);
         return result;
@@ -117,7 +117,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
         }
         switch (scalar.getStyle()) {
             case DOUBLE_QUOTED:
-                p.out.append('"')
+                p.append('"')
                         .append(scalar.getValue()
                                 .replace("\\", "\\\\")
                                 .replace("\0", "\\0")
@@ -138,21 +138,21 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
                         .append('"');
                 break;
             case SINGLE_QUOTED:
-                p.out.append('\'')
+                p.append('\'')
                         .append(scalar.getValue())
                         .append('\'');
                 break;
             case LITERAL:
-                p.out.append('|')
+                p.append('|')
                         .append(scalar.getValue());
                 break;
             case FOLDED:
-                p.out.append('>')
+                p.append('>')
                         .append(scalar.getValue());
                 break;
             case PLAIN:
             default:
-                p.out.append(scalar.getValue());
+                p.append(scalar.getValue());
                 break;
 
         }
@@ -162,18 +162,18 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
 
     public Yaml visitAnchor(Yaml.Anchor anchor, PrintOutputCapture<P> p) {
         visitMarkers(anchor.getMarkers(), p);
-        p.out.append(anchor.getPrefix());
-        p.out.append("&");
-        p.out.append(anchor.getKey());
-        p.out.append(anchor.getPostfix());
+        p.append(anchor.getPrefix());
+        p.append("&");
+        p.append(anchor.getKey());
+        p.append(anchor.getPostfix());
         afterSyntax(anchor, p);
         return anchor;
     }
 
     public Yaml visitAlias(Yaml.Alias alias, PrintOutputCapture<P> p) {
         beforeSyntax(alias, p);
-        p.out.append("*");
-        p.out.append(alias.getAnchor().getKey());
+        p.append("*");
+        p.append(alias.getAnchor().getKey());
         afterSyntax(alias, p);
         return alias;
     }
@@ -183,18 +183,18 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
 
     private void beforeSyntax(Yaml y, PrintOutputCapture<P> p) {
         for (Marker marker : y.getMarkers().getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), YAML_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), YAML_MARKER_WRAPPER));
         }
-        p.out.append(y.getPrefix());
+        p.append(y.getPrefix());
         visitMarkers(y.getMarkers(), p);
         for (Marker marker : y.getMarkers().getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), YAML_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), YAML_MARKER_WRAPPER));
         }
     }
 
     private void afterSyntax(Yaml y, PrintOutputCapture<P> p) {
         for (Marker marker : y.getMarkers().getMarkers()) {
-            p.out.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), YAML_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), YAML_MARKER_WRAPPER));
         }
     }
 }

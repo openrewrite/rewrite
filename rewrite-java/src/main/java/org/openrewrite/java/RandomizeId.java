@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 
 public class RandomizeId extends Recipe {
     @Override
@@ -28,11 +29,11 @@ public class RandomizeId extends Recipe {
     public String getDescription() {
         return "Scramble the IDs. This was intended as a utility to test _en masse_ " +
                 "different techniques for UUID generation and compare their relative performance " +
-                "outside of a microbenchmark.";
+                "outside a microbenchmark.";
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new RandomizeIdVisitor<>();
     }
 }

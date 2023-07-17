@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -29,6 +30,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 @SuppressWarnings("rawtypes")
 class DeleteStatementTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void deleteField() {
         rewriteRun(

@@ -22,7 +22,6 @@ import org.openrewrite.hcl.tree.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.marker.SearchResult;
 
 import java.util.List;
 import java.util.function.UnaryOperator;
@@ -31,22 +30,22 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Space visitSpace(Space space, Space.Location loc, PrintOutputCapture<P> p) {
-        p.out.append(space.getWhitespace());
+        p.append(space.getWhitespace());
 
         for (Comment comment : space.getComments()) {
             visitMarkers(comment.getMarkers(), p);
             switch (comment.getStyle()) {
                 case LINE_SLASH:
-                    p.out.append("//").append(comment.getText());
+                    p.append("//").append(comment.getText());
                     break;
                 case LINE_HASH:
-                    p.out.append("#").append(comment.getText());
+                    p.append("#").append(comment.getText());
                     break;
                 case INLINE:
-                    p.out.append("/*").append(comment.getText()).append("*/");
+                    p.append("/*").append(comment.getText()).append("*/");
                     break;
             }
-            p.out.append(comment.getSuffix());
+            p.append(comment.getSuffix());
         }
         return space;
     }
@@ -55,7 +54,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
         if (leftPadded != null) {
             beforeSyntax(leftPadded.getBefore(), leftPadded.getMarkers(), location.getBeforeLocation(), p);
             if (prefix != null) {
-                p.out.append(prefix);
+                p.append(prefix);
             }
             visit(leftPadded.getElement(), p);
             afterSyntax(leftPadded.getMarkers(), p);
@@ -69,7 +68,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
             visit(node.getElement(), p);
             visitSpace(node.getAfter(), location.getAfterLocation(), p);
             if (i < nodes.size() - 1) {
-                p.out.append(suffixBetween);
+                p.append(suffixBetween);
             }
             afterSyntax(node.getMarkers(), p);
         }
@@ -80,9 +79,9 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
             return;
         }
         beforeSyntax(container.getBefore(), container.getMarkers(), location.getBeforeLocation(), p);
-        p.out.append(before);
+        p.append(before);
         visitRightPadded(container.getPadding().getElements(), location.getElementLocation(), suffixBetween, p);
-        p.out.append(after == null ? "" : after);
+        p.append(after == null ? "" : after);
         afterSyntax(container.getMarkers(), p);
     }
 
@@ -91,11 +90,11 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
         beforeSyntax(attribute, Space.Location.ATTRIBUTE, p);
         visit(attribute.getName(), p);
         visitSpace(attribute.getPadding().getType().getBefore(), Space.Location.ATTRIBUTE_ASSIGNMENT, p);
-        p.out.append(attribute.getType().equals(Hcl.Attribute.Type.Assignment) ? "=" : ":");
+        p.append(attribute.getType().equals(Hcl.Attribute.Type.Assignment) ? "=" : ":");
         visit(attribute.getValue(), p);
         if (attribute.getComma() != null) {
             visitSpace(attribute.getComma().getPrefix(), Space.Location.OBJECT_VALUE_ATTRIBUTE_COMMA, p);
-            p.out.append(",");
+            p.append(",");
         }
         afterSyntax(attribute, p);
         return attribute;
@@ -117,43 +116,43 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
         visitSpace(binary.getPadding().getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p);
         switch (binary.getOperator()) {
             case Addition:
-                p.out.append('+');
+                p.append('+');
                 break;
             case Subtraction:
-                p.out.append('-');
+                p.append('-');
                 break;
             case Multiplication:
-                p.out.append('*');
+                p.append('*');
                 break;
             case Division:
-                p.out.append('/');
+                p.append('/');
                 break;
             case Modulo:
-                p.out.append('%');
+                p.append('%');
                 break;
             case LessThan:
-                p.out.append('<');
+                p.append('<');
                 break;
             case GreaterThan:
-                p.out.append('>');
+                p.append('>');
                 break;
             case LessThanOrEqual:
-                p.out.append("<=");
+                p.append("<=");
                 break;
             case GreaterThanOrEqual:
-                p.out.append(">=");
+                p.append(">=");
                 break;
             case Equal:
-                p.out.append("==");
+                p.append("==");
                 break;
             case NotEqual:
-                p.out.append("!=");
+                p.append("!=");
                 break;
             case Or:
-                p.out.append("||");
+                p.append("||");
                 break;
             case And:
-                p.out.append("&&");
+                p.append("&&");
                 break;
         }
         visit(binary.getRight(), p);
@@ -167,10 +166,10 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
         visit(block.getType(), p);
         visit(block.getLabels(), p);
         visitSpace(block.getOpen(), Space.Location.BLOCK_OPEN, p);
-        p.out.append('{');
+        p.append('{');
         visit(block.getBody(), p);
         visitSpace(block.getEnd(), Space.Location.BLOCK_CLOSE, p);
-        p.out.append('}');
+        p.append('}');
         afterSyntax(block, p);
         return block;
     }
@@ -207,19 +206,19 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     @Override
     public Hcl visitForObject(Hcl.ForObject forObject, PrintOutputCapture<P> p) {
         beforeSyntax(forObject, Space.Location.FOR_OBJECT, p);
-        p.out.append("{");
+        p.append("{");
         visit(forObject.getIntro(), p);
         visitLeftPadded(":", forObject.getPadding().getUpdateName(), HclLeftPadded.Location.FOR_UPDATE, p);
         visitLeftPadded("=>", forObject.getPadding().getUpdateValue(), HclLeftPadded.Location.FOR_UPDATE_VALUE, p);
         if (forObject.getEllipsis() != null) {
             visitSpace(forObject.getEllipsis().getPrefix(), Space.Location.FOR_UPDATE_VALUE_ELLIPSIS, p);
-            p.out.append("...");
+            p.append("...");
         }
         if (forObject.getPadding().getCondition() != null) {
             visitLeftPadded("if", forObject.getPadding().getCondition(), HclLeftPadded.Location.FOR_CONDITION, p);
         }
         visitSpace(forObject.getEnd(), Space.Location.FOR_OBJECT_SUFFIX, p);
-        p.out.append("}");
+        p.append("}");
         afterSyntax(forObject, p);
         return forObject;
     }
@@ -227,14 +226,14 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     @Override
     public Hcl visitForTuple(Hcl.ForTuple forTuple, PrintOutputCapture<P> p) {
         beforeSyntax(forTuple, Space.Location.FOR_TUPLE, p);
-        p.out.append("[");
+        p.append("[");
         visit(forTuple.getIntro(), p);
         visitLeftPadded(":", forTuple.getPadding().getUpdate(), HclLeftPadded.Location.FOR_UPDATE, p);
         if (forTuple.getPadding().getCondition() != null) {
             visitLeftPadded("if", forTuple.getPadding().getCondition(), HclLeftPadded.Location.FOR_CONDITION, p);
         }
         visitSpace(forTuple.getEnd(), Space.Location.FOR_TUPLE_SUFFIX, p);
-        p.out.append("]");
+        p.append("]");
         afterSyntax(forTuple, p);
         return forTuple;
     }
@@ -252,11 +251,11 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     @Override
     public Hcl visitHeredocTemplate(Hcl.HeredocTemplate heredocTemplate, PrintOutputCapture<P> p) {
         beforeSyntax(heredocTemplate, Space.Location.HEREDOC, p);
-        p.out.append(heredocTemplate.getArrow());
+        p.append(heredocTemplate.getArrow());
         visit(heredocTemplate.getDelimiter(), p);
         visit(heredocTemplate.getExpressions(), p);
         visitSpace(heredocTemplate.getEnd(), Space.Location.HEREDOC_END, p);
-        p.out.append(heredocTemplate.getDelimiter().getName());
+        p.append(heredocTemplate.getDelimiter().getName());
         afterSyntax(heredocTemplate, p);
         return heredocTemplate;
     }
@@ -264,7 +263,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     @Override
     public Hcl visitIdentifier(Hcl.Identifier identifier, PrintOutputCapture<P> p) {
         beforeSyntax(identifier, Space.Location.IDENTIFIER, p);
-        p.out.append(identifier.getName());
+        p.append(identifier.getName());
         afterSyntax(identifier, p);
         return identifier;
     }
@@ -281,10 +280,10 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     @Override
     public Hcl visitIndexPosition(Hcl.Index.Position indexPosition, PrintOutputCapture<P> p) {
         beforeSyntax(indexPosition, Space.Location.INDEX_POSITION, p);
-        p.out.append("[");
+        p.append("[");
         visitMarkers(indexPosition.getMarkers(), p);
         visitRightPadded(indexPosition.getPadding().getPosition(), HclRightPadded.Location.INDEX_POSITION, p);
-        p.out.append("]");
+        p.append("]");
         afterSyntax(indexPosition, p);
         return indexPosition;
     }
@@ -292,7 +291,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     @Override
     public Hcl visitLiteral(Hcl.Literal literal, PrintOutputCapture<P> p) {
         beforeSyntax(literal, Space.Location.LITERAL, p);
-        p.out.append(literal.getValueSource());
+        p.append(literal.getValueSource());
         afterSyntax(literal, p);
         return literal;
     }
@@ -309,9 +308,9 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     @Override
     public Hcl visitParentheses(Hcl.Parentheses parentheses, PrintOutputCapture<P> p) {
         beforeSyntax(parentheses, Space.Location.PARENTHETICAL_EXPRESSION, p);
-        p.out.append('(');
+        p.append('(');
         visitRightPadded(parentheses.getPadding().getExpression(), HclRightPadded.Location.PARENTHESES, p);
-        p.out.append(')');
+        p.append(')');
         afterSyntax(parentheses, p);
         return parentheses;
     }
@@ -319,9 +318,9 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     @Override
     public Hcl visitQuotedTemplate(Hcl.QuotedTemplate template, PrintOutputCapture<P> p) {
         beforeSyntax(template, Space.Location.QUOTED_TEMPLATE, p);
-        p.out.append('"');
+        p.append('"');
         visit(template.getExpressions(), p);
-        p.out.append('"');
+        p.append('"');
         afterSyntax(template, p);
         return template;
     }
@@ -329,9 +328,9 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     @Override
     public Hcl visitTemplateInterpolation(Hcl.TemplateInterpolation template, PrintOutputCapture<P> p) {
         beforeSyntax(template, Space.Location.TEMPLATE_INTERPOLATION, p);
-        p.out.append("${");
+        p.append("${");
         visit(template.getExpression(), p);
-        p.out.append('}');
+        p.append('}');
         afterSyntax(template, p);
         return template;
     }
@@ -349,15 +348,15 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
     public Hcl visitSplatOperator(Hcl.Splat.Operator splatOperator, PrintOutputCapture<P> p) {
         beforeSyntax(splatOperator, Space.Location.SPLAT_OPERATOR, p);
         if (splatOperator.getType().equals(Hcl.Splat.Operator.Type.Full)) {
-            p.out.append('[');
+            p.append('[');
         } else {
-            p.out.append('.');
+            p.append('.');
         }
         visitSpace(splatOperator.getSplat().getElement().getPrefix(), Space.Location.SPLAT_OPERATOR_PREFIX, p);
-        p.out.append('*');
+        p.append('*');
         if (splatOperator.getType().equals(Hcl.Splat.Operator.Type.Full)) {
             visitSpace(splatOperator.getSplat().getAfter(), Space.Location.SPLAT_OPERATOR_SUFFIX, p);
-            p.out.append(']');
+            p.append(']');
         }
         afterSyntax(splatOperator, p);
         return splatOperator;
@@ -377,10 +376,10 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
         beforeSyntax(unary, Space.Location.UNARY, p);
         switch (unary.getOperator()) {
             case Negative:
-                p.out.append('-');
+                p.append('-');
                 break;
             case Not:
-                p.out.append('!');
+                p.append('!');
                 break;
         }
         visit(unary.getExpression(), p);
@@ -405,14 +404,14 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
 
     private void beforeSyntax(Space prefix, Markers markers, @Nullable Space.Location loc, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), HCL_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), HCL_MARKER_WRAPPER));
         }
         if (loc != null) {
             visitSpace(prefix, loc, p);
         }
         visitMarkers(markers, p);
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), HCL_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), HCL_MARKER_WRAPPER));
         }
     }
 
@@ -422,7 +421,7 @@ public class HclPrinter<P> extends HclVisitor<PrintOutputCapture<P>> {
 
     private void afterSyntax(Markers markers, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), HCL_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), HCL_MARKER_WRAPPER));
         }
     }
 }

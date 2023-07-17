@@ -15,10 +15,10 @@
  */
 package org.openrewrite;
 
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -26,8 +26,9 @@ import org.openrewrite.marker.Markers;
 
 import java.util.UUID;
 
-@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
+@JsonPropertyOrder({"@c"}) // serialize type info first
+@JsonIgnoreProperties(ignoreUnknown = true)
 public interface Tree {
     @SuppressWarnings("unused")
     @JsonProperty("@c")
@@ -91,13 +92,13 @@ public interface Tree {
 
     default <P> String print(Cursor cursor, PrintOutputCapture<P> out) {
         this.<P>printer(cursor).visit(this, out, cursor);
-        return out.out.toString();
+        return out.getOut();
     }
 
     default <P> String print(TreeVisitor<?, PrintOutputCapture<Integer>> printer) {
         PrintOutputCapture<Integer> outputCapture = new PrintOutputCapture<>(0);
         printer.visit(this, outputCapture);
-        return outputCapture.out.toString();
+        return outputCapture.getOut();
     }
 
     default <P> String printTrimmed(P p, Cursor cursor) {

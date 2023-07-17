@@ -16,7 +16,9 @@
 package org.openrewrite.text;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
@@ -24,38 +26,65 @@ import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static org.openrewrite.Tree.randomId;
 
-public class PlainTextParser implements Parser<PlainText> {
+public class PlainTextParser implements Parser {
+
+    /**
+     * Downcast a {@link SourceFile} to a {@link PlainText} if it isn't already one.
+     *
+     * @param sourceFile A source file which may be a {@link PlainText} or not.
+     * @return The same {@link PlainText} reference if the source file is already a {@link PlainText}.
+     * Otherwise, a new {@link PlainText} instance with the same contents as the source file.
+     */
+    public static PlainText convert(SourceFile sourceFile) {
+        if (sourceFile instanceof PlainText) {
+            return (PlainText) sourceFile;
+        }
+        PlainText text = PlainTextParser.builder().build()
+                .parse(sourceFile.printAll())
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Failed to parse as plain text"))
+                .withSourcePath(sourceFile.getSourcePath())
+                .withFileAttributes(sourceFile.getFileAttributes())
+                .withCharsetBomMarked(sourceFile.isCharsetBomMarked())
+                .withId(sourceFile.getId());
+        if (sourceFile.getCharset() != null) {
+            text = (PlainText) text.withCharset(sourceFile.getCharset());
+        }
+        return text;
+    }
+
     @Override
-    public List<PlainText> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
-                                       ExecutionContext ctx) {
-        List<PlainText> plainTexts = new ArrayList<>();
+    public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
+                                          ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        for (Input source : sources) {
+        return StreamSupport.stream(sources.spliterator(), false).map(source -> {
             Path path = source.getRelativePath(relativeTo);
             try {
                 EncodingDetectingInputStream is = source.getSource(ctx);
                 String sourceStr = is.readFully();
-                PlainText plainText = new PlainText(randomId(),
+                PlainText plainText = new PlainText(
+                        randomId(),
                         path,
                         Markers.EMPTY,
                         is.getCharset().name(),
                         is.isCharsetBomMarked(),
                         source.getFileAttributes(),
                         null,
-                        sourceStr);
-                plainTexts.add(plainText);
+                        sourceStr,
+                        null
+                );
                 parsingListener.parsed(source, plainText);
+                return plainText;
             } catch (Throwable t) {
-                ParsingExecutionContextView.view(ctx).parseFailure(source, relativeTo, this, t);
                 ctx.getOnError().accept(t);
+                return ParseError.build(this, source, relativeTo, ctx, t);
             }
-        }
-        return plainTexts;
+        });
     }
 
     @Override
@@ -78,7 +107,7 @@ public class PlainTextParser implements Parser<PlainText> {
         }
 
         @Override
-        public Parser<?> build() {
+        public PlainTextParser build() {
             return new PlainTextParser();
         }
 

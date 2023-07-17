@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -23,6 +24,7 @@ import static org.openrewrite.java.Assertions.java;
 
 class ChangeMethodAccessLevelTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void publicToPrivate() {
         rewriteRun(
@@ -389,6 +391,36 @@ class ChangeMethodAccessLevelTest implements RewriteTest {
                   @Override
                   protected String aMethod() {
                       return "example_B";
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void dontAutoFormatBody() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodAccessLevel("com.abc.A aMethod(..)", "package", null)),
+          java(
+            """
+              package com.abc;
+
+              class A {
+                  // comment
+                  @Deprecated protected static void aMethod(Double d) {
+                      System.out.print (  "foo");
+                  }
+              }
+              """,
+            """
+              package com.abc;
+
+              class A {
+                  // comment
+                  @Deprecated
+                  static void aMethod(Double d) {
+                      System.out.print (  "foo");
                   }
               }
               """

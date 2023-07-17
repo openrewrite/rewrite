@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.Cursor;
-import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -32,7 +31,6 @@ import java.util.Stack;
  * Notes:
  * - The current version will rename variables even if a variable with `toName` is already declared in the same scope.
  */
-@Incubating(since = "7.5.0")
 public class RenameVariable<P> extends JavaIsoVisitor<P> {
     private final J.VariableDeclarations.NamedVariable variable;
     private final String toName;
@@ -87,10 +85,10 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                     if (fieldAccessTargetsVariable(parent.getValue())) {
                         return ident.withSimpleName(newName);
                     }
-                } else if (currentNameScope.size() == 1) {
+                } else if (currentNameScope.size() == 1 && isVariableName(parent.getValue(), ident)) {
                     if (parent.getValue() instanceof J.VariableDeclarations.NamedVariable) {
                         J variableDeclaration = parent.getParentTreeCursor().getValue();
-                        J maybeParameter = getCursor().dropParentUntil(is -> is instanceof J.ClassDeclaration || is instanceof J.MethodDeclaration).getValue();
+                        J maybeParameter = getCursor().dropParentUntil(is -> is instanceof JavaSourceFile || is instanceof J.ClassDeclaration || is instanceof J.MethodDeclaration).getValue();
                         if (maybeParameter instanceof J.MethodDeclaration) {
                             J.MethodDeclaration methodDeclaration = (J.MethodDeclaration) maybeParameter;
                             if (methodDeclaration.getParameters().contains((Statement) variableDeclaration) &&
@@ -106,6 +104,25 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                 }
             }
             return super.visitIdentifier(ident, p);
+        }
+
+        private boolean isVariableName(Object value, J.Identifier ident) {
+            if (value instanceof J.MethodInvocation) {
+                J.MethodInvocation m = (J.MethodInvocation) value;
+                return m.getName() != ident;
+            } else if(value instanceof J.NewClass) {
+                J.NewClass m = (J.NewClass) value;
+                return m.getClazz() != ident;
+            } else if(value instanceof J.NewArray) {
+                J.NewArray a = (J.NewArray) value;
+                return a.getTypeExpression() != ident;
+            } else if(value instanceof J.VariableDeclarations) {
+                J.VariableDeclarations v = (J.VariableDeclarations) value;
+                return ident != v.getTypeExpression();
+            } else if(value instanceof J.ParameterizedType) {
+                return false;
+            }
+            return true;
         }
 
         /**

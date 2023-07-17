@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.test.RewriteTest;
@@ -164,7 +165,7 @@ class TypeUtilsTest implements RewriteTest {
                     assertThat(variable.getVariableType().getType()).isInstanceOf(JavaType.Class.class);
                     return super.visitVariable(variable, o);
                 }
-            })
+            }.visit(cu, new InMemoryExecutionContext()))
           )
         );
     }
@@ -175,17 +176,20 @@ class TypeUtilsTest implements RewriteTest {
           java(
             """
               class Test {
-                  java.util.List<Integer> integer1;
-                  java.util.List<Integer> integer2;
+                  java.util.List<Integer> integer;
               }
               """,
             spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
                 @Override
                 public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Object o) {
-                    assertThat(variable.getVariableType().getType()).isInstanceOf(JavaType.Parameterized.class);
+                    JavaType type = variable.getVariableType().getType();
+                    assertThat(type).isInstanceOf(JavaType.Parameterized.class);
+                    assertThat(TypeUtils.isAssignableTo("java.util.List", type)).isTrue();
+                    assertThat(TypeUtils.isAssignableTo("java.util.List<java.lang.Integer>", type)).isTrue();
+                    assertThat(TypeUtils.isAssignableTo("java.util.List<java.lang.String>", type)).isFalse();
                     return super.visitVariable(variable, o);
                 }
-            })
+            }.visit(cu, new InMemoryExecutionContext()))
           )
         );
     }
@@ -210,7 +214,7 @@ class TypeUtilsTest implements RewriteTest {
                     assertThat(TypeUtils.isOfType(varType, shallowParameterizedType)).isTrue();
                     return super.visitVariable(variable, o);
                 }
-            })
+            }.visit(cu, new InMemoryExecutionContext()))
           )
         );
     }

@@ -16,18 +16,18 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.text.PlainText;
 
 import java.nio.file.Paths;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.Tree.randomId;
 
 class CursorTest {
     @Test
     void peekMessages() {
-        var t = new PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test");
+        var t = PlainText.builder()
+          .text("test")
+          .build();
         var cursor = new Cursor(null, t);
 
         cursor.putMessage("key", 1);
@@ -39,7 +39,10 @@ class CursorTest {
 
     @Test
     void pollMessages() {
-        var t = new PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test");
+        var t = PlainText.builder()
+          .sourcePath(Paths.get("test.txt"))
+          .text("test")
+          .build();
         var cursor = new Cursor(null, t);
 
         cursor.putMessage("key", 1);
@@ -53,14 +56,20 @@ class CursorTest {
 
     @Test
     void pathPredicates() {
-        var t = new PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test");
+        var t = PlainText.builder()
+          .sourcePath(Paths.get("test.txt"))
+          .text("test")
+          .build();
         var cursor = new Cursor(new Cursor(new Cursor(null, 1), t), 2);
         assertThat(cursor.getPath(v -> v instanceof PlainText).next()).isSameAs(t);
     }
 
     @Test
     void pathAsStreamPredicates() {
-        var t = new PlainText(randomId(), Paths.get("test.txt"), Markers.EMPTY, null, false, null, null, "test");
+        var t = PlainText.builder()
+          .sourcePath(Paths.get("test.txt"))
+          .text("test")
+          .build();
         var cursor = new Cursor(new Cursor(new Cursor(null, 1), t), 2);
         assertThat(cursor.getPathAsStream(v -> v instanceof PlainText).toList()).containsExactly(t);
     }

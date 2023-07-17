@@ -24,14 +24,11 @@ import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
 import org.eclipse.jgit.lib.*;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markers;
-import org.openrewrite.marker.Markup;
+import org.openrewrite.marker.RecipesThatMadeChanges;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.lang.ref.WeakReference;
-import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -56,46 +53,37 @@ public class Result {
     private final SourceFile after;
 
     @Getter
-    private final Collection<Stack<Recipe>> recipes;
+    private final Collection<List<Recipe>> recipes;
 
     @Getter
     @Nullable
     private final Duration timeSavings;
 
-    @Nullable
-    private transient WeakReference<String> diff;
+    public Result(@Nullable SourceFile before, @Nullable SourceFile after, Collection<List<Recipe>> recipes) {
+        this.before = before;
+        this.after = after;
+        this.recipes = recipes;
 
-    @Nullable
-    private Path relativeTo;
-
-    public List<Throwable> getRecipeErrors() {
-        List<Throwable> exceptions = new ArrayList<>();
-        new TreeVisitor<Tree, Integer>() {
-            @Nullable
-            @Override
-            public Tree visit(@Nullable Tree tree, Integer p) {
-                if (tree != null) {
-                    try {
-                        Method getMarkers = tree.getClass().getDeclaredMethod("getMarkers");
-                        Markers markers = (Markers) getMarkers.invoke(tree);
-                        markers.findFirst(Markup.Error.class)
-                                .ifPresent(e -> exceptions.add(e.getException()));
-                    } catch (Throwable ignored) {
-                    }
+        Duration timeSavings = null;
+        for (List<Recipe> recipesStack : recipes) {
+            if (recipesStack != null && !recipesStack.isEmpty()) {
+                Duration perOccurrence = recipesStack.get(recipesStack.size() - 1).getEstimatedEffortPerOccurrence();
+                if (perOccurrence != null) {
+                    timeSavings = perOccurrence;
+                    break;
                 }
-                return super.visit(tree, p);
             }
-        }.visit(after, 0);
-        return exceptions;
+        }
+
+        this.timeSavings = timeSavings;
     }
 
-    /**
-     * @return The list of recipe instances that made changes.
-     * @deprecated Use {@link #getRecipeDescriptorsThatMadeChanges()} instead.
-     */
-    @Deprecated
-    public Set<Recipe> getRecipesThatMadeChanges() {
-        return recipes.stream().map(Stack::peek).collect(Collectors.toSet());
+    public Result(@Nullable SourceFile before, SourceFile after) {
+        this(before, after, after.getMarkers()
+                .findFirst(RecipesThatMadeChanges.class)
+                .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe " +
+                                                             "reported making a change"))
+                .getRecipes());
     }
 
     /**
@@ -105,7 +93,7 @@ public class Result {
     public List<RecipeDescriptor> getRecipeDescriptorsThatMadeChanges() {
         List<RecipeDescriptor> recipesToDisplay = new ArrayList<>();
 
-        for (Stack<Recipe> currentStack : recipes) {
+        for (List<Recipe> currentStack : recipes) {
             Recipe root;
             if (currentStack.size() > 1) {
                 // The first recipe is typically an Environment.CompositeRecipe and should not be included in the list of RecipeDescriptors
@@ -136,24 +124,6 @@ public class Result {
         return recipesToDisplay;
     }
 
-    public Result(@Nullable SourceFile before, @Nullable SourceFile after, Collection<Stack<Recipe>> recipes) {
-        this.before = before;
-        this.after = after;
-        this.recipes = recipes;
-
-        Duration timeSavings = null;
-        for (Stack<Recipe> recipesStack : recipes) {
-            if (recipesStack != null) {
-                Duration perOccurrence = recipesStack.peek().getEstimatedEffortPerOccurrence();
-                if (perOccurrence != null) {
-                    timeSavings = timeSavings == null ? perOccurrence : timeSavings.plus(perOccurrence);
-                }
-            }
-        }
-
-        this.timeSavings = timeSavings;
-    }
-
     /**
      * @return Git-style patch diff representing the changes to this compilation unit.
      */
@@ -175,24 +145,6 @@ public class Result {
 
     @Incubating(since = "7.34.0")
     public String diff(@Nullable Path relativeTo, @Nullable PrintOutputCapture.MarkerPrinter markerPrinter, @Nullable Boolean ignoreAllWhitespace) {
-        String d;
-        if (this.diff == null) {
-            d = computeDiff(relativeTo, markerPrinter, ignoreAllWhitespace);
-            this.diff = new WeakReference<>(d);
-        } else {
-            d = this.diff.get();
-            if (d == null || !Objects.equals(this.relativeTo, relativeTo)) {
-                d = computeDiff(relativeTo, markerPrinter, ignoreAllWhitespace);
-                this.diff = new WeakReference<>(d);
-            }
-        }
-        return d;
-    }
-
-    private String computeDiff(@Nullable Path relativeTo,
-                               @Nullable PrintOutputCapture.MarkerPrinter markerPrinter,
-                               @Nullable Boolean ignoreAllWhitespace) {
-
         Path beforePath = before == null ? null : before.getSourcePath();
         Path afterPath = null;
         if (before == null && after == null) {
@@ -205,8 +157,15 @@ public class Result {
                 new PrintOutputCapture<>(0) :
                 new PrintOutputCapture<>(0, markerPrinter);
 
-        FileMode beforeMode = before != null  && before.getFileAttributes() != null && before.getFileAttributes().isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
-        FileMode afterMode = after != null  && after.getFileAttributes() != null && after.getFileAttributes().isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
+        FileMode beforeMode = before != null && before.getFileAttributes() != null && before.getFileAttributes().isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
+        FileMode afterMode = after != null && after.getFileAttributes() != null && after.getFileAttributes().isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
+
+        Set<Recipe> recipeSet = new HashSet<>(recipes.size());
+        for (List<Recipe> rs : recipes) {
+            if (!rs.isEmpty()) {
+                recipeSet.add(rs.get(0));
+            }
+        }
 
         try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
                 beforePath,
@@ -214,11 +173,10 @@ public class Result {
                 relativeTo,
                 before == null ? "" : before.printAll(out),
                 after == null ? "" : after.printAll(out.clone()),
-                recipes.stream().map(Stack::peek).collect(Collectors.toSet()),
+                recipeSet,
                 beforeMode,
                 afterMode
         )) {
-            this.relativeTo = relativeTo;
             return diffEntry.getDiff(ignoreAllWhitespace);
         }
     }
@@ -316,24 +274,24 @@ public class Result {
             AtomicBoolean addedComment = new AtomicBoolean(false);
             // NOTE: String.lines() would remove empty lines which we don't want
             return Arrays.stream(diff.split("\n"))
-                    .map(l -> {
-                        if (!addedComment.get() && l.startsWith("@@") && l.endsWith("@@")) {
-                            addedComment.set(true);
+                           .map(l -> {
+                               if (!addedComment.get() && l.startsWith("@@") && l.endsWith("@@")) {
+                                   addedComment.set(true);
 
-                            Set<String> sortedRecipeNames = new LinkedHashSet<>();
-                            for (Recipe recipesThatMadeChange : recipesThatMadeChanges) {
-                                sortedRecipeNames.add(recipesThatMadeChange.getName());
-                            }
-                            StringJoiner joinedRecipeNames = new StringJoiner(", ", " ", "");
-                            for (String name : sortedRecipeNames) {
-                                joinedRecipeNames.add(name);
-                            }
+                                   Set<String> sortedRecipeNames = new LinkedHashSet<>();
+                                   for (Recipe recipesThatMadeChange : recipesThatMadeChanges) {
+                                       sortedRecipeNames.add(recipesThatMadeChange.getName());
+                                   }
+                                   StringJoiner joinedRecipeNames = new StringJoiner(", ", " ", "");
+                                   for (String name : sortedRecipeNames) {
+                                       joinedRecipeNames.add(name);
+                                   }
 
-                            return l + joinedRecipeNames;
-                        }
-                        return l;
-                    })
-                    .collect(Collectors.joining("\n")) + "\n";
+                                   return l + joinedRecipeNames;
+                               }
+                               return l;
+                           })
+                           .collect(Collectors.joining("\n")) + "\n";
         }
 
         @Override

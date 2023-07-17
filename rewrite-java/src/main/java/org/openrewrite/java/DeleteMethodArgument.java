@@ -17,12 +17,11 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.MethodCall;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
@@ -68,13 +67,8 @@ public class DeleteMethodArgument extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(methodPattern);
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new DeleteMethodArgumentVisitor(new MethodMatcher(methodPattern));
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesMethod<>(methodPattern), new DeleteMethodArgumentVisitor(new MethodMatcher(methodPattern)));
     }
 
     private class DeleteMethodArgumentVisitor extends JavaIsoVisitor<ExecutionContext> {
@@ -87,11 +81,22 @@ public class DeleteMethodArgument extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+            return (J.MethodInvocation) visitMethodCall(m);
+        }
+
+        @Override
+        public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+            J.NewClass n = super.visitNewClass(newClass, ctx);
+            return (J.NewClass) visitMethodCall(n);
+        }
+
+        private MethodCall visitMethodCall(MethodCall methodCall) {
+            MethodCall m = methodCall;
             List<Expression> originalArgs = m.getArguments();
             if (methodMatcher.matches(m) && originalArgs.stream()
                     .filter(a -> !(a instanceof J.Empty))
                     .count() >= argumentIndex + 1) {
-                List<Expression> args = new ArrayList<>(m.getArguments());
+                List<Expression> args = new ArrayList<>(originalArgs);
 
                 args.remove(argumentIndex);
                 if (args.isEmpty()) {

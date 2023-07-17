@@ -22,7 +22,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.SourceFile;
 
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -41,7 +41,7 @@ public class WeighingJavaAstsBenchmark {
     public void bloomFilter(JavaCompilationUnitState state, Blackhole blackhole) {
         Bloom bloom = Bloom.construct(new long[0], 1);
         long weight = 0;
-        for (J.CompilationUnit sourceFile : state.getSourceFiles()) {
+        for (SourceFile sourceFile : state.getSourceFiles()) {
             weight += sourceFile.getWeight(t -> {
                 int id = System.identityHashCode(t);
                 if (bloom.mayContain(id)) {
@@ -58,7 +58,7 @@ public class WeighingJavaAstsBenchmark {
     public void identitySet(JavaCompilationUnitState state, Blackhole blackhole) {
         Set<Object> uniqueTypes = Collections.newSetFromMap(new IdentityHashMap<>());
         long weight = 0;
-        for (J.CompilationUnit sourceFile : state.getSourceFiles()) {
+        for (SourceFile sourceFile : state.getSourceFiles()) {
             weight += sourceFile.getWeight(uniqueTypes::add);
         }
         blackhole.consume(weight);

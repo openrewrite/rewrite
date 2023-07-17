@@ -111,4 +111,15 @@ class CompilationUnitTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void shouldNotFailWhenImportCannotBeResolved() {
+        rewriteRun(
+          groovy(
+            """
+              import com.example.MyClass
+              """
+          )
+        );
+    }
 }

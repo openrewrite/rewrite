@@ -15,7 +15,7 @@
  */
 package org.openrewrite.config;
 
-import org.openrewrite.Incubating;
+import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
 import org.openrewrite.RecipeException;
 import org.openrewrite.style.NamedStyles;
@@ -34,19 +34,41 @@ public class Environment {
     private final Collection<? extends ResourceLoader> resourceLoaders;
     private final Collection<? extends ResourceLoader> dependencyResourceLoaders;
 
-    public Collection<Recipe> listRecipes() {
-        List<Recipe> dependencyRecipes = dependencyResourceLoaders.stream()
-                .flatMap(r -> r.listRecipes().stream())
-                .collect(toList());
-        List<Recipe> recipes = resourceLoaders.stream()
-                .flatMap(r -> r.listRecipes().stream())
-                .collect(toList());
+    public List<Recipe> listRecipes() {
+        List<Recipe> dependencyRecipes = new ArrayList<>();
+        for (ResourceLoader dependencyResourceLoader : dependencyResourceLoaders) {
+            dependencyRecipes.addAll(dependencyResourceLoader.listRecipes());
+        }
+        Map<String, List<Contributor>> recipeToContributors = new HashMap<>();
+        Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
+        for (ResourceLoader r : resourceLoaders) {
+            if (r instanceof YamlResourceLoader) {
+                recipeExamples.putAll(r.listRecipeExamples());
+                recipeToContributors.putAll(r.listContributors());
+            }
+        }
+
+        List<Recipe> recipes = new ArrayList<>();
+        for (ResourceLoader r : resourceLoaders) {
+            recipes.addAll(r.listRecipes());
+        }
+        for (Recipe recipe : dependencyRecipes) {
+            if (recipe instanceof DeclarativeRecipe) {
+                ((DeclarativeRecipe) recipe).initialize(dependencyRecipes, recipeToContributors);
+            }
+        }
         for (Recipe recipe : recipes) {
+            recipe.setContributors(recipeToContributors.get(recipe.getName()));
+
+            if (recipeExamples.containsKey(recipe.getName())) {
+                recipe.setExamples(recipeExamples.get(recipe.getName()));
+            }
+
             if (recipe instanceof DeclarativeRecipe) {
                 List<Recipe> availableRecipes = new ArrayList<>();
                 availableRecipes.addAll(dependencyRecipes);
                 availableRecipes.addAll(recipes);
-                ((DeclarativeRecipe) recipe).initialize(availableRecipes);
+                ((DeclarativeRecipe) recipe).initialize(availableRecipes, recipeToContributors);
             }
         }
         return recipes;
@@ -59,26 +81,67 @@ public class Environment {
     }
 
     public Collection<RecipeDescriptor> listRecipeDescriptors() {
-        return resourceLoaders.stream()
-                .flatMap(r -> r.listRecipeDescriptors().stream())
-                .collect(toList());
-    }
+        Map<String, List<Contributor>> recipeToContributors = new HashMap<>();
+        Map<String, List<RecipeExample>> recipeToExamples = new HashMap<>();
+        for (ResourceLoader r : resourceLoaders) {
+            if (r instanceof YamlResourceLoader) {
+                recipeToContributors.putAll(r.listContributors());
+                recipeToExamples.putAll(r.listRecipeExamples());
+            } else if (r instanceof ClasspathScanningLoader) {
+                ClasspathScanningLoader classpathScanningLoader = (ClasspathScanningLoader) r;
 
-    public Collection<RecipeExample> listRecipeExamples() {
-        return resourceLoaders.stream()
-                .flatMap(r -> r.listRecipeExamples().stream())
-                .collect(toList());
+                Map<String, List<Contributor>> contributors = classpathScanningLoader.listContributors();
+                for (String key : contributors.keySet()) {
+                    if (recipeToContributors.containsKey(key)) {
+                        recipeToContributors.get(key).addAll(contributors.get(key));
+                    } else {
+                        recipeToContributors.put(key, contributors.get(key));
+                    }
+                }
+
+                Map<String, List<RecipeExample>> examplesMap = classpathScanningLoader.listRecipeExamples();
+                for (String key : examplesMap.keySet()) {
+                    if (recipeToExamples.containsKey(key)) {
+                        recipeToExamples.get(key).addAll(examplesMap.get(key));
+                    } else {
+                        recipeToExamples.put(key, examplesMap.get(key));
+                    }
+                }
+            }
+        }
+
+        List<RecipeDescriptor> result = new ArrayList<>();
+        for (ResourceLoader r : resourceLoaders) {
+            if (r instanceof YamlResourceLoader) {
+                result.addAll((((YamlResourceLoader) r).listRecipeDescriptors(emptyList(), recipeToContributors, recipeToExamples)));
+            } else {
+                Collection<RecipeDescriptor> descriptors = r.listRecipeDescriptors();
+                for (RecipeDescriptor descriptor : descriptors) {
+                    if (descriptor.getContributors() != null &&
+                        recipeToContributors.containsKey(descriptor.getName())) {
+                        descriptor.getContributors().addAll(recipeToContributors.get(descriptor.getName()));
+                    }
+
+                    if (descriptor.getExamples() != null &&
+                        recipeToExamples.containsKey(descriptor.getName())) {
+                        descriptor.getExamples().addAll(recipeToExamples.get(descriptor.getName()));
+                    }
+                }
+                result.addAll(descriptors);
+            }
+        }
+        return result;
     }
 
     public Recipe activateRecipes(Iterable<String> activeRecipes) {
-        Recipe root = new CompositeRecipe();
-        Collection<Recipe> recipes = listRecipes();
+        List<Recipe> allRecipes = listRecipes();
         List<String> recipesNotFound = new ArrayList<>();
+        List<Recipe> activatedRecipes = new ArrayList<>();
         for (String activeRecipe : activeRecipes) {
             boolean foundRecipe = false;
-            for (Recipe recipe : recipes) {
+            for (Recipe recipe : allRecipes) {
                 if (activeRecipe.equals(recipe.getName())) {
-                    root.doNext(recipe);
+                    activatedRecipes.add(recipe);
                     foundRecipe = true;
                     break;
                 }
@@ -90,17 +153,16 @@ public class Environment {
         if (!recipesNotFound.isEmpty()) {
             throw new RecipeException("Recipes not found: " + String.join(", ", recipesNotFound));
         }
-        return root;
+        return new CompositeRecipe(activatedRecipes);
     }
 
     public Recipe activateRecipes(String... activeRecipes) {
         return activateRecipes(Arrays.asList(activeRecipes));
     }
 
+    //TODO: Nothing uses this and in most cases it would be a bad idea anyway, should consider removing
     public Recipe activateAll() {
-        Recipe root = new CompositeRecipe();
-        listRecipes().forEach(root::doNext);
-        return root;
+        return new CompositeRecipe(listRecipes());
     }
 
     /**
@@ -125,6 +187,7 @@ public class Environment {
         return activated;
     }
 
+    @SuppressWarnings("unused")
     public List<NamedStyles> activateStyles(String... activeStyles) {
         return activateStyles(Arrays.asList(activeStyles));
     }
@@ -161,6 +224,7 @@ public class Environment {
             return load(new ClasspathScanningLoader(properties, acceptPackages));
         }
 
+        @SuppressWarnings("unused")
         public Builder scanClassLoader(ClassLoader classLoader) {
             return load(new ClasspathScanningLoader(properties, classLoader));
         }
@@ -170,6 +234,7 @@ public class Environment {
          * @param classLoader A classloader that is populated with the transitive dependencies of the jar.
          * @return This builder.
          */
+        @SuppressWarnings("unused")
         public Builder scanJar(Path jar, Collection<Path> dependencies, ClassLoader classLoader) {
             List<ClasspathScanningLoader> list = new ArrayList<>();
             for (Path dep : dependencies) {
@@ -179,6 +244,7 @@ public class Environment {
             return load(new ClasspathScanningLoader(jar, properties, list, classLoader), list);
         }
 
+        @SuppressWarnings("unused")
         public Builder scanUserHome() {
             File userHomeRewriteConfig = new File(System.getProperty("user.home") + "/.rewrite/rewrite.yml");
             if (userHomeRewriteConfig.exists()) {

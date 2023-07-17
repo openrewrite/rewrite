@@ -15,7 +15,6 @@
  */
 package org.openrewrite.internal;
 
-import org.apache.tools.ant.types.selectors.SelectorUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -31,12 +30,17 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class StringUtils {
     private StringUtils() {
     }
 
-    public static String trimIndentPreserveCRLF(String text) {
+    public static String trimIndentPreserveCRLF(@Nullable String text) {
+        if (text == null) {
+            //noinspection DataFlowIssue
+            return null;
+        }
         return trimIndent((text.endsWith("\r\n") ? text.substring(0, text.length() - 2) : text)
                 .replace('\r', '⏎'))
                 .replace('⏎', '\r');
@@ -231,6 +235,10 @@ public class StringUtils {
         return string == null || string.isEmpty();
     }
 
+    public static boolean isNotEmpty(@Nullable String string) {
+        return string != null && !string.isEmpty();
+    }
+
     public static String readFully(@Nullable InputStream inputStream) {
         if (inputStream == null) {
             return "";
@@ -345,7 +353,7 @@ public class StringUtils {
      *
      * @param text      A target string
      * @param substring The substring to search for
-     * @return the number of times the substring is found in the target. 0 if no occurances are found.
+     * @return the number of times the substring is found in the target. 0 if no occurrences are found.
      */
     public static int countOccurrences(@NonNull String text, @NonNull String substring) {
 
@@ -423,15 +431,136 @@ public class StringUtils {
             value = "";
         }
 
-        return SelectorUtils.match(
-                globPattern
-                        .replace('/', File.separatorChar)
-                        .replace('\\', File.separatorChar),
-                value
-                        .replace('/', File.separatorChar)
-                        .replace('\\', File.separatorChar),
+        return matchesGlob(
+                globPattern.replace(wrongFileSeparatorChar, File.separatorChar),
+                value.replace(wrongFileSeparatorChar, File.separatorChar),
                 false
         );
+    }
+
+    private static final char wrongFileSeparatorChar = File.separatorChar == '/' ? '\\' : '/';
+
+    private static boolean matchesGlob(String pattern, String str, boolean caseSensitive) {
+        int patIdxStart = 0;
+        int patIdxEnd = pattern.length() - 1;
+        int strIdxStart = 0;
+        int strIdxEnd = str.length() - 1;
+
+        if (!pattern.contains("*")) {
+            // No '*'s, so we make a shortcut
+            if (patIdxEnd != strIdxEnd) {
+                return false; // Pattern and string do not have the same size
+            }
+            for (int i = 0; i <= patIdxEnd; i++) {
+                char ch = pattern.charAt(i);
+                if (ch != '?' && different(caseSensitive, ch, str.charAt(i))) {
+                    return false; // Character mismatch
+                }
+            }
+            return true; // String matches against pattern
+        }
+
+        if (patIdxEnd == 0) {
+            return true; // Pattern contains only '*', which matches anything
+        }
+
+        // Process characters before first star
+        while (patIdxStart <= patIdxEnd && strIdxStart <= strIdxEnd) {
+            char ch = pattern.charAt(patIdxStart);
+            if (ch == '*') {
+                break;
+            }
+            if (ch != '?'
+                && different(caseSensitive, ch, str.charAt(strIdxStart))) {
+                return false; // Character mismatch
+            }
+            patIdxStart++;
+            strIdxStart++;
+        }
+        if (strIdxStart > strIdxEnd) {
+            // All characters in the string are used. Check if only '*'s are
+            // left in the pattern. If so, we succeeded. Otherwise failure.
+            return allStars(pattern, patIdxStart, patIdxEnd);
+        } else if (patIdxStart > patIdxEnd) {
+            // String not exhausted by pattern is. Failure
+            return false;
+        }
+
+        // Process characters after last star
+        while (patIdxStart <= patIdxEnd && strIdxStart <= strIdxEnd) {
+            char ch = pattern.charAt(patIdxEnd);
+            if (ch == '*') {
+                break;
+            }
+            if (ch != '?' && different(caseSensitive, ch, str.charAt(strIdxEnd))) {
+                return false; // Character mismatch
+            }
+            patIdxEnd--;
+            strIdxEnd--;
+        }
+        if (strIdxStart > strIdxEnd) {
+            // All characters in the string are used. Check if only '*'s are
+            // left in the pattern. If so, we succeeded. Otherwise failure.
+            return allStars(pattern, patIdxStart, patIdxEnd);
+        }
+
+        // process pattern between stars. padIdxStart and patIdxEnd point
+        // always to a '*'.
+        while (patIdxStart != patIdxEnd && strIdxStart <= strIdxEnd) {
+            int patIdxTmp = -1;
+            for (int i = patIdxStart + 1; i <= patIdxEnd; i++) {
+                if (pattern.charAt(i) == '*') {
+                    patIdxTmp = i;
+                    break;
+                }
+            }
+            if (patIdxTmp == patIdxStart + 1) {
+                // Two stars next to each other, skip the first one.
+                patIdxStart++;
+                continue;
+            }
+            // Find the pattern between padIdxStart & padIdxTmp in str between
+            // strIdxStart & strIdxEnd
+            int patLength = (patIdxTmp - patIdxStart - 1);
+            int strLength = (strIdxEnd - strIdxStart + 1);
+            int foundIdx = -1;
+            strLoop:
+            for (int i = 0; i <= strLength - patLength; i++) {
+                for (int j = 0; j < patLength; j++) {
+                    char ch = pattern.charAt(patIdxStart + j + 1);
+                    if (ch != '?' && different(caseSensitive, ch, str.charAt(strIdxStart + i + j))) {
+                        continue strLoop;
+                    }
+                }
+                foundIdx = strIdxStart + i;
+                break;
+            }
+
+            if (foundIdx == -1) {
+                return false;
+            }
+            patIdxStart = patIdxTmp;
+            strIdxStart = foundIdx + patLength;
+        }
+
+        // All characters in the string are used. Check if only '*'s are left
+        // in the pattern. If so, we succeeded. Otherwise failure.
+        return allStars(pattern, patIdxStart, patIdxEnd);
+    }
+
+    private static boolean allStars(String chars, int start, int end) {
+        for (int i = start; i <= end; ++i) {
+            if (chars.charAt(i) != '*') {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean different(boolean caseSensitive, char ch, char other) {
+        return caseSensitive
+                ? ch != other
+                : Character.toUpperCase(ch) != Character.toUpperCase(other);
     }
 
     public static String indent(String text) {
@@ -509,8 +638,11 @@ public class StringUtils {
         return true;
     }
 
+    private static final Pattern SINGLE_DOT_OR_DOLLAR = Pattern.compile("(?:([^.]+)|^)\\.(?:([^.]+)|$)");
+    private static final String SINGLE_DOT_OR_DOLLAR_REPLACEMENT = "$1" + Matcher.quoteReplacement("[.$]") + "$2";
+
     /**
-     * See https://eclipse.org/aspectj/doc/next/progguide/semantics-pointcuts.html#type-patterns
+     * See <a href="https://eclipse.org/aspectj/doc/next/progguide/semantics-pointcuts.html#type-patterns">https://eclipse.org/aspectj/doc/next/progguide/semantics-pointcuts.html#type-patterns</a>
      * <p>
      * An embedded * in an identifier matches any sequence of characters, but
      * does not match the package (or inner-type) separator ".".
@@ -520,11 +652,11 @@ public class StringUtils {
      * the code is in any declaration of a type whose name begins with "com.xerox.".
      */
     public static String aspectjNameToPattern(String name) {
-        return name
+        String replaced = name
                 .replace("$", "\\$")
                 .replace("[", "\\[")
-                .replace("]", "\\]")
-                .replaceAll("(?:([^.]+)|^)\\.(?:([^.]+)|$)", "$1" + Matcher.quoteReplacement("[.$]") + "$2")
+                .replace("]", "\\]");
+        return SINGLE_DOT_OR_DOLLAR.matcher(replaced).replaceAll(SINGLE_DOT_OR_DOLLAR_REPLACEMENT)
                 .replace("*", "[^.]*")
                 .replace("..", "\\.(.+\\.)?");
     }
@@ -575,9 +707,7 @@ public class StringUtils {
     }
 
     /**
-     * Considering C-style comments to be whitespace, return the index of the next non-whitespace character
-     *
-     * @return
+     * @return Considering C-style comments to be whitespace, return the index of the next non-whitespace character.
      */
     public static int indexOfNextNonWhitespace(int cursor, String source) {
         boolean inMultiLineComment = false;

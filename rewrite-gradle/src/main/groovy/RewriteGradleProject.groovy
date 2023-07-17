@@ -15,19 +15,18 @@
  */
 //file:noinspection UnstableApiUsage
 
+
 import org.gradle.api.Action
 import org.gradle.api.JavaVersion
 import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.artifacts.Dependency
-import org.gradle.api.artifacts.ModuleDependency
+import org.gradle.api.artifacts.ExternalDependency
 import org.gradle.api.artifacts.dsl.DependencyHandler
-import org.gradle.api.artifacts.dsl.RepositoryHandler
-import org.gradle.api.artifacts.repositories.IvyArtifactRepository
-import org.gradle.api.artifacts.repositories.MavenArtifactRepository
 import org.gradle.api.file.FileCollection
 import org.gradle.api.file.FileTree
 import org.gradle.api.file.FileTreeElement
+import org.gradle.api.initialization.dsl.ScriptHandler
 import org.gradle.api.specs.Spec
 import org.gradle.api.tasks.testing.TestFilter
 import org.gradle.api.tasks.testing.TestFrameworkOptions
@@ -37,70 +36,35 @@ import org.gradle.api.tasks.testing.testng.TestNGOptions
 import org.gradle.process.JavaForkOptions
 import org.gradle.process.ProcessForkOptions
 
-
-
 interface DependencyHandlerSpec extends DependencyHandler {
-    Dependency annotationProcessor(String dependencyNotation)
-    Dependency annotationProcessor(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency annotationProcessor(Map<String, String> dependencyNotation)
-    Dependency annotationProcessor(Map<String, String> dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency api(String dependencyNotation)
-    Dependency api(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency api(Map<String, String> dependencyNotation)
-    Dependency api(Map<String, String> dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency classpath(String dependencyNotation)
-    Dependency classpath(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency classpath(Map<String, String> dependencyNotation)
-    Dependency classpath(Map<String, String> dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency compile(String dependencyNotation)
-    Dependency compile(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency compile(Map<String, String> dependencyNotation)
-    Dependency compile(Map<String, String> dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency compileOnly(String dependencyNotation)
-    Dependency compileOnly(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency compileOnly(Map<String, String> dependencyNotation)
-    Dependency compileOnly(Map<String, String> dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency implementation(String dependencyNotation)
-    Dependency implementation(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency implementation(Map<String, String> dependencyNotation)
-    Dependency implementation(Map<String, String> dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency runtime(String dependencyNotation)
-    Dependency runtime(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency runtime(Map<String, String> dependencyNotation)
-    Dependency runtime(Map<String, String> dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency runtimeOnly(String dependencyNotation)
-    Dependency runtimeOnly(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency runtimeOnly(Map<String, String> dependencyNotation)
-    Dependency runtimeOnly(Map<String, String> dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency runtimeClasspath(String dependencyNotation)
-    Dependency runtimeClasspath(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency runtimeClasspath(Map<String, String> dependencyNotation)
-    Dependency runtimeClasspath(Map<String, String> dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency testCompile(String dependencyNotation)
-    Dependency testCompile(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency testCompile(Map<String, String> dependencyNotation)
-    Dependency testCompile(Map<String, String> dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency testImplementation(String dependencyNotation)
-    Dependency testImplementation(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency testImplementation(Map<String, String> dependencyNotation)
-    Dependency testImplementation(Map<String, String> dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency testRuntime(String dependencyNotation)
-    Dependency testRuntime(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency testRuntime(Map<String, String> dependencyNotation)
-    Dependency testRuntime(Map<String, String> dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency testRuntimeOnly(String dependencyNotation)
-    Dependency testRuntimeOnly(String dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-    Dependency testRuntimeOnly(Map<String, String> dependencyNotation)
-    Dependency testRuntimeOnly(Map<String, String> dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ModuleDependency) Closure closure)
-}
-
-interface RepositoryHandlerSpec extends RepositoryHandler {
-    MavenArtifactRepository maven(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=MavenArtifactRepositorySpec) Closure closure)
-    IvyArtifactRepository ivy(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=IvyArtifactRepository) Closure closure)
-}
-
-interface MavenArtifactRepositorySpec extends MavenArtifactRepository {
-    void url(Object url)
+    Dependency annotationProcessor(Object dependencyNotation)
+    Dependency annotationProcessor(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency api(Object dependencyNotation)
+    Dependency api(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency classpath(Object dependencyNotation)
+    Dependency classpath(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency compile(Object dependencyNotation)
+    Dependency compile(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency compileOnly(Object dependencyNotation)
+    Dependency compileOnly(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency implementation(Object dependencyNotation)
+    Dependency implementation(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency runtime(Object dependencyNotation)
+    Dependency runtime(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency runtimeOnly(Object dependencyNotation)
+    Dependency runtimeOnly(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency runtimeClasspath(Object dependencyNotation)
+    Dependency runtimeClasspath(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency testCompile(Object dependencyNotation)
+    Dependency testCompile(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency testCompileOnly(Object dependencyNotation)
+    Dependency testCompileOnly(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=ExternalDependency) Closure closure)
+    Dependency testImplementation(Object dependencyNotation)
+    Dependency testImplementation(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency testRuntime(Object dependencyNotation)
+    Dependency testRuntime(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
+    Dependency testRuntimeOnly(Object dependencyNotation)
+    Dependency testRuntimeOnly(Object dependencyNotation, @DelegatesTo(strategy=Closure.DELEGATE_ONLY, value= ExternalDependency) Closure closure)
 }
 
 interface RewriteTestSpec {
@@ -183,10 +147,16 @@ interface RewriteTestSpec {
     void filter(Action<TestFilter> action)
 }
 
+interface ScriptHandlerSpec extends ScriptHandler {
+    void repositories(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RepositoryHandlerSpec) Closure cl)
+    void dependencies(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=DependencyHandlerSpec) Closure cl)
+}
+
 abstract class RewriteGradleProject extends groovy.lang.Script implements Project {
-    Map ext;
+    Map ext
 
     // It would be more correct for ext to delegate to ExtraPropertiesExtension, but StaticTypeCheckingVisitor has problems with that
+    abstract void buildscript(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=ScriptHandlerSpec) Closure cl)
     abstract void ext(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=Map) Closure cl)
     abstract void dependencies(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=DependencyHandlerSpec) Closure cl)
     abstract void plugins(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=PluginSpec) Closure cl)
@@ -212,4 +182,6 @@ abstract class RewriteGradleProject extends groovy.lang.Script implements Projec
     abstract <T extends Task> T task(String name, Class<T> type)
     abstract <T extends Task> T task(String name, Class<T> type, Object... constructorArgs)
     abstract <T extends Task> T task(String name, Class<T> type, Action<? super T> configuration)
+
+    abstract void apply(Map<String, String> args)
 }

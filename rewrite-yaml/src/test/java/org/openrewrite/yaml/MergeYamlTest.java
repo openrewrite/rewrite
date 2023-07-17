@@ -17,6 +17,7 @@ package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -30,17 +31,17 @@ class MergeYamlTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$.on",
+            //language=yaml
             """
-                    schedule:
-                        - cron: "0 18 * * *"
+              schedule:
+                  - cron: "0 18 * * *"
               """,
             true,
-            null,
             null
           )),
           yaml(
             """
-              name: Github Actions workflow
+              name: GitHub Actions workflow
               on: [workflow_dispatch]
               """
           )
@@ -53,22 +54,23 @@ class MergeYamlTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$",
+            //language=yaml
             """
-                  spring:
-                    application:
-                      name: update
-                      description: a description
+              spring:
+                application:
+                  name: update
+                  description: a description
               """,
             false,
-            null,
             null
           )),
-          yaml("",
+          yaml(
+            "",
             """
-                  spring:
-                    application:
-                      name: update
-                      description: a description
+              spring:
+                application:
+                  name: update
+                  description: a description
               """
           )
         );
@@ -80,65 +82,66 @@ class MergeYamlTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$",
+            //language=yaml
             """
-                  spring:
-                    application:
-                      name: update
-                      description: a description
+              spring:
+                application:
+                  name: update
+                  description: a description
               """,
             false,
-            null,
             null
           )),
           yaml(
             """
-                  spring:
-                    application:
-                      name: main
+              spring:
+                application:
+                  name: main
               """,
             """
-                  spring:
-                    application:
-                      name: update
-                      description: a description
+              spring:
+                application:
+                  name: update
+                  description: a description
               """
           )
         );
     }
 
+    @DocumentExample
     @Test
     void nonExistentBlock() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$.spec",
+            //language=yaml
             """
-                lifecycleRule:
-                    - action:
-                          type: Delete
-                      condition:
-                          age: 7
+              lifecycleRule:
+                  - action:
+                        type: Delete
+                    condition:
+                        age: 7
               """,
             false,
-            null,
             null
           )),
           yaml(
             """
-                  apiVersion: storage.cnrm.cloud.google.com/v1beta1
-                  kind: StorageBucket
-                  spec:
-                      bucketPolicyOnly: true
+              apiVersion: storage.cnrm.cloud.google.com/v1beta1
+              kind: StorageBucket
+              spec:
+                  bucketPolicyOnly: true
               """,
             """
-                  apiVersion: storage.cnrm.cloud.google.com/v1beta1
-                  kind: StorageBucket
-                  spec:
-                      bucketPolicyOnly: true
-                      lifecycleRule:
-                          - action:
-                                type: Delete
-                            condition:
-                                age: 7
+              apiVersion: storage.cnrm.cloud.google.com/v1beta1
+              kind: StorageBucket
+              spec:
+                  bucketPolicyOnly: true
+                  lifecycleRule:
+                      - action:
+                            type: Delete
+                        condition:
+                            age: 7
               """
           )
         );
@@ -150,24 +153,25 @@ class MergeYamlTest implements RewriteTest {
         rewriteRun(spec ->
             spec.recipe(new MergeYaml(
               "$",
+              //language=yaml
               """
-                  widget:
-                    list:
-                      - item 2
+                widget:
+                  list:
+                    - item 2
                 """,
-              false, null, null
+              false, null
             )),
           yaml(
             """
-                widget:
-                  list:
-                    - item 1
-              """,
+              widget:
+                list:
+                  - item 1
+                """,
             """
-                widget:
-                  list:
-                    - item 1
-                    - item 2
+              widget:
+                list:
+                  - item 1
+                  - item 2
               """
           )
         );
@@ -180,19 +184,20 @@ class MergeYamlTest implements RewriteTest {
           spec -> spec.recipe(new
               MergeYaml(
               "$",
+              //language=yaml
               """
-                  widget:
-                    list:
-                      - item 2
+                widget:
+                  list:
+                    - item 2
                 """,
-              true, null, null
+              true, null
             )
           ),
           yaml(
             """
-                widget:
-                  list:
-                    - item 1
+              widget:
+                list:
+                  - item 1
               """
           )
         );
@@ -203,25 +208,25 @@ class MergeYamlTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$.spec",
+            //language=yaml
             """
-                bucketPolicyOnly: true
+              bucketPolicyOnly: true
               """,
             false,
-            null,
             null
           )),
           yaml(
             """
-                  apiVersion: storage.cnrm.cloud.google.com/v1beta1
-                  kind: StorageBucket
-                  spec:
-                      bucketPolicyOnly: false
+              apiVersion: storage.cnrm.cloud.google.com/v1beta1
+              kind: StorageBucket
+              spec:
+                  bucketPolicyOnly: false
               """,
             """
-                  apiVersion: storage.cnrm.cloud.google.com/v1beta1
-                  kind: StorageBucket
-                  spec:
-                      bucketPolicyOnly: true
+              apiVersion: storage.cnrm.cloud.google.com/v1beta1
+              kind: StorageBucket
+              spec:
+                  bucketPolicyOnly: true
               """
           )
         );
@@ -235,34 +240,34 @@ class MergeYamlTest implements RewriteTest {
             .cycles(2)
             .recipe(new MergeYaml(
               "$.spec",
+              //language=yaml
               """
+                lifecycleRule:
+                    - action:
+                          type: Delete
+                      condition:
+                          age: 7
+                """,
+              false,
+              null
+            )),
+          yaml(
+            """
+              apiVersion: storage.cnrm.cloud.google.com/v1beta1
+              kind: StorageBucket
+              spec:
+                  bucketPolicyOnly: true
+              """,
+            """
+              apiVersion: storage.cnrm.cloud.google.com/v1beta1
+              kind: StorageBucket
+              spec:
+                  bucketPolicyOnly: true
                   lifecycleRule:
                       - action:
                             type: Delete
                         condition:
                             age: 7
-                """,
-              false,
-              null,
-              null
-            )),
-          yaml(
-            """
-                  apiVersion: storage.cnrm.cloud.google.com/v1beta1
-                  kind: StorageBucket
-                  spec:
-                      bucketPolicyOnly: true
-              """,
-            """
-                  apiVersion: storage.cnrm.cloud.google.com/v1beta1
-                  kind: StorageBucket
-                  spec:
-                      bucketPolicyOnly: true
-                      lifecycleRule:
-                          - action:
-                                type: Delete
-                            condition:
-                                age: 7
               """
           )
         );
@@ -273,9 +278,9 @@ class MergeYamlTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$",
+            //language=yaml
             "spec: 0",
             true,
-            null,
             null
           )),
           yaml(
@@ -299,22 +304,21 @@ class MergeYamlTest implements RewriteTest {
             "$.spec.containers",
             "imagePullPolicy: Always",
             true,
-            null,
             null
           )),
           yaml(
             """
-                  kind: Pod
-                  spec:
-                    containers:
-                      - name: <container name>
+              kind: Pod
+              spec:
+                containers:
+                  - name: <container name>
               """,
             """
-                  kind: Pod
-                  spec:
-                    containers:
-                      - name: <container name>
-                        imagePullPolicy: Always
+              kind: Pod
+              spec:
+                containers:
+                  - name: <container name>
+                    imagePullPolicy: Always
               """
           )
         );
@@ -326,26 +330,26 @@ class MergeYamlTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$.spec.containers[?(@.name == 'pod-0')]",
+            //language=yaml
             "imagePullPolicy: Always",
             true,
-            null,
             null
           )),
           yaml(
             """
-                  kind: Pod
-                  spec:
-                    containers:
-                      - name: pod-0
-                      - name: pod-1
+              kind: Pod
+              spec:
+                containers:
+                  - name: pod-0
+                  - name: pod-1
               """,
             """
-                  kind: Pod
-                  spec:
-                    containers:
-                      - name: pod-0
-                        imagePullPolicy: Always
-                      - name: pod-1
+              kind: Pod
+              spec:
+                containers:
+                  - name: pod-0
+                    imagePullPolicy: Always
+                  - name: pod-1
               """
           )
         );
@@ -356,31 +360,31 @@ class MergeYamlTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$.spec.containers",
+            //language=yaml
             """
-                securityContext:
-                  privileged: false
+              securityContext:
+                privileged: false
               """,
             true,
-            null,
             null
           )),
           yaml(
             """
-                  kind: Pod
-                  spec:
-                    containers:
-                      - name: pod-0
-                        securityContext:
-                          foo: bar
+              kind: Pod
+              spec:
+                containers:
+                  - name: pod-0
+                    securityContext:
+                      foo: bar
               """,
             """
-                  kind: Pod
-                  spec:
-                    containers:
-                      - name: pod-0
-                        securityContext:
-                          foo: bar
-                          privileged: false
+              kind: Pod
+              spec:
+                containers:
+                  - name: pod-0
+                    securityContext:
+                      foo: bar
+                      privileged: false
               """
           )
         );
@@ -391,28 +395,28 @@ class MergeYamlTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$.spec.containers",
+            //language=yaml
             """
-                securityContext:
-                  privileged: false
+              securityContext:
+                privileged: false
               """,
             true,
-            null,
             null
           )),
           yaml(
             """
-                  kind: Pod
-                  spec:
-                    containers:
-                      - name: pod-0
+              kind: Pod
+              spec:
+                containers:
+                  - name: pod-0
               """,
             """
-                  kind: Pod
-                  spec:
-                    containers:
-                      - name: pod-0
-                        securityContext:
-                          privileged: false
+              kind: Pod
+              spec:
+                containers:
+                  - name: pod-0
+                    securityContext:
+                      privileged: false
               """
           )
         );
@@ -423,26 +427,26 @@ class MergeYamlTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$.steps[?(@.uses == 'actions/setup-java')]",
+            //language=yaml
             """
-                with:
-                  cache: 'gradle'
+              with:
+                cache: 'gradle'
               """,
             false,
-            null,
             null
           )),
           yaml(
             """
-                  steps:
-                    - uses: actions/checkout
-                    - uses: actions/setup-java
+              steps:
+                - uses: actions/checkout
+                - uses: actions/setup-java
               """,
             """
-                  steps:
-                    - uses: actions/checkout
-                    - uses: actions/setup-java
-                      with:
-                        cache: 'gradle'
+              steps:
+                - uses: actions/checkout
+                - uses: actions/setup-java
+                  with:
+                    cache: 'gradle'
               """
           )
         );
@@ -454,44 +458,44 @@ class MergeYamlTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$",
+            //language=yaml
             """
-                  darwin:
-                    logging:
-                      - 1
-                      - 2
-                    finches:
-                      species:
-                        Geospiza:
-                          - Sharp-beaked
-                          - Common cactus
-                        Camarhynchus:
-                          - Woodpecker
-                          - Mangrove
+              darwin:
+                logging:
+                  - 1
+                  - 2
+                finches:
+                  species:
+                    Geospiza:
+                      - Sharp-beaked
+                      - Common cactus
+                    Camarhynchus:
+                      - Woodpecker
+                      - Mangrove
               """,
             true,
-            null,
             null
           )),
           yaml(
             """
-                  com:
-                    key1: value1
+              com:
+                key1: value1
               """,
             """
-                  com:
-                    key1: value1
-                  darwin:
-                    logging:
-                      - 1
-                      - 2
-                    finches:
-                      species:
-                        Geospiza:
-                          - Sharp-beaked
-                          - Common cactus
-                        Camarhynchus:
-                          - Woodpecker
-                          - Mangrove
+              com:
+                key1: value1
+              darwin:
+                logging:
+                  - 1
+                  - 2
+                finches:
+                  species:
+                    Geospiza:
+                      - Sharp-beaked
+                      - Common cactus
+                    Camarhynchus:
+                      - Woodpecker
+                      - Mangrove
               """
           )
         );
@@ -503,30 +507,30 @@ class MergeYamlTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$",
+            //language=yaml
             """
-                 core:
-                   - map2:
-                       value:
-                         - 1
-                         - 2
+              core:
+                - map2:
+                    value:
+                      - 1
+                      - 2
               """,
             true,
-            null,
             null
           )),
           yaml(
             """
-                  noncore:
-                    key1: value01
+              noncore:
+                key1: value01
               """,
             """
-                  noncore:
-                    key1: value01
-                  core:
-                    - map2:
-                        value:
-                          - 1
-                          - 2
+              noncore:
+                key1: value01
+              core:
+                - map2:
+                    value:
+                      - 1
+                      - 2
               """
           )
         );
@@ -538,6 +542,7 @@ class MergeYamlTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$",
+            //language=yaml
             """
               testing:
                 mmap4:
@@ -547,30 +552,29 @@ class MergeYamlTest implements RewriteTest {
                     nnmap2: v222
               """,
             true,
-            null,
             null
           )),
           yaml(
             """
-                  com:
-                    key1: value1
-                    key3: value3
-                  testing:
-                    core:
-                      key1: value01
+              com:
+                key1: value1
+                key3: value3
+              testing:
+                core:
+                  key1: value01
               """,
             """
-                  com:
-                    key1: value1
-                    key3: value3
-                  testing:
-                    core:
-                      key1: value01
-                    mmap4:
-                      - mmmap1: v111
-                        mmmap2: v222
-                      - nnmap1: v111
-                        nnmap2: v222
+              com:
+                key1: value1
+                key3: value3
+              testing:
+                core:
+                  key1: value01
+                mmap4:
+                  - mmmap1: v111
+                    mmmap2: v222
+                  - nnmap1: v111
+                    nnmap2: v222
               """
           )
         );
@@ -584,13 +588,13 @@ class MergeYamlTest implements RewriteTest {
             .expectedCyclesThatMakeChanges(2)
             .recipe(new MergeYaml(
               "$.testing",
+              //language=yaml
               """
-                  table:
-                    - name: jdk_version
-                      value: 18
+                table:
+                  - name: jdk_version
+                    value: 18
                 """,
               false,
-              null,
               "name"
             )),
           yaml(
@@ -601,12 +605,12 @@ class MergeYamlTest implements RewriteTest {
                     row2key2: maven
               """,
             """
-                  testing:
-                    table:
-                      - name: build_tool
-                        row2key2: maven
-                      - name: jdk_version
-                        value: 18
+              testing:
+                table:
+                  - name: build_tool
+                    row2key2: maven
+                  - name: jdk_version
+                    value: 18
               """
           )
         );
@@ -620,26 +624,26 @@ class MergeYamlTest implements RewriteTest {
             .expectedCyclesThatMakeChanges(2)
             .recipe(new MergeYaml(
               "$.testing",
+              //language=yaml
               """
-                  table:
-                    - name: jdk_version
-                      value: 18
+                table:
+                  - name: jdk_version
+                    value: 18
                 """,
               false,
-              null,
               "name"
             )),
           yaml(
             """
-                  testing:
-                    another: value
+              testing:
+                another: value
               """,
             """
-                  testing:
-                    another: value
-                    table:
-                      - name: jdk_version
-                        value: 18
+              testing:
+                another: value
+                table:
+                  - name: jdk_version
+                    value: 18
               """
           )
         );
@@ -651,6 +655,7 @@ class MergeYamlTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$",
+            //language=yaml
             """
               testing:
                 table:
@@ -658,17 +663,16 @@ class MergeYamlTest implements RewriteTest {
                     value: 18
               """,
             false,
-            null,
             null
           )),
           yaml(
             """
               """,
             """
-                  testing:
-                    table:
-                      - name: jdk_version
-                        value: 18
+              testing:
+                table:
+                  - name: jdk_version
+                    value: 18
               """
           )
         );
@@ -682,31 +686,31 @@ class MergeYamlTest implements RewriteTest {
             .expectedCyclesThatMakeChanges(2)
             .recipe(new MergeYaml(
               "$.testing",
+              //language=yaml
               """
-                  table:
-                    - name: jdk_version
-                      value: 18
-                    - name: build_tool
-                      row2key2: maven
+                table:
+                  - name: jdk_version
+                    value: 18
+                  - name: build_tool
+                    row2key2: maven
                 """,
               false,
-              null,
               "name"
             )),
           yaml(
             """
-                  testing:
-                    table:
-                      - name: jdk_version
-                        value: 18
+              testing:
+                table:
+                  - name: jdk_version
+                    value: 18
               """,
             """
-                  testing:
-                    table:
-                      - name: jdk_version
-                        value: 18
-                      - name: build_tool
-                        row2key2: maven
+              testing:
+                table:
+                  - name: jdk_version
+                    value: 18
+                  - name: build_tool
+                    row2key2: maven
               """
           )
         );
@@ -720,27 +724,27 @@ class MergeYamlTest implements RewriteTest {
             .expectedCyclesThatMakeChanges(2)
             .recipe(new MergeYaml(
               "$.testing",
+              //language=yaml
               """
-                  table:
-                    - name: jdk_version
-                      value: 17
+                table:
+                  - name: jdk_version
+                    value: 17
                 """,
               false,
-              null,
               "name"
             )),
           yaml(
             """
-                  testing:
-                    table:
-                      - name: jdk_version
-                        value: 18
+              testing:
+                table:
+                  - name: jdk_version
+                    value: 18
               """,
             """
-                  testing:
-                    table:
-                      - name: jdk_version
-                        value: 17
+              testing:
+                table:
+                  - name: jdk_version
+                    value: 17
               """
           )
         );
@@ -754,41 +758,41 @@ class MergeYamlTest implements RewriteTest {
             .expectedCyclesThatMakeChanges(2)
             .recipe(new MergeYaml(
               "$.spec",
+              //language=yaml
               """
-                  serviceClaims:
-                    - name: db02
-                      ref:
-                        apiVersion: sql.tanzu.vmware.com/v1
-                        kind: Postgres
-                        name: customer-profile-database-02
+                serviceClaims:
+                  - name: db02
+                    ref:
+                      apiVersion: sql.tanzu.vmware.com/v1
+                      kind: Postgres
+                      name: customer-profile-database-02
                 """,
               false,
-              null,
               "name"
             )),
           yaml(
             """
-                  spec:
-                    serviceClaims:
-                      - name: db
-                        ref:
-                          apiVersion: sql.tanzu.vmware.com/v1
-                          kind: Postgres
-                          name: customer-profile-database
+              spec:
+                serviceClaims:
+                  - name: db
+                    ref:
+                      apiVersion: sql.tanzu.vmware.com/v1
+                      kind: Postgres
+                      name: customer-profile-database
               """,
             """
-                  spec:
-                    serviceClaims:
-                      - name: db
-                        ref:
-                          apiVersion: sql.tanzu.vmware.com/v1
-                          kind: Postgres
-                          name: customer-profile-database
-                      - name: db02
-                        ref:
-                          apiVersion: sql.tanzu.vmware.com/v1
-                          kind: Postgres
-                          name: customer-profile-database-02
+              spec:
+                serviceClaims:
+                  - name: db
+                    ref:
+                      apiVersion: sql.tanzu.vmware.com/v1
+                      kind: Postgres
+                      name: customer-profile-database
+                  - name: db02
+                    ref:
+                      apiVersion: sql.tanzu.vmware.com/v1
+                      kind: Postgres
+                      name: customer-profile-database-02
               """
           )
         );
@@ -802,57 +806,39 @@ class MergeYamlTest implements RewriteTest {
             .expectedCyclesThatMakeChanges(2)
             .recipe(new MergeYaml(
               "$.spec",
+              //language=yaml
               """
-                  serviceClaims:
-                    - name: db
-                      ref:
-                        apiVersion: sql.tanzu.vmware.com/v2
-                        kind: MySQL
-                        name: relation-profile-database
+                serviceClaims:
+                  - name: db
+                    ref:
+                      apiVersion: sql.tanzu.vmware.com/v2
+                      kind: MySQL
+                      name: relation-profile-database
                 """,
               false,
-              null,
               "name"
             )),
           yaml(
             """
-                  spec:
-                    serviceClaims:
-                      - name: db
-                        ref:
-                          apiVersion: sql.tanzu.vmware.com/v1
-                          kind: Postgres
-                          name: customer-profile-database
+              spec:
+                serviceClaims:
+                  - name: db
+                    ref:
+                      apiVersion: sql.tanzu.vmware.com/v1
+                      kind: Postgres
+                      name: customer-profile-database
               """,
             """
-                  spec:
-                    serviceClaims:
-                      - name: db
-                        ref:
-                          apiVersion: sql.tanzu.vmware.com/v2
-                          kind: MySQL
-                          name: relation-profile-database
+              spec:
+                serviceClaims:
+                  - name: db
+                    ref:
+                      apiVersion: sql.tanzu.vmware.com/v2
+                      kind: MySQL
+                      name: relation-profile-database
               """
           )
         );
     }
 
-    @Test
-    void changeOnlyMatchingFile() {
-        rewriteRun(
-          spec -> spec.recipe(new MergeYaml("$", "spec: 0", true, "**/a.yml", null)),
-          yaml(
-            "apiVersion: policy/v1beta1",
-            """
-              apiVersion: policy/v1beta1
-              spec: 0
-              """,
-            spec -> spec.path("a.yml")
-          ),
-          yaml(
-            "apiVersion: policy/v1beta1",
-            spec -> spec.path("b.yml")
-          )
-        );
-    }
 }

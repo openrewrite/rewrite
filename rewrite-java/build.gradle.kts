@@ -16,6 +16,8 @@ tasks.register<JavaExec>("generateAntlrSources") {
 
 dependencies {
     api(project(":rewrite-core"))
+    api(project(":rewrite-yaml"))
+    api(project(":rewrite-xml"))
 
     api("io.micrometer:micrometer-core:1.9.+")
     api("org.jetbrains:annotations:latest.release")
@@ -31,7 +33,7 @@ dependencies {
     implementation("org.apache.commons:commons-text:latest.release")
     implementation("io.github.classgraph:classgraph:latest.release")
 
-    implementation("org.xerial.snappy:snappy-java:1.1.8.4")
+    implementation("org.xerial.snappy:snappy-java:1.1.10.1")
 
     api("com.fasterxml.jackson.core:jackson-annotations")
 
@@ -46,6 +48,7 @@ dependencies {
     }
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-java-test"))
+    testRuntimeOnly(project(":rewrite-java-17"))
     testImplementation("com.tngtech.archunit:archunit:1.0.1")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.0.1")
 

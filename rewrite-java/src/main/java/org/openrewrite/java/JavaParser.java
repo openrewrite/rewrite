@@ -23,6 +23,7 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -37,6 +38,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -50,7 +52,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
-public interface JavaParser extends Parser<J.CompilationUnit> {
+public interface JavaParser extends Parser {
 
     /**
      * Set to <code>true</code> on an {@link ExecutionContext} supplied to parsing to skip generation of
@@ -109,13 +111,13 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
     static List<Path> dependenciesFromResources(ExecutionContext ctx, String... artifactNamesWithVersions) {
         List<Path> artifacts = new ArrayList<>(artifactNamesWithVersions.length);
-        List<String> missingArtifactNames = new ArrayList<>(artifactNamesWithVersions.length);
+        Set<String> missingArtifactNames = new LinkedHashSet<>(artifactNamesWithVersions.length);
         File resourceTarget = JavaParserExecutionContextView.view(ctx)
                 .getParserClasspathDownloadTarget();
 
         nextArtifact:
         for (String artifactName : artifactNamesWithVersions) {
-            Pattern jarPattern = Pattern.compile(artifactName + "\\.jar$");
+            Pattern jarPattern = Pattern.compile("[/\\\\]" + artifactName + "-?.*\\.jar$");
             File[] extracted = resourceTarget.listFiles();
             if (extracted != null) {
                 for (File file : extracted) {
@@ -128,47 +130,59 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
             missingArtifactNames.add(artifactName);
         }
 
-        for (String artifactName : new ArrayList<>(missingArtifactNames)) {
-            Pattern jarPattern = Pattern.compile(artifactName + "-?.*?\\.jar$");
-            try (ScanResult result = new ClassGraph().acceptPaths("META-INF/rewrite/classpath").scan()) {
-                ResourceList resources = result.getResourcesWithExtension(".jar");
+        if (missingArtifactNames.isEmpty()) {
+            return artifacts;
+        }
+
+        Class<?> caller;
+        try {
+            // StackWalker is only available in Java 15+, but right now we only use classloader isolated
+            // recipe instances in Java 17 environments, so we can safely use StackWalker there.
+            Class<?> options = Class.forName("java.lang.StackWalker$Option");
+            Object retainOption = options.getDeclaredField("RETAIN_CLASS_REFERENCE").get(null);
+
+            Class<?> walkerClass = Class.forName("java.lang.StackWalker");
+            Method getInstance = walkerClass.getDeclaredMethod("getInstance", options);
+            Object walker = getInstance.invoke(null, retainOption);
+            Method getDeclaringClass = Class.forName("java.lang.StackWalker$StackFrame").getDeclaredMethod("getDeclaringClass");
+            caller = (Class<?>) walkerClass.getMethod("walk", Function.class).invoke(walker, (Function<Stream<Object>, Object>) s -> s
+                    .map(f -> {
+                        try {
+                            return (Class<?>) getDeclaringClass.invoke(f);
+                        } catch (IllegalAccessException | InvocationTargetException e) {
+                            throw new RuntimeException(e);
+                        }
+                    })
+                    .filter(c -> !c.getName().equals(JavaParser.class.getName()) &&
+                                 !c.getName().equals(JavaParser.Builder.class.getName()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("Unable to find caller of JavaParser.dependenciesFromResources(..)")));
+        } catch (ClassNotFoundException | NoSuchFieldException | IllegalAccessException |
+                 NoSuchMethodException | InvocationTargetException e) {
+            caller = JavaParser.class;
+        }
+
+        try (ScanResult result = new ClassGraph().acceptPaths("META-INF/rewrite/classpath")
+                .addClassLoader(caller.getClassLoader())
+                .scan()) {
+            ResourceList resources = result.getResourcesWithExtension(".jar");
+
+            for (String artifactName : new ArrayList<>(missingArtifactNames)) {
+                Pattern jarPattern = Pattern.compile(artifactName + "-?.*\\.jar$");
                 for (Resource resource : resources) {
                     if (jarPattern.matcher(resource.getPath()).find()) {
                         try {
                             Path artifact = resourceTarget.toPath().resolve(Paths.get(resource.getPath()).getFileName());
-
-                            Class<?> caller;
-                            try {
-                                // StackWalker is only available in Java 15+, but right now we only use classloader isolated
-                                // recipe instances in Java 17 environments, so we can safely use StackWalker there.
-                                Class<?> options = Class.forName("java.lang.StackWalker$Option");
-                                Object retainOption = options.getDeclaredField("RETAIN_CLASS_REFERENCE").get(null);
-
-                                Class<?> walkerClass = Class.forName("java.lang.StackWalker");
-                                Method getInstance = walkerClass.getDeclaredMethod("getInstance", options);
-                                Object walker = getInstance.invoke(null, retainOption);
-                                Method getDeclaringClass = Class.forName("java.lang.StackWalker$StackFrame").getDeclaredMethod("getDeclaringClass");
-                                caller = (Class<?>) walkerClass.getMethod("walk", Function.class).invoke(walker, (Function<Stream<Object>, Object>) s -> s
-                                        .map(f -> {
-                                            try {
-                                                return (Class<?>) getDeclaringClass.invoke(f);
-                                            } catch (IllegalAccessException | InvocationTargetException e) {
-                                                throw new RuntimeException(e);
-                                            }
-                                        })
-                                        .filter(c -> !c.getName().equals(JavaParser.class.getName()) &&
-                                                     !c.getName().equals(JavaParser.Builder.class.getName()))
-                                        .findFirst()
-                                        .orElseThrow(() -> new IllegalStateException("Unable to find caller of JavaParser.dependenciesFromResources(..)")));
-                            } catch (ClassNotFoundException | NoSuchFieldException | IllegalAccessException |
-                                     NoSuchMethodException | InvocationTargetException e) {
-                                caller = JavaParser.class;
+                            if (!Files.exists(artifact)) {
+                                try {
+                                    Files.copy(
+                                            requireNonNull(caller.getResourceAsStream("/" + resource.getPath())),
+                                            artifact
+                                    );
+                                } catch (FileAlreadyExistsException ignore) {
+                                    // can happen when tests run in parallel, for example
+                                }
                             }
-
-                            Files.copy(
-                                    requireNonNull(caller.getResourceAsStream("/" + resource.getPath())),
-                                    artifact
-                            );
                             missingArtifactNames.remove(artifactName);
                             artifacts.add(artifact);
                         } catch (IOException e) {
@@ -178,11 +192,15 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                     }
                 }
             }
-        }
 
-        if (!missingArtifactNames.isEmpty()) {
-            throw new IllegalArgumentException("Unable to find classpath resource dependencies beginning with: " +
-                                               missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ")));
+            if (!missingArtifactNames.isEmpty()) {
+                throw new IllegalArgumentException("Unable to find classpath resource dependencies beginning with: " +
+                                                   missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ", "", ".\n")) +
+                                                   "The caller is of type " + (caller == null ? "NO CALLER IDENTIFIED" : caller.getName()) + ".\n" +
+                                                   "The resources resolvable from the caller's classpath are: " +
+                                                   resources.stream().map(Resource::getPath).sorted().collect(joining(", "))
+                );
+            }
         }
 
         return artifacts;
@@ -193,7 +211,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
      */
     static JavaParser.Builder<? extends JavaParser, ?> fromJavaVersion() {
         JavaParser.Builder<? extends JavaParser, ?> javaParser;
-        String[] versionParts = System.getProperty("java.version").split("\\.");
+        String[] versionParts = System.getProperty("java.version").split("[.-]");
         int version = Integer.parseInt(versionParts[0]);
         if (version == 1) {
             version = 8;
@@ -236,7 +254,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     }
 
     @Override
-    default List<J.CompilationUnit> parse(ExecutionContext ctx, @Language("java") String... sources) {
+    default Stream<SourceFile> parse(ExecutionContext ctx, @Language("java") String... sources) {
         return parseInputs(
                 Arrays.stream(sources)
                         .map(sourceFile -> new Input(
@@ -250,7 +268,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     }
 
     @Override
-    default List<J.CompilationUnit> parse(@Language("java") String... sources) {
+    default Stream<SourceFile> parse(@Language("java") String... sources) {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         return parse(ctx, sources);
     }
@@ -266,6 +284,8 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
      */
     JavaParser reset();
 
+    JavaParser reset(Collection<URI> uris);
+
     /**
      * Changes the classpath on the parser. Intended for use in multiple pass parsing, where we want to keep the
      * compiler symbol table intact for type attribution on later parses, i.e. for maven multi-module projects.
@@ -273,17 +293,6 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
      * @param classpath new classpath to use
      */
     void setClasspath(Collection<Path> classpath);
-
-    /**
-     * Changes the source set on the parser. Intended for use in multiple pass parsing, where we want to keep the
-     * compiler symbol table intact for type attribution on later parses, i.e. for maven multi-module projects.
-     *
-     * @param sourceSet source set used to set {@link org.openrewrite.java.marker.JavaSourceSet} markers on
-     *                  subsequently parsed {@link J.CompilationUnit}
-     */
-    void setSourceSet(String sourceSet);
-
-    JavaSourceSet getSourceSet(ExecutionContext ctx);
 
     @SuppressWarnings("unchecked")
     abstract class Builder<P extends JavaParser, B extends Builder<P, B>> extends Parser.Builder {

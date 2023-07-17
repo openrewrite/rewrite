@@ -37,15 +37,13 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         return "groovy";
     }
 
-    @Override
-    public J visitJavaSourceFile(JavaSourceFile cu, P p) {
-        return cu instanceof G.CompilationUnit ? visitCompilationUnit((G.CompilationUnit) cu, p) : cu;
-    }
-
     public J visitCompilationUnit(G.CompilationUnit cu, P p) {
         G.CompilationUnit c = cu;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        if (c.getPackageDeclaration() != null) {
+            c = c.withPackageDeclaration((G.Package) visitNonNull(c.getPackageDeclaration(), p));
+        }
         c = c.withStatements(ListUtils.map(c.getStatements(), e -> visitAndCast(e, p)));
         c = c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
         return c;
@@ -75,6 +73,7 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         G.GString.Value v = value;
         v = v.withMarkers(visitMarkers(v.getMarkers(), p));
         v = v.withTree(visit(v.getTree(), p));
+        v = v.withAfter(visitSpace(v.getAfter(), GSpace.Location.GSTRING, p));
         return v;
     }
 
@@ -139,6 +138,23 @@ public class GroovyVisitor<P> extends JavaVisitor<P> {
         b = b.withRight(visitAndCast(b.getRight(), p));
         b = b.withType(visitType(b.getType(), p));
         return b;
+    }
+
+    public J visitRange(G.Range range, P p) {
+        G.Range r = range;
+        r = r.withPrefix(visitSpace(r.getPrefix(), GSpace.Location.RANGE_PREFIX, p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(r, p);
+        if (!(temp instanceof G.Range)) {
+            return temp;
+        } else {
+            r = (G.Range) temp;
+        }
+        r = r.withFrom(visitAndCast(r.getFrom(), p));
+        r = r.getPadding().withInclusive(visitLeftPadded(r.getPadding().getInclusive(), GLeftPadded.Location.RANGE_INCLUSION, p));
+        r = r.withTo(visitAndCast(r.getTo(), p));
+        r = r.withType(visitType(r.getType(), p));
+        return r;
     }
 
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, GRightPadded.Location loc, P p) {

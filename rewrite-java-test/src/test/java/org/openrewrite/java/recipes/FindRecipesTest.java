@@ -16,6 +16,7 @@
 package org.openrewrite.java.recipes;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.table.RewriteRecipeSource;
 import org.openrewrite.test.RewriteTest;
@@ -23,8 +24,9 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 
-public class FindRecipesTest implements RewriteTest {
+class FindRecipesTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void findRecipes() {
         rewriteRun(

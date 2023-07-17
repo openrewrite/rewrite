@@ -15,10 +15,13 @@
  */
 package org.openrewrite.config;
 
+import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
 import org.openrewrite.style.NamedStyles;
 
 import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 
 public interface ResourceLoader {
     Collection<Recipe> listRecipes();
@@ -29,5 +32,7 @@ public interface ResourceLoader {
 
     Collection<CategoryDescriptor> listCategoryDescriptors();
 
-    Collection<RecipeExample> listRecipeExamples();
+    Map<String, List<Contributor>> listContributors();
+
+    Map<String, List<RecipeExample>> listRecipeExamples();
 }

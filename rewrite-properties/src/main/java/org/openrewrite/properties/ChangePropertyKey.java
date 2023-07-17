@@ -15,10 +15,12 @@
  */
 package org.openrewrite.properties;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
@@ -37,7 +39,6 @@ public class ChangePropertyKey extends Recipe {
             example = "management.metrics.enable.process.files")
     String newPropertyKey;
 
-    @Incubating(since = "7.17.0")
     @Option(displayName = "Use relaxed binding",
             description = "Whether to match the `oldPropertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
                     "rules. Default is `true`. Set to `false`  to use exact matching.",
@@ -45,37 +46,11 @@ public class ChangePropertyKey extends Recipe {
     @Nullable
     Boolean relaxedBinding;
 
-    @Incubating(since = "7.8.0")
-    @Option(displayName = "Optional file matcher",
-            description = "Matching files will be modified. This is a glob expression.",
-            required = false,
-            example = "**/application-*.properties")
-    @Nullable
-    String fileMatcher;
-
     @Option(displayName = "Regex",
-            description = "Default false. If enabled, `oldPropertyKey` will be interepreted as a Regular Expression, and capture group contents will be available in `newPropertyKey`",
-            required = false,
-            example = "true")
+            description = "Default false. If enabled, `oldPropertyKey` will be interpreted as a Regular Expression, and capture group contents will be available in `newPropertyKey`",
+            required = false)
     @Nullable
     Boolean regex;
-
-    @Deprecated
-    public ChangePropertyKey(String oldPropertyKey, String newPropertyKey,
-            @Nullable Boolean relaxedBinding, @Nullable String fileMatcher) {
-        this(oldPropertyKey, newPropertyKey, relaxedBinding, fileMatcher, null);
-    }
-
-    @JsonCreator
-    public ChangePropertyKey(String oldPropertyKey, String newPropertyKey,
-            @Nullable Boolean relaxedBinding, @Nullable String fileMatcher,
-            @Nullable Boolean regex) {
-        this.oldPropertyKey = oldPropertyKey;
-        this.newPropertyKey = newPropertyKey;
-        this.relaxedBinding = relaxedBinding;
-        this.fileMatcher = fileMatcher;
-        this.regex = regex;
-    }
 
     @Override
     public String getDisplayName() {
@@ -85,14 +60,6 @@ public class ChangePropertyKey extends Recipe {
     @Override
     public String getDescription() {
         return "Change a property key leaving the value intact.";
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        if (fileMatcher != null) {
-            return new HasSourcePath<>(fileMatcher);
-        }
-        return null;
     }
 
     @Override

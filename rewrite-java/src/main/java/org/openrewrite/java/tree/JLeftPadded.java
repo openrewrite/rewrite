@@ -66,6 +66,7 @@ public class JLeftPadded<T> {
         CLASS_KIND(Space.Location.CLASS_KIND),
         EXTENDS(Space.Location.EXTENDS),
         FIELD_ACCESS_NAME(Space.Location.FIELD_ACCESS_NAME),
+        IMPORT_ALIAS_PREFIX(Space.Location.IMPORT_ALIAS_PREFIX),
         LANGUAGE_EXTENSION(Space.Location.LANGUAGE_EXTENSION),
         MEMBER_REFERENCE_NAME(Space.Location.MEMBER_REFERENCE_NAME),
         METHOD_DECLARATION_DEFAULT_VALUE(Space.Location.METHOD_DECLARATION_DEFAULT_VALUE),
@@ -89,17 +90,17 @@ public class JLeftPadded<T> {
     }
 
     @Nullable
-    public static <T> JLeftPadded<T> withElement(@Nullable JLeftPadded<T> before, @Nullable T elements) {
+    public static <T> JLeftPadded<T> withElement(@Nullable JLeftPadded<T> before, @Nullable T element) {
         if (before == null) {
-            if (elements == null) {
+            if (element == null) {
                 return null;
             }
-            return new JLeftPadded<>(Space.EMPTY, elements, Markers.EMPTY);
+            return new JLeftPadded<>(Space.EMPTY, element, Markers.EMPTY);
         }
-        if (elements == null) {
+        if (element == null) {
             return null;
         }
-        return before.withElement(elements);
+        return before.withElement(element);
     }
 
     @Override

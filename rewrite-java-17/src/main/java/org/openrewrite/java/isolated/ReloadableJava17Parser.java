@@ -15,34 +15,32 @@
  */
 package org.openrewrite.java.isolated;
 
-import com.sun.tools.javac.comp.*;
+import com.sun.tools.javac.comp.Annotate;
+import com.sun.tools.javac.comp.Check;
+import com.sun.tools.javac.comp.Enter;
+import com.sun.tools.javac.comp.Modules;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
-import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Timer;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Tree;
-import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.MetricsHelper;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaParsingException;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
@@ -59,7 +57,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 /**
@@ -67,11 +64,7 @@ import static java.util.stream.Collectors.toList;
  */
 @NonNullApi
 public class ReloadableJava17Parser implements JavaParser {
-    private String sourceSet = "main";
     private final JavaTypeCache typeCache;
-
-    @Nullable
-    private transient JavaSourceSet sourceSetProvenance;
 
     @Nullable
     private Collection<Path> classpath;
@@ -113,9 +106,6 @@ public class ReloadableJava17Parser implements JavaParser {
         Options.instance(context).put("-g", "-g");
         Options.instance(context).put("-proc", "none");
 
-        // MUST be created ahead of compiler construction
-        new TimedTodo(context);
-
         // MUST be created (registered with the context) after pfm and compilerLog
         compiler = new JavaCompiler(context);
 
@@ -156,64 +146,31 @@ public class ReloadableJava17Parser implements JavaParser {
     }
 
     @Override
-    public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
+        return cus.entrySet().stream().map(cuByPath -> {
+            Input input = cuByPath.getKey();
+            try {
+                ReloadableJava17ParserVisitor parser = new ReloadableJava17ParserVisitor(
+                        input.getRelativePath(relativeTo),
+                        input.getFileAttributes(),
+                        input.getSource(ctx),
+                        styles,
+                        typeCache,
+                        ctx,
+                        context
+                );
 
-        List<J.CompilationUnit> mappedCus = cus.entrySet().stream()
-                .map(cuByPath -> {
-                    Timer.Sample sample = Timer.start();
-                    Input input = cuByPath.getKey();
-                    try {
-                        ReloadableJava17ParserVisitor parser = new ReloadableJava17ParserVisitor(
-                                input.getRelativePath(relativeTo),
-                                input.getFileAttributes(),
-                                input.getSource(ctx),
-                                styles,
-                                typeCache,
-                                ctx,
-                                context
-                        );
-
-                        J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
-                        sample.stop(MetricsHelper.successTags(
-                                        Timer.builder("rewrite.parse")
-                                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
-                                                .tag("file.type", "Java")
-                                                .tag("step", "(3) Map to Rewrite AST"))
-                                .register(Metrics.globalRegistry));
-                        parsingListener.parsed(input, cu);
-                        return cu;
-                    } catch (Throwable t) {
-                        sample.stop(MetricsHelper.errorTags(
-                                        Timer.builder("rewrite.parse")
-                                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
-                                                .tag("file.type", "Java")
-                                                .tag("step", "(3) Map to Rewrite AST"), t)
-                                .register(Metrics.globalRegistry));
-                        ParsingExecutionContextView.view(ctx).parseFailure(input, relativeTo, this, t);
-                        ctx.getOnError().accept(t);
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull)
-                .collect(toList());
-
-        JavaSourceSet sourceSet = getSourceSet(ctx);
-        if (!ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
-            List<JavaType.FullyQualified> classpath = sourceSet.getClasspath();
-            for (J.CompilationUnit cu : mappedCus) {
-                for (JavaType type : cu.getTypesInUse().getTypesInUse()) {
-                    if (type instanceof JavaType.FullyQualified) {
-                        classpath.add((JavaType.FullyQualified) type);
-                    }
-                }
+                J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
+                cuByPath.setValue(null); // allow memory used by this JCCompilationUnit to be released
+                parsingListener.parsed(input, cu);
+                return cu;
+            } catch (Throwable t) {
+                ctx.getOnError().accept(t);
+                return ParseError.build(this, input, relativeTo, ctx, t);
             }
-            sourceSetProvenance = sourceSet.withClasspath(classpath);
-        }
-
-        assert sourceSetProvenance != null;
-        return ListUtils.map(mappedCus, cu -> cu.withMarkers(cu.getMarkers().add(sourceSetProvenance)));
+        });
     }
 
     LinkedHashMap<Input, JCTree.JCCompilationUnit> parseInputsToCompilerAst(Iterable<Input> sourceFiles, ExecutionContext ctx) {
@@ -230,27 +187,20 @@ public class ReloadableJava17Parser implements JavaParser {
         }
 
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = new LinkedHashMap<>();
-        for (Input input1 : acceptedInputs(sourceFiles)) {
-            cus.put(input1, MetricsHelper.successTags(
-                            Timer.builder("rewrite.parse")
-                                    .description("The time spent by the JDK in parsing and tokenizing the source file")
-                                    .tag("file.type", "Java")
-                                    .tag("step", "(1) JDK parsing"))
-                    .register(Metrics.globalRegistry)
-                    .record(() -> {
-                        try {
-                            return compiler.parse(new ReloadableJava17ParserInputFileObject(input1, ctx));
-                        } catch (IllegalStateException e) {
-                            if ("endPosTable already set".equals(e.getMessage())) {
-                                throw new IllegalStateException(
-                                        "Call reset() on JavaParser before parsing another set of source files that " +
-                                        "have some of the same fully qualified names. Source file [" +
-                                        input1.getPath() + "]\n[\n" + StringUtils.readFully(input1.getSource(ctx), getCharset(ctx)) + "\n]", e);
-                            }
-                            throw e;
-                        }
-                    }));
-        }
+        acceptedInputs(sourceFiles).forEach(input1 -> {
+            try {
+                JCTree.JCCompilationUnit jcCompilationUnit = compiler.parse(new ReloadableJava17ParserInputFileObject(input1, ctx));
+                cus.put(input1, jcCompilationUnit);
+            } catch (IllegalStateException e) {
+                if ("endPosTable already set".equals(e.getMessage())) {
+                    throw new IllegalStateException(
+                            "Call reset() on JavaParser before parsing another set of source files that " +
+                            "have some of the same fully qualified names. Source file [" +
+                            input1.getPath() + "]\n[\n" + StringUtils.readFully(input1.getSource(ctx), getCharset(ctx)) + "\n]", e);
+                }
+                throw e;
+            }
+        });
 
         try {
             initModules(cus.values());
@@ -264,9 +214,10 @@ public class ReloadableJava17Parser implements JavaParser {
             }
 
             compiler.attribute(compiler.todo);
-        } catch (Throwable t) {
+        } catch (
+                Throwable t) {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
-            // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
+            // unhindered, but it sometimes cannot (so attribution is always best-effort in the presence of errors)
             ctx.getOnError().accept(new JavaParsingException("Failed symbol entering or attribution", t));
         }
         return cus;
@@ -285,27 +236,21 @@ public class ReloadableJava17Parser implements JavaParser {
         return this;
     }
 
+    @Override
+    public JavaParser reset(Collection<URI> uris) {
+        if (!uris.isEmpty()) {
+            compilerLog.reset(uris);
+        }
+        pfm.flush();
+        Check.instance(context).newRound();
+        Annotate.instance(context).newRound();
+        Enter.instance(context).newRound();
+        Modules.instance(context).newRound();
+        return this;
+    }
+
     public void setClasspath(Collection<Path> classpath) {
         this.classpath = classpath;
-    }
-
-    @Override
-    public void setSourceSet(String sourceSet) {
-        this.sourceSetProvenance = null;
-        this.sourceSet = sourceSet;
-    }
-
-    @Override
-    public JavaSourceSet getSourceSet(ExecutionContext ctx) {
-        if (sourceSetProvenance == null) {
-            if (ctx.getMessage(SKIP_SOURCE_SET_TYPE_GENERATION, false)) {
-                sourceSetProvenance = new JavaSourceSet(Tree.randomId(), sourceSet, emptyList());
-            } else {
-                sourceSetProvenance = JavaSourceSet.build(sourceSet, classpath == null ? emptyList() : classpath,
-                        typeCache, false);
-            }
-        }
-        return sourceSetProvenance;
     }
 
     private void compileDependencies() {
@@ -346,33 +291,9 @@ public class ReloadableJava17Parser implements JavaParser {
         public void reset() {
             sourceMap.clear();
         }
-    }
 
-    private static class TimedTodo extends Todo {
-        @Nullable
-        private Timer.Sample sample;
-
-        private TimedTodo(Context context) {
-            super(context);
-        }
-
-        @Override
-        public boolean isEmpty() {
-            if (sample != null) {
-                sample.stop(MetricsHelper.successTags(
-                                Timer.builder("rewrite.parse")
-                                        .description("The time spent by the JDK in type attributing the source file")
-                                        .tag("file.type", "Java")
-                                        .tag("step", "(2) Type attribution"))
-                        .register(Metrics.globalRegistry));
-            }
-            return super.isEmpty();
-        }
-
-        @Override
-        public Env<AttrContext> remove() {
-            this.sample = Timer.start();
-            return super.remove();
+        public void reset(Collection<URI> uris) {
+            sourceMap.keySet().removeIf(f -> uris.contains(f.toUri()));
         }
     }
 
@@ -408,8 +329,8 @@ public class ReloadableJava17Parser implements JavaParser {
         public Iterable<JavaFileObject> list(Location location, String packageName, Set<JavaFileObject.Kind> kinds, boolean recurse) throws IOException {
             if (StandardLocation.CLASS_PATH.equals(location)) {
                 Iterable<JavaFileObject> listed = super.list(location, packageName, kinds, recurse);
-                return Stream.concat(
-                        classByteClasspath.stream()
+                return classByteClasspath.isEmpty() ? listed
+                        : Stream.concat(classByteClasspath.stream()
                                 .filter(jfo -> jfo.getPackage().equals(packageName)),
                         StreamSupport.stream(listed.spliterator(), false)
                 ).collect(toList());
@@ -438,7 +359,7 @@ public class ReloadableJava17Parser implements JavaParser {
                                 .replace('/', '.'));
                         nameRef.set(name.substring(name.lastIndexOf('/') + 1));
                     } else {
-                        pkgRef.set(name);
+                        pkgRef.set("");
                         nameRef.set(name);
                     }
                 }

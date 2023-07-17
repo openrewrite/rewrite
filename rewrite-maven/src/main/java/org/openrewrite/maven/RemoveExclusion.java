@@ -15,12 +15,12 @@
  */
 package org.openrewrite.maven;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.GroupArtifact;
@@ -38,46 +38,30 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 @EqualsAndHashCode(callSuper = true)
 public class RemoveExclusion extends Recipe {
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob.",
+            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
             example = "com.google.guava")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob.",
+            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
             example = "guava")
     String artifactId;
 
     @Option(displayName = "Exclusion Group",
-            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob.",
+            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
             example = "com.google.guava")
     String exclusionGroupId;
 
     @Option(displayName = "Exclusion Artifact",
-            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'. Supports glob.",
+            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`. Supports glob.",
             example = "guava")
     String exclusionArtifactId;
 
     @Option(displayName = "Only ineffective",
             description = "Default false. If enabled, matching exclusions will only be removed if they are ineffective (if the excluded dependency was not actually a transitive dependency of the target dependency).",
-            required = false,
-            example = "true")
+            required = false)
     @Nullable
     Boolean onlyIneffective;
-
-    @JsonCreator
-    public RemoveExclusion(String groupId, String artifactId, String exclusionGroupId, String exclusionArtifactId,
-            @Nullable Boolean onlyIneffective) {
-        this.groupId = groupId;
-        this.artifactId = artifactId;
-        this.exclusionGroupId = exclusionGroupId;
-        this.exclusionArtifactId = exclusionArtifactId;
-        this.onlyIneffective = onlyIneffective;
-    }
-
-    @Deprecated
-    public RemoveExclusion(String groupId, String artifactId, String exclusionGroupId, String exclusionArtifactId) {
-        this(groupId, artifactId, exclusionGroupId, exclusionArtifactId, null);
-    }
 
     @Override
     public String getDisplayName() {
@@ -90,7 +74,7 @@ public class RemoveExclusion extends Recipe {
     }
 
     @Override
-    public MavenVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext executionContext) {
@@ -107,7 +91,7 @@ public class RemoveExclusion extends Recipe {
                                             Xml.Tag exclusion = (Xml.Tag) child2;
                                             if (exclusion.getChildValue("groupId").map(g -> matchesGlob(g, exclusionGroupId)).orElse(false) &&
                                                 exclusion.getChildValue("artifactId").map(g -> matchesGlob(g, exclusionArtifactId)).orElse(false) &&
-                                                    !(isEffectiveExclusion(tag, groupArtifact(exclusion)) && onlyIneffective())) {
+                                                    !(isEffectiveExclusion(tag, groupArtifact(exclusion)) && Boolean.TRUE.equals(onlyIneffective))) {
                                                 return null;
                                             }
                                         }
@@ -150,9 +134,5 @@ public class RemoveExclusion extends Recipe {
                 return managedDependency != null && managedDependency.getRequested() != null;
             }
         };
-    }
-
-    private boolean onlyIneffective() {
-        return Boolean.TRUE.equals(onlyIneffective);
     }
 }

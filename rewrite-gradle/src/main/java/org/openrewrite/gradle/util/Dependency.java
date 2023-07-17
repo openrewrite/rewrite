@@ -18,6 +18,7 @@ package org.openrewrite.gradle.util;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.internal.lang.Nullable;
 
 @Value
 @With
@@ -25,8 +26,14 @@ import lombok.With;
 public class Dependency {
     String groupId;
     String artifactId;
+
+    @Nullable
     String version;
+
+    @Nullable
     String classifier;
+
+    @Nullable
     String ext;
 
     public String toStringNotation() {

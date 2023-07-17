@@ -237,10 +237,30 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           groovy(
             """
-            def closure = {}
-            closure()
-            closure.call()
-            """)
+              def closure = {}
+              closure()
+              closure.call()
+              """
+          )
+        );
+    }
+
+    @Test
+    void staticMethodInvocation() {
+        rewriteRun(
+          groovy(
+            """
+              class StringUtils {
+                static boolean isEmpty(String value) {
+                  return value == null || value.isEmpty()
+                }
+
+                static void main(String[] args) {
+                  isEmpty("")
+                }
+              }
+              """
+          )
         );
     }
 }

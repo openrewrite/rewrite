@@ -17,10 +17,7 @@ package org.openrewrite.java.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
@@ -55,18 +52,13 @@ public class FindFields extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesField<>(fullyQualifiedTypeName, fieldName);
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesField<>(fullyQualifiedTypeName, fieldName), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext executionContext) {
                 JavaType.Variable varType = fieldAccess.getName().getFieldType();
                 if (varType != null && TypeUtils.isOfClassType(varType.getOwner(), fullyQualifiedTypeName) &&
-                        varType.getName().equals(fieldName)) {
+                    varType.getName().equals(fieldName)) {
                     return SearchResult.found(fieldAccess);
                 }
                 return super.visitFieldAccess(fieldAccess, executionContext);
@@ -77,7 +69,7 @@ public class FindFields extends Recipe {
                 J.Identifier i = super.visitIdentifier(identifier, executionContext);
                 JavaType.Variable varType = identifier.getFieldType();
                 if (varType != null && TypeUtils.isOfClassType(varType.getOwner(), fullyQualifiedTypeName) &&
-                        varType.getName().equals(fieldName)) {
+                    varType.getName().equals(fieldName)) {
                     i = SearchResult.found(i);
                 }
                 return i;
@@ -88,12 +80,12 @@ public class FindFields extends Recipe {
                 J.MemberReference m = super.visitMemberReference(memberRef, ctx);
                 JavaType.Variable varType = memberRef.getVariableType();
                 if (varType != null && TypeUtils.isOfClassType(varType.getOwner(), fullyQualifiedTypeName) &&
-                        varType.getName().equals(fieldName)) {
+                    varType.getName().equals(fieldName)) {
                     m = m.withReference(SearchResult.found(m.getReference()));
                 }
                 return m;
             }
-        };
+        });
     }
 
     public static Set<J> find(J j, String fullyQualifiedTypeName, String fieldName) {
@@ -103,7 +95,7 @@ public class FindFields extends Recipe {
                 J.FieldAccess f = super.visitFieldAccess(fieldAccess, vs);
                 JavaType.Variable varType = fieldAccess.getName().getFieldType();
                 if (varType != null && TypeUtils.isOfClassType(varType.getOwner(), fullyQualifiedTypeName) &&
-                        varType.getName().equals(fieldName)) {
+                    varType.getName().equals(fieldName)) {
                     vs.add(f);
                 }
                 return f;
@@ -114,7 +106,7 @@ public class FindFields extends Recipe {
                 J.Identifier i = super.visitIdentifier(identifier, vs);
                 JavaType.Variable varType = identifier.getFieldType();
                 if (varType != null && TypeUtils.isOfClassType(varType.getOwner(), fullyQualifiedTypeName) &&
-                        varType.getName().equals(fieldName)) {
+                    varType.getName().equals(fieldName)) {
                     vs.add(i);
                 }
                 return i;
@@ -125,7 +117,7 @@ public class FindFields extends Recipe {
                 J.MemberReference m = super.visitMemberReference(memberRef, vs);
                 JavaType.Variable varType = memberRef.getVariableType();
                 if (varType != null && TypeUtils.isOfClassType(varType.getOwner(), fullyQualifiedTypeName) &&
-                        varType.getName().equals(fieldName)) {
+                    varType.getName().equals(fieldName)) {
                     vs.add(m);
                 }
                 return m;

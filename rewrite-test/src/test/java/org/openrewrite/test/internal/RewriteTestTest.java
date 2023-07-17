@@ -16,8 +16,6 @@
 package org.openrewrite.test.internal;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.EqualsAndHashCode;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -27,7 +25,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.openrewrite.test.SourceSpecs.text;
 
-public class RewriteTestTest implements RewriteTest {
+class RewriteTestTest implements RewriteTest {
 
     @Test
     void rejectRecipeWithNameOption() {

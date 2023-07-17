@@ -69,17 +69,11 @@ public class ChangeStaticFieldToMethod extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesField<>(oldClassName, oldFieldName);
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
-
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesField<>(oldClassName, oldFieldName), new JavaVisitor<ExecutionContext>() {
             @Override
             public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext context) {
-                if(TypeUtils.isOfClassType(classDecl.getType(), oldClassName)) {
+                if (TypeUtils.isOfClassType(classDecl.getType(), oldClassName)) {
                     // Don't modify the class that declares the static field being replaced
                     return classDecl;
                 }
@@ -89,8 +83,8 @@ public class ChangeStaticFieldToMethod extends Recipe {
             @Override
             public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 if (getCursor().firstEnclosing(J.Import.class) == null &&
-                        TypeUtils.isOfClassType(fieldAccess.getTarget().getType(), oldClassName) &&
-                        fieldAccess.getSimpleName().equals(oldFieldName)) {
+                    TypeUtils.isOfClassType(fieldAccess.getTarget().getType(), oldClassName) &&
+                    fieldAccess.getSimpleName().equals(oldFieldName)) {
                     return useNewMethod(fieldAccess);
                 }
                 return super.visitFieldAccess(fieldAccess, ctx);
@@ -100,14 +94,13 @@ public class ChangeStaticFieldToMethod extends Recipe {
             public J visitIdentifier(J.Identifier ident, ExecutionContext executionContext) {
                 JavaType.Variable varType = ident.getFieldType();
                 if (varType != null &&
-                        TypeUtils.isOfClassType(varType.getOwner(), oldClassName) &&
-                        varType.getName().equals(oldFieldName)) {
+                    TypeUtils.isOfClassType(varType.getOwner(), oldClassName) &&
+                    varType.getName().equals(oldFieldName)) {
                     return useNewMethod(ident);
                 }
                 return ident;
             }
 
-            @NonNull
             private J useNewMethod(TypeTree tree) {
                 String newClass = newClassName == null ? oldClassName : newClassName;
 
@@ -116,20 +109,19 @@ public class ChangeStaticFieldToMethod extends Recipe {
 
                 Cursor statementCursor = getCursor().dropParentUntil(Statement.class::isInstance);
                 Statement statement = statementCursor.getValue();
-                JavaTemplate template = makeNewMethod(newClass, statementCursor);
-                J.Block block = statement.withTemplate(template, statement.getCoordinates().replace());
+                J.Block block = makeNewMethod(newClass).apply(statementCursor, statement.getCoordinates().replace());
                 J.MethodInvocation method = block.getStatements().get(0).withPrefix(tree.getPrefix());
 
                 if (method.getMethodType() == null) {
                     throw new IllegalArgumentException("Error while changing a static field to a method. The generated template using a the new class ["
-                            + newClass + "] and the method [" + newMethodName + "] resulted in a null method type.");
+                                                       + newClass + "] and the method [" + newMethodName + "] resulted in a null method type.");
                 }
                 return tree.getType() == null ? method :
                         method.withMethodType(method.getMethodType().withReturnType(tree.getType()));
             }
 
             @NonNull
-            private JavaTemplate makeNewMethod(String newClass, Cursor statementCursor) {
+            private JavaTemplate makeNewMethod(String newClass) {
 
                 String packageName = StringUtils.substringBeforeLast(newClass, ".");
                 String simpleClassName = StringUtils.substringAfterLast(newClass, ".");
@@ -138,24 +130,23 @@ public class ChangeStaticFieldToMethod extends Recipe {
                 @Language("java") String methodStub;
                 if (newTarget == null) {
                     methodStub = "package " + packageName + ";" +
-                            " public class " + simpleClassName + " {" +
-                            " public static void " + newMethodName + "() { return null; }" +
-                            " }";
+                                 " public class " + simpleClassName + " {" +
+                                 " public static void " + newMethodName + "() { return null; }" +
+                                 " }";
                 } else {
                     methodStub = "package " + packageName + ";" +
-                            " public class Target {" +
-                            " public static void " + newMethodName + "() { return null; }" +
-                            " }" +
-                            " public class " + simpleClassName + " {public static Target " + newTarget + ";}";
+                                 " public class Target {" +
+                                 " public static void " + newMethodName + "() { return null; }" +
+                                 " }" +
+                                 " public class " + simpleClassName + " {public static Target " + newTarget + ";}";
                 }
                 return JavaTemplate
-                        .builder(() -> statementCursor, methodInvocationTemplate)
-                        .javaParser(() -> JavaParser.fromJavaVersion()
-                                .dependsOn(methodStub)
-                                .build())
+                        .builder(methodInvocationTemplate)
+                        .contextSensitive()
+                        .javaParser(JavaParser.fromJavaVersion().dependsOn(methodStub))
                         .imports(newClass)
                         .build();
             }
-        };
+        });
     }
 }

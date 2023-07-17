@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
@@ -45,52 +46,37 @@ public class Autodetect extends NamedStyles {
                 emptySet(), styles);
     }
 
-    public static Autodetect detect(List<? extends JavaSourceFile> cus) {
-        Builder builder = builder();
-        for (JavaSourceFile cu : cus) {
-            builder.phase1(cu);
-        }
-        for (JavaSourceFile cu : cus) {
-            builder.phase2(cu);
-        }
-        return builder.build();
+    public static Detector detector() {
+        return new Detector();
     }
 
-    public static Builder builder() {
-        return new Builder();
-    }
+    public static class Detector {
 
-    public static class Builder {
         private final IndentStatistics indentStatistics = new IndentStatistics();
-        private final ImportLayoutStatistics importLayoutStatistics = new ImportLayoutStatistics();
         private final SpacesStatistics spacesStatistics = new SpacesStatistics();
         private final WrappingAndBracesStatistics wrappingAndBracesStatistics = new WrappingAndBracesStatistics();
         private final GeneralFormatStatistics generalFormatStatistics = new GeneralFormatStatistics();
-        private final NavigableSet<String> importedPackages = new TreeSet<>();
 
-        /**
-         * Accumulate information about style one source file at a time.
-         * @param cu A JVM source file.
-         */
-        public void phase1(JavaSourceFile cu) {
-            for (J.Import anImport : cu.getImports()) {
-                importedPackages.add(anImport.getPackageName() + ".");
+        private final FindImportLayout findImportLayout = new FindImportLayout();
+        private final FindIndentJavaVisitor findIndent = new FindIndentJavaVisitor();
+        private final FindSpacesStyle findSpaces = new FindSpacesStyle();
+        private final FindWrappingAndBracesStyle findWrappingAndBraces = new FindWrappingAndBracesStyle();
+        private final FindLineFormatJavaVisitor findLineFormat = new FindLineFormatJavaVisitor();
+
+        public void sample(SourceFile cu) {
+            if(cu instanceof JavaSourceFile) {
+                findImportLayout.visitNonNull(cu, 0);
+                findIndent.visitNonNull(cu, indentStatistics);
+                findSpaces.visitNonNull(cu, spacesStatistics);
+                findWrappingAndBraces.visitNonNull(cu, wrappingAndBracesStatistics);
+                findLineFormat.visitNonNull(cu, generalFormatStatistics);
             }
-            importLayoutStatistics.mapBlockPatterns(importedPackages);
-        }
-
-        public void phase2(JavaSourceFile cu) {
-            new FindIndentJavaVisitor().visitNonNull(cu, indentStatistics);
-            new FindImportLayout().visitNonNull(cu, importLayoutStatistics);
-            new FindSpacesStyle().visitNonNull(cu, spacesStatistics);
-            new FindWrappingAndBracesStyle().visitNonNull(cu, wrappingAndBracesStatistics);
-            new FindLineFormatJavaVisitor().visitNonNull(cu, generalFormatStatistics);
         }
 
         public Autodetect build() {
             return new Autodetect(Tree.randomId(), Arrays.asList(
                     indentStatistics.getTabsAndIndentsStyle(),
-                    importLayoutStatistics.getImportLayoutStyle(),
+                    findImportLayout.aggregate().getImportLayoutStyle(),
                     spacesStatistics.getSpacesStyle(),
                     wrappingAndBracesStatistics.getWrappingAndBracesStyle(),
                     generalFormatStatistics.getFormatStyle()));
@@ -119,6 +105,7 @@ public class Autodetect extends NamedStyles {
             int indentDepth;
             int continuationDepth;
         }
+
         // depth -> count of whitespace char (4 spaces, 2 tabs, etc) -> count of occurrences
         Map<DepthCoordinate, Map<Integer, Long>> depthToSpaceIndentFrequencies = new ConcurrentHashMap<>();
 
@@ -127,15 +114,15 @@ public class Autodetect extends NamedStyles {
         }
 
         public void record(DepthCoordinate depth, int charCount) {
-            if(charCount <= 0) {
+            if (charCount <= 0) {
                 return;
             }
             depthToSpaceIndentFrequencies.compute(depth, (n, map) -> {
-                if(map == null) {
+                if (map == null) {
                     map = new ConcurrentHashMap<>();
                 }
                 map.compute(charCount, (m, count) -> {
-                    if(count == null) {
+                    if (count == null) {
                         count = 0L;
                     }
                     return count + 1;
@@ -144,26 +131,6 @@ public class Autodetect extends NamedStyles {
             });
         }
 
-        /**
-         * Determines the most frequent indentation. Assumes that indentation is a multiple of depth, which is true for
-         * normal indentation but not usually true for continuation indents.
-         */
-        public int commonIndent() {
-            Map<Integer, Long> map = depthToSpaceIndentFrequencies.entrySet().stream()
-                    .flatMap(it -> {
-                        int depth = it.getKey().getIndentDepth();
-                        return it.getValue().entrySet()
-                                .stream()
-                                .map(charsToOccurrence -> new AbstractMap.SimpleEntry<>(
-                                        charsToOccurrence.getKey() / depth,
-                                        charsToOccurrence.getValue()));
-                    })
-                    .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, Long::sum));
-
-            return map.entrySet().stream().max(Comparator.comparingLong(Map.Entry::getValue))
-                    .map(Map.Entry::getKey)
-                    .orElse(4); // IntelliJ default
-        }
 
         /**
          * Use the provided common indentation to interpret this IndentStatistic's contents as continuation indents.
@@ -178,7 +145,7 @@ public class Autodetect extends NamedStyles {
                         return it.getValue().entrySet()
                                 .stream()
                                 .map(charsToOccurrence -> new AbstractMap.SimpleEntry<>(
-                                            (charsToOccurrence.getKey() - (depth * commonIndent)) / continuationDepth,
+                                        (charsToOccurrence.getKey() - (depth * commonIndent)) / continuationDepth,
                                         charsToOccurrence.getValue()));
                     })
                     .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, Long::sum));
@@ -194,17 +161,18 @@ public class Autodetect extends NamedStyles {
         private final IndentStatistic spaceContinuationIndentFrequencies = new IndentStatistic();
         private final IndentStatistic tabIndentFrequencies = new IndentStatistic();
         private final IndentStatistic tabContinuationIndentFrequencies = new IndentStatistic();
-        private int linesWithSpaceIndents = 0;
-        private int linesWithTabIndents = 0;
-
+        private final IndentStatistic deltaSpaceIndentFrequencies = new IndentStatistic();
+        private long accumulateDepthCount = 0;
         private int multilineAlignedToFirstArgument = 0;
         private int multilineNotAlignedToFirstArgument = 0;
 
         private int depth = 0;
         private int continuationDepth = 1;
+
         public int getDepth() {
             return depth;
         }
+
         public int getContinuationDepth() {
             return continuationDepth;
         }
@@ -228,22 +196,57 @@ public class Autodetect extends NamedStyles {
             continuationDepth--;
         }
 
-        public boolean isIndentedWithSpaces() {
-            return linesWithSpaceIndents >= linesWithTabIndents;
-        }
-
         public TabsAndIndentsStyle getTabsAndIndentsStyle() {
-            boolean useTabs = !isIndentedWithSpaces();
+            /*
+             * For each line, if the code follows an indentation style exactly,
+             * Assume :
+             *      nw = space count in prefix
+             *      nt = tabs count in prefix
+             *      d = block depth
+             *      X = tabSize, which means space count per tab, unknown to be solved here.
+             * So theoretically the formula is:
+             *      d = nt + (nw / X)                                                                       (1)
+             *      X = nw / (d - nt)                                                                       (2)
+             * Because this is a linear equation, it also applies to the sum of multiple values, that is:
+             *          d1 + d2 + .. + dn = (nt1 + nt2 + .. + ntn) + (nw1 +nw2 + ... + nwn) / X             (3)
+             * So let's define:
+             *      D = d1 + d2 + .. + dn, which is the total count of depth.
+             *      NT = nt1 + nt2 + .. + ntn, which is the total count of tabs.
+             *      NW = nw1 +nw2 + ... + nwn, which is the total count of spaces.
+             * So
+             *      D = NT + (NW / X)                                                                       (4)
+             *      X = NW / (D - NT)                                                                       (5)
+             * the more data (more lines of code), the more accuracy.
+             *
+             * (1) How to determine the `useTabs` boolean value?
+             * From formula #4, D is composed of two parts, the Tabs part (NT) and the spaces part (NW / X).
+             * so `useTabs` should be determined by which part is bigger (> 50%).
+             * define:
+             *      PT = (NT / D), which means the percentage of tabs.
+             * So
+             *      useTabs = PT > 0.5
+             */
+            if (this.accumulateDepthCount == 0) {
+                return IntelliJ.tabsAndIndents();
+            }
 
-            IndentStatistic indentFrequencies = useTabs ? tabIndentFrequencies : spaceIndentFrequencies;
+            long d = this.accumulateDepthCount;                     // D in above comments
+            long nt = getTotalCharCount(tabIndentFrequencies);      // NT in above comments
+            double pt = nt / (double) d;                            // PT in above comments
+            boolean useTabs = pt >= 0.5;
+
+            // Calculate tabSize based on the frequency, pick up the biggest frequency group.
+            // Using frequency are less susceptible to outliers than means.
+            int moreFrequentTabSize = getBiggestGroupOfTabSize(deltaSpaceIndentFrequencies);
+            int tabSize = (moreFrequentTabSize == 0) ? 4 : moreFrequentTabSize;
+
             IndentStatistic continuationFrequencies = useTabs ? tabContinuationIndentFrequencies : spaceContinuationIndentFrequencies;
 
-            int indent = indentFrequencies.commonIndent();
-            int continuationIndent = continuationFrequencies.continuationIndent(indent);
+            int continuationIndent = continuationFrequencies.continuationIndent(tabSize);
             return new TabsAndIndentsStyle(
                     useTabs,
-                    indent,
-                    indent,
+                    tabSize,
+                    tabSize,
                     continuationIndent,
                     false,
                     new TabsAndIndentsStyle.MethodDeclarationParameters(
@@ -252,7 +255,41 @@ public class Autodetect extends NamedStyles {
         }
     }
 
+    private static long getTotalCharCount(IndentStatistic indentStatistic) {
+        return indentStatistic.depthToSpaceIndentFrequencies.entrySet()
+                .stream()
+                .flatMap(entry -> entry.getValue().entrySet().stream())
+                .mapToLong(entry -> entry.getKey() * entry.getValue())
+                .sum();
+    }
+
+    private static int getBiggestGroupOfTabSize(IndentStatistic deltaSpaces) {
+        Map<Integer, Integer> tabSizeToFrequencyMap = deltaSpaces.depthToSpaceIndentFrequencies.entrySet().stream()
+                .filter(entry -> entry.getKey().indentDepth != 0)
+                .flatMap(entry -> entry.getValue().entrySet().stream()
+                        .map(spaceCountToFrequency -> new AbstractMap.SimpleEntry<>(
+                                (int) Math.round(spaceCountToFrequency.getKey() / (double) entry.getKey().indentDepth),
+                                spaceCountToFrequency.getValue().intValue())))
+                .collect(Collectors.groupingBy(Map.Entry::getKey, Collectors.summingInt(Map.Entry::getValue)));
+
+        return tabSizeToFrequencyMap.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse(0);
+    }
+
     private static class FindLineFormatJavaVisitor extends JavaIsoVisitor<GeneralFormatStatistics> {
+
+        @Override
+        public @Nullable J visit(@Nullable Tree tree, GeneralFormatStatistics generalFormatStatistics) {
+            try {
+                super.visit(tree, generalFormatStatistics);
+            } catch (Exception e) {
+                // Suppress errors. A malformed element should not fail parsing overall.
+            }
+            return (J) tree;
+        }
+
         @Override
         public Space visitSpace(Space space, Space.Location loc, GeneralFormatStatistics stats) {
             String prefix = space.getWhitespace();
@@ -260,13 +297,11 @@ public class Autodetect extends NamedStyles {
 
             for (int i = 0; i < chars.length; i++) {
                 char c = chars[i];
-                if (c == '\n' || c == '\r') {
-                    if (c == '\n') {
-                        if (i == 0 || chars[i - 1] != '\r') {
-                            stats.linesWithLFNewLines++;
-                        } else {
-                            stats.linesWithCRLFNewLines++;
-                        }
+                if (c == '\n') {
+                    if (i == 0 || chars[i - 1] != '\r') {
+                        stats.linesWithLFNewLines++;
+                    } else {
+                        stats.linesWithCRLFNewLines++;
                     }
                 }
             }
@@ -275,6 +310,16 @@ public class Autodetect extends NamedStyles {
     }
 
     private static class FindIndentJavaVisitor extends JavaIsoVisitor<IndentStatistics> {
+
+        @Override
+        public @Nullable J visit(@Nullable Tree tree, IndentStatistics indentStatistics) {
+            try {
+                super.visit(tree, indentStatistics);
+            } catch (Exception e) {
+                // Suppress errors. A malformed element should not fail parsing overall.
+            }
+            return (J) tree;
+        }
 
         @Override
         public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration cd, IndentStatistics stats) {
@@ -322,8 +367,8 @@ public class Autodetect extends NamedStyles {
                     // Some statement types, like method invocations, are also expressions
                     // If an expression appears in a context where statements are expected, its indent is not a continuation
                     Set<Expression> statementExpressions = getCursor()
-                                .getMessage("STATEMENT_EXPRESSION", Collections.newSetFromMap(
-                                            new IdentityHashMap<>(block.getStatements().size())));
+                            .getMessage("STATEMENT_EXPRESSION", Collections.newSetFromMap(
+                                    new IdentityHashMap<>(block.getStatements().size())));
                     statementExpressions.add((Expression) s);
                     getCursor().putMessage("STATEMENT_EXPRESSION", statementExpressions);
                 }
@@ -353,6 +398,15 @@ public class Autodetect extends NamedStyles {
 
         @Override
         public Statement visitStatement(Statement statement, IndentStatistics stats) {
+            boolean isInParentheses = getCursor().dropParentUntil(
+                    p -> p instanceof J.Block ||
+                         p instanceof JContainer ||
+                         p instanceof SourceFile).getValue() instanceof JContainer;
+            if (isInParentheses) {
+                // ignore statements in parentheses.
+                return statement;
+            }
+
             countIndents(statement.getPrefix().getWhitespace(), false, stats);
             return statement;
         }
@@ -361,7 +415,7 @@ public class Autodetect extends NamedStyles {
         public Expression visitExpression(Expression expression, IndentStatistics stats) {
             super.visitExpression(expression, stats);
             Set<Expression> statementExpressions = getCursor().getNearestMessage("STATEMENT_EXPRESSION", emptySet());
-            if(statementExpressions.contains(expression)) {
+            if (statementExpressions.contains(expression)) {
                 return expression;
             }
             countIndents(expression.getPrefix().getWhitespace(), true, stats);
@@ -373,12 +427,12 @@ public class Autodetect extends NamedStyles {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation m, IndentStatistics stats) {
             Set<Expression> statementExpressions = getCursor().getNearestMessage("STATEMENT_EXPRESSION", emptySet());
-            if(statementExpressions.contains(m)) {
+            if (statementExpressions.contains(m)) {
                 visitStatement(m, stats);
             } else {
                 visitExpression(m, stats);
             }
-            if(m.getPadding().getSelect() != null) {
+            if (m.getPadding().getSelect() != null) {
                 countIndents(m.getPadding().getSelect().getAfter().getWhitespace(), true, stats);
             }
             visitContainer(m.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, stats);
@@ -421,20 +475,14 @@ public class Autodetect extends NamedStyles {
                     }
                 }
                 if (spaceIndent > 0 || tabIndent > 0) {
-                    if (!mixed) {
-                        if(isContinuation) {
-                            stats.spaceContinuationIndentFrequencies.record(depth, stats.getContinuationDepth(), spaceIndent);
-                            stats.tabContinuationIndentFrequencies.record(depth, stats.getContinuationDepth(), tabIndent);
-                        } else {
-                            stats.spaceIndentFrequencies.record(depth, 0, spaceIndent);
-                            stats.tabIndentFrequencies.record(depth, 0, tabIndent);
-                        }
-                    }
-
-                    if (spaceIndent > tabIndent) {
-                        stats.linesWithSpaceIndents++;
-                    } else {
-                        stats.linesWithTabIndents++;
+                    if (!isContinuation) {
+                        stats.spaceIndentFrequencies.record(depth, 0, spaceIndent);
+                        stats.tabIndentFrequencies.record(depth, 0, tabIndent);
+                        stats.deltaSpaceIndentFrequencies.record(depth - tabIndent, 0, spaceIndent);
+                        stats.accumulateDepthCount += depth;
+                    } else if (!mixed) {
+                        stats.spaceContinuationIndentFrequencies.record(depth, stats.getContinuationDepth(), spaceIndent);
+                        stats.tabContinuationIndentFrequencies.record(depth, stats.getContinuationDepth(), tabIndent);
                     }
                 }
             }
@@ -552,7 +600,7 @@ public class Autodetect extends NamedStyles {
                                         builder = builder.importStaticAllOthers();
                                         addNewLine = true;
                                         continue;
-                                    } else {
+                                    } else if (i > insertStaticAllOtherAtIndex) {
                                         if (countOfBlocksInStaticGroups.get(i) == 0) {
                                             continue;
                                         } else {
@@ -636,7 +684,7 @@ public class Autodetect extends NamedStyles {
                                 }
 
                                 if (!(i - 1 >= 0 && "javax.*".equals(nonStaticBlocks.get(i - 1).pattern) ||
-                                        i + 1 < nonStaticBlocks.size() && "javax.*".equals(nonStaticBlocks.get(i + 1).pattern))) {
+                                      i + 1 < nonStaticBlocks.size() && "javax.*".equals(nonStaticBlocks.get(i + 1).pattern))) {
                                     if (isJavaxBeforeJava()) {
                                         builder = builder.importPackage("javax.*");
                                         builder = builder.importPackage("java.*");
@@ -656,7 +704,7 @@ public class Autodetect extends NamedStyles {
                                 }
 
                                 if (!(i - 1 >= 0 && "java.*".equals(nonStaticBlocks.get(i - 1).pattern) ||
-                                        i + 1 < nonStaticBlocks.size() - 1 && "java.*".equals(nonStaticBlocks.get(i + 1).pattern))) {
+                                      i + 1 < nonStaticBlocks.size() - 1 && "java.*".equals(nonStaticBlocks.get(i + 1).pattern))) {
                                     if (isJavaxBeforeJava()) {
                                         builder = builder.importPackage("javax.*");
                                         builder = builder.importPackage("java.*");
@@ -806,51 +854,103 @@ public class Autodetect extends NamedStyles {
         }
     }
 
-    private static class FindImportLayout extends JavaIsoVisitor<ImportLayoutStatistics> {
-        @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ImportLayoutStatistics importLayoutStatistics) {
-            Set<ImportLayoutStatistics.Block> blocks = new LinkedHashSet<>();
+    @Value
+    private static class ImportAttributes {
+        boolean isStatic;
+        String packageName;
+        String prefix;
+    }
 
-            importLayoutStatistics.staticAtBotCount += (cu.getImports().size() > 0 &&
-                    cu.getImports().get(cu.getImports().size() - 1).isStatic()) ? 1 : 0;
-            importLayoutStatistics.staticAtTopCount += (cu.getImports().size() > 0 &&
-                    cu.getImports().get(0).isStatic()) ? 1 : 0;
+    private static class FindImportLayout extends JavaIsoVisitor<Integer> {
+        private final List<List<ImportAttributes>> importsBySourceFile = new ArrayList<>();
+        private final NavigableSet<String> importedPackages = new TreeSet<>();
+        private final ImportLayoutStatistics importLayoutStatistics = new ImportLayoutStatistics();
 
-            boolean staticBlock = false;
-            int blockStart = 0;
-            int i = 0;
-            String previousPkg = "";
-            int previousPkgCount = 1;
-            int javaPos = Integer.MAX_VALUE;
-            int javaxPos = Integer.MAX_VALUE;
-            Map<ImportLayoutStatistics.Block, Integer> referenceCount = new HashMap<>();
-            for (J.Import anImport : cu.getImports()) {
-                previousPkgCount += previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + ".")) ? 1 : 0;
-                boolean containsNewLine = anImport.getPrefix().getWhitespace().contains("\n\n") || anImport.getPrefix().getWhitespace().contains("\r\n\r\n");
-                if (containsNewLine ||
+        public ImportLayoutStatistics aggregate() {
+            // initializes importLayoutStatistics.pkgToBlockPattern which is used in the loop that follows
+            importLayoutStatistics.mapBlockPatterns(importedPackages);
+
+            for (List<ImportAttributes> imports : importsBySourceFile) {
+                Set<ImportLayoutStatistics.Block> blocks = new LinkedHashSet<>();
+
+                importLayoutStatistics.staticAtBotCount += (imports.size() > 0 &&
+                                                            imports.get(imports.size() - 1).isStatic()) ? 1 : 0;
+                importLayoutStatistics.staticAtTopCount += (imports.size() > 0 &&
+                                                            imports.get(0).isStatic()) ? 1 : 0;
+
+                boolean staticBlock = false;
+                int blockStart = 0;
+                int i = 0;
+                String previousPkg = "";
+                int previousPkgCount = 1;
+                int javaPos = Integer.MAX_VALUE;
+                int javaxPos = Integer.MAX_VALUE;
+                Map<ImportLayoutStatistics.Block, Integer> referenceCount = new HashMap<>();
+                for (ImportAttributes anImport : imports) {
+                    previousPkgCount += previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + ".")) ? 1 : 0;
+                    boolean containsNewLine = anImport.getPrefix().contains("\n\n") || anImport.getPrefix().contains("\r\n\r\n");
+                    if (containsNewLine ||
                         i > 0 && importLayoutStatistics.pkgToBlockPattern.containsKey(anImport.getPackageName() + ".") &&
-                                !previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + "."))) {
-                    if (i - blockStart > 0) {
-                        ImportLayoutStatistics.Block block = new ImportLayoutStatistics.Block(
-                                staticBlock ?
-                                        ImportLayoutStatistics.BlockType.ImportStatic :
-                                        ImportLayoutStatistics.BlockType.Import,
-                                previousPkg,
-                                containsNewLine);
+                        !previousPkg.equals(importLayoutStatistics.pkgToBlockPattern.get(anImport.getPackageName() + "."))) {
+                        if (i - blockStart > 0) {
+                            ImportLayoutStatistics.Block block = new ImportLayoutStatistics.Block(
+                                    staticBlock ?
+                                            ImportLayoutStatistics.BlockType.ImportStatic :
+                                            ImportLayoutStatistics.BlockType.Import,
+                                    previousPkg,
+                                    containsNewLine);
 
-                        javaPos = "java.*".equals(block.pattern) && javaPos > blockStart ? blockStart : javaPos;
-                        javaxPos = "javax.*".equals(block.pattern) && javaxPos > blockStart ? blockStart : javaxPos;
+                            javaPos = "java.*".equals(block.pattern) && javaPos > blockStart ? blockStart : javaPos;
+                            javaxPos = "javax.*".equals(block.pattern) && javaxPos > blockStart ? blockStart : javaxPos;
 
-                        if (blocks.contains(block) && previousPkgCount > referenceCount.get(block)) {
-                            blocks.remove(block);
+                            if (blocks.contains(block) && previousPkgCount > referenceCount.get(block)) {
+                                blocks.remove(block);
+                            }
+                            blocks.add(block);
+                            referenceCount.put(block, previousPkgCount + 1);
+                            previousPkgCount = 1;
                         }
-                        blocks.add(block);
-                        referenceCount.put(block, previousPkgCount + 1);
-                        previousPkgCount = 1;
+
+                        blockStart = i;
                     }
 
-                    blockStart = i;
+                    staticBlock = anImport.isStatic();
+                    i++;
+                    previousPkg = importLayoutStatistics.pkgToBlockPattern.getOrDefault(anImport.getPackageName() + ".", "");
                 }
+
+                if (i - blockStart > 0) {
+                    ImportLayoutStatistics.Block block = new ImportLayoutStatistics.Block(
+                            staticBlock ?
+                                    ImportLayoutStatistics.BlockType.ImportStatic :
+                                    ImportLayoutStatistics.BlockType.Import,
+                            previousPkg,
+                            false);
+
+                    if (blocks.contains(block) && previousPkgCount > referenceCount.get(block)) {
+                        blocks.remove(block);
+                    }
+
+                    javaPos = "java.*".equals(block.pattern) ? blockStart : javaPos;
+                    javaxPos = "javax.*".equals(block.pattern) ? blockStart : javaxPos;
+                    blocks.add(block);
+                }
+
+                if (javaPos != Integer.MAX_VALUE && javaxPos != Integer.MAX_VALUE) {
+                    importLayoutStatistics.javaBeforeJavaxCount += javaPos < javaxPos ? 1 : 0;
+                    importLayoutStatistics.javaxBeforeJavaCount += javaxPos < javaPos ? 1 : 0;
+                }
+
+                importLayoutStatistics.blocksPerSourceFile.add(new ArrayList<>(blocks));
+            }
+
+            return importLayoutStatistics;
+        }
+
+        @Override
+        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Integer integer) {
+            for (J.Import anImport : cu.getImports()) {
+                importedPackages.add(anImport.getPackageName() + ".");
 
                 if (anImport.getQualid().getSimpleName().equals("*")) {
                     if (anImport.isStatic()) {
@@ -885,35 +985,11 @@ public class Autodetect extends NamedStyles {
                         );
                     }
                 }
-
-                staticBlock = anImport.isStatic();
-                i++;
-                previousPkg = importLayoutStatistics.pkgToBlockPattern.getOrDefault(anImport.getPackageName() + ".", "");
             }
 
-            if (i - blockStart > 0) {
-                ImportLayoutStatistics.Block block = new ImportLayoutStatistics.Block(
-                        staticBlock ?
-                                ImportLayoutStatistics.BlockType.ImportStatic :
-                                ImportLayoutStatistics.BlockType.Import,
-                        previousPkg,
-                        false);
-
-                if (blocks.contains(block) && previousPkgCount > referenceCount.get(block)) {
-                    blocks.remove(block);
-                }
-
-                javaPos = "java.*".equals(block.pattern) ? blockStart : javaPos;
-                javaxPos = "javax.*".equals(block.pattern) ? blockStart : javaxPos;
-                blocks.add(block);
-            }
-
-            if (javaPos != Integer.MAX_VALUE && javaxPos != Integer.MAX_VALUE) {
-                importLayoutStatistics.javaBeforeJavaxCount += javaPos < javaxPos ? 1 : 0;
-                importLayoutStatistics.javaxBeforeJavaCount += javaxPos < javaPos ? 1 : 0;
-            }
-
-            importLayoutStatistics.blocksPerSourceFile.add(new ArrayList<>(blocks));
+            importsBySourceFile.add(cu.getImports().stream()
+                    .map(it -> new ImportAttributes(it.isStatic(), it.getPackageName(), it.getPrefix().getWhitespace()))
+                    .collect(Collectors.toList()));
 
             return cu;
         }
@@ -989,6 +1065,17 @@ public class Autodetect extends NamedStyles {
     }
 
     private static class FindSpacesStyle extends JavaIsoVisitor<SpacesStatistics> {
+
+        @Override
+        public @Nullable J visit(@Nullable Tree tree, SpacesStatistics spacesStatistics) {
+            try {
+                super.visit(tree, spacesStatistics);
+            } catch (Exception e) {
+                // Suppress errors. A malformed element should not fail parsing overall.
+            }
+            return (J) tree;
+        }
+
         @Override
         public J.TypeCast visitTypeCast(J.TypeCast typeCast, SpacesStatistics stats) {
             stats.afterTypeCast += hasSpace(typeCast.getExpression().getPrefix());
@@ -1031,8 +1118,35 @@ public class Autodetect extends NamedStyles {
         }
 
         @Override
+        public J.Lambda visitLambda(J.Lambda lambda, SpacesStatistics stats) {
+            List<J> parameters = lambda.getParameters().getParameters();
+            if (parameters.size() > 1) {
+                List<JRightPadded<J>> paddedParameters = lambda.getParameters().getPadding().getParams();
+                for (int i = 0; i < paddedParameters.size() - 1; i++) {
+                    stats.beforeComma += hasSpace(paddedParameters.get(i).getAfter());
+                }
+                for (int i = 1; i < parameters.size(); i++) {
+                    stats.afterComma += hasSpace(parameters.get(i).getPrefix());
+                }
+            }
+
+            return super.visitLambda(lambda, stats);
+        }
+
+        @Override
         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, SpacesStatistics stats) {
             stats.beforeMethodDeclaration += hasSpace(method.getPadding().getParameters().getBefore());
+
+            List<Statement> parameters = method.getParameters();
+            if (parameters.size() > 1) {
+                List<JRightPadded<Statement>> paddedParameters = method.getPadding().getParameters().getPadding().getElements();
+                for (int i = 0; i < paddedParameters.size() - 1; i++) {
+                    stats.beforeComma += hasSpace(paddedParameters.get(i).getAfter());
+                }
+                for (int i = 1; i < parameters.size(); i++) {
+                    stats.afterComma += hasSpace(parameters.get(i).getPrefix());
+                }
+            }
             return super.visitMethodDeclaration(method, stats);
         }
 
@@ -1040,14 +1154,17 @@ public class Autodetect extends NamedStyles {
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, SpacesStatistics stats) {
             stats.beforeMethodCall += hasSpace(method.getPadding().getArguments().getBefore());
 
-            if (method.getArguments().size() > 1) {
-                stats.withinMethodCallParentheses += hasSpace(method.getPadding().getArguments().getPadding().getElements().get(0).getElement().getPrefix());
-                stats.withinMethodCallParentheses += hasSpace(method.getPadding().getArguments().getPadding().getElements().get(method.getArguments().size() - 1).getAfter());
-                for (JRightPadded<Expression> elem : method.getPadding().getArguments().getPadding().getElements()) {
+            List<Expression> arguments = method.getArguments();
+            if (arguments.size() > 1) {
+                List<JRightPadded<Expression>> paddedArguments = method.getPadding().getArguments().getPadding().getElements();
+                stats.withinMethodCallParentheses += hasSpace(paddedArguments.get(0).getElement().getPrefix());
+                stats.withinMethodCallParentheses += hasSpace(paddedArguments.get(method.getArguments().size() - 1).getAfter());
+                for (int i = 0; i < paddedArguments.size() - 1; i++) {
+                    JRightPadded<Expression> elem = paddedArguments.get(i);
                     stats.beforeComma += hasSpace(elem.getAfter());
                 }
-                for (Expression e : method.getArguments()) {
-                    stats.afterComma += hasSpace(e.getPrefix());
+                for (int i = 1; i < arguments.size(); i++) {
+                    stats.afterComma += hasSpace(arguments.get(i).getPrefix());
                 }
             }
             return super.visitMethodInvocation(method, stats);
@@ -1056,15 +1173,37 @@ public class Autodetect extends NamedStyles {
         @Override
         public J.NewArray visitNewArray(J.NewArray newArray, SpacesStatistics stats) {
             JContainer<Expression> initializer = newArray.getPadding().getInitializer();
-            if (newArray.getInitializer() != null && initializer != null && initializer.getElements().size() > 0) {
-                for (JRightPadded<Expression> elem : initializer.getPadding().getElements()) {
-                    stats.beforeComma += hasSpace(elem.getAfter());
+            List<Expression> elements = newArray.getInitializer();
+            if (elements != null && initializer != null && elements.size() > 1) {
+                List<JRightPadded<Expression>> paddedElements = initializer.getPadding().getElements();
+                for (int i = 0; i < paddedElements.size() - 1; i++) {
+                    stats.beforeComma += hasSpace(paddedElements.get(i).getAfter());
                 }
-                for (Expression e : newArray.getInitializer()) {
-                    stats.afterComma += hasSpace(e.getPrefix());
+                for (int i = 1; i < elements.size(); i++) {
+                    stats.afterComma += hasSpace(elements.get(i).getPrefix());
                 }
             }
             return super.visitNewArray(newArray, stats);
+        }
+
+        @Override
+        public J.NewClass visitNewClass(J.NewClass newClass, SpacesStatistics stats) {
+            stats.beforeMethodCall += hasSpace(newClass.getPadding().getArguments().getBefore());
+
+            List<Expression> arguments = newClass.getArguments();
+            if (arguments.size() > 1) {
+                List<JRightPadded<Expression>> paddedArguments = newClass.getPadding().getArguments().getPadding().getElements();
+                stats.withinMethodCallParentheses += hasSpace(paddedArguments.get(0).getElement().getPrefix());
+                stats.withinMethodCallParentheses += hasSpace(paddedArguments.get(newClass.getArguments().size() - 1).getAfter());
+                for (int i = 0; i < paddedArguments.size() - 1; i++) {
+                    JRightPadded<Expression> elem = paddedArguments.get(i);
+                    stats.beforeComma += hasSpace(elem.getAfter());
+                }
+                for (int i = 1; i < arguments.size(); i++) {
+                    stats.afterComma += hasSpace(arguments.get(i).getPrefix());
+                }
+            }
+            return super.visitNewClass(newClass, stats);
         }
 
         @Override
@@ -1112,9 +1251,9 @@ public class Autodetect extends NamedStyles {
 
     private static class FindWrappingAndBracesStyle extends JavaIsoVisitor<WrappingAndBracesStatistics> {
         @Override
-        public J.If.Else visitElse(J.If.Else elze, WrappingAndBracesStatistics stats) {
-            stats.elseOnNewLine += hasNewLine(elze.getPrefix());
-            return super.visitElse(elze, stats);
+        public J.If.Else visitElse(J.If.Else else_, WrappingAndBracesStatistics stats) {
+            stats.elseOnNewLine += hasNewLine(else_.getPrefix());
+            return super.visitElse(else_, stats);
         }
 
         private int hasNewLine(Space space) {

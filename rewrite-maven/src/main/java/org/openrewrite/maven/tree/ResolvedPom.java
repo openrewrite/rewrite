@@ -231,18 +231,21 @@ public class ResolvedPom {
             case "pom.groupId":
                 return requested.getGroupId();
             case "project.parent.groupId":
+            case "parent.groupId":
                 return requested.getParent() != null ? requested.getParent().getGroupId() : null;
             case "artifactId":
             case "project.artifactId":
             case "pom.artifactId":
                 return requested.getArtifactId(); // cannot be inherited from parent
             case "project.parent.artifactId":
+            case "parent.artifactId":
                 return requested.getParent() == null ? null : requested.getParent().getArtifactId();
             case "version":
             case "project.version":
             case "pom.version":
                 return requested.getVersion();
             case "project.parent.version":
+            case "parent.version":
                 return requested.getParent() != null ? requested.getParent().getVersion() : null;
         }
 
@@ -350,8 +353,7 @@ public class ResolvedPom {
             mergeRepositories(pom.getRepositories());
 
             if (pom.getParent() != null) {
-                Pom parentPom = downloader.download(getValues(pom.getParent().getGav()),
-                        pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
+                Pom parentPom = resolveParentPom(pom);
 
                 for (Pom ancestor : pomAncestry) {
                     if (ancestor.getGav().equals(parentPom.getGav())) {
@@ -379,8 +381,7 @@ public class ResolvedPom {
             mergeRequestedDependencies(pom.getDependencies());
 
             if (pom.getParent() != null) {
-                Pom parentPom = downloader.download(getValues(pom.getParent().getGav()),
-                        pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
+                Pom parentPom = resolveParentPom(pom);
 
                 MavenExecutionContextView.view(ctx)
                         .getResolutionListener()
@@ -396,6 +397,24 @@ public class ResolvedPom {
                 pomAncestry.add(0, parentPom);
                 resolveParentDependenciesRecursively(pomAncestry);
             }
+        }
+
+        private Pom resolveParentPom(Pom pom) throws MavenDownloadingException {
+            @SuppressWarnings("DataFlowIssue") GroupArtifactVersion gav = getValues(pom.getParent().getGav());
+            if (gav.getVersion() == null) {
+                throw new MavenParsingException("Parent version must always specify a version " + gav);
+            }
+
+            VersionRequirement newRequirement = VersionRequirement.fromVersion(gav.getVersion(), 0);
+            GroupArtifact ga = new GroupArtifact(gav.getGroupId(), gav.getArtifactId());
+            String newRequiredVersion = newRequirement.resolve(ga, downloader, getRepositories());
+            if (newRequiredVersion == null) {
+                throw new MavenParsingException("Could not resolve version for [" + ga + "] matching version requirements " + newRequirement);
+            }
+            gav = gav.withVersion(newRequiredVersion);
+
+            return downloader.download(gav,
+                    pom.getParent().getRelativePath(), ResolvedPom.this, repositories);
         }
 
         private void mergeRequestedDependencies(List<Dependency> incomingRequestedDependencies) {
@@ -484,7 +503,7 @@ public class ResolvedPom {
                                 .dependencyManagement(defined.withGav(getValues(defined.getGav())), pom);
                         dependencyManagement.add(new ResolvedManagedDependency(
                                 getValues(defined.getGav()),
-                                Scope.fromName(getValue(defined.getScope())),
+                                defined.getScope() == null ? null : Scope.fromName(getValue(defined.getScope())),
                                 getValue(defined.getType()),
                                 getValue(defined.getClassifier()),
                                 ListUtils.map(defined.getExclusions(), (UnaryOperator<GroupArtifact>) ResolvedPom.this::getValues),
@@ -609,7 +628,11 @@ public class ResolvedPom {
                         includedBy.getDependencies().add(resolved);
                     }
 
-                    dependencies.add(resolved);
+                    if (dd.getScope().transitiveOf(scope) == scope) {
+                        dependencies.add(resolved);
+                    } else {
+                        continue;
+                    }
 
                     nextDependency:
                     for (Dependency d2 : resolvedPom.getRequestedDependencies()) {
@@ -679,13 +702,10 @@ public class ResolvedPom {
         //noinspection ConstantConditions
         Scope scopeInThisProject = getManagedScope(getValue(d2.getGroupId()), getValue(d2.getArtifactId()), getValue(d2.getType()),
                 getValue(d2.getClassifier()));
-        if (scopeInThisProject == null) {
-            scopeInThisProject = Scope.Compile;
-        }
         // project POM's dependency management overrules the containingPom's dependencyManagement
         // IFF the dependency is in the runtime classpath of the containingPom;
         // if the dependency was not already in the classpath of the containingPom, then project POM cannot override scope / "promote" it into the classpath
-        return scopeInContainingPom.isInClasspathOf(scopeInThisProject) ? scopeInThisProject : scopeInContainingPom;
+        return scopeInThisProject == null ? scopeInContainingPom : (scopeInContainingPom.isInClasspathOf(scopeInThisProject) ? scopeInThisProject : scopeInContainingPom);
     }
 
     private Dependency getValues(Dependency dep, int depth) {

@@ -15,13 +15,20 @@
  */
 package org.openrewrite.java;
 
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ScanResult;
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.SourceFile;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
+import java.io.IOException;
 import java.nio.file.Path;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -83,5 +90,44 @@ class JavaParserTest implements RewriteTest {
         JavaParserExecutionContextView ctx = JavaParserExecutionContextView.view(new InMemoryExecutionContext());
         ctx.setParserClasspathDownloadTarget(temp.toFile());
         assertThat(JavaParser.dependenciesFromResources(ctx, "guava-31.0-jre")).isNotEmpty();
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3222")
+    void parseFromByteArray() {
+        try (ScanResult scan = new ClassGraph().scan()) {
+            byte[][] classes = scan.getResourcesMatchingWildcard("javaparser-byte-array-tests/**.class").stream()
+              .map(it -> {
+                  try {
+                      return it.read().array();
+                  } catch (IOException e) {
+                      throw new RuntimeException(e);
+                  }
+              })
+              .toArray(byte[][]::new);
+
+            JavaParser parser = JavaParser.fromJavaVersion()
+              .classpath(classes)
+              .build();
+
+            @Language("java")
+            String source = """
+              import example.InterfaceA;
+              public class User implements InterfaceA, InterfaceB {
+                @Override
+                public void methodA() {}
+              
+                @Override
+               public void methodB() {}
+              }
+              """;
+            Stream<SourceFile> compilationUnits = parser.parse(new InMemoryExecutionContext(Throwable::printStackTrace), source);
+            assertThat(compilationUnits.map(J.CompilationUnit.class::cast)).singleElement()
+              .satisfies(cu -> assertThat(cu.getClasses()).singleElement()
+                .satisfies(cd -> assertThat(cd.getImplements()).satisfiesExactly(
+                  i -> assertThat(i.getType()).hasToString("example.InterfaceA"),
+                  i -> assertThat(i.getType()).hasToString("InterfaceB")
+                )));
+        }
     }
 }
