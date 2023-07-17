@@ -758,7 +758,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         FirElement receiver = functionCall.getExplicitReceiver() != null ? functionCall.getExplicitReceiver() : functionCall.getDispatchReceiver();
         Expression left = convertToExpression(receiver, ctx);
 
-        Space opPrefix = whitespace();
+        Space opPrefix = sourceBefore(comparisonExpression.getOperation().getOperator());
         J.Binary.Type op = mapOperation(comparisonExpression.getOperation());
 
         if (functionCall.getArgumentList().getArguments().size() != 1) {
@@ -4567,27 +4567,21 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J.Binary.Type op = null;
         switch (firOp) {
             case EQ:
-                skip("=");
                 op = J.Binary.Type.Equal;
                 break;
             case NOT_EQ:
-                skip("!=");
                 op = J.Binary.Type.NotEqual;
                 break;
             case GT:
-                skip(">");
                 op = J.Binary.Type.GreaterThan;
                 break;
             case GT_EQ:
-                skip(">=");
                 op = J.Binary.Type.GreaterThanOrEqual;
                 break;
             case LT:
-                skip("<");
                 op = J.Binary.Type.LessThan;
                 break;
             case LT_EQ:
-                skip("<=");
                 op = J.Binary.Type.LessThanOrEqual;
                 break;
             default:

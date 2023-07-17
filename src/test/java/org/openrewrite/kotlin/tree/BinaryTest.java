@@ -23,6 +23,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
+@SuppressWarnings({"KotlinConstantConditions", "ControlFlowWithEmptyBody"})
 class BinaryTest implements RewriteTest {
 
     @Test
@@ -273,6 +274,24 @@ class BinaryTest implements RewriteTest {
                 val b = n % 2 == 0
               }
               """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "1 == 1 == true",
+      "1==1==true"
+    })
+    void multipleEquals(String arg) {
+        rewriteRun(
+          kotlin(
+            """
+              fun method ( ) {
+                  if ( %s ) {
+                  }
+              }
+              """.formatted(arg)
           )
         );
     }
