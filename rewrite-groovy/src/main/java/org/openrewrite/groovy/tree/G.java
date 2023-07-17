@@ -179,7 +179,7 @@ public interface G extends J {
 
         @Override
         public <P> J acceptGroovy(GroovyVisitor<P> v, P p) {
-            return v.visitJavaSourceFile(this, p);
+            return v.visitCompilationUnit(this, p);
         }
 
         @Override
@@ -637,6 +637,7 @@ public interface G extends J {
             UUID id;
             Markers markers;
             J tree;
+            Space after;
             boolean enclosedInBraces;
 
             @Override
@@ -648,6 +649,10 @@ public interface G extends J {
             @Override
             public Space getPrefix() {
                 return Space.EMPTY;
+            }
+
+            public Space getAfter() {
+                return after == null ? Space.EMPTY : after;
             }
 
             @Override

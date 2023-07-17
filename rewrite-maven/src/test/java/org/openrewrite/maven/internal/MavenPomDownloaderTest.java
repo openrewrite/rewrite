@@ -21,6 +21,7 @@ import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -28,6 +29,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.MavenParser;
@@ -49,6 +51,7 @@ import static java.util.Collections.emptyMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SuppressWarnings({"NullableProblems", "HttpUrlsUsage"})
 class MavenPomDownloaderTest {
@@ -83,6 +86,18 @@ class MavenPomDownloaderTest {
 
         assertThat(oss).isNotNull();
         assertThat(oss.getUri()).isEqualTo("https://oss.sonatype.org/content/repositories/snapshots");
+    }
+
+    @ParameterizedTest
+    @Issue("https://github.com/openrewrite/rewrite/issues/3141")
+    @ValueSource(strings = {"http://0.0.0.0", "https://0.0.0.0", "0.0.0.0:443"})
+    void skipBlockedRepository(String url) {
+        var downloader = new MavenPomDownloader(emptyMap(), ctx);
+        MavenRepository oss = downloader.normalizeRepository(
+          MavenRepository.builder().id("myRepo").uri(url).build(),
+          null, null);
+
+        assertThat(oss).isNull();
     }
 
     @ParameterizedTest
@@ -135,6 +150,42 @@ class MavenPomDownloaderTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3152")
+    void useSnapshotTimestampVersion() {
+        var downloader = new MavenPomDownloader(emptyMap(), ctx);
+        var gav = new GroupArtifactVersion("fred", "fred", "2020.0.2-20210127.131051-2");
+        try (MockWebServer mockRepo = new MockWebServer()) {
+            mockRepo.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest recordedRequest) {
+                    return !recordedRequest.getPath().endsWith("fred/fred/2020.0.2-SNAPSHOT/fred-2020.0.2-20210127.131051-2.pom") ?
+                      new MockResponse().setResponseCode(404).setBody("") :
+                      new MockResponse().setResponseCode(200).setBody(
+                        //language=xml
+                        """
+                          <project>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dataflow-build</artifactId>
+                              <version>2.10.0-SNAPSHOT</version>
+                          </project>
+                          """);
+                }
+            });
+            mockRepo.start();
+            var repositories = List.of(MavenRepository.builder()
+              .id("id")
+              .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+              .username("user")
+              .password("pass")
+              .build());
+
+            assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
     void usesAnonymousRequestIfRepositoryRejectsCredentials() {
         var downloader = new MavenPomDownloader(emptyMap(), ctx);
         var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
@@ -147,12 +198,12 @@ class MavenPomDownloaderTest {
                       new MockResponse().setResponseCode(200).setBody(
                         //language=xml
                         """
-                        <project>
-                            <groupId>org.springframework.cloud</groupId>
-                            <artifactId>spring-cloud-dataflow-build</artifactId>
-                            <version>2.10.0-SNAPSHOT</version>
-                        </project>
-                        """);
+                          <project>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dataflow-build</artifactId>
+                              <version>2.10.0-SNAPSHOT</version>
+                          </project>
+                          """);
                 }
             });
             mockRepo.start();
@@ -181,6 +232,43 @@ class MavenPomDownloaderTest {
                       new MockResponse().setResponseCode(200).setBody(
                         //language=xml
                         """
+                          <project>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dataflow-build</artifactId>
+                              <version>2.10.0-SNAPSHOT</version>
+                          </project>
+                          """) :
+                      new MockResponse().setResponseCode(401).setBody("");
+                }
+            });
+            mockRepo.start();
+            var repositories = List.of(MavenRepository.builder()
+              .id("id")
+              .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
+              .username("user")
+              .password("pass")
+              .build());
+
+            assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Test
+    @DisplayName("When username or password are environment properties that cannot be resolved, they should not be used")
+    @Issue("https://github.com/openrewrite/rewrite/issues/3142")
+    void doesNotUseAuthenticationIfCredentialsCannotBeResolved() {
+        var downloader = new MavenPomDownloader(emptyMap(), ctx);
+        var gav = new GroupArtifactVersion("fred", "fred", "1.0.0");
+        try (MockWebServer mockRepo = new MockWebServer()) {
+            mockRepo.setDispatcher(new Dispatcher() {
+                @Override
+                public MockResponse dispatch(RecordedRequest recordedRequest) {
+                    return recordedRequest.getHeaders().get("Authorization") == null ?
+                      new MockResponse().setResponseCode(200).setBody(
+                        //language=xml
+                        """
                         <project>
                             <groupId>org.springframework.cloud</groupId>
                             <artifactId>spring-cloud-dataflow-build</artifactId>
@@ -194,8 +282,8 @@ class MavenPomDownloaderTest {
             var repositories = List.of(MavenRepository.builder()
               .id("id")
               .uri("http://%s:%d/maven".formatted(mockRepo.getHostName(), mockRepo.getPort()))
-              .username("user")
-              .password("pass")
+              .username("${env.ARTIFACTORY_USERNAME}")
+              .password("${env.ARTIFACTORY_USERNAME}")
               .build());
 
             assertDoesNotThrow(() -> downloader.download(gav, null, null, repositories));
@@ -270,6 +358,7 @@ class MavenPomDownloaderTest {
             snapshotRepo.start();
 
             MavenParser.builder().build().parse(ctx,
+              //language=xml
               """
                     <project>
                         <modelVersion>4.0.0</modelVersion>
@@ -326,7 +415,7 @@ class MavenPomDownloaderTest {
           .knownToExist(true)
           .deriveMetadataIfMissing(true)
           .build();
-        MavenMetadata metaData  = new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext())
+        MavenMetadata metaData = new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext())
           .downloadMetadata(new GroupArtifact("fred", "fred"), null, List.of(repository));
         assertThat(metaData.getVersioning().getVersions()).hasSize(3).containsAll(Arrays.asList("1.0.0", "1.1.0", "2.0.0"));
     }

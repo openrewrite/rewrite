@@ -16,16 +16,18 @@
 package org.openrewrite.text;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
 class FindAndReplaceJavaTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void findAndReplaceJava() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace("Test", "Replaced", null, null)),
+          spec -> spec.recipe(new FindAndReplace("Test", "Replaced", null, null, null, null, null)),
           java(
             "class Test {}",
             "class Replaced {}"

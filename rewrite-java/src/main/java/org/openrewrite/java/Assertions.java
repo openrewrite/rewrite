@@ -21,6 +21,7 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.marker.JavaVersion;
@@ -29,10 +30,8 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.test.*;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.nio.file.Path;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -71,16 +70,21 @@ public class Assertions {
             List<FindMissingTypes.MissingTypeResult> missingTypeResults = FindMissingTypes.findMissingTypes(sf);
             missingTypeResults = missingTypeResults.stream()
                     .filter(missingType -> {
-                        if (typeValidation.identifiers() && missingType.getJ() instanceof J.Identifier) {
+                        if (missingType.getJ() instanceof J.Identifier) {
+                            return typeValidation.identifiers();
+                        } else if (missingType.getJ() instanceof J.ClassDeclaration) {
+                            return typeValidation.classDeclarations();
+                        } else if (missingType.getJ() instanceof J.MethodInvocation || missingType.getJ() instanceof J.MemberReference) {
+                            return typeValidation.methodInvocations();
+                        } else if (missingType.getJ() instanceof J.NewClass) {
+                            return typeValidation.constructorInvocations();
+                        } else if (missingType.getJ() instanceof J.MethodDeclaration) {
+                            return typeValidation.methodDeclarations();
+                        } else if (missingType.getJ() instanceof J.VariableDeclarations.NamedVariable) {
+                            return typeValidation.variableDeclarations();
+                        } else {
                             return true;
-                        } else if (typeValidation.classDeclarations() && missingType.getJ() instanceof J.ClassDeclaration) {
-                            return true;
-                        } else if (typeValidation.methodInvocations() && missingType.getJ() instanceof J.MethodInvocation) {
-                            return true;
-                        } else if (typeValidation.constructorInvocations() && missingType.getJ() instanceof J.NewClass) {
-                            return true;
-                        } else
-                            return typeValidation.methodDeclarations() && missingType.getJ() instanceof J.MethodDeclaration;
+                        }
                     })
                     .collect(Collectors.toList());
             if (!missingTypeResults.isEmpty()) {
@@ -124,10 +128,7 @@ public class Assertions {
 
     private static void acceptSpec(Consumer<SourceSpec<J.CompilationUnit>> spec, SourceSpec<J.CompilationUnit> java) {
         Consumer<J.CompilationUnit> userSuppliedAfterRecipe = java.getAfterRecipe();
-        java.afterRecipe(cu -> {
-            J.clearCaches();
-            userSuppliedAfterRecipe.accept(cu);
-        });
+        java.afterRecipe(userSuppliedAfterRecipe::accept);
         spec.accept(java);
     }
 
@@ -171,13 +172,21 @@ public class Assertions {
         return srcTestResources(spec -> sourceSet(spec, "test"), resources);
     }
 
+    public static SourceSpecs srcSmokeTestJava(Consumer<SourceSpec<SourceFile>> spec, SourceSpecs... javaSources) {
+        return dir("src/smokeTest/java", spec, javaSources);
+    }
+
+    public static SourceSpecs srcSmokeTestJava(SourceSpecs... javaSources) {
+        return srcSmokeTestJava(spec -> sourceSet(spec, "smokeTest"), javaSources);
+    }
+
     public static SourceSpec<?> version(SourceSpec<?> sourceSpec, int version) {
         return sourceSpec.markers(javaVersion(version));
     }
 
     public static SourceSpecs version(SourceSpecs sourceSpec, int version) {
         for (SourceSpec<?> spec : sourceSpec) {
-            spec.markers((javaVersion(version)));
+            spec.markers(javaVersion(version));
         }
         return sourceSpec;
     }
@@ -187,8 +196,32 @@ public class Assertions {
     }
 
     public static SourceSpec<?> sourceSet(SourceSpec<?> sourceSpec, String sourceSet) {
-        sourceSpec.setSourceSetName(sourceSet);
+        sourceSpec.markers(javaSourceSet(sourceSet));
         return sourceSpec;
+    }
+
+    public static UncheckedConsumer<List<SourceFile>> addTypesToSourceSet(String sourceSetName, List<String> extendsFrom, List<Path> classpath) {
+        return sourceFiles -> {
+            JavaSourceSet sourceSet = JavaSourceSet.build(sourceSetName, classpath, new JavaTypeCache(), false);
+
+            for (int i = 0; i < sourceFiles.size(); i++) {
+                SourceFile sourceFile = sourceFiles.get(i);
+                Optional<JavaSourceSet> maybeCurrentSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class);
+                if (!maybeCurrentSourceSet.isPresent() || !maybeCurrentSourceSet.get().getName().equals(sourceSetName)) {
+                    continue;
+                }
+
+                sourceFiles.set(i, sourceFile.withMarkers(sourceFile.getMarkers().computeByType(sourceSet, (original, updated) -> updated)));
+            }
+        };
+    }
+
+    public static UncheckedConsumer<List<SourceFile>> addTypesToSourceSet(String sourceSetName, List<String> extendsFrom) {
+        return addTypesToSourceSet(sourceSetName, extendsFrom, Collections.emptyList());
+    }
+
+    public static UncheckedConsumer<List<SourceFile>> addTypesToSourceSet(String sourceSetName) {
+        return addTypesToSourceSet(sourceSetName, Collections.emptyList(), Collections.emptyList());
     }
 
     public static JavaVersion javaVersion(int version) {

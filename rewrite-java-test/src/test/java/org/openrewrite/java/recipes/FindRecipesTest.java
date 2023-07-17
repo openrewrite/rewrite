@@ -16,6 +16,7 @@
 package org.openrewrite.java.recipes;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.table.RewriteRecipeSource;
 import org.openrewrite.test.RewriteTest;
@@ -25,6 +26,7 @@ import static org.openrewrite.java.Assertions.java;
 
 class FindRecipesTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void findRecipes() {
         rewriteRun(

@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -28,6 +29,7 @@ public class ChangeDependencyScopeTest implements RewriteTest {
         spec.recipe(new ChangeDependencyScope("com.google.guava", "guava", "test"));
     }
 
+    @DocumentExample
     @Test
     void noScopeToScope() {
         rewriteRun(

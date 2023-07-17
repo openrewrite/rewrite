@@ -31,7 +31,7 @@ public class IsLikelyNotTest extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Applicability.not(new IsLikelyTest().getVisitor());
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.not(new IsLikelyTest().getVisitor());
     }
 }

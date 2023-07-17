@@ -15,19 +15,20 @@
  */
 package org.openrewrite.java;
 
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ScanResult;
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.SourceFile;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
 
+import java.io.IOException;
 import java.nio.file.Path;
-import java.util.List;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
@@ -92,38 +93,41 @@ class JavaParserTest implements RewriteTest {
     }
 
     @Test
-    void resetParserTest() throws Exception {
-        JavaParser parser = JavaParser.fromJavaVersion().build();
-        String source = """
-          import java.util.List;
-          import java.util.ArrayList;
-          
-          class Something {
-              List<Integer> getList() {
-                  System.out.println("hello");
-                  return new ArrayList<>();
+    @Issue("https://github.com/openrewrite/rewrite/issues/3222")
+    void parseFromByteArray() {
+        try (ScanResult scan = new ClassGraph().scan()) {
+            byte[][] classes = scan.getResourcesMatchingWildcard("javaparser-byte-array-tests/**.class").stream()
+              .map(it -> {
+                  try {
+                      return it.read().array();
+                  } catch (IOException e) {
+                      throw new RuntimeException(e);
+                  }
+              })
+              .toArray(byte[][]::new);
+
+            JavaParser parser = JavaParser.fromJavaVersion()
+              .classpath(classes)
+              .build();
+
+            @Language("java")
+            String source = """
+              import example.InterfaceA;
+              public class User implements InterfaceA, InterfaceB {
+                @Override
+                public void methodA() {}
+              
+                @Override
+               public void methodB() {}
               }
-          }
-          """;
-        List<J.CompilationUnit> cus = parser.parse(source);
-
-        J.CompilationUnit c = cus.get(0);
-        J.MethodDeclaration m = c.getClasses().get(0).getBody().getStatements().stream().filter(J.MethodDeclaration.class::isInstance).map(J.MethodDeclaration.class::cast).findFirst().orElseThrow();
-        JavaType.Method methodType = m.getMethodType();
-        assertThat(TypeUtils.asFullyQualified(methodType.getReturnType()).getFullyQualifiedName()).isEqualTo("java.util.List");
-
-        parser.reset(cus.stream().map(cu -> cu.getSourcePath().toUri()).collect(Collectors.toList()));
-//        parser.reset();
-
-        cus = parser.parse(source);
-        assertThat(cus.size()).isEqualTo(1);
-        assertThat(cus.get(0).getClasses().size()).isEqualTo(1);
-
-        c = cus.get(0);
-        m = c.getClasses().get(0).getBody().getStatements().stream().filter(J.MethodDeclaration.class::isInstance).map(J.MethodDeclaration.class::cast).findFirst().orElseThrow();
-        methodType = m.getMethodType();
-        assertThat(TypeUtils.asFullyQualified(methodType.getReturnType()).getFullyQualifiedName()).isEqualTo("java.util.List");
-
+              """;
+            Stream<SourceFile> compilationUnits = parser.parse(new InMemoryExecutionContext(Throwable::printStackTrace), source);
+            assertThat(compilationUnits.map(J.CompilationUnit.class::cast)).singleElement()
+              .satisfies(cu -> assertThat(cu.getClasses()).singleElement()
+                .satisfies(cd -> assertThat(cd.getImplements()).satisfiesExactly(
+                  i -> assertThat(i.getType()).hasToString("example.InterfaceA"),
+                  i -> assertThat(i.getType()).hasToString("InterfaceB")
+                )));
+        }
     }
-
 }

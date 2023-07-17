@@ -45,9 +45,6 @@ public class RecipeDescriptor {
     @EqualsAndHashCode.Include
     List<OptionDescriptor> options;
 
-    @Deprecated
-    List<String> languages;
-
     @With
     List<RecipeDescriptor> recipeList;
 
@@ -57,6 +54,8 @@ public class RecipeDescriptor {
     List<Maintainer> maintainers;
 
     List<Contributor> contributors;
+
+    List<RecipeExample> examples;
 
     URI source;
 }

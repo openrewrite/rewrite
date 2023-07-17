@@ -15,10 +15,7 @@
  */
 package org.openrewrite.text;
 
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.Value;
-import lombok.With;
+import lombok.*;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
@@ -26,25 +23,37 @@ import org.openrewrite.marker.Markers;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Predicate;
+
+import static java.util.Collections.emptyList;
+import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 
 /**
  * The simplest of all ASTs representing nothing more than just unstructured text.
  */
 @Value
-@With
+@Builder
+@AllArgsConstructor
 public class PlainText implements SourceFile, Tree {
-    UUID id;
 
+    @Builder.Default
+    @With
+    UUID id = Tree.randomId();
+
+    @With
     Path sourcePath;
 
-    Markers markers;
+    @Builder.Default
+    @With
+    Markers markers = Markers.EMPTY;
 
     @Nullable // for backwards compatibility
     @With(AccessLevel.PRIVATE)
     String charsetName;
 
+    @With
     boolean charsetBomMarked;
 
     @Override
@@ -52,11 +61,13 @@ public class PlainText implements SourceFile, Tree {
         return charsetName == null ? StandardCharsets.UTF_8 : Charset.forName(charsetName);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public SourceFile withCharset(Charset charset) {
         return withCharsetName(charset.name());
     }
 
+    @With
     @Nullable
     FileAttributes fileAttributes;
 
@@ -65,12 +76,24 @@ public class PlainText implements SourceFile, Tree {
     @Nullable
     Checksum checksum;
 
-    String text;
+    @Builder.Default
+    String text = "";
+
+    public PlainText withText(String text) {
+        if (!text.equals(this.text)) {
+            return new PlainText(this.id, this.sourcePath, this.markers, this.charsetName, this.charsetBomMarked,
+                    this.fileAttributes, this.checksum, text, this.snippets);
+        }
+        return this;
+    }
+
+    List<Snippet> snippets;
 
     @Override
     public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
         return v.isAdaptableTo(PlainTextVisitor.class);
     }
+
 
     @SuppressWarnings("unchecked")
     @Override
@@ -86,5 +109,46 @@ public class PlainText implements SourceFile, Tree {
     @Override
     public long getWeight(Predicate<Object> uniqueIdentity) {
         return text.length() / 10;
+    }
+
+    public List<Snippet> getSnippets() {
+        if (snippets == null) {
+            return emptyList();
+        }
+        return snippets;
+    }
+
+    public PlainText withSnippets(@Nullable List<Snippet> snippets) {
+        snippets = nullIfEmpty(snippets);
+        if (this.snippets == snippets) {
+            return this;
+        }
+        return new PlainText(id, sourcePath, markers, charsetName, charsetBomMarked, fileAttributes, checksum, text, snippets);
+    }
+
+    @Value
+    @With
+    public static class Snippet implements Tree {
+        UUID id;
+
+        Markers markers;
+
+        String text;
+
+        @Override
+        public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
+            return v.isAdaptableTo(PlainTextVisitor.class);
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return (R) v.adapt(PlainTextVisitor.class).visitSnippet(this, p);
+        }
+
+        @Override
+        public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
+            return new PlainTextPrinter<>();
+        }
     }
 }

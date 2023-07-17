@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -29,6 +30,7 @@ class DependencyUseMapNotationTest implements RewriteTest {
         spec.recipe(new DependencyUseMapNotation());
     }
 
+    @DocumentExample
     @Test
     void basicString() {
         rewriteRun(

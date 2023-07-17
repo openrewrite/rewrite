@@ -18,6 +18,7 @@ package org.openrewrite.gradle;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.gradle.internal.DefaultImportsCustomizer;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
@@ -28,29 +29,12 @@ import java.nio.file.Path;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-public class GradleParser implements Parser<G.CompilationUnit> {
+public class GradleParser implements Parser {
     private final GroovyParser buildParser;
     private final GroovyParser settingsParser;
-
-    @Deprecated//(since = "7.37.0", forRemoval = true)
-    public GradleParser(GroovyParser.Builder groovyParser) {
-        GroovyParser.Builder base = groovyParser;
-        this.buildParser = GroovyParser.builder(base)
-                .compilerCustomizers(
-                        new DefaultImportsCustomizer(),
-                        config -> config.setScriptBaseClass("RewriteGradleProject")
-                )
-                .build();
-        this.settingsParser = GroovyParser.builder(base)
-                .compilerCustomizers(
-                        new DefaultImportsCustomizer(),
-                        config -> config.setScriptBaseClass("RewriteSettings")
-                )
-                .build();
-    }
 
     private GradleParser(Builder builder) {
         GroovyParser.Builder base = builder.groovyParser;
@@ -71,15 +55,14 @@ public class GradleParser implements Parser<G.CompilationUnit> {
     }
 
     @Override
-    public List<G.CompilationUnit> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         return StreamSupport.stream(sources.spliterator(), false)
                 .flatMap(source -> {
                     if (source.getPath().endsWith("settings.gradle")) {
-                        return settingsParser.parseInputs(Collections.singletonList(source), relativeTo, ctx).stream();
+                        return settingsParser.parseInputs(Collections.singletonList(source), relativeTo, ctx);
                     }
-                    return buildParser.parseInputs(Collections.singletonList(source), relativeTo, ctx).stream();
-                })
-                .collect(Collectors.toList());
+                    return buildParser.parseInputs(Collections.singletonList(source), relativeTo, ctx);
+                });
     }
 
     @Override
@@ -112,19 +95,6 @@ public class GradleParser implements Parser<G.CompilationUnit> {
         public Builder groovyParser(GroovyParser.Builder groovyParser) {
             this.groovyParser = groovyParser;
             return this;
-        }
-
-        /**
-         * @deprecated Use {@code groovyParser(GroovyParser.Builder)} instead.
-         */
-        @Deprecated//(since = "7.37.0", forRemoval = true)
-        public Builder setGroovyParser(GroovyParser.Builder groovyParser) {
-            return groovyParser(groovyParser);
-        }
-
-        @Deprecated//(since = "7.37.0", forRemoval = true)
-        public GroovyParser.Builder getGroovyParser() {
-            return groovyParser;
         }
 
         public Builder buildscriptClasspath(Collection<Path> classpath) {

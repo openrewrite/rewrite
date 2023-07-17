@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -29,6 +30,7 @@ class ReplaceConstantTest implements RewriteTest {
         spec.recipe(new ReplaceConstant("com.google.common.base.Charsets", "UTF_8", "\"UTF_8\""));
     }
 
+    @DocumentExample
     @Test
     void replaceConstant() {
         rewriteRun(

@@ -19,10 +19,13 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
+import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.ByteArrayInputStream;
@@ -32,8 +35,10 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 
 @SuppressWarnings("UnusedReturnValue")
 @Getter
@@ -88,6 +93,9 @@ public class RecipeSpec {
 
     List<UncheckedConsumer<SourceSpec<?>>> allSources = new ArrayList<>();
 
+    @Nullable
+    Function<List<SourceFile>, LargeSourceSet> sourceSet;
+
     /**
      * Configuration that applies to all source file inputs.
      */
@@ -101,8 +109,14 @@ public class RecipeSpec {
         return this;
     }
 
+    public RecipeSpec recipes(Recipe... recipes) {
+        this.recipe = new CompositeRecipe(Arrays.asList(recipes));
+        return this;
+    }
+
     public RecipeSpec recipe(InputStream yaml, String... activeRecipes) {
         return recipe(Environment.builder()
+                .scanRuntimeClasspath() // Slow but required to find recipe classes the yaml recipe may depend on
                 .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties()))
                 .build()
                 .activateRecipes(activeRecipes));
@@ -110,14 +124,6 @@ public class RecipeSpec {
 
     public RecipeSpec recipeFromYaml(@Language("yaml") String yaml, String... activeRecipes) {
         return recipe(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)), activeRecipes);
-    }
-
-    /**
-     * @deprecated Use {@link #recipeFromResource(String, String...)} instead.
-     */
-    @Deprecated
-    public RecipeSpec recipe(String yamlResource, String... activeRecipes) {
-        return recipeFromResource(yamlResource, activeRecipes);
     }
 
     public RecipeSpec recipeFromResource(String yamlResource, String... activeRecipes) {
@@ -178,9 +184,10 @@ public class RecipeSpec {
                     assertThat(rows).isNotNull();
                     assertThat(rows).isNotEmpty();
                     extract.accept(rows);
+                    return;
                 }
             }
-
+            fail("No data table found with row type " + rowType);
         });
     }
 
@@ -209,6 +216,11 @@ public class RecipeSpec {
     @Incubating(since = "7.35.0")
     public RecipeSpec validateRecipeSerialization(boolean validate) {
         this.serializationValidation = validate;
+        return this;
+    }
+
+    public RecipeSpec sourceSet(Function<List<SourceFile>, LargeSourceSet> sourceSetBuilder) {
+        this.sourceSet = sourceSetBuilder;
         return this;
     }
 

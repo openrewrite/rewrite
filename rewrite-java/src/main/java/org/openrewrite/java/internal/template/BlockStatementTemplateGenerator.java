@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -33,7 +34,8 @@ import org.openrewrite.marker.Markers;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
-import static org.openrewrite.java.tree.JavaCoordinates.Mode.*;
+import static org.openrewrite.java.tree.JavaCoordinates.Mode.AFTER;
+import static org.openrewrite.java.tree.JavaCoordinates.Mode.REPLACEMENT;
 
 /**
  * Generates a stub containing enough variable, method, and class scope
@@ -62,6 +64,7 @@ public class BlockStatementTemplateGenerator {
                                                           "}";
 
     private final Set<String> imports;
+    private final boolean contextSensitive;
 
     public String template(Cursor cursor, String template, Space.Location location, JavaCoordinates.Mode mode) {
         //noinspection ConstantConditions
@@ -82,7 +85,7 @@ public class BlockStatementTemplateGenerator {
 
                     template(next(cursor), cursor.getValue(), before, after, cursor.getValue(), mode);
 
-                    return before.toString().trim() + "\n/*" + TEMPLATE_COMMENT + "*/" + template + "/*" + STOP_COMMENT + "*/" + "\n" + after;
+                    return before.toString().trim() + "\n/*" + TEMPLATE_COMMENT + "*/" + template + "/*" + STOP_COMMENT + "*/" + "\n" + after.toString().trim();
                 });
     }
 
@@ -94,6 +97,15 @@ public class BlockStatementTemplateGenerator {
 
             @Nullable
             J.Block blockEnclosingTemplateComment;
+
+            @Override
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer integer) {
+                if (getCursor().getParentTreeCursor().getValue() instanceof SourceFile && (classDecl.getSimpleName().equals("__P__") || classDecl.getSimpleName().equals("__M__"))) {
+                    // don't visit the __P__ and __M__ classes declaring stubs
+                    return classDecl;
+                }
+                return super.visitClassDeclaration(classDecl, integer);
+            }
 
             @Override
             public J.Block visitBlock(J.Block block, Integer p) {
@@ -198,8 +210,56 @@ public class BlockStatementTemplateGenerator {
         return js;
     }
 
-    @SuppressWarnings("ConstantConditions")
     private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
+        if (contextSensitive) {
+            contextTemplate(cursor, prior, before, after, insertionPoint, mode);
+        } else {
+            contextFreeTemplate(cursor, prior, before, after, insertionPoint, mode);
+        }
+    }
+
+    @SuppressWarnings("DataFlowIssue")
+    private void contextFreeTemplate(Cursor cursor, J j, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
+        if (j instanceof J.Lambda) {
+            throw new IllegalArgumentException(
+                    "Templating a lambda requires a cursor so that it can be properly parsed and type-attributed. " +
+                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
+        } else if (j instanceof J.MemberReference) {
+            throw new IllegalArgumentException(
+                    "Templating a method reference requires a cursor so that it can be properly parsed and type-attributed. " +
+                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
+        } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
+            before.insert(0, "class Template {{\n");
+            before.append("Object o = ");
+            after.append(";");
+            after.append("\n}}");
+        } else if ((j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations || j instanceof J.Block || j instanceof J.ClassDeclaration)
+                   && cursor.getValue() instanceof J.Block
+                   && (cursor.getParent().getValue() instanceof J.ClassDeclaration || cursor.getParent().getValue() instanceof J.NewClass)) {
+            before.insert(0, "class Template {\n");
+            after.append("\n}");
+        } else if (j instanceof J.ClassDeclaration) {
+            // While not impossible to handle, reaching this point is likely to be a mistake.
+            // Without context a class declaration can include no imports, package, or outer class.
+            // It is a rare class that is deliberately in the root package with no imports.
+            // In the more likely case omission of these things is unintentional, the resulting type metadata would be
+            // incorrect, and it would not be obvious to the recipe author why.
+            throw new IllegalArgumentException(
+                    "Templating a class declaration requires context from which package declaration and imports may be reached. " +
+                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
+        } else if (j instanceof Statement && !(j instanceof J.Import) && !(j instanceof J.Package)) {
+            before.insert(0, "class Template {{\n");
+            after.append("\n}}");
+        }
+
+        before.insert(0, EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
+        for (String anImport : imports) {
+            before.insert(0, anImport);
+        }
+    }
+
+    @SuppressWarnings("ConstantConditions")
+    private void contextTemplate(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
         J j = cursor.getValue();
         if (j instanceof JavaSourceFile) {
             before.insert(0, EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
@@ -254,10 +314,33 @@ public class BlockStatementTemplateGenerator {
                 before.insert(0, "{\n");
             }
 
-            if (prior instanceof Statement) {
+            if (prior == insertionPoint && prior instanceof Expression) {
+                // the template represents an expression, so we need to wrap it in a statement
                 after.append(';');
             }
             after.append('}');
+        } else if (j instanceof J.Annotation) {
+            J.Annotation annotation = (J.Annotation) j;
+            Optional<Expression> arg = annotation.getArguments().stream().filter(a -> a == prior).findFirst();
+            if (arg.isPresent()) {
+                StringBuilder beforeBuffer = new StringBuilder();
+                beforeBuffer.append('@').append(((JavaType.Class) annotation.getType()).getFullyQualifiedName()).append('(');
+                before.insert(0, beforeBuffer);
+                after.append(')').append('\n');
+
+                J parent = next(cursor).getValue();
+                if (parent instanceof J.ClassDeclaration) {
+                    J.ClassDeclaration cd = (J.ClassDeclaration) parent;
+                    after.append(cd.withBody(null).withLeadingAnnotations(null).withPrefix(Space.EMPTY).printTrimmed(cursor).trim()).append("{}");
+                } else if (parent instanceof J.MethodDeclaration) {
+                    J.MethodDeclaration md = (J.MethodDeclaration) parent;
+                    after.append(md.withBody(null)
+                            .withLeadingAnnotations(emptyList())
+                            .withPrefix(Space.EMPTY)
+                            .printTrimmed(cursor).trim()).append("{}");
+                }
+                // TODO cover more cases where annotations can appear, ideally not by "inlining" template for parent
+            }
         } else if (j instanceof J.DoWhileLoop) {
             J.DoWhileLoop dw = (J.DoWhileLoop) j;
             if (referToSameElement(prior, dw.getWhileCondition())) {
@@ -266,6 +349,7 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.Assert) {
             before.insert(0, "assert ");
+            after.append(';');
         } else if (j instanceof J.NewArray) {
             J.NewArray n = (J.NewArray) j;
             if (n.getInitializer() != null && n.getInitializer().stream().anyMatch(arg -> referToSameElement(prior, arg))) {
@@ -340,8 +424,11 @@ public class BlockStatementTemplateGenerator {
             }
         } else if (j instanceof J.ForEachLoop.Control) {
             J.ForEachLoop.Control c = (J.ForEachLoop.Control) j;
-            if (c.getVariable() == prior) {
+            if (referToSameElement(prior, c.getVariable())) {
                 after.append(" = /*" + STOP_COMMENT + "/*").append(c.getIterable().printTrimmed(cursor));
+            } else if (referToSameElement(prior, c.getIterable())) {
+                before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ =");
+                after.append(";");
             }
         } else if (j instanceof J.ForEachLoop) {
             J.ForEachLoop f = (J.ForEachLoop) j;
@@ -411,6 +498,12 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.Return) {
             before.insert(0, "return ");
             after.append(";");
+        } else if (j instanceof J.Throw) {
+            before.insert(0, "throw ");
+            after.append(";");
+        } else if (j instanceof J.Parentheses) {
+            before.insert(0, '(');
+            after.append(')');
         } else if (j instanceof J.If) {
             J.If iff = (J.If) j;
             if (referToSameElement(prior, iff.getIfCondition())) {
@@ -438,7 +531,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.Ternary) {
             J.Ternary ternary = (J.Ternary) j;
             String condition = PatternVariables.simplifiedPatternVariableCondition(ternary.getCondition(), insertionPoint);
-            if(condition != null) {
+            if (condition != null) {
                 if (referToSameElement(prior, ternary.getCondition())) {
                     int splitIdx = condition.indexOf('§');
                     before.insert(0, condition.substring(0, splitIdx) + '(');
@@ -462,6 +555,15 @@ public class BlockStatementTemplateGenerator {
             J.Assignment as = (J.Assignment) j;
             if (referToSameElement(prior, as.getAssignment())) {
                 before.insert(0, as.getVariable() + " = ");
+                J parent = next(cursor).getValue();
+                if (!(parent instanceof J.Annotation)) {
+                    after.append(";");
+                }
+            }
+        } else if (j instanceof J.AssignmentOperation) {
+            J.AssignmentOperation as = (J.AssignmentOperation) j;
+            if (referToSameElement(prior, as.getAssignment())) {
+                before.insert(0, "Object __b" + cursor.getPathAsStream().count() + "__ = ");
                 after.append(";");
             }
         } else if (j instanceof J.EnumValue) {
@@ -470,7 +572,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.EnumValueSet) {
             after.append(";");
         }
-        template(next(cursor), j, before, after, insertionPoint, REPLACEMENT);
+        contextTemplate(next(cursor), j, before, after, insertionPoint, REPLACEMENT);
     }
 
     private void addLeadingVariableDeclarations(Cursor cursor, J current, J.Block containingBlock, StringBuilder before, J insertionPoint) {

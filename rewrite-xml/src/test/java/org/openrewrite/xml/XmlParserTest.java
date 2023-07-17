@@ -16,13 +16,34 @@
 package org.openrewrite.xml;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.xml.tree.Xml;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.xml.Assertions.xml;
 
 @SuppressWarnings({"CheckDtdRefs", "CheckTagEmptyBody"})
 class XmlParserTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(toRecipe(
+          () -> new XmlVisitor<>() {
+              @Override
+              public Xml visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, ExecutionContext executionContext) {
+                  assertNotNull(docTypeDecl.getPrefixUnsafe(), "prefix should not be null");
+                  assertNotNull(docTypeDecl.getName(), "name should not be null");
+                  assertNotNull(docTypeDecl.getInternalSubset(), "internalSubset should not be null");
+                  assertNotNull(docTypeDecl.getBeforeTagDelimiterPrefix(), "beforeTagDelimiterPrefix should not be null");
+                  return super.visitDocTypeDecl(docTypeDecl, executionContext);
+              }
+          }
+        ));
+    }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2189")
     @Test
@@ -105,6 +126,21 @@ class XmlParserTest implements RewriteTest {
             """
               <foo>
                   <a><!-- comment -->a</a>
+              </foo>
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3301")
+    @Test
+    void singleQuestionMarkContent() {
+        rewriteRun(
+          xml(
+            """
+              <foo>
+                  <a><!-- comment -->a</a>
+                  <literal>List&lt;?&gt;</literal>
               </foo>
               """
           )
@@ -272,6 +308,19 @@ class XmlParserTest implements RewriteTest {
           xml(
             """
               <?xml version = "1.0" encoding    =   "UTF-8" standalone = "no" ?><blah></blah>
+              """)
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3175")
+    @Test
+    void linkWithQuestionMark() {
+        rewriteRun(
+          xml(
+            """
+              <?xml version="1.0" encoding="ISO-8859-1"?>
+              <?xml-stylesheet type="text/xsl" href="/name/other?link"?>
+              <blah></blah>
               """)
         );
     }

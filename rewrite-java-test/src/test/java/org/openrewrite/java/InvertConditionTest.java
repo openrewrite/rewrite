@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
@@ -25,6 +26,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class InvertConditionTest implements RewriteTest {
 
+    @DocumentExample
     @SuppressWarnings({"StatementWithEmptyBody", "ConstantConditions", "InfiniteRecursion"})
     @Test
     void invertCondition() {

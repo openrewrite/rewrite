@@ -16,6 +16,7 @@
 package org.openrewrite.xml.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.style.TabsAndIndentsStyle;
 
@@ -24,6 +25,7 @@ import static org.openrewrite.xml.Assertions.xml;
 
 class TabsAndIndentsTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void indentsAndContinuationIndents() {
         rewriteRun(

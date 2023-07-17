@@ -18,10 +18,7 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.semver.Semver;
 
@@ -79,8 +76,8 @@ public class UpgradeParentVersion extends Recipe {
     }
 
     @Override
-    public Validated validate() {
-        Validated validated = super.validate();
+    public Validated<Object> validate() {
+        Validated<Object> validated = super.validate();
         //noinspection ConstantConditions
         if (newVersion != null) {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
@@ -89,12 +86,7 @@ public class UpgradeParentVersion extends Recipe {
     }
 
     @Override
-    protected MavenVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return changeParentPom().getSingleSourceApplicableTest();
-    }
-
-    @Override
-    public MavenVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return changeParentPom().getVisitor();
     }
 

@@ -16,6 +16,7 @@
 package org.openrewrite.xml.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -27,6 +28,7 @@ class LineBreaksTest implements RewriteTest {
         spec.recipe(new LineBreaks());
     }
 
+    @DocumentExample
     @SuppressWarnings("CheckTagEmptyBody")
     @Test
     void tags() {

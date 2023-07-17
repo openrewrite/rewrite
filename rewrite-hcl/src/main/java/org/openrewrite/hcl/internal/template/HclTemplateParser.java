@@ -70,7 +70,10 @@ public class HclTemplateParser {
     }
 
     private Hcl.ConfigFile compileTemplate(String stub) {
-        return parser.parse(stub).get(0);
+        return parser.parse(stub)
+                .findFirst()
+                .map(Hcl.ConfigFile.class::cast)
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as HCL"));
     }
 
     private String substitute(String stub, String template) {
@@ -84,7 +87,7 @@ public class HclTemplateParser {
         List<H> hs;
         synchronized (templateCacheLock) {
             hs = (List<H>) templateCache.get(stub);
-            if(hs == null) {
+            if (hs == null) {
                 hs = (List<H>) ifAbsent.get();
                 templateCache.put(stub, hs);
             }

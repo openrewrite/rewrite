@@ -22,14 +22,18 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.transport.RemoteConfig;
+import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.treewalk.WorkingTreeOptions;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.ci.*;
+import org.openrewrite.marker.ci.BuildEnvironment;
+import org.openrewrite.marker.ci.IncompleteGitConfigException;
+import org.openrewrite.marker.ci.JenkinsBuildEnvironment;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -65,18 +69,18 @@ public class GitProvenance implements Marker {
      */
     @Nullable
     public String getOrganizationName(String baseUrl) {
-        if(origin == null) {
+        if (origin == null) {
             return null;
         }
         int schemeEndIndex = baseUrl.indexOf("://");
-        if(schemeEndIndex != -1) {
+        if (schemeEndIndex != -1) {
             baseUrl = baseUrl.substring(schemeEndIndex + 3);
         }
-        if(baseUrl.startsWith("git@")) {
+        if (baseUrl.startsWith("git@")) {
             baseUrl = baseUrl.substring(4);
         }
         String remainder = origin.substring(origin.indexOf(baseUrl) + baseUrl.length());
-        if(remainder.startsWith("/")) {
+        if (remainder.startsWith("/")) {
             remainder = remainder.substring(1);
         }
 
@@ -87,7 +91,6 @@ public class GitProvenance implements Marker {
      * There is too much variability in how different git hosting services arrange their organizations to reliably
      * determine the organization component of the URL without additional information. The version of this method
      * which accepts a "baseUrl" parameter should be used instead
-     *
      */
     @Deprecated
     @Nullable
@@ -95,21 +98,14 @@ public class GitProvenance implements Marker {
         if (origin == null) {
             return null;
         }
-        String path;
-        if (origin.startsWith("git")) {
-            path = origin.substring(origin.indexOf(':') + 1);
-        } else {
-            path = URI.create(origin).getPath().substring(1);
-        }
-        int firstSlashPos = path.lastIndexOf('/');
-        int secondSlashPos = path.lastIndexOf('/', firstSlashPos - 1);
-
-        if (secondSlashPos > -1) {
-            return path.substring(secondSlashPos + 1, firstSlashPos);
-        } else if (firstSlashPos > -1) {
-            return path.substring(0, firstSlashPos);
-        } else {
-            return "";
+        try {
+            String path = new URIish(origin).getPath();
+            // Strip off any trailing repository name
+            path = path.substring(0, path.lastIndexOf('/'));
+            // Strip off any leading sub organization names
+            return path.substring(path.lastIndexOf('/') + 1);
+        } catch (URISyntaxException e) {
+            return null;
         }
     }
 
@@ -118,11 +114,12 @@ public class GitProvenance implements Marker {
         if (origin == null) {
             return null;
         }
-        if (origin.startsWith("git")) {
-            return origin.substring(origin.lastIndexOf('/') + 1).replaceAll("\\.git$", "");
-        } else {
-            String path = URI.create(origin).getPath();
-            return path.substring(path.lastIndexOf('/') + 1).replaceAll("\\.git$", "");
+        try {
+            String path = new URIish(origin).getPath();
+            return path.substring(path.lastIndexOf('/') + 1)
+                    .replaceAll("\\.git$", "");
+        } catch (URISyntaxException e) {
+            return null;
         }
     }
 
@@ -138,20 +135,20 @@ public class GitProvenance implements Marker {
     }
 
     /**
-     * @param projectDir       The project directory.
+     * @param projectDir  The project directory.
      * @param environment In detached head scenarios, the branch is best
-     *                         determined from a {@link BuildEnvironment} marker if possible.
+     *                    determined from a {@link BuildEnvironment} marker if possible.
      * @return A marker containing git provenance information.
      */
     public static @Nullable GitProvenance fromProjectDirectory(Path projectDir, @Nullable BuildEnvironment environment) {
 
         if (environment != null) {
-            if(environment instanceof JenkinsBuildEnvironment) {
+            if (environment instanceof JenkinsBuildEnvironment) {
                 JenkinsBuildEnvironment jenkinsBuildEnvironment = (JenkinsBuildEnvironment) environment;
                 try (Repository repository = new RepositoryBuilder().findGitDir(projectDir.toFile()).build()) {
-                    String branch = jenkinsBuildEnvironment.getLocalBranch()  != null
+                    String branch = jenkinsBuildEnvironment.getLocalBranch() != null
                             ? jenkinsBuildEnvironment.getLocalBranch()
-                            :  localBranchName(repository, jenkinsBuildEnvironment.getBranch());
+                            : localBranchName(repository, jenkinsBuildEnvironment.getBranch());
                     return fromGitConfig(repository, branch, getChangeset(repository));
                 } catch (IllegalArgumentException | GitAPIException e) {
                     // Silently ignore if the project directory is not a git repository
@@ -196,10 +193,11 @@ public class GitProvenance implements Marker {
         } catch (IllegalArgumentException e) {
             printRequireGitDirOrWorkTreeException(e);
             return null;
-        }catch (IOException e) {
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
+
     private static GitProvenance fromGitConfig(Repository repository, @Nullable String branch, String changeset) {
         if (branch == null) {
             branch = resolveBranchFromGitConfig(repository);
@@ -258,7 +256,7 @@ public class GitProvenance implements Marker {
             List<RemoteConfig> remotes = git.remoteList().call();
             for (RemoteConfig remote : remotes) {
                 if (remoteBranch.startsWith(remote.getName()) &&
-                    (branch == null || branch.length() > remoteBranch.length() - remote.getName().length() - 1)) {
+                        (branch == null || branch.length() > remoteBranch.length() - remote.getName().length() - 1)) {
                     branch = remoteBranch.substring(remote.getName().length() + 1); // +1 for the forward slash
                 }
             }
@@ -334,12 +332,12 @@ public class GitProvenance implements Marker {
     public enum AutoCRLF {
         False,
         True,
-        Input;
+        Input
     }
 
     public enum EOL {
         CRLF,
         LF,
-        Native;
+        Native
     }
 }

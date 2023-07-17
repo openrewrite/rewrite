@@ -16,6 +16,7 @@
 package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaParser;
@@ -59,6 +60,7 @@ class SpacesTest implements RewriteTest {
           )));
     }
 
+    @DocumentExample
     @Test
     void beforeParensMethodDeclarationTrue() {
         rewriteRun(

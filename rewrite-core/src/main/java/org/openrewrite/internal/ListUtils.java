@@ -18,7 +18,6 @@ package org.openrewrite.internal;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.BiFunction;
@@ -72,6 +71,28 @@ public final class ListUtils {
             }
         }
 
+        return newLs;
+    }
+
+    /**
+     * Insert element to a list at the specified position in the list.
+     * Throws the same exceptions as List.add()
+     * @param ls The original list.
+     * @param t The element to add.
+     * @param index index at which the specified element is to be inserted
+     * @param <T> The type of elements in the list.
+     * @return A new list with the element inserted at the specified position.
+     */
+    public static <T> List<T> insert(@Nullable List<T> ls, @Nullable T t, int index) {
+        //noinspection DuplicatedCode
+        if (ls == null && t == null) {
+            return emptyList();
+        } else if (t == null) {
+            return ls;
+        }
+
+        List<T> newLs = ls == null ?  new ArrayList<>(1) : new ArrayList<>(ls);
+        newLs.add(index, t);
         return newLs;
     }
 
@@ -141,8 +162,33 @@ public final class ListUtils {
         return newLs;
     }
 
+    // inlined version of `map(List, BiFunction)` for memory efficiency (no overhead for lambda)
     public static <T> List<T> map(@Nullable List<T> ls, UnaryOperator<T> map) {
-        return map(ls, (i, t) -> map.apply(t));
+        if (ls == null || ls.isEmpty()) {
+            //noinspection ConstantConditions
+            return ls;
+        }
+
+        List<T> newLs = ls;
+        boolean nullEncountered = false;
+        for (int i = 0; i < ls.size(); i++) {
+            T tree = ls.get(i);
+            T newTree = map.apply(tree);
+            if (newTree != tree) {
+                if (newLs == ls) {
+                    newLs = new ArrayList<>(ls);
+                }
+                newLs.set(i, newTree);
+            }
+            nullEncountered |= newTree == null;
+        }
+
+        if (newLs != ls && nullEncountered) {
+            //noinspection StatementWithEmptyBody
+            while (newLs.remove(null)) ;
+        }
+
+        return newLs;
     }
 
     public static <T> List<T> flatMap(@Nullable List<T> ls, BiFunction<Integer, T, Object> flatMap) {
@@ -213,6 +259,7 @@ public final class ListUtils {
     }
 
     public static <T> List<T> concat(@Nullable List<T> ls, @Nullable T t) {
+        //noinspection DuplicatedCode
         if (t == null && ls == null) {
             return emptyList();
         } else if (t == null) {
@@ -276,4 +323,16 @@ public final class ListUtils {
     public static <T> List<T> nullIfEmpty(@Nullable List<T> ls) {
         return ls == null || ls.isEmpty() ? null : ls;
     }
+
+    public static <T> T @Nullable [] arrayOrNullIfEmpty(@Nullable List<T> list, T[] array) {
+        if (list == null || list.isEmpty()) {
+            return null;
+        }
+        return list.toArray(array);
+    }
+
+    public static <T> T @Nullable [] nullIfEmpty(T @Nullable [] list) {
+        return list == null || list.length == 0 ? null : list;
+    }
+
 }

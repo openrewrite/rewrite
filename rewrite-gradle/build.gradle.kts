@@ -8,12 +8,24 @@ val parserClasspath = configurations.create("parserClasspath")
 repositories {
     maven {
         url = uri("https://repo.gradle.org/gradle/libs-releases/")
+        content {
+            excludeVersionByRegex(".+", ".+", ".+-rc-?[0-9]*")
+        }
     }
     maven {
         url = uri("https://plugins.gradle.org/m2/")
+        content {
+            excludeVersionByRegex(".+", ".+", ".+-rc-?[0-9]*")
+        }
     }
 }
 
+//val rewriteVersion = rewriteRecipe.rewriteVersion.get()
+val rewriteVersion = if(project.hasProperty("releasing")) {
+    "latest.release"
+} else {
+    "latest.integration"
+}
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-groovy")) {
@@ -23,14 +35,12 @@ dependencies {
     api("org.jetbrains:annotations:latest.release")
     compileOnly(project(":rewrite-test"))
     implementation(project(":rewrite-properties"))
-    implementation("org.openrewrite.gradle.tooling:model:latest.release")
+    implementation("org.openrewrite.gradle.tooling:model:$rewriteVersion")
 
     compileOnly("org.codehaus.groovy:groovy:latest.release")
     compileOnly(gradleApi())
 
     compileOnly("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
-
-    compileOnly("org.gradle:gradle-tooling-api:latest.release")
 
     "parserClasspath"("org.gradle:gradle-base-services:latest.release")
     "parserClasspath"("org.gradle:gradle-core-api:latest.release")
@@ -45,8 +55,6 @@ dependencies {
     "parserClasspath"("org.gradle:gradle-testing-jvm:latest.release")
     "parserClasspath"("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
 
-    testImplementation("org.gradle:gradle-tooling-api:latest.release")
-
     testImplementation(project(":rewrite-test")) {
         // because gradle-api fatjars this implementation already
         exclude("ch.qos.logback", "logback-classic")
@@ -54,6 +62,7 @@ dependencies {
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
 
     testRuntimeOnly("org.codehaus.groovy:groovy:latest.release")
+    testRuntimeOnly("org.gradle:gradle-base-services:latest.release")
     testRuntimeOnly(gradleApi())
     testRuntimeOnly("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
     testRuntimeOnly("com.google.guava:guava:latest.release")

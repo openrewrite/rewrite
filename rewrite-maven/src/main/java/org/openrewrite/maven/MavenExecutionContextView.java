@@ -23,6 +23,7 @@ import org.openrewrite.maven.cache.MavenPomCache;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
 
+import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -42,6 +43,7 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
     private static final String MAVEN_PINNED_SNAPSHOT_VERSIONS = "org.openrewrite.maven.pinnedSnapshotVersions";
     private static final String MAVEN_POM_CACHE = "org.openrewrite.maven.pomCache";
     private static final String MAVEN_RESOLUTION_LISTENER = "org.openrewrite.maven.resolutionListener";
+    private static final String MAVEN_RESOLUTION_TIME = "org.openrewrite.maven.resolutionTime";
 
     public MavenExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -52,6 +54,15 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
             return (MavenExecutionContextView) ctx;
         }
         return new MavenExecutionContextView(ctx);
+    }
+
+    public MavenExecutionContextView recordResolutionTime(Duration time) {
+        this.computeMessage(MAVEN_RESOLUTION_TIME, time.toMillis(), () -> 0L, Long::sum);
+        return this;
+    }
+
+    public Duration getResolutionTime() {
+        return Duration.ofMillis(getMessage(MAVEN_RESOLUTION_TIME, 0L));
     }
 
     public MavenExecutionContextView setResolutionListener(ResolutionEventListener listener) {

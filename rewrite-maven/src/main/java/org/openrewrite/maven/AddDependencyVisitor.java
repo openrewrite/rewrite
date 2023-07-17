@@ -34,6 +34,8 @@ import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
@@ -107,13 +109,16 @@ public class AddDependencyVisitor extends MavenIsoVisitor<ExecutionContext> {
         }
 
         Scope resolvedScope = scope == null ? Scope.Compile : Scope.fromName(scope);
-        for (ResolvedDependency d : getResolutionResult().getDependencies().get(resolvedScope)) {
-            if (d.isDirect() && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
-                return maven;
+        Map<Scope, List<ResolvedDependency>> dependencies = getResolutionResult().getDependencies();
+        if (dependencies.containsKey(resolvedScope)) {
+            for (ResolvedDependency d : dependencies.get(resolvedScope)) {
+                if (d.isDirect() && groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId())) {
+                    return maven;
+                }
             }
         }
 
-        Validated versionValidation = Semver.validate(version, versionPattern);
+        Validated<VersionComparator> versionValidation = Semver.validate(version, versionPattern);
         if (versionValidation.isValid()) {
             versionComparator = versionValidation.getValue();
         }

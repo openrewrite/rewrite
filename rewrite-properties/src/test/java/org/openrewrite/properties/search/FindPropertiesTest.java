@@ -18,6 +18,7 @@ package org.openrewrite.properties.search;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -26,6 +27,7 @@ import static org.openrewrite.properties.Assertions.properties;
 @SuppressWarnings("UnusedProperty")
 class FindPropertiesTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void findProperty() {
         rewriteRun(

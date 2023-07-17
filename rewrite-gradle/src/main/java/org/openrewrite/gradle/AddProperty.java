@@ -18,21 +18,21 @@ package org.openrewrite.gradle;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.gradle.search.FindGradleProject;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.ChangePropertyValue;
 import org.openrewrite.properties.PropertiesParser;
 
 import java.nio.file.Paths;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
+import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class AddProperty extends Recipe {
+public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
 
     @Option(displayName = "Property name",
             description = "The name of the property to add.",
@@ -49,6 +49,13 @@ public class AddProperty extends Recipe {
     @Nullable
     Boolean overwrite;
 
+    @Option(displayName = "File pattern",
+            description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
+                    "When not set, all source files are searched.",
+            example = "**/*.properties")
+    @Nullable
+    String filePattern;
+
     @Override
     public String getDisplayName() {
         return "Add Gradle property";
@@ -59,34 +66,79 @@ public class AddProperty extends Recipe {
         return "Add a property to the `gradle.properties` file.";
     }
 
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getApplicableTest() {
-        return new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor();
+    static class NeedsProperty {
+        boolean isGradleProject;
+        boolean hasGradleProperties;
     }
 
     @Override
-    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        AtomicBoolean exists = new AtomicBoolean();
-        List<SourceFile> after = ListUtils.map(before, sourceFile -> {
-            if (sourceFile.getSourcePath().endsWith(Paths.get("gradle.properties"))) {
-                exists.set(true);
-                Tree t = !Boolean.TRUE.equals(overwrite) ?
-                        sourceFile :
-                        new ChangePropertyValue(key, value, null, null, null)
-                                .getVisitor().visitNonNull(sourceFile, ctx);
-                return (SourceFile) new org.openrewrite.properties.AddProperty(key, value, null, null)
-                        .getVisitor()
-                        .visitNonNull(t, ctx);
+    public NeedsProperty getInitialValue(ExecutionContext ctx) {
+        return new NeedsProperty();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(NeedsProperty acc) {
+        return new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                if (filePattern != null) {
+                    if (new FindSourceFiles(filePattern).getVisitor().visitNonNull(tree, ctx) != tree &&
+                            sourceFile.getSourcePath().endsWith("gradle.properties")) {
+                        acc.hasGradleProperties = true;
+                    }
+                } else if (sourceFile.getSourcePath().endsWith("gradle.properties")) {
+                    acc.hasGradleProperties = true;
+                }
+
+                if (IsBuildGradle.matches(sourceFile.getSourcePath())) {
+                    acc.isGradleProject = true;
+                }
+
+                return tree;
             }
-            return sourceFile;
-        });
+        };
+    }
 
-        if (!exists.get()) {
-            after = ListUtils.concatAll(before, PropertiesParser.builder().build()
+    @Override
+    public Collection<? extends SourceFile> generate(NeedsProperty acc, ExecutionContext ctx) {
+        if (!acc.hasGradleProperties) {
+            return PropertiesParser.builder().build()
                     .parseInputs(singletonList(Parser.Input.fromString(Paths.get("gradle.properties"),
-                            key + "=" + value)), null, ctx));
+                            key + "=" + value)), null, ctx)
+                    .collect(Collectors.toList());
         }
+        return Collections.emptyList();
+    }
 
-        return after;
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(NeedsProperty acc) {
+        return Preconditions.check(acc.isGradleProject && acc.hasGradleProperties, new TreeVisitor<Tree, ExecutionContext>() {
+            @Override
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                if (filePattern != null) {
+                    if (new FindSourceFiles(filePattern).getVisitor().visitNonNull(sourceFile, ctx) != sourceFile &&
+                            sourceFile.getSourcePath().endsWith("gradle.properties")) {
+                        Tree t = !Boolean.TRUE.equals(overwrite) ?
+                                sourceFile :
+                                new ChangePropertyValue(key, value, null, false, null)
+                                        .getVisitor().visitNonNull(sourceFile, ctx);
+                        return new org.openrewrite.properties.AddProperty(key, value, null)
+                                .getVisitor()
+                                .visitNonNull(t, ctx);
+                    }
+                } else if (sourceFile.getSourcePath().endsWith("gradle.properties")) {
+                    Tree t = !Boolean.TRUE.equals(overwrite) ?
+                            sourceFile :
+                            new ChangePropertyValue(key, value, null, false, null)
+                                    .getVisitor().visitNonNull(sourceFile, ctx);
+                    return new org.openrewrite.properties.AddProperty(key, value, null)
+                            .getVisitor()
+                            .visitNonNull(t, ctx);
+                }
+                return sourceFile;
+            }
+        });
     }
 }

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.search;
 
+import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -23,43 +24,72 @@ import org.openrewrite.marker.SearchResult;
 
 import java.util.regex.Pattern;
 
+import static java.util.Objects.requireNonNull;
+
 public class UsesType<P> extends JavaIsoVisitor<P> {
+
+    @Nullable
+    private final String fullyQualifiedType;
+    @Nullable
     private final Pattern typePattern;
 
-    public UsesType(String fullyQualifiedType) {
-        this.typePattern = Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedType));
+    @Nullable
+    private final Boolean includeImplicit;
+
+    public UsesType(String fullyQualifiedType, @Nullable Boolean includeImplicit) {
+        if (fullyQualifiedType.contains("*")) {
+            this.fullyQualifiedType = null;
+            this.typePattern = Pattern.compile(StringUtils.aspectjNameToPattern(fullyQualifiedType));
+        } else {
+            this.fullyQualifiedType = fullyQualifiedType;
+            this.typePattern = null;
+        }
+        this.includeImplicit = includeImplicit;
     }
 
     @Override
-    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        JavaSourceFile c = cu;
+    public J visit(@Nullable Tree tree, P p) {
+        if (tree instanceof JavaSourceFile) {
+            JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+            JavaSourceFile c = cu;
 
-        for (JavaType.Method method : c.getTypesInUse().getUsedMethods()) {
-            if (method.hasFlags(Flag.Static)) {
-                if ((c = maybeMark(c, method.getDeclaringType())) != cu) {
+            for (JavaType.Method method : c.getTypesInUse().getUsedMethods()) {
+                if (Boolean.TRUE.equals(includeImplicit) || method.hasFlags(Flag.Static)) {
+                    if ((c = maybeMark(c, method.getDeclaringType())) != cu) {
+                        return c;
+                    }
+                }
+                if (Boolean.TRUE.equals(includeImplicit)) {
+                    if ((c = maybeMark(c, method.getReturnType())) != cu) {
+                        return c;
+                    }
+
+                    for (JavaType parameterType : method.getParameterTypes()) {
+                        if ((c = maybeMark(c, parameterType)) != cu) {
+                            return c;
+                        }
+                    }
+                }
+            }
+
+            for (JavaType type : c.getTypesInUse().getTypesInUse()) {
+                JavaType checkType = type instanceof JavaType.Primitive ? type : TypeUtils.asFullyQualified(type);
+                if ((c = maybeMark(c, checkType)) != cu) {
+                    return c;
+                }
+            }
+
+            for (J.Import anImport : c.getImports()) {
+                if (anImport.isStatic()) {
+                    if ((c = maybeMark(c, TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType()))) != cu) {
+                        return c;
+                    }
+                } else if ((c = maybeMark(c, TypeUtils.asFullyQualified(anImport.getQualid().getType()))) != cu) {
                     return c;
                 }
             }
         }
-
-        for (JavaType type : c.getTypesInUse().getTypesInUse()) {
-            JavaType checkType = type instanceof JavaType.Primitive ? type : TypeUtils.asFullyQualified(type);
-            if ((c = maybeMark(c, checkType)) != cu) {
-                return c;
-            }
-        }
-
-        for (J.Import anImport : c.getImports()) {
-            if (anImport.isStatic()) {
-                if ((c = maybeMark(c, TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType()))) != cu) {
-                    return c;
-                }
-            } else if ((c = maybeMark(c, TypeUtils.asFullyQualified(anImport.getQualid().getType()))) != cu) {
-                return c;
-            }
-        }
-
-        return c;
+        return (J) tree;
     }
 
     private JavaSourceFile maybeMark(JavaSourceFile c, @Nullable JavaType type) {
@@ -67,7 +97,8 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
             return c;
         }
 
-        if (TypeUtils.isAssignableTo(typePattern, type)) {
+        if (typePattern != null && TypeUtils.isAssignableTo(typePattern, type)
+            || fullyQualifiedType != null && TypeUtils.isAssignableTo(fullyQualifiedType, type)) {
             return SearchResult.found(c);
         }
 

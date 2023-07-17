@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -29,6 +30,7 @@ class AddPluginDependencyTest implements RewriteTest {
           "org.openrewrite.recipe", "rewrite-spring", "1.0.0"));
     }
 
+    @DocumentExample
     @Test
     void addWithNoExistingDependencies() {
         rewriteRun(

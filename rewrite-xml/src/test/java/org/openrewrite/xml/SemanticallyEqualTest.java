@@ -112,6 +112,52 @@ class SemanticallyEqualTest implements RewriteTest {
         );
     }
 
+    @Test
+    void differentTagsSameContent() {
+        rewriteRun(
+          semanticallyEqual(false),
+          xml(
+            """
+              <tasks>
+                <delete file="erewhon" />
+              </tasks>
+              """
+          ),
+          xml(
+            """
+              <target>
+                <delete file="erewhon" />
+              </target>
+              """
+          )
+        );
+    }
+
+    @Test
+    void differentChildTagSameContent() {
+        rewriteRun(
+          semanticallyEqual(false),
+          xml(
+            """
+              <configuration>
+                <tasks>
+                  <delete file="erewhon" />
+                </tasks>
+              </configuration>
+              """
+          ),
+          xml(
+            """
+              <configuration>
+                <target>
+                  <delete file="erewhon" />
+                </target>
+              </configuration>
+              """
+          )
+        );
+    }
+
     private static Consumer<RecipeSpec> semanticallyEqual(boolean isEqual) {
         return spec -> spec.beforeRecipe(sources ->
           assertThat(SemanticallyEqual.areEqual((Xml) sources.get(0), (Xml) sources.get(1))).isEqualTo(isEqual));

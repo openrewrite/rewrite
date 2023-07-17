@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -32,6 +33,7 @@ class FindMissingTypesTest implements RewriteTest {
           .typeValidationOptions(TypeValidation.none());
     }
 
+    @DocumentExample
     @Test
     void missingAnnotationType() {
         rewriteRun(
@@ -72,6 +74,50 @@ class FindMissingTypesTest implements RewriteTest {
                   {
                       /*~~(Identifier type is missing or malformed)~~>*/Foo f;
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void classReference() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  {
+                      Class<?> c = Unknown.class;
+                  }
+              }
+              """,
+            """
+              class A {
+                  {
+                      Class<?> c = /*~~(Identifier type is missing or malformed)~~>*/Unknown.class;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodReference() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.Consumer;
+              
+              class A {
+                  Consumer<String> r = System.out::printlns;
+              }
+              """,
+            """
+              import java.util.function.Consumer;
+              
+              class A {
+                  Consumer<String> r = /*~~(MemberReference type is missing or malformed)~~>*/System.out::printlns;
               }
               """
           )

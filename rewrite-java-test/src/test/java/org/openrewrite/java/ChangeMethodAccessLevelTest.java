@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -23,6 +24,7 @@ import static org.openrewrite.java.Assertions.java;
 
 class ChangeMethodAccessLevelTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void publicToPrivate() {
         rewriteRun(

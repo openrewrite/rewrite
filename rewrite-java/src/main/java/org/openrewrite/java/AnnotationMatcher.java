@@ -46,8 +46,8 @@ import java.util.regex.Pattern;
  * <p>
  * {@literal @}java.lang.SuppressWarnings                                 - Matches java.lang.SuppressWarnings with no parameters.
  * {@literal @}myhttp.Get(serviceName="payments", path="recentPayments")  - Matches references to myhttp.Get where the parameters are also matched.
- * {@literal @}myhttp.Get(path="recentPayments", serviceName="payments")  - Exaclty the same results from the previous example, order of parameters does not matter.
- * {@literal @}java.lang.SuppressWarnings("deprecation")                  - Matches java.langSupressWarning with a single parameter.
+ * {@literal @}myhttp.Get(path="recentPayments", serviceName="payments")  - Exactly the same results from the previous example, order of parameters does not matter.
+ * {@literal @}java.lang.SuppressWarnings("deprecation")                  - Matches java.langSuppressWarning with a single parameter.
  * {@literal @}org.junit.runner.RunWith(org.junit.runners.JUnit4.class)   - Matches JUnit4's @RunWith(JUnit4.class)
  * </PRE>
  */
@@ -144,9 +144,9 @@ public class AnnotationMatcher {
                 if ("class".equals(fa.getSimpleName()) && matchText.endsWith(".class")) {
                     JavaType argType = fa.getTarget().getType();
                     if (argType instanceof JavaType.FullyQualified) {
-                        String queryTypeFqn = JavaType.ShallowClass.build(matchText.replaceAll("\\.class$", "")).getFullyQualifiedName();
+                        String queryTypeFqn = JavaType.ShallowClass.build(matchText.substring(0, matchText.length() - 6)).getFullyQualifiedName();
                         String targetTypeFqn = ((JavaType.FullyQualified) argType).getFullyQualifiedName();
-                        return queryTypeFqn.equals(targetTypeFqn);
+                        return TypeUtils.fullyQualifiedNamesAreEqual(queryTypeFqn, targetTypeFqn);
                     }
                     return false;
                 }

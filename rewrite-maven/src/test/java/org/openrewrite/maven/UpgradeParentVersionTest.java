@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.maven.tree.MavenRepository;
@@ -56,6 +57,7 @@ class UpgradeParentVersionTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void nonMavenCentralRepository() {
         rewriteRun(

@@ -16,6 +16,7 @@
 package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.test.RewriteTest;
 
@@ -24,6 +25,7 @@ import static org.openrewrite.java.Assertions.java;
 @SuppressWarnings({"ClassInitializerMayBeStatic", "ResultOfMethodCallIgnored"})
 class UsesAllMethodsTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void usesBothMethods() {
         rewriteRun(

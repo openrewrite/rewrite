@@ -38,6 +38,7 @@ import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.marker.Markers;
 
 import java.math.BigDecimal;
@@ -75,6 +76,12 @@ public class GroovyParserVisitor {
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     @SuppressWarnings("RegExpSimplifiable")
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
+
+    /**
+     * Elements within GString expressions which omit curly braces have column positions which are incorrect.
+     * The column positions act like there *is* a curly brace.
+     */
+    private int columnOffset;
 
     public GroovyParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source, JavaTypeCache typeCache, ExecutionContext ctx) {
         this.sourcePath = sourcePath;
@@ -502,7 +509,7 @@ public class GroovyParserVisitor {
                 params.add(JRightPadded.build(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY)));
             }
 
-            JContainer<NameTree> throwz = method.getExceptions().length == 0 ? null : JContainer.build(
+            JContainer<NameTree> throws_ = method.getExceptions().length == 0 ? null : JContainer.build(
                     sourceBefore("throws"),
                     bodyVisitor.visitRightPadded(method.getExceptions(), null),
                     Markers.EMPTY
@@ -519,7 +526,7 @@ public class GroovyParserVisitor {
                     returnType,
                     new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
                     JContainer.build(beforeParen, params, Markers.EMPTY),
-                    throwz,
+                    throws_,
                     body,
                     null,
                     typeMapping.methodType(method)
@@ -560,7 +567,7 @@ public class GroovyParserVisitor {
                     if (',' == source.charAt(cursor)) {
                         // In Groovy trailing "," are allowed
                         cursor += 1;
-                        converted = converted.withMarkers(Markers.EMPTY.add(new TrailingComma(randomId(), whitespace())));
+                        converted = converted.withMarkers(Markers.EMPTY.add(new org.openrewrite.java.marker.TrailingComma(randomId(), whitespace())));
                     }
                     ts.add(converted);
                     if (afterLast != null && source.startsWith(afterLast, cursor)) {
@@ -571,6 +578,12 @@ public class GroovyParserVisitor {
                 }
             }
             return ts;
+        }
+
+        private void visitParenthesized(ASTNode node, Space fmt) {
+            skip("(");
+            queue.add(new J.Parentheses<Expression>(randomId(), fmt, Markers.EMPTY,
+                    convert(node, t -> sourceBefore(")"))));
         }
 
         @Override
@@ -677,144 +690,157 @@ public class GroovyParserVisitor {
         @Override
         public void visitBinaryExpression(BinaryExpression binary) {
             Space fmt = whitespace();
-            Expression left = visit(binary.getLeftExpression());
 
-            Space opPrefix = whitespace();
-            boolean assignment = false;
-            J.AssignmentOperation.Type assignOp = null;
-            J.Binary.Type binaryOp = null;
-            G.Binary.Type gBinaryOp = null;
-            switch (binary.getOperation().getText()) {
-                case "+":
-                    binaryOp = J.Binary.Type.Addition;
-                    break;
-                case "&&":
-                    binaryOp = J.Binary.Type.And;
-                    break;
-                case "&":
-                    binaryOp = J.Binary.Type.BitAnd;
-                    break;
-                case "|":
-                    binaryOp = J.Binary.Type.BitOr;
-                    break;
-                case "^":
-                    binaryOp = J.Binary.Type.BitXor;
-                    break;
-                case "/":
-                    binaryOp = J.Binary.Type.Division;
-                    break;
-                case "==":
-                    binaryOp = J.Binary.Type.Equal;
-                    break;
-                case ">":
-                    binaryOp = J.Binary.Type.GreaterThan;
-                    break;
-                case ">=":
-                    binaryOp = J.Binary.Type.GreaterThanOrEqual;
-                    break;
-                case "<<":
-                    binaryOp = J.Binary.Type.LeftShift;
-                    break;
-                case "<":
-                    binaryOp = J.Binary.Type.LessThan;
-                    break;
-                case "<=":
-                    binaryOp = J.Binary.Type.LessThanOrEqual;
-                    break;
-                case "%":
-                    binaryOp = J.Binary.Type.Modulo;
-                    break;
-                case "*":
-                    binaryOp = J.Binary.Type.Multiplication;
-                    break;
-                case "!=":
-                    binaryOp = J.Binary.Type.NotEqual;
-                    break;
-                case "||":
-                    binaryOp = J.Binary.Type.Or;
-                    break;
-                case ">>":
-                    binaryOp = J.Binary.Type.RightShift;
-                    break;
-                case "-":
-                    binaryOp = J.Binary.Type.Subtraction;
-                    break;
-                case ">>>":
-                    binaryOp = J.Binary.Type.UnsignedRightShift;
-                    break;
-                case "=":
-                    assignment = true;
-                    break;
-                case "+=":
-                    assignOp = J.AssignmentOperation.Type.Addition;
-                    break;
-                case "-=":
-                    assignOp = J.AssignmentOperation.Type.Subtraction;
-                    break;
-                case "&=":
-                    assignOp = J.AssignmentOperation.Type.BitAnd;
-                    break;
-                case "|=":
-                    assignOp = J.AssignmentOperation.Type.BitOr;
-                    break;
-                case "^=":
-                    assignOp = J.AssignmentOperation.Type.BitXor;
-                    break;
-                case "/=":
-                    assignOp = J.AssignmentOperation.Type.Division;
-                    break;
-                case "<<=":
-                    assignOp = J.AssignmentOperation.Type.LeftShift;
-                    break;
-                case "%=":
-                    assignOp = J.AssignmentOperation.Type.Modulo;
-                    break;
-                case "*=":
-                    assignOp = J.AssignmentOperation.Type.Multiplication;
-                    break;
-                case ">>=":
-                    assignOp = J.AssignmentOperation.Type.RightShift;
-                    break;
-                case ">>>=":
-                    assignOp = J.AssignmentOperation.Type.UnsignedRightShift;
-                    break;
-                case "=~":
-                    gBinaryOp = G.Binary.Type.Find;
-                    break;
-                case "==~":
-                    gBinaryOp = G.Binary.Type.Match;
-                    break;
-                case "[":
-                    gBinaryOp = G.Binary.Type.Access;
-                    break;
-                case "in":
-                    gBinaryOp = G.Binary.Type.In;
-                    break;
-            }
+            if (source.charAt(cursor) == '(') {
+                visitParenthesized(binary, fmt);
+            } else {
+                Expression left = visit(binary.getLeftExpression());
 
-            cursor += binary.getOperation().getText().length();
-            Expression right = visit(binary.getRightExpression());
-
-            if (assignment) {
-                queue.add(new J.Assignment(randomId(), fmt, Markers.EMPTY,
-                        left, JLeftPadded.build(right).withBefore(opPrefix),
-                        typeMapping.type(binary.getType())));
-            } else if (assignOp != null) {
-                queue.add(new J.AssignmentOperation(randomId(), fmt, Markers.EMPTY,
-                        left, JLeftPadded.build(assignOp).withBefore(opPrefix),
-                        right, typeMapping.type(binary.getType())));
-            } else if (binaryOp != null) {
-                queue.add(new J.Binary(randomId(), fmt, Markers.EMPTY,
-                        left, JLeftPadded.build(binaryOp).withBefore(opPrefix),
-                        right, typeMapping.type(binary.getType())));
-            } else if (gBinaryOp != null) {
-                Space after = EMPTY;
-                if (gBinaryOp == G.Binary.Type.Access) {
-                    after = sourceBefore("]");
+                Space opPrefix = whitespace();
+                boolean assignment = false;
+                boolean instanceOf = false;
+                J.AssignmentOperation.Type assignOp = null;
+                J.Binary.Type binaryOp = null;
+                G.Binary.Type gBinaryOp = null;
+                switch (binary.getOperation().getText()) {
+                    case "+":
+                        binaryOp = J.Binary.Type.Addition;
+                        break;
+                    case "&&":
+                        binaryOp = J.Binary.Type.And;
+                        break;
+                    case "&":
+                        binaryOp = J.Binary.Type.BitAnd;
+                        break;
+                    case "|":
+                        binaryOp = J.Binary.Type.BitOr;
+                        break;
+                    case "^":
+                        binaryOp = J.Binary.Type.BitXor;
+                        break;
+                    case "/":
+                        binaryOp = J.Binary.Type.Division;
+                        break;
+                    case "==":
+                        binaryOp = J.Binary.Type.Equal;
+                        break;
+                    case ">":
+                        binaryOp = J.Binary.Type.GreaterThan;
+                        break;
+                    case ">=":
+                        binaryOp = J.Binary.Type.GreaterThanOrEqual;
+                        break;
+                    case "<<":
+                        binaryOp = J.Binary.Type.LeftShift;
+                        break;
+                    case "<":
+                        binaryOp = J.Binary.Type.LessThan;
+                        break;
+                    case "<=":
+                        binaryOp = J.Binary.Type.LessThanOrEqual;
+                        break;
+                    case "%":
+                        binaryOp = J.Binary.Type.Modulo;
+                        break;
+                    case "*":
+                        binaryOp = J.Binary.Type.Multiplication;
+                        break;
+                    case "!=":
+                        binaryOp = J.Binary.Type.NotEqual;
+                        break;
+                    case "||":
+                        binaryOp = J.Binary.Type.Or;
+                        break;
+                    case ">>":
+                        binaryOp = J.Binary.Type.RightShift;
+                        break;
+                    case "-":
+                        binaryOp = J.Binary.Type.Subtraction;
+                        break;
+                    case ">>>":
+                        binaryOp = J.Binary.Type.UnsignedRightShift;
+                        break;
+                    case "instanceof":
+                        instanceOf = true;
+                        break;
+                    case "=":
+                        assignment = true;
+                        break;
+                    case "+=":
+                        assignOp = J.AssignmentOperation.Type.Addition;
+                        break;
+                    case "-=":
+                        assignOp = J.AssignmentOperation.Type.Subtraction;
+                        break;
+                    case "&=":
+                        assignOp = J.AssignmentOperation.Type.BitAnd;
+                        break;
+                    case "|=":
+                        assignOp = J.AssignmentOperation.Type.BitOr;
+                        break;
+                    case "^=":
+                        assignOp = J.AssignmentOperation.Type.BitXor;
+                        break;
+                    case "/=":
+                        assignOp = J.AssignmentOperation.Type.Division;
+                        break;
+                    case "<<=":
+                        assignOp = J.AssignmentOperation.Type.LeftShift;
+                        break;
+                    case "%=":
+                        assignOp = J.AssignmentOperation.Type.Modulo;
+                        break;
+                    case "*=":
+                        assignOp = J.AssignmentOperation.Type.Multiplication;
+                        break;
+                    case ">>=":
+                        assignOp = J.AssignmentOperation.Type.RightShift;
+                        break;
+                    case ">>>=":
+                        assignOp = J.AssignmentOperation.Type.UnsignedRightShift;
+                        break;
+                    case "=~":
+                        gBinaryOp = G.Binary.Type.Find;
+                        break;
+                    case "==~":
+                        gBinaryOp = G.Binary.Type.Match;
+                        break;
+                    case "[":
+                        gBinaryOp = G.Binary.Type.Access;
+                        break;
+                    case "in":
+                        gBinaryOp = G.Binary.Type.In;
+                        break;
                 }
-                queue.add(new G.Binary(randomId(), fmt, Markers.EMPTY,
-                        left, JLeftPadded.build(gBinaryOp).withBefore(opPrefix),
-                        right, after, typeMapping.type(binary.getType())));
+
+                cursor += binary.getOperation().getText().length();
+                Expression right = visit(binary.getRightExpression());
+
+                if (assignment) {
+                    queue.add(new J.Assignment(randomId(), fmt, Markers.EMPTY,
+                            left, JLeftPadded.build(right).withBefore(opPrefix),
+                            typeMapping.type(binary.getType())));
+                } else if (instanceOf) {
+                    queue.add(new J.InstanceOf(randomId(), fmt, Markers.EMPTY,
+                            JRightPadded.build(left).withAfter(opPrefix), right, null,
+                            typeMapping.type(binary.getType())));
+                } else if (assignOp != null) {
+                    queue.add(new J.AssignmentOperation(randomId(), fmt, Markers.EMPTY,
+                            left, JLeftPadded.build(assignOp).withBefore(opPrefix),
+                            right, typeMapping.type(binary.getType())));
+                } else if (binaryOp != null) {
+                    queue.add(new J.Binary(randomId(), fmt, Markers.EMPTY,
+                            left, JLeftPadded.build(binaryOp).withBefore(opPrefix),
+                            right, typeMapping.type(binary.getType())));
+                } else if (gBinaryOp != null) {
+                    Space after = EMPTY;
+                    if (gBinaryOp == G.Binary.Type.Access) {
+                        after = sourceBefore("]");
+                    }
+                    queue.add(new G.Binary(randomId(), fmt, Markers.EMPTY,
+                            left, JLeftPadded.build(gBinaryOp).withBefore(opPrefix),
+                            right, after, typeMapping.type(binary.getType())));
+                }
             }
         }
 
@@ -1090,21 +1116,29 @@ public class GroovyParserVisitor {
                 }
                 value = text.substring(delimiterLength, text.length() - delimiterLength);
             } else if (expression.isNullExpression()) {
-                text = "null";
+                if(source.startsWith("null", cursor)) {
+                    text = "null";
+                } else {
+                    text = "";
+                }
                 jType = JavaType.Primitive.Null;
             } else {
                 ctx.getOnError().accept(new IllegalStateException("Unexpected constant type " + type));
                 return;
             }
 
-            if (source.charAt(cursor) == '+' && !text.startsWith("+")) {
-                // A unaryPlus operator is implied on numerics and needs to be manually detected / added via the source.
-                text = "+" + text;
-            }
-            cursor += text.length();
+            if (source.charAt(cursor) == '(') {
+                visitParenthesized(expression, prefix);
+            } else {
+                if (source.charAt(cursor) == '+' && !text.startsWith("+")) {
+                    // A unaryPlus operator is implied on numerics and needs to be manually detected / added via the source.
+                    text = "+" + text;
+                }
+                cursor += text.length();
 
-            queue.add(new J.Literal(randomId(), prefix, Markers.EMPTY, value, text,
-                    null, jType));
+                queue.add(new J.Literal(randomId(), prefix, Markers.EMPTY, value, text,
+                        null, jType));
+            }
         }
 
         @Override
@@ -1271,10 +1305,10 @@ public class GroovyParserVisitor {
             J.ControlParentheses<Expression> ifCondition = new J.ControlParentheses<>(randomId(), sourceBefore("("), Markers.EMPTY,
                     JRightPadded.build((Expression) visit(ifElse.getBooleanExpression().getExpression())).withAfter(sourceBefore(")")));
             JRightPadded<Statement> then = maybeSemicolon(visit(ifElse.getIfBlock()));
-            J.If.Else elze = ifElse.getElseBlock() instanceof EmptyStatement ? null :
+            J.If.Else else_ = ifElse.getElseBlock() instanceof EmptyStatement ? null :
                     new J.If.Else(randomId(), sourceBefore("else"), Markers.EMPTY,
                             maybeSemicolon(visit(ifElse.getElseBlock())));
-            queue.add(new J.If(randomId(), fmt, Markers.EMPTY, ifCondition, then, elze));
+            queue.add(new J.If(randomId(), fmt, Markers.EMPTY, ifCondition, then, else_));
         }
 
         @Override
@@ -1312,10 +1346,12 @@ public class GroovyParserVisitor {
                     boolean inCurlies = source.charAt(cursor) == '{';
                     if (inCurlies) {
                         cursor++;
+                    } else {
+                        columnOffset--;
                     }
-                    strings.add(new G.GString.Value(randomId(), Markers.EMPTY, visit(e), inCurlies));
-                    if (inCurlies) {
-                        cursor++;
+                    strings.add(new G.GString.Value(randomId(), Markers.EMPTY, visit(e),  inCurlies ? sourceBefore("}") : Space.EMPTY, inCurlies));
+                    if(!inCurlies) {
+                        columnOffset++;
                     }
                 } else if (e instanceof ConstantExpression) {
                     ConstantExpression cs = (ConstantExpression) e;
@@ -1520,6 +1556,65 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitStaticMethodCallExpression(StaticMethodCallExpression call) {
+            Space fmt = whitespace();
+
+            MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
+            JavaType.Method methodType = typeMapping.methodType(methodNode);
+            J.Identifier name = new J.Identifier(randomId(), sourceBefore(call.getMethodAsString()), Markers.EMPTY,
+                    call.getMethodAsString(), methodType, null);
+
+            // Method invocations may have type information that can enrich the type information of its parameters
+            Markers markers = Markers.EMPTY;
+            if (call.getArguments() instanceof ArgumentListExpression) {
+                ArgumentListExpression args = (ArgumentListExpression) call.getArguments();
+                if (call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE) != null) {
+                    for (org.codehaus.groovy.ast.expr.Expression arg : args.getExpressions()) {
+                        if (!(arg instanceof ClosureExpression)) {
+                            continue;
+                        }
+                        ClosureExpression cl = (ClosureExpression) arg;
+                        ClassNode actualParamTypeRaw = call.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
+                        for (Parameter p : cl.getParameters()) {
+                            if (p.isDynamicTyped()) {
+                                p.setType(actualParamTypeRaw);
+                                p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
+                            }
+                        }
+                        for (Map.Entry<String, Variable> declaredVariable : cl.getVariableScope().getDeclaredVariables().entrySet()) {
+                            if (declaredVariable.getValue() instanceof Parameter && declaredVariable.getValue().isDynamicTyped()) {
+                                Parameter p = (Parameter) declaredVariable.getValue();
+                                p.setType(actualParamTypeRaw);
+                                p.removeNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
+                            }
+                        }
+                    }
+                }
+                // handle the obscure case where there are empty parens ahead of a closure
+                if (args.getExpressions().size() == 1 && args.getExpressions().get(0) instanceof ClosureExpression) {
+                    int saveCursor = cursor;
+                    Space prefix = whitespace();
+                    if (source.charAt(cursor) == '(') {
+                        cursor += 1;
+                        Space infix = whitespace();
+                        if (source.charAt(cursor) == ')') {
+                            cursor += 1;
+                            markers = markers.add(new EmptyArgumentListPrecedesArgument(randomId(), prefix, infix));
+                        } else {
+                            cursor = saveCursor;
+                        }
+                    } else {
+                        cursor = saveCursor;
+                    }
+                }
+            }
+            JContainer<Expression> args = visit(call.getArguments());
+
+            queue.add(new J.MethodInvocation(randomId(), fmt, markers,
+                    null, null, name, args, methodType));
+        }
+
+        @Override
         public void visitPropertyExpression(PropertyExpression prop) {
             Space fmt = whitespace();
             Expression target = visit(prop.getObjectExpression());
@@ -1549,13 +1644,13 @@ public class GroovyParserVisitor {
         }
 
         @Override
-        public void visitReturnStatement(ReturnStatement retn) {
+        public void visitReturnStatement(ReturnStatement return_) {
             Space fmt = sourceBefore("return");
-            if (retn.getExpression() instanceof ConstantExpression && isSynthetic(retn.getExpression()) &&
-                (((ConstantExpression) retn.getExpression()).getValue() == null)) {
+            if (return_.getExpression() instanceof ConstantExpression && isSynthetic(return_.getExpression()) &&
+                (((ConstantExpression) return_.getExpression()).getValue() == null)) {
                 queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, null));
             } else {
-                queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, visit(retn.getExpression())));
+                queue.add(new J.Return(randomId(), fmt, Markers.EMPTY, visit(return_.getExpression())));
             }
         }
 
@@ -1601,11 +1696,17 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitTernaryExpression(TernaryExpression ternary) {
-            queue.add(new J.Ternary(randomId(), whitespace(), Markers.EMPTY,
-                    visit(ternary.getBooleanExpression()),
-                    padLeft(sourceBefore("?"), visit(ternary.getTrueExpression())),
-                    padLeft(sourceBefore(":"), visit(ternary.getFalseExpression())),
-                    typeMapping.type(ternary.getType())));
+            Space prefix = whitespace();
+
+            if (source.charAt(cursor) == '(') {
+                visitParenthesized(ternary, prefix);
+            } else {
+                queue.add(new J.Ternary(randomId(), prefix, Markers.EMPTY,
+                        visit(ternary.getBooleanExpression()),
+                        padLeft(sourceBefore("?"), visit(ternary.getTrueExpression())),
+                        padLeft(sourceBefore(":"), visit(ternary.getFalseExpression())),
+                        typeMapping.type(ternary.getType())));
+            }
         }
 
         @Override
@@ -1681,11 +1782,11 @@ public class GroovyParserVisitor {
 
             // Strangely, groovy parses the finally's block as a BlockStatement which contains another BlockStatement
             // The true contents of the block are within the first statement of this apparently pointless enclosing BlockStatement
-            JLeftPadded<J.Block> finallyy = !(node.getFinallyStatement() instanceof BlockStatement) ? null :
+            JLeftPadded<J.Block> finally_ = !(node.getFinallyStatement() instanceof BlockStatement) ? null :
                     padLeft(sourceBefore("finally"), visit(((BlockStatement) node.getFinallyStatement()).getStatements().get(0)));
 
             //noinspection ConstantConditions
-            queue.add(new J.Try(randomId(), prefix, Markers.EMPTY, resources, body, catches, finallyy));
+            queue.add(new J.Try(randomId(), prefix, Markers.EMPTY, resources, body, catches, finally_));
 
         }
 
@@ -2034,15 +2135,6 @@ public class GroovyParserVisitor {
     }
 
     /**
-     * Strings in ConstantExpression have already replaced character sequences like "\n", so its value does not match
-     * the source code.
-     */
-    private String valueWithEscapes(ConstantExpression stringLiteral) {
-        String delimiter = "";
-        return delimiter;
-    }
-
-    /**
      * Gets the length in characters of the AST node.
      * cursor is presumed to point at the beginning of the node.
      */
@@ -2052,7 +2144,7 @@ public class GroovyParserVisitor {
         }
         int lineCount = node.getLastLineNumber() - node.getLineNumber();
         if (lineCount == 0) {
-            return node.getLastColumnNumber() - node.getColumnNumber();
+            return node.getLastColumnNumber() - node.getColumnNumber() + columnOffset;
         }
         int linesSoFar = 0;
         int length = 0;
@@ -2068,7 +2160,7 @@ public class GroovyParserVisitor {
 
             length++;
 
-            if (finalLineChars == node.getLastColumnNumber()) {
+            if (finalLineChars == node.getLastColumnNumber() + columnOffset) {
                 return length;
             }
         }
@@ -2179,7 +2271,7 @@ public class GroovyParserVisitor {
     }
 
     /*
-       Visit the value filled in to a parameterized type, such as in a variable declaration.
+       Visit the value filled into a parameterized type, such as in a variable declaration.
        Not to be confused with the declaration of a type parameter on a class or method.
 
        Can contain a J.Identifier, as is the case in a typical variable declaration:

@@ -16,6 +16,7 @@
 package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -38,6 +39,7 @@ class FindImportsTest implements RewriteTest {
         assertThat(new TypeMatcher("java.util.List").matchesPackage("java.util.*")).isTrue();
     }
 
+    @DocumentExample
     @Test
     void exactMatch() {
         rewriteRun(

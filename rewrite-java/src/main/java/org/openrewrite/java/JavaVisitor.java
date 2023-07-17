@@ -15,14 +15,16 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.*;
+import org.openrewrite.Cursor;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
@@ -149,17 +151,16 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @SuppressWarnings("unused")
     public Space visitSpace(Space space, Space.Location loc, P p) {
-        Space s = space;
-        s = s.withComments(ListUtils.map(s.getComments(), comment -> {
-            if (comment instanceof Javadoc) {
-                if (javadocVisitor == null) {
-                    javadocVisitor = getJavadocVisitor();
-                }
-                return (Comment) javadocVisitor.visit((Javadoc) comment, p);
-            }
-            return comment;
-        }));
-        return s;
+        return space == Space.EMPTY || space == Space.SINGLE_SPACE ? space :
+                space.withComments(ListUtils.map(space.getComments(), comment -> {
+                    if (comment instanceof Javadoc) {
+                        if (javadocVisitor == null) {
+                            javadocVisitor = getJavadocVisitor();
+                        }
+                        return (Comment) javadocVisitor.visit((Javadoc) comment, p);
+                    }
+                    return comment;
+                }));
     }
 
     @Nullable
@@ -204,7 +205,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         a = a.withAnnotations(ListUtils.map(a.getAnnotations(), e -> visitAndCast(e, p)));
         a = a.withTypeExpression(visitAndCast(a.getTypeExpression(), p));
         a = a.withTypeExpression(visitTypeName(a.getTypeExpression(), p));
-        a = a.withType(visitType(a.getType(), p));
         return a;
     }
 
@@ -269,12 +269,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                         ), JRightPadded.Location.DIMENSION, p)
                 )
         );
-        a = a.withType(visitType(a.getType(), p));
         return a;
     }
 
-    public J visitAssert(J.Assert azzert, P p) {
-        J.Assert a = azzert;
+    public J visitAssert(J.Assert assert_, P p) {
+        J.Assert a = assert_;
         a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.ASSERT_PREFIX, p));
         a = a.withMarkers(visitMarkers(a.getMarkers(), p));
         Statement temp = (Statement) visitStatement(a, p);
@@ -383,8 +382,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return b;
     }
 
-    public J visitCase(J.Case caze, P p) {
-        J.Case c = caze;
+    public J visitCase(J.Case case_, P p) {
+        J.Case c = case_;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.CASE_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
         Statement temp = (Statement) visitStatement(c, p);
@@ -399,8 +398,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return c;
     }
 
-    public J visitCatch(J.Try.Catch catzh, P p) {
-        J.Try.Catch c = catzh;
+    public J visitCatch(J.Try.Catch catch_, P p) {
+        J.Try.Catch c = catch_;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.CATCH_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
         c = c.withParameter(visitAndCast(c.getParameter(), p));
@@ -454,12 +453,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         c = c.withBody(visitAndCast(c.getBody(), p));
         c = c.withType(visitType(c.getType(), p));
         return c;
-    }
-
-    public J visitJavaSourceFile(JavaSourceFile cu, P p) {
-        return cu instanceof J.CompilationUnit ?
-                visitCompilationUnit((J.CompilationUnit) cu, p) :
-                cu;
     }
 
     public J visitCompilationUnit(J.CompilationUnit cu, P p) {
@@ -538,13 +531,13 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return e;
     }
 
-    public J visitEnumValue(J.EnumValue enoom, P p) {
-        J.EnumValue e = enoom;
+    public J visitEnumValue(J.EnumValue enum_, P p) {
+        J.EnumValue e = enum_;
         e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.ENUM_VALUE_PREFIX, p));
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        e = e.withAnnotations(ListUtils.map(e.getAnnotations(), a -> visitAndCast(a, p)));
         e = e.withName(visitAndCast(e.getName(), p));
         e = e.withInitializer(visitAndCast(e.getInitializer(), p));
-        e = e.withAnnotations(ListUtils.map(e.getAnnotations(), a -> visitAndCast(a, p)));
         return e;
     }
 
@@ -649,8 +642,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return i;
     }
 
-    public J visitElse(J.If.Else elze, P p) {
-        J.If.Else e = elze;
+    public J visitElse(J.If.Else else_, P p) {
+        J.If.Else e = else_;
         e = e.withPrefix(visitSpace(e.getPrefix(), Space.Location.ELSE_PREFIX, p));
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
         e = e.getPadding().withBody(visitRightPadded(e.getPadding().getBody(), JRightPadded.Location.IF_ELSE, p));
@@ -673,8 +666,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return i;
     }
 
-    public J visitImport(J.Import impoort, P p) {
-        J.Import i = impoort;
+    public J visitImport(J.Import import_, P p) {
+        J.Import i = import_;
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.IMPORT_PREFIX, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
         i = i.getPadding().withStatic(visitLeftPadded(i.getPadding().getStatic(), JLeftPadded.Location.STATIC_IMPORT, p));
@@ -976,6 +969,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             pt = pt.getPadding().withTypeParameters(visitContainer(pt.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, p));
         }
         pt = pt.getPadding().withTypeParameters(visitTypeNames(pt.getPadding().getTypeParameters(), p));
+        pt = pt.withType(visitType(pt.getType(), p));
         return pt;
     }
 
@@ -1008,8 +1002,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return pr;
     }
 
-    public J visitReturn(J.Return retrn, P p) {
-        J.Return r = retrn;
+    public J visitReturn(J.Return return_, P p) {
+        J.Return r = return_;
         r = r.withPrefix(visitSpace(r.getPrefix(), Space.Location.RETURN_PREFIX, p));
         r = r.withMarkers(visitMarkers(r.getMarkers(), p));
         Statement temp = (Statement) visitStatement(r, p);
@@ -1022,8 +1016,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return r;
     }
 
-    public J visitSwitch(J.Switch switzh, P p) {
-        J.Switch s = switzh;
+    public J visitSwitch(J.Switch switch_, P p) {
+        J.Switch s = switch_;
         s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.SWITCH_PREFIX, p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
         Statement temp = (Statement) visitStatement(s, p);
@@ -1037,8 +1031,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return s;
     }
 
-    public J visitSwitchExpression(J.SwitchExpression switzh, P p) {
-        J.SwitchExpression s = switzh;
+    public J visitSwitchExpression(J.SwitchExpression switch_, P p) {
+        J.SwitchExpression s = switch_;
         s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.SWITCH_EXPRESSION_PREFIX, p));
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
         Expression temp = (Expression) visitExpression(s, p);
@@ -1185,6 +1179,21 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         u = u.withExpression(visitAndCast(u.getExpression(), p));
         u = u.withType(visitType(u.getType(), p));
         return u;
+    }
+
+    public J visitUnknown(J.Unknown unknown, P p) {
+        J.Unknown u = unknown;
+        u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.UNKNOWN_PREFIX, p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+        u = u.withSource(visitAndCast(u.getSource(), p));
+        return u;
+    }
+
+    public J visitUnknownSource(J.Unknown.Source source, P p) {
+        J.Unknown.Source s = source;
+        s = s.withPrefix(visitSpace(s.getPrefix(), Space.Location.UNKNOWN_SOURCE_PREFIX, p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        return s;
     }
 
     public J visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
@@ -1381,7 +1390,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     /**
-     * Check if a child AST element is in the same lexical scope as that of the AST element associated with the current
+     * Check if a child LST element is in the same lexical scope as that of the LST element associated with the current
      * cursor.
      * <p>
      * See {@link JavaVisitor#isInSameNameScope}
@@ -1391,21 +1400,5 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
      */
     protected boolean isInSameNameScope(Cursor child) {
         return isInSameNameScope(getCursor(), child);
-    }
-
-    @Override
-    protected @Nullable String describeLocation(Cursor cursor) {
-        List<String> namedElements = new ArrayList<>();
-        for (Iterator<Object> it = cursor.getPath(); it.hasNext(); ) {
-            final Object tree = it.next();
-            if (tree instanceof J.ClassDeclaration) {
-                namedElements.add(0, ((J.ClassDeclaration) tree).getSimpleName());
-            } else if (tree instanceof J.MethodDeclaration) {
-                namedElements.add(0, ((J.MethodDeclaration) tree).getSimpleName());
-            }
-        }
-        String location = String.join(".", namedElements);
-        String filename = super.describeLocation(cursor);
-        return "".equals(location) ? filename : String.format("%s (in %s)", filename, location);
     }
 }

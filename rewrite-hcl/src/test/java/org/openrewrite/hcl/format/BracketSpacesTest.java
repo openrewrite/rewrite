@@ -16,6 +16,7 @@
 package org.openrewrite.hcl.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -28,6 +29,7 @@ class BracketSpacesTest implements RewriteTest {
         spec.recipe(new AutoFormat());
     }
 
+    @DocumentExample
     @Test
     void blockBraces() {
         rewriteRun(

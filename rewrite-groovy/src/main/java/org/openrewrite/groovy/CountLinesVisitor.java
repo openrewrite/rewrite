@@ -16,54 +16,12 @@
 package org.openrewrite.groovy;
 
 import org.openrewrite.Tree;
-import org.openrewrite.groovy.tree.G;
-import org.openrewrite.java.tree.*;
 
-import java.util.concurrent.atomic.AtomicInteger;
-
-public class CountLinesVisitor extends GroovyVisitor<AtomicInteger> {
-
-    @Override
-    public J visitJavaSourceFile(JavaSourceFile cu, AtomicInteger count) {
-        if(cu instanceof G.CompilationUnit) {
-            return super.visitJavaSourceFile(cu, count);
-        }
-        return cu;
-    }
-
-    @Override
-    public G visitCompilationUnit(G.CompilationUnit cu, AtomicInteger count) {
-        // Skip compilation unit prefix and EOF
-        if(cu.getPackageDeclaration() != null) {
-            // Package often does not have a prefix to count newlines within
-            count.incrementAndGet();
-        }
-        count.getAndAdd(cu.getImports().size());
-        for(J.ClassDeclaration c  : cu.getClasses()) {
-            visit(c, count);
-        }
-        return cu;
-    }
-
-    @Override
-    public J visitBlock(J.Block block, AtomicInteger count) {
-        // Skip whitespace related to opening and closing braces
-        // Lines of code count shouldn't change based on curly brace placement
-        for(Statement s  : block.getStatements()) {
-            visit(s, count);
-        }
-        return block;
-    }
-
-    @Override
-    public Space visitSpace(Space space, Space.Location loc, AtomicInteger count) {
-        if(space.getWhitespace().contains("\n")) {
-            count.incrementAndGet();
-        }
-        return super.visitSpace(space, loc, count);
-    }
+// Originally created this thinking there would be a need for groovy-specific specialization, but so far the
+// java line counter has been sufficient.
+public class CountLinesVisitor extends org.openrewrite.java.CountLinesVisitor {
 
     public static int countLines(Tree tree) {
-        return new CountLinesVisitor().reduce(tree, new AtomicInteger()).get();
+        return org.openrewrite.java.CountLinesVisitor.countLines(tree);
     }
 }

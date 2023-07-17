@@ -16,6 +16,7 @@
 package org.openrewrite.hcl.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
 import org.openrewrite.hcl.HclParser;
@@ -38,6 +39,7 @@ class SpacesTest implements RewriteTest {
         spec.recipe(new Spaces());
     }
 
+    @DocumentExample
     @Test
     void columnarAlignment() {
         rewriteRun(

@@ -21,6 +21,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.java.search.FindTypes;
 
 import java.util.concurrent.TimeUnit;
@@ -43,6 +44,7 @@ public class FindTypesBenchmark {
 
     @Benchmark
     public void findTypes(JavaCompilationUnitState state) {
-        new FindTypes("java.util.List", false).run(state.getSourceFiles());
+        new FindTypes("java.util.List", false)
+                .run(state.getSourceSet(), new InMemoryExecutionContext());
     }
 }

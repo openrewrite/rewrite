@@ -22,7 +22,6 @@ import lombok.With;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -44,6 +43,9 @@ public class Markers {
     List<Marker> markers;
 
     public static Markers build(Collection<? extends Marker> markers) {
+        if (markers.isEmpty()) {
+            return EMPTY;
+        }
         List<Marker> markerList;
         if (markers instanceof List) {
             //noinspection unchecked
@@ -52,7 +54,7 @@ public class Markers {
             markerList = new ArrayList<>(markers.size());
             markerList.addAll(markers);
         }
-        return markers.isEmpty() ? EMPTY : new Markers(randomId(), markerList);
+        return new Markers(randomId(), markerList);
     }
 
     /**
@@ -109,7 +111,7 @@ public class Markers {
     }
 
     public <M extends Marker> Markers setByType(M m) {
-        return computeByType(m, (replacement, existing) -> replacement);
+        return computeByType(m, (existing, replacement) -> replacement);
     }
 
     /**
@@ -162,23 +164,5 @@ public class Markers {
                 .filter(markerType::isInstance)
                 .map(markerType::cast)
                 .findFirst();
-    }
-
-    /**
-     * @deprecated Use {@link SearchResult#found(Tree)} instead.
-     * @return A markers instance with a search result added.
-     */
-    @Deprecated
-    public Markers searchResult() {
-        return searchResult(null);
-    }
-
-    /**
-     * @deprecated Use {@link SearchResult#found(Tree, String)} instead.
-     * @return A markers instance with a search result added.
-     */
-    @Deprecated
-    public Markers searchResult(@Nullable String description) {
-        return computeByType(new SearchResult(randomId(), description), (s1, s2) -> s1 == null ? s2 : s1);
     }
 }

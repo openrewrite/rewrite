@@ -15,7 +15,10 @@
  */
 package org.openrewrite.style;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.With;
 import org.openrewrite.Tree;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
@@ -99,7 +102,7 @@ public class NamedStyles implements Marker {
                 mergedStyles);
     }
 
-    public Validated validate() {
+    public Validated<Object> validate() {
         return Validated.none();
     }
 }

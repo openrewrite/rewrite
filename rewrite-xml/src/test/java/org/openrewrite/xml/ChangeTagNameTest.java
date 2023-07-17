@@ -16,16 +16,18 @@
 package org.openrewrite.xml;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.xml.Assertions.xml;
 
 class ChangeTagNameTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void renamesWhitelistToAllowlist() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeTagName("/virtual-patches/enhanced-virtual-patch/whitelist-pattern", "allowlist-pattern", null)),
+          spec -> spec.recipe(new ChangeTagName("/virtual-patches/enhanced-virtual-patch/whitelist-pattern", "allowlist-pattern")),
           xml(
             """
               <virtual-patches>

@@ -1,11 +1,4 @@
 pluginManagement {
-    resolutionStrategy {
-        eachPlugin {
-            if (requested.id.namespace != null && requested.id.namespace!!.startsWith("org.openrewrite.build")) {
-                useVersion("1.9.2")
-            }
-        }
-    }
     repositories {
         mavenLocal()
         gradlePluginPortal()
@@ -87,7 +80,7 @@ if (System.getProperty("idea.active") == null &&
 // ---------------------------------------------------------------
 
 plugins {
-    id("com.gradle.enterprise") version "3.11"
+    id("com.gradle.enterprise") version "3.13.3"
     id("com.gradle.common-custom-user-data-gradle-plugin") version "latest.release"
 }
 

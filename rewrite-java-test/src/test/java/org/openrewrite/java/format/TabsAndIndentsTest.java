@@ -17,6 +17,7 @@ package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaParser;
@@ -166,6 +167,7 @@ class TabsAndIndentsTest implements RewriteTest {
     }
 
     // https://rules.sonarsource.com/java/tag/confusing/RSPEC-3973
+    @DocumentExample
     @SuppressWarnings("SuspiciousIndentAfterControlStatement")
     @Test
     void rspec3973() {
@@ -2297,6 +2299,27 @@ class TabsAndIndentsTest implements RewriteTest {
               public record RenameRequest(
                   @NotBlank
                   @JsonProperty("name") String name) {
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3089")
+    @Test
+    void enumConstants() {
+        rewriteRun(
+          java(
+            """
+              public enum WorkflowStatus {
+                  @SuppressWarnings("value1")
+                  VALUE1,
+                  @SuppressWarnings("value2")
+                  VALUE2,
+                  @SuppressWarnings("value3")
+                  VALUE3,
+                  @SuppressWarnings("value4")
+                  VALUE4
               }
               """
           )

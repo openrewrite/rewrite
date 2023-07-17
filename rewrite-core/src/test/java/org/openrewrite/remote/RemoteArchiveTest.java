@@ -17,9 +17,9 @@ package org.openrewrite.remote;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.openrewrite.Tree;
-import org.openrewrite.marker.Markers;
-import org.openrewrite.quark.Quark;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.HttpSenderExecutionContextView;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.test.MockHttpSender;
 
 import java.io.ByteArrayOutputStream;
@@ -37,6 +37,9 @@ class RemoteArchiveTest {
     @ValueSource(strings = {"7.4.2", "7.5-rc-1", "7.6"})
     void gradleWrapper(String version) throws Exception {
         URL distributionUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("gradle-" + version + "-bin.zip"));
+        ExecutionContext ctx = new InMemoryExecutionContext();
+        HttpSenderExecutionContextView.view(ctx)
+          .setLargeFileHttpSender(new MockHttpSender(distributionUrl::openStream));
 
         RemoteArchive remoteArchive = Remote
           .builder(
@@ -45,18 +48,14 @@ class RemoteArchiveTest {
           )
           .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
 
-        byte[] actual = readAll(remoteArchive.getInputStream(new MockHttpSender(distributionUrl::openStream)));
+        byte[] actual = readAll(remoteArchive.getInputStream(ctx));
         assertThat(actual).hasSizeGreaterThan(50_000);
     }
 
     private byte[] readAll(InputStream is) {
         try {
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            int count;
-            byte[] buf = new byte[4096];
-            while ((count = is.read(buf)) != -1) {
-                baos.write(buf, 0, count);
-            }
+            is.transferTo(baos);
             return baos.toByteArray();
         } catch (IOException e) {
             throw new RuntimeException(e);

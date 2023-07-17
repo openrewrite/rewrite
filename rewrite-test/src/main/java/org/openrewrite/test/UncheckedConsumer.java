@@ -18,7 +18,6 @@ package org.openrewrite.test;
 import org.openrewrite.internal.LoathingOfOthers;
 
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 @LoathingOfOthers("Checked Exceptions")
 public interface UncheckedConsumer<T> extends Consumer<T> {

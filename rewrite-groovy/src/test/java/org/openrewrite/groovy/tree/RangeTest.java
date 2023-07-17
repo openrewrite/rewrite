@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.groovy.Assertions.groovy;
 
-public class RangeTest implements RewriteTest {
+class RangeTest implements RewriteTest {
 
     @Test
     void rangeExpression() {

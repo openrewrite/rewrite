@@ -20,18 +20,21 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class Find extends Recipe {
-
-    private static final String SR_PREFIX = "~~>(";
-    private static final int SR_LENGTH = SR_PREFIX.length();
 
     @Override
     public String getDisplayName() {
@@ -40,7 +43,7 @@ public class Find extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Search for text in a plain text file. Wraps the results in \"~~>( )\".";
+        return "Search for text, treating all textual sources as plain text.";
     }
 
     @Option(displayName = "Find",
@@ -49,51 +52,91 @@ public class Find extends Recipe {
     String find;
 
     @Option(displayName = "Regex",
-            description = "Default false. If true, `find` will be interpreted as a Regular Expression.",
+            description = "If true, `find` will be interpreted as a Regular Expression. Default `false`.",
             required = false)
     @Nullable
     Boolean regex;
 
+    @Option(displayName = "Case sensitive",
+            description = "If `true` the search will be sensitive to case. Default `false`.",
+            required = false)
+    @Nullable
+    Boolean caseSensitive;
+
+    @Option(displayName = "Regex Multiline Mode",
+            description = "When performing a regex search setting this to `true` allows \"^\" and \"$\" to match the beginning and end of lines, respectively. " +
+                          "When performing a regex search when this is `false` \"^\" and \"$\" will match only the beginning and ending of the entire source file, respectively." +
+                          "Has no effect when not performing a regex search. Default `false`.",
+            required = false)
+    @Nullable
+    Boolean multiline;
+
+    @Option(displayName = "Regex Dot All",
+            description = "When performing a regex search setting this to `true` allows \".\" to match line terminators." +
+                          "Has no effect when not performing a regex search. Default `false`.",
+            required = false)
+    @Nullable
+    Boolean dotAll;
+
+    @Option(displayName = "File pattern",
+            description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
+                          "When not set, all source files are searched.",
+            example = "**/*.java")
+    @Nullable
+    String filePattern;
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new TreeVisitor<Tree, ExecutionContext>() {
+
+        TreeVisitor<?, ExecutionContext> visitor = new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Tree visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
-                if(sourceFile instanceof Quark || sourceFile instanceof Remote || sourceFile instanceof Binary) {
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                if (sourceFile instanceof Quark || sourceFile instanceof Remote || sourceFile instanceof Binary) {
                     return sourceFile;
                 }
                 PlainText plainText = PlainTextParser.convert(sourceFile);
                 String searchStr = find;
-                if(!Boolean.TRUE.equals(regex)) {
+                if (!Boolean.TRUE.equals(regex)) {
                     searchStr = Pattern.quote(searchStr);
                 }
-                Pattern pattern = Pattern.compile(searchStr);
+                int patternOptions = 0;
+                if(!Boolean.TRUE.equals(caseSensitive)) {
+                    patternOptions |= Pattern.CASE_INSENSITIVE;
+                }
+                if(Boolean.TRUE.equals(multiline)) {
+                    patternOptions |= Pattern.MULTILINE;
+                }
+                if(Boolean.TRUE.equals(dotAll)) {
+                    patternOptions |= Pattern.DOTALL;
+                }
+                Pattern pattern = Pattern.compile(searchStr, patternOptions);
                 Matcher matcher = pattern.matcher(plainText.getText());
                 String rawText = plainText.getText();
-                StringBuilder result = new StringBuilder();
-                boolean anyFound = false;
+                if (!matcher.find()) {
+                    return sourceFile;
+                }
+                matcher.reset();
+                List<PlainText.Snippet> snippets = new ArrayList<>();
                 int previousEnd = 0;
-                while(matcher.find()) {
-                    anyFound = true;
+                while (matcher.find()) {
                     int matchStart = matcher.start();
-                    result.append(rawText, previousEnd, matchStart);
-                    if(matchStart >= SR_LENGTH && rawText.substring(matchStart - SR_LENGTH, matchStart).equals(SR_PREFIX)) {
-                        result.append(rawText, matchStart, matcher.end());
-                    } else {
-                        result.append(SR_PREFIX).append(rawText, matchStart, matcher.end()).append(")");
-                    }
+                    snippets.add(snippet(rawText.substring(previousEnd, matchStart)));
+                    snippets.add(SearchResult.found(snippet(rawText.substring(matchStart, matcher.end()))));
                     previousEnd = matcher.end();
                 }
-                if(anyFound) {
-                    result.append(rawText.substring(previousEnd));
-                    String newText = result.toString();
-                    if(!newText.equals(rawText)) {
-                        plainText = plainText.withText(newText);
-                    }
-                }
-                return plainText;
+                snippets.add(snippet(rawText.substring(previousEnd)));
+                return plainText.withText("").withSnippets(snippets);
             }
         };
+        if(filePattern != null) {
+            visitor = Preconditions.check(new HasSourcePath<>(filePattern), visitor);
+        }
+        return visitor;
     }
 
+
+    private static PlainText.Snippet snippet(String text) {
+        return new PlainText.Snippet(Tree.randomId(), Markers.EMPTY, text);
+    }
 }

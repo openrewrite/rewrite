@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -50,6 +51,7 @@ class GenerateGetterAndSetterVisitorTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void getterAndSetterForNonPrimitive() {
         rewriteRun(

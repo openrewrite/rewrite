@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import lombok.Value;
 import lombok.With;
 import org.antlr.v4.runtime.*;
+import org.openrewrite.Cursor;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.java.internal.grammar.TemplateParameterLexer;
 import org.openrewrite.java.internal.grammar.TemplateParameterParser;
@@ -35,19 +36,30 @@ import static org.openrewrite.Tree.randomId;
 
 class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
 
-    static boolean matchesTemplate(JavaTemplate template, J input) {
+    @Value
+    static class TemplateMatchResult {
+        boolean match;
+        List<J> matchedParameters;
+    }
+
+    static TemplateMatchResult matchesTemplate(JavaTemplate template, Cursor input) {
         JavaCoordinates coordinates;
-        if (input instanceof Expression) {
-            coordinates = ((Expression) input).getCoordinates().replace();
-        } else if (input instanceof Statement) {
-            coordinates = ((Statement) input).getCoordinates().replace();
+        if (input.getValue() instanceof Expression) {
+            coordinates = ((Expression) input.getValue()).getCoordinates().replace();
+        } else if (input.getValue() instanceof Statement) {
+            coordinates = ((Statement) input.getValue()).getCoordinates().replace();
         } else {
             throw new IllegalArgumentException("Only expressions and statements can be matched against a template: " + input.getClass());
         }
 
         J[] parameters = createTemplateParameters(template.getCode());
-        J templateTree = template.withTemplate(input, coordinates, parameters);
-        return matchesTemplate(templateTree, input);
+        try {
+            J templateTree = template.apply(input, coordinates, (Object[]) parameters);
+            return matchTemplate(templateTree, input);
+        } catch (RuntimeException e) {
+            // FIXME this is just a workaround, as template matching finds many new corner cases in `JavaTemplate` which we need to fix
+            return new TemplateMatchResult(false, Collections.emptyList());
+        }
     }
 
     private static J[] createTemplateParameters(String code) {
@@ -113,6 +125,12 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         return parameters.toArray(new J[0]);
     }
 
+    private static TemplateMatchResult matchTemplate(J templateTree, Cursor cursor) {
+        JavaTemplateSemanticallyEqualVisitor semanticallyEqualVisitor = new JavaTemplateSemanticallyEqualVisitor();
+        semanticallyEqualVisitor.visit(templateTree, cursor.getValue(), cursor.getParentOrThrow());
+        return new TemplateMatchResult(semanticallyEqualVisitor.isEqual(), semanticallyEqualVisitor.matchedParameters);
+    }
+
     @Value
     @With
     private static class TemplateParameter implements Marker {
@@ -120,31 +138,35 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
         String typeName;
     }
 
-    private static boolean matchesTemplate(J templateTree, J tree) {
-        SemanticallyEqualVisitor semanticallyEqualVisitor = new JavaTemplateSemanticallyEqualVisitor();
-        semanticallyEqualVisitor.visit(templateTree, tree);
-        return semanticallyEqualVisitor.isEqual();
-    }
-
     @SuppressWarnings("ConstantConditions")
     private static class JavaTemplateSemanticallyEqualVisitor extends SemanticallyEqualVisitor {
+
+        final List<J> matchedParameters = new ArrayList<>();
 
         public JavaTemplateSemanticallyEqualVisitor() {
             super(true);
         }
 
-        private boolean matchesTemplateParameterPlaceholder(J.Empty empty, J j) {
-            return empty.getMarkers().findFirst(TemplateParameter.class)
-                    .map(m -> "java.lang.Object".equals(m.typeName)
-                              || j instanceof TypedTree
-                                 && TypeUtils.isAssignableTo(m.typeName, ((TypedTree) j).getType()))
-                    .orElse(false);
+        private boolean matchTemplateParameterPlaceholder(J.Empty empty, J j) {
+            if (j instanceof TypedTree && !(j instanceof J.Primitive)) {
+                TemplateParameter marker = (TemplateParameter) empty.getMarkers().getMarkers().get(0);
+                if ("java.lang.Object".equals(marker.typeName)
+                        || TypeUtils.isAssignableTo(marker.typeName, ((TypedTree) j).getType())) {
+                    return registerMatch(j);
+                }
+            }
+            return false;
+        }
+
+        private boolean registerMatch(J j) {
+            return matchedParameters.add(j);
         }
 
         @Override
         public J.Empty visitEmpty(J.Empty empty, J j) {
             if (isEqual.get()) {
-                if (matchesTemplateParameterPlaceholder(empty, j)) {
+                if (isTemplateParameterPlaceholder(empty)) {
+                    isEqual.set(matchTemplateParameterPlaceholder(empty, j));
                     return empty;
                 }
                 if (!(j instanceof J.Empty)) {
@@ -159,6 +181,11 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
                 }
             }
             return empty;
+        }
+
+        private static boolean isTemplateParameterPlaceholder(J.Empty empty) {
+            Markers markers = empty.getMarkers();
+            return markers.getMarkers().size() == 1 && markers.getMarkers().get(0) instanceof TemplateParameter;
         }
     }
 }

@@ -16,16 +16,16 @@
 package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
-import org.openrewrite.java.marker.JavaSourceSet;
-import org.openrewrite.java.tree.J;
 
 import java.lang.reflect.Constructor;
 import java.net.URI;
 import java.nio.charset.Charset;
-import java.nio.file.*;
-import java.util.*;
+import java.nio.file.Path;
+import java.util.Collection;
+import java.util.stream.Stream;
 
 public class Java17Parser implements JavaParser {
     private final JavaParser delegate;
@@ -35,7 +35,7 @@ public class Java17Parser implements JavaParser {
     }
 
     @Override
-    public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return delegate.parseInputs(sourceFiles, relativeTo, ctx);
     }
 
@@ -54,16 +54,6 @@ public class Java17Parser implements JavaParser {
     @Override
     public void setClasspath(Collection<Path> classpath) {
         delegate.setClasspath(classpath);
-    }
-
-    @Override
-    public void setSourceSet(String sourceSet) {
-        delegate.setSourceSet(sourceSet);
-    }
-
-    @Override
-    public JavaSourceSet getSourceSet(ExecutionContext ctx) {
-        return delegate.getSourceSet(ctx);
     }
 
     public static Builder builder() {

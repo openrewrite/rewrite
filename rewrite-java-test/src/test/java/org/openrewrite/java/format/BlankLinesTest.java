@@ -17,6 +17,7 @@ package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.style.BlankLinesStyle;
@@ -34,7 +35,6 @@ import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.java.Assertions.mavenProject;
 
 class BlankLinesTest implements RewriteTest {
 
@@ -87,6 +87,7 @@ class BlankLinesTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void eachMethodOnItsOwnLine() {
         rewriteRun(
@@ -902,6 +903,24 @@ class BlankLinesTest implements RewriteTest {
               package com.intellij.samples;
               
               public class Test {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3089")
+    void enumAnnotations() {
+        rewriteRun(
+          blankLines(),
+          java(
+            """
+              public enum Test {
+                  @Deprecated
+                  A,
+                  @Deprecated
+                  B
               }
               """
           )

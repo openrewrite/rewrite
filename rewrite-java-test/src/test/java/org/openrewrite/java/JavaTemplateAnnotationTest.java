@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
@@ -31,6 +31,7 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
  */
 class JavaTemplateAnnotationTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void replaceAnnotation() {
         rewriteRun(
@@ -38,14 +39,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                   @Override
                   public J visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
-                      annotation = annotation.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "@Deprecated(since = \"#{}\", forRemoval = true)")
-                          .build(),
-                        annotation.getCoordinates().replace()
-                        ,
-                        "2.0"
-                      );
-                      return annotation;
+                      return JavaTemplate.apply("@Deprecated(since = \"#{}\", forRemoval = true)",
+                        getCursor(), annotation.getCoordinates().replace(), "2.0");
                   }
               }
             )),
@@ -72,13 +67,8 @@ class JavaTemplateAnnotationTest implements RewriteTest {
             .recipe(toRecipe(() -> new JavaVisitor<>() {
                   @Override
                   public J visitAnnotation(J.Annotation annotation, ExecutionContext executionContext) {
-                      annotation = annotation.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "@Deprecated(since = \"#{any(java.lang.String)}\", forRemoval = true)")
-                          .build(),
-                        annotation.getCoordinates().replace()
-                        ,
-                        "2.0"
-                      );
+                      annotation = JavaTemplate.apply("@Deprecated(since = \"#{any(java.lang.String)}\", forRemoval = true)",
+                        getCursor(), annotation.getCoordinates().replace(), "2.0");
                       return annotation;
                   }
               }

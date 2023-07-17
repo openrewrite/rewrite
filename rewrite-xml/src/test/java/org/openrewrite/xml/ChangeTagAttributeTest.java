@@ -16,16 +16,18 @@
 package org.openrewrite.xml;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.xml.Assertions.xml;
 
 class ChangeTagAttributeTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void alterAttributeWhenElementAndAttributeMatch() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", "myBean.subpackage", null)),
+          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", "myBean.subpackage")),
           xml(
             """
               <beans>
@@ -46,7 +48,7 @@ class ChangeTagAttributeTest implements RewriteTest {
     @Test
     void alterAttributeWithNullOldValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", null, null))
+          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", null))
             .expectedCyclesThatMakeChanges(1).cycles(1),
           xml(
             """
@@ -66,9 +68,30 @@ class ChangeTagAttributeTest implements RewriteTest {
     }
 
     @Test
+    void removeAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", null, "myBean.subpackage")),
+          xml(
+            """
+              <beans>
+                  <bean id='myBean.subpackage.subpackage2'/>
+                  <other id='myBean.subpackage.subpackage2'/>
+              </beans>
+              """,
+            """
+              <beans>
+                  <bean/>
+                  <other id='myBean.subpackage.subpackage2'/>
+              </beans>
+              """
+          )
+        );
+    }
+
+    @Test
     void attributeNotMatched() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", "not.matched", null)),
+          spec -> spec.recipe(new ChangeTagAttribute("bean", "id", "myBean2.subpackage", "not.matched")),
           xml(
             """
               <beans>

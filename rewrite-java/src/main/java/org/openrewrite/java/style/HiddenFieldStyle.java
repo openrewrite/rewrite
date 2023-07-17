@@ -17,7 +17,6 @@ package org.openrewrite.java.style;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.Incubating;
 import org.openrewrite.style.Style;
 import org.openrewrite.style.StyleHelper;
 
@@ -25,7 +24,6 @@ import static org.openrewrite.java.style.Checkstyle.hiddenFieldStyle;
 
 @Value
 @With
-@Incubating(since = "7.6.0")
 public class HiddenFieldStyle implements Style {
     /**
      * Whether to ignore constructor parameters.

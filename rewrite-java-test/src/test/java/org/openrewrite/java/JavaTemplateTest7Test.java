@@ -18,8 +18,6 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
-import org.openrewrite.java.cleanup.IsEmptyCallOnCollections;
-import org.openrewrite.java.cleanup.UseLambdaForFunctionalInterface;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
 
@@ -39,12 +37,11 @@ class JavaTemplateTest7Test implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               final MethodMatcher matcher = new MethodMatcher("Integer valueOf(..)");
-              final JavaTemplate t = JavaTemplate.builder(() -> getCursor().getParentOrThrow(), "new Integer(#{any()})").build();
 
               @Override
               public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
                   if (matcher.matches(method)) {
-                      return method.withTemplate(t, method.getCoordinates().replace(), method.getArguments().get(0));
+                      return JavaTemplate.apply("new Integer(#{any()})", getCursor(), method.getCoordinates().replace(), method.getArguments().get(0));
                   }
                   return super.visitMethodInvocation(method, p);
               }
@@ -75,22 +72,19 @@ class JavaTemplateTest7Test implements RewriteTest {
               public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
                   var cd = classDecl;
                   if (cd.getBody().getStatements().isEmpty()) {
-                      cd = cd.withBody(
-                        cd.getBody().withTemplate(
-                          JavaTemplate.builder(() -> getCursor().getParentOrThrow(),
-                              //language=groovy
-                              """
-                                /**
-                                 * comment
-                                 */
-                                void foo() {
-                                }
-                                """
-                            )
-                            .build(),
-                          cd.getBody().getCoordinates().firstStatement()
+                      cd = JavaTemplate.builder(
+                          //language=groovy
+                          """
+                            /**
+                             * comment
+                             */
+                            void foo() {
+                            }
+                            """
                         )
-                      );
+                        .contextSensitive()
+                        .build()
+                        .apply(getCursor(), cd.getBody().getCoordinates().firstStatement());
                   }
                   return cd;
               }
@@ -126,11 +120,7 @@ class JavaTemplateTest7Test implements RewriteTest {
                   var a = assignment;
                   if (a.getAssignment() instanceof J.MethodInvocation) {
                       J.MethodInvocation mi = (J.MethodInvocation) a.getAssignment();
-                      a = a.withAssignment(mi.withTemplate(
-                        JavaTemplate.builder(this::getCursor, "1")
-                          .build(),
-                        mi.getCoordinates().replace()
-                      ));
+                      a = JavaTemplate.apply("1", getCursor(), mi.getCoordinates().replace());
                   }
                   return a;
               }
@@ -149,79 +139,6 @@ class JavaTemplateTest7Test implements RewriteTest {
                   void foo() {
                       int i;
                       i = 1;
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @SuppressWarnings({"Convert2Lambda", "TrivialFunctionalExpressionUsage", "CodeBlock2Expr"})
-    @Test
-    void nestedAnonymousRunnables() {
-        rewriteRun(
-          spec -> spec.recipe(new UseLambdaForFunctionalInterface()),
-          java(
-            """
-              class Test {
-                  public void test(int n) {
-                      new Runnable() {
-                          public void run() {
-                              Runnable r = new Runnable() {
-                                  public void run() {
-                                      System.out.println("Hello world!");
-                                  }
-                              };
-                          }
-                      }.run();
-                  }
-              }
-              """,
-            """
-              class Test {
-                  public void test(int n) {
-                      new Runnable() {
-                          public void run() {
-                              Runnable r = () -> {
-                                  System.out.println("Hello world!");
-                              };
-                          }
-                      }.run();
-                  }
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void doWhileLoopCondition() {
-        rewriteRun(
-          spec -> spec.recipe(new IsEmptyCallOnCollections()),
-          java(
-            """
-              import java.util.List;
-
-              class Test {
-                  void method(List<String> l) {
-                      int i = l.size() - 1;
-                        do {
-                            l.remove(i);
-                            i--;
-                        } while (l.size() > 0);
-                  }
-              }
-              """,
-            """
-              import java.util.List;
-
-              class Test {
-                  void method(List<String> l) {
-                      int i = l.size() - 1;
-                        do {
-                            l.remove(i);
-                            i--;
-                        } while (!l.isEmpty());
                   }
               }
               """

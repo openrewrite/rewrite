@@ -17,7 +17,6 @@ package org.openrewrite.config;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.NonNull;
 
 import java.net.URI;
 import java.util.Collection;
@@ -110,7 +109,6 @@ class CategoryTreeTest {
         assertThat(categoryTree.getRecipe("org.openrewrite.MyRecipe")).isNotNull();
     }
 
-    @NonNull
     private static RecipeDescriptor recipeDescriptor(String packageName) {
         return new RecipeDescriptor(packageName + ".MyRecipe",
           "My recipe", "", emptySet(), null, emptyList(),
@@ -129,10 +127,10 @@ class CategoryTreeTest {
     void categoryRoots() {
         CategoryTree.Root<Group> ct = categoryTree();
         assertThat(ct.getCategories().stream().map(sub -> sub.getDescriptor().getPackageName()))
-                .contains(
-                        "io.moderne.rewrite", "io.moderne.cloud", // because "io.moderne" is marked as a root
-                        "org.openrewrite" // because "org" is marked as a root
-                );
+          .contains(
+            "io.moderne.rewrite", "io.moderne.cloud", // because "io.moderne" is marked as a root
+            "org.openrewrite" // because "org" is marked as a root
+          );
     }
 
     @Test

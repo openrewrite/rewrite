@@ -111,8 +111,7 @@ public class Java8ParserInputFileObject implements JavaFileObject {
     public boolean isNameCompatible(String simpleName, Kind kind) {
         String baseName = simpleName + kind.extension;
         return kind.equals(getKind())
-                && (baseName.equals(toUri().getPath())
-                || toUri().getPath().endsWith("/" + baseName));
+                && path.getFileName().toString().equals(baseName);
     }
 
     @Override

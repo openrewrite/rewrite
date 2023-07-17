@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RewriteTest;
@@ -30,24 +30,19 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
  */
 class JavaTemplateImportTest implements RewriteTest {
 
-    @ExpectedToFail
+    @Disabled
     @Test
     void replaceImport() {
         rewriteRun(
           spec -> spec.expectedCyclesThatMakeChanges(2)
             .recipe(toRecipe(() -> new JavaVisitor<>() {
-
-                @Override
-                public J visitImport(J.Import impoort, ExecutionContext executionContext) {
-                    impoort = impoort.withTemplate(
-                      JavaTemplate.builder(this::getCursor, "import #{}").build(),
-                      impoort.getCoordinates().replace(),
-                      "java.util.Stack"
-                    );
-                    return impoort;
-                }
-            }
-          )),
+                  @Override
+                  public J visitImport(J.Import import_, ExecutionContext executionContext) {
+                      return JavaTemplate.apply("import #{}", getCursor(),
+                        import_.getCoordinates().replace(), "java.util.Stack");
+                  }
+              }
+            )),
           java(
             """
               import java.util.List;

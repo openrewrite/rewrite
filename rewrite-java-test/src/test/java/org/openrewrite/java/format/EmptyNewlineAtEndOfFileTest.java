@@ -16,6 +16,7 @@
 package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
@@ -62,6 +63,7 @@ class EmptyNewlineAtEndOfFileTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void autodetectCRLF() {
         rewriteRun(

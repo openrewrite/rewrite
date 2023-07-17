@@ -25,7 +25,7 @@ import org.openrewrite.test.RewriteTest;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SuppressWarnings("ConstantConditions")
+@SuppressWarnings({"ConstantConditions", "ResultOfMethodCallIgnored"})
 class AutodetectTest implements RewriteTest {
 
     private static JavaParser jp() {
@@ -51,9 +51,14 @@ class AutodetectTest implements RewriteTest {
             }
             """
         );
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
     }
 
     @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
@@ -62,18 +67,18 @@ class AutodetectTest implements RewriteTest {
         var cus = jp().parse(
           """
             package org.springframework.cloud.netflix.eureka;
-            
+                        
             import static org.springframework.cloud.netflix.eureka.EurekaConstants.DEFAULT_PREFIX;
-            
+                        
             @SuppressWarnings("ALL")
             @ConfigurationProperties(EurekaClientConfigBean.PREFIX)
             public class EurekaClientConfigBean implements EurekaClientConfig, Ordered {
             	private static final int MINUTES = 60;
-            
+                        
             	public void setOrder(int order) {
             		this.order = order;
             	}
-            
+                        
             	@Override
             	public boolean equals(Object o) {
             		EurekaClientConfigBean that = (EurekaClientConfigBean) o;
@@ -84,13 +89,15 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
 
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
-        assertThat(tabsAndIndents.getTabSize()).isEqualTo(1);
-        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(1);
-        assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(2);
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(8);
     }
 
     @SuppressWarnings("InfiniteRecursion")
@@ -99,33 +106,35 @@ class AutodetectTest implements RewriteTest {
         var cus = jp().parse(
           """
             package com.netflix.kayenta.orca.controllers;
-            
+                        
             @SuppressWarnings("ALL")
             @RestController
             public class AdminController {
               private final ApplicationEventPublisher publisher;
-            
+                        
               @Autowired
               public AdminController(ApplicationEventPublisher publisher) {
                 this.publisher = publisher;
               }
-            
+                        
               @RequestMapping(
                   method = RequestMethod.POST)
               void setInstanceEnabled(@RequestBody Map<String, Boolean> enabledWrapper) {
                 Boolean enabled = enabledWrapper.get("enabled");
-            
+                        
                 if (enabled == null) {
                   throw new ValidationException("The field 'enabled' must be set.", null);
                 }
-            
+                        
                 setInstanceEnabled(enabled);
               }
             }
             """
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
 
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
@@ -142,21 +151,23 @@ class AutodetectTest implements RewriteTest {
                 @Override
                 public J.Identifier visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
                     J.Identifier i = super.visitIdentifier(ident, ctx);
-            
+                        
                     if (TypeUtils.isOfClassType(i.getType(), oldPackageName)
                             && i.getSimpleName().equals(oldPackageType.getClassName())) {
                         i = i.withName((newPackageType).getClassName())
                                 .withType(newPackageType);
                     }
-            
+                        
                     return i;
                 }
-            
+                        
             }
             """
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
 
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
@@ -181,11 +192,164 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
         assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
-        assertThat(tabsAndIndents.getTabSize()).isEqualTo(1);
-        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(1);
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+    }
+
+    @Test
+    void mixedTabAndWhiteSpacesIndentsWithTabSize4() {
+        var cus = jp().parse(
+          """
+            /**
+             *
+             */
+            public class Test {
+            	private final ApplicationEventPublisher publisher;
+            	public void method() {
+            		int value = 0;
+                	int value1 = 1;
+            	    int value2 = 2;
+            		{
+            	        int value3 = 2;
+                	    int value4 = 4;
+            		}
+            	}
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+    }
+
+    // TabSize 3 is atypical but not unheard of
+    @Test
+    void mixedTabAndWhiteSpacesIndentsWithTabSize3() {
+        var cus = jp().parse(
+          """
+            /**
+             *
+             */
+            public class Test {
+            	private final ApplicationEventPublisher publisher;
+            	public void method() {
+            		int value = 0;
+            	   int value1 = 1;
+            	   int value2 = 2;
+            		{
+            	      int value3 = 2;
+            	      int value4 = 4;
+            		}
+            	}
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(3);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(3);
+    }
+
+    @Test
+    void mixedTabAndWhiteSpacesIndentsWithTabSize4AndUseTabIsFalse() {
+        var cus = jp().parse(
+          """
+            /**
+             *
+             */
+            public class Test {
+            	private final ApplicationEventPublisher publisher;
+                public void method() {
+            	    int value = 0;
+            	    int value1 = 1;
+            	    int value2 = 2;
+            	    {
+                	    int value3 = 2;
+                    	int value4 = 4;
+            	    }
+            	}
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+    }
+
+    @Test
+    void inconsistentIndents() {
+        var cus = jp().parse(
+          """
+            package org.openrewrite.before;
+
+            import java.util.ArrayList;
+            import java.util.List;
+                        
+            public class HelloWorld {
+                public static void main(String[] args) {
+                    System.out.print("Hello");
+                        System.out.println(" world");
+                }
+            }
+            """
+        );
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+    }
+
+    @Test
+    void mixedTabAndWhiteSpacesIndentsWithTabSize4WithSomeErrors() {
+        var cus = jp().parse(
+          """
+            /**
+             *
+             */
+            public class Test {
+                private final ApplicationEventPublisher publisher;
+                public void method() {
+            	     int value = 0;
+            	   int value1 = 1;
+            	    int value2 = 2;
+            	    {
+                	     int value3 = 2;
+                   	int value4 = 4;
+            	    }
+            	}
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+        assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
     }
 
     @Test
@@ -209,7 +373,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
 
         assertThat(importLayout.getLayout().get(0)).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
@@ -217,26 +383,26 @@ class AutodetectTest implements RewriteTest {
 
         assertThat(importLayout.getLayout().get(2))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-            .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-            .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("org\\.openrewrite\\.internal\\..+"));
+          .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
+          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("org\\.openrewrite\\.internal\\..+"));
 
         assertThat(importLayout.getLayout().get(3)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
 
         assertThat(importLayout.getLayout().get(4))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-            .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-            .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("javax\\..+"));
+          .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
+          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("javax\\..+"));
 
         assertThat(importLayout.getLayout().get(5))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-            .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-            .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("java\\..+"));
+          .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
+          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("java\\..+"));
 
         assertThat(importLayout.getLayout().get(6)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
 
         assertThat(importLayout.getLayout().get(7))
           .isInstanceOf(ImportLayoutStyle.Block.AllOthers.class)
-            .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).isStatic());
+          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).isStatic());
     }
 
     @Test
@@ -244,35 +410,37 @@ class AutodetectTest implements RewriteTest {
         var cus = jp().parse(
           """
             package com.example;
-            
+                        
             import static com.example.Assertions.java;
-            
+                        
             import static java.util.Collections.singletonList;
             import static org.assertj.core.api.Assertions.assertThat;
             import static org.junit.jupiter.api.Assertions.assertEquals;
-            
+                        
             import java.util.List;
             """,
           """
             package com.example;
-            
+                        
             import static com.example.Assertions.java;
-            
+                        
             import static java.util.Collections.singletonList;
             import static org.assertj.core.api.Assertions.assertThat;
             import static org.junit.jupiter.api.Assertions.assertEquals;
-            
+                        
             import java.util.List;
             """
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
 
         assertThat(importLayout.getLayout().get(0))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-            .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-            .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("com\\.example\\..+"));
+          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
+          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("com\\.example\\..+"));
 
         assertThat(importLayout.getLayout().get(1)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
 
@@ -304,7 +472,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
 
         assertThat(importLayout.getClassCountToUseStarImport()).isEqualTo(6);
@@ -339,7 +509,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
 
         assertThat(importLayout.getClassCountToUseStarImport()).isEqualTo(2147483647);
@@ -357,8 +529,10 @@ class AutodetectTest implements RewriteTest {
                 }
             """
         );
-        
-        var styles = Autodetect.detect(cus);
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isTrue();
@@ -377,7 +551,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
@@ -397,7 +573,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
         assertThat(spacesStyle.getOther().getBeforeColonInForEach()).isTrue();
@@ -405,7 +583,7 @@ class AutodetectTest implements RewriteTest {
 
     @Test
     void detectAfterTypeCast() {
-        var cu = jp().parse(
+        var cus = jp().parse(
           """
                 class T {
                     {
@@ -415,7 +593,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var styles = Autodetect.detect(cu);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
         assertThat(spacesStyle.getOther().getAfterTypeCast()).isTrue();
@@ -424,7 +604,7 @@ class AutodetectTest implements RewriteTest {
     @SuppressWarnings("StatementWithEmptyBody")
     @Test
     void detectBeforeForSemicolon() {
-        var cu = jp().parse(
+        var cus = jp().parse(
           """
             class T {
                 void m() {
@@ -434,7 +614,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var styles = Autodetect.detect(cu);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
         assertThat(spacesStyle.getOther().getBeforeForSemicolon()).isFalse();
@@ -453,7 +635,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
@@ -472,7 +656,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
@@ -491,7 +677,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isTrue();
@@ -500,7 +688,7 @@ class AutodetectTest implements RewriteTest {
 
     @Test
     void detectAfterCommaInNewArray() {
-        var cu = jp().parse(
+        var cus = jp().parse(
           """
                 class T {
                     static {
@@ -509,8 +697,64 @@ class AutodetectTest implements RewriteTest {
                 }
             """
         );
-        
-        var styles = Autodetect.detect(cu);
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
+
+        assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
+        assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3172")
+    void detectAfterCommaShouldIgnoreFirstElement() {
+        var cus = jp().parse(
+          """
+                class T {
+                    static {
+                        int[] i0 = new int[]{1, 2};
+                        int[] i1 = new int[]{2, 3};
+                        int[] i2 = new int[]{3, 4};
+                        int[] i3 = new int[]{4,5};
+                    }
+                }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
+
+        assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
+        assertThat(spacesStyle.getOther().getAfterComma()).isTrue();
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3172")
+    void detectAfterCommaBasedOnLambdas() {
+        var cus = jp().parse(
+          """
+                import java.util.function.BiConsumer;
+                
+                class T {
+                    static {
+                        int[] i0 = new int[]{1,2};
+                        int[] i1 = new int[]{2,3};
+
+                        BiConsumer<?, ?> c0 = (a, b) -> {};
+                        BiConsumer<?, ?> c1 = (a, b) -> {};
+                        BiConsumer<?, ?> c2 = (a, b) -> {};
+                    }
+                }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
         assertThat(spacesStyle.getOther().getBeforeComma()).isFalse();
@@ -531,8 +775,10 @@ class AutodetectTest implements RewriteTest {
                 }
             """
         );
-        
-        var styles = Autodetect.detect(cus);
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
         assertThat(spacesStyle.getWithin().getEmptyMethodCallParentheses()).isFalse();
@@ -551,7 +797,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var spacesStyle = NamedStyles.merge(SpacesStyle.class, singletonList(styles));
 
         assertThat(spacesStyle.getWithin().getMethodCallParentheses()).isTrue();
@@ -573,7 +821,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var wrappingAndBracesStyle = NamedStyles.merge(WrappingAndBracesStyle.class, singletonList(styles));
 
         assertThat(wrappingAndBracesStyle.getIfStatement().getElseOnNewLine()).isFalse();
@@ -597,14 +847,16 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var wrappingAndBracesStyle = NamedStyles.merge(WrappingAndBracesStyle.class, singletonList(styles));
 
         assertThat(wrappingAndBracesStyle.getIfStatement().getElseOnNewLine()).isTrue();
     }
 
     @Test
-    void detectClrfLineFormat() {
+    void detectCrlfLineFormat() {
         @SuppressWarnings("TextBlockMigration") var cus = jp().parse(
           "class Test {\r\n" +
           "    // some comment\r\n" +
@@ -614,7 +866,9 @@ class AutodetectTest implements RewriteTest {
           "}\r\n"
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var lineFormatStyle = NamedStyles.merge(GeneralFormatStyle.class, singletonList(styles));
 
         assertThat(lineFormatStyle.isUseCRLFNewLines()).isTrue();
@@ -631,7 +885,9 @@ class AutodetectTest implements RewriteTest {
           "}\r\n"
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var lineFormatStyle = NamedStyles.merge(GeneralFormatStyle.class, singletonList(styles));
 
         assertThat(lineFormatStyle.isUseCRLFNewLines()).isFalse();
@@ -659,7 +915,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
 
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();
@@ -678,7 +936,7 @@ class AutodetectTest implements RewriteTest {
         var cus = jp().parse(
           """
             import java.util.stream.Stream;
-            
+                        
             class Continuations {
                 public void cont() {
                     Stream.of("foo",
@@ -708,7 +966,9 @@ class AutodetectTest implements RewriteTest {
             """
         );
 
-        var styles = Autodetect.detect(cus);
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
         var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
 
         assertThat(tabsAndIndents.getUseTabCharacter()).isFalse();

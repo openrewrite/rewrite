@@ -85,6 +85,43 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void systemScope() {
+        rewriteRun(
+          spec -> spec
+            .recipe(addDependency("doesnotexist:doesnotexist:1", "com.google.common.math.IntMath", "system")),
+          mavenProject("project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            pomXml(
+              """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                    </project>
+                """,
+              """
+                    <project>
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                        <dependencies>
+                            <dependency>
+                                <groupId>doesnotexist</groupId>
+                                <artifactId>doesnotexist</artifactId>
+                                <version>1</version>
+                                <scope>system</scope>
+                            </dependency>
+                        </dependencies>
+                    </project>
+                """
+            )
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
     void onlyIfUsingTestScope(String onlyIfUsing) {
@@ -830,6 +867,99 @@ class AddDependencyTest implements RewriteTest {
                                 <scope>test</scope>
                             </dependency>
                         </dependencies>
+                    </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void noCompileScopeDependency() {
+        rewriteRun(
+          spec -> spec.recipe(addDependency("jakarta.xml.bind:jakarta.xml.bind-api:latest.release", "com.google.common.math.IntMath", true)),
+          mavenProject(
+            "project",
+            srcMainJava(
+              java(usingGuavaIntMath)
+            ),
+            pomXml(
+              """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>org.springframework.samples</groupId>
+                      <artifactId>spring-petclinic</artifactId>
+                      <version>2.7.3</version>
+                    
+                      <parent>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-parent</artifactId>
+                        <version>3.0.5</version>
+                      </parent>
+                      <name>petclinic</name>
+                    
+                      <properties>
+                        <jakarta-servlet.version>5.0.0</jakarta-servlet.version>
+                    
+                        <java.version>17</java.version>
+                        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+                        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+                    
+                        <webjars-bootstrap.version>5.1.3</webjars-bootstrap.version>
+                        <webjars-font-awesome.version>4.7.0</webjars-font-awesome.version>
+                    
+                        <jacoco.version>0.8.8</jacoco.version>
+                    
+                      </properties>
+                    
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-data-jpa</artifactId>
+                        </dependency>
+                      </dependencies>
+                    
+                    </project>
+                """,
+              """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>org.springframework.samples</groupId>
+                      <artifactId>spring-petclinic</artifactId>
+                      <version>2.7.3</version>
+                    
+                      <parent>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-parent</artifactId>
+                        <version>3.0.5</version>
+                      </parent>
+                      <name>petclinic</name>
+                    
+                      <properties>
+                        <jakarta-servlet.version>5.0.0</jakarta-servlet.version>
+                    
+                        <java.version>17</java.version>
+                        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+                        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+                    
+                        <webjars-bootstrap.version>5.1.3</webjars-bootstrap.version>
+                        <webjars-font-awesome.version>4.7.0</webjars-font-awesome.version>
+                    
+                        <jacoco.version>0.8.8</jacoco.version>
+                    
+                      </properties>
+                    
+                      <dependencies>
+                        <dependency>
+                          <groupId>jakarta.xml.bind</groupId>
+                          <artifactId>jakarta.xml.bind-api</artifactId>
+                        </dependency>
+                        <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot-starter-data-jpa</artifactId>
+                        </dependency>
+                      </dependencies>
+                    
                     </project>
                 """
             )

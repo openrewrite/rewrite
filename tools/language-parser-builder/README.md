@@ -12,7 +12,7 @@ Update the `Assertions` class with the correct `@Language` annotation for your l
 
 The class `src/model/Toml` is meant to help you write a simplified version of the LST model. `GenerateModel` takes this simplified form and writes out the full LST model and fills out basic visitor navigation and printing methods. The generated methods in `TomlPrinter` (which will of course be renamed to the language you are implementing) are meant as a starting point. There will be further printing modification necessary, but the generator takes care of a lot of the repetitive work.
 
-You can proceed incrementally, adding model objects and running the generator, implemeting their print methods, etc. Or you can write out the entire model and generate once. The generator will not overwrite any existing methods, so iterative generation does not clobber your work.
+You can proceed incrementally, adding model objects and running the generator, implementing their print methods, etc. Or you can write out the entire model and generate once. The generator will not overwrite any existing methods, so iterative generation does not clobber your work.
 
 ### Completing the language parser
 

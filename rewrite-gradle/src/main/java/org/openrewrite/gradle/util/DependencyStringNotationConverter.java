@@ -15,8 +15,11 @@
  */
 package org.openrewrite.gradle.util;
 
+import org.openrewrite.internal.lang.Nullable;
+
 public class DependencyStringNotationConverter {
-    public Dependency parse(String notation) {
+
+    public static Dependency parse(String notation) {
         int idx = notation.lastIndexOf('@');
         if (idx == -1) {
             return parse(notation, null);
@@ -30,7 +33,7 @@ public class DependencyStringNotationConverter {
         return parse(notation, null);
     }
 
-    private Dependency parse(String notation, String ext) {
+    private static Dependency parse(String notation, @Nullable String ext) {
         Dependency dependency = new Dependency(null, null, null, null, ext);
 
         int count = 0;
@@ -54,7 +57,7 @@ public class DependencyStringNotationConverter {
         return dependency;
     }
 
-    private Dependency assignValue(Dependency dependency, int count, String fragment) {
+    private static Dependency assignValue(Dependency dependency, int count, String fragment) {
         switch (count) {
             case 0:
                 return dependency.withGroupId(fragment);

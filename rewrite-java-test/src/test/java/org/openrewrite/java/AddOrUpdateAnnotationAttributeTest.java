@@ -86,6 +86,38 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
     }
 
     @Test
+    void removeValueAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.example.Foo", null, null, null)),
+          java(
+            """
+              package org.example;
+              public @interface Foo {
+                  String value() default "";
+              }
+              """
+          ),
+
+          java(
+            """
+              import org.example.Foo;
+
+              @Foo("goodbye")
+              public class A {
+              }
+              """,
+            """
+              import org.example.Foo;
+
+              @Foo
+              public class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addNamedAttribute() {
         rewriteRun(spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", "500", null)),
           java(
@@ -150,6 +182,43 @@ class AddOrUpdateAnnotationAttributeTest implements RewriteTest {
               class SomeTest {
                   
                   @Test(timeout = 500)
+                  void foo() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void removeAttribute() {
+        rewriteRun(
+          spec -> spec.recipe(new AddOrUpdateAnnotationAttribute("org.junit.Test", "timeout", null, null)),
+          java(
+            """
+              package org.junit;
+              public @interface Test {
+                  long timeout() default 0L;
+              }
+              """
+          ),
+          java(
+            """
+              import org.junit.Test;
+                            
+              class SomeTest {
+                  
+                  @Test(timeout = 1)
+                  void foo() {
+                  }
+              }
+              """,
+            """
+              import org.junit.Test;
+                            
+              class SomeTest {
+                  
+                  @Test
                   void foo() {
                   }
               }

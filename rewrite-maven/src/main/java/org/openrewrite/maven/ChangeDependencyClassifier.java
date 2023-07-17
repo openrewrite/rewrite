@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -47,7 +48,7 @@ public class ChangeDependencyClassifier extends Recipe {
      */
     @Option(displayName = "New classifier",
             description = "Classifier to apply to specified Maven dependency. " +
-                    "May be omitted, which indicates that no classifier should be added and any existing scope be removed from the dependency.",
+                          "May be omitted, which indicates that no classifier should be added and any existing scope be removed from the dependency.",
             example = "jar",
             required = false)
     @Nullable
@@ -64,7 +65,7 @@ public class ChangeDependencyClassifier extends Recipe {
     }
 
     @Override
-    public MavenVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {

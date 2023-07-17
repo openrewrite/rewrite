@@ -15,21 +15,24 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.JavaType;
+
+import java.util.function.UnaryOperator;
+
+import static org.openrewrite.java.tree.JavaType.*;
 
 public class UnsafeJavaTypeVisitor<P> extends JavaTypeVisitor<P> {
 
     @Override
     public JavaType visitClass(JavaType.Class aClass, P p) {
         return aClass.unsafeSet(
-                ListUtils.map(aClass.getTypeParameters(), t -> visit(t, p)),
+                mapInPlace(aClass.getTypeParameters().toArray(EMPTY_JAVA_TYPE_ARRAY), t -> visit(t, p)),
                 (JavaType.FullyQualified) visit(aClass.getSupertype(), p),
                 (JavaType.FullyQualified) visit(aClass.getOwningClass(), p),
-                ListUtils.map(aClass.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p)),
-                ListUtils.map(aClass.getInterfaces(), i -> (JavaType.FullyQualified) visit(i, p)),
-                ListUtils.map(aClass.getMembers(), m -> (JavaType.Variable) visit(m, p)),
-                ListUtils.map(aClass.getMethods(), m -> (JavaType.Method) visit(m, p))
+                mapInPlace(aClass.getAnnotations().toArray(EMPTY_FULLY_QUALIFIED_ARRAY), a -> (JavaType.FullyQualified) visit(a, p)),
+                mapInPlace(aClass.getInterfaces().toArray(EMPTY_FULLY_QUALIFIED_ARRAY), i -> (JavaType.FullyQualified) visit(i, p)),
+                mapInPlace(aClass.getMembers().toArray(EMPTY_VARIABLE_ARRAY), m -> (JavaType.Variable) visit(m, p)),
+                mapInPlace(aClass.getMethods().toArray(EMPTY_METHOD_ARRAY), m -> (JavaType.Method) visit(m, p))
         );
     }
 
@@ -42,7 +45,7 @@ public class UnsafeJavaTypeVisitor<P> extends JavaTypeVisitor<P> {
     public JavaType visitParameterized(JavaType.Parameterized parameterized, P p) {
         return parameterized.unsafeSet(
                 (JavaType.FullyQualified) visit(parameterized.getType(), p),
-                ListUtils.map(parameterized.getTypeParameters(), t -> visit(t, p))
+                mapInPlace(parameterized.getTypeParameters().toArray(EMPTY_JAVA_TYPE_ARRAY), t -> visit(t, p))
         );
     }
 
@@ -51,7 +54,7 @@ public class UnsafeJavaTypeVisitor<P> extends JavaTypeVisitor<P> {
         return generic.unsafeSet(
                 generic.getName(),
                 generic.getVariance(),
-                ListUtils.map(generic.getBounds(), b -> visit(b, p))
+                mapInPlace(generic.getBounds().toArray(EMPTY_JAVA_TYPE_ARRAY), b -> visit(b, p))
         );
     }
 
@@ -60,9 +63,9 @@ public class UnsafeJavaTypeVisitor<P> extends JavaTypeVisitor<P> {
         return method.unsafeSet(
                 (JavaType.FullyQualified) visit(method.getDeclaringType(), p),
                 visit(method.getReturnType(), p),
-                ListUtils.map(method.getParameterTypes(), pt -> visit(pt, p)),
-                ListUtils.map(method.getThrownExceptions(), t -> (JavaType.FullyQualified) visit(t, p)),
-                ListUtils.map(method.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p))
+                mapInPlace(method.getParameterTypes().toArray(EMPTY_JAVA_TYPE_ARRAY), pt -> visit(pt, p)),
+                mapInPlace(method.getThrownExceptions().toArray(EMPTY_FULLY_QUALIFIED_ARRAY), t -> (JavaType.FullyQualified) visit(t, p)),
+                mapInPlace(method.getAnnotations().toArray(EMPTY_FULLY_QUALIFIED_ARRAY), a -> (JavaType.FullyQualified) visit(a, p))
         );
     }
 
@@ -71,12 +74,19 @@ public class UnsafeJavaTypeVisitor<P> extends JavaTypeVisitor<P> {
         return variable.unsafeSet(
                 visit(variable.getOwner(), p),
                 visit(variable.getType(), p),
-                ListUtils.map(variable.getAnnotations(), a -> (JavaType.FullyQualified) visit(a, p))
+                mapInPlace(variable.getAnnotations().toArray(EMPTY_FULLY_QUALIFIED_ARRAY), a -> (JavaType.FullyQualified) visit(a, p))
         );
     }
 
     @Override
     public JavaType visitMultiCatch(JavaType.MultiCatch multiCatch, P p) {
-        return multiCatch.unsafeSet(ListUtils.map(multiCatch.getThrowableTypes(), t -> visit(t, p)));
+        return multiCatch.unsafeSet(mapInPlace(multiCatch.getThrowableTypes().toArray(EMPTY_JAVA_TYPE_ARRAY), t -> visit(t, p)));
+    }
+
+    private static <T extends JavaType> T[] mapInPlace(T[] ls, UnaryOperator<T> map) {
+        for (int i = 0; i < ls.length; i++) {
+            ls[i] = map.apply(ls[i]);
+        }
+        return ls;
     }
 }

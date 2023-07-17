@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -34,7 +35,6 @@ class ChangePropertyKeyTest implements RewriteTest {
           "management.metrics.binders.*.enabled",
           "management.metrics.enable.process.files",
           null,
-          null,
           null
         ));
     }
@@ -43,7 +43,7 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Test
     void shorterNewKeyWithIndentedConfig() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("a.b.c.d.e", "x.y", null, null, null)),
+          spec -> spec.recipe(new ChangePropertyKey("a.b.c.d.e", "x.y", null, null)),
           yaml(
             """
               a:
@@ -65,7 +65,7 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Test
     void longerNewKeyWithIndentedConfig() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("x.y", "a.b.c.d.e", null, null, null)),
+          spec -> spec.recipe(new ChangePropertyKey("x.y", "a.b.c.d.e", null, null)),
           yaml(
             """
               x:
@@ -80,10 +80,12 @@ class ChangePropertyKeyTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void singleEntry() {
         rewriteRun(
-          yaml("management.metrics.binders.files.enabled: true",
+          yaml(
+            "management.metrics.binders.files.enabled: true",
             "management.metrics.enable.process.files: true"
           )
         );
@@ -92,7 +94,8 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Test
     void singleGlobEntry() {
         rewriteRun(
-          yaml("management.metrics.binders.files.enabled: true",
+          yaml(
+            "management.metrics.binders.files.enabled: true",
             "management.metrics.enable.process.files: true"
           )
         );
@@ -105,23 +108,22 @@ class ChangePropertyKeyTest implements RewriteTest {
             "management.metrics.binders.files.enabled",
             "management.metrics.enable.process.files",
             null,
-            null,
             null
           )),
           yaml(
             """
-                  unrelated.property: true
-                  management.metrics:
-                      binders:
-                          jvm.enabled: true
-                          files.enabled: true
+              unrelated.property: true
+              management.metrics:
+                  binders:
+                      jvm.enabled: true
+                      files.enabled: true
               """,
             """
-                  unrelated.property: true
-                  management.metrics:
-                      binders:
-                          jvm.enabled: true
-                      enable.process.files: true
+              unrelated.property: true
+              management.metrics:
+                  binders:
+                      jvm.enabled: true
+                  enable.process.files: true
               """
           )
         );
@@ -132,15 +134,15 @@ class ChangePropertyKeyTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                  unrelated.property: true
-                  management.metrics:
-                      binders:
-                          files.enabled: true
+              unrelated.property: true
+              management.metrics:
+                  binders:
+                      files.enabled: true
               """,
             """
-                  unrelated.property: true
-                  management.metrics:
-                      enable.process.files: true
+              unrelated.property: true
+              management.metrics:
+                  enable.process.files: true
               """
           )
         );
@@ -151,7 +153,7 @@ class ChangePropertyKeyTest implements RewriteTest {
         @Test
         void indentedProperty() {
             rewriteRun(
-              spec -> spec.recipe(new ChangePropertyKey("a.b.c", "a.b.c.d", null, null, null)),
+              spec -> spec.recipe(new ChangePropertyKey("a.b.c", "a.b.c.d", null, null)),
               yaml(
                 """
                   a:
@@ -166,7 +168,7 @@ class ChangePropertyKeyTest implements RewriteTest {
         @Test
         void dotSeparatedPropertyEqualToNewPropertyKey() {
             rewriteRun(
-              spec -> spec.recipe(new ChangePropertyKey("a.b.c", "a.b.c.d", null, null, null)),
+              spec -> spec.recipe(new ChangePropertyKey("a.b.c", "a.b.c.d", null, null)),
               yaml("a.b.c.d: true")
             );
         }
@@ -174,7 +176,7 @@ class ChangePropertyKeyTest implements RewriteTest {
         @Test
         void dotSeparatedPropertyIncludingNewPropertyKey() {
             rewriteRun(
-              spec -> spec.recipe(new ChangePropertyKey("a.b.c", "a.b.c.d", null, null, null)),
+              spec -> spec.recipe(new ChangePropertyKey("a.b.c", "a.b.c.d", null, null)),
               yaml("a.b.c.d.x: true")
             );
         }
@@ -183,41 +185,22 @@ class ChangePropertyKeyTest implements RewriteTest {
         @Issue("https://github.com/openrewrite/rewrite/issues/1114")
         void changePathToOnePathLonger() {
             rewriteRun(
-              spec -> spec.recipe(new ChangePropertyKey("a.b.c", "a.b.c.d", null, null, null)),
-              yaml("a.b.c: true",
+              spec -> spec.recipe(new ChangePropertyKey("a.b.c", "a.b.c.d", null, null)),
+              yaml(
+                "a.b.c: true",
                 "a.b.c.d: true"
               )
             );
         }
 
+        @DocumentExample
         @Test
         void changePathToOnePathShorter() {
             rewriteRun(
-              spec -> spec.recipe(new ChangePropertyKey("a.b.c.d", "a.b.c", null, null, null)),
-              yaml("a.b.c.d: true",
+              spec -> spec.recipe(new ChangePropertyKey("a.b.c.d", "a.b.c", null, null)),
+              yaml(
+                "a.b.c.d: true",
                 "a.b.c: true"
-              )
-            );
-        }
-
-        @Test
-        void changeOnlyMatchingFile() {
-            rewriteRun(
-              spec -> spec.recipe(new ChangePropertyKey(
-                "management.metrics.binders.files.enabled",
-                "management.metrics.enable.process.files",
-                null,
-                "**/a.yml",
-                null
-              )),
-              yaml(
-                "management.metrics.binders.files.enabled: true",
-                "management.metrics.enable.process.files: true",
-                spec -> spec.path("a.yml")
-              ),
-              yaml(
-                "management.metrics.binders.files.enabled: true",
-                spec -> spec.path("b.yml")
               )
             );
         }
@@ -232,23 +215,23 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void relaxedBinding(String propertyKey) {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey(propertyKey, "acme.my-project.person.changed-first-name-key", true, null, null)),
+          spec -> spec.recipe(new ChangePropertyKey(propertyKey, "acme.my-project.person.changed-first-name-key", true, null)),
           yaml(
             """
-                  unrelated.root: true
-                  acme.my-project:
+              unrelated.root: true
+              acme.my-project:
+                  unrelated: true
+                  person:
                       unrelated: true
-                      person:
-                          unrelated: true
-                          first-name: example
+                      first-name: example
               """,
             """
-                  unrelated.root: true
-                  acme.my-project:
+              unrelated.root: true
+              acme.my-project:
+                  unrelated: true
+                  person:
                       unrelated: true
-                      person:
-                          unrelated: true
-                          changed-first-name-key: example
+                      changed-first-name-key: example
               """
           )
         );
@@ -262,7 +245,6 @@ class ChangePropertyKeyTest implements RewriteTest {
             "acme.my-project.person.first-name",
             "acme.my-project.person.changed-first-name-key",
             false,
-            null,
             null
           )),
           yaml(
@@ -288,27 +270,26 @@ class ChangePropertyKeyTest implements RewriteTest {
             "i",
             "a.b.c",
             false,
-            null,
             null
           )),
           yaml(
             """
-                  a:
-                    b:
-                      f0: v0
-                      f1: v1
-                  i:
-                    f0: v0
-                    f1: v1
+              a:
+                b:
+                  f0: v0
+                  f1: v1
+              i:
+                f0: v0
+                f1: v1
               """,
             """
-                  a:
-                    b:
-                      f0: v0
-                      f1: v1
-                  a.b.c:
-                    f0: v0
-                    f1: v1
+              a:
+                b:
+                  f0: v0
+                  f1: v1
+              a.b.c:
+                f0: v0
+                f1: v1
               """
           )
         );
@@ -322,27 +303,26 @@ class ChangePropertyKeyTest implements RewriteTest {
             "old-property",
             "new-property.sub-property.super-sub",
             true,
-            null,
             null
           )),
           yaml(
             """
-                  newProperty.subProperty:
-                      superSub:
-                        f0: v0
-                        f1: v1
-                  oldProperty:
+              newProperty.subProperty:
+                  superSub:
                     f0: v0
                     f1: v1
+              oldProperty:
+                f0: v0
+                f1: v1
               """,
             """
-                  newProperty.subProperty:
-                      superSub:
-                        f0: v0
-                        f1: v1
-                  new-property.sub-property.super-sub:
+              newProperty.subProperty:
+                  superSub:
                     f0: v0
                     f1: v1
+              new-property.sub-property.super-sub:
+                f0: v0
+                f1: v1
               """
           )
         );
@@ -355,18 +335,17 @@ class ChangePropertyKeyTest implements RewriteTest {
             "a.b.c.a0",
             "a.b.a0",
             true,
-            null,
             null
           )),
           yaml(
             """
-                  a:
-                    b:
-                      c:
-                        - a0: x
-                          a1: 'y'
-                        - aa1: x
-                          a1: 'y'
+              a:
+                b:
+                  c:
+                    - a0: x
+                      a1: 'y'
+                    - aa1: x
+                      a1: 'y'
               """
           )
         );
@@ -380,7 +359,6 @@ class ChangePropertyKeyTest implements RewriteTest {
             "description",
             "newDescription",
             false,
-            null,
             null
           )),
           yaml(
@@ -402,21 +380,21 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Test
     void updatePropertyWithMapping() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("app.foo.change.from", "app.bar.change.to", null, null, null)),
+          spec -> spec.recipe(new ChangePropertyKey("app.foo.change.from", "app.bar.change.to", null, null)),
           yaml(
             """
-                  app:
-                    foo.change.from: hi
-                    bar:
-                      other:
-                        property: bye
+              app:
+                foo.change.from: hi
+                bar:
+                  other:
+                    property: bye
               """,
             """
-                  app:
-                    bar.change.to: hi
-                    bar:
-                      other:
-                        property: bye
+              app:
+                bar.change.to: hi
+                bar:
+                  other:
+                    property: bye
               """
           )
         );
@@ -428,20 +406,20 @@ class ChangePropertyKeyTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                  unrelated:
-                    property: true
-                  management.metrics:
-                    binders.files.enabled: true
-                  other:
-                    property: true
+              unrelated:
+                property: true
+              management.metrics:
+                binders.files.enabled: true
+              other:
+                property: true
               """,
             """
-                  unrelated:
-                    property: true
-                  management.metrics:
-                    enable.process.files: true
-                  other:
-                    property: true
+              unrelated:
+                property: true
+              management.metrics:
+                enable.process.files: true
+              other:
+                property: true
               """
           )
         );
@@ -451,14 +429,14 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1841")
     void relocatesPropertyIfNothingElseInFamily() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("a.b.c", "x.y.z", true, null, null)),
+          spec -> spec.recipe(new ChangePropertyKey("a.b.c", "x.y.z", true, null)),
           yaml(
             """
-                  a:
-                    b:
-                      c: abc
-                  something:
-                    else: qwe
+              a:
+                b:
+                  c: abc
+              something:
+                else: qwe
               """,
             """
               something:
@@ -477,21 +455,20 @@ class ChangePropertyKeyTest implements RewriteTest {
             "spring.elasticsearch.rest.sniffer.interval",
             "spring.elasticsearch.restclient.sniffer.interval",
             true,
-            null,
             null
           )),
           yaml(
             """
-                  spring:
-                    elasticsearch:
-                      rest:
-                        sniffer:
-                          interval: 1
+              spring:
+                elasticsearch:
+                  rest:
+                    sniffer:
+                      interval: 1
               """,
             """
-                  spring:
-                    elasticsearch:
-                        restclient.sniffer.interval: 1
+              spring:
+                elasticsearch:
+                    restclient.sniffer.interval: 1
               """
           )
         );
@@ -500,10 +477,11 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Nested
     @Issue("https://github.com/openrewrite/rewrite-spring/issues/189")
     class WhenOldPropertyKeyIsPrefixOfDotSeparatedKeyTest implements RewriteTest {
+        @DocumentExample
         @Test
         void scalarValue() {
             rewriteRun(
-              spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, null)),
+              spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null)),
               yaml(
                 """
                   spring.profiles.group.prod: proddb,prodmq,prodmetrics
@@ -518,15 +496,15 @@ class ChangePropertyKeyTest implements RewriteTest {
         @Test
         void mappingValue() {
             rewriteRun(
-              spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, null)),
+              spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null)),
               yaml(
                 """
-                      spring.profiles.group:
-                        prod: proddb,prodmq,prodmetrics
+                  spring.profiles.group:
+                    prod: proddb,prodmq,prodmetrics
                   """,
                 """
-                      spring.config.activate.on-profile.group:
-                        prod: proddb,prodmq,prodmetrics
+                  spring.config.activate.on-profile.group:
+                    prod: proddb,prodmq,prodmetrics
                   """
               )
             );
@@ -535,17 +513,17 @@ class ChangePropertyKeyTest implements RewriteTest {
         @Test
         void matchSplitAcrossParentEntries() {
             rewriteRun(
-              spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, null)),
+              spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null)),
               yaml(
                 """
-                      spring:
-                        profiles.group:
-                          prod: proddb,prodmq,prodmetrics
+                  spring:
+                    profiles.group:
+                      prod: proddb,prodmq,prodmetrics
                   """,
                 """
-                      spring:
-                        config.activate.on-profile.group:
-                          prod: proddb,prodmq,prodmetrics
+                  spring:
+                    config.activate.on-profile.group:
+                      prod: proddb,prodmq,prodmetrics
                   """
               )
             );
@@ -561,7 +539,7 @@ class ChangePropertyKeyTest implements RewriteTest {
             @Test
             void dotDotDot() {
                 rewriteRun(
-                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, List.of("group"))),
+                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"))),
                   yaml(
                     """
                       spring.profiles.group.prod: proddb,prodmq,prodmetrics
@@ -573,11 +551,11 @@ class ChangePropertyKeyTest implements RewriteTest {
             @Test
             void dotDotIndent() {
                 rewriteRun(
-                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, List.of("group"))),
+                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"))),
                   yaml(
                     """
-                          spring.profiles.group:
-                            prod: proddb,prodmq,prodmetrics
+                      spring.profiles.group:
+                        prod: proddb,prodmq,prodmetrics
                       """
                   )
                 );
@@ -586,11 +564,11 @@ class ChangePropertyKeyTest implements RewriteTest {
             @Test
             void dotIndentDot() {
                 rewriteRun(
-                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, List.of("group"))),
+                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"))),
                   yaml(
                     """
-                          spring.profiles:
-                            group.prod: proddb,prodmq,prodmetrics
+                      spring.profiles:
+                        group.prod: proddb,prodmq,prodmetrics
                       """
                   )
                 );
@@ -599,12 +577,12 @@ class ChangePropertyKeyTest implements RewriteTest {
             @Test
             void dotIndentIndent() {
                 rewriteRun(
-                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, List.of("group"))),
+                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"))),
                   yaml(
                     """
-                          spring.profiles:
-                            group:
-                              prod: proddb,prodmq,prodmetrics
+                      spring.profiles:
+                        group:
+                          prod: proddb,prodmq,prodmetrics
                       """
                   )
                 );
@@ -613,11 +591,11 @@ class ChangePropertyKeyTest implements RewriteTest {
             @Test
             void indentDotDot() {
                 rewriteRun(
-                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, List.of("group"))),
+                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"))),
                   yaml(
                     """
-                          spring:
-                            profiles.group.prod: proddb,prodmq,prodmetrics
+                      spring:
+                        profiles.group.prod: proddb,prodmq,prodmetrics
                       """
                   )
                 );
@@ -626,12 +604,12 @@ class ChangePropertyKeyTest implements RewriteTest {
             @Test
             void indentDotIndent() {
                 rewriteRun(
-                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, List.of("group"))),
+                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"))),
                   yaml(
                     """
-                          spring:
-                            profiles.group:
-                              prod: proddb,prodmq,prodmetrics
+                      spring:
+                        profiles.group:
+                          prod: proddb,prodmq,prodmetrics
                       """
                   )
                 );
@@ -640,12 +618,12 @@ class ChangePropertyKeyTest implements RewriteTest {
             @Test
             void indentIndentDot() {
                 rewriteRun(
-                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, List.of("group"))),
+                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"))),
                   yaml(
                     """
-                          spring:
-                            profiles:
-                              group.prod: proddb,prodmq,prodmetrics
+                      spring:
+                        profiles:
+                          group.prod: proddb,prodmq,prodmetrics
                       """
                   )
                 );
@@ -654,42 +632,43 @@ class ChangePropertyKeyTest implements RewriteTest {
             @Test
             void indentIndentIndent() {
                 rewriteRun(
-                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, List.of("group"))),
+                  spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"))),
                   yaml(
                     """
-                          spring:
-                            profiles:
-                              group:
-                                prod: proddb,prodmq,prodmetrics
+                      spring:
+                        profiles:
+                          group:
+                            prod: proddb,prodmq,prodmetrics
                       """
                   )
                 );
             }
         }
 
+        @DocumentExample
         @Test
         void multipleExcludedEntries() {
             rewriteRun(
-              spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, List.of("group", "active", "include"))),
+              spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group", "active", "include"))),
               yaml(
                 """
-                      spring:
-                        profiles:
-                          active: allEnvs
-                          include: baseProfile
-                          foo: bar
-                          group:
-                            prod: proddb,prodmq,prodmetrics
+                  spring:
+                    profiles:
+                      active: allEnvs
+                      include: baseProfile
+                      foo: bar
+                      group:
+                        prod: proddb,prodmq,prodmetrics
                   """,
                 """
-                      spring:
-                        profiles:
-                          active: allEnvs
-                          include: baseProfile
-                          group:
-                            prod: proddb,prodmq,prodmetrics
-                        config.activate.on-profile:
-                          foo: bar
+                  spring:
+                    profiles:
+                      active: allEnvs
+                      include: baseProfile
+                      group:
+                        prod: proddb,prodmq,prodmetrics
+                    config.activate.on-profile:
+                      foo: bar
                   """
               )
             );
@@ -698,22 +677,22 @@ class ChangePropertyKeyTest implements RewriteTest {
         @Test
         void targetMappingIncludesNonExcludedEntryWithScalarValue() {
             rewriteRun(
-              spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, List.of("group"))),
+              spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"))),
               yaml(
                 """
-                      spring:
-                        profiles:
-                          foo: bar
-                          group:
-                            prod: proddb,prodmq,prodmetrics
+                  spring:
+                    profiles:
+                      foo: bar
+                      group:
+                        prod: proddb,prodmq,prodmetrics
                   """,
                 """
-                      spring:
-                        profiles:
-                          group:
-                            prod: proddb,prodmq,prodmetrics
-                        config.activate.on-profile:
-                          foo: bar
+                  spring:
+                    profiles:
+                      group:
+                        prod: proddb,prodmq,prodmetrics
+                    config.activate.on-profile:
+                      foo: bar
                   """
               )
             );
@@ -722,24 +701,24 @@ class ChangePropertyKeyTest implements RewriteTest {
         @Test
         void targetMappingIncludesNonExcludedEntryWithMappingValue() {
             rewriteRun(
-              spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, List.of("group"))),
+              spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"))),
               yaml(
                 """
-                      spring:
-                        profiles:
-                          foo:
-                            bar: qwe
-                          group:
-                            prod: proddb,prodmq,prodmetrics
+                  spring:
+                    profiles:
+                      foo:
+                        bar: qwe
+                      group:
+                        prod: proddb,prodmq,prodmetrics
                   """,
                 """
-                      spring:
-                        profiles:
-                          group:
-                            prod: proddb,prodmq,prodmetrics
-                        config.activate.on-profile:
-                          foo:
-                            bar: qwe
+                  spring:
+                    profiles:
+                      group:
+                        prod: proddb,prodmq,prodmetrics
+                    config.activate.on-profile:
+                      foo:
+                        bar: qwe
                   """
               )
             );
@@ -748,15 +727,15 @@ class ChangePropertyKeyTest implements RewriteTest {
         @Test
         void targetMappingHasScalarValue() {
             rewriteRun(
-              spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null, List.of("group"))),
+              spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, List.of("group"))),
               yaml(
                 """
-                      spring:
-                        profiles: foo
+                  spring:
+                    profiles: foo
                   """,
                 """
-                      spring:
-                        config.activate.on-profile: foo
+                  spring:
+                    config.activate.on-profile: foo
                   """
               )
             );
@@ -766,7 +745,7 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Test
     void doesNotBreakOnKeysWhichIncludeRegexSpecialCharacters() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("foo", "foo.bar", null, null, null)),
+          spec -> spec.recipe(new ChangePropertyKey("foo", "foo.bar", null, null)),
           yaml(
             """
             swagger:
@@ -782,7 +761,7 @@ class ChangePropertyKeyTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/2881")
     void embedIndentedPropertyIntoExisting() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("a.b.d", "a.b", null, null, null)),
+          spec -> spec.recipe(new ChangePropertyKey("a.b.d", "a.b", null, null)),
           yaml(
             """
               a:
@@ -801,5 +780,4 @@ class ChangePropertyKeyTest implements RewriteTest {
           )
         );
     }
-
 }

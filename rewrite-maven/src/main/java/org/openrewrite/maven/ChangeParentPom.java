@@ -17,10 +17,7 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.table.MavenMetadataFailures;
@@ -34,7 +31,10 @@ import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -110,29 +110,13 @@ public class ChangeParentPom extends Recipe {
     List<String> retainVersions;
 
     @Override
-    protected MavenVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new MavenVisitor<ExecutionContext>() {
-            @Override
-            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                Parent parent = getResolutionResult().getPom().getRequested().getParent();
-                if (parent != null &&
-                    matchesGlob(parent.getArtifactId(), oldArtifactId) &&
-                    matchesGlob(parent.getGroupId(), oldGroupId)) {
-                    return SearchResult.found(document);
-                }
-                return document;
-            }
-        };
-    }
-
-    @Override
-    public Validated validate() {
-        Validated validated = super.validate();
+    public Validated<Object> validate() {
+        Validated<Object> validated = super.validate();
         //noinspection ConstantConditions
         if (newVersion != null) {
             validated = validated.and(Semver.validate(newVersion, versionPattern));
         }
-        if(retainVersions != null) {
+        if (retainVersions != null) {
             for (int i = 0; i < retainVersions.size(); i++) {
                 String retainVersion = retainVersions.get(i);
                 validated = validated.and(Validated.test(
@@ -149,11 +133,22 @@ public class ChangeParentPom extends Recipe {
     }
 
     @Override
-    public MavenVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
         assert versionComparator != null;
 
-        return new MavenIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new MavenVisitor<ExecutionContext>() {
+            @Override
+            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                Parent parent = getResolutionResult().getPom().getRequested().getParent();
+                if (parent != null &&
+                    matchesGlob(parent.getArtifactId(), oldArtifactId) &&
+                    matchesGlob(parent.getGroupId(), oldGroupId)) {
+                    return SearchResult.found(document);
+                }
+                return document;
+            }
+        }, new MavenIsoVisitor<ExecutionContext>() {
             @Nullable
             private Collection<String> availableVersions;
 
@@ -189,12 +184,12 @@ public class ChangeParentPom extends Recipe {
 
                                 if (changeParentTagVisitors.size() > 0) {
                                     retainVersions();
-                                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, retainVersions));
+                                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, retainVersions).getVisitor());
                                     for (XmlVisitor<ExecutionContext> visitor : changeParentTagVisitors) {
                                         doAfterVisit(visitor);
                                     }
                                     maybeUpdateModel();
-                                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null));
+                                    doAfterVisit(new RemoveRedundantDependencyVersions(null, null, true, null).getVisitor());
                                 }
                             }
                         } catch (MavenDownloadingException e) {
@@ -208,22 +203,24 @@ public class ChangeParentPom extends Recipe {
             private void retainVersions() {
                 for (Recipe retainVersionRecipe : RetainVersions.plan(this, retainVersions == null ?
                         emptyList() : retainVersions)) {
-                    doAfterVisit(retainVersionRecipe);
+                    doAfterVisit(retainVersionRecipe.getVisitor());
                 }
             }
 
             private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion,
                                                                 ExecutionContext ctx) throws MavenDownloadingException {
+                String finalCurrentVersion = !Semver.isVersion(currentVersion) ? "0.0.0" : currentVersion;
+
                 if (availableVersions == null) {
                     MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, ctx));
                     availableVersions = mavenMetadata.getVersioning().getVersions().stream()
-                            .filter(v -> versionComparator.isValid(currentVersion, v))
-                            .filter(v -> Boolean.TRUE.equals(allowVersionDowngrades) || versionComparator.compare(currentVersion, currentVersion, v) < 0)
+                            .filter(v -> versionComparator.isValid(finalCurrentVersion, v))
+                            .filter(v -> Boolean.TRUE.equals(allowVersionDowngrades) || versionComparator.compare(finalCurrentVersion, finalCurrentVersion, v) < 0)
                             .collect(Collectors.toList());
                 }
-                return Boolean.TRUE.equals(allowVersionDowngrades) ? availableVersions.stream().max((v1, v2) -> versionComparator.compare(currentVersion, v1, v2)) : versionComparator.upgrade(currentVersion, availableVersions);
+                return Boolean.TRUE.equals(allowVersionDowngrades) ? availableVersions.stream().max((v1, v2) -> versionComparator.compare(finalCurrentVersion, v1, v2)) : versionComparator.upgrade(finalCurrentVersion, availableVersions);
             }
-        };
+        });
     }
 }
 

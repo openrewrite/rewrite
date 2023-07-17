@@ -17,10 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesType;
@@ -43,7 +40,7 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     @Override
     public String getDescription() {
         return "Some annotations accept arguments. This recipe sets an existing argument to the specified value, " +
-                "or adds the argument if it is not already set.";
+               "or adds the argument if it is not already set.";
     }
 
     @Option(displayName = "Annotation Type",
@@ -59,8 +56,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     String attributeName;
 
     @Option(displayName = "Attribute value",
-            description = "The value to set the attribute to.",
+            description = "The value to set the attribute to. Set to `null` to remove the attribute.",
             example = "500")
+    @Nullable
     String attributeValue;
 
     @Option(displayName = "Add Only",
@@ -69,13 +67,8 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
     Boolean addOnly;
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesType<>(annotationType);
-    }
-
-    @Override
-    public JavaIsoVisitor<ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesType<>(annotationType, false), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Annotation visitAnnotation(J.Annotation a, ExecutionContext context) {
                 if (!TypeUtils.isOfClassType(a.getType(), annotationType)) {
@@ -85,18 +78,20 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                 String newAttributeValue = maybeQuoteStringArgument(attributeName, attributeValue, a);
                 List<Expression> currentArgs = a.getArguments();
                 if (currentArgs == null || currentArgs.isEmpty()) {
+                    if (newAttributeValue == null) {
+                        return a;
+                    }
+
                     if (attributeName == null || "value".equals(attributeName)) {
-                        return a.withTemplate(
-                                JavaTemplate.builder(this::getCursor, "#{}")
-                                        .build(),
-                                a.getCoordinates().replaceArguments(),
-                                newAttributeValue);
+                        return JavaTemplate.builder("#{}")
+                                .contextSensitive()
+                                .build()
+                                .apply(getCursor(), a.getCoordinates().replaceArguments(), newAttributeValue);
                     } else {
-                        return a.withTemplate(
-                                JavaTemplate.builder(this::getCursor, attributeName + " = #{}")
-                                        .build(),
-                                a.getCoordinates().replaceArguments(),
-                                newAttributeValue);
+                        return JavaTemplate.builder("#{} = #{}")
+                                .contextSensitive()
+                                .build()
+                                .apply(getCursor(), a.getCoordinates().replaceArguments(), attributeName, newAttributeValue);
                     }
                 } else {
                     // First assume the value exists amongst the arguments and attempt to update it
@@ -110,6 +105,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 return it;
                             }
                             J.Literal value = (J.Literal) as.getAssignment();
+                            if (newAttributeValue == null) {
+                                return null;
+                            }
                             if (newAttributeValue.equals(value.getValueSource()) || Boolean.TRUE.equals(addOnly)) {
                                 foundAttributeWithDesiredValue.set(true);
                                 return it;
@@ -118,6 +116,9 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                         } else if (it instanceof J.Literal) {
                             // The only way anything except an assignment can appear is if there's an implicit assignment to "value"
                             if (attributeName == null || "value".equals(attributeName)) {
+                                if (newAttributeValue == null) {
+                                    return null;
+                                }
                                 J.Literal value = (J.Literal) it;
                                 if (newAttributeValue.equals(value.getValueSource()) || Boolean.TRUE.equals(addOnly)) {
                                     foundAttributeWithDesiredValue.set(true);
@@ -126,11 +127,11 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                                 return ((J.Literal) it).withValue(newAttributeValue).withValueSource(newAttributeValue);
                             } else {
                                 //noinspection ConstantConditions
-                                return ((J.Annotation) (finalA.withTemplate(
-                                        JavaTemplate.builder(this::getCursor, "value = #{}")
-                                                .build(),
-                                        finalA.getCoordinates().replaceArguments(),
-                                        it))).getArguments().get(0);
+                                return ((J.Annotation) JavaTemplate.builder("value = #{}")
+                                        .contextSensitive()
+                                        .build()
+                                        .apply(getCursor(), finalA.getCoordinates().replaceArguments(), it)
+                                ).getArguments().get(0);
                             }
                         }
                         return it;
@@ -141,11 +142,11 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
                     // There was no existing value to update, so add a new value into the argument list
                     String effectiveName = (attributeName == null) ? "value" : attributeName;
                     //noinspection ConstantConditions
-                    J.Assignment as = (J.Assignment) ((J.Annotation) a.withTemplate(
-                            JavaTemplate.builder(this::getCursor, effectiveName + " = #{}")
-                                    .build(),
-                            a.getCoordinates().replaceArguments(),
-                            newAttributeValue)).getArguments().get(0);
+                    J.Assignment as = (J.Assignment) ((J.Annotation) JavaTemplate.builder("#{} = #{}")
+                            .contextSensitive()
+                            .build()
+                            .apply(getCursor(), a.getCoordinates().replaceArguments(), effectiveName, newAttributeValue)
+                    ).getArguments().get(0);
                     List<Expression> newArguments = ListUtils.concat(as, a.getArguments());
                     a = a.withArguments(newArguments);
                     a = autoFormat(a, context);
@@ -153,11 +154,12 @@ public class AddOrUpdateAnnotationAttribute extends Recipe {
 
                 return a;
             }
-        };
+        });
     }
 
-    private static String maybeQuoteStringArgument(@Nullable String attributeName, String attributeValue, J.Annotation annotation) {
-        if (attributeIsString(attributeName, annotation)) {
+    @Nullable
+    private static String maybeQuoteStringArgument(@Nullable String attributeName, @Nullable String attributeValue, J.Annotation annotation) {
+        if ((attributeValue != null) && attributeIsString(attributeName, annotation)) {
             return "\"" + attributeValue + "\"";
         } else {
             return attributeValue;

@@ -57,11 +57,11 @@ public class TextComment implements Comment {
     @Override
     public <P> void printComment(Cursor cursor, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(cursor, this), JAVA_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(cursor, this), JAVA_MARKER_WRAPPER));
         }
         p.append(multiline ? "/*" + text + "*/" : "//" + text);
         for (Marker marker : markers.getMarkers()) {
-            p.out.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(cursor, this), JAVA_MARKER_WRAPPER));
+            p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(cursor, this), JAVA_MARKER_WRAPPER));
         }
     }
 }

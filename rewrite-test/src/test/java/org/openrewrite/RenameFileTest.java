@@ -30,6 +30,7 @@ public class RenameFileTest implements RewriteTest {
         spec.recipe(new RenameFile("**/hello.txt", "goodbye.txt"));
     }
 
+    @DocumentExample
     @Test
     void hasFileMatch() {
         rewriteRun(

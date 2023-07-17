@@ -18,6 +18,7 @@ package org.openrewrite.properties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -33,7 +34,7 @@ class ChangePropertyValueTest implements RewriteTest {
           "management.metrics.binders.files.enabled",
           "false",
           null,
-          null,
+          false,
           null
         ));
     }
@@ -55,6 +56,7 @@ class ChangePropertyValueTest implements RewriteTest {
         );
     }
 
+    @DocumentExample
     @Test
     void changeValue() {
         rewriteRun(
@@ -68,7 +70,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void conditionallyChangeValue() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("quarkus.quartz.store-type", "jdbc-cmt", "db", null, null)),
+          spec -> spec.recipe(new ChangePropertyValue("quarkus.quartz.store-type", "jdbc-cmt", "db", false, null)),
           properties(
             "quarkus.quartz.store-type=db",
             "quarkus.quartz.store-type=jdbc-cmt"
@@ -79,7 +81,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Test
     void conditionallyChangeValueNoChange() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("quarkus.quartz.store-type", "jdbc-cmt", "cache", null, null)),
+          spec -> spec.recipe(new ChangePropertyValue("quarkus.quartz.store-type", "jdbc-cmt", "cache", false, null)),
           properties(
             "quarkus.quartz.store-type=db"
           )
@@ -95,7 +97,7 @@ class ChangePropertyValueTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/1168")
     void relaxedBinding(String propertyKey) {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue(propertyKey, "updated", "example", null, null)),
+          spec -> spec.recipe(new ChangePropertyValue(propertyKey, "updated", "example", false, null)),
           properties(
             """
               acme.my-project.person.first-name=example
@@ -120,7 +122,7 @@ class ChangePropertyValueTest implements RewriteTest {
             "updated",
             "example",
             false,
-            null
+            false
           )),
           properties(
             """
@@ -138,17 +140,22 @@ class ChangePropertyValueTest implements RewriteTest {
     }
 
     @Test
-    void changeOnlyMatchingFile() {
+    void regex() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("management.metrics", "false", "true", null, "**/a.properties")),
+          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar$1", "f(o+)", true, null)),
           properties(
-            "management.metrics=true",
-            "management.metrics=false",
-            spec -> spec.path("a.properties")
-          ),
+            "my.prop=foooo",
+            "my.prop=baroooo"
+          )
+        );
+    }
+
+    @Test
+    void regexDefaultOff() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar$1", ".+", null, null)),
           properties(
-            "management.metrics=true",
-            spec -> spec.path("b.properties")
+            "my.prop=foo"
           )
         );
     }

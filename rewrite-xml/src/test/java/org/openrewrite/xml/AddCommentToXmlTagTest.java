@@ -16,12 +16,14 @@
 package org.openrewrite.xml;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class AddCommentToXmlTagTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void addCommentToDependencyBlock() {
         rewriteRun(

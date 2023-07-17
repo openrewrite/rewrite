@@ -18,38 +18,42 @@ package org.openrewrite.config;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
 import org.openrewrite.Contributor;
 import org.openrewrite.Recipe;
+import org.openrewrite.ScanningRecipe;
+import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.NamedStyles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Modifier;
 import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.constructRecipe;
-import static org.openrewrite.internal.RecipeIntrospectionUtils.recipeDescriptorFromRecipe;
 
 public class ClasspathScanningLoader implements ResourceLoader {
     private static final Logger logger = LoggerFactory.getLogger(ClasspathScanningLoader.class);
 
-    private final List<Recipe> recipes = new ArrayList<>();
+    private final LinkedHashSet<Recipe> recipes = new LinkedHashSet<>();
     private final List<NamedStyles> styles = new ArrayList<>();
 
-    private final List<RecipeDescriptor> recipeDescriptors = new ArrayList<>();
+    private final LinkedHashSet<RecipeDescriptor> recipeDescriptors = new LinkedHashSet<>();
     private final List<CategoryDescriptor> categoryDescriptors = new ArrayList<>();
-    private final List<RecipeExample> recipeExamples = new ArrayList<>();
 
     private final Map<String, List<Contributor>> recipeAttributions = new HashMap<>();
+    private final Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
 
     /**
      * Construct a ClasspathScanningLoader scans the runtime classpath of the current java process for recipes
      *
-     * @param properties Yaml placeholder properties
+     * @param properties     Yaml placeholder properties
      * @param acceptPackages Limit scan to specified packages
      */
     public ClasspathScanningLoader(Properties properties, String[] acceptPackages) {
@@ -63,7 +67,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
     /**
      * Construct a ClasspathScanningLoader scans the provided classload for recipes
      *
-     * @param properties Yaml placeholder properties
+     * @param properties  Yaml placeholder properties
      * @param classLoader Limit scan to classes loadable by this classloader
      */
     public ClasspathScanningLoader(Properties properties, ClassLoader classLoader) {
@@ -103,23 +107,21 @@ public class ClasspathScanningLoader implements ResourceLoader {
         try (ScanResult scanResult = classGraph.enableMemoryMapping().scan()) {
             List<YamlResourceLoader> yamlResourceLoaders = new ArrayList<>();
 
-            scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) -> {
-                yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders));
-            });
-            scanResult.getResourcesWithExtension("yaml").forEachInputStreamIgnoringIOException((res, input) -> {
-                yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders));
-            });
+            scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->
+                    yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders)));
+            scanResult.getResourcesWithExtension("yaml").forEachInputStreamIgnoringIOException((res, input) ->
+                    yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties, classLoader, dependencyResourceLoaders)));
             // Extract in two passes so that the full list of recipes from all sources are known when computing recipe descriptors
             // Otherwise recipes which include recipes from other sources in their recipeList will have incomplete descriptors
-            for(YamlResourceLoader resourceLoader : yamlResourceLoaders) {
+            for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
                 recipes.addAll(resourceLoader.listRecipes());
                 categoryDescriptors.addAll(resourceLoader.listCategoryDescriptors());
                 styles.addAll(resourceLoader.listStyles());
-                recipeExamples.addAll(resourceLoader.listRecipeExamples());
                 recipeAttributions.putAll(resourceLoader.listContributors());
+                recipeExamples.putAll(resourceLoader.listRecipeExamples());
             }
-            for(YamlResourceLoader resourceLoader : yamlResourceLoaders) {
-                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes, recipeAttributions));
+            for (YamlResourceLoader resourceLoader : yamlResourceLoaders) {
+                recipeDescriptors.addAll(resourceLoader.listRecipeDescriptors(recipes, recipeAttributions, recipeExamples));
             }
         }
     }
@@ -130,30 +132,45 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 .overrideClassLoaders(classLoader)
                 .scan()) {
 
-            for (ClassInfo classInfo : result.getSubclasses(Recipe.class.getName())) {
-                Class<?> recipeClass = classInfo.loadClass();
-                if (recipeClass.getName().equals(DeclarativeRecipe.class.getName()) || recipeClass.getEnclosingClass() != null) {
-                    continue;
-                }
-                try {
-                    Recipe recipe = constructRecipe(recipeClass);
-                    recipeDescriptors.add(recipeDescriptorFromRecipe(recipe));
-                    recipes.add(recipe);
-                } catch (Exception e) {
-                    logger.warn("Unable to configure {}", recipeClass.getName(), e);
-                }
-            }
+            configureRecipes(result, Recipe.class.getName());
+            configureRecipes(result, ScanningRecipe.class.getName());
+
             for (ClassInfo classInfo : result.getSubclasses(NamedStyles.class.getName())) {
                 Class<?> styleClass = classInfo.loadClass();
                 try {
                     Constructor<?> constructor = RecipeIntrospectionUtils.getZeroArgsConstructor(styleClass);
-                    if(constructor != null) {
+                    if (constructor != null) {
                         constructor.setAccessible(true);
                         styles.add((NamedStyles) constructor.newInstance());
                     }
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     logger.warn("Unable to configure {}", styleClass.getName(), e);
                 }
+            }
+        }
+    }
+
+    private void configureRecipes(ScanResult result, String className) {
+        for (ClassInfo classInfo : result.getSubclasses(className)) {
+            Class<?> recipeClass = classInfo.loadClass();
+            if (recipeClass.getName().equals(DeclarativeRecipe.class.getName())
+                || recipeClass.getEnclosingClass() != null
+                // `ScanningRecipe` is an example of an abstract `Recipe` subtype
+                || (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
+                continue;
+            }
+            Timer.Builder builder = Timer.builder("rewrite.scan.configure.recipe");
+            Timer.Sample sample = Timer.start();
+            try {
+                Recipe recipe = constructRecipe(recipeClass);
+                recipeDescriptors.add(recipe.getDescriptor());
+                recipes.add(recipe);
+                MetricsHelper.successTags(builder.tags("recipe", "elided"));
+            } catch (Throwable e) {
+                MetricsHelper.errorTags(builder.tags("recipe", recipeClass.getName()), e);
+                logger.warn("Unable to configure {}", recipeClass.getName(), e);
+            } finally {
+                sample.stop(builder.register(Metrics.globalRegistry));
             }
         }
     }
@@ -179,7 +196,12 @@ public class ClasspathScanningLoader implements ResourceLoader {
     }
 
     @Override
-    public Collection<RecipeExample> listRecipeExamples() {
+    public Map<String, List<RecipeExample>> listRecipeExamples() {
         return recipeExamples;
+    }
+
+    @Override
+    public Map<String, List<Contributor>> listContributors() {
+        return recipeAttributions;
     }
 }

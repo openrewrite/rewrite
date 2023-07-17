@@ -19,6 +19,8 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.Markup;
 
+import java.util.Iterator;
+
 import static java.util.Objects.requireNonNull;
 
 public class FindRecipeRunException extends TreeVisitor<Tree, Integer> {
@@ -28,12 +30,20 @@ public class FindRecipeRunException extends TreeVisitor<Tree, Integer> {
 
     public FindRecipeRunException(RecipeRunException rre) {
         this.vt = rre;
-        this.nearestTree = (Tree) requireNonNull(rre.getCursor()).getPath(Tree.class::isInstance).next();
+        if (rre.getCursor() == null) {
+            this.nearestTree = null;
+        } else {
+            Iterator<Object> path = requireNonNull(rre.getCursor()).getPath(Tree.class::isInstance);
+            this.nearestTree = path.hasNext() ? (Tree) path.next() : null;
+        }
     }
 
     @Override
     public Tree preVisit(Tree tree, Integer integer) {
-        if (tree == nearestTree) {
+        if (nearestTree == null) {
+            return null;
+        } else if (tree == nearestTree) {
+            stopAfterPreVisit();
             return Markup.error(tree, vt);
         }
         return tree;

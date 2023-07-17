@@ -17,7 +17,6 @@ package org.openrewrite.marker;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.api.errors.InvalidRefNameException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.RepositoryCache;
 import org.eclipse.jgit.transport.TagOpt;
@@ -25,7 +24,6 @@ import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.util.FS;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -57,7 +55,9 @@ class GitProvenanceTest {
           "https://github.com/openrewrite/rewrite.git",
           "file:///openrewrite/rewrite.git",
           "http://localhost:7990/scm/openrewrite/rewrite.git",
-          "git@github.com:openrewrite/rewrite.git"
+          "http://localhost:7990/scm/some/openrewrite/rewrite.git",
+          "git@github.com:openrewrite/rewrite.git",
+          "org-12345678@github.com:openrewrite/rewrite.git"
         );
     }
 

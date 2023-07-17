@@ -61,8 +61,10 @@ public class Space {
         if (comments.isEmpty()) {
             if (whitespace == null || whitespace.isEmpty()) {
                 return Space.EMPTY;
+            } else if (whitespace.length() <= 100) {
+                //noinspection StringOperationCanBeSimplified
+                return flyweights.computeIfAbsent(new String(whitespace), k -> new Space(whitespace, comments));
             }
-            return flyweights.computeIfAbsent(whitespace, k -> new Space(whitespace, comments));
         }
         return new Space(whitespace, comments);
     }
@@ -415,6 +417,8 @@ public class Space {
         TYPE_PARAMETER_SUFFIX,
         UNARY_OPERATOR,
         UNARY_PREFIX,
+        UNKNOWN_PREFIX,
+        UNKNOWN_SOURCE_PREFIX,
         VARARGS,
         VARIABLE_DECLARATIONS_PREFIX,
         VARIABLE_INITIALIZER,

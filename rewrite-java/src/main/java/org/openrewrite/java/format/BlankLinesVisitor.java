@@ -27,6 +27,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import static java.util.Objects.requireNonNull;
+
 public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
@@ -43,40 +45,46 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        JavaSourceFile j = cu;
-        if (j.getPackageDeclaration() != null) {
-            if (!j.getPrefix().getComments().isEmpty()) {
-                j = j.withComments(ListUtils.mapLast(j.getComments(), c -> {
-                    String suffix = keepMaximumLines(c.getSuffix(), style.getKeepMaximum().getBetweenHeaderAndPackage());
-                    suffix = minimumLines(suffix, style.getMinimum().getBeforePackage());
-                    return c.withSuffix(suffix);
-                }));
-            } else {
+    public J visit(@Nullable Tree tree, P p) {
+        if (getCursor().getNearestMessage("stop") != null) {
+            return (J) tree;
+        }
+        if (tree instanceof JavaSourceFile) {
+            JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+            if (cu.getPackageDeclaration() != null) {
+                if (!cu.getPrefix().getComments().isEmpty()) {
+                    cu = cu.withComments(ListUtils.mapLast(cu.getComments(), c -> {
+                        String suffix = keepMaximumLines(c.getSuffix(), style.getKeepMaximum().getBetweenHeaderAndPackage());
+                        suffix = minimumLines(suffix, style.getMinimum().getBeforePackage());
+                        return c.withSuffix(suffix);
+                    }));
+                } else {
                 /*
                  if comments are empty and package is present, leading whitespace is on the compilation unit and
                  should be removed
                  */
-                j = j.withPrefix(Space.EMPTY);
+                    cu = cu.withPrefix(Space.EMPTY);
+                }
             }
-        }
 
-        if (j.getPackageDeclaration() == null) {
-            if (j.getComments().isEmpty()) {
+            if (cu.getPackageDeclaration() == null) {
+                if (cu.getComments().isEmpty()) {
                 /*
                 if package decl and comments are null/empty, leading whitespace is on the
                 compilation unit and should be removed
                  */
-                j = j.withPrefix(Space.EMPTY);
+                    cu = cu.withPrefix(Space.EMPTY);
+                } else {
+                    cu = cu.withComments(ListUtils.mapLast(cu.getComments(), c ->
+                            c.withSuffix(minimumLines(c.getSuffix(), style.getMinimum().getBeforeImports()))));
+                }
             } else {
-                j = j.withComments(ListUtils.mapLast(j.getComments(), c ->
-                        c.withSuffix(minimumLines(c.getSuffix(), style.getMinimum().getBeforeImports()))));
+                cu = cu.getPadding().withImports(ListUtils.mapFirst(cu.getPadding().getImports(), i ->
+                        minimumLines(i, style.getMinimum().getAfterPackage())));
             }
-        } else {
-            j = j.getPadding().withImports(ListUtils.mapFirst(j.getPadding().getImports(), i ->
-                    minimumLines(i, style.getMinimum().getAfterPackage())));
+            return super.visit(cu, p);
         }
-        return super.visitJavaSourceFile(j, p);
+        return super.visit(tree, p);
     }
 
     @Override
@@ -114,10 +122,10 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
                 // Apply `style.getMinimum().getAroundClass()` to classes declared in the SourceFile.
                 (classes.contains(j)) ? minimumLines(j, style.getMinimum().getAroundClass()) : j;
 
-        // style.getKeepMaximum().getInDeclarations() also sets the maximum new lines of class declaration prefixex.
+        // style.getKeepMaximum().getInDeclarations() also sets the maximum new lines of class declaration prefixes.
         j = firstClass ?
                 (hasImports ? keepMaximumLines(j, Math.max(style.getKeepMaximum().getInDeclarations(), style.getMinimum().getAfterImports())) : j) :
-                (classes.contains(j)) ? keepMaximumLines(j, Math.max(style.getKeepMaximum().getInDeclarations(), style.getKeepMaximum().getInDeclarations())) : j;
+                (classes.contains(j)) ? keepMaximumLines(j, style.getKeepMaximum().getInDeclarations()) : j;
 
         if (!hasImports && firstClass) {
             if (cu.getPackageDeclaration() == null) {
@@ -133,8 +141,14 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public J.Import visitImport(J.Import impoort, P p) {
-        J.Import i = super.visitImport(impoort, p);
+    public J.EnumValue visitEnumValue(J.EnumValue _enum, P p) {
+        J.EnumValue e = super.visitEnumValue(_enum, p);
+        return keepMaximumLines(e, style.getKeepMaximum().getInDeclarations());
+    }
+
+    @Override
+    public J.Import visitImport(J.Import import_, P p) {
+        J.Import i = super.visitImport(import_, p);
         JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
         if (i.equals(cu.getImports().get(0)) && cu.getPackageDeclaration() == null && cu.getPrefix().equals(Space.EMPTY)) {
             i = i.withPrefix(i.getPrefix().withWhitespace(""));
@@ -257,6 +271,9 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private Space minimumLines(Space prefix, int min) {
+        if (min == 0) {
+            return prefix;
+        }
         if (prefix.getComments().isEmpty() ||
             prefix.getWhitespace().contains("\n") ||
             prefix.getComments().get(0) instanceof Javadoc ||
@@ -300,14 +317,5 @@ public class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, "stop", true);
         }
         return super.postVisit(tree, p);
-    }
-
-    @Nullable
-    @Override
-    public J visit(@Nullable Tree tree, P p) {
-        if (getCursor().getNearestMessage("stop") != null) {
-            return (J) tree;
-        }
-        return super.visit(tree, p);
     }
 }

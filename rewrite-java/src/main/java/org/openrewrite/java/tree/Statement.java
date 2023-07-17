@@ -15,26 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import org.openrewrite.internal.lang.Nullable;
-
 public interface Statement extends J {
-    default boolean hasClassType(@Nullable JavaType.Class classType) {
-        if (classType == null) {
-            return false;
-        }
-
-        if (!(this instanceof VariableDeclarations)) {
-            return false;
-        }
-
-        VariableDeclarations variable = (VariableDeclarations) this;
-
-        if (variable.getTypeExpression() == null) {
-            return false;
-        }
-
-        return TypeUtils.isOfClassType(variable.getTypeExpression().getType(), classType.getFullyQualifiedName());
-    }
-
     CoordinateBuilder.Statement getCoordinates();
 }

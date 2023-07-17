@@ -25,6 +25,7 @@ import static org.openrewrite.groovy.Assertions.groovy;
 
 class GroovyVisitorTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void autoFormatIncludesOmitParentheses() {
         rewriteRun(

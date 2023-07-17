@@ -69,7 +69,7 @@ externalid
     ;
 
 processinginstruction
-    :   SPECIAL_OPEN PI_TEXT SPECIAL_CLOSE
+    :   SPECIAL_OPEN PI_TEXT+ SPECIAL_CLOSE
     ;
 
 content
@@ -87,4 +87,4 @@ attribute
     :   Name '=' STRING ; // Our STRING is AttValue in spec
 
 chardata
-    :   (TEXT | SEA_WS) ;
+    :   (TEXT | QUESTION_MARK | SEA_WS) ;

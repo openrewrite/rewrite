@@ -325,12 +325,14 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             return existing;
         }
 
-        List<String> paramNames = null;
+        String[] paramNames = null;
         if (method.getParameters().length > 0) {
-            paramNames = new ArrayList<>(method.getParameters().length);
-            for (Parameter p : method.getParameters()) {
+            paramNames = new String[method.getParameters().length];
+            Parameter[] parameters = method.getParameters();
+            for (int i = 0; i < parameters.length; i++) {
+                Parameter p = parameters[i];
                 if (!p.isSynthetic()) {
-                    paramNames.add(p.getName());
+                    paramNames[i] = p.getName();
                 }
             }
         }
@@ -387,11 +389,13 @@ public class JavaReflectionTypeMapping implements JavaTypeMapping<Type> {
             return existing;
         }
 
-        List<String> paramNames = null;
+        String[] paramNames = null;
         if (method.getParameters().length > 0) {
-            paramNames = new ArrayList<>(method.getParameters().length);
-            for (Parameter p : method.getParameters()) {
-                paramNames.add(p.getName());
+            paramNames = new String[method.getParameters().length];
+            Parameter[] parameters = method.getParameters();
+            for (int i = 0; i < parameters.length; i++) {
+                Parameter p = parameters[i];
+                paramNames[i] = p.getName();
             }
         }
 

@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -25,6 +26,7 @@ import static org.openrewrite.maven.Assertions.pomXml;
 
 class UpgradePluginVersionTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void upgradeToExactVersion() {
         rewriteRun(

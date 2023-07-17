@@ -17,31 +17,33 @@ package org.openrewrite.gradle.plugins;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.junit.jupiter.api.Disabled;
 import org.openrewrite.*;
 import org.openrewrite.gradle.IsBuildGradle;
 import org.openrewrite.gradle.IsSettingsGradle;
+import org.openrewrite.gradle.marker.GradleProject;
+import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.semver.ExactVersion;
+import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.table.MavenMetadataFailures;
+import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.semver.Semver;
-import org.openrewrite.semver.VersionComparator;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-import static org.openrewrite.gradle.plugins.GradlePluginUtils.availablePluginVersions;
-
-@Disabled("Gradle plugin portal is down on August 23, 2022")
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class UpgradePluginVersion extends Recipe {
+    @EqualsAndHashCode.Exclude
+    MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
+
     @Option(displayName = "Plugin id",
             description = "The `ID` part of `plugin { ID }`, as a glob expression.",
             example = "com.jfrog.bintray")
@@ -71,23 +73,31 @@ public class UpgradePluginVersion extends Recipe {
     }
 
     @Override
-    public Validated validate() {
+    public Validated<Object> validate() {
         return super.validate().and(Semver.validate(newVersion, versionPattern));
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return Applicability.or(new IsBuildGradle<>(), new IsSettingsGradle<>());
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
-        assert versionComparator != null;
-
         MethodMatcher pluginMatcher = new MethodMatcher("PluginSpec id(..)", false);
         MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)", false);
-        return new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new GroovyVisitor<ExecutionContext>() {
+            private GradleProject gradleProject;
+            private GradleSettings gradleSettings;
+
+            @Override
+            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext executionContext) {
+                Optional<GradleProject> maybeGradleProject = cu.getMarkers().findFirst(GradleProject.class);
+                Optional<GradleSettings> maybeGradleSettings = cu.getMarkers().findFirst(GradleSettings.class);
+                if (!maybeGradleProject.isPresent() && !maybeGradleSettings.isPresent()) {
+                    return cu;
+                }
+
+                gradleProject = maybeGradleProject.orElse(null);
+                gradleSettings = maybeGradleSettings.orElse(null);
+                return super.visitCompilationUnit(cu, executionContext);
+            }
+
             @Override
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
@@ -114,23 +124,30 @@ public class UpgradePluginVersion extends Recipe {
                     return m;
                 }
                 Optional<String> version;
-                if(versionComparator instanceof ExactVersion) {
-                    version = versionComparator.upgrade(currentVersion, Collections.singletonList(newVersion));
-                } else {
-                    version = versionComparator.upgrade(currentVersion, availablePluginVersions(pluginId, ctx));
-                }
-                J.MethodInvocation finalM = m;
-                m = version.map(upgradeVersion -> finalM.withArguments(ListUtils.map(versionArgs, v -> {
-                            J.Literal versionLiteral = (J.Literal) v;
-                            assert versionLiteral.getValueSource() != null;
-                            return versionLiteral
-                                    .withValue(upgradeVersion)
-                                    .withValueSource(versionLiteral.getValueSource().replace(currentVersion, upgradeVersion));
-                        })))
-                        .orElse(m);
+                try {
+                    version = AddPluginVisitor.resolvePluginVersion(pluginId, currentVersion, newVersion, versionPattern, getRepositories(), ctx);
+                    J.MethodInvocation finalM = m;
+                    m = version.map(upgradeVersion -> finalM.withArguments(ListUtils.map(versionArgs, v -> {
+                                J.Literal versionLiteral = (J.Literal) v;
+                                assert versionLiteral.getValueSource() != null;
+                                return versionLiteral
+                                        .withValue(upgradeVersion)
+                                        .withValueSource(versionLiteral.getValueSource().replace(currentVersion, upgradeVersion));
+                            })))
+                            .orElse(m);
 
-                return m;
+                    return m;
+                } catch (MavenDownloadingException e) {
+                    return e.warn(m);
+                }
             }
-        };
+
+            private List<MavenRepository> getRepositories() {
+                if (gradleSettings != null) {
+                    return gradleSettings.getPluginRepositories();
+                }
+                return gradleProject.getMavenPluginRepositories();
+            }
+        });
     }
 }

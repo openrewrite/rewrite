@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
-import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -27,9 +27,10 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
     @Test
     void targetToStatic() {
         rewriteRun(
-          spec -> spec.recipe(new CompositeRecipe()
-            .doNext(new ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null))
-            .doNext(new ChangeMethodName("b.B nonStatic()", "foo", null, null))),
+          spec -> spec.recipes(
+            new ChangeMethodTargetToStatic("a.A nonStatic()", "b.B", null, null),
+            new ChangeMethodName("b.B nonStatic()", "foo", null, null)
+          ),
           java(
             """
               package a;
@@ -138,6 +139,61 @@ class ChangeMethodTargetToStaticTest implements RewriteTest {
               class Test {
                  public void test() {
                      A.method();
+                 }
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3085")
+    @Disabled
+    void keepImportComments() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeMethodTargetToStatic("org.codehaus.plexus.util.StringUtils isBlank(String)", "org.openrewrite.internal.StringUtils", null, null)),
+          java(
+            """
+              package org.codehaus.plexus.util;
+                            
+              public class StringUtils {
+                 public boolean isBlank(String s) {
+                     s.isBlank();
+                 }
+              }
+              """
+          ),
+          java(
+            """
+              package a;
+
+              /*
+               * This is a comment
+               */
+
+              import org.codehaus.plexus.util.StringUtils;
+              import java.util.UUID;
+
+              class Test {
+                 public void test() {
+                     StringUtils.isBlank("x");
+                 }
+              }
+              """,
+            """
+              package a;
+
+              /*
+               * This is a comment
+               */
+
+              import org.openrewrite.internal.StringUtils;
+              import java.util.UUID;
+
+              class Test {
+                 public void test() {
+                     StringUtils.isBlank("x");
                  }
               }
               """

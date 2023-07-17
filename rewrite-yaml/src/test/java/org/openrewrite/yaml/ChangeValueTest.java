@@ -16,6 +16,7 @@
 package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -23,13 +24,13 @@ import static org.openrewrite.yaml.Assertions.yaml;
 
 class ChangeValueTest implements RewriteTest {
 
+    @DocumentExample
     @Test
     void changeNestedKeyValue() {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(
             "$.metadata.name",
-            "monitoring",
-            null
+            "monitoring"
           )),
           yaml(
             """
@@ -54,8 +55,7 @@ class ChangeValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(
             "$.sources[?(@ == 'https://old-url.git')]",
-            "https://super-cool-url.git",
-            null
+            "https://super-cool-url.git"
           )),
           yaml(
             """
@@ -84,8 +84,7 @@ class ChangeValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(
             "$.*.yo",
-            "howdy",
-            null
+            "howdy"
           )),
           yaml(
             """
@@ -109,8 +108,7 @@ class ChangeValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(
             "$.metadata.name",
-            "monitoring",
-            null
+            "monitoring"
           )),
           yaml(
             """
@@ -134,8 +132,7 @@ class ChangeValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(
             ".name",
-            "monitoring",
-            null
+            "monitoring"
           )),
           yaml(
             """
@@ -159,8 +156,7 @@ class ChangeValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(
             "$.subjects[*].kind",
-            "Deployment",
-            null
+            "Deployment"
           )),
           yaml(
             """
@@ -186,8 +182,7 @@ class ChangeValueTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeValue(
             "$.subjects[?(@.kind == 'ServiceAccount')].kind",
-            "Deployment",
-            null
+            "Deployment"
           )),
           yaml(
             """
@@ -205,15 +200,6 @@ class ChangeValueTest implements RewriteTest {
                       name: monitoring-tools
               """
           )
-        );
-    }
-
-    @Test
-    void changeOnlyMatchingFile() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeValue(".metadata", "monitoring", "**/a.yml")),
-          yaml("metadata: monitoring-tools", "metadata: monitoring", spec -> spec.path("a.yml")),
-          yaml("metadata: monitoring-tools", spec -> spec.path("b.yml"))
         );
     }
 }

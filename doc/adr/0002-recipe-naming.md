@@ -39,7 +39,7 @@ public class DeleteKey extends Recipe {
 
 Recipes are currently organized hierarchically by package name. These package naming guidelines apply to both recipes defined in code as well as the name given to declarative recipes defined in YAML.
 
-* **DO** start every OpenRewrite recipe package with with `org.openrewrite.<LANGUAGE>`.
+* **DO** start every OpenRewrite recipe package with `org.openrewrite.<LANGUAGE>`.
 * **DO** place every general-purpose search recipe in `org.openrewrite.<LANGUAGE>.search`.
 * **DO** place every general-purpose security recipe in `org.openrewrite.<LANGUAGE>.security`.
 * **DO** place every general-purpose formatting recipe in `org.openrewrite.<LANGUAGE>.format`.

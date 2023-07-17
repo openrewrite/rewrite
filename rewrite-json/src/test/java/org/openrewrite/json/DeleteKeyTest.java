@@ -17,16 +17,18 @@ package org.openrewrite.json;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.json.Assertions.json;
 
 class DeleteKeyTest implements RewriteTest {
+    @DocumentExample
     @Test
     void deleteNestedKey() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.metadata.name", null)),
+          spec -> spec.recipe(new DeleteKey("$.metadata.name")),
           json("""
               {
                 "apiVersion": "v1",
@@ -51,7 +53,7 @@ class DeleteKeyTest implements RewriteTest {
     @Test
     void deleteArrayKey() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.subjects.kind", null)),
+          spec -> spec.recipe(new DeleteKey("$.subjects.kind")),
           json("""
               {
                 "subjects": [
@@ -80,7 +82,7 @@ class DeleteKeyTest implements RewriteTest {
     @Disabled
     void deleteNestedKeyRemovingUnusedKeysRecursively() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteKey("$.b.c.d", null)),
+          spec -> spec.recipe(new DeleteKey("$.b.c.d")),
           json("""
               {
                 "a": "a-value",

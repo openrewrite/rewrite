@@ -20,11 +20,16 @@ import com.gradle.enterprise.gradleplugin.GradleEnterpriseExtension
 import com.gradle.scan.plugin.BuildScanExtension
 import org.gradle.api.initialization.Settings
 
+interface PluginManagementSpec extends org.gradle.plugin.management.PluginManagementSpec {
+    void repositories(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=RepositoryHandlerSpec) Closure cl)
+}
+
 interface GradleEnterpriseSpec extends GradleEnterpriseExtension {
     void buildScan(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=BuildScanExtension) Closure cl);
 }
 
 abstract class RewriteSettings extends groovy.lang.Script implements Settings {
+    abstract void pluginManagement(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=PluginManagementSpec) Closure cl)
     abstract void plugins(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=PluginSpec) Closure cl)
     abstract void gradleEnterprise(@DelegatesTo(strategy=Closure.DELEGATE_ONLY, value=GradleEnterpriseSpec) Closure cl)
 }
