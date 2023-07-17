@@ -59,12 +59,12 @@ public class GradleWrapper {
                 .filter(dt -> dt.name().equalsIgnoreCase(distributionTypeName))
                 .findAny()
                 .orElse(DistributionType.Bin);
-        VersionComparator versionComparator = (version == null) ?
+        VersionComparator versionComparator = StringUtils.isBlank(version) ?
                 new LatestRelease(null) :
                 requireNonNull(Semver.validate(version, null).getValue());
 
         HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getLargeFileHttpSender();
-        String gradleVersionsUrl = (StringUtils.isBlank(repositoryUrl)) ? "https://services.gradle.org/versions/all" : repositoryUrl;
+        String gradleVersionsUrl = StringUtils.isBlank(repositoryUrl) ? "https://services.gradle.org/versions/all" : repositoryUrl;
         try (HttpSender.Response resp = httpSender.send(httpSender.get(gradleVersionsUrl).build())) {
             if (resp.isSuccessful()) {
                 List<GradleVersion> allVersions = new ObjectMapper()

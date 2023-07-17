@@ -92,10 +92,10 @@ public class MavenWrapper {
 
         MavenPomDownloader pomDownloader = new MavenPomDownloader(Collections.emptyMap(), ctx, null, null);
 
-        VersionComparator wrapperVersionComparator = (wrapperVersion == null) ?
+        VersionComparator wrapperVersionComparator = StringUtils.isBlank(wrapperVersion) ?
                 new LatestRelease(null) :
                 requireNonNull(Semver.validate(wrapperVersion, null).getValue());
-        VersionComparator distributionVersionComparator = (distributionVersion == null) ?
+        VersionComparator distributionVersionComparator = StringUtils.isBlank(distributionVersion) ?
                 new LatestRelease(null) :
                 requireNonNull(Semver.validate(distributionVersion, null).getValue());
 
