@@ -174,12 +174,12 @@ public class Cursor {
     @Override
     public String toString() {
         return "Cursor{" +
-                stream(Spliterators.spliteratorUnknownSize(getPath(), 0), false)
-                        .map(t -> t instanceof Tree ?
-                                t.getClass().getSimpleName() :
-                                t.toString())
-                        .collect(Collectors.joining("->"))
-                + "}";
+               stream(Spliterators.spliteratorUnknownSize(getPath(), 0), false)
+                       .map(t -> t instanceof Tree ?
+                               t.getClass().getSimpleName() :
+                               t.toString())
+                       .collect(Collectors.joining("->"))
+               + "}";
     }
 
     public Cursor dropParentUntil(Predicate<Object> valuePredicate) {
@@ -204,7 +204,6 @@ public class Cursor {
         return cursor;
     }
 
-    @Incubating(since = "7.0.0")
     @Nullable
     public Cursor getParent(int levels) {
         Cursor cursor = this;
@@ -219,7 +218,6 @@ public class Cursor {
         return getParent(1);
     }
 
-    @Incubating(since = "7.0.0")
     public Cursor getParentOrThrow(int levels) {
         Cursor parent = getParent(levels);
         if (parent == null) {
@@ -235,7 +233,7 @@ public class Cursor {
     /**
      * Return the first parent of the current cursor which points to an AST element, or the root cursor if the current
      * cursor already points to the root AST element. This skips over non-tree Padding elements.
-     *
+     * <br/>
      * If you do want to access Padding elements, use getParent() or getParentOrThrow(), which do not skip over these elements.
      *
      * @return a cursor which either points at the first non-padding parent of the current element
@@ -251,7 +249,7 @@ public class Cursor {
 
     public boolean isScopeInPath(Tree scope) {
         return value instanceof Tree && ((Tree) value).getId().equals(scope.getId()) ||
-                getPathAsStream().anyMatch(p -> p instanceof Tree && ((Tree) p).getId().equals(scope.getId()));
+               getPathAsStream().anyMatch(p -> p instanceof Tree && ((Tree) p).getId().equals(scope.getId()));
     }
 
     public void putMessageOnFirstEnclosing(Class<?> enclosing, String key, Object value) {
@@ -273,8 +271,8 @@ public class Cursor {
         if (messages == null) {
             messages = new HashMap<>();
         }
-        @SuppressWarnings("unchecked") T t = (T) messages.computeIfAbsent(key, mappingFunction);
-        return t;
+        //noinspection unchecked
+        return (T) messages.computeIfAbsent(key, mappingFunction);
     }
 
     /**
@@ -292,8 +290,8 @@ public class Cursor {
 
     public <T> T getNearestMessage(String key, T defaultValue) {
         @SuppressWarnings("unchecked") T t = messages == null ? null : (T) messages.get(key);
-        if(t == null) {
-            if(parent != null) {
+        if (t == null) {
+            if (parent != null) {
                 return parent.getNearestMessage(key, defaultValue);
             }
             return defaultValue;
@@ -343,6 +341,13 @@ public class Cursor {
     public <T> T pollMessage(String key) {
         //noinspection unchecked
         return messages == null ? null : (T) messages.remove(key);
+    }
+
+    public void clearMessages() {
+        if (messages != null) {
+            messages.clear();
+            messages = null;
+        }
     }
 
     /**

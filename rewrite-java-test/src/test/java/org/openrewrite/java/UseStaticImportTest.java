@@ -16,8 +16,8 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
@@ -96,7 +96,7 @@ class UseStaticImportTest implements RewriteTest {
 
               @Override
               public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-                  doAfterVisit(new UseStaticImport("asserts.Assert assert*(..)"));
+                  doAfterVisit(new UseStaticImport("asserts.Assert assert*(..)").getVisitor());
                   return super.visitCompilationUnit(cu, executionContext);
               }
           })).cycles(2).expectedCyclesThatMakeChanges(2),

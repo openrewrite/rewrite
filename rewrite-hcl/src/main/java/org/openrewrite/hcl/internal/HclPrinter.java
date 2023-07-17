@@ -22,7 +22,6 @@ import org.openrewrite.hcl.tree.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.marker.SearchResult;
 
 import java.util.List;
 import java.util.function.UnaryOperator;

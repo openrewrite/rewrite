@@ -16,9 +16,9 @@
 package org.openrewrite.java.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
-import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.test.RecipeSpec;
@@ -32,15 +32,18 @@ class MinimumViableSpacingTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-            @Override
-            public Space visitSpace(Space space, Space.Location loc, ExecutionContext ctx) {
-                if(ctx.getMessage("cyclesThatResultedInChanges",0) == 0) {
-                    return space.withWhitespace("");
-                }
-                return space;
-            }
-        }).doNext(toRecipe(() -> new MinimumViableSpacingVisitor<>(null))));
+        spec.recipes(
+          toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public Space visitSpace(Space space, Space.Location loc, ExecutionContext ctx) {
+                  if (ctx.getMessage("cyclesThatResultedInChanges", 0) == 0) {
+                      return space.withWhitespace("");
+                  }
+                  return space;
+              }
+          }),
+          toRecipe(() -> new MinimumViableSpacingVisitor<>(null))
+        );
     }
 
     @DocumentExample
@@ -160,6 +163,39 @@ class MinimumViableSpacingTest implements RewriteTest {
               """,
             """
               public final class A{public static String foo(){return "foo";}}
+              """
+          )
+        );
+    }
+
+    // This test can not be reproduced by running MinimumViableSpacingVisitor only, so using `AutoFormat` recipe here.
+    @Issue("https://github.com/openrewrite/rewrite/issues/3346")
+    @Test
+    void annotatedReturnTypeExpression() {
+        rewriteRun(
+          spec -> spec.recipe(new AutoFormat()),
+          java(
+            """
+              class A {
+                  public @Deprecated String method() {
+                      return "name";
+                  }
+
+                  public    @Deprecated String method2() {
+                      return "name";
+                  }
+              }
+              """,
+            """
+              class A {
+                  public @Deprecated String method() {
+                      return "name";
+                  }
+
+                  public @Deprecated String method2() {
+                      return "name";
+                  }
+              }
               """
           )
         );

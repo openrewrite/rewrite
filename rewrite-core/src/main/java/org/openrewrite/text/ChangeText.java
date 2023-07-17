@@ -15,16 +15,19 @@
  */
 package org.openrewrite.text;
 
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-import org.openrewrite.*;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 
 import java.util.Collections;
 import java.util.Set;
 
-@Getter
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@RequiredArgsConstructor
+import static java.util.Collections.emptyList;
+
+@Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangeText extends Recipe {
 
@@ -52,8 +55,10 @@ public class ChangeText extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new PlainTextVisitor<ExecutionContext>() {
             @Override
-            public PlainText preVisit(PlainText tree, ExecutionContext ctx) {
-                return tree.withText(toText);
+            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+                return text
+                        .withSnippets(emptyList())
+                        .withText(toText);
             }
         };
     }

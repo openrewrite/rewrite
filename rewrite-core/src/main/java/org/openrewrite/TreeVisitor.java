@@ -34,12 +34,14 @@ import java.beans.Transient;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Abstract {@link TreeVisitor} for processing {@link Tree elements}
@@ -54,6 +56,8 @@ import java.util.function.Function;
  * @param <P> An input object that is passed to every visit method.
  */
 public abstract class TreeVisitor<T extends Tree, P> {
+    private static final String STOP_AFTER_PRE_VISIT = "__org.openrewrite.stopVisitor__";
+
     Cursor cursor = new Cursor(null, Cursor.ROOT_VALUE);
 
     public static <T extends Tree, P> TreeVisitor<T, P> noop() {
@@ -72,7 +76,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
         };
     }
 
-    private List<TreeVisitor<T, P>> afterVisit;
+    private List<TreeVisitor<?, P>> afterVisit;
 
     private int visitCount;
     private final DistributionSummary visitCountSummary = DistributionSummary.builder("rewrite.visitor.visit.method.count").description("Visit methods called per source file visited.").tag("visitor.class", getClass().getName()).register(Metrics.globalRegistry);
@@ -129,30 +133,38 @@ public abstract class TreeVisitor<T extends Tree, P> {
      *
      * @param visitor The visitor to run.
      */
-    protected void doAfterVisit(TreeVisitor<T, P> visitor) {
+    protected void doAfterVisit(TreeVisitor<?, P> visitor) {
+        if (afterVisit == null) {
+            afterVisit = new ArrayList<>(2);
+        }
         afterVisit.add(visitor);
     }
 
-    /**
-     * Execute the recipe's main visitor once after the whole source file has been visited.
-     * The visitor is executed against the whole source file. This operation only happens once
-     * immediately after the containing visitor visits the whole source file. A subsequent {@link Recipe}
-     * cycle will not run it.
-     * <p>
-     * This method is ideal for one-off operations like auto-formatting, adding/removing imports, etc.
-     *
-     * @param recipe The recipe whose visitor to run.
-     */
-    protected void doAfterVisit(Recipe recipe) {
-        //noinspection unchecked
-        afterVisit.add((TreeVisitor<T, P>) recipe.getVisitor());
-    }
-
-    protected List<TreeVisitor<T, P>> getAfterVisit() {
-        return afterVisit;
+    protected List<TreeVisitor<?, P>> getAfterVisit() {
+        return afterVisit == null ? emptyList() : afterVisit;
     }
 
     public final Cursor getCursor() {
+        return cursor;
+    }
+
+    /**
+     * Updates the cursor on this visitor and returns the updated cursor.
+     *
+     * @param currentValue The new (current) value of the cursor based on a mutation of what was formerly the
+     *                     {@link Cursor#getValue()}.
+     * @return The updated cursor.
+     */
+    public final Cursor updateCursor(T currentValue) {
+        Object old = cursor.getValue();
+        if (!(old instanceof Tree)) {
+            throw new IllegalArgumentException("To update the cursor, it must currently be positioned at a Tree instance");
+        }
+        if (!((Tree) old).getId().equals(currentValue.getId())) {
+            throw new IllegalArgumentException("Updating the cursor in place is only supported for mutations on a Tree instance " +
+                                               "that maintain the same ID after the mutation.");
+        }
+        cursor = new Cursor(cursor.getParentOrThrow(), currentValue);
         return cursor;
     }
 
@@ -170,12 +182,6 @@ public abstract class TreeVisitor<T extends Tree, P> {
     public T visit(@Nullable Tree tree, P p, Cursor parent) {
         this.cursor = parent;
         return visit(tree, p);
-    }
-
-    @Nullable
-    public T visitSourceFile(SourceFile sourceFile, P p) {
-        //noinspection unchecked
-        return (T) sourceFile;
     }
 
     /**
@@ -251,14 +257,9 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
         Timer.Sample sample = null;
         boolean topLevel = false;
-        if (afterVisit == null) {
+        if (visitCount == 0) {
             topLevel = true;
-            visitCount = 0;
             sample = Timer.start();
-            if (p instanceof ExecutionContext) {
-                cursor.putMessage("org.openrewrite.ExecutionContext", p);
-            }
-            afterVisit = new CopyOnWriteArrayList<>();
         }
 
         visitCount++;
@@ -272,11 +273,13 @@ public abstract class TreeVisitor<T extends Tree, P> {
             if (isAcceptable) {
                 //noinspection unchecked
                 t = preVisit((T) tree, p);
-                if (t != null) {
-                    t = t.accept(this, p);
-                }
-                if (t != null) {
-                    t = postVisit(t, p);
+                if (!cursor.getMessage(STOP_AFTER_PRE_VISIT, false)) {
+                    if (t != null) {
+                        t = t.accept(this, p);
+                    }
+                    if (t != null) {
+                        t = postVisit(t, p);
+                    }
                 }
                 if (t != tree && t != null && p instanceof ExecutionContext) {
                     ExecutionContext ctx = (ExecutionContext) p;
@@ -304,16 +307,18 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 visitCountSummary.record(visitCount);
 
                 if (t != null && afterVisit != null) {
-                    for (TreeVisitor<T, P> v : afterVisit) {
+                    for (TreeVisitor<?, P> v : afterVisit) {
                         if (v != null) {
                             v.setCursor(getCursor());
-                            t = v.visit(t, p);
+                            //noinspection unchecked
+                            t = (T) v.visit(t, p);
                         }
                     }
                 }
 
                 sample.stop(Timer.builder("rewrite.visitor.visit.cumulative").tag("visitor.class", getClass().getName()).register(Metrics.globalRegistry));
                 afterVisit = null;
+                visitCount = 0;
             }
         } catch (Throwable e) {
             if (e instanceof RecipeRunException) {
@@ -321,7 +326,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 throw e;
             }
 
-            throw new RecipeRunException(e, getCursor(), describeLocation(getCursor()));
+            throw new RecipeRunException(e, getCursor());
         }
 
         //noinspection unchecked
@@ -356,11 +361,12 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return (T2) visit(tree, p);
     }
 
-    public Markers visitMarkers(Markers markers, P p) {
-        return markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> this.visitMarker(marker, p)));
+    public Markers visitMarkers(@Nullable Markers markers, P p) {
+        return markers == null || markers == Markers.EMPTY ?
+                Markers.EMPTY :
+                markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> this.visitMarker(marker, p)));
     }
 
-    @Incubating(since = "7.2.0")
     public <M extends Marker> M visitMarker(Marker marker, P p) {
         //noinspection unchecked
         return (M) marker;
@@ -376,7 +382,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     @SuppressWarnings("rawtypes")
-    private Class<? extends Tree> visitorTreeType(Class<? extends TreeVisitor> v) {
+    protected Class<? extends Tree> visitorTreeType(Class<? extends TreeVisitor> v) {
         for (TypeVariable<? extends Class<? extends TreeVisitor>> tp : v.getTypeParameters()) {
             for (Type bound : tp.getBounds()) {
                 if (bound instanceof Class && Tree.class.isAssignableFrom((Class<?>) bound)) {
@@ -401,7 +407,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
             }
         }
         throw new IllegalArgumentException("Expected to find a tree type somewhere in the type parameters of the " +
-                                           "type hierarhcy of visitor " + getClass().getName());
+                                           "type hierarchy of visitor " + getClass().getName());
     }
 
     public <R extends Tree, V extends TreeVisitor<R, P>> V adapt(Class<? extends V> adaptTo) {
@@ -414,12 +420,13 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return TreeVisitorAdapter.adapt(this, adaptTo);
     }
 
-    @Nullable
-    protected String describeLocation(Cursor cursor) {
-        SourceFile sourceFile = cursor.firstEnclosing(SourceFile.class);
-        if (sourceFile == null) {
-            return null;
-        }
-        return sourceFile.getSourcePath().toString();
+    /**
+     * Can be used in {@link TreeVisitor#preVisit(Tree, Object)} to prevent a call
+     * to {@link TreeVisitor#visit(Tree, Object)} and {@link TreeVisitor#postVisit(Tree, Object)}, therefore
+     * stopping further navigation deeper down the tree.
+     */
+    @Incubating(since = "8.0.0")
+    public void stopAfterPreVisit() {
+        getCursor().putMessage(STOP_AFTER_PRE_VISIT, true);
     }
 }

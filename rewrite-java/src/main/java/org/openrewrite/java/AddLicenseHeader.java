@@ -17,11 +17,9 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.TextComment;
@@ -29,6 +27,8 @@ import org.openrewrite.marker.Markers;
 
 import java.util.Calendar;
 import java.util.Collections;
+
+import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -56,22 +56,26 @@ public class AddLicenseHeader extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, ExecutionContext executionContext) {
-                if (cu.getComments().isEmpty()) {
-                    PropertyPlaceholderHelper propertyPlaceholderHelper = new PropertyPlaceholderHelper("${", "}", null);
-                    String formattedLicenseText = "\n * " + propertyPlaceholderHelper.replacePlaceholders(licenseText,
-                            k -> {
-                                if ("CURRENT_YEAR".equals(k)) {
-                                    return Integer.toString(Calendar.getInstance().get(Calendar.YEAR));
-                                }
-                                return System.getProperty(k);
-                            }).replace("\n", "\n * ") + "\n ";
+            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+                    if (cu.getComments().isEmpty()) {
+                        PropertyPlaceholderHelper propertyPlaceholderHelper = new PropertyPlaceholderHelper("${", "}", null);
+                        String formattedLicenseText = "\n * " + propertyPlaceholderHelper.replacePlaceholders(licenseText,
+                                k -> {
+                                    if ("CURRENT_YEAR".equals(k)) {
+                                        return Integer.toString(Calendar.getInstance().get(Calendar.YEAR));
+                                    }
+                                    return System.getProperty(k);
+                                }).replace("\n", "\n * ") + "\n ";
 
-                    cu = cu.withComments(Collections.singletonList(
-                            new TextComment(true, formattedLicenseText, "\n", Markers.EMPTY)
-                    ));
+                        cu = cu.withComments(Collections.singletonList(
+                                new TextComment(true, formattedLicenseText, "\n", Markers.EMPTY)
+                        ));
+                    }
+                    return super.visit(cu, ctx);
                 }
-                return cu;
+                return super.visit(tree, ctx);
             }
 
             @Override

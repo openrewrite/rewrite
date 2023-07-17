@@ -81,6 +81,50 @@ class FindMissingTypesTest implements RewriteTest {
     }
 
     @Test
+    void classReference() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  {
+                      Class<?> c = Unknown.class;
+                  }
+              }
+              """,
+            """
+              class A {
+                  {
+                      Class<?> c = /*~~(Identifier type is missing or malformed)~~>*/Unknown.class;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodReference() {
+        rewriteRun(
+          java(
+            """
+              import java.util.function.Consumer;
+              
+              class A {
+                  Consumer<String> r = System.out::printlns;
+              }
+              """,
+            """
+              import java.util.function.Consumer;
+              
+              class A {
+                  Consumer<String> r = /*~~(MemberReference type is missing or malformed)~~>*/System.out::printlns;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void newClass() {
         rewriteRun(
           java(

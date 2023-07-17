@@ -27,7 +27,6 @@ import java.util.Set;
 
 @EqualsAndHashCode(callSuper = true)
 @Value
-@Incubating(since = "7.7.0")
 public class FindPlugin extends Recipe {
 
     @Option(displayName = "Group",

@@ -17,11 +17,7 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Issue;
-import org.openrewrite.Tree;
-import org.openrewrite.DocumentExample;
+import org.openrewrite.*;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
@@ -957,6 +953,185 @@ class RemoveUnusedImportsTest implements RewriteTest {
               
               class Test {
                   short uniqueCount = SHORT1;
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1698")
+    @Test
+    void correctlyRemoveImportsFromInternalClasses() {
+        rewriteRun(
+          java(
+            """
+              package com.Source.A;
+              
+              public class B {
+                public enum Enums {
+                    B1, B2
+                }
+
+                public static void helloWorld() {
+                    System.out.println("hello world!");              
+                }
+              }
+              """
+          ),
+          java(
+            """
+              package com.test;
+
+              import static com.Source.A.B.Enums.B1;
+              import static com.Source.A.B.Enums.B2;
+              import static com.Source.A.B.helloWorld;
+              
+              class Test {
+                  public static void main(String[] args) {
+                    var uniqueCount = B1;
+                    helloWorld();
+                  }
+              }
+              """,
+            """
+              package com.test;
+
+              import static com.Source.A.B.Enums.B1;
+              import static com.Source.A.B.helloWorld;
+              
+              class Test {
+                  public static void main(String[] args) {
+                    var uniqueCount = B1;
+                    helloWorld();
+                  }              
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1698")
+    @Test
+    void correctlyRemoveImportsFromNestedInternalClasses() {
+        rewriteRun(
+          java(
+            """
+              package com.Source.A;
+              
+              public class B {
+                public enum Enums {
+                    B1, B2
+                }
+                
+                public static class C {
+                    public enum Enums {
+                        C1, C2
+                    }
+                }
+
+                public static void helloWorld() {
+                    System.out.println("hello world!");              
+                }
+              }
+              """
+          ),
+          java(
+            """
+              package com.test;
+
+              import static com.Source.A.B.Enums.B1;
+              import static com.Source.A.B.Enums.B2;
+              import static com.Source.A.B.C.Enums.C1;
+              import static com.Source.A.B.C.Enums.C2;
+              import static com.Source.A.B.helloWorld;
+              
+              class Test {
+                  public static void main(String[] args) {
+                    var uniqueCount = B1;
+                    var uniqueCountNested = C1;
+                    helloWorld();
+                  }
+              }
+              """,
+            """
+              package com.test;
+
+              import static com.Source.A.B.Enums.B1;
+              import static com.Source.A.B.C.Enums.C1;
+              import static com.Source.A.B.helloWorld;
+              
+              class Test {
+                  public static void main(String[] args) {
+                    var uniqueCount = B1;
+                    var uniqueCountNested = C1;
+                    helloWorld();
+                  }              
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3275")
+    @Test
+    void doesNotRemoveReferencedClassesBeingUsedAsParameters() {
+        rewriteRun(
+          java(
+            """
+              package com.Source.mine;
+
+              public class A {
+                  public static final short SHORT1 = (short)1;
+                  
+                  public short getShort1() {
+                    return SHORT1;
+                  } 
+              }
+              """
+          ),
+          java(
+            """
+              package com.test;
+
+              import com.Source.mine.A;
+              
+              class Test {
+                  void f(A classA) {
+                    classA.getShort1();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3275")
+    @Test
+    void doesNotRemoveReferencedClassesBeingUsedAsParametersUnusualPackageName() {
+        rewriteRun(
+          java(
+            """
+              package com.Source.$;
+
+              public class A {
+                  public static final short SHORT1 = (short)1;
+
+                  public short getShort1() {
+                    return SHORT1;
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.test;
+
+              import com.Source.$.A;
+
+              class Test {
+                  void f(A classA) {
+                    classA.getShort1();
+                  }
               }
               """
           )

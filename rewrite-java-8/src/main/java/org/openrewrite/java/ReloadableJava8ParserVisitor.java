@@ -956,7 +956,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 JContainer.build(paramFmt, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"),
                         Markers.EMPTY), EMPTY)), Markers.EMPTY);
 
-        JContainer<NameTree> throwss = node.getThrows().isEmpty() ? null :
+        JContainer<NameTree> throws_ = node.getThrows().isEmpty() ? null :
                 JContainer.build(sourceBefore("throws"), convertAll(node.getThrows(), commaDelim, noDelim),
                         Markers.EMPTY);
 
@@ -968,7 +968,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         return new J.MethodDeclaration(randomId(), fmt, Markers.EMPTY,
                 modifierResults.getLeadingAnnotations(),
                 modifierResults.getModifiers(), typeParams,
-                returnType, name, params, throwss, body, defaultValue,
+                returnType, name, params, throws_, body, defaultValue,
                 typeMapping.methodDeclarationType(jcMethod.sym, null));
     }
 
@@ -1204,10 +1204,10 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         J.Block block = convert(node.getBlock());
         List<J.Try.Catch> catches = convertAll(node.getCatches());
 
-        JLeftPadded<J.Block> finallyy = node.getFinallyBlock() == null ? null :
+        JLeftPadded<J.Block> finally_ = node.getFinallyBlock() == null ? null :
                 padLeft(sourceBefore("finally"), convert(node.getFinallyBlock()));
 
-        return new J.Try(randomId(), fmt, Markers.EMPTY, resources, block, catches, finallyy);
+        return new J.Try(randomId(), fmt, Markers.EMPTY, resources, block, catches, finally_);
     }
 
     @Override

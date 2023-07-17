@@ -23,6 +23,7 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
@@ -37,7 +38,10 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.charset.Charset;
-import java.nio.file.*;
+import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -48,7 +52,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
-public interface JavaParser extends Parser<J.CompilationUnit> {
+public interface JavaParser extends Parser {
 
     /**
      * Set to <code>true</code> on an {@link ExecutionContext} supplied to parsing to skip generation of
@@ -113,7 +117,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
         nextArtifact:
         for (String artifactName : artifactNamesWithVersions) {
-            Pattern jarPattern = Pattern.compile(artifactName + "-?.*\\.jar$");
+            Pattern jarPattern = Pattern.compile("[/\\\\]" + artifactName + "-?.*\\.jar$");
             File[] extracted = resourceTarget.listFiles();
             if (extracted != null) {
                 for (File file : extracted) {
@@ -170,10 +174,14 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                         try {
                             Path artifact = resourceTarget.toPath().resolve(Paths.get(resource.getPath()).getFileName());
                             if (!Files.exists(artifact)) {
-                                Files.copy(
-                                        requireNonNull(caller.getResourceAsStream("/" + resource.getPath())),
-                                        artifact
-                                );
+                                try {
+                                    Files.copy(
+                                            requireNonNull(caller.getResourceAsStream("/" + resource.getPath())),
+                                            artifact
+                                    );
+                                } catch (FileAlreadyExistsException ignore) {
+                                    // can happen when tests run in parallel, for example
+                                }
                             }
                             missingArtifactNames.remove(artifactName);
                             artifacts.add(artifact);
@@ -246,7 +254,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     }
 
     @Override
-    default List<J.CompilationUnit> parse(ExecutionContext ctx, @Language("java") String... sources) {
+    default Stream<SourceFile> parse(ExecutionContext ctx, @Language("java") String... sources) {
         return parseInputs(
                 Arrays.stream(sources)
                         .map(sourceFile -> new Input(
@@ -260,7 +268,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     }
 
     @Override
-    default List<J.CompilationUnit> parse(@Language("java") String... sources) {
+    default Stream<SourceFile> parse(@Language("java") String... sources) {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         return parse(ctx, sources);
     }
@@ -285,20 +293,6 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
      * @param classpath new classpath to use
      */
     void setClasspath(Collection<Path> classpath);
-
-    /**
-     * Changes the source set on the parser. Intended for use in multiple pass parsing, where we want to keep the
-     * compiler symbol table intact for type attribution on later parses, i.e. for maven multi-module projects.
-     *
-     * @deprecated
-     * @param sourceSet source set used to set {@link org.openrewrite.java.marker.JavaSourceSet} markers on
-     *                  subsequently parsed {@link J.CompilationUnit}
-     */
-    @Deprecated//(since = "7.40.0", forRemoval = true)
-    void setSourceSet(String sourceSet);
-
-    @Deprecated//(since = "7.40.0", forRemoval = true)
-    JavaSourceSet getSourceSet(ExecutionContext ctx);
 
     @SuppressWarnings("unchecked")
     abstract class Builder<P extends JavaParser, B extends Builder<P, B>> extends Parser.Builder {

@@ -30,12 +30,17 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class StringUtils {
     private StringUtils() {
     }
 
-    public static String trimIndentPreserveCRLF(String text) {
+    public static String trimIndentPreserveCRLF(@Nullable String text) {
+        if (text == null) {
+            //noinspection DataFlowIssue
+            return null;
+        }
         return trimIndent((text.endsWith("\r\n") ? text.substring(0, text.length() - 2) : text)
                 .replace('\r', '⏎'))
                 .replace('⏎', '\r');
@@ -348,7 +353,7 @@ public class StringUtils {
      *
      * @param text      A target string
      * @param substring The substring to search for
-     * @return the number of times the substring is found in the target. 0 if no occurances are found.
+     * @return the number of times the substring is found in the target. 0 if no occurrences are found.
      */
     public static int countOccurrences(@NonNull String text, @NonNull String substring) {
 
@@ -432,6 +437,7 @@ public class StringUtils {
                 false
         );
     }
+
     private static final char wrongFileSeparatorChar = File.separatorChar == '/' ? '\\' : '/';
 
     private static boolean matchesGlob(String pattern, String str, boolean caseSensitive) {
@@ -632,6 +638,9 @@ public class StringUtils {
         return true;
     }
 
+    private static final Pattern SINGLE_DOT_OR_DOLLAR = Pattern.compile("(?:([^.]+)|^)\\.(?:([^.]+)|$)");
+    private static final String SINGLE_DOT_OR_DOLLAR_REPLACEMENT = "$1" + Matcher.quoteReplacement("[.$]") + "$2";
+
     /**
      * See <a href="https://eclipse.org/aspectj/doc/next/progguide/semantics-pointcuts.html#type-patterns">https://eclipse.org/aspectj/doc/next/progguide/semantics-pointcuts.html#type-patterns</a>
      * <p>
@@ -643,11 +652,11 @@ public class StringUtils {
      * the code is in any declaration of a type whose name begins with "com.xerox.".
      */
     public static String aspectjNameToPattern(String name) {
-        return name
+        String replaced = name
                 .replace("$", "\\$")
                 .replace("[", "\\[")
-                .replace("]", "\\]")
-                .replaceAll("(?:([^.]+)|^)\\.(?:([^.]+)|$)", "$1" + Matcher.quoteReplacement("[.$]") + "$2")
+                .replace("]", "\\]");
+        return SINGLE_DOT_OR_DOLLAR.matcher(replaced).replaceAll(SINGLE_DOT_OR_DOLLAR_REPLACEMENT)
                 .replace("*", "[^.]*")
                 .replace("..", "\\.(.+\\.)?");
     }
@@ -698,9 +707,7 @@ public class StringUtils {
     }
 
     /**
-     * Considering C-style comments to be whitespace, return the index of the next non-whitespace character
-     *
-     * @return
+     * @return Considering C-style comments to be whitespace, return the index of the next non-whitespace character.
      */
     public static int indexOfNextNonWhitespace(int cursor, String source) {
         boolean inMultiLineComment = false;

@@ -22,6 +22,7 @@ import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.RemoveImport;
@@ -45,10 +46,15 @@ public class RemoveImportBenchmark {
             }
 
             @Override
-            public TreeVisitor<?, ExecutionContext> getVisitor() {
-                return new RemoveImport("java.util.function.Function");
+            public String getDescription() {
+                return "Remove function.";
             }
-        }.run(state.getSourceFiles());
+
+            @Override
+            public TreeVisitor<?, ExecutionContext> getVisitor() {
+                return new RemoveImport<>("java.util.function.Function");
+            }
+        }.run(state.getSourceSet(), new InMemoryExecutionContext());
     }
 
     public static void main(String[] args) throws RunnerException {

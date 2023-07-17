@@ -17,12 +17,8 @@ package org.openrewrite.java.search;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
@@ -49,7 +45,7 @@ public class FindMissingTypes extends Recipe {
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new FindMissingTypesVisitor();
     }
 
@@ -103,6 +99,29 @@ public class FindMissingTypes extends Recipe {
         }
 
         @Override
+        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+            J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
+            if (v == variable) {
+                JavaType.Variable variableType = v.getVariableType();
+                if (!isWellFormedType(variableType, seenTypes) && !isAllowedToHaveUnknownType(variable)) {
+                    v = SearchResult.found(v, "Variable type is missing or malformed");
+                } else if (variableType != null && !variableType.getName().equals(v.getSimpleName())) {
+                    v = SearchResult.found(v, "type information has a different variable name '" + variableType.getName() + "'");
+                }
+            }
+            return v;
+        }
+
+        private boolean isAllowedToHaveUnknownType(J.VariableDeclarations.NamedVariable variable) {
+            Cursor parent = getCursor().getParent();
+            while (parent != null && parent.getParent() != null && !(parent.getParentTreeCursor().getValue() instanceof J.ClassDeclaration)) {
+                parent = parent.getParentTreeCursor();
+            }
+            // If the variable is declared in a class initializer, then it's allowed to have unknown type
+            return parent != null && parent.getValue() instanceof J.Block;
+        }
+
+        @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
             // If one of the method's arguments or type parameters is missing type, then the invocation very likely will too
@@ -116,6 +135,18 @@ public class FindMissingTypes extends Recipe {
                 }
             }
             return mi;
+        }
+
+        @Override
+        public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
+            J.MemberReference mr = super.visitMemberReference(memberRef, ctx);
+            JavaType.Method type = mr.getMethodType();
+            if (!isWellFormedType(type, seenTypes)) {
+                mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
+            } else if (!type.getName().equals(mr.getReference().getSimpleName()) && !type.isConstructor()) {
+                mr = SearchResult.found(mr, "type information has a different method name '" + type.getName() + "'");
+            }
+            return mr;
         }
 
         @Override
@@ -193,22 +224,23 @@ public class FindMissingTypes extends Recipe {
         private boolean isFieldAccess(J.Identifier ident) {
             J value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.FieldAccess
-                    && (ident.equals(((J.FieldAccess) value).getName()) || ident.equals(((J.FieldAccess) value).getTarget()));
+                    && (ident == ((J.FieldAccess) value).getName() ||
+                        ident == ((J.FieldAccess) value).getTarget() && !((J.FieldAccess) value).getSimpleName().equals("class"));
         }
 
         private boolean isBeingDeclared(J.Identifier ident) {
             J value = getCursor().getParentTreeCursor().getValue();
-            return value instanceof J.VariableDeclarations.NamedVariable && ident.equals(((J.VariableDeclarations.NamedVariable) value).getName());
+            return value instanceof J.VariableDeclarations.NamedVariable && ident == ((J.VariableDeclarations.NamedVariable) value).getName();
         }
 
         private boolean isParameterizedType(J.Identifier ident) {
             J value = getCursor().getParentTreeCursor().getValue();
-            return value instanceof J.ParameterizedType && ident.equals(((J.ParameterizedType) value).getClazz());
+            return value instanceof J.ParameterizedType && ident == ((J.ParameterizedType) value).getClazz();
         }
 
         private boolean isNewClass(J.Identifier ident) {
             J value = getCursor().getParentTreeCursor().getValue();
-            return value instanceof J.NewClass && ident.equals(((J.NewClass) value).getClazz());
+            return value instanceof J.NewClass && ident == ((J.NewClass) value).getClazz();
         }
 
         private boolean isTypeParameter() {
@@ -218,7 +250,8 @@ public class FindMissingTypes extends Recipe {
 
         private boolean isMemberReference(J.Identifier ident) {
             J value = getCursor().getParentTreeCursor().getValue();
-            return value instanceof J.MemberReference && ident.equals(((J.MemberReference) value).getReference());
+            return value instanceof J.MemberReference &&
+                   ident == ((J.MemberReference) value).getReference();
         }
 
         private boolean isCaseLabel() {
@@ -232,7 +265,7 @@ public class FindMissingTypes extends Recipe {
         private boolean isAnnotationField(J.Identifier ident) {
             Cursor parent = getCursor().getParent();
             return parent != null && parent.getValue() instanceof J.Assignment
-                    && (ident.equals(((J.Assignment) parent.getValue()).getVariable()) && getCursor().firstEnclosing(J.Annotation.class) != null);
+                    && (ident == ((J.Assignment) parent.getValue()).getVariable() && getCursor().firstEnclosing(J.Annotation.class) != null);
         }
 
     }

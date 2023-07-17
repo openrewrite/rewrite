@@ -21,6 +21,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.java.ChangeMethodTargetToStatic;
 
 import java.util.concurrent.TimeUnit;
@@ -44,6 +45,6 @@ public class ChangeMethodTargetToStaticBenchmark {
     @Benchmark
     public void changeMethodTargetToStatic(JavaCompilationUnitState state) {
         new ChangeMethodTargetToStatic("org.junit.Assert assertThat(..)", "org.hamcrest.MatcherAssert", null, null)
-                .run(state.getSourceFiles());
+                .run(state.getSourceSet(), new InMemoryExecutionContext());
     }
 }

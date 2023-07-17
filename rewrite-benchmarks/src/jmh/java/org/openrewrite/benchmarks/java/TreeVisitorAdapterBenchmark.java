@@ -20,6 +20,7 @@ import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.RunnerException;
 import org.openjdk.jmh.runner.options.Options;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.TreeVisitorAdapter;
@@ -38,7 +39,7 @@ public class TreeVisitorAdapterBenchmark {
 
     @Benchmark
     public void adaptToJava(JavaCompilationUnitState cus) {
-        for (J.CompilationUnit cu : cus.getSourceFiles()) {
+        for (SourceFile cu : cus.getSourceFiles()) {
             //noinspection unchecked
             TreeVisitorAdapter.adapt(new TreeVisitor<Tree, Integer>() {
                 @Override
@@ -51,7 +52,7 @@ public class TreeVisitorAdapterBenchmark {
 
     @Benchmark
     public void noAdaptation(JavaCompilationUnitState cus) {
-        for (J.CompilationUnit cu : cus.getSourceFiles()) {
+        for (SourceFile cu : cus.getSourceFiles()) {
             new JavaVisitor<>().visitNonNull(cu, 0);
         }
     }

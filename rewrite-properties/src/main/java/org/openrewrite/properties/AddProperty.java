@@ -15,7 +15,6 @@
  */
 package org.openrewrite.properties;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
@@ -29,8 +28,8 @@ import org.openrewrite.properties.tree.Properties;
 import java.util.List;
 import java.util.Set;
 
-@EqualsAndHashCode(callSuper = true)
 @Value
+@EqualsAndHashCode(callSuper = true)
 public class AddProperty extends Recipe {
 
     @Option(displayName = "Property key",
@@ -49,28 +48,6 @@ public class AddProperty extends Recipe {
     @Nullable
     String delimiter;
 
-    @Option(displayName = "Optional file matcher",
-            description = "Matching files will be modified. This is a glob expression.",
-            required = false,
-            example = "**/application-*.properties")
-    @Nullable
-    String fileMatcher;
-
-    public AddProperty(String property, String value, @Nullable String fileMatcher) {
-        this.property = property;
-        this.value = value;
-        this.delimiter = null;
-        this.fileMatcher = fileMatcher;
-    }
-
-    @JsonCreator
-    public AddProperty(String property, String value, @Nullable String delimiter, @Nullable String fileMatcher) {
-        this.property = property;
-        this.value = value;
-        this.delimiter = delimiter;
-        this.fileMatcher = fileMatcher;
-    }
-
     @Override
     public String getDisplayName() {
         return "Add a new property";
@@ -82,28 +59,24 @@ public class AddProperty extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        if (fileMatcher != null) {
-            return new HasSourcePath<>(fileMatcher);
-        }
-        return null;
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new PropertiesVisitor<ExecutionContext>() {
+    public PropertiesIsoVisitor<ExecutionContext> getVisitor() {
+        return new PropertiesIsoVisitor<ExecutionContext>() {
             @Override
-            public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
-                Properties p = super.visitFile(file, executionContext);
+            public Properties.File visitFile(Properties.File file, ExecutionContext executionContext) {
+                Properties.File p = super.visitFile(file, executionContext);
                 if (!StringUtils.isBlank(property) && !StringUtils.isBlank(value)) {
                     Set<Properties.Entry> properties = FindProperties.find(p, property, false);
                     if (properties.isEmpty()) {
                         Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, value);
                         Properties.Entry.Delimiter delimitedBy = delimiter != null && !delimiter.isEmpty() ? Properties.Entry.Delimiter.getDelimiter(delimiter) : Properties.Entry.Delimiter.EQUALS;
                         String beforeEquals = delimitedBy == Properties.Entry.Delimiter.NONE ? delimiter : "";
-                        Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, property, beforeEquals, delimitedBy, propertyValue);
-                        List<Properties.Content> contentList = ListUtils.concat(((Properties.File) p).getContent(), entry);
-                        p = ((Properties.File) p).withContent(contentList);
+                        String prefix = "";
+                        if (!p.getContent().isEmpty()) {
+                            prefix = "\n";
+                        }
+                        Properties.Entry entry = new Properties.Entry(Tree.randomId(), prefix, Markers.EMPTY, property, beforeEquals, delimitedBy, propertyValue);
+                        List<Properties.Content> contentList = ListUtils.concat(p.getContent(), entry);
+                        p = p.withContent(contentList);
                     }
                 }
                 return p;

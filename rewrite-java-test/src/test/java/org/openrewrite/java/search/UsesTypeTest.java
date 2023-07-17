@@ -16,8 +16,8 @@
 package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Issue;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -102,6 +102,33 @@ class UsesTypeTest implements RewriteTest {
         rewriteRun(
           spec ->
             spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.*", false))),
+          java(
+            """
+              import java.io.File;
+              import static java.util.Collections.singleton;
+                            
+              class Test {
+              }
+              """,
+            """
+              /*~~>*/import java.io.File;
+              import static java.util.Collections.singleton;
+                            
+              class Test {
+              }
+              """
+          )
+        );
+    }
+
+    /**
+     * Type wildcards are greedy.
+     */
+    @Test
+    void usesRecursiveTypeWildcard() {
+        rewriteRun(
+          spec ->
+            spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java..*", false))),
           java(
             """
               import java.io.File;
@@ -250,6 +277,27 @@ class UsesTypeTest implements RewriteTest {
                   public void foo() {
                       Collections.copy(Collections.emptyList(), Collections.emptyList());
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void findNestedType() {
+        rewriteRun(
+          spec -> spec.recipe(RewriteTest.toRecipe(() -> new UsesType<>("java.util.Map.Entry", false))),
+          java(
+            """
+              import java.util.Map.Entry;
+              
+              class Test {
+              }
+              """,
+            """
+              /*~~>*/import java.util.Map.Entry;
+              
+              class Test {
               }
               """
           )

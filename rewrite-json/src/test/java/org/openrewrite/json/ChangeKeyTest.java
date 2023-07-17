@@ -16,8 +16,8 @@
 package org.openrewrite.json;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Example;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Example;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.json.Assertions.json;
@@ -29,8 +29,7 @@ class ChangeKeyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeKey(
             "$.description",
-            "\"newDescription\"",
-            null
+            "\"newDescription\""
           )),
           json("""
               {
@@ -56,8 +55,7 @@ class ChangeKeyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeKey(
             "$.metadata.name",
-            "\"name2\"",
-            null
+            "\"name2\""
           )),
           json("""
               {
@@ -86,8 +84,7 @@ class ChangeKeyTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new ChangeKey(
             "$.subjects.kind",
-            "\"kind2\"",
-            null
+            "\"kind2\""
           )),
           json("""
               {

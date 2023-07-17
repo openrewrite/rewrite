@@ -162,8 +162,33 @@ public final class ListUtils {
         return newLs;
     }
 
+    // inlined version of `map(List, BiFunction)` for memory efficiency (no overhead for lambda)
     public static <T> List<T> map(@Nullable List<T> ls, UnaryOperator<T> map) {
-        return map(ls, (i, t) -> map.apply(t));
+        if (ls == null || ls.isEmpty()) {
+            //noinspection ConstantConditions
+            return ls;
+        }
+
+        List<T> newLs = ls;
+        boolean nullEncountered = false;
+        for (int i = 0; i < ls.size(); i++) {
+            T tree = ls.get(i);
+            T newTree = map.apply(tree);
+            if (newTree != tree) {
+                if (newLs == ls) {
+                    newLs = new ArrayList<>(ls);
+                }
+                newLs.set(i, newTree);
+            }
+            nullEncountered |= newTree == null;
+        }
+
+        if (newLs != ls && nullEncountered) {
+            //noinspection StatementWithEmptyBody
+            while (newLs.remove(null)) ;
+        }
+
+        return newLs;
     }
 
     public static <T> List<T> flatMap(@Nullable List<T> ls, BiFunction<Integer, T, Object> flatMap) {
@@ -298,4 +323,16 @@ public final class ListUtils {
     public static <T> List<T> nullIfEmpty(@Nullable List<T> ls) {
         return ls == null || ls.isEmpty() ? null : ls;
     }
+
+    public static <T> T @Nullable [] arrayOrNullIfEmpty(@Nullable List<T> list, T[] array) {
+        if (list == null || list.isEmpty()) {
+            return null;
+        }
+        return list.toArray(array);
+    }
+
+    public static <T> T @Nullable [] nullIfEmpty(T @Nullable [] list) {
+        return list == null || list.length == 0 ? null : list;
+    }
+
 }

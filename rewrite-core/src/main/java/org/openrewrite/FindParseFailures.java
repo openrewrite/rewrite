@@ -17,13 +17,34 @@ package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.table.ParseFailures;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindParseFailures extends Recipe {
-    ParseFailures failures = new ParseFailures(this);
+
+    @Option(displayName = "Max snippet length",
+            description = "When the failure occurs on a granular tree element, its source code will be included " +
+                          "as a column in the data table up to this maximum snippet length.",
+            required = false)
+    @Nullable
+    Integer maxSnippetLength;
+
+    @Option(displayName = "Parser name",
+            description = "Only display specified parser failures.",
+            required = false)
+    @Nullable
+    String parserType;
+
+    @Option(displayName = "Stack trace",
+            description = "Only mark specified stack traces.",
+            required = false)
+    @Nullable
+    String stackTrace;
+
+    transient ParseFailures failures = new ParseFailures(this);
 
     @Override
     public String getDisplayName() {
@@ -37,19 +58,39 @@ public class FindParseFailures extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TreeVisitor<Tree, ExecutionContext>() {
+
             @Override
-            public Tree visitSourceFile(SourceFile sourceFile, ExecutionContext ctx) {
-                return sourceFile.getMarkers().findFirst(ParseExceptionResult.class)
-                        .<Tree>map(exceptionResult -> {
+            public Tree postVisit(Tree tree, ExecutionContext ctx) {
+                return tree.getMarkers().findFirst(ParseExceptionResult.class)
+                        .map(exceptionResult -> {
+                            if (parserType != null && !exceptionResult.getParserType().equals(parserType)) {
+                                return tree;
+                            }
+
+                            if (stackTrace != null && !exceptionResult.getMessage().contains(stackTrace)) {
+                                return tree;
+                            }
+
+                            String snippet = tree instanceof SourceFile ? null : tree.printTrimmed(getCursor());
+                            if(snippet != null && maxSnippetLength != null && snippet.length() > maxSnippetLength) {
+                                snippet = snippet.substring(0, maxSnippetLength);
+                            }
+
                             failures.insertRow(ctx, new ParseFailures.Row(
-                                    sourceFile.getSourcePath().toString(),
+                                    exceptionResult.getParserType(),
+                                    (tree instanceof SourceFile ? (SourceFile) tree : getCursor().firstEnclosingOrThrow(SourceFile.class))
+                                            .getSourcePath().toString(),
+                                    exceptionResult.getExceptionType(),
+                                    exceptionResult.getTreeType(),
+                                    snippet,
                                     exceptionResult.getMessage()
                             ));
-                            return Markup.info(sourceFile, exceptionResult.getMessage());
+
+                            return Markup.info(tree, exceptionResult.getMessage());
                         })
-                        .orElse(sourceFile);
+                        .orElse(tree);
             }
         };
     }

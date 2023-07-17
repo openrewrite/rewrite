@@ -21,13 +21,13 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
 import org.openrewrite.java.marker.JavaVersion;
 import org.openrewrite.java.search.FindMissingTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.*;
 
 import java.nio.file.Path;
@@ -70,16 +70,21 @@ public class Assertions {
             List<FindMissingTypes.MissingTypeResult> missingTypeResults = FindMissingTypes.findMissingTypes(sf);
             missingTypeResults = missingTypeResults.stream()
                     .filter(missingType -> {
-                        if (typeValidation.identifiers() && missingType.getJ() instanceof J.Identifier) {
+                        if (missingType.getJ() instanceof J.Identifier) {
+                            return typeValidation.identifiers();
+                        } else if (missingType.getJ() instanceof J.ClassDeclaration) {
+                            return typeValidation.classDeclarations();
+                        } else if (missingType.getJ() instanceof J.MethodInvocation || missingType.getJ() instanceof J.MemberReference) {
+                            return typeValidation.methodInvocations();
+                        } else if (missingType.getJ() instanceof J.NewClass) {
+                            return typeValidation.constructorInvocations();
+                        } else if (missingType.getJ() instanceof J.MethodDeclaration) {
+                            return typeValidation.methodDeclarations();
+                        } else if (missingType.getJ() instanceof J.VariableDeclarations.NamedVariable) {
+                            return typeValidation.variableDeclarations();
+                        } else {
                             return true;
-                        } else if (typeValidation.classDeclarations() && missingType.getJ() instanceof J.ClassDeclaration) {
-                            return true;
-                        } else if (typeValidation.methodInvocations() && missingType.getJ() instanceof J.MethodInvocation) {
-                            return true;
-                        } else if (typeValidation.constructorInvocations() && missingType.getJ() instanceof J.NewClass) {
-                            return true;
-                        } else
-                            return typeValidation.methodDeclarations() && missingType.getJ() instanceof J.MethodDeclaration;
+                        }
                     })
                     .collect(Collectors.toList());
             if (!missingTypeResults.isEmpty()) {
@@ -123,10 +128,7 @@ public class Assertions {
 
     private static void acceptSpec(Consumer<SourceSpec<J.CompilationUnit>> spec, SourceSpec<J.CompilationUnit> java) {
         Consumer<J.CompilationUnit> userSuppliedAfterRecipe = java.getAfterRecipe();
-        java.afterRecipe(cu -> {
-            J.clearCaches();
-            userSuppliedAfterRecipe.accept(cu);
-        });
+        java.afterRecipe(userSuppliedAfterRecipe::accept);
         spec.accept(java);
     }
 
@@ -200,30 +202,7 @@ public class Assertions {
 
     public static UncheckedConsumer<List<SourceFile>> addTypesToSourceSet(String sourceSetName, List<String> extendsFrom, List<Path> classpath) {
         return sourceFiles -> {
-            JavaSourceSet sourceSet = JavaSourceSet.build(sourceSetName, classpath, null, false);
-            List<JavaType.FullyQualified> types = sourceSet.getClasspath();
-            for (SourceFile sourceFile : sourceFiles) {
-                if (!(sourceFile instanceof JavaSourceFile)) {
-                    continue;
-                }
-
-                Optional<JavaSourceSet> maybeCurrentSourceSet = sourceFile.getMarkers().findFirst(JavaSourceSet.class);
-                if (!maybeCurrentSourceSet.isPresent()) {
-                    continue;
-                }
-
-                JavaSourceSet currentSourceSet = maybeCurrentSourceSet.get();
-                if (!currentSourceSet.getName().equals(sourceSetName) && !extendsFrom.contains(currentSourceSet.getName())) {
-                    continue;
-                }
-
-                for (JavaType type : ((JavaSourceFile) sourceFile).getTypesInUse().getTypesInUse()) {
-                    if (type instanceof JavaType.FullyQualified) {
-                        types.add((JavaType.FullyQualified) type);
-                    }
-                }
-            }
-            sourceSet = sourceSet.withClasspath(types);
+            JavaSourceSet sourceSet = JavaSourceSet.build(sourceSetName, classpath, new JavaTypeCache(), false);
 
             for (int i = 0; i < sourceFiles.size(); i++) {
                 SourceFile sourceFile = sourceFiles.get(i);

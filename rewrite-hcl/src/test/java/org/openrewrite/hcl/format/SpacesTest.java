@@ -16,12 +16,12 @@
 package org.openrewrite.hcl.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
 import org.openrewrite.hcl.HclParser;
 import org.openrewrite.hcl.style.SpacesStyle;
 import org.openrewrite.hcl.tree.Comment;
-import org.openrewrite.DocumentExample;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;

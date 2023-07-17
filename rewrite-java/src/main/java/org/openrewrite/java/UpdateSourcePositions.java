@@ -39,7 +39,7 @@ public class UpdateSourcePositions extends Recipe {
     }
 
     @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         Map<Tree, Range> positionMap = new IdentityHashMap<>();
         PositionPrintOutputCapture ppoc = new PositionPrintOutputCapture();
 
@@ -67,10 +67,6 @@ public class UpdateSourcePositions extends Recipe {
 
             @Override
             protected void visitModifier(J.Modifier modifier, PrintOutputCapture<ExecutionContext> p) {
-                if (modifier == null) {
-                    return;
-                }
-
                 PositionPrintOutputCapture prefix = new PositionPrintOutputCapture(ppoc.pos, ppoc.line, ppoc.column);
                 spacePrinter.visitSpace(modifier.getPrefix(), Space.Location.ANY, prefix);
 
@@ -91,7 +87,7 @@ public class UpdateSourcePositions extends Recipe {
                     return null;
                 }
                 if (firstVisit) {
-                    tree = printer.visit(tree, ppoc);
+                    tree = printer.visitNonNull(tree, ppoc);
                     firstVisit = false;
                 }
 

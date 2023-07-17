@@ -30,6 +30,8 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Objects.requireNonNull;
+
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class Find extends Recipe {
@@ -50,34 +52,74 @@ public class Find extends Recipe {
     String find;
 
     @Option(displayName = "Regex",
-            description = "If true, `find` will be interpreted as a Regular Expression. Default false.",
+            description = "If true, `find` will be interpreted as a Regular Expression. Default `false`.",
             required = false)
     @Nullable
     Boolean regex;
 
+    @Option(displayName = "Case sensitive",
+            description = "If `true` the search will be sensitive to case. Default `false`.",
+            required = false)
+    @Nullable
+    Boolean caseSensitive;
+
+    @Option(displayName = "Regex Multiline Mode",
+            description = "When performing a regex search setting this to `true` allows \"^\" and \"$\" to match the beginning and end of lines, respectively. " +
+                          "When performing a regex search when this is `false` \"^\" and \"$\" will match only the beginning and ending of the entire source file, respectively." +
+                          "Has no effect when not performing a regex search. Default `false`.",
+            required = false)
+    @Nullable
+    Boolean multiline;
+
+    @Option(displayName = "Regex Dot All",
+            description = "When performing a regex search setting this to `true` allows \".\" to match line terminators." +
+                          "Has no effect when not performing a regex search. Default `false`.",
+            required = false)
+    @Nullable
+    Boolean dotAll;
+
+    @Option(displayName = "File pattern",
+            description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
+                          "When not set, all source files are searched.",
+            example = "**/*.java")
+    @Nullable
+    String filePattern;
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new TreeVisitor<Tree, ExecutionContext>() {
+
+        TreeVisitor<?, ExecutionContext> visitor = new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public Tree visitSourceFile(SourceFile sourceFile, ExecutionContext executionContext) {
-                if(sourceFile instanceof Quark || sourceFile instanceof Remote || sourceFile instanceof Binary) {
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                if (sourceFile instanceof Quark || sourceFile instanceof Remote || sourceFile instanceof Binary) {
                     return sourceFile;
                 }
                 PlainText plainText = PlainTextParser.convert(sourceFile);
                 String searchStr = find;
-                if(!Boolean.TRUE.equals(regex)) {
+                if (!Boolean.TRUE.equals(regex)) {
                     searchStr = Pattern.quote(searchStr);
                 }
-                Pattern pattern = Pattern.compile(searchStr);
+                int patternOptions = 0;
+                if(!Boolean.TRUE.equals(caseSensitive)) {
+                    patternOptions |= Pattern.CASE_INSENSITIVE;
+                }
+                if(Boolean.TRUE.equals(multiline)) {
+                    patternOptions |= Pattern.MULTILINE;
+                }
+                if(Boolean.TRUE.equals(dotAll)) {
+                    patternOptions |= Pattern.DOTALL;
+                }
+                Pattern pattern = Pattern.compile(searchStr, patternOptions);
                 Matcher matcher = pattern.matcher(plainText.getText());
                 String rawText = plainText.getText();
-                if(!matcher.find()) {
+                if (!matcher.find()) {
                     return sourceFile;
                 }
                 matcher.reset();
                 List<PlainText.Snippet> snippets = new ArrayList<>();
                 int previousEnd = 0;
-                while(matcher.find()) {
+                while (matcher.find()) {
                     int matchStart = matcher.start();
                     snippets.add(snippet(rawText.substring(previousEnd, matchStart)));
                     snippets.add(SearchResult.found(snippet(rawText.substring(matchStart, matcher.end()))));
@@ -87,6 +129,10 @@ public class Find extends Recipe {
                 return plainText.withText("").withSnippets(snippets);
             }
         };
+        if(filePattern != null) {
+            visitor = Preconditions.check(new HasSourcePath<>(filePattern), visitor);
+        }
+        return visitor;
     }
 
 

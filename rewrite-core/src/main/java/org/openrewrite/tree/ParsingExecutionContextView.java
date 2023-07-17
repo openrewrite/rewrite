@@ -15,26 +15,16 @@
  */
 package org.openrewrite.tree;
 
-import org.openrewrite.*;
-
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-
+import org.openrewrite.DelegatingExecutionContext;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.text.PlainText;
 
 import java.nio.charset.Charset;
-
-import static org.openrewrite.Tree.randomId;
 
 public class ParsingExecutionContextView extends DelegatingExecutionContext {
     private static final String PARSING_LISTENER = "org.openrewrite.core.parsingListener";
 
     private static final String CHARSET = "org.openrewrite.parser.charset";
-
-    private static final String PARSING_FAILURES = "org.openrewrite.core.parsingFailures";
 
     public ParsingExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -54,31 +44,6 @@ public class ParsingExecutionContextView extends DelegatingExecutionContext {
 
     public ParsingEventListener getParsingListener() {
         return getMessage(PARSING_LISTENER, ParsingEventListener.NOOP);
-    }
-
-    public ParsingExecutionContextView parseFailure(Parser.Input input, @Nullable Path relativeTo, Parser<?> parser, Throwable t) {
-        PlainText pt = PlainText.builder()
-                .sourcePath(input.getRelativePath(relativeTo))
-                .text(input.getSource(this).readFully())
-                .build();
-        return parseFailure(pt, parser, t);
-    }
-
-    public ParsingExecutionContextView parseFailure(PlainText raw, Parser<?> parser, Throwable t) {
-        putMessageInCollection(PARSING_FAILURES,
-                raw.withMarkers(raw.getMarkers().addIfAbsent(ParseExceptionResult.build(parser, t))),
-                ArrayList::new);
-        return this;
-    }
-
-    @SuppressWarnings("unused")
-    public List<PlainText> getParseFailures() {
-        return getMessage(PARSING_FAILURES, Collections.emptyList());
-    }
-
-    @SuppressWarnings("unused")
-    public List<PlainText> pollParseFailures() {
-        return pollMessage(PARSING_FAILURES, Collections.emptyList());
     }
 
     public ParsingExecutionContextView setCharset(@Nullable Charset charset) {

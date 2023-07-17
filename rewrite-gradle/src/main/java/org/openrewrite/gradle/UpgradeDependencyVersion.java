@@ -40,10 +40,7 @@ import org.openrewrite.maven.MavenDownloadingExceptions;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.*;
-import org.openrewrite.semver.DependencyMatcher;
-import org.openrewrite.semver.LatestPatch;
-import org.openrewrite.semver.Semver;
-import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.semver.*;
 
 import java.util.*;
 
@@ -71,13 +68,16 @@ public class UpgradeDependencyVersion extends Recipe {
     String artifactId;
 
     @Option(displayName = "New version",
-            description = "An exact version number or node-style semver selector used to select the version number.",
+            description = "An exact version number or node-style semver selector used to select the version number. " +
+                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors)",
             example = "29.X")
     String newVersion;
 
     @Option(displayName = "Version pattern",
             description = "Allows version selection to be extended beyond the original Node Semver semantics. So for example," +
-                          "Setting 'version' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
+                          "Setting 'newVersion' to \"25-29\" can be paired with a metadata pattern of \"-jre\" to select Guava 29.0-jre",
             example = "-jre",
             required = false)
     @Nullable
@@ -107,44 +107,43 @@ public class UpgradeDependencyVersion extends Recipe {
         return validated;
     }
 
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor();
-    }
-
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
         VersionComparator versionComparator = requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
         DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, versionComparator);
-        return new GroovyVisitor<ExecutionContext>() {
+        return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker), new GroovyVisitor<ExecutionContext>() {
 
             @Override
-            public J visitJavaSourceFile(JavaSourceFile sourceFile, ExecutionContext ctx) {
-                JavaSourceFile cu = (JavaSourceFile) super.visitJavaSourceFile(sourceFile, ctx);
-                Map<String, GroupArtifact> variableNames = getCursor().getMessage(VERSION_VARIABLE_KEY);
-                if(variableNames != null) {
-                    Optional<GradleProject> maybeGp = cu.getMarkers()
-                            .findFirst(GradleProject.class);
-                    if(!maybeGp.isPresent()) {
-                        return cu;
-                    }
+            public J postVisit(J tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    JavaSourceFile cu = (JavaSourceFile) tree;
+                    Map<String, GroupArtifact>  variableNames = getCursor().getMessage(VERSION_VARIABLE_KEY);
+                    if (variableNames != null) {
+                        Optional<GradleProject> maybeGp = cu.getMarkers()
+                                .findFirst(GradleProject.class);
+                        if (!maybeGp.isPresent()) {
+                            return cu;
+                        }
 
-                    cu = (JavaSourceFile) new UpdateVariable(variableNames, versionComparator, maybeGp.get()).visitNonNull(cu, ctx);
-                }
-                Set<GroupArtifactVersion> versionUpdates = getCursor().getMessage(NEW_VERSION_KEY);
-                if(versionUpdates != null) {
-                    Optional<GradleProject> maybeGp = cu.getMarkers()
-                            .findFirst(GradleProject.class);
-                    if(!maybeGp.isPresent()) {
-                        return cu;
+                        cu = (JavaSourceFile) new UpdateVariable(variableNames, versionComparator, maybeGp.get()).visitNonNull(cu, ctx);
                     }
-                    GradleProject newGp = maybeGp.get();
-                    for (GroupArtifactVersion gav : versionUpdates) {
-                        newGp = replaceVersion(newGp, ctx, gav);
+                    Set<GroupArtifactVersion> versionUpdates = getCursor().getMessage(NEW_VERSION_KEY);
+                    if (versionUpdates != null) {
+                        Optional<GradleProject> maybeGp = cu.getMarkers()
+                                .findFirst(GradleProject.class);
+                        if (!maybeGp.isPresent()) {
+                            return cu;
+                        }
+                        GradleProject newGp = maybeGp.get();
+                        for (GroupArtifactVersion gav : versionUpdates) {
+                            newGp = replaceVersion(newGp, ctx, gav);
+                        }
+                        cu = cu.withMarkers(cu.getMarkers().removeByType(GradleProject.class).add(newGp));
                     }
-                    cu = cu.withMarkers(cu.getMarkers().removeByType(GradleProject.class).add(newGp));
+                    return cu;
                 }
-                return cu;
+                return tree;
             }
 
             @Override
@@ -198,8 +197,9 @@ public class UpgradeDependencyVersion extends Recipe {
                                 .orElseThrow(() -> new IllegalArgumentException("Gradle files are expected to have a GradleProject marker."));
                         String version = dep.getVersion();
                         try {
-                            String newVersion = findNewerVersion(dep.getGroupId(), dep.getArtifactId(), version, versionComparator,
-                                    gradleProject, ctx);
+                            String newVersion = "classpath".equals(m.getSimpleName()) ?
+                                    findNewerPluginVersion(dep.getGroupId(), dep.getArtifactId(), version, versionComparator, gradleProject, ctx) :
+                                    findNewerProjectDependencyVersion(dep.getGroupId(), dep.getArtifactId(), version, versionComparator, gradleProject, ctx);
                             if (newVersion == null || version.equals(newVersion)) {
                                 return m;
                             }
@@ -248,8 +248,9 @@ public class UpgradeDependencyVersion extends Recipe {
                         }
                         String newVersion;
                         try {
-                            newVersion = findNewerVersion((String) groupLiteral.getValue(), (String) artifactLiteral.getValue(), version, versionComparator,
-                                    gradleProject, ctx);
+                            newVersion = "classpath".equals(m.getSimpleName()) ?
+                                    findNewerPluginVersion((String) groupLiteral.getValue(), (String) artifactLiteral.getValue(), version, versionComparator, gradleProject, ctx) :
+                                    findNewerProjectDependencyVersion((String) groupLiteral.getValue(), (String) artifactLiteral.getValue(), version, versionComparator, gradleProject, ctx);
                         } catch (MavenDownloadingException e) {
                             return e.warn(m);
                         }
@@ -276,7 +277,7 @@ public class UpgradeDependencyVersion extends Recipe {
 
                 return m;
             }
-        };
+        });
     }
 
     @Value
@@ -285,6 +286,7 @@ public class UpgradeDependencyVersion extends Recipe {
         Map<String, GroupArtifact> versionVariableNames;
         VersionComparator versionComparator;
         GradleProject gradleProject;
+
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
             J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
@@ -300,21 +302,24 @@ public class UpgradeDependencyVersion extends Recipe {
             if (noneMatch) {
                 return v;
             }
-            if(!(v.getInitializer() instanceof J.Literal)) {
+            if (!(v.getInitializer() instanceof J.Literal)) {
                 return v;
             }
             J.Literal initializer = (J.Literal) v.getInitializer();
-            if(initializer.getType() != JavaType.Primitive.String) {
+            if (initializer.getType() != JavaType.Primitive.String) {
                 return v;
             }
             String version = (String) initializer.getValue();
-            if(version == null) {
+            if (version == null) {
                 return v;
             }
 
             try {
-                String newVersion = findNewerVersion(ga.getGroupId(), ga.getArtifactId(), version, versionComparator, gradleProject, ctx);
-                if(newVersion == null) {
+                String newVersion = findNewerProjectDependencyVersion(ga.getGroupId(), ga.getArtifactId(), version, versionComparator, gradleProject, ctx);
+                if (newVersion == null) {
+                    newVersion = findNewerPluginVersion(ga.getGroupId(), ga.getArtifactId(), version, versionComparator, gradleProject, ctx);
+                }
+                if (newVersion == null) {
                     return v;
                 }
                 getCursor().dropParentUntil(p -> p instanceof SourceFile)
@@ -361,7 +366,10 @@ public class UpgradeDependencyVersion extends Recipe {
             }
 
             try {
-                String newVersion = findNewerVersion(ga.getGroupId(), ga.getArtifactId(), version, versionComparator, gradleProject, ctx);
+                String newVersion = findNewerProjectDependencyVersion(ga.getGroupId(), ga.getArtifactId(), version, versionComparator, gradleProject, ctx);
+                if (newVersion == null) {
+                    newVersion = findNewerPluginVersion(ga.getGroupId(), ga.getArtifactId(), version, versionComparator, gradleProject, ctx);
+                }
                 if (newVersion == null) {
                     return a;
                 }
@@ -379,16 +387,32 @@ public class UpgradeDependencyVersion extends Recipe {
     }
 
     @Nullable
+    private String findNewerPluginVersion(String groupId, String artifactId, String version, VersionComparator versionComparator,
+                                          GradleProject gradleProject, ExecutionContext ctx) throws MavenDownloadingException {
+        return findNewerVersion(groupId, artifactId, version, versionComparator, gradleProject.getMavenPluginRepositories(), ctx);
+    }
+
+    @Nullable
+    private String findNewerProjectDependencyVersion(String groupId, String artifactId, String version, VersionComparator versionComparator,
+                                                     GradleProject gradleProject, ExecutionContext ctx) throws MavenDownloadingException {
+        return findNewerVersion(groupId, artifactId, version, versionComparator, gradleProject.getMavenRepositories(), ctx);
+    }
+
+    @Nullable
     private String findNewerVersion(String groupId, String artifactId, String version, VersionComparator versionComparator,
-                                    GradleProject gradleProject, ExecutionContext ctx) throws MavenDownloadingException {
+                                    List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
         // in the case of "latest.patch", a new version can only be derived if the
         // current version is a semantic version
         if (versionComparator instanceof LatestPatch && !versionComparator.isValid(version, version)) {
             return null;
         }
 
+        if (versionComparator instanceof ExactVersion) {
+            return versionComparator.upgrade(version, Collections.singletonList(newVersion)).orElse(null);
+        }
+
         try {
-            MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, gradleProject, ctx));
+            MavenMetadata mavenMetadata = metadataFailures.insertRows(ctx, () -> downloadMetadata(groupId, artifactId, repositories, ctx));
             List<String> versions = new ArrayList<>();
             for (String v : mavenMetadata.getVersioning().getVersions()) {
                 if (versionComparator.isValid(version, v)) {
@@ -402,15 +426,15 @@ public class UpgradeDependencyVersion extends Recipe {
         }
     }
 
-    public MavenMetadata downloadMetadata(String groupId, String artifactId, GradleProject gradleProject, ExecutionContext ctx) throws MavenDownloadingException {
+    private MavenMetadata downloadMetadata(String groupId, String artifactId, List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
         return new MavenPomDownloader(emptyMap(), ctx, null, null)
                 .downloadMetadata(new GroupArtifact(groupId, artifactId), null,
-                        gradleProject.getMavenRepositories());
+                        repositories);
     }
 
     static GradleProject replaceVersion(GradleProject gp, ExecutionContext ctx, GroupArtifactVersion gav) {
         try {
-            if(gav.getGroupId() == null || gav.getArtifactId() == null) {
+            if (gav.getGroupId() == null || gav.getArtifactId() == null) {
                 return gp;
             }
             MavenPomDownloader mpd = new MavenPomDownloader(emptyMap(), ctx, null, null);
@@ -439,10 +463,10 @@ public class UpgradeDependencyVersion extends Recipe {
                 anyChanged |= newGdc != gdc;
                 newNameToConfiguration.put(newGdc.getName(), newGdc);
             }
-            if(anyChanged) {
+            if (anyChanged) {
                 gp = gp.withNameToConfiguration(newNameToConfiguration);
             }
-        } catch (MavenDownloadingException | MavenDownloadingExceptions  e) {
+        } catch (MavenDownloadingException | MavenDownloadingExceptions e) {
             return gp;
         }
         return gp;

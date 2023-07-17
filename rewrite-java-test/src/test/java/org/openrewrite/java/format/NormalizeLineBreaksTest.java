@@ -22,7 +22,6 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.SourceSpec;
 
 import java.util.function.Consumer;
 

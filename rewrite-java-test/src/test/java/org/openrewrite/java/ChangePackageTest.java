@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.java.tree.J;
@@ -298,22 +297,20 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               import org.openrewrite.Test;
-              
+                            
               public class A {
                   Test a;
               }
               """,
             """
               import org.openrewrite.test.Test;
-              
+                            
               public class A {
                   Test a;
               }
               """,
-            spec -> spec.afterRecipe(cu -> {
-                assertThat(TypeUtils.asFullyQualified(cu.getTypesInUse().getVariables().iterator().next().getType()).
-                  getFullyQualifiedName()).isEqualTo("org.openrewrite.test.Test");
-            })
+            spec -> spec.afterRecipe(cu -> assertThat(TypeUtils.asFullyQualified(cu.getTypesInUse().getVariables().iterator().next().getType()).
+              getFullyQualifiedName()).isEqualTo("org.openrewrite.test.Test"))
           )
         );
     }
@@ -554,13 +551,12 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
     void annotationArgument() {
         rewriteRun(
           java("""
               package org.openrewrite;
-              class Argument {}
+              public class Argument {}
               """,
             SourceSpec::skip),
           java(
@@ -575,7 +571,7 @@ class ChangePackageTest implements RewriteTest {
               @Target({ElementType.TYPE, ElementType.METHOD})
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test {
-                  Class<T> value();
+                  Class<?> value();
               }
               """,
             SourceSpec::skip
@@ -606,13 +602,12 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
     void annotationArgumentNamed() {
         rewriteRun(
           java("""
               package org.openrewrite;
-              class Argument {}
+              public class Argument {}
               """,
             SourceSpec::skip),
           java(
@@ -627,7 +622,7 @@ class ChangePackageTest implements RewriteTest {
               @Target({ElementType.TYPE, ElementType.METHOD})
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test {
-                  Class<T> named();
+                  Class<?> named();
               }
               """,
             SourceSpec::skip
@@ -658,13 +653,12 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
     void annotationArgumentFullyQualified() {
         rewriteRun(
           java("""
               package org.openrewrite;
-              class Argument {}
+              public class Argument {}
               """,
             SourceSpec::skip),
           java(
@@ -679,7 +673,7 @@ class ChangePackageTest implements RewriteTest {
               @Target({ElementType.TYPE, ElementType.METHOD})
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test {
-                  Class<T> value();
+                  Class<?> value();
               }
               """,
             SourceSpec::skip
@@ -708,13 +702,12 @@ class ChangePackageTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
     void annotationArgumentNamedFullyQualified() {
         rewriteRun(
           java("""
               package org.openrewrite;
-              class Argument {}
+              public class Argument {}
               """,
             SourceSpec::skip),
           java(
@@ -729,7 +722,7 @@ class ChangePackageTest implements RewriteTest {
               @Target({ElementType.TYPE, ElementType.METHOD})
               @Retention(RetentionPolicy.RUNTIME)
               public @interface Test {
-                  Class<T> named();
+                  Class<?> named();
               }
               """,
             SourceSpec::skip
@@ -1263,13 +1256,13 @@ class ChangePackageTest implements RewriteTest {
           java(
             """
               import org.openrewrite.Test;
-              public class Test {
+              public class A {
                   Class<?> clazz = Test.class;
               }
               """,
             """
               import org.openrewrite.test.Test;
-              public class Test {
+              public class A {
                   Class<?> clazz = Test.class;
               }
               """,

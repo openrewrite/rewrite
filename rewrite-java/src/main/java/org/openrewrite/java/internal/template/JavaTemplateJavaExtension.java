@@ -28,7 +28,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -48,10 +47,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             emptyList(), Space.format(" "));
 
     public JavaTemplateJavaExtension(JavaTemplateParser templateParser, Substitutions substitutions,
-                                     String substitutedTemplate, JavaCoordinates coordinates,
-                                     AtomicReference<Cursor> parentCursorRef,
-                                     Cursor parentScope) {
-        super(templateParser, substitutions, substitutedTemplate, coordinates, parentCursorRef, parentScope);
+                                     String substitutedTemplate, JavaCoordinates coordinates) {
+        super(templateParser, substitutions, substitutedTemplate, coordinates);
     }
 
     @Override
@@ -103,6 +100,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     )
                             );
                         }
+                        break;
                     }
                     case STATEMENT_PREFIX: {
                         return block.withStatements(ListUtils.flatMap(block.getStatements(), statement -> {
@@ -159,7 +157,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     getCursor().getParentOrThrow());
                         }
                         case EXTENDS: {
-                            TypeTree anExtends = substitutions.unsubstitute(templateParser.parseExtends(substitutedTemplate));
+                            TypeTree anExtends = substitutions.unsubstitute(templateParser.parseExtends(getCursor(), substitutedTemplate));
                             J.ClassDeclaration c = classDecl.withExtends(anExtends);
 
                             //noinspection ConstantConditions
@@ -167,7 +165,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             return c;
                         }
                         case IMPLEMENTS: {
-                            List<TypeTree> implementings = substitutions.unsubstitute(templateParser.parseImplements(substitutedTemplate));
+                            List<TypeTree> implementings = substitutions.unsubstitute(templateParser.parseImplements(getCursor(), substitutedTemplate));
                             List<JavaType.FullyQualified> implementsTypes = implementings.stream()
                                     .map(TypedTree::getType)
                                     .map(TypeUtils::asFullyQualified)
@@ -213,7 +211,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                     getCursor().getParentOrThrow());
                         }
                         case TYPE_PARAMETERS: {
-                            List<J.TypeParameter> typeParameters = substitutions.unsubstitute(templateParser.parseTypeParameters(substitutedTemplate));
+                            List<J.TypeParameter> typeParameters = substitutions.unsubstitute(templateParser.parseTypeParameters(getCursor(), substitutedTemplate));
                             return classDecl.withTypeParameters(typeParameters);
                         }
                     }
@@ -268,7 +266,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             @Override
             public J visitLambda(J.Lambda lambda, Integer p) {
                 if (loc.equals(LAMBDA_PARAMETERS_PREFIX) && lambda.getParameters().isScope(insertionPoint)) {
-                    return lambda.withParameters(substitutions.unsubstitute(templateParser.parseLambdaParameters(substitutedTemplate)));
+                    return lambda.withParameters(substitutions.unsubstitute(templateParser.parseLambdaParameters(getCursor(), substitutedTemplate)));
                 }
                 return maybeReplaceStatement(lambda, J.class, 0);
             }
@@ -310,7 +308,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             return method.withBody(autoFormat(body, p, getCursor()));
                         }
                         case METHOD_DECLARATION_PARAMETERS: {
-                            List<Statement> parameters = substitutions.unsubstitute(templateParser.parseParameters(substitutedTemplate));
+                            List<Statement> parameters = substitutions.unsubstitute(templateParser.parseParameters(getCursor(), substitutedTemplate));
 
                             // Update the J.MethodDeclaration's type information to reflect its new parameter list
                             JavaType.Method type = method.getMethodType();
@@ -368,14 +366,14 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             return method.withParameters(parameters).withMethodType(type);
                         }
                         case THROWS: {
-                            J.MethodDeclaration m = method.withThrows(substitutions.unsubstitute(templateParser.parseThrows(substitutedTemplate)));
+                            J.MethodDeclaration m = method.withThrows(substitutions.unsubstitute(templateParser.parseThrows(getCursor(), substitutedTemplate)));
 
                             // Update method type information to reflect the new checked exceptions
                             JavaType.Method type = m.getMethodType();
                             if (type != null) {
                                 List<JavaType.FullyQualified> newThrows = new ArrayList<>();
-                                List<NameTree> throwz = (m.getThrows() == null) ? emptyList() : m.getThrows();
-                                for (NameTree t : throwz) {
+                                List<NameTree> throws_ = (m.getThrows() == null) ? emptyList() : m.getThrows();
+                                for (NameTree t : throws_) {
                                     J.Identifier exceptionIdent = (J.Identifier) t;
                                     newThrows.add((JavaType.FullyQualified) exceptionIdent.getType());
                                 }
@@ -388,7 +386,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             return m;
                         }
                         case TYPE_PARAMETERS: {
-                            List<J.TypeParameter> typeParameters = substitutions.unsubstitute(templateParser.parseTypeParameters(substitutedTemplate));
+                            List<J.TypeParameter> typeParameters = substitutions.unsubstitute(templateParser.parseTypeParameters(getCursor(), substitutedTemplate));
                             J.MethodDeclaration m = method.withTypeParameters(typeParameters);
                             return autoFormat(m, typeParameters.get(typeParameters.size() - 1), p,
                                     getCursor().getParentOrThrow());
@@ -436,9 +434,18 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             }
 
             @Override
+            public J visitNewClass(J.NewClass newClass, Integer p) {
+                if (newClass.isScope(insertionPoint)) {
+                    // allow a `J.NewClass` to also be replaced by an expression
+                    return maybeReplaceStatement(newClass, J.class, p);
+                }
+                return super.visitNewClass(newClass, p);
+            }
+
+            @Override
             public J visitPackage(J.Package pkg, Integer integer) {
                 if (loc.equals(PACKAGE_PREFIX) && pkg.isScope(insertionPoint)) {
-                    return pkg.withExpression(substitutions.unsubstitute(templateParser.parsePackage(substitutedTemplate)));
+                    return pkg.withExpression(substitutions.unsubstitute(templateParser.parsePackage(getCursor(), substitutedTemplate)));
                 }
                 return super.visitPackage(pkg, integer);
             }
@@ -469,6 +476,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                                                                "statement to replace one statement, but generated " + gen.size() +
                                                                ". Template:\n" + substitutedTemplate);
                         }
+
                         return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p);
                     }
                     throw new IllegalArgumentException("Cannot insert a new statement before an existing statement and return both to a visit method that returns one statement.");

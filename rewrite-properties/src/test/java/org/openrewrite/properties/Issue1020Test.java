@@ -28,7 +28,7 @@ class Issue1020Test implements RewriteTest {
     @Test
     void removalOfDoublePound() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyKey("server.port", "chassis.name", null, null, null)),
+          spec -> spec.recipe(new ChangePropertyKey("server.port", "chassis.name", null, null)),
           properties(
             """
               key=**##**chassis.management.metrics.export.cloudwatch.awsAccessKey
@@ -41,7 +41,7 @@ class Issue1020Test implements RewriteTest {
     @Test
     void removalOfSlashPound() {
         rewriteRun(
-          spec -> spec.recipe(new ChangePropertyValue("server.tomcat.accesslog.enabled", "true", null, false, null, null)),
+          spec -> spec.recipe(new ChangePropertyValue("server.tomcat.accesslog.enabled", "true", null, false, null)),
           properties(
             """
               boot.features=https://docs.spring.io/spring-boot/docs/current/reference/htmlsingle**/#**boot-features-jersey

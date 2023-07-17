@@ -51,13 +51,8 @@ public class NoStaticImport extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(methodPattern);
-    }
-
-    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesMethod<>(methodPattern), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
@@ -101,6 +96,6 @@ public class NoStaticImport extends Recipe {
                 }
                 return m;
             }
-        };
+        });
     }
 }

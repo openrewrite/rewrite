@@ -17,7 +17,10 @@ package org.openrewrite.xml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.tree.Xml;
@@ -59,21 +62,6 @@ public class ChangeTagAttribute extends Recipe {
     @Nullable
     String oldValue;
 
-    @Option(displayName = "File matcher",
-            description = "If provided only matching files will be modified. This is a glob expression.",
-            required = false,
-            example = "'**/application-*.xml'")
-    @Nullable
-    String fileMatcher;
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        if (fileMatcher != null) {
-            return new HasSourcePath<>(fileMatcher);
-        }
-        return null;
-    }
-
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new XmlVisitor<ExecutionContext>() {
@@ -95,6 +83,7 @@ public class ChangeTagAttribute extends Recipe {
                 }
 
                 if (newValue == null) {
+                    //noinspection DataFlowIssue
                     return null;
                 }
 

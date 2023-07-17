@@ -20,9 +20,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.maven.tree.Parent;
 import org.openrewrite.xml.XmlIsoVisitor;
-import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
@@ -30,7 +28,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static java.util.Objects.requireNonNull;
 import static org.openrewrite.maven.MavenVisitor.*;
 
 @Getter

@@ -16,7 +16,6 @@
 package org.openrewrite;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 
@@ -29,7 +28,7 @@ class SetFilePermissionsTest implements RewriteTest {
     void revokeReadPermissions() {
         rewriteRun(
           spec -> spec.recipe(new SetFilePermissions("test.txt", false, true, true))
-            .afterRecipe(run -> run.getResults().forEach(r -> {
+            .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> {
                 assertThat(r.getAfter()).isNotNull();
                 assertThat(r.getAfter().getFileAttributes()).isNotNull();
                 assertThat(r.getAfter().getFileAttributes().isReadable()).isFalse();
@@ -44,7 +43,7 @@ class SetFilePermissionsTest implements RewriteTest {
     void revokeWritePermissions() {
         rewriteRun(
           spec -> spec.recipe(new SetFilePermissions("test.txt", true, false, true))
-            .afterRecipe(run -> run.getResults().forEach(r -> {
+            .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> {
                 assertThat(r.getAfter()).isNotNull();
                 assertThat(r.getAfter().getFileAttributes()).isNotNull();
                 assertThat(r.getAfter().getFileAttributes().isReadable()).isTrue();
@@ -60,7 +59,7 @@ class SetFilePermissionsTest implements RewriteTest {
         rewriteRun(
           spec ->
             spec.recipe(new SetFilePermissions("test.txt", true, true, false))
-              .afterRecipe(run -> run.getResults().forEach(r -> {
+              .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> {
                   assertThat(r.getAfter()).isNotNull();
                   assertThat(r.getAfter().getFileAttributes()).isNotNull();
                   assertThat(r.getAfter().getFileAttributes().isReadable()).isTrue();

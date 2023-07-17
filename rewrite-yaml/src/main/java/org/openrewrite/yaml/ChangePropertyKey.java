@@ -17,7 +17,10 @@ package org.openrewrite.yaml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.Recipe;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.NameCaseConvention;
 import org.openrewrite.internal.StringUtils;
@@ -53,21 +56,12 @@ public class ChangePropertyKey extends Recipe {
             example = "management.metrics.enable.process.files")
     String newPropertyKey;
 
-    @Incubating(since = "7.17.0")
     @Option(displayName = "Use relaxed binding",
             description = "Whether to match the `oldPropertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
                     "rules. Default is `true`. Set to `false`  to use exact matching.",
             required = false)
     @Nullable
     Boolean relaxedBinding;
-
-    @Incubating(since = "7.8.0")
-    @Option(displayName = "Optional file matcher",
-            description = "Matching files will be modified. This is a glob expression.",
-            required = false,
-            example = "**/application-*.yml")
-    @Nullable
-    String fileMatcher;
 
     @Option(displayName = "Except",
             description = "If any of these property keys exist as direct children of `oldPropertyKey`, then they will not be moved to `newPropertyKey`.",
@@ -88,15 +82,7 @@ public class ChangePropertyKey extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        if (fileMatcher != null) {
-            return new HasSourcePath<>(fileMatcher);
-        }
-        return null;
-    }
-
-    @Override
-    public YamlVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ChangePropertyKeyVisitor<>();
     }
 

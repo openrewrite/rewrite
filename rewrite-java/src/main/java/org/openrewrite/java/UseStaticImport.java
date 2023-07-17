@@ -17,9 +17,7 @@ package org.openrewrite.java;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
+import org.openrewrite.*;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -51,13 +49,8 @@ public class UseStaticImport extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(methodPattern);
-    }
-
-    @Override
-    public JavaVisitor<ExecutionContext> getVisitor() {
-        return new UseStaticImportVisitor();
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new UsesMethod<>(methodPattern), new UseStaticImportVisitor());
     }
 
     private class UseStaticImportVisitor extends JavaIsoVisitor<ExecutionContext> {

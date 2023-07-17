@@ -62,6 +62,7 @@ dependencies {
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
 
     testRuntimeOnly("org.codehaus.groovy:groovy:latest.release")
+    testRuntimeOnly("org.gradle:gradle-base-services:latest.release")
     testRuntimeOnly(gradleApi())
     testRuntimeOnly("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
     testRuntimeOnly("com.google.guava:guava:latest.release")

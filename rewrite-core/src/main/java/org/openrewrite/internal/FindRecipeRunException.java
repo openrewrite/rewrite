@@ -30,8 +30,12 @@ public class FindRecipeRunException extends TreeVisitor<Tree, Integer> {
 
     public FindRecipeRunException(RecipeRunException rre) {
         this.vt = rre;
-        Iterator<Object> path = requireNonNull(rre.getCursor()).getPath(Tree.class::isInstance);
-        this.nearestTree = path.hasNext() ? (Tree) path.next() : null;
+        if (rre.getCursor() == null) {
+            this.nearestTree = null;
+        } else {
+            Iterator<Object> path = requireNonNull(rre.getCursor()).getPath(Tree.class::isInstance);
+            this.nearestTree = path.hasNext() ? (Tree) path.next() : null;
+        }
     }
 
     @Override
@@ -39,6 +43,7 @@ public class FindRecipeRunException extends TreeVisitor<Tree, Integer> {
         if (nearestTree == null) {
             return null;
         } else if (tree == nearestTree) {
+            stopAfterPreVisit();
             return Markup.error(tree, vt);
         }
         return tree;

@@ -22,7 +22,6 @@ import org.intellij.lang.annotations.Language;
 
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -43,6 +42,13 @@ public class DataTable<Row> {
     private final String description;
 
     private boolean enabled = true;
+
+    /**
+     * Ignore any row insertions after this cycle. This prevents
+     * data table producing recipes from having to keep track of state across
+     * multiple cycles to prevent duplicate row entries.
+     */
+    protected int maxCycle = 1;
 
     public DataTable(Recipe recipe, Class<Row> type, String name,
                      @Language("markdown") String displayName,
@@ -76,7 +82,7 @@ public class DataTable<Row> {
     }
 
     public void insertRow(ExecutionContext ctx, Row row) {
-        if (enabled) {
+        if (enabled && ctx.getCycle() <= maxCycle) {
             ctx.computeMessage(ExecutionContext.DATA_TABLES, row, ConcurrentHashMap::new, (extract, allDataTables) -> {
                 //noinspection unchecked
                 List<Row> dataTablesOfType = (List<Row>) allDataTables.computeIfAbsent(this, c -> new ArrayList<>());

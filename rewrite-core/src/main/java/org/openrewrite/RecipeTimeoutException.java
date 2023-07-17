@@ -15,7 +15,6 @@
  */
 package org.openrewrite;
 
-@Incubating(since = "7.3.0")
 public class RecipeTimeoutException extends RuntimeException {
     private final Recipe recipe;
 

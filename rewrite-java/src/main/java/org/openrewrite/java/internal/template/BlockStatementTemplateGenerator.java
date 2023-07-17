@@ -34,7 +34,8 @@ import org.openrewrite.marker.Markers;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
-import static org.openrewrite.java.tree.JavaCoordinates.Mode.*;
+import static org.openrewrite.java.tree.JavaCoordinates.Mode.AFTER;
+import static org.openrewrite.java.tree.JavaCoordinates.Mode.REPLACEMENT;
 
 /**
  * Generates a stub containing enough variable, method, and class scope
@@ -63,6 +64,7 @@ public class BlockStatementTemplateGenerator {
                                                           "}";
 
     private final Set<String> imports;
+    private final boolean contextSensitive;
 
     public String template(Cursor cursor, String template, Space.Location location, JavaCoordinates.Mode mode) {
         //noinspection ConstantConditions
@@ -83,7 +85,7 @@ public class BlockStatementTemplateGenerator {
 
                     template(next(cursor), cursor.getValue(), before, after, cursor.getValue(), mode);
 
-                    return before.toString().trim() + "\n/*" + TEMPLATE_COMMENT + "*/" + template + "/*" + STOP_COMMENT + "*/" + "\n" + after;
+                    return before.toString().trim() + "\n/*" + TEMPLATE_COMMENT + "*/" + template + "/*" + STOP_COMMENT + "*/" + "\n" + after.toString().trim();
                 });
     }
 
@@ -208,8 +210,56 @@ public class BlockStatementTemplateGenerator {
         return js;
     }
 
-    @SuppressWarnings("ConstantConditions")
     private void template(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
+        if (contextSensitive) {
+            contextTemplate(cursor, prior, before, after, insertionPoint, mode);
+        } else {
+            contextFreeTemplate(cursor, prior, before, after, insertionPoint, mode);
+        }
+    }
+
+    @SuppressWarnings("DataFlowIssue")
+    private void contextFreeTemplate(Cursor cursor, J j, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
+        if (j instanceof J.Lambda) {
+            throw new IllegalArgumentException(
+                    "Templating a lambda requires a cursor so that it can be properly parsed and type-attributed. " +
+                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
+        } else if (j instanceof J.MemberReference) {
+            throw new IllegalArgumentException(
+                    "Templating a method reference requires a cursor so that it can be properly parsed and type-attributed. " +
+                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
+        } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
+            before.insert(0, "class Template {{\n");
+            before.append("Object o = ");
+            after.append(";");
+            after.append("\n}}");
+        } else if ((j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations || j instanceof J.Block || j instanceof J.ClassDeclaration)
+                   && cursor.getValue() instanceof J.Block
+                   && (cursor.getParent().getValue() instanceof J.ClassDeclaration || cursor.getParent().getValue() instanceof J.NewClass)) {
+            before.insert(0, "class Template {\n");
+            after.append("\n}");
+        } else if (j instanceof J.ClassDeclaration) {
+            // While not impossible to handle, reaching this point is likely to be a mistake.
+            // Without context a class declaration can include no imports, package, or outer class.
+            // It is a rare class that is deliberately in the root package with no imports.
+            // In the more likely case omission of these things is unintentional, the resulting type metadata would be
+            // incorrect, and it would not be obvious to the recipe author why.
+            throw new IllegalArgumentException(
+                    "Templating a class declaration requires context from which package declaration and imports may be reached. " +
+                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
+        } else if (j instanceof Statement && !(j instanceof J.Import) && !(j instanceof J.Package)) {
+            before.insert(0, "class Template {{\n");
+            after.append("\n}}");
+        }
+
+        before.insert(0, EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
+        for (String anImport : imports) {
+            before.insert(0, anImport);
+        }
+    }
+
+    @SuppressWarnings("ConstantConditions")
+    private void contextTemplate(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
         J j = cursor.getValue();
         if (j instanceof JavaSourceFile) {
             before.insert(0, EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
@@ -481,7 +531,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.Ternary) {
             J.Ternary ternary = (J.Ternary) j;
             String condition = PatternVariables.simplifiedPatternVariableCondition(ternary.getCondition(), insertionPoint);
-            if(condition != null) {
+            if (condition != null) {
                 if (referToSameElement(prior, ternary.getCondition())) {
                     int splitIdx = condition.indexOf('§');
                     before.insert(0, condition.substring(0, splitIdx) + '(');
@@ -522,7 +572,7 @@ public class BlockStatementTemplateGenerator {
         } else if (j instanceof J.EnumValueSet) {
             after.append(";");
         }
-        template(next(cursor), j, before, after, insertionPoint, REPLACEMENT);
+        contextTemplate(next(cursor), j, before, after, insertionPoint, REPLACEMENT);
     }
 
     private void addLeadingVariableDeclarations(Cursor cursor, J current, J.Block containingBlock, StringBuilder before, J insertionPoint) {

@@ -16,8 +16,11 @@
 package org.openrewrite.java.search;
 
 import lombok.RequiredArgsConstructor;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
@@ -25,6 +28,8 @@ import org.openrewrite.marker.SearchResult;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Marks a {@link JavaSourceFile} as matching if all the passed methods are found.
@@ -38,13 +43,16 @@ public class UsesAllMethods<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        List<MethodMatcher> unmatched = new ArrayList<>(methodMatchers);
-        for (JavaType.Method type : cu.getTypesInUse().getUsedMethods()) {
-            if (unmatched.removeIf(matcher -> matcher.matches(type)) && unmatched.isEmpty()) {
-                return SearchResult.found(cu);
+    public J visit(@Nullable Tree tree, P p) {
+        if (tree instanceof JavaSourceFile) {
+            JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
+            List<MethodMatcher> unmatched = new ArrayList<>(methodMatchers);
+            for (JavaType.Method type : cu.getTypesInUse().getUsedMethods()) {
+                if (unmatched.removeIf(matcher -> matcher.matches(type)) && unmatched.isEmpty()) {
+                    return SearchResult.found(cu);
+                }
             }
         }
-        return cu;
+        return (J) tree;
     }
 }

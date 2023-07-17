@@ -26,7 +26,9 @@ import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
-import java.util.*;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -37,7 +39,6 @@ public class FindProperty extends Recipe {
             example = "management.metrics.binders.*.enabled")
     String propertyKey;
 
-    @Incubating(since = "7.17.0")
     @Option(displayName = "Use relaxed binding",
             description = "Whether to match the `propertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
                     "rules. Default is `true`. Set to `false`  to use exact matching.",
@@ -57,7 +58,7 @@ public class FindProperty extends Recipe {
     }
 
     @Override
-    public YamlVisitor<ExecutionContext> getVisitor() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new YamlIsoVisitor<ExecutionContext>() {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {

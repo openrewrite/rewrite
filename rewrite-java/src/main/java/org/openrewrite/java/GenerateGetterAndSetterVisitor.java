@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 package org.openrewrite.java;
-import org.openrewrite.*;
+
+import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.tree.J;
@@ -22,15 +23,15 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
 
-import java.util.Collections;
+import static java.util.Collections.emptyList;
 
 public class GenerateGetterAndSetterVisitor<P> extends JavaIsoVisitor<P> {
     private final String fieldName;
     private final String capitalizedFieldName;
     private final JavaTemplate getter = JavaTemplate
-            .builder(() -> getCursor().getParentOrThrow(), "" + "public #{} #{}() {return #{any()};}").build();
+            .builder("" + "public #{} #{}() {return #{any()};}").contextSensitive().build();
     private final JavaTemplate setter = JavaTemplate
-            .builder(() -> getCursor().getParentOrThrow(), "" + "public void set#{}(#{} #{}) {this.#{} = #{};}").build();
+            .builder("" + "public void set#{}(#{} #{}) {this.#{} = #{};}").contextSensitive().build();
 
     public GenerateGetterAndSetterVisitor(String fieldName) {
         this.fieldName = fieldName;
@@ -77,15 +78,21 @@ public class GenerateGetterAndSetterVisitor<P> extends JavaIsoVisitor<P> {
                 fieldType = fullyQualified.getClassName();
             }
             if (getCursor().pollMessage("getter-exists") == null) {
-                Statement getterStatement = maybeAutoFormat(c, c.withBody(c.getBody().withStatements(Collections.emptyList()))
-                        .withTemplate(getter, c.getBody().getCoordinates().lastStatement(), fieldType,
-                                getterPrefix + capitalizedFieldName, var.getName()), p).getBody().getStatements().get(0);
+                Statement getterStatement = maybeAutoFormat(c, c.withBody(
+                        getter.apply(
+                                new Cursor(getCursor(), c.getBody().withStatements(emptyList())),
+                                c.getBody().getCoordinates().lastStatement(),
+                                fieldType, getterPrefix + capitalizedFieldName, var.getName()
+                        )), p).getBody().getStatements().get(0);
                 c = c.withBody(c.getBody().withStatements(ListUtils.concat(c.getBody().getStatements(), getterStatement)));
             }
             if (getCursor().pollMessage("setter-exists") == null) {
-                Statement setterStatement = maybeAutoFormat(c, c.withBody(c.getBody().withStatements(Collections.emptyList()))
-                        .withTemplate(setter, c.getBody().getCoordinates().lastStatement(), capitalizedFieldName, fieldType,
-                                var.getSimpleName(), var.getSimpleName(), var.getSimpleName()), p).getBody().getStatements().get(0);
+                Statement setterStatement = maybeAutoFormat(c, c.withBody(
+                        setter.apply(
+                                new Cursor(getCursor(), c.getBody().withStatements(emptyList())),
+                                c.getBody().getCoordinates().lastStatement(),
+                                capitalizedFieldName, fieldType, var.getSimpleName(), var.getSimpleName(), var.getSimpleName()
+                        )), p).getBody().getStatements().get(0);
                 c = c.withBody(c.getBody().withStatements(ListUtils.concat(c.getBody().getStatements(), setterStatement)));
             }
         }

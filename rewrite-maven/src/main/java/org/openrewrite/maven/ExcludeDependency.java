@@ -34,12 +34,12 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 public class ExcludeDependency extends Recipe {
 
     @Option(displayName = "Group",
-            description = "The first part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The first part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "com.google.guava")
     String groupId;
 
     @Option(displayName = "Artifact",
-            description = "The second part of a dependency coordinate 'com.google.guava:guava:VERSION'.",
+            description = "The second part of a dependency coordinate `com.google.guava:guava:VERSION`.",
             example = "guava")
     String artifactId;
 
@@ -53,7 +53,7 @@ public class ExcludeDependency extends Recipe {
     String scope;
 
     @Override
-    public Validated validate() {
+    public Validated<Object> validate() {
         return super.validate().and(Validated.test("scope", "scope is a valid Maven scope", scope, s -> {
             try {
                 if (s != null) {

@@ -16,8 +16,6 @@
 package org.openrewrite.test.internal;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.EqualsAndHashCode;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;

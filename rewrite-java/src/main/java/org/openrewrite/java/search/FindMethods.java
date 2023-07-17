@@ -18,13 +18,10 @@ package org.openrewrite.java.search;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.table.MethodCalls;
-import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
@@ -67,21 +64,16 @@ public class FindMethods extends Recipe {
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getSingleSourceApplicableTest() {
-        return new UsesMethod<>(methodPattern, matchOverrides);
-    }
-
-    @Override
     @SuppressWarnings("ConstantConditions")
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(new UsesMethod<>(methodPattern, matchOverrides), new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(method)) {
                     JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                    if(javaSourceFile != null) {
+                    if (javaSourceFile != null) {
                         methodCalls.insertRow(ctx, new MethodCalls.Row(
                                 javaSourceFile.getSourcePath().toString(),
                                 method.printTrimmed(getCursor())
@@ -97,7 +89,7 @@ public class FindMethods extends Recipe {
                 J.MemberReference m = super.visitMemberReference(memberRef, ctx);
                 if (methodMatcher.matches(m.getMethodType())) {
                     JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                    if(javaSourceFile != null) {
+                    if (javaSourceFile != null) {
                         methodCalls.insertRow(ctx, new MethodCalls.Row(
                                 javaSourceFile.getSourcePath().toString(),
                                 memberRef.printTrimmed(getCursor())
@@ -113,7 +105,7 @@ public class FindMethods extends Recipe {
                 J.NewClass n = super.visitNewClass(newClass, ctx);
                 if (methodMatcher.matches(newClass)) {
                     JavaSourceFile javaSourceFile = getCursor().firstEnclosing(JavaSourceFile.class);
-                    if(javaSourceFile != null) {
+                    if (javaSourceFile != null) {
                         methodCalls.insertRow(ctx, new MethodCalls.Row(
                                 javaSourceFile.getSourcePath().toString(),
                                 newClass.printTrimmed(getCursor())
@@ -123,7 +115,7 @@ public class FindMethods extends Recipe {
                 }
                 return n;
             }
-        };
+        });
     }
 
     public static Set<J> find(J j, String methodPattern) {

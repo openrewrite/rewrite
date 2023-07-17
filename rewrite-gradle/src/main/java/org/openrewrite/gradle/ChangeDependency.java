@@ -17,10 +17,7 @@ package org.openrewrite.gradle;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.gradle.search.FindGradleProject;
@@ -97,13 +94,8 @@ public class ChangeDependency extends Recipe {
     }
 
     @Override
-    protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
-        return new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor();
-    }
-
-    @Override
-    protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new GroovyIsoVisitor<ExecutionContext>() {
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.Marker).getVisitor(), new GroovyIsoVisitor<ExecutionContext>() {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
 
@@ -127,17 +119,17 @@ public class ChangeDependency extends Recipe {
 
                 List<Expression> depArgs = m.getArguments();
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
-                    m = updateDependency(m, ctx);
+                    m = updateDependency(m);
                 } else if (depArgs.get(0) instanceof J.MethodInvocation &&
                         (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
                                 ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
-                    m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform, ctx)));
+                    m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform)));
                 }
 
                 return m;
             }
 
-            private J.MethodInvocation updateDependency(J.MethodInvocation m, ExecutionContext ctx) {
+            private J.MethodInvocation updateDependency(J.MethodInvocation m) {
                 List<Expression> depArgs = m.getArguments();
                 if (depArgs.get(0) instanceof J.Literal) {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
@@ -152,7 +144,7 @@ public class ChangeDependency extends Recipe {
                                 updated = updated.withArtifactId(newArtifactId);
                             }
                             if (newVersion != null) {
-                                doAfterVisit(new UpgradeDependencyVersion(updated.getGroupId(), updated.getArtifactId(), newVersion, versionPattern));
+                                doAfterVisit(new UpgradeDependencyVersion(updated.getGroupId(), updated.getArtifactId(), newVersion, versionPattern).getVisitor());
                             }
                             if (original != updated) {
                                 String replacement = updated.toStringNotation();
@@ -174,7 +166,7 @@ public class ChangeDependency extends Recipe {
                                 updated = updated.withArtifactId(newArtifactId);
                             }
                             if (newVersion != null) {
-                                doAfterVisit(new UpgradeDependencyVersion(updated.getGroupId(), updated.getArtifactId(), newVersion, versionPattern));
+                                doAfterVisit(new UpgradeDependencyVersion(updated.getGroupId(), updated.getArtifactId(), newVersion, versionPattern).getVisitor());
                             }
                             if (original != updated) {
                                 String replacement = updated.toStringNotation();
@@ -233,7 +225,7 @@ public class ChangeDependency extends Recipe {
                         updatedArtifactId = newArtifactId;
                     }
                     if (newVersion != null) {
-                        doAfterVisit(new UpgradeDependencyVersion(updatedGroupId, updatedArtifactId, newVersion, versionPattern));
+                        doAfterVisit(new UpgradeDependencyVersion(updatedGroupId, updatedArtifactId, newVersion, versionPattern).getVisitor());
                     }
 
                     if (!updatedGroupId.equals(groupId) || !updatedArtifactId.equals(artifactId)) {
@@ -303,6 +295,6 @@ public class ChangeDependency extends Recipe {
                 }
                 return gp;
             }
-        };
+        });
     }
 }

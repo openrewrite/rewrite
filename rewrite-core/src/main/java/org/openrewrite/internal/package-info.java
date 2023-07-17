@@ -13,9 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@PolyglotNamespace("OpenRewrite")
 @NonNullApi
 package org.openrewrite.internal;
 
-import org.openrewrite.PolyglotNamespace;
 import org.openrewrite.internal.lang.NonNullApi;

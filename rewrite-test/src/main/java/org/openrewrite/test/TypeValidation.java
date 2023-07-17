@@ -38,12 +38,15 @@ public class TypeValidation {
     private boolean methodDeclarations = true;
 
     @Builder.Default
+    private boolean variableDeclarations = false; // FIXME false until recipes have been corrected
+
+    @Builder.Default
     private boolean methodInvocations = true;
 
     @Builder.Default
     private boolean constructorInvocations = true;
 
     public static TypeValidation none() {
-        return new TypeValidation(false,false,false,false,false);
+        return new TypeValidation(false,false,false,false,false,false);
     }
 }

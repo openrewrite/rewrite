@@ -27,7 +27,7 @@ class FindAndReplaceJavaTest implements RewriteTest {
     @Test
     void findAndReplaceJava() {
         rewriteRun(
-          spec -> spec.recipe(new FindAndReplace("Test", "Replaced", null, null)),
+          spec -> spec.recipe(new FindAndReplace("Test", "Replaced", null, null, null, null, null)),
           java(
             "class Test {}",
             "class Replaced {}"

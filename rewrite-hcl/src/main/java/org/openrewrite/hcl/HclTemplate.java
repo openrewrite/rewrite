@@ -25,33 +25,35 @@ import org.openrewrite.hcl.tree.*;
 import org.openrewrite.hcl.tree.Space.Location;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.template.SourceTemplate;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
-    private final Supplier<Cursor> parentScopeGetter;
     private final String code;
     private final int parameterCount;
     private final Consumer<String> onAfterVariableSubstitution;
     private final HclTemplateParser templateParser;
 
-    private HclTemplate(Supplier<Cursor> parentScopeGetter, String code,
-                        Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
-        this.parentScopeGetter = parentScopeGetter;
+    private HclTemplate(String code, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         this.code = code;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.parameterCount = StringUtils.countOccurrences(code, "#{");
         this.templateParser = new HclTemplateParser(onAfterVariableSubstitution, onBeforeParseTemplate);
     }
 
+    public static <H extends Hcl> H apply(String template, Cursor scope, HclCoordinates coordinates, Object... parameters) {
+        return builder(template).build().apply(scope, coordinates, parameters);
+    }
+
     @Override
-    public <H extends Hcl> H withTemplate(Tree changing, HclCoordinates coordinates, Object[] parameters) {
+    public <H extends Hcl> H apply(Cursor scope, HclCoordinates coordinates, Object... parameters) {
+        if (!(scope.getValue() instanceof Hcl)) {
+            throw new IllegalArgumentException("`scope` must point to a Hcl instance.");
+        }
+
         if (parameters.length != parameterCount) {
             throw new IllegalArgumentException("This template requires " + parameterCount + " parameters.");
         }
@@ -62,24 +64,6 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
 
         Tree insertionPoint = coordinates.getTree();
         Location loc = coordinates.getSpaceLocation();
-
-        AtomicReference<Cursor> parentCursorRef = new AtomicReference<>();
-
-        // Find the parent cursor of the CHANGING element, which may not be the same as the cursor of
-        // the method using the template.
-        new HclVisitor<Integer>() {
-            @Nullable
-            @Override
-            public Hcl visit(@Nullable Tree tree, Integer integer) {
-                if (tree != null && tree.isScope(changing)) {
-                    parentCursorRef.set(getCursor());
-                    return (Hcl) tree;
-                }
-                return super.visit(tree, integer);
-            }
-        }.visit(parentScopeGetter.get().getValue(), 0, parentScopeGetter.get().getParentOrThrow());
-
-        Cursor parentCursor = parentCursorRef.get();
 
         //noinspection unchecked
         H h = (H) new HclVisitor<Integer>() {
@@ -138,7 +122,7 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
                         List<BodyContent> gen = substitutions.unsubstitute(templateParser.parseBodyContent(substitutedTemplate));
 
                         if (coordinates.getComparator() != null) {
-                            for (BodyContent g : gen) {
+                            for (BodyContent ignored : gen) {
                                 b = b.withBody(
                                         ListUtils.insertInOrder(
                                                 b.getBody(),
@@ -183,18 +167,17 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
 
                 return e;
             }
-        }.visit(changing, 0, parentCursor);
+        }.visit(scope.getValue(), 0, scope.getParentOrThrow());
 
         assert h != null;
         return h;
     }
 
-    public static Builder builder(Supplier<Cursor> parentScope, String code) {
-        return new Builder(parentScope, code);
+    public static Builder builder(String code) {
+        return new Builder(code);
     }
 
     public static class Builder {
-        private final Supplier<Cursor> parentScope;
         private final String code;
 
         private Consumer<String> onAfterVariableSubstitution = s -> {
@@ -202,8 +185,7 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
         private Consumer<String> onBeforeParseTemplate = s -> {
         };
 
-        Builder(Supplier<Cursor> parentScope, String code) {
-            this.parentScope = parentScope;
+        Builder(String code) {
             this.code = code.trim();
         }
 
@@ -218,7 +200,7 @@ public class HclTemplate implements SourceTemplate<Hcl, HclCoordinates> {
         }
 
         public HclTemplate build() {
-            return new HclTemplate(parentScope, code, onAfterVariableSubstitution, onBeforeParseTemplate);
+            return new HclTemplate(code, onAfterVariableSubstitution, onBeforeParseTemplate);
         }
     }
 }

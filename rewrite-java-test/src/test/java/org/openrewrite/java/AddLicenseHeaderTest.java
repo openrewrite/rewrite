@@ -21,7 +21,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static java.util.Calendar.*;
+import static java.util.Calendar.YEAR;
 import static java.util.Calendar.getInstance;
 import static org.openrewrite.java.Assertions.java;
 

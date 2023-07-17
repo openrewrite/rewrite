@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Statement;
 
 /**
@@ -32,11 +31,6 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     @Override
     public Expression visitExpression(Expression expression, P p) {
         return (Expression) super.visitExpression(expression, p);
-    }
-
-    @Override
-    public JavaSourceFile visitJavaSourceFile(JavaSourceFile cu, P p) {
-        return (JavaSourceFile) super.visitJavaSourceFile(cu, p);
     }
 
     @Override
@@ -136,8 +130,8 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
-    public J.If.Else visitElse(J.If.Else elze, P p) {
-        return (J.If.Else) super.visitElse(elze, p);
+    public J.If.Else visitElse(J.If.Else else_, P p) {
+        return (J.If.Else) super.visitElse(else_, p);
     }
 
     @Override
@@ -324,6 +318,16 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     @Override
     public J.Unary visitUnary(J.Unary unary, P p) {
         return (J.Unary) super.visitUnary(unary, p);
+    }
+
+    @Override
+    public J.Unknown visitUnknown(J.Unknown unknown, P p) {
+        return (J.Unknown) super.visitUnknown(unknown, p);
+    }
+
+    @Override
+    public J.Unknown.Source visitUnknownSource(J.Unknown.Source source, P p) {
+        return (J.Unknown.Source) super.visitUnknownSource(source, p);
     }
 
     @Override

@@ -30,7 +30,10 @@ import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 import org.openrewrite.test.TypeValidation;
 
-import java.util.*;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.fail;
@@ -53,20 +56,23 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
               public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
-                  return literal.getValue() == Integer.valueOf(42) ? literal.withTemplate(
-                    JavaTemplate.builder(this::getCursor, "s.length()")
-//                          .doBeforeParseTemplate(System.out::println)
-                      .build(),
-                    literal.getCoordinates().replace()
-                  ) : super.visitLiteral(literal, executionContext);
+                  return literal.getValue() == Integer.valueOf(42) ?
+                    JavaTemplate.builder("s.length()")
+                      .contextSensitive()
+                      .build()
+                      .apply(
+                        getCursor(),
+                        literal.getCoordinates().replace()
+                      ) :
+                    super.visitLiteral(literal, executionContext);
               }
           }))
           // custom missing type validation
           .typeValidationOptions(TypeValidation.none())
-          .afterRecipe(run -> run.getResults().forEach(r -> assertTypeAttribution((J) r.getAfter())));
+          .afterRecipe(run -> run.getChangeset().getAllResults().forEach(r -> assertTypeAttribution((J) r.getAfter())));
     }
 
-    @SuppressWarnings({"PointlessBooleanExpression", "IfStatementWithIdenticalBranches"})
+    @SuppressWarnings({"PointlessBooleanExpression", "IfStatementWithIdenticalBranches", "ConstantValue"})
     @Test
     void replaceExpressionInNestedIfCondition() {
         rewriteRun(
@@ -473,11 +479,14 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                     }
 
                     List<Expression> arguments = mi.getArguments();
-                    mi = mi.withTemplate(
-                      JavaTemplate.builder(this::getCursor, "#{any(java.lang.String)}.formatted(#{any()})")
-                        .build(),
-                      mi.getCoordinates().replace(),
-                      arguments.toArray());
+                    mi = JavaTemplate.builder("#{any(java.lang.String)}.formatted(#{any()})")
+                      .contextSensitive()
+                      .build()
+                      .apply(
+                        updateCursor(mi),
+                        mi.getCoordinates().replace(),
+                        arguments.toArray()
+                      );
 
                     mi = maybeAutoFormat(mi, mi.withArguments(
                       ListUtils.map(arguments.subList(1, arguments.size()), (a, b) -> b.withPrefix(arguments.get(a + 1).getPrefix()))), p);

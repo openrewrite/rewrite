@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
@@ -28,9 +29,19 @@ import java.util.List;
 
 /**
  * Produce a part by user provided sample code and type, make sure the part can be produced from the sample code and only once.
+ * Deprecated, please use JavaTemplate instead.
  */
+@Deprecated
 public final class PartProvider {
-    private PartProvider(){}
+    private PartProvider() {
+    }
+
+    public static <J2 extends J> J2 buildPart(@Language("java") String codeToProvideAPart,
+                                              Class<J2> expected,
+                                              Collection<Path> classpath) {
+        JavaParser.Builder<? extends JavaParser, ?> builder = JavaParser.fromJavaVersion().classpath(classpath);
+        return buildPart(codeToProvideAPart, expected, builder.build());
+    }
 
     public static <J2 extends J> J2 buildPart(@Language("java") String codeToProvideAPart,
                                               Class<J2> expected,
@@ -42,22 +53,19 @@ public final class PartProvider {
         return buildPart(codeToProvideAPart, expected, builder.build());
     }
 
-    public static <J2 extends J> J2 buildPart(@Language("java") String codeToProvideAPart,
-                                              Class<J2> expected,
-                                              Collection<Path> classpath) {
-        JavaParser.Builder<? extends JavaParser, ?> builder = JavaParser.fromJavaVersion().classpath(classpath);
-        return buildPart(codeToProvideAPart, expected, builder.build());
-    }
-
     private static <J2 extends J> J2 buildPart(@Language("java") String codeToProvideAPart,
-                                                Class<J2> expected,
+                                               Class<J2> expected,
                                                JavaParser parser) {
-        J.CompilationUnit cu = parser.parse(codeToProvideAPart).get(0);
+        SourceFile cu = parser
+                .parse(codeToProvideAPart)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
         List<J2> parts = new ArrayList<>(1);
         new JavaVisitor<List<J2>>() {
             @Override
             public @Nullable J visit(@Nullable Tree tree, List<J2> j2s) {
                 if (expected.isInstance(tree)) {
+                    //noinspection unchecked
                     J2 j2 = (J2) tree;
                     j2s.add(j2);
                     return j2;

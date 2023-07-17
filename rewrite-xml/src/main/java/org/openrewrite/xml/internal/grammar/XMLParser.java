@@ -927,6 +927,7 @@ public class XMLParser extends Parser {
 				}
 				break;
 			case SEA_WS:
+			case QUESTION_MARK:
 			case TEXT:
 				{
 				setState(120);
@@ -1197,6 +1198,7 @@ public class XMLParser extends Parser {
 	@SuppressWarnings("CheckReturnValue")
 	public static class ChardataContext extends ParserRuleContext {
 		public TerminalNode TEXT() { return getToken(XMLParser.TEXT, 0); }
+		public TerminalNode QUESTION_MARK() { return getToken(XMLParser.QUESTION_MARK, 0); }
 		public TerminalNode SEA_WS() { return getToken(XMLParser.SEA_WS, 0); }
 		public ChardataContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -1226,7 +1228,7 @@ public class XMLParser extends Parser {
 			{
 			setState(159);
 			_la = _input.LA(1);
-			if ( !(_la==SEA_WS || _la==TEXT) ) {
+			if ( !(((_la) & ~0x3f) == 0 && ((1L << _la) & 8512L) != 0) ) {
 			_errHandler.recoverInline(this);
 			}
 			else {
@@ -1273,8 +1275,8 @@ public class XMLParser extends Parser {
 		"\u000b\f\u000b\u0095\t\u000b\u0001\u000b\u0003\u000b\u0098\b\u000b\u0001"+
 		"\f\u0001\f\u0001\r\u0001\r\u0001\r\u0001\r\u0001\u000e\u0001\u000e\u0001"+
 		"\u000e\u0000\u0000\u000f\u0000\u0002\u0004\u0006\b\n\f\u000e\u0010\u0012"+
-		"\u0014\u0016\u0018\u001a\u001c\u0000\u0002\u0001\u0000\u0004\u0005\u0002"+
-		"\u0000\u0006\u0006\r\r\u00ac\u0000\u001f\u0001\u0000\u0000\u0000\u0002"+
+		"\u0014\u0016\u0018\u001a\u001c\u0000\u0002\u0001\u0000\u0004\u0005\u0003"+
+		"\u0000\u0006\u0006\b\b\r\r\u00ac\u0000\u001f\u0001\u0000\u0000\u0000\u0002"+
 		"%\u0001\u0000\u0000\u0000\u0004-\u0001\u0000\u0000\u0000\u00069\u0001"+
 		"\u0000\u0000\u0000\b;\u0001\u0000\u0000\u0000\nQ\u0001\u0000\u0000\u0000"+
 		"\fd\u0001\u0000\u0000\u0000\u000ef\u0001\u0000\u0000\u0000\u0010i\u0001"+

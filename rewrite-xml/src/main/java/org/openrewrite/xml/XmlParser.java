@@ -15,16 +15,13 @@
  */
 package org.openrewrite.xml;
 
-import io.micrometer.core.instrument.Metrics;
-import io.micrometer.core.instrument.Timer;
 import org.antlr.v4.runtime.*;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
+import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
-import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 import org.openrewrite.xml.internal.XmlParserVisitor;
@@ -33,56 +30,41 @@ import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
-import java.util.List;
-import java.util.Objects;
+import java.util.stream.Stream;
 
-import static java.util.stream.Collectors.toList;
-
-public class XmlParser implements Parser<Xml.Document> {
+public class XmlParser implements Parser {
     @Override
-    public List<Xml.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+    public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        return acceptedInputs(sourceFiles).stream()
-                .map(sourceFile -> {
-                    Timer.Builder timer = Timer.builder("rewrite.parse")
-                            .description("The time spent parsing an XML file")
-                            .tag("file.type", "XML");
-                    Timer.Sample sample = Timer.start();
-                    Path path = sourceFile.getRelativePath(relativeTo);
-                    try {
-                        EncodingDetectingInputStream is = sourceFile.getSource(ctx);
-                        String sourceStr = is.readFully();
+        return acceptedInputs(sourceFiles).map(sourceFile -> {
+            Path path = sourceFile.getRelativePath(relativeTo);
+            try (EncodingDetectingInputStream is = sourceFile.getSource(ctx)) {
+                String sourceStr = is.readFully();
 
-                        XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
-                                CharStreams.fromString(sourceStr))));
+                XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
+                        CharStreams.fromString(sourceStr))));
 
-                        parser.removeErrorListeners();
-                        parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
+                parser.removeErrorListeners();
+                parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
 
-                        Xml.Document document = new XmlParserVisitor(
-                                path,
-                                sourceFile.getFileAttributes(),
-                                sourceStr,
-                                is.getCharset(),
-                                is.isCharsetBomMarked()
-                        ).visitDocument(parser.document());
-
-                        sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
-                        parsingListener.parsed(sourceFile, document);
-                        return document;
-                    } catch (Throwable t) {
-                        sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
-                        ParsingExecutionContextView.view(ctx).parseFailure(sourceFile, relativeTo, this, t);
-                        ctx.getOnError().accept(new IllegalStateException(path + " " + t.getMessage(), t));
-                        return null;
-                    }
-                })
-                .filter(Objects::nonNull)
-                .collect(toList());
+                Xml.Document document = new XmlParserVisitor(
+                        path,
+                        sourceFile.getFileAttributes(),
+                        sourceStr,
+                        is.getCharset(),
+                        is.isCharsetBomMarked()
+                ).visitDocument(parser.document());
+                parsingListener.parsed(sourceFile, document);
+                return document;
+            } catch (Throwable t) {
+                ctx.getOnError().accept(t);
+                return ParseError.build(this, sourceFile, relativeTo, ctx, t);
+            }
+        });
     }
 
     @Override
-    public List<Xml.Document> parse(@Language("xml") String... sources) {
+    public Stream<SourceFile> parse(@Language("xml") String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
     }
 
@@ -123,6 +105,7 @@ public class XmlParser implements Parser<Xml.Document> {
     public static Builder builder() {
         return new Builder();
     }
+
     public static class Builder extends org.openrewrite.Parser.Builder {
 
         public Builder() {

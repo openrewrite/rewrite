@@ -380,15 +380,6 @@ public class CategoryTree<G> {
         }
     }
 
-    /**
-     * @return The subcategories if this category.
-     * @deprecated Use {@link #getCategories()} instead.
-     */
-    @Deprecated
-    public Collection<CategoryTree<G>> getSubtrees() {
-        return getCategories(true, true);
-    }
-
     public Collection<CategoryTree<G>> getCategories() {
         return getCategories(true, true);
     }
