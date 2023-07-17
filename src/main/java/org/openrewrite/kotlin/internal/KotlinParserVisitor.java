@@ -1319,7 +1319,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 opPrefix = sourceBefore("in");
                 kotlinBinaryType = K.Binary.Type.Contains;
 
-                right = convertToExpression(functionCall.getExplicitReceiver(), ctx);
+                FirExpression rhs = functionCall.getExplicitReceiver() != null ? functionCall.getExplicitReceiver() : functionCall.getDispatchReceiver();
+                right = convertToExpression(rhs, ctx);
 
                 break;
             case "get":
@@ -1366,7 +1367,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         typeMapping.type(functionCall.getArgumentList().getArguments().get(1))
                 );
             default:
-                left = convertToExpression(functionCall.getExplicitReceiver(), ctx);
+                FirExpression lhs = functionCall.getExplicitReceiver() != null ? functionCall.getExplicitReceiver() : functionCall.getDispatchReceiver();
+                left = convertToExpression(lhs, ctx);
 
                 opPrefix = sourceBefore("..");
                 kotlinBinaryType = K.Binary.Type.RangeTo;
