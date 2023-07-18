@@ -22,6 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
+import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
@@ -41,8 +42,7 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
+import static org.assertj.core.api.Assertions.*;
 import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 
 @SuppressWarnings("unused")
@@ -157,12 +157,25 @@ public interface RewriteTest extends SourceSpecs {
                 .isNotNull();
 
         if (!(recipe instanceof AdHocRecipe) && !(recipe instanceof CompositeRecipe) &&
+            !(recipe.equals(Recipe.noop())) &&
             testClassSpec.serializationValidation &&
             testMethodSpec.serializationValidation) {
             RecipeSerializer recipeSerializer = new RecipeSerializer();
             assertThat(recipeSerializer.read(recipeSerializer.write(recipe)))
                     .as("Recipe must be serializable/deserializable")
                     .isEqualTo(recipe);
+            assertThatCode(() -> {
+                Recipe r = RecipeIntrospectionUtils.constructRecipe(recipe.getClass());
+                // getRecipeList should not fail with default parameters from RecipeIntrospectionUtils.
+                r.getRecipeList();
+                // We add recipes to HashSet in some places, we need to validate that hashCode and equals does not fail.
+                //noinspection ResultOfMethodCallIgnored
+                r.hashCode();
+                //noinspection EqualsWithItself,ResultOfMethodCallIgnored
+                r.equals(r);
+            })
+                    .as("Recipe must be able to instantiate via RecipeIntrospectionUtils")
+                    .doesNotThrowAnyException();
             validateRecipeNameAndDescription(recipe);
             validateRecipeOptions(recipe);
         }
