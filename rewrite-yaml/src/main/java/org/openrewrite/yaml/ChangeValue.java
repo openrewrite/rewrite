@@ -30,12 +30,12 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = true)
 public class ChangeValue extends Recipe {
     @Option(displayName = "Key path",
-            description = "A JsonPath expression to locate a YAML entry.",
+            description = "A [JsonPath](https://github.com/json-path/JsonPath) expression to locate a YAML entry.",
             example = "$.subjects.kind")
     String oldKeyPath;
 
     @Option(displayName = "New value",
-            description = "The new value to set for the key identified by oldKeyPath.",
+            description = "The new value to set for the key identified by the `oldKeyPath`.",
             example = "Deployment")
     String value;
 
@@ -46,7 +46,7 @@ public class ChangeValue extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change a YAML mapping entry value leaving the key intact.";
+        return "Change a YAML mapping entry value while leaving the key intact.";
     }
 
     @Override

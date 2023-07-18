@@ -27,12 +27,12 @@ import org.openrewrite.yaml.tree.Yaml;
 @EqualsAndHashCode(callSuper = true)
 public class CopyValue extends Recipe {
     @Option(displayName = "Old key path",
-            description = "A JsonPath expression to locate a YAML key/value pair to copy.",
+            description = "A [JsonPath](https://github.com/json-path/JsonPath) expression to locate a YAML key/value pair to copy.",
             example = "$.source.kind")
     String oldKeyPath;
 
     @Option(displayName = "New key path",
-            description = "A JsonPath expression for where the new value should be copied to.",
+            description = "A [JsonPath](https://github.com/json-path/JsonPath) expression for where the new value should be copied to.",
             example = "$.dest.kind")
     String newKey;
 

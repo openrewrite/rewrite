@@ -27,12 +27,12 @@ import org.openrewrite.yaml.tree.Yaml;
 @EqualsAndHashCode(callSuper = true)
 public class ChangeKey extends Recipe {
     @Option(displayName = "Old key path",
-            description = "A JsonPath expression to locate a YAML entry.",
+            description = "A [JsonPath](https://github.com/json-path/JsonPath) expression to locate a YAML entry.",
             example = "$.subjects.kind")
     String oldKeyPath;
 
     @Option(displayName = "New key",
-            description = "The new name for the key selected by oldKeyPath.",
+            description = "The new name for the key selected by the `oldKeyPath`.",
             example = "kind")
     String newKey;
 
@@ -43,7 +43,7 @@ public class ChangeKey extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change a YAML mapping entry key leaving the value intact.";
+        return "Change a YAML mapping entry key while leaving the value intact.";
     }
 
     @Override

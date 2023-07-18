@@ -41,7 +41,7 @@ public class FindProperty extends Recipe {
 
     @Option(displayName = "Use relaxed binding",
             description = "Whether to match the `propertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
-                    "rules. Default is `true`. Set to `false`  to use exact matching.",
+                    "rules. Defaults to `true`. If you want to use exact matching in your search, set this to `false`.",
             required = false)
     @Nullable
     Boolean relaxedBinding;
@@ -53,8 +53,7 @@ public class FindProperty extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find a YAML property. Nested YAML mappings are interpreted as dot separated property names, i.e. " +
-                " as Spring Boot interprets `application.yml` files.";
+        return "Find YAML properties that match the specified `propertyKey`. Expects dot notation for nested YAML mappings, similar to how Spring Boot interprets `application.yml` files.";
     }
 
     @Override
