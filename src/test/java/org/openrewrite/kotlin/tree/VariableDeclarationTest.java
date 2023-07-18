@@ -16,7 +16,8 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -25,10 +26,14 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 @SuppressWarnings({"UnusedReceiverParameter", "PropertyName", "RemoveCurlyBracesFromTemplate", "UnnecessaryStringEscape", "RedundantGetter"})
 class VariableDeclarationTest implements RewriteTest {
 
-    @Test
-    void singleVariableDeclaration() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "\n",
+      "\r\n"
+    })
+    void singleVariableDeclaration(String newLine) {
         rewriteRun(
-          kotlin("val a = 1")
+          kotlin("%sval a = 1%s".formatted(newLine, newLine))
         );
     }
 

@@ -778,8 +778,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public <T> J visitConstExpression(FirConstExpression<T> constExpression, ExecutionContext ctx) {
-        String valueSource = source.substring(constExpression.getSource().getStartOffset(), constExpression.getSource().getEndOffset());
-        Space prefix = sourceBefore(valueSource);
+        Space prefix = whitespace();
+        String valueSource = source.substring(cursor, cursor + constExpression.getValue().toString().length());
+        skip(valueSource);
 
         Object value = constExpression.getValue();
         JavaType.Primitive type;

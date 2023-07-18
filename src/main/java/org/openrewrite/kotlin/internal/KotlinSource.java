@@ -25,6 +25,7 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiElementVisitor;
 import org.jetbrains.kotlin.com.intellij.psi.PsiFile;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.psi.KtElement;
+import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.openrewrite.Parser;
 
 import java.util.*;
@@ -32,7 +33,8 @@ import java.util.*;
 @Getter
 public class KotlinSource {
     Parser.Input input;
-    Map<Integer, ASTNode> nodes; // Maybe replace with PsiTree?
+    Map<Integer, ASTNode> nodes;
+    Map<Integer, Map<Class<? extends PsiElement>, ASTNode>> nodesMap;
 
     @Setter
     FirFile firFile;
@@ -41,6 +43,7 @@ public class KotlinSource {
                         @Nullable PsiFile psiFile) {
         this.input = input;
         this.nodes = map(psiFile);
+        this.nodesMap = mapNodes(psiFile);
     }
 
     // Map the PsiFile ahead of time so that the Disposable may be disposed early and free up memory.
@@ -68,6 +71,40 @@ public class KotlinSource {
 
                 if (element.getNextSibling() instanceof KtElement) {
                     visitElement(element.getNextSibling());
+                }
+            }
+        };
+        v.visitElement(psiFile);
+        return result;
+    }
+
+    // TODO: replace map() with this method.
+    private Map<Integer, Map<Class<? extends PsiElement>, ASTNode>> mapNodes(@Nullable PsiFile psiFile) {
+        Map<Integer, Map<Class<? extends PsiElement>, ASTNode>> result = new LinkedHashMap<>();
+        if (psiFile == null) {
+            return result;
+        }
+
+        Set<PsiElement> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+        PsiElementVisitor v = new PsiElementVisitor() {
+            @Override
+            public void visitElement(@NotNull PsiElement element) {
+                if (!visited.add(element)) {
+                    return;
+                }
+
+                result.compute(element.getTextRange().getStartOffset(), (k, v) -> {
+                    if (v == null) {
+                        v = new IdentityHashMap<>();
+                    }
+                        v.put(element.getClass(), element.getNode());
+                    return v;
+                });
+
+                Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(element).iterator();
+                while (iterator.hasNext()) {
+                    PsiElement child = iterator.next();
+                    visitElement(child);
                 }
             }
         };
