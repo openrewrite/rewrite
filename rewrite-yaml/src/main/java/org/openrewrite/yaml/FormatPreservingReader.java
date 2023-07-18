@@ -78,9 +78,9 @@ class FormatPreservingReader extends Reader {
             buffer.ensureCapacity(buffer.size() + read);
             for (int i = 0; i < read; i++) {
                 char e = cbuf[i];
-                if (Character.UnicodeBlock.of(e) != Character.UnicodeBlock.BASIC_LATIN && i % 2 == 0) {
-                    bufferIndex--;
-                }
+//                if (Character.UnicodeBlock.of(e) != Character.UnicodeBlock.BASIC_LATIN && i % 2 == 0) {
+//                    bufferIndex--;
+//                }
                 buffer.add(e);
             }
         }

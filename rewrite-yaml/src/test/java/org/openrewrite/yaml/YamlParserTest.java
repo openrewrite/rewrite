@@ -33,7 +33,7 @@ class YamlParserTest {
       "🛠",
       "prefix 🛠",
       "🛠🛠",
-      "🛠 🛠",
+      "🛠 infix 🛠",
       "🛠 suffix"
     })
     void parseYamlWithUnicode(String input) {
@@ -44,15 +44,15 @@ class YamlParserTest {
         Yaml.Documents documents = (Yaml.Documents) sourceFile;
         Yaml.Document document = documents.getDocuments().get(0);
 
-        // Assert that end is parsed correctly
-        assertThat(document.getEnd().getPrefix()).isEqualTo("\n");
-
         // Assert that the title is parsed correctly
         Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
         Yaml.Mapping.Entry entry = mapping.getEntries().get(0);
         Yaml.Scalar title = (Yaml.Scalar) entry.getValue();
         assertThat(title.getPrefix()).isEqualTo(" ");
         assertThat(title.getValue()).isEqualTo(input);
+
+        // Assert that end is parsed correctly
+        assertThat(document.getEnd().getPrefix()).isEqualTo("\n");
     }
 
 }
