@@ -25,6 +25,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 public class LocalRemoteArtifactCache implements RemoteArtifactCache {
@@ -48,13 +49,20 @@ public class LocalRemoteArtifactCache implements RemoteArtifactCache {
     @Nullable
     public Path put(URI uri, InputStream artifactInputStream, Consumer<Throwable> onError) {
         try {
-            Path artifact = cacheDir.resolve(hashUri(uri) + ".tmp");
+            Path artifact = cacheDir.resolve(UUID.randomUUID() + ".tmp");
             try (InputStream is = artifactInputStream) {
                 Files.copy(is, artifact, StandardCopyOption.REPLACE_EXISTING);
             }
-            Files.move(artifact, cacheDir.resolve(hashUri(uri)), StandardCopyOption.ATOMIC_MOVE,
-                    StandardCopyOption.REPLACE_EXISTING);
-            return cacheDir.resolve(hashUri(uri));
+            Path cachedArtifact = cacheDir.resolve(hashUri(uri));
+            synchronized (this) {
+                if (!Files.exists(cachedArtifact)) {
+                    Files.move(artifact, cachedArtifact, StandardCopyOption.ATOMIC_MOVE,
+                            StandardCopyOption.REPLACE_EXISTING);
+                } else {
+                    Files.delete(artifact);
+                }
+            }
+            return cachedArtifact;
         } catch (Exception e) {
             onError.accept(e);
             return null;
