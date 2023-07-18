@@ -582,10 +582,16 @@ public interface K extends J {
         @With
         public static final class Value implements K {
             UUID id;
+
+            @Nullable
             Space prefix;
+
             Markers markers;
             J tree;
+
+            @Nullable
             Space after;
+
             boolean enclosedInBraces;
 
             @Override

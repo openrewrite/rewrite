@@ -28,6 +28,8 @@ public class KSpace {
         KRETURN_PREFIX,
         KSTRING_PREFIX,
         KSTRING_SUFFIX,
+        KSTRING_VALUE_PREFIX,
+        KSTRING_VALUE_AFTER,
         KTHIS_PREFIX,
         LIST_LITERAL_PREFIX,
         LIST_LITERAL_ELEMENTS,

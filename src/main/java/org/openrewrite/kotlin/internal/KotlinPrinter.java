@@ -178,7 +178,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
         visit(value.getTree(), p);
         if (value.isEnclosedInBraces()) {
-            visitSpace(value.getAfter(), KSpace.Location.KSTRING_SUFFIX, p);
+            if (value.getAfter() != null) {
+                visitSpace(value.getAfter(), KSpace.Location.KSTRING_SUFFIX, p);
+            }
             p.append('}');
         }
         afterSyntax(value, p);
@@ -1000,11 +1002,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         beforeSyntax(j.getPrefix(), j.getMarkers(), loc, p);
     }
 
-    private void beforeSyntax(Space prefix, Markers markers, @Nullable KSpace.Location loc, PrintOutputCapture<P> p) {
+    private void beforeSyntax(@Nullable Space prefix, Markers markers, @Nullable KSpace.Location loc, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
             p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
         }
-        if (loc != null) {
+        if (loc != null && prefix != null) {
             visitSpace(prefix, loc, p);
         }
         visitMarkers(markers, p);

@@ -120,8 +120,14 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
 
     public J visitKStringValue(K.KString.Value value, P p) {
         K.KString.Value v = value;
+        if (v.getPrefix() != null) {
+            v = v.withPrefix(visitSpace(v.getPrefix(), KSpace.Location.KSTRING_VALUE_PREFIX, p));
+        }
         v = v.withMarkers(visitMarkers(v.getMarkers(), p));
         v = v.withTree(visit(v.getTree(), p));
+        if (v.getAfter() != null) {
+            v = v.withAfter(visitSpace(v.getAfter(), KSpace.Location.KSTRING_VALUE_AFTER, p));
+        }
         return v;
     }
 
