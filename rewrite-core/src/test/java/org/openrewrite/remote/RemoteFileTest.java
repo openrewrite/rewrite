@@ -55,11 +55,11 @@ class RemoteFileTest {
 
     @Test
     void gradleWrapperPropertiesConcurrent() throws Exception {
-        int NUM_EXECUTIONS = 5;
-        ExecutorService executorService = Executors.newFixedThreadPool(NUM_EXECUTIONS);
+        int executionCount = 5;
+        ExecutorService executorService = Executors.newFixedThreadPool(executionCount);
         CompletionService<byte[]> completionService = new ExecutorCompletionService<>(executorService);
 
-        for (int i = 0; i < NUM_EXECUTIONS; i++) {
+        for (int i = 0; i < executionCount; i++) {
             completionService.submit(() -> {
                 URL distributionUrl = requireNonNull(RemoteFileTest.class.getClassLoader().getResource("gradle-wrapper.properties"));
 
@@ -73,15 +73,15 @@ class RemoteFileTest {
                     distributionUrl.toURI()
                   )
                   .build();
-                
+
                 return readAll(remoteFile.getInputStream(ctx));
             });
         }
 
-        for (int i = 0; i < NUM_EXECUTIONS; i++) {
+        for (int i = 0; i < executionCount; i++) {
             Future<byte[]> result = completionService.take();
             byte[] actual = result.get();
-            assertThat(actual).hasSizeGreaterThanOrEqualTo(223);
+            assertThat(actual).hasSizeGreaterThan(800);
         }
 
         executorService.shutdown();
