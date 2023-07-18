@@ -28,7 +28,7 @@ public class RemoveUnused extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Remove YAML mapping and sequence keys that have no value.";
+        return "Remove YAML mappings and sequence keys that have no value.";
     }
 
     @Override

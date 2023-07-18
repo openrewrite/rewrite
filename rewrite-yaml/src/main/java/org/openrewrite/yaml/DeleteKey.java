@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicReference;
 @EqualsAndHashCode(callSuper = true)
 public class DeleteKey extends Recipe {
     @Option(displayName = "Key path",
-            description = "A JsonPath expression to locate a YAML entry.",
+            description = "A [JsonPath](https://github.com/json-path/JsonPath) expression to locate a YAML entry.",
             example = "$.source.kind")
     String keyPath;
 
