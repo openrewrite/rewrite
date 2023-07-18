@@ -83,9 +83,9 @@ class RemoteArchiveTest {
         for (int i = 0; i < executionCount; i++) {
             Future<byte[]> result = completionService.take();
             byte[] actual = result.get();
-            assertThat(actual).hasSizeGreaterThan(800);
+            assertThat(actual).hasSizeGreaterThan(50_000);
         }
-        
+
         executorService.shutdown();
     }
 

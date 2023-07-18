@@ -50,7 +50,7 @@ class RemoteFileTest {
           .build();
 
         byte[] actual = readAll(remoteFile.getInputStream(ctx));
-        assertThat(actual).hasSizeGreaterThanOrEqualTo(223);
+        assertThat(actual).hasSizeGreaterThanOrEqualTo(800);
     }
 
     @Test
