@@ -16,14 +16,11 @@
 package org.openrewrite.remote;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.test.MockHttpSender;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -49,16 +46,15 @@ class RemoteFileTest {
           )
           .build();
 
-        byte[] actual = readAll(remoteFile.getInputStream(ctx));
-        assertThat(actual).hasSizeGreaterThanOrEqualTo(800);
+        long actual = getInputStreamSize(remoteFile.getInputStream(ctx));
+        assertThat(actual).isGreaterThan(800);
     }
 
     @Test
     void gradleWrapperPropertiesConcurrent() throws Exception {
         int executionCount = 5;
         ExecutorService executorService = Executors.newFixedThreadPool(executionCount);
-        CompletionService<byte[]> completionService = new ExecutorCompletionService<>(executorService);
-
+        CompletionService<Long> completionService = new ExecutorCompletionService<>(executorService);
         for (int i = 0; i < executionCount; i++) {
             completionService.submit(() -> {
                 URL distributionUrl = requireNonNull(RemoteFileTest.class.getClassLoader().getResource("gradle-wrapper.properties"));
@@ -74,24 +70,23 @@ class RemoteFileTest {
                   )
                   .build();
 
-                return readAll(remoteFile.getInputStream(ctx));
+                return getInputStreamSize(remoteFile.getInputStream(ctx));
             });
         }
 
         for (int i = 0; i < executionCount; i++) {
-            Future<byte[]> result = completionService.take();
-            byte[] actual = result.get();
-            assertThat(actual).hasSizeGreaterThan(800);
+            Future<Long> result = completionService.take();
+            Long actual = result.get();
+            assertThat(actual).isGreaterThanOrEqualTo(800);
         }
 
         executorService.shutdown();
     }
 
-    private byte[] readAll(InputStream is) {
+    private Long getInputStreamSize(InputStream is) {
+        BlackHoleOutputStream out = new BlackHoleOutputStream();
         try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            is.transferTo(baos);
-            return baos.toByteArray();
+            return is.transferTo(out);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

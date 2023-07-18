@@ -22,7 +22,6 @@ import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.test.MockHttpSender;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
@@ -49,8 +48,8 @@ class RemoteArchiveTest {
           )
           .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
 
-        byte[] actual = readAll(remoteArchive.getInputStream(ctx));
-        assertThat(actual).hasSizeGreaterThan(50_000);
+        long actual = getInputStreamSize(remoteArchive.getInputStream(ctx));
+        assertThat(actual).isGreaterThan(50_000);
     }
 
     @ParameterizedTest
@@ -58,7 +57,7 @@ class RemoteArchiveTest {
     void gradleWrapperConcurrent(String version) throws Exception {
         int executionCount = 5;
         ExecutorService executorService = Executors.newFixedThreadPool(executionCount);
-        CompletionService<byte[]> completionService = new ExecutorCompletionService<>(executorService);
+        CompletionService<Long> completionService = new ExecutorCompletionService<>(executorService);
 
         for (int i = 0; i < executionCount; i++) {
             completionService.submit(() -> {
@@ -76,24 +75,23 @@ class RemoteArchiveTest {
                   )
                   .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
 
-                return readAll(remoteArchive.getInputStream(ctx));
+                return getInputStreamSize(remoteArchive.getInputStream(ctx));
             });
         }
 
         for (int i = 0; i < executionCount; i++) {
-            Future<byte[]> result = completionService.take();
-            byte[] actual = result.get();
-            assertThat(actual).hasSizeGreaterThan(50_000);
+            Future<Long> result = completionService.take();
+            Long actual = result.get();
+            assertThat(actual).isGreaterThan(50_000);
         }
 
         executorService.shutdown();
     }
 
-    private byte[] readAll(InputStream is) {
+    private Long getInputStreamSize(InputStream is) {
+        BlackHoleOutputStream out = new BlackHoleOutputStream();
         try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            is.transferTo(baos);
-            return baos.toByteArray();
+            return is.transferTo(out);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
