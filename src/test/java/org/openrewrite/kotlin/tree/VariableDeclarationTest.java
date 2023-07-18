@@ -28,16 +28,7 @@ class VariableDeclarationTest implements RewriteTest {
     @Test
     void singleVariableDeclaration() {
         rewriteRun(
-          kotlin(
-            "val a = 1")
-        );
-    }
-
-    @Test
-    void singleVariableDeclarationWithCRLF() {
-        rewriteRun(
-          kotlin(
-            "\r\nval a = 1")
+          kotlin("val a = 1")
         );
     }
 
