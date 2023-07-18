@@ -157,13 +157,23 @@ public interface RewriteTest extends SourceSpecs {
                 .isNotNull();
 
         if (!(recipe instanceof AdHocRecipe) && !(recipe instanceof CompositeRecipe) &&
+            !(recipe.equals(Recipe.noop())) &&
             testClassSpec.serializationValidation &&
             testMethodSpec.serializationValidation) {
             RecipeSerializer recipeSerializer = new RecipeSerializer();
             assertThat(recipeSerializer.read(recipeSerializer.write(recipe)))
                     .as("Recipe must be serializable/deserializable")
                     .isEqualTo(recipe);
-            assertThatCode(() -> RecipeIntrospectionUtils.constructRecipe(recipe.getClass()))
+            assertThatCode(() -> {
+                Recipe r = RecipeIntrospectionUtils.constructRecipe(recipe.getClass());
+                // getRecipeList should not fail with default parameters from RecipeIntrospectionUtils.
+                r.getRecipeList();
+                // We add recipes to HashSet in some places, we need to validate that hashCode and equals does not fail.
+                //noinspection ResultOfMethodCallIgnored
+                r.hashCode();
+                //noinspection EqualsWithItself
+                assert r.equals(r);
+            })
                     .as("Recipe must be able to instantiate via RecipeIntrospectionUtils")
                     .doesNotThrowAnyException();
             validateRecipeNameAndDescription(recipe);
