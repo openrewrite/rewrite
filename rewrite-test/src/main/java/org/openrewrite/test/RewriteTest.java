@@ -171,8 +171,8 @@ public interface RewriteTest extends SourceSpecs {
                 // We add recipes to HashSet in some places, we need to validate that hashCode and equals does not fail.
                 //noinspection ResultOfMethodCallIgnored
                 r.hashCode();
-                //noinspection EqualsWithItself
-                assert r.equals(r);
+                //noinspection EqualsWithItself,ResultOfMethodCallIgnored
+                r.equals(r);
             })
                     .as("Recipe must be able to instantiate via RecipeIntrospectionUtils")
                     .doesNotThrowAnyException();
