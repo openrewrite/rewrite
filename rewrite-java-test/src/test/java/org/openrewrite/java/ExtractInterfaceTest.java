@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.AllArgsConstructor;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.*;
 import org.openrewrite.java.tree.J;
@@ -29,6 +30,7 @@ import static org.openrewrite.java.Assertions.java;
 
 class ExtractInterfaceTest implements RewriteTest {
 
+    @AllArgsConstructor
     private static class ExtractTestInterface extends ScanningRecipe<AtomicReference<J.CompilationUnit>> {
         @Override
         public String getDisplayName() {
