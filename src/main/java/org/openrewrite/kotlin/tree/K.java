@@ -586,11 +586,20 @@ public interface K extends J {
             @Nullable
             Space prefix;
 
+            @Override
+            public Space getPrefix() {
+                return prefix == null ? Space.EMPTY : prefix;
+            }
+
             Markers markers;
             J tree;
 
             @Nullable
             Space after;
+
+            public Space getAfter() {
+                return after == null ? Space.EMPTY : after;
+            }
 
             boolean enclosedInBraces;
 
