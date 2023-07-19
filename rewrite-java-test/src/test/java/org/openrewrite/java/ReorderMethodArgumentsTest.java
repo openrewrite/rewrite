@@ -31,7 +31,7 @@ class ReorderMethodArgumentsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipes(
             new ReorderMethodArguments("a.A foo(String, Integer, Integer)",
-              new String[]{"n", "m", "s"}, null, null),
+              new String[]{"n", "m", "s"}, null, null, null),
             toRecipe(() -> new JavaVisitor<>() {
                 @Override
                 public J visitLiteral(J.Literal literal, ExecutionContext p) {
@@ -86,7 +86,7 @@ class ReorderMethodArgumentsTest implements RewriteTest {
     void reorderArgumentsWithNoSourceAttachment() {
         rewriteRun(
           spec -> spec.recipe(new ReorderMethodArguments("a.A foo(..)",
-              new String[]{"s", "n"}, new String[]{"n", "s"}, null))
+              new String[]{"s", "n"}, new String[]{"n", "s"}, null, null))
             .cycles(1).expectedCyclesThatMakeChanges(1),
           java(
             """
@@ -124,7 +124,7 @@ class ReorderMethodArgumentsTest implements RewriteTest {
     void reorderArgumentsWhereOneOfTheOriginalArgumentsIsVararg() {
         rewriteRun(
           spec -> spec.recipe(new ReorderMethodArguments("a.A foo(..)",
-              new String[]{"s", "o", "n"}, null, null))
+              new String[]{"s", "o", "n"}, null, null, null))
             .cycles(1).expectedCyclesThatMakeChanges(1),
           java(
             """
@@ -162,7 +162,7 @@ class ReorderMethodArgumentsTest implements RewriteTest {
     void reorderArgumentsWhereTheLastArgumentIsVarargAndNotPresentInInvocation() {
         rewriteRun(
           spec -> spec.recipe(new ReorderMethodArguments("a.A foo(..)",
-            new String[]{"o", "s"}, null, null)),
+            new String[]{"o", "s"}, null, null, null)),
           java(
             """
               package a;

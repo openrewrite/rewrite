@@ -28,7 +28,7 @@ class SimplifyMethodChainTest implements RewriteTest {
     void simplify() {
         rewriteRun(
           spec -> spec.recipe(new SimplifyMethodChain(
-            Arrays.asList("A b()", "B c()"), "c2")),
+            Arrays.asList("A b()", "B c()"), "c2", false)),
           java(
             """
               class A {

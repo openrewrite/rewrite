@@ -49,7 +49,8 @@ public class RemoveImplements extends Recipe {
     @Option(displayName = "Filter",
             description = "Only apply the interface removal to classes with fully qualified names that begin with this filter. " +
                           "`null` or empty matches all classes.",
-            example = "com.yourorg.")
+            example = "com.yourorg.",
+            required = false)
     @Nullable
     String filter;
 

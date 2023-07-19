@@ -73,6 +73,12 @@ public class ReorderMethodArguments extends Recipe {
     @Nullable
     Boolean ignoreDefinition;
 
+    @Option(displayName = "Match on overrides",
+            description = "When enabled, find methods that are overrides of the method pattern.",
+            required = false)
+    @Nullable
+    Boolean matchOverrides;
+
     @JsonPOJOBuilder(withPrefix = "")
     public static class Builder {
     }
@@ -104,7 +110,7 @@ public class ReorderMethodArguments extends Recipe {
                 }
                 return super.visit(tree, ctx);
             }
-        }, new ReorderMethodArgumentsVisitor(new MethodMatcher(methodPattern)));
+        }, new ReorderMethodArgumentsVisitor(new MethodMatcher(methodPattern, matchOverrides)));
     }
 
     private class ReorderMethodArgumentsVisitor extends JavaIsoVisitor<ExecutionContext> {
