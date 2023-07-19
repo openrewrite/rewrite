@@ -34,7 +34,7 @@ import java.util.*;
 public class KotlinSource {
     Parser.Input input;
     Map<Integer, ASTNode> nodes;
-    Map<Integer, Map<Class<? extends PsiElement>, ASTNode>> nodesMap;
+//    Map<Integer, Map<Class<? extends PsiElement>, ASTNode>> nodesMap;
 
     @Setter
     FirFile firFile;
@@ -43,10 +43,9 @@ public class KotlinSource {
                         @Nullable PsiFile psiFile) {
         this.input = input;
         this.nodes = map(psiFile);
-        this.nodesMap = mapNodes(psiFile);
+//        this.nodesMap = mapNodes(psiFile);
     }
 
-    // Map the PsiFile ahead of time so that the Disposable may be disposed early and free up memory.
     private Map<Integer, ASTNode> map(@Nullable PsiFile psiFile) {
         Map<Integer, ASTNode> result = new LinkedHashMap<>();
         if (psiFile == null) {
@@ -78,7 +77,9 @@ public class KotlinSource {
         return result;
     }
 
-    // TODO: replace map() with this method.
+    // TODO: assess whether this is a better way to map nodes.
+    // The cursor positions on the FIR source will be out of sync with the source and PSI source when
+    // there are multiple CRLF end of lines and/or other elements that the compiler removes during desugaring.
     private Map<Integer, Map<Class<? extends PsiElement>, ASTNode>> mapNodes(@Nullable PsiFile psiFile) {
         Map<Integer, Map<Class<? extends PsiElement>, ASTNode>> result = new LinkedHashMap<>();
         if (psiFile == null) {
