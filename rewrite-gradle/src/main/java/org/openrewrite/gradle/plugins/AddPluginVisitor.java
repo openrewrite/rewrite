@@ -25,6 +25,7 @@ import org.openrewrite.gradle.search.FindPlugins;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.FindMethods;
@@ -37,10 +38,7 @@ import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.MavenMetadata;
 import org.openrewrite.maven.tree.MavenRepository;
-import org.openrewrite.semver.ExactVersion;
-import org.openrewrite.semver.LatestPatch;
-import org.openrewrite.semver.Semver;
-import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.semver.*;
 
 import java.nio.file.Paths;
 import java.util.List;
@@ -67,22 +65,19 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
     public static Optional<String> resolvePluginVersion(String pluginId, String currentVersion, @Nullable String newVersion, @Nullable String versionPattern,
                                                         List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
-        Optional<String> version;
-        if (newVersion == null) {
-            version = Optional.empty();
-        } else {
-            VersionComparator versionComparator = Semver.validate(newVersion, versionPattern).getValue();
-            assert versionComparator != null;
+        VersionComparator versionComparator = StringUtils.isBlank(newVersion) ?
+                new LatestRelease(null) :
+                requireNonNull(Semver.validate(newVersion, versionPattern).getValue());
 
-            if (versionComparator instanceof ExactVersion) {
-                version = versionComparator.upgrade(currentVersion, singletonList(newVersion));
-            } else if (versionComparator instanceof LatestPatch && !versionComparator.isValid(currentVersion, currentVersion)) {
-                // in the case of "latest.patch", a new version can only be derived if the
-                // current version is a semantic version
-                return Optional.empty();
-            } else {
-                version = findNewerVersion(pluginId, pluginId + ".gradle.plugin", currentVersion, versionComparator, repositories, ctx);
-            }
+        Optional<String> version;
+        if (versionComparator instanceof ExactVersion) {
+            version = Optional.of(newVersion);
+        } else if (versionComparator instanceof LatestPatch && !versionComparator.isValid(currentVersion, currentVersion)) {
+            // in the case of "latest.patch", a new version can only be derived if the
+            // current version is a semantic version
+            return Optional.empty();
+        } else {
+            version = findNewerVersion(pluginId, pluginId + ".gradle.plugin", currentVersion, versionComparator, repositories, ctx);
         }
         return version;
     }
@@ -108,10 +103,15 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
     public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
         if (FindPlugins.find(cu, pluginId).isEmpty()) {
             Optional<String> version;
-            try {
-                version = resolvePluginVersion(pluginId, "0", newVersion, versionPattern, repositories, ctx);
-            } catch (MavenDownloadingException e) {
-                return e.warn(cu);
+            if (newVersion == null) {
+                // We have been requested to add a versionless plugin
+                version = Optional.empty();
+            } else {
+                try {
+                    version = resolvePluginVersion(pluginId, "0", newVersion, versionPattern, repositories, ctx);
+                } catch (MavenDownloadingException e) {
+                    return e.warn(cu);
+                }
             }
 
             AtomicInteger singleQuote = new AtomicInteger();

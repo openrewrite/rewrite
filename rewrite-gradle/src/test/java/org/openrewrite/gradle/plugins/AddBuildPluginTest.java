@@ -66,6 +66,26 @@ class AddBuildPluginTest implements RewriteTest {
     }
 
     @Test
+    void addThirdPartyPluginWithoutVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new AddBuildPlugin("org.openrewrite.rewrite", null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+                  id "org.openrewrite.rewrite"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addPluginWithVersionToNewBlock() {
         rewriteRun(
           spec -> spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null)),

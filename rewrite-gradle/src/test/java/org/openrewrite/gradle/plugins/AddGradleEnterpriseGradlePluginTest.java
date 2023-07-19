@@ -20,6 +20,8 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.groovy.tree.G.CompilationUnit;
 import org.openrewrite.marker.BuildTool;
+import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
@@ -28,6 +30,7 @@ import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.Assertions.*;
@@ -222,6 +225,33 @@ class AddGradleEnterpriseGradlePluginTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void defaultsToLatestRelease() {
+        rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
+            .recipe(new AddGradleEnterpriseGradlePlugin(null, null, null, null, null, null)),
+          buildGradle(
+            ""
+          ),
+          settingsGradle(
+            "",
+            spec -> spec.after(after -> {
+                Matcher versionMatcher = Pattern.compile("id 'com\\.gradle\\.enterprise' version '(.*?)'").matcher(after);
+                assertThat(versionMatcher.find()).isTrue();
+                String version = versionMatcher.group(1);
+                VersionComparator versionComparator = requireNonNull(Semver.validate("[3.14,)", null).getValue());
+                assertThat(versionComparator.compare(null, "3.14", version)).isLessThanOrEqualTo(0);
+
+                return """
+                  plugins {
+                      id 'com.gradle.enterprise' version '%s'
+                  }
+                  """.formatted(version);
+            })
           )
         );
     }

@@ -23,6 +23,7 @@ import org.openrewrite.gradle.marker.GradleProject;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.semver.Semver;
 
 import java.util.Optional;
 
@@ -35,7 +36,10 @@ public class AddBuildPlugin extends Recipe {
     String pluginId;
 
     @Option(displayName = "Plugin version",
-            description = "An exact version number or node-style semver selector used to select the version number.",
+            description = "An exact version number or node-style semver selector used to select the version number. " +
+                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors).",
             example = "3.x",
             required = false)
     @Nullable
@@ -57,6 +61,15 @@ public class AddBuildPlugin extends Recipe {
     @Override
     public String getDescription() {
         return "Add a Gradle build plugin to `build.gradle(.kts)`.";
+    }
+
+    @Override
+    public Validated<Object> validate() {
+        Validated<Object> validated = super.validate();
+        if (version != null) {
+            validated = validated.and(Semver.validate(version, versionPattern));
+        }
+        return validated;
     }
 
     @Override

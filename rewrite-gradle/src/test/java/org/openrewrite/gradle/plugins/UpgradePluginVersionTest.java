@@ -17,11 +17,17 @@ package org.openrewrite.gradle.plugins;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static java.util.Objects.requireNonNull;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.*;
-import static org.openrewrite.gradle.Assertions.buildGradle;
 
 class UpgradePluginVersionTest implements RewriteTest {
     @Override
@@ -105,6 +111,33 @@ class UpgradePluginVersionTest implements RewriteTest {
                   id 'org.openrewrite.rewrite' version '999.0'
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void defaultsToLatestRelease() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("org.openrewrite.rewrite", null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'org.openrewrite.rewrite' version '5.34.0'
+              }
+              """,
+            spec -> spec.after(after -> {
+                Matcher versionMatcher = Pattern.compile("id 'org\\.openrewrite\\.rewrite' version '(.*?)'").matcher(after);
+                assertThat(versionMatcher.find()).isTrue();
+                String version = versionMatcher.group(1);
+                VersionComparator versionComparator = requireNonNull(Semver.validate("[6.1.16,)", null).getValue());
+                assertThat(versionComparator.compare(null, "6.1.16", version)).isLessThanOrEqualTo(0);
+
+                return """
+                  plugins {
+                      id 'org.openrewrite.rewrite' version '%s'
+                  }
+                  """.formatted(version);
+            })
           )
         );
     }

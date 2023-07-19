@@ -26,6 +26,7 @@ import org.openrewrite.gradle.marker.GradleSettings;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
@@ -54,8 +55,14 @@ public class AddGradleEnterpriseGradlePlugin extends Recipe {
     MavenMetadataFailures metadataFailures = new MavenMetadataFailures(this);
 
     @Option(displayName = "Plugin version",
-            description = "An exact version number or node-style semver selector used to select the plugin version.",
-            example = "3.x")
+            description = "An exact version number or node-style semver selector used to select the version number. " +
+                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors). " +
+                          "Defaults to `latest.release`.",
+            example = "3.x",
+            required = false)
+    @Nullable
     String version;
 
     @Option(displayName = "Server URL",
@@ -115,6 +122,15 @@ public class AddGradleEnterpriseGradlePlugin extends Recipe {
     }
 
     @Override
+    public Validated<Object> validate() {
+        Validated<Object> validated = super.validate();
+        if (version != null) {
+            validated = validated.and(Semver.validate(version, null));
+        }
+        return validated;
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(Preconditions.or(new IsBuildGradle<>(), new IsSettingsGradle<>()), new GroovyIsoVisitor<ExecutionContext>() {
             @Override
@@ -163,9 +179,8 @@ public class AddGradleEnterpriseGradlePlugin extends Recipe {
 
     private G.CompilationUnit withPlugin(G.CompilationUnit cu, String pluginId, VersionComparator versionComparator, List<MavenRepository> repositories, ExecutionContext ctx) {
         try {
-            Optional<String> maybeNewVersion = resolvePluginVersion(pluginId, "0", version, null, repositories, ctx);
+            Optional<String> maybeNewVersion = resolvePluginVersion(pluginId, "0", StringUtils.isBlank(version) ? "latest.release" : version, null, repositories, ctx);
             if (!maybeNewVersion.isPresent()) {
-                // shouldn't happen since a non-null version was passed to resolvePluginVersion
                 return cu;
             }
             String newVersion = maybeNewVersion.get();
