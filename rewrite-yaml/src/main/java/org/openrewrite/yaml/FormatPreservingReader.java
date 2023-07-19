@@ -32,6 +32,7 @@ class FormatPreservingReader extends Reader {
 
     private ArrayList<Character> buffer = new ArrayList<>();
     private int bufferIndex = 0;
+    private int unicodeOffset = 0;
 
     FormatPreservingReader(Reader delegate) {
         this.delegate = delegate;
@@ -58,6 +59,9 @@ class FormatPreservingReader extends Reader {
     }
 
     public String prefix(int lastEnd, Event event) {
+        if (event.getEventId() == Event.ID.DocumentEnd) {
+            bufferIndex -= unicodeOffset;
+        }
         return prefix(lastEnd, event.getStartMark().getIndex());
     }
 
@@ -78,9 +82,9 @@ class FormatPreservingReader extends Reader {
             buffer.ensureCapacity(buffer.size() + read);
             for (int i = 0; i < read; i++) {
                 char e = cbuf[i];
-//                if (Character.UnicodeBlock.of(e) != Character.UnicodeBlock.BASIC_LATIN && i % 2 == 0) {
-//                    bufferIndex--;
-//                }
+                if (Character.UnicodeBlock.of(e) != Character.UnicodeBlock.BASIC_LATIN && i % 2 == 0) {
+                    unicodeOffset++;
+                }
                 buffer.add(e);
             }
         }

@@ -31,6 +31,7 @@ class YamlParserTest {
     @ValueSource(strings = {
       "b",
       "🛠",
+      "012🛠",
       "prefix 🛠",
       "🛠🛠",
       "🛠 infix 🛠",
@@ -47,12 +48,65 @@ class YamlParserTest {
         // Assert that the title is parsed correctly
         Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
         Yaml.Mapping.Entry entry = mapping.getEntries().get(0);
-        Yaml.Scalar title = (Yaml.Scalar) entry.getValue();
-        assertThat(title.getPrefix()).isEqualTo(" ");
-        assertThat(title.getValue()).isEqualTo(input);
+        Yaml.Scalar scalar = (Yaml.Scalar) entry.getValue();
+        assertThat(scalar.getValue()).isEqualTo(input);
+        assertThat(scalar.getPrefix()).as("Scalar prefix").isEqualTo(" ");
 
         // Assert that end is parsed correctly
-        assertThat(document.getEnd().getPrefix()).isEqualTo("\n");
+        assertThat(document.getEnd().getPrefix()).as("Document end prefix").isEqualTo("\n");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      """
+        a: b\n
+        c:
+          - d
+          - e
+          - f
+        """,
+      """
+        a: b 🛠\n
+        c:
+          - d
+          - e 🛠
+          - f 🛠🛠
+          - g
+        """,
+      """
+        a: 🛠 b\n
+        c:
+          - d
+          - 🛠 e
+          - 🛠🛠 f
+          - g
+        """
+    })
+    void parseYamlWithUnicodeBlock(String input) {
+        Stream<SourceFile> yamlSources = YamlParser.builder().build().parse(input);
+        SourceFile sourceFile = yamlSources.findFirst().get();
+        assertThat(sourceFile).isNotInstanceOf(ParseError.class);
+
+        Yaml.Documents documents = (Yaml.Documents) sourceFile;
+        Yaml.Document document = documents.getDocuments().get(0);
+
+        // Assert that the title is parsed correctly
+        Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
+        Yaml.Mapping.Entry entry = mapping.getEntries().get(0);
+        Yaml.Scalar scalar = (Yaml.Scalar) entry.getValue();
+        assertThat(scalar.getPrefix()).as("Scalar prefix").isEqualTo(" ");
+
+        // Assert that the list is parsed correctly
+        Yaml.Sequence sequence = (Yaml.Sequence) mapping.getEntries().get(1).getValue();
+
+        // Assert first list item
+        for (Yaml.Sequence.Entry sequenceEntry : sequence.getEntries()) {
+            Yaml.Scalar sequenceTitle = (Yaml.Scalar) sequenceEntry.getBlock();
+            assertThat(sequenceTitle.getPrefix()).as( sequenceEntry + " prefix").isEqualTo(" ");
+        }
+
+        // Assert that end is parsed correctly
+        assertThat(document.getEnd().getPrefix()).as("Document end prefix").isEqualTo("\n");
     }
 
 }
