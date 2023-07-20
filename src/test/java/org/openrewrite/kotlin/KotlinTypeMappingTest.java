@@ -37,18 +37,18 @@ public class KotlinTypeMappingTest {
 
     @SuppressWarnings("OptionalGetWithoutIsPresent")
     private static final J.ClassDeclaration goatClassDeclaration =
-      requireNonNull(((K.CompilationUnit) KotlinParser.builder()
-        .logCompilationWarningsAndErrors(true)
-        .build()
-        .parse(new InMemoryExecutionContext(), goat)
-        .findFirst()
-        .get())
-        .getClasses()
-        .get(0)
-      );
+            requireNonNull(((K.CompilationUnit) KotlinParser.builder()
+                    .logCompilationWarningsAndErrors(true)
+                    .build()
+                    .parse(new InMemoryExecutionContext(), goat)
+                    .findFirst()
+                    .get())
+                    .getClasses()
+                    .get(0)
+            );
 
     private static final JavaType.Parameterized goatType =
-      requireNonNull(TypeUtils.asParameterized(goatClassDeclaration.getType()));
+            requireNonNull(TypeUtils.asParameterized(goatClassDeclaration.getType()));
 
     public JavaType.Method methodType(String methodName) {
         JavaType.Method type = goatType.getMethods().stream()
@@ -60,12 +60,12 @@ public class KotlinTypeMappingTest {
     }
 
     public J.VariableDeclarations getField(String fieldName) {
-          return goatClassDeclaration.getBody().getStatements().stream()
-          .filter(s -> s instanceof J.VariableDeclarations)
-          .map(J.VariableDeclarations.class::cast)
-          .filter(mv -> mv.getVariables().stream().anyMatch(v -> v.getSimpleName().equals(fieldName)))
-          .findFirst()
-          .orElse(null);
+        return goatClassDeclaration.getBody().getStatements().stream()
+                .filter(s -> s instanceof J.VariableDeclarations)
+                .map(J.VariableDeclarations.class::cast)
+                .filter(mv -> mv.getVariables().stream().anyMatch(v -> v.getSimpleName().equals(fieldName)))
+                .findFirst()
+                .orElse(null);
     }
 
     public JavaType firstMethodParameter(String methodName) {
@@ -79,8 +79,10 @@ public class KotlinTypeMappingTest {
 
     @Test
     void fieldType() {
-        J.Identifier id = getField("intField").getVariables().get(0).getName();
-        assertThat(id.getFieldType()).isNotNull();
+        J.Identifier id = getField("field").getVariables().get(0).getName();
+        assertThat(id.getFieldType()).isInstanceOf(JavaType.Variable.class);
+        assertThat(id.getFieldType().toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=field,type=kotlin.Int}");
+        assertThat(id.getType()).isInstanceOf(JavaType.Class.class);
         assertThat(id.getType().toString()).isEqualTo("kotlin.Int");
     }
 

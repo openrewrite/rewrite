@@ -19,12 +19,14 @@ package org.openrewrite.kotlin
 
 import java.lang.Object
 
+// Whenever this class is changed, make a corresponding change in KotlinTypeGoat in the main java source set.
 @AnnotationWithRuntimeRetention
 @AnnotationWithSourceRetention
 abstract class KotlinTypeGoat<T, S> {
     //abstract class KotlinTypeGoat<T, S> where S: PT<S>, S: C {
     val parameterizedField: PT<TypeA> = object : PT<TypeA> {}
-    val intField: Int = 1;
+
+    val field: Int = C.Inner().innerField
 
 //    abstract class InheritedKotlinTypeGoat<T, U> : KotlinTypeGoat<T, U>() where U : PT<U>, U : C
 
@@ -69,7 +71,9 @@ abstract class KotlinTypeGoat<T, S> {
 }
 
 interface C {
-    class Inner
+    class Inner {
+        val innerField: Int = 1
+    }
 }
 
 interface PT<T>

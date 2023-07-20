@@ -148,6 +148,12 @@ public class KotlinTypeSignatureBuilderTest {
     }
 
     @Test
+    void fieldType() {
+        assertThat(fieldSignature("field"))
+            .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=field,type=kotlin.Int}");
+    }
+
+    @Test
     void classSignature() {
         assertThat(firstMethodParameterSignature("clazz"))
                 .isEqualTo("org.openrewrite.kotlin.C");
