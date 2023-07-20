@@ -4159,7 +4159,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     private J.Identifier createIdentifier(String name, FirElement firElement) {
-        return createIdentifier(name, typeMapping.type(firElement, getCurrentFile()), null);
+        JavaType type = typeMapping.type(firElement, getCurrentFile());
+
+        return createIdentifier(name,
+            type instanceof JavaType.Variable ? ((JavaType.Variable) type).getType() : type,
+            type instanceof JavaType.Variable ? (JavaType.Variable) type : null);
     }
 
     private J.Identifier createIdentifier(String name, FirResolvedNamedReference namedReference) {
