@@ -27,17 +27,21 @@ import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyIsoVisitor;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
+import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.semver.DependencyMatcher;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static java.util.Objects.requireNonNull;
 
@@ -69,7 +73,10 @@ public class ChangeDependency extends Recipe {
     String newArtifactId;
 
     @Option(displayName = "New version",
-            description = "An exact version number or node-style semver selector used to select the version number.",
+            description = "An exact version number or node-style semver selector used to select the version number. " +
+                          "You can also use `latest.release` for the latest available version and `latest.patch` if " +
+                          "the current version is a valid semantic version. For more details, you can look at the documentation " +
+                          "page of [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors).",
             example = "29.X",
             required = false)
     @Nullable
@@ -99,13 +106,20 @@ public class ChangeDependency extends Recipe {
             final DependencyMatcher depMatcher = requireNonNull(DependencyMatcher.build(oldGroupId + ":" + oldArtifactId).getValue());
             final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
 
+            GradleProject gradleProject;
+
             @Override
             public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
+                Optional<GradleProject> maybeGp = cu.getMarkers().findFirst(GradleProject.class);
+                if (!maybeGp.isPresent()) {
+                    return cu;
+                }
+
+                gradleProject = maybeGp.get();
+
                 G.CompilationUnit g = super.visitCompilationUnit(cu, ctx);
                 if (g != cu) {
-                    GradleProject gp = g.getMarkers().findFirst(GradleProject.class)
-                            .orElseThrow(() -> new IllegalArgumentException("Gradle files are expected to have a GradleProject marker."));
-                    g = g.withMarkers(g.getMarkers().setByType(updateGradleModel(gp)));
+                    g = g.withMarkers(g.getMarkers().setByType(updateGradleModel(gradleProject)));
                 }
                 return g;
             }
@@ -119,17 +133,17 @@ public class ChangeDependency extends Recipe {
 
                 List<Expression> depArgs = m.getArguments();
                 if (depArgs.get(0) instanceof J.Literal || depArgs.get(0) instanceof G.GString || depArgs.get(0) instanceof G.MapEntry) {
-                    m = updateDependency(m);
+                    m = updateDependency(m, ctx);
                 } else if (depArgs.get(0) instanceof J.MethodInvocation &&
                         (((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("platform") ||
                                 ((J.MethodInvocation) depArgs.get(0)).getSimpleName().equals("enforcedPlatform"))) {
-                    m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform)));
+                    m = m.withArguments(ListUtils.mapFirst(depArgs, platform -> updateDependency((J.MethodInvocation) platform, ctx)));
                 }
 
                 return m;
             }
 
-            private J.MethodInvocation updateDependency(J.MethodInvocation m) {
+            private J.MethodInvocation updateDependency(J.MethodInvocation m, ExecutionContext ctx) {
                 List<Expression> depArgs = m.getArguments();
                 if (depArgs.get(0) instanceof J.Literal) {
                     String gav = (String) ((J.Literal) depArgs.get(0)).getValue();
@@ -137,14 +151,26 @@ public class ChangeDependency extends Recipe {
                         Dependency original = DependencyStringNotationConverter.parse(gav);
                         if (depMatcher.matches(original.getGroupId(), original.getArtifactId())) {
                             Dependency updated = original;
-                            if (newGroupId != null && !updated.getGroupId().equals(newGroupId)) {
+                            if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
                                 updated = updated.withGroupId(newGroupId);
                             }
-                            if (newArtifactId != null && !updated.getArtifactId().equals(newArtifactId)) {
+                            if (!StringUtils.isBlank(newArtifactId) && !updated.getArtifactId().equals(newArtifactId)) {
                                 updated = updated.withArtifactId(newArtifactId);
                             }
-                            if (newVersion != null) {
-                                doAfterVisit(new UpgradeDependencyVersion(updated.getGroupId(), updated.getArtifactId(), newVersion, versionPattern).getVisitor());
+                            if (!StringUtils.isBlank(newVersion)) {
+                                List<MavenRepository> repositories = "classpath".equals(m.getSimpleName()) ?
+                                        gradleProject.getMavenPluginRepositories() :
+                                        gradleProject.getMavenRepositories();
+                                String resolvedVersion;
+                                try {
+                                    resolvedVersion = AddDependencyVisitor.resolveDependencyVersion(updated.getGroupId(), updated.getArtifactId(), "0", newVersion, versionPattern, repositories, null, ctx)
+                                            .orElse(null);
+                                } catch (MavenDownloadingException e) {
+                                    return e.warn(m);
+                                }
+                                if (resolvedVersion != null && !resolvedVersion.equals(updated.getVersion())) {
+                                    updated = updated.withVersion(resolvedVersion);
+                                }
                             }
                             if (original != updated) {
                                 String replacement = updated.toStringNotation();
@@ -159,14 +185,26 @@ public class ChangeDependency extends Recipe {
                         Dependency original = DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
                         if (depMatcher.matches(original.getGroupId(), original.getArtifactId())) {
                             Dependency updated = original;
-                            if (newGroupId != null && !updated.getGroupId().equals(newGroupId)) {
+                            if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
                                 updated = updated.withGroupId(newGroupId);
                             }
-                            if (newArtifactId != null && !updated.getArtifactId().equals(newArtifactId)) {
+                            if (!StringUtils.isBlank(newArtifactId) && !updated.getArtifactId().equals(newArtifactId)) {
                                 updated = updated.withArtifactId(newArtifactId);
                             }
-                            if (newVersion != null) {
-                                doAfterVisit(new UpgradeDependencyVersion(updated.getGroupId(), updated.getArtifactId(), newVersion, versionPattern).getVisitor());
+                            if (!StringUtils.isBlank(newVersion)) {
+                                List<MavenRepository> repositories = "classpath".equals(m.getSimpleName()) ?
+                                        gradleProject.getMavenPluginRepositories() :
+                                        gradleProject.getMavenRepositories();
+                                String resolvedVersion;
+                                try {
+                                    resolvedVersion = AddDependencyVisitor.resolveDependencyVersion(updated.getGroupId(), updated.getArtifactId(), "0", newVersion, versionPattern, repositories, null, ctx)
+                                            .orElse(null);
+                                } catch (MavenDownloadingException e) {
+                                    return e.warn(m);
+                                }
+                                if (resolvedVersion != null && !resolvedVersion.equals(updated.getVersion())) {
+                                    updated = updated.withVersion(resolvedVersion);
+                                }
                             }
                             if (original != updated) {
                                 String replacement = updated.toStringNotation();
@@ -180,10 +218,11 @@ public class ChangeDependency extends Recipe {
                 } else if (m.getArguments().get(0) instanceof G.MapEntry) {
                     G.MapEntry groupEntry = null;
                     G.MapEntry artifactEntry = null;
+                    G.MapEntry versionEntry = null;
                     String groupId = null;
                     String artifactId = null;
+                    String version = null;
 
-                    String valueDelimiter = "'";
                     for (Expression e : depArgs) {
                         if (!(e instanceof G.MapEntry)) {
                             continue;
@@ -200,48 +239,63 @@ public class ChangeDependency extends Recipe {
                         String keyValue = (String) key.getValue();
                         String valueValue = (String) value.getValue();
                         if ("group".equals(keyValue)) {
-                            if (value.getValueSource() != null) {
-                                valueDelimiter = value.getValueSource().substring(0, value.getValueSource().indexOf(valueValue));
-                            }
                             groupEntry = arg;
                             groupId = valueValue;
                         } else if ("name".equals(keyValue)) {
                             artifactEntry = arg;
                             artifactId = valueValue;
+                        } else if ("version".equals(keyValue)) {
+                            versionEntry = arg;
+                            version = valueValue;
                         }
                     }
-                    if (groupId == null || artifactId == null) {
+                    if (groupId == null || artifactId == null || version == null) {
                         return m;
                     }
                     if (!depMatcher.matches(groupId, artifactId)) {
                         return m;
                     }
                     String updatedGroupId = groupId;
-                    if (newGroupId != null && !updatedGroupId.equals(newGroupId)) {
+                    if (!StringUtils.isBlank(newGroupId) && !updatedGroupId.equals(newGroupId)) {
                         updatedGroupId = newGroupId;
                     }
                     String updatedArtifactId = artifactId;
-                    if (newArtifactId != null && !updatedArtifactId.equals(newArtifactId)) {
+                    if (!StringUtils.isBlank(newArtifactId) && !updatedArtifactId.equals(newArtifactId)) {
                         updatedArtifactId = newArtifactId;
                     }
-                    if (newVersion != null) {
-                        doAfterVisit(new UpgradeDependencyVersion(updatedGroupId, updatedArtifactId, newVersion, versionPattern).getVisitor());
+                    String updatedVersion = version;
+                    if (!StringUtils.isBlank(newVersion)) {
+                        List<MavenRepository> repositories = "classpath".equals(m.getSimpleName()) ?
+                                gradleProject.getMavenPluginRepositories() :
+                                gradleProject.getMavenRepositories();
+                        String resolvedVersion;
+                        try {
+                            resolvedVersion = AddDependencyVisitor.resolveDependencyVersion(updatedGroupId, updatedArtifactId, "0", newVersion, versionPattern, repositories, null, ctx)
+                                    .orElse(null);
+                        } catch (MavenDownloadingException e) {
+                            return e.warn(m);
+                        }
+                        if (resolvedVersion != null && !resolvedVersion.equals(updatedVersion)) {
+                            updatedVersion = resolvedVersion;
+                        }
                     }
 
-                    if (!updatedGroupId.equals(groupId) || !updatedArtifactId.equals(artifactId)) {
-                        String delimiter = valueDelimiter;
+                    if (!updatedGroupId.equals(groupId) || !updatedArtifactId.equals(artifactId) || !updatedVersion.equals(version)) {
                         G.MapEntry finalGroup = groupEntry;
+                        String finalGroupIdValue = updatedGroupId;
                         G.MapEntry finalArtifact = artifactEntry;
+                        String finalArtifactIdValue = updatedArtifactId;
+                        G.MapEntry finalVersion = versionEntry;
+                        String finalVersionValue = updatedVersion;
                         m = m.withArguments(ListUtils.map(m.getArguments(), arg -> {
                             if (arg == finalGroup) {
-                                return finalGroup.withValue(((J.Literal) finalGroup.getValue())
-                                        .withValue(newGroupId)
-                                        .withValueSource(delimiter + newGroupId + delimiter));
+                                return finalGroup.withValue(ChangeStringLiteral.withStringValue((J.Literal) finalGroup.getValue(), finalGroupIdValue));
                             }
                             if (arg == finalArtifact) {
-                                return finalArtifact.withValue(((J.Literal) finalArtifact.getValue())
-                                        .withValue(newArtifactId)
-                                        .withValueSource(delimiter + newArtifactId + delimiter));
+                                return finalArtifact.withValue(ChangeStringLiteral.withStringValue((J.Literal) finalArtifact.getValue(), finalArtifactIdValue));
+                            }
+                            if (arg == finalVersion) {
+                                return finalVersion.withValue(ChangeStringLiteral.withStringValue((J.Literal) finalVersion.getValue(), finalVersionValue));
                             }
                             return arg;
                         }));

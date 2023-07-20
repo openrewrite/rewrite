@@ -46,6 +46,7 @@ class ChangeDependencyTest implements RewriteTest {
               
               dependencies {
                   implementation "commons-lang:commons-lang:2.6"
+                  implementation group: "commons-lang", name: "commons-lang", version: "2.6"
               }
               """,
             """
@@ -59,6 +60,7 @@ class ChangeDependencyTest implements RewriteTest {
               
               dependencies {
                   implementation "org.apache.commons:commons-lang3:3.11"
+                  implementation group: "org.apache.commons", name: "commons-lang3", version: "3.11"
               }
               """
           )
@@ -81,6 +83,7 @@ class ChangeDependencyTest implements RewriteTest {
               
               dependencies {
                   implementation "commons-lang:commons-lang:2.6"
+                  implementation group: "commons-lang", name: "commons-lang", version: "2.6"
               }
               """,
             """
@@ -94,6 +97,7 @@ class ChangeDependencyTest implements RewriteTest {
               
               dependencies {
                   implementation "org.apache.commons:commons-lang:2.6"
+                  implementation group: "org.apache.commons", name: "commons-lang", version: "2.6"
               }
               """
           )
@@ -116,40 +120,6 @@ class ChangeDependencyTest implements RewriteTest {
               
               dependencies {
                   implementation "commons-lang:commons-lang:2.6"
-              }
-              """,
-            """
-              plugins {
-                  id "java-library"
-              }
-              
-              repositories {
-                  mavenCentral()
-              }
-              
-              dependencies {
-                  implementation "commons-lang:commons-lang3:2.6"
-              }
-              """
-          )
-        );
-    }
-
-    @Test
-    void worksWithMapNotation() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null)),
-          buildGradle(
-            """
-              plugins {
-                  id "java-library"
-              }
-              
-              repositories {
-                  mavenCentral()
-              }
-              
-              dependencies {
                   implementation group: "commons-lang", name: "commons-lang", version: "2.6"
               }
               """,
@@ -163,7 +133,8 @@ class ChangeDependencyTest implements RewriteTest {
               }
               
               dependencies {
-                  implementation group: "org.apache.commons", name: "commons-lang3", version: "3.11"
+                  implementation "commons-lang:commons-lang3:2.6"
+                  implementation group: "commons-lang", name: "commons-lang3", version: "2.6"
               }
               """
           )
@@ -199,6 +170,37 @@ class ChangeDependencyTest implements RewriteTest {
               
               dependencies {
                   implementation platform("org.apache.commons:commons-lang3:3.11")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeDependencyWithLowerVersionAfter() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("org.openrewrite", "plugin", "io.moderne", "moderne-gradle-plugin", "0.x", null)),
+          buildGradle(
+            """
+              buildscript {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+                  dependencies {
+                      classpath "org.openrewrite:plugin:6.0.0"
+                      classpath group: "org.openrewrite", name: "plugin", version: "6.0.0"
+                  }
+              }
+              """,
+            """
+              buildscript {
+                  repositories {
+                      gradlePluginPortal()
+                  }
+                  dependencies {
+                      classpath "io.moderne:moderne-gradle-plugin:0.39.0"
+                      classpath group: "io.moderne", name: "moderne-gradle-plugin", version: "0.39.0"
+                  }
               }
               """
           )
