@@ -24,6 +24,7 @@ import java.lang.Object
 abstract class KotlinTypeGoat<T, S> {
     //abstract class KotlinTypeGoat<T, S> where S: PT<S>, S: C {
     val parameterizedField: PT<TypeA> = object : PT<TypeA> {}
+    val intField: Int = 1;
 
 //    abstract class InheritedKotlinTypeGoat<T, U> : KotlinTypeGoat<T, U>() where U : PT<U>, U : C
 
