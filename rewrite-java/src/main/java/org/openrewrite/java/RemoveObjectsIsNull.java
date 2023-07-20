@@ -19,7 +19,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.cleanup.UnnecessaryParentheses;
+import org.openrewrite.java.cleanup.UnnecessaryParenthesesVisitor;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -56,7 +56,7 @@ public class RemoveObjectsIsNull extends Recipe {
             private Expression replace(ExecutionContext executionContext, J.MethodInvocation m, String pattern) {
                 Expression e = m.getArguments().get(0);
                 Expression replaced = JavaTemplate.apply(pattern, getCursor(), m.getCoordinates().replace(), e);
-                return (Expression) new UnnecessaryParentheses().getVisitor()
+                return (Expression) new UnnecessaryParenthesesVisitor()
                         .visitNonNull(replaced, executionContext, getCursor());
             }
         });

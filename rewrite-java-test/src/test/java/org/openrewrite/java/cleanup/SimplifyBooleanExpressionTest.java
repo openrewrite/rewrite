@@ -22,13 +22,14 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ALL")
 class SimplifyBooleanExpressionTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new SimplifyBooleanExpression());
+        spec.recipe(toRecipe(() -> new SimplifyBooleanExpressionVisitor()));
     }
 
     @DocumentExample

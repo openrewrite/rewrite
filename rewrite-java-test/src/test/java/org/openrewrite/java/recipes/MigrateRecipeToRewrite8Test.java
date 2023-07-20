@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.recipes;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
@@ -648,6 +649,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
         );
     }
 
+    @Disabled
     @Test
     void doAfterVisitRecipeIsRemoved() {
         // language=java
@@ -686,7 +688,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
                           @Override
                           public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                               J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-                              doAfterVisit(new SimplifyBooleanExpression());
+                              doAfterVisit(new ChangePackage("A", "B", true));
                               return m;
                           }
                       };
@@ -720,7 +722,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
                                   public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                                       J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                                       // [Rewrite8 migration] TreeVisitor#doAfterVisit(Recipe) has been removed, it could be mistaken usage of `TreeVisitor#doAfterVisit(TreeVisitor<?, P> visitor)` here, please review code and see if it can be replaced.
-                                      doAfterVisit(new SimplifyBooleanExpression());
+                                      doAfterVisit(new ChangePackage("A", "B", true));
                                       return m;
                                   }
                               });

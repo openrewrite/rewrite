@@ -32,6 +32,7 @@ import java.util.function.UnaryOperator;
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({
   "UnnecessaryLocalVariable", "ConstantConditions", "UnusedAssignment", "PointlessBooleanExpression",
@@ -40,7 +41,7 @@ import static org.openrewrite.java.Assertions.java;
 class UnnecessaryParenthesesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new UnnecessaryParentheses());
+        spec.recipe(toRecipe(UnnecessaryParenthesesVisitor::new));
     }
 
     private static Consumer<RecipeSpec> unnecessaryParentheses(UnaryOperator<UnnecessaryParenthesesStyle> with) {
@@ -819,6 +820,7 @@ class UnnecessaryParenthesesTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("all")
     @Test
     void unwrapWhileParens() {
         rewriteRun(

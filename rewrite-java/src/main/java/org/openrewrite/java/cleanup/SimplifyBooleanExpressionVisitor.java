@@ -26,37 +26,9 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 
-import java.time.Duration;
-import java.util.Collections;
-import java.util.Set;
-
 import static java.util.Objects.requireNonNull;
 
-public class SimplifyBooleanExpression extends Recipe {
-
-    @Override
-    public String getDisplayName() {
-        return "Simplify boolean expression";
-    }
-
-    @Override
-    public String getDescription() {
-        return "Checks for over-complicated boolean expressions. Finds code like `if (b == true)`, `b || true`, `!false`, etc.";
-    }
-
-    @Override
-    public Set<String> getTags() {
-        return Collections.singleton("RSPEC-1125");
-    }
-
-    @Override
-    public Duration getEstimatedEffortPerOccurrence() {
-        return Duration.ofMinutes(5);
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new JavaVisitor<ExecutionContext>() {
+public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionContext>  {
             private static final String MAYBE_AUTO_FORMAT_ME = "MAYBE_AUTO_FORMAT_ME";
 
             @Override
@@ -65,7 +37,7 @@ public class SimplifyBooleanExpression extends Recipe {
                     JavaSourceFile cu = (JavaSourceFile) requireNonNull(super.visit(tree, ctx));
                     if (tree != cu) {
                         // recursive simplification
-                        cu = (JavaSourceFile) getVisitor().visitNonNull(cu, ctx);
+                        cu = (JavaSourceFile) visitNonNull(cu, ctx);
                     }
                     return cu;
                 }
@@ -188,11 +160,4 @@ public class SimplifyBooleanExpression extends Recipe {
                     }
                 }.visit(j, 0);
             }
-        };
-    }
-
-    @Override
-    public boolean causesAnotherCycle() {
-        return true;
-    }
-}
+        }
