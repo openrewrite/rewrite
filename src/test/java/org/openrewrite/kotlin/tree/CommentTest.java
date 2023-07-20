@@ -52,4 +52,28 @@ class CommentTest implements RewriteTest {
         );
     }
 
+    @Test
+    void leadingComments() {
+        rewriteRun(
+          kotlin(
+            """
+              // C1
+              
+              // C2
+              open class Test {
+                  // C3
+                  
+                  // C4
+                  internal val n = 0
+
+                  // C5
+                  
+                  // C6
+                  internal fun method() {
+                  }
+              }
+              """
+          )
+        );
+    }
 }
