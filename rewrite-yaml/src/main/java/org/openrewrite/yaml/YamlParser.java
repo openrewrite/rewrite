@@ -238,7 +238,17 @@ public class YamlParser implements org.openrewrite.Parser {
 
                         } else if (builder != null) {
                             builder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue));
-                            lastEnd = event.getEndMark().getIndex();
+
+                            int unicodeOffset = 0;
+                            {
+                                char[] charArray = scalarValue.toCharArray();
+                                for (int i = 0; i < charArray.length; i++) {
+                                    if (Character.UnicodeBlock.of(charArray[i]) != Character.UnicodeBlock.BASIC_LATIN && i % 2 == 0) {
+                                        unicodeOffset++;
+                                    }
+                                }
+                            }
+                            lastEnd = event.getEndMark().getIndex() + unicodeOffset;
                         }
                         break;
                     }

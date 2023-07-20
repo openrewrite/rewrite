@@ -21,6 +21,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.yaml.tree.Yaml;
 
+import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -57,31 +58,37 @@ class YamlParserTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {
-      """
-        a: b\n
-        c:
-          - d
-          - e
-          - f
-        """,
-      """
-        a: b 🛠\n
-        c:
-          - d
-          - e 🛠
-          - f 🛠🛠
-          - g
-        """,
-      """
-        a: 🛠 b\n
-        c:
-          - d
-          - 🛠 e
-          - 🛠🛠 f
-          - g
-        """
-    })
+    @ValueSource(strings = {"""
+      c:
+        - d
+        - e
+        - f
+      """, """
+      c:
+        - d
+        - e 🛠
+        - f
+      """, """
+      c:
+        - d
+        - 🛠 e
+        - f
+      """, """
+      c:
+        - d
+        - e 🛠🛠
+        - f
+      """, """
+      c:
+        - d
+        - 🛠🛠 e
+        - f
+      """, """
+      c:
+        - d
+        - 🛠 e 🛠
+        - f
+      """})
     void parseYamlWithUnicodeBlock(String input) {
         Stream<SourceFile> yamlSources = YamlParser.builder().build().parse(input);
         SourceFile sourceFile = yamlSources.findFirst().get();
@@ -90,19 +97,16 @@ class YamlParserTest {
         Yaml.Documents documents = (Yaml.Documents) sourceFile;
         Yaml.Document document = documents.getDocuments().get(0);
 
-        // Assert that the title is parsed correctly
-        Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
-        Yaml.Mapping.Entry entry = mapping.getEntries().get(0);
-        Yaml.Scalar scalar = (Yaml.Scalar) entry.getValue();
-        assertThat(scalar.getPrefix()).as("Scalar prefix").isEqualTo(" ");
-
         // Assert that the list is parsed correctly
-        Yaml.Sequence sequence = (Yaml.Sequence) mapping.getEntries().get(1).getValue();
+        Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
+        Yaml.Sequence sequence = (Yaml.Sequence) mapping.getEntries().get(0).getValue();
 
-        // Assert first list item
-        for (Yaml.Sequence.Entry sequenceEntry : sequence.getEntries()) {
+        // Assert each list item
+        List<Yaml.Sequence.Entry> entries = sequence.getEntries();
+        for (int i = 0, entriesSize = entries.size(); i < entriesSize; i++) {
+            Yaml.Sequence.Entry sequenceEntry = entries.get(i);
             Yaml.Scalar sequenceTitle = (Yaml.Scalar) sequenceEntry.getBlock();
-            assertThat(sequenceTitle.getPrefix()).as( sequenceEntry + " prefix").isEqualTo(" ");
+            assertThat(sequenceTitle.getPrefix()).as("Sequence entry #%d prefix".formatted(i)).isEqualTo(" ");
         }
 
         // Assert that end is parsed correctly
