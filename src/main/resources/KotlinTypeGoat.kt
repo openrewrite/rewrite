@@ -20,6 +20,7 @@ package org.openrewrite.kotlin
 import java.lang.Object
 
 // Whenever this class is changed, make a corresponding change in KotlinTypeGoat in the main java source set.
+@Suppress("unused")
 @AnnotationWithRuntimeRetention
 @AnnotationWithSourceRetention
 abstract class KotlinTypeGoat<T, S> {
@@ -58,7 +59,7 @@ abstract class KotlinTypeGoat<T, S> {
     abstract fun genericContravariant(n: PT<in C>): PT<in C>
     abstract fun <U : KotlinTypeGoat<U, *>> genericRecursive(n: KotlinTypeGoat<out Array<U>, *>): KotlinTypeGoat<out Array<U>, *>
     abstract fun <U> genericUnbounded(n: PT<U>): PT<U>
-    abstract fun inner(n: org.openrewrite.kotlin.C.Inner)
+    abstract fun inner(n: C.Inner)
     abstract fun enumTypeA(n: EnumTypeA)
     abstract fun enumTypeB(n: EnumTypeB)
     //    abstract fun <U> inheritedJavaTypeGoat(n: InheritedKotlinTypeGoat<T, U>): InheritedKotlinTypeGoat<T, U> where U : PT<U>, U : C
