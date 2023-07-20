@@ -64,6 +64,7 @@ public interface JavaParser extends Parser {
         return new ClassGraph()
                 .disableNestedJarScanning()
                 .getClasspathURIs().stream()
+                .filter(uri -> "file".equals(uri.getScheme()))
                 .map(Paths::get).collect(toList());
     }
 
@@ -194,6 +195,7 @@ public interface JavaParser extends Parser {
             }
 
             if (!missingArtifactNames.isEmpty()) {
+                //noinspection ConstantValue
                 throw new IllegalArgumentException("Unable to find classpath resource dependencies beginning with: " +
                                                    missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ", "", ".\n")) +
                                                    "The caller is of type " + (caller == null ? "NO CALLER IDENTIFIED" : caller.getName()) + ".\n" +
@@ -326,6 +328,7 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
+        @SuppressWarnings("unused")
         public B dependsOn(Collection<Input> inputs) {
             this.dependsOn = inputs;
             return (B) this;
@@ -348,6 +351,7 @@ public interface JavaParser extends Parser {
             return (B) this;
         }
 
+        @SuppressWarnings("UnusedReturnValue")
         public B classpathFromResources(ExecutionContext ctx, String... classpath) {
             this.classpath = dependenciesFromResources(ctx, classpath);
             return (B) this;
