@@ -79,7 +79,9 @@ public class KotlinTypeMappingTest {
 
     @Test
     void fieldType() {
-        J.Identifier id = getField("field").getVariables().get(0).getName();
+        J.VariableDeclarations.NamedVariable variable = getField("field").getVariables().get(0);
+        J.Identifier id = variable.getName();
+        assertThat(variable.getType()).isEqualTo(id.getType());
         assertThat(id.getFieldType()).isInstanceOf(JavaType.Variable.class);
         assertThat(id.getFieldType().toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=field,type=kotlin.Int}");
         assertThat(id.getType()).isInstanceOf(JavaType.Class.class);
