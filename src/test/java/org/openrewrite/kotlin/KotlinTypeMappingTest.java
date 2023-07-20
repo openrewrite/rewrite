@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.tree.Flag;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.tree.K;
@@ -33,16 +34,21 @@ import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 @SuppressWarnings("ConstantConditions")
 public class KotlinTypeMappingTest {
     private static final String goat = StringUtils.readFully(KotlinTypeMappingTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
+
     @SuppressWarnings("OptionalGetWithoutIsPresent")
-    private static final JavaType.Parameterized goatType = requireNonNull(TypeUtils.asParameterized(((K.CompilationUnit) KotlinParser.builder()
-            .logCompilationWarningsAndErrors(true)
-            .build()
-            .parse(new InMemoryExecutionContext(), goat)
-            .findFirst()
-            .get())
-            .getClasses()
-            .get(0)
-            .getType()));
+    private static final J.ClassDeclaration goatClassDeclaration =
+            requireNonNull(((K.CompilationUnit) KotlinParser.builder()
+                    .logCompilationWarningsAndErrors(true)
+                    .build()
+                    .parse(new InMemoryExecutionContext(), goat)
+                    .findFirst()
+                    .get())
+                    .getClasses()
+                    .get(0)
+            );
+
+    private static final JavaType.Parameterized goatType =
+            requireNonNull(TypeUtils.asParameterized(goatClassDeclaration.getType()));
 
     public JavaType.Method methodType(String methodName) {
         JavaType.Method type = goatType.getMethods().stream()
@@ -53,6 +59,15 @@ public class KotlinTypeMappingTest {
         return type;
     }
 
+    public J.VariableDeclarations getField(String fieldName) {
+        return goatClassDeclaration.getBody().getStatements().stream()
+                .filter(s -> s instanceof J.VariableDeclarations)
+                .map(J.VariableDeclarations.class::cast)
+                .filter(mv -> mv.getVariables().stream().anyMatch(v -> v.getSimpleName().equals(fieldName)))
+                .findFirst()
+                .orElse(null);
+    }
+
     public JavaType firstMethodParameter(String methodName) {
         return methodType(methodName).getParameterTypes().get(0);
     }
@@ -60,6 +75,17 @@ public class KotlinTypeMappingTest {
     @Test
     void extendsKotlinAny() {
         assertThat(goatType.getSupertype().getFullyQualifiedName()).isEqualTo("kotlin.Any");
+    }
+
+    @Test
+    void fieldType() {
+        J.VariableDeclarations.NamedVariable variable = getField("field").getVariables().get(0);
+        J.Identifier id = variable.getName();
+        assertThat(variable.getType()).isEqualTo(id.getType());
+        assertThat(id.getFieldType()).isInstanceOf(JavaType.Variable.class);
+        assertThat(id.getFieldType().toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=field,type=kotlin.Int}");
+        assertThat(id.getType()).isInstanceOf(JavaType.Class.class);
+        assertThat(id.getType().toString()).isEqualTo("kotlin.Int");
     }
 
     @Test

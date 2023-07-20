@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+@file:Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN", "unused")
 
+// Whenever this class is changed, make a corresponding change in JavaTypeGoat in the main java source set.
 package org.openrewrite.kotlin
 
 import java.lang.Object
@@ -24,6 +25,8 @@ import java.lang.Object
 abstract class KotlinTypeGoat<T, S> {
     //abstract class KotlinTypeGoat<T, S> where S: PT<S>, S: C {
     val parameterizedField: PT<TypeA> = object : PT<TypeA> {}
+
+    val field: Int = 10
 
 //    abstract class InheritedKotlinTypeGoat<T, U> : KotlinTypeGoat<T, U>() where U : PT<U>, U : C
 
@@ -55,7 +58,7 @@ abstract class KotlinTypeGoat<T, S> {
     abstract fun genericContravariant(n: PT<in C>): PT<in C>
     abstract fun <U : KotlinTypeGoat<U, *>> genericRecursive(n: KotlinTypeGoat<out Array<U>, *>): KotlinTypeGoat<out Array<U>, *>
     abstract fun <U> genericUnbounded(n: PT<U>): PT<U>
-    abstract fun inner(n: org.openrewrite.kotlin.C.Inner)
+    abstract fun inner(n: C.Inner)
     abstract fun enumTypeA(n: EnumTypeA)
     abstract fun enumTypeB(n: EnumTypeB)
     //    abstract fun <U> inheritedJavaTypeGoat(n: InheritedKotlinTypeGoat<T, U>): InheritedKotlinTypeGoat<T, U> where U : PT<U>, U : C
