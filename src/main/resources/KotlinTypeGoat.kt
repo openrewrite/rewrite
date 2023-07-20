@@ -13,14 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@file:Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+@file:Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN", "unused")
 
+// Whenever this class is changed, make a corresponding change in JavaTypeGoat in the main java source set.
 package org.openrewrite.kotlin
 
 import java.lang.Object
 
-// Whenever this class is changed, make a corresponding change in KotlinTypeGoat in the main java source set.
-@Suppress("unused")
 @AnnotationWithRuntimeRetention
 @AnnotationWithSourceRetention
 abstract class KotlinTypeGoat<T, S> {
