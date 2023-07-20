@@ -269,7 +269,7 @@ class VariableDeclarationTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/84")
     @Test
-    void unresolvedNameFirSource() {
+    void unresolvedNameInLightSource() {
         rewriteRun(
           kotlin(
             """

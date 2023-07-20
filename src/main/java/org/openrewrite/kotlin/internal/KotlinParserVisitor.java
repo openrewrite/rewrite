@@ -119,8 +119,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<J.Annotation> annotations = null;
 
-        KtFileAnnotationList annotationList = PsiTreeUtil.findChildOfType(getPsiElement(file), KtFileAnnotationList.class);
-        if (annotationList != null) {
+        PsiElement currentPsiNode = getCurrentPsiNode();
+        if (currentPsiNode instanceof KtAnnotationEntry) {
+            currentPsiNode = PsiTreeUtil.getParentOfType(currentPsiNode, KtFileAnnotationList.class);
+            annotations = mapFileAnnotations((KtFileAnnotationList) currentPsiNode, file.getAnnotations());
+        } else if (currentPsiNode instanceof KtFile) {
+            KtFileAnnotationList annotationList = PsiTreeUtil.findChildOfType(getCurrentPsiNode(), KtFileAnnotationList.class);
             annotations = mapFileAnnotations(annotationList, file.getAnnotations());
         }
 
@@ -210,10 +214,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             Space prefix = whitespace();
             skip(fullName);
             return TypeTree.build(fullName).withPrefix(prefix);
-        } else if (errorNamedReference.getSource() instanceof KtFakeSourceElement) {
-            KtNameReferenceExpression psi = (KtNameReferenceExpression) ((KtFakeSourceElement) errorNamedReference.getSource()).getPsi();
-            skip(psi.getReferencedName());
-            return TypeTree.build(psi.getReferencedName());
         } else {
             throw new UnsupportedOperationException("Unsupported error name reference type.");
         }
@@ -289,6 +289,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         } else {
             skip("{");
         }
+
+        JavaType closureType = null;
 
         boolean omitDestruct = false;
         List<JRightPadded<J>> paramExprs = new ArrayList<>(anonymousFunction.getValueParameters().size());
@@ -396,7 +398,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 params,
                 EMPTY,
                 body,
-                null);
+                closureType);
 
         return label != null ? label.withStatement(lambda) : lambda;
     }
@@ -1657,16 +1659,32 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Markers markers = Markers.EMPTY;
 
         List<J.Modifier> modifiers = emptyList();
-        PsiElement propertyNode = getPsiElement(property);
-        List<PsiElement> propertyNodeChildren = Arrays.asList(propertyNode.getChildren());
+        PsiElement currentNode = getCurrentPsiNode();
+        PsiElement propertyNode = currentNode instanceof KtProperty ? currentNode :
+                PsiTreeUtil.getParentOfType(currentNode, KtProperty.class);
+        List<PsiElement> propertyNodeChildren = propertyNode != null ? Arrays.asList(propertyNode.getChildren()) : emptyList();
 
-        KtModifierList modifierList = PsiTreeUtil.findChildOfType(propertyNode, KtModifierList.class);
-        List<J.Annotation> annotations = new ArrayList<>();
-        if (modifierList != null && modifierList.getTextRange().getStartOffset() == cursor) {
-            modifiers = mapModifierList(modifierList, collectFirAnnotations(property), annotations);
+        if (currentNode instanceof KtAnnotationEntry) {
+            currentNode = PsiTreeUtil.getParentOfType(currentNode, KtModifierList.class);
         }
 
-        String maybeValOrVarModifier = getValOrVarModifier(propertyNode);
+        PsiElement parentNode = currentNode;
+        if (currentNode != null &&
+                !(currentNode instanceof KtProperty) &&
+                !(currentNode instanceof KtDestructuringDeclaration) &&
+                !(currentNode instanceof KtParameter)) {
+            parentNode = currentNode.getParent();
+            if (parentNode == null || parentNode.getTextRange().getStartOffset() != currentNode.getTextRange().getStartOffset()) {
+                parentNode = currentNode;
+            }
+        }
+
+        List<J.Annotation> annotations = new ArrayList<>();
+        if (currentNode instanceof KtModifierList) {
+            modifiers = mapModifierList((KtModifierList) currentNode, collectFirAnnotations(property), annotations);
+        }
+
+        String maybeValOrVarModifier = getValOrVarModifier(parentNode);
         if (maybeValOrVarModifier != null) {
             annotations.add(mapKModifierToAnnotation(maybeValOrVarModifier));
         }
@@ -1822,7 +1840,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         .map(KtPropertyAccessor.class::cast)
                         .collect(toList());
                 if (accessors.size() > 2) {
-                    throw new RuntimeException("Detected over sized explicit property accessors from a property, should have setter/getter only");
+                    throw new RuntimeException("Detected oversized explicit property accessors from a property, should have setter/getter only");
                 }
 
                 for (KtPropertyAccessor ktPropertyAccessor : accessors) {
@@ -2015,7 +2033,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
         if (propertyAccessor.isGetter() || propertyAccessor.isSetter()) {
             Markers markers = Markers.EMPTY;
-
+            List<J> modifiers = emptyList();
             List<J.Annotation> annotations = emptyList();
 
             J.TypeParameters typeParameters = null;
@@ -2229,7 +2247,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitSimpleFunction(FirSimpleFunction simpleFunction, ExecutionContext ctx) {
         Space prefix = whitespace();
         Markers markers = Markers.EMPTY;
-
+        List<J> modifiers = emptyList();
         List<J.Annotation> annotations = mapModifiers(simpleFunction.getAnnotations(), simpleFunction.getName().asString());
 
         J.TypeParameters typeParameters = null;
@@ -2281,6 +2299,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         JContainer<Statement> params;
         Space before = sourceBefore("(");
+        // FIXME
         params = !simpleFunction.getValueParameters().isEmpty() ?
                 JContainer.build(before, convertAllToExpressions(simpleFunction.getValueParameters(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY) :
                 JContainer.build(before, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
@@ -2328,6 +2347,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J.Block body;
         saveCursor = cursor;
         before = whitespace();
+        // TODO: check if body is not a block.
         if (simpleFunction.getBody() instanceof FirSingleExpressionBlock) {
             if (source.startsWith("=", cursor)) {
                 skip("=");
@@ -2443,6 +2463,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitTypeAlias(FirTypeAlias typeAlias, ExecutionContext ctx) {
         Space prefix = whitespace();
 
+        List<J> modifiers = emptyList();
         Markers markers = Markers.EMPTY;
 
         List<J.Annotation> annotations = mapModifiers(typeAlias.getAnnotations(), "typealias");
@@ -2574,13 +2595,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             JRightPadded<Expression> expr = JRightPadded.build(element).withAfter(after);
 
             J clazz = visitElement(typeOperatorCall.getConversionTypeRef(), ctx);
+            J pattern = null;
             return new J.InstanceOf(
                     randomId(),
                     prefix,
                     markers,
                     expr,
                     clazz,
-                    null,
+                    pattern,
                     typeMapping.type(typeOperatorCall));
         }
     }
@@ -2676,6 +2698,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
         skip("try");
 
+        JContainer<J.Try.Resource> resources = null;
         J.Block block = (J.Block) visitElement(tryExpression.getTryBlock(), ctx);
         List<J.Try.Catch> catches = new ArrayList<>(tryExpression.getCatches().size());
         for (FirCatch aCatch : tryExpression.getCatches()) {
@@ -2688,7 +2711,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return new J.Try(randomId(),
                 prefix,
                 Markers.EMPTY,
-                null,
+                resources,
                 block,
                 catches,
                 finally_);
@@ -2758,6 +2781,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
     }
 
+    // Merge visitValueParameter and visitProperty
     @Override
     public J visitValueParameter(FirValueParameter valueParameter, ExecutionContext ctx) {
         Space prefix = whitespace();
@@ -3157,7 +3181,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitConstructor(FirConstructor constructor, ExecutionContext ctx) {
         Space prefix = whitespace();
         Markers markers = Markers.EMPTY;
-
+        List<J> modifiers = emptyList();
         List<J.Annotation> annotations = mapModifiers(constructor.getAnnotations(), "constructor");
 
         JRightPadded<J.VariableDeclarations.NamedVariable> infixReceiver = null;
@@ -3184,6 +3208,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         JContainer<Statement> params;
         Space before = sourceBefore("(");
+        // TODO fix me
         params = !constructor.getValueParameters().isEmpty() ?
                 JContainer.build(before, convertAllToExpressions(constructor.getValueParameters(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY) :
                 JContainer.build(before, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
@@ -3253,6 +3278,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J.Block body;
         saveCursor = cursor;
         before = whitespace();
+        // TODO: confirm convert is okay for Body.
         if (constructor.getBody() instanceof FirSingleExpressionBlock) {
             if (source.startsWith("=", cursor)) {
                 skip("=");
@@ -3426,11 +3452,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Markers markers = Markers.EMPTY;
 
         List<J.Modifier> modifiers = emptyList();
-        KtModifierList modifierList = PsiTreeUtil.findChildOfType(getPsiElement(regularClass), KtModifierList.class);
-        List<J.Annotation> leadingAnnotations = new ArrayList<>();
+        PsiElement currentNode = getCurrentPsiNode();
+        if (currentNode instanceof KtAnnotationEntry) {
+            currentNode = PsiTreeUtil.getParentOfType(currentNode, KtModifierList.class);
+        }
+
         List<J.Annotation> kindAnnotations = new ArrayList<>();
-        if (modifierList != null && modifierList.getTextRange().getStartOffset() == cursor) {
-            modifiers = mapModifierList(modifierList, regularClass.getAnnotations(), leadingAnnotations, kindAnnotations);
+        if (currentNode instanceof KtModifierList) {
+            modifiers = mapModifierList((KtModifierList) currentNode, regularClass.getAnnotations(), kindAnnotations);
         }
 
         ClassKind classKind = regularClass.getClassKind();
@@ -3499,6 +3528,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
         }
 
+        List<J.Annotation> leadingAnnotation = new ArrayList<>();
         int saveCursor = cursor;
         Space before = whitespace();
         JContainer<Statement> primaryConstructor = null;
@@ -3509,7 +3539,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 J.Annotation annotation = mapKModifierToAnnotation("internal");
                 annotation = annotation.withMarkers(annotation.getMarkers().addIfAbsent(new ExplicitInlineConstructor(randomId())));
                 annotation = annotation.withMarkers(annotation.getMarkers().addIfAbsent(new Modifier(randomId())));
-                leadingAnnotations.add(annotation);
+                leadingAnnotation.add(annotation);
                 before = whitespace();
             }
 
@@ -3517,7 +3547,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 J.Annotation annotation = new J.Annotation(randomId(), before, Markers.EMPTY, createIdentifier("constructor", regularClass), null);
                 annotation = annotation.withMarkers(annotation.getMarkers().addIfAbsent(new ExplicitInlineConstructor(randomId())));
                 annotation = annotation.withMarkers(annotation.getMarkers().addIfAbsent(new Modifier(randomId())));
-                leadingAnnotations.add(annotation);
+                leadingAnnotation.add(annotation);
                 before = whitespace();
             }
             skip("(");
@@ -3653,7 +3683,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 randomId(),
                 prefix,
                 markers,
-                leadingAnnotations,
+                leadingAnnotation,
                 modifiers,
                 kind,
                 name,
@@ -3667,11 +3697,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     private List<J.Modifier> mapModifierList(KtModifierList currentNode, List<FirAnnotation> annotations, List<J.Annotation> lastAnnotations) {
-        return mapModifierList(currentNode, annotations, null, lastAnnotations);
-    }
-
-    private List<J.Modifier> mapModifierList(KtModifierList currentNode, List<FirAnnotation> annotations,
-                                             @Nullable List<J.Annotation> leadingAnnotations, List<J.Annotation> lastAnnotations) {
         Map<Integer, FirAnnotation> annotationsMap = new HashMap<>();
         for (FirAnnotation annotation : annotations) {
             annotationsMap.put(annotation.getSource().getStartOffset(), annotation);
@@ -3680,18 +3705,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<J.Modifier> modifiers = new ArrayList<>();
         List<J.Annotation> currentAnnotations = new ArrayList<>();
         Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(currentNode).iterator();
-        boolean leading = true;
         while (iterator.hasNext()) {
             PsiElement it = iterator.next();
             if (it instanceof LeafPsiElement && it.getNode().getElementType() instanceof KtModifierKeywordToken) {
                 if (isJModifier(it.getText())) {
-                    if (leading) {
-                        leading = false;
-                        if (leadingAnnotations != null && !currentAnnotations.isEmpty()) {
-                            leadingAnnotations.addAll(currentAnnotations);
-                            currentAnnotations.clear();
-                        }
-                    }
                     modifiers.add(mapToJModifier(it.getText(), currentAnnotations));
                     currentAnnotations = new ArrayList<>();
                 } else {
@@ -3823,7 +3840,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         throw new UnsupportedOperationException(generateUnsupportedMessage("FirWrappedExpression"));
     }
 
-    public J visitNoReceiverExpression() {
+    public J visitNoReceiverExpression(FirNoReceiverExpression noReceiverExpression, ExecutionContext ctx) {
         throw new UnsupportedOperationException(generateUnsupportedMessage("FirNoReceiverExpression"));
     }
 
@@ -3891,14 +3908,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         int saveCursor = cursor;
-        whitespace();
+        Space prefix = whitespace();
         ASTNode node = nodes.get(cursor);
-        cursor = saveCursor;
         if (node != null) {
             switch (node.getElementType().getDebugName()) {
                 case "PARENTHESIZED":
                     if (node.getTextRange().getEndOffset() >= firElement.getSource().getEndOffset()) {
-                        return wrapInParens(firElement, ctx);
+                        return wrapInParens(firElement, prefix, ctx);
                     }
                     break;
                 case "REFERENCE_EXPRESSION":
@@ -3916,6 +3932,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
         }
 
+        cursor = saveCursor;
         // FIR error elements
         if (firElement instanceof FirErrorNamedReference) {
             return visitErrorNamedReference((FirErrorNamedReference) firElement, ctx);
@@ -4137,15 +4154,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         } else if (firElement instanceof FirWrappedExpression) {
             return visitWrappedExpression((FirWrappedExpression) firElement, ctx);
         } else if (firElement instanceof FirNoReceiverExpression) {
-            return visitNoReceiverExpression();
+            return visitNoReceiverExpression((FirNoReceiverExpression) firElement, ctx);
         }
 
         throw new IllegalArgumentException("Unsupported FirElement " + firElement.getClass().getName());
     }
 
     @SuppressWarnings("unchecked")
-    private <J2 extends J> J wrapInParens(FirElement firElement, ExecutionContext ctx) {
-        Space prefix = sourceBefore("(");
+    private <J2 extends J> J wrapInParens(FirElement firElement, Space prefix, ExecutionContext ctx) {
+        skip("(");
         return new J.Parentheses<>(
                 randomId(),
                 prefix,
@@ -4332,7 +4349,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         FirProperty loopCondition = (FirProperty) firBlock.getStatements().get(0);
         Expression expression;
-        expression = convertToExpression(((FirFunctionCall) loopCondition.getInitializer()).getExplicitReceiver(), ctx);
+        if (loopCondition.getInitializer() instanceof FirFunctionCall &&
+                ((FirFunctionCall) loopCondition.getInitializer()).getExplicitReceiver() instanceof FirFunctionCall) {
+            expression = convertToExpression(((FirFunctionCall) loopCondition.getInitializer()).getExplicitReceiver(), ctx);
+        } else {
+            expression = convertToExpression(((FirFunctionCall) loopCondition.getInitializer()).getExplicitReceiver(), ctx);
+        }
 
         Space afterExpression = sourceBefore(")");
         J.ForEachLoop.Control control = new J.ForEachLoop.Control(
@@ -4584,6 +4606,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     private final Function<FirElement, Space> commaDelim = ignored -> sourceBefore(",");
+    private final Function<FirElement, Space> noDelim = ignored -> EMPTY;
 
     private void skip(@Nullable String token) {
         if (token != null && source.startsWith(token, cursor)) {
@@ -4604,8 +4627,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return t.getSource().getEndOffset();
     }
 
-    private PsiElement getPsiElement(FirElement element) {
-        return element.getSource() == null ? null : ((KtRealPsiSourceElement) element.getSource()).getPsi();
+    @Nullable
+    private PsiElement getCurrentPsiNode() {
+        if (nodes.containsKey(cursor)) {
+            return nodes.get(cursor).getPsi();
+        }
+        return null;
     }
 
     @SuppressWarnings("unchecked")
@@ -4712,6 +4739,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     private int positionOfNext(String untilDelim) {
+        return positionOfNext(untilDelim, null);
+    }
+
+    private int positionOfNext(String untilDelim, @Nullable Character stop) {
         boolean inMultiLineComment = false;
         boolean inSingleLineComment = false;
 
@@ -4742,6 +4773,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 }
 
                 if (!inMultiLineComment && !inSingleLineComment) {
+                    if (stop != null && source.charAt(delimIndex) == stop) {
+                        return -1;
+                    } // reached stop word before finding the delimiter
+
                     if (source.startsWith(untilDelim, delimIndex)) {
                         break; // found it!
                     }

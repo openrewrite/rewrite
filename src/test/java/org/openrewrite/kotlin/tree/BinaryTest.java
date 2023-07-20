@@ -303,7 +303,7 @@ class BinaryTest implements RewriteTest {
           kotlin(
             """
               data class Foo ( val aliases : List < String > ) {
-                  fun names ( ) = listOf ( "canonicalName" ) + aliases
+                  fun names ( ) = listOf ( canonicalName ) + aliases
               }
               """
           )
