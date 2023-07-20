@@ -239,6 +239,14 @@ public class YamlParser implements org.openrewrite.Parser {
                         } else if (builder != null) {
                             builder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue));
 
+                            {
+                                String read = reader.readStringFromBuffer(
+                                        event.getStartMark().getIndex(),
+                                        event.getEndMark().getIndex());
+                                System.out.println("scalarValue = " + scalarValue);
+                                System.out.println("bufferRead  = " + read);
+                            }
+
                             int unicodeOffset = 0;
                             {
                                 char[] charArray = scalarValue.toCharArray();
