@@ -1563,8 +1563,8 @@ class TabsAndIndentsTest implements RewriteTest {
               public class Test {
                   public Test method(int n) {
                       return n > 0 ?
-                       this :
-                                method(n).method(n);
+                          this :
+                          method(n).method(n);
                   }
               }
               """,
