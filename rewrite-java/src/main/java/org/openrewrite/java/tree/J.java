@@ -74,7 +74,9 @@ public interface J extends Tree {
     <J2 extends J> J2 withPrefix(Space space);
 
     @Override
-    default IndentType getIndentType() { return IndentType.CONTINUATION_INDENT; }
+    default IndentType getIndentType() {
+        return IndentType.NONE;
+    }
 
     Space getPrefix();
 
@@ -216,6 +218,11 @@ public interface J extends Tree {
             return v.visitAnnotation(this, p);
         }
 
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.CONTINUATION_INDENT;
+        }
+
         @Transient
         public CoordinateBuilder.Annotation getCoordinates() {
             return new CoordinateBuilder.Annotation(this);
@@ -283,6 +290,11 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitArrayAccess(this, p);
+        }
+
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.CONTINUATION_INDENT;
         }
 
         @Transient
@@ -435,6 +447,11 @@ public interface J extends Tree {
         }
 
         @Override
+        public IndentType getIndentType() {
+            return IndentType.CONTINUATION_INDENT;
+        }
+
+        @Override
         @Transient
         public List<J> getSideEffects() {
             return singletonList(this);
@@ -522,6 +539,11 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAssignmentOperation(this, p);
+        }
+
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.CONTINUATION_INDENT;
         }
 
         @Override
@@ -2409,6 +2431,11 @@ public interface J extends Tree {
             return v.visitIdentifier(this, p);
         }
 
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.CONTINUATION_INDENT;
+        }
+
         @Transient
         public CoordinateBuilder.Identifier getCoordinates() {
             return new CoordinateBuilder.Identifier(this);
@@ -3036,6 +3063,11 @@ public interface J extends Tree {
         }
 
         @Override
+        public IndentType getIndentType() {
+            return IndentType.CONTINUATION_INDENT;
+        }
+
+        @Override
         @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
@@ -3159,6 +3191,11 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitLiteral(this, p);
+        }
+
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.CONTINUATION_INDENT;
         }
 
         @Transient
@@ -3503,6 +3540,11 @@ public interface J extends Tree {
             return v.visitMethodDeclaration(this, p);
         }
 
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.CONTINUATION_INDENT;
+        }
+
         public boolean isAbstract() {
             return body == null;
         }
@@ -3759,6 +3801,11 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitMethodInvocation(this, p);
+        }
+
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.CONTINUATION_INDENT;
         }
 
         @Override
@@ -4026,6 +4073,11 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitNewArray(this, p);
+        }
+
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.CONTINUATION_INDENT;
         }
 
         @Transient
@@ -4760,6 +4812,11 @@ public interface J extends Tree {
         }
 
         @Override
+        public IndentType getIndentType() {
+            return IndentType.CONTINUATION_INDENT;
+        }
+
+        @Override
         @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
@@ -5052,6 +5109,11 @@ public interface J extends Tree {
         }
 
         @Override
+        public IndentType getIndentType() {
+            return IndentType.CONTINUATION_INDENT;
+        }
+
+        @Override
         @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
@@ -5260,6 +5322,11 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitTypeParameter(this, p);
+        }
+
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.CONTINUATION_INDENT;
         }
 
         public Padding getPadding() {
@@ -5537,6 +5604,11 @@ public interface J extends Tree {
         }
 
         @Override
+        public IndentType getIndentType() {
+            return IndentType.CONTINUATION_INDENT;
+        }
+
+        @Override
         @Transient
         public CoordinateBuilder.VariableDeclarations getCoordinates() {
             return new CoordinateBuilder.VariableDeclarations(this);
@@ -5644,6 +5716,11 @@ public interface J extends Tree {
             @Override
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitVariable(this, p);
+            }
+
+            @Override
+            public IndentType getIndentType() {
+                return IndentType.CONTINUATION_INDENT;
             }
 
             public Cursor getDeclaringScope(Cursor cursor) {

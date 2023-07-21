@@ -38,7 +38,9 @@ public interface Tree {
         return getClass().getName();
     }
 
-    default IndentType getIndentType() { return IndentType.NONE; }
+    default IndentType getIndentType() {
+        return IndentType.NONE;
+    }
 
     static UUID randomId() {
         //noinspection ConstantConditions

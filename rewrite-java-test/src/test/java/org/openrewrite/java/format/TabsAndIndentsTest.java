@@ -1563,8 +1563,8 @@ class TabsAndIndentsTest implements RewriteTest {
               public class Test {
                   public Test method(int n) {
                       return n > 0 ?
-                          this :
-                          method(n).method(n);
+                       this :
+                                method(n).method(n);
                   }
               }
               """,
@@ -1572,8 +1572,8 @@ class TabsAndIndentsTest implements RewriteTest {
               public class Test {
                   public Test method(int n) {
                       return n > 0 ?
-                              this :
-                              method(n).method(n);
+                          this :
+                          method(n).method(n);
                   }
               }
               """
@@ -1769,8 +1769,8 @@ class TabsAndIndentsTest implements RewriteTest {
                         ::
                         plus;
                       if (x
-                        >
-                        0) {
+                          >
+                          0) {
                           int someVariable = a ?
                             x :
                             y;
@@ -1781,7 +1781,7 @@ class TabsAndIndentsTest implements RewriteTest {
                             y;
                       }
                       x
-                        ++;
+                          ++;
                       X
                         [
                         1
