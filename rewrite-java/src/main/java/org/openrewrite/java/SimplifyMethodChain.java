@@ -31,16 +31,19 @@ import java.util.stream.Collectors;
 @EqualsAndHashCode(callSuper = true)
 public class SimplifyMethodChain extends Recipe {
     @Option(displayName = "Method pattern chain",
-            description = "A list of method patterns that are called in sequence")
+            description = "A list of method patterns that are called in sequence",
+            example = "['java.util.Map keySet()', 'java.util.Set contains(..)']")
     List<String> methodPatternChain;
 
     @Option(displayName = "New method name",
-            description = "The method name that will replace the existing name. The new method name target is assumed to have the same arguments as the last method in the chain.")
+            description = "The method name that will replace the existing name. The new method name target is assumed to have the same arguments as the last method in the chain.",
+            example = "containsKey")
     String newMethodName;
 
     @Option(displayName = "Match on overrides",
             description = "When enabled, find methods that are overrides of the method pattern.",
-            required = false)
+            required = false,
+            example = "false")
     @Nullable
     Boolean matchOverrides;
 
