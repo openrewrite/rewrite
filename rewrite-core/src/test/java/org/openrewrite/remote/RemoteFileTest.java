@@ -15,8 +15,7 @@
  */
 package org.openrewrite.remote;
 
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
@@ -31,58 +30,54 @@ import java.util.concurrent.*;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 
-class RemoteArchiveTest {
+class RemoteFileTest {
 
-    @ParameterizedTest
-    @ValueSource(strings = {"7.4.2", "7.5-rc-1", "7.6"})
-    void gradleWrapper(String version) throws Exception {
-        URL distributionUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader().getResource("gradle-" + version + "-bin.zip"));
+    @Test
+    void gradleWrapperProperties() throws Exception {
+        URL distributionUrl = requireNonNull(RemoteFileTest.class.getClassLoader().getResource("gradle-wrapper.properties"));
         ExecutionContext ctx = new InMemoryExecutionContext();
         HttpSenderExecutionContextView.view(ctx)
           .setLargeFileHttpSender(new MockHttpSender(distributionUrl::openStream));
 
-        RemoteArchive remoteArchive = Remote
+        RemoteFile remoteFile = Remote
           .builder(
-            Paths.get("gradle/wrapper/gradle-wrapper.jar"),
+            Paths.get("gradle/wrapper/gradle-wrapper.properties"),
             distributionUrl.toURI()
           )
-          .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
+          .build();
 
-        long actual = getInputStreamSize(remoteArchive.getInputStream(ctx));
-        assertThat(actual).isGreaterThan(50_000);
+        long actual = getInputStreamSize(remoteFile.getInputStream(ctx));
+        assertThat(actual).isGreaterThan(800);
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"7.4.2", "7.5-rc-1", "7.6"})
-    void gradleWrapperConcurrent(String version) throws Exception {
+    @Test
+    void gradleWrapperPropertiesConcurrent() throws Exception {
         int executionCount = 5;
         ExecutorService executorService = Executors.newFixedThreadPool(executionCount);
         CompletionService<Long> completionService = new ExecutorCompletionService<>(executorService);
-
         for (int i = 0; i < executionCount; i++) {
             completionService.submit(() -> {
-                URL distributionUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader()
-                  .getResource("gradle-" + version + "-bin.zip"));
+                URL distributionUrl = requireNonNull(RemoteFileTest.class.getClassLoader().getResource("gradle-wrapper.properties"));
 
                 ExecutionContext ctx = new InMemoryExecutionContext();
                 HttpSenderExecutionContextView.view(ctx)
                   .setLargeFileHttpSender(new MockHttpSender(distributionUrl::openStream));
 
-                RemoteArchive remoteArchive = Remote
+                RemoteFile remoteFile = Remote
                   .builder(
-                    Paths.get("gradle/wrapper/gradle-wrapper.jar"),
+                    Paths.get("gradle/wrapper/gradle-wrapper.properties"),
                     distributionUrl.toURI()
                   )
-                  .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
+                  .build();
 
-                return getInputStreamSize(remoteArchive.getInputStream(ctx));
+                return getInputStreamSize(remoteFile.getInputStream(ctx));
             });
         }
 
         for (int i = 0; i < executionCount; i++) {
             Future<Long> result = completionService.take();
             Long actual = result.get();
-            assertThat(actual).isGreaterThan(50_000);
+            assertThat(actual).isGreaterThanOrEqualTo(800);
         }
 
         executorService.shutdown();
