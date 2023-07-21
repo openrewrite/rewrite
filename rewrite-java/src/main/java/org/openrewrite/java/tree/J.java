@@ -2361,6 +2361,8 @@ public interface J extends Tree {
         @Getter
         Markers markers;
 
+        List<J.Annotation> annotations;
+
         String simpleName;
 
         @Nullable
@@ -3798,6 +3800,14 @@ public interface J extends Tree {
         @With
         Markers markers;
 
+        /**
+         * For languages other than Java the type will be Modifier.Type.LanguageExtension and its text will be this keyword.
+         * For all keywords which appear in Java this will be null.
+         */
+        @With
+        @Nullable
+        String keyword;
+
         @With
         Type type;
 
@@ -3829,7 +3839,13 @@ public interface J extends Tree {
             Synchronized,
             Native,
             Strictfp,
-            Async
+            Async,
+            Reified,
+            Inline,
+            /**
+             * For modifiers not seen in Java this is used in conjunction with "keyword"
+             */
+            LanguageExtension
         }
     }
 
