@@ -667,6 +667,11 @@ public interface J extends Tree {
             return v.visitBinary(this, p);
         }
 
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.CONTINUATION_INDENT;
+        }
+
         @Transient
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
@@ -2431,11 +2436,6 @@ public interface J extends Tree {
             return v.visitIdentifier(this, p);
         }
 
-        @Override
-        public IndentType getIndentType() {
-            return IndentType.CONTINUATION_INDENT;
-        }
-
         @Transient
         public CoordinateBuilder.Identifier getCoordinates() {
             return new CoordinateBuilder.Identifier(this);
@@ -3338,6 +3338,11 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitMemberReference(this, p);
+        }
+
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.CONTINUATION_INDENT;
         }
 
         public Padding getPadding() {
@@ -4966,6 +4971,11 @@ public interface J extends Tree {
             return v.visitTernary(this, p);
         }
 
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.CONTINUATION_INDENT;
+        }
+
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -5473,6 +5483,11 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitUnary(this, p);
+        }
+
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.CONTINUATION_INDENT;
         }
 
         @Override
