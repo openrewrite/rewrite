@@ -132,6 +132,19 @@ class VariableDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void whitespaceAfter() {
+        rewriteRun(
+          kotlin(
+            """
+              val a = "Hello"
+              val b = " $a "
+              val c = " ${a} "
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/172")
     @Test
     void propertyAccessor() {

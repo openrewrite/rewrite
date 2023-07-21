@@ -202,6 +202,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     randomId(),
                     prefix,
                     Markers.EMPTY,
+                    emptyList(),
                     name,
                     null,
                     null);
@@ -776,7 +777,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public <T> J visitConstExpression(FirConstExpression<T> constExpression, ExecutionContext ctx) {
-        Space prefix = whitespace();
+        Space prefix = EMPTY;
+        if (!(constExpression.getValue() instanceof String) || constExpression.getValue() instanceof String &&
+                (((String) constExpression.getValue()).isEmpty() || !((String) constExpression.getValue()).trim().isEmpty())) {
+            prefix = whitespace();
+        }
         String valueSource = source.substring(cursor, cursor + constExpression.getSource().getEndOffset() - constExpression.getSource().getStartOffset());
         skip(valueSource);
 
@@ -919,6 +924,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 randomId(),
                 prefix,
                 Markers.EMPTY,
+                emptyList(),
                 "super",
                 null,
                 null);
@@ -1680,7 +1686,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     randomId(),
                     EMPTY,
                     Markers.EMPTY,
-                    new J.Identifier(randomId(), EMPTY, Markers.EMPTY, "", null, null),
+                    new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", null, null),
                     emptyList(),
                     null,
                     null
@@ -2262,7 +2268,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                             randomId(),
                             EMPTY,
                             Markers.EMPTY.addIfAbsent(new ReceiverType(randomId())),
-                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, "<receiverType>", null, null),
+                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "<receiverType>", null, null),
                             emptyList(),
                             padLeft(EMPTY, receiver),
                             null))
@@ -2491,6 +2497,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                                 randomId(),
                                 EMPTY,
                                 Markers.EMPTY,
+                                emptyList(),
                                 "",
                                 null,
                                 null),
@@ -2601,6 +2608,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     randomId(),
                     EMPTY,
                     Markers.EMPTY,
+                    emptyList(),
                     "reified",
                     null,
                     null
@@ -2648,6 +2656,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                             randomId(),
                             EMPTY,
                             Markers.EMPTY,
+                            emptyList(),
                             "",
                             null,
                             null),
@@ -3171,7 +3180,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                             randomId(),
                             EMPTY,
                             Markers.EMPTY.addIfAbsent(new ReceiverType(randomId())),
-                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, "<receiverType>", null, null),
+                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "<receiverType>", null, null),
                             emptyList(),
                             padLeft(EMPTY, receiver),
                             null))
@@ -3452,6 +3461,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     randomId(),
                     EMPTY,
                     Markers.EMPTY,
+                    emptyList(),
                     "",
                     null,
                     null
@@ -4201,6 +4211,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 randomId(),
                 prefix,
                 Markers.EMPTY,
+                emptyList(),
                 value,
                 type,
                 fieldType
@@ -4221,6 +4232,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                                 randomId(),
                                 EMPTY,
                                 Markers.EMPTY,
+                                emptyList(),
                                 name,
                                 null,
                                 null
@@ -4239,6 +4251,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J.Identifier name = new J.Identifier(randomId(),
                 EMPTY,
                 Markers.EMPTY,
+                emptyList(),
                 modifier.getType().name().toLowerCase(),
                 null,
                 null);
@@ -4473,7 +4486,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 throw new IllegalArgumentException("Unknown modifier " + text);
         }
         skip(text);
-        return new J.Modifier(randomId(), prefix, Markers.EMPTY, type, annotations);
+        return new J.Modifier(randomId(), prefix, Markers.EMPTY, null, type, annotations);
     }
 
     @Nullable
