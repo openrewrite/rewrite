@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
@@ -26,7 +27,7 @@ public class AutodetectGeneralFormatStyle extends JavaIsoVisitor<LineEndingsCoun
      * Makes a best-effort attempt to determine whether windows-style (CRLF) line endings or unix-style (LF) are
      * more common in the supplied AST.
      */
-    public static GeneralFormatStyle autodetectGeneralFormatStyle(JavaSourceFile j) {
+    public static GeneralFormatStyle autodetectGeneralFormatStyle(SourceFile j) {
         LineEndingsCount count = new LineEndingsCount();
         new AutodetectGeneralFormatStyle().visit(j, count);
         if(count.lf >= count.crlf) {

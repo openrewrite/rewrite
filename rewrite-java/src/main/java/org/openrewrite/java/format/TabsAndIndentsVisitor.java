@@ -17,6 +17,7 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
+import org.openrewrite.formatting.IndentType;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -78,25 +79,9 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     @Nullable
     public J preVisit(@Nullable J tree, P p) {
-        if (tree instanceof JavaSourceFile ||
-                tree instanceof J.Package ||
-                tree instanceof J.Import ||
-                tree instanceof J.Label ||
-                tree instanceof J.DoWhileLoop ||
-                tree instanceof J.ArrayDimension ||
-                tree instanceof J.ClassDeclaration) {
-            getCursor().putMessage("indentType", IndentType.ALIGN);
-        } else if (tree instanceof J.Block ||
-                tree instanceof J.If ||
-                tree instanceof J.If.Else ||
-                tree instanceof J.ForLoop ||
-                tree instanceof J.ForEachLoop ||
-                tree instanceof J.WhileLoop ||
-                tree instanceof J.Case ||
-                tree instanceof J.EnumValueSet) {
-            getCursor().putMessage("indentType", IndentType.INDENT);
-        } else {
-            getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
+        IndentType indentType = tree != null ? tree.getIndentType() : IndentType.NONE;
+        if (indentType != IndentType.NONE) {
+            getCursor().putMessage("indentType", indentType);
         }
 
         return tree;
@@ -623,11 +608,5 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             return (J) tree;
         }
         return super.visit(tree, p);
-    }
-
-    private enum IndentType {
-        ALIGN,
-        INDENT,
-        CONTINUATION_INDENT
     }
 }

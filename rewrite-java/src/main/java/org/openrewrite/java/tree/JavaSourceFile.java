@@ -15,14 +15,16 @@
  */
 package org.openrewrite.java.tree;
 
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.SourceFile;
+import org.openrewrite.formatting.IndentType;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.TypesInUse;
 
 import java.nio.file.Path;
 import java.util.List;
 
-public interface JavaSourceFile extends J {
+public interface JavaSourceFile extends SourceFile, J {
     TypesInUse getTypesInUse();
 
     @Nullable
@@ -30,9 +32,9 @@ public interface JavaSourceFile extends J {
 
     JavaSourceFile withPackageDeclaration(J.Package pkg);
 
-    List<Import> getImports();
+    List<J.Import> getImports();
 
-    JavaSourceFile withImports(List<Import> imports);
+    JavaSourceFile withImports(List<J.Import> imports);
 
     List<J.ClassDeclaration> getClasses();
 
@@ -51,8 +53,13 @@ public interface JavaSourceFile extends J {
 
     SourceFile withSourcePath(Path path);
 
+    @Override
+    default IndentType getIndentType() {
+        return IndentType.ALIGN;
+    }
+
     interface Padding {
-        List<JRightPadded<Import>> getImports();
-        JavaSourceFile withImports(List<JRightPadded<Import>> imports);
+        List<JRightPadded<J.Import>> getImports();
+        JavaSourceFile withImports(List<JRightPadded<J.Import>> imports);
     }
 }

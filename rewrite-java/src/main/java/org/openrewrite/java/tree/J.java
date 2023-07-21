@@ -19,7 +19,9 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
+import org.openrewrite.formatting.IndentType;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.LoathingOfOthers;
 import org.openrewrite.internal.SelfLoathing;
@@ -70,6 +72,9 @@ public interface J extends Tree {
     }
 
     <J2 extends J> J2 withPrefix(Space space);
+
+    @Override
+    default IndentType getIndentType() { return IndentType.CONTINUATION_INDENT; }
 
     Space getPrefix();
 
@@ -767,6 +772,11 @@ public interface J extends Tree {
             return v.visitBlock(this, p);
         }
 
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.INDENT;
+        }
+
         @Transient
         public CoordinateBuilder.Block getCoordinates() {
             return new CoordinateBuilder.Block(this);
@@ -934,6 +944,11 @@ public interface J extends Tree {
 
         public Type getType() {
             return type == null ? Type.Statement : type;
+        }
+
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.INDENT;
         }
 
         /**
@@ -1140,6 +1155,11 @@ public interface J extends Tree {
 
         public ClassDeclaration withTypeParameters(@Nullable List<TypeParameter> typeParameters) {
             return getPadding().withTypeParameters(JContainer.withElementsNullable(this.typeParameters, typeParameters));
+        }
+
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.ALIGN;
         }
 
         @Nullable
@@ -1677,6 +1697,11 @@ public interface J extends Tree {
             return new CoordinateBuilder.Statement(this);
         }
 
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.ALIGN;
+        }
+
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -1826,6 +1851,11 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitEnumValueSet(this, p);
+        }
+
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.INDENT;
         }
 
         @Override
@@ -2036,6 +2066,11 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitForEachLoop(this, p);
+        }
+
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.INDENT;
         }
 
         @Override
@@ -2433,6 +2468,11 @@ public interface J extends Tree {
         }
 
         @Override
+        public IndentType getIndentType() {
+            return IndentType.INDENT;
+        }
+
+        @Override
         @Transient
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
@@ -2474,6 +2514,11 @@ public interface J extends Tree {
             @Override
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitElse(this, p);
+            }
+
+            @Override
+            public IndentType getIndentType() {
+                return IndentType.INDENT;
             }
 
             public Padding getPadding() {
@@ -2564,6 +2609,11 @@ public interface J extends Tree {
 
         @Nullable
         JLeftPadded<J.Identifier> alias;
+
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.ALIGN;
+        }
 
         public boolean isStatic() {
             return statik.getElement();
@@ -2890,6 +2940,11 @@ public interface J extends Tree {
          * Right padded before the ':'
          */
         JRightPadded<Identifier> label;
+
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.ALIGN;
+        }
 
         public Identifier getLabel() {
             return label.getElement();
@@ -4045,6 +4100,11 @@ public interface J extends Tree {
             return v.visitArrayDimension(this, p);
         }
 
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.ALIGN;
+        }
+
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -4270,6 +4330,10 @@ public interface J extends Tree {
         @With
         List<Annotation> annotations;
 
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.ALIGN;
+        }
 
         public String getPackageName() {
             return expression.withPrefix(Space.EMPTY).print(new Cursor(null,
@@ -5705,6 +5769,11 @@ public interface J extends Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitWhileLoop(this, p);
+        }
+
+        @Override
+        public IndentType getIndentType() {
+            return IndentType.INDENT;
         }
 
         @Override

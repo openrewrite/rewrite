@@ -19,8 +19,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import org.openrewrite.formatting.IndentType;
 import org.openrewrite.internal.MetricsHelper;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
@@ -35,6 +37,8 @@ public interface Tree {
     default String getJacksonPolymorphicTypeTag() {
         return getClass().getName();
     }
+
+    default IndentType getIndentType() { return IndentType.NONE; }
 
     static UUID randomId() {
         //noinspection ConstantConditions
