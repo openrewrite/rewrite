@@ -947,8 +947,8 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             name = new J.MethodDeclaration.IdentifierWithAnnotations(new J.Identifier(randomId(), sourceBefore(owner),
                     Markers.EMPTY, emptyList(), owner, null, null), returnType == null ? returnTypeAnnotations : emptyList());
         } else {
-            name = new J.MethodDeclaration.IdentifierWithAnnotations(new J.Identifier(randomId(), sourceBefore(node.getName().toString()), Markers.EMPTY,
-                    returnType == null ? returnTypeAnnotations : emptyList(), node.getName().toString(), null, null), emptyList());
+            name = new J.MethodDeclaration.IdentifierWithAnnotations(new J.Identifier(randomId(), sourceBefore(node.getName().toString(), null), Markers.EMPTY,
+                    emptyList(), node.getName().toString(), null, null), returnType == null ? returnTypeAnnotations : emptyList());
         }
 
         Space paramFmt = sourceBefore("(");
