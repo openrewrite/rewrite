@@ -108,6 +108,7 @@ class ImplementInterfaceTest implements RewriteTest {
                         randomId(),
                         Space.EMPTY,
                         Markers.EMPTY,
+                        emptyList(),
                         "String",
                         ShallowClass.build("java.lang.String"),
                         null
@@ -116,6 +117,7 @@ class ImplementInterfaceTest implements RewriteTest {
                         randomId(),
                         Space.build(" ", emptyList()),
                         Markers.EMPTY,
+                        emptyList(),
                         "LocalDate",
                         ShallowClass.build("java.time.LocalDate"),
                         null

@@ -425,6 +425,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                 randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
+                emptyList(),
                 name,
                 null,
                 null
@@ -553,7 +554,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         } else {
             qualifierType = typeMapping.type(enclosingClassType);
             if (source.charAt(cursor) == '#') {
-                qualifier = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, "", qualifierType, null);
+                qualifier = new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "", qualifierType, null);
                 cursor++;
             } else {
                 qualifier = null;
@@ -565,6 +566,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                     randomId(),
                     Space.EMPTY,
                     Markers.EMPTY,
+                    emptyList(),
                     ref.memberName.toString(),
                     null,
                     null
@@ -1032,7 +1034,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                     JLeftPadded.build(new J.Identifier(randomId(),
                             Space.EMPTY,
                             Markers.EMPTY,
-                            fieldAccess.name.toString(), null, null)),
+                            emptyList(), fieldAccess.name.toString(), null, null)),
                     typeMapping.type(node));
         }
 
@@ -1041,7 +1043,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             String name = node.getName().toString();
             cursor += name.length();
             JavaType type = typeMapping.type(node);
-            return new J.Identifier(randomId(), fmt, Markers.EMPTY, name, type, null);
+            return new J.Identifier(randomId(), fmt, Markers.EMPTY, emptyList(), name, type, null);
         }
 
         @Override
@@ -1049,7 +1051,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
             JCTree.JCPrimitiveTypeTree primitiveType = (JCTree.JCPrimitiveTypeTree) node;
             String name = primitiveType.toString();
             cursor += name.length();
-            return new J.Identifier(randomId(), fmt, Markers.EMPTY, name, typeMapping.primitive(primitiveType.typetag), null);
+            return new J.Identifier(randomId(), fmt, Markers.EMPTY, emptyList(), name, typeMapping.primitive(primitiveType.typetag), null);
         }
 
         @Override

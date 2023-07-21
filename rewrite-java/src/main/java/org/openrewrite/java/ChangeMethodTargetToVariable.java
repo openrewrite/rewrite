@@ -29,6 +29,7 @@ import org.openrewrite.marker.Markers;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -109,6 +110,7 @@ public class ChangeMethodTargetToVariable extends Recipe {
                                 Space.EMPTY :
                                 m.getSelect().getPrefix(),
                         Markers.EMPTY,
+                        emptyList(),
                         variableName,
                         this.variableType,
                         null)

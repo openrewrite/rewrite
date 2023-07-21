@@ -70,7 +70,7 @@ public class ChangeMethodAccessLevelVisitor<P> extends JavaIsoVisitor<P> {
 
             // If current access level is package-private (no modifier), add the new modifier
             else if (currentMethodAccessLevel == null) {
-                J.Modifier mod = new J.Modifier(Tree.randomId(), Space.build(" ", emptyList()), Markers.EMPTY, newAccessLevel, Collections.emptyList());
+                J.Modifier mod = new J.Modifier(Tree.randomId(), Space.build(" ", emptyList()), Markers.EMPTY, null, newAccessLevel, Collections.emptyList());
                 m = m.withModifiers(ListUtils.concat(mod, m.getModifiers()));
 
                 if(method.getModifiers().isEmpty()) {

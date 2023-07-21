@@ -53,7 +53,7 @@ public class ExtractField<P> extends JavaVisitor<P> {
                                             v.getSimpleName(), getCursor().firstEnclosingOrThrow(J.ClassDeclaration.class).getType(),
                                             v.getType(), emptyList())))
                             )
-                            .withModifiers(singletonList(new J.Modifier(randomId(), Space.EMPTY, Markers.EMPTY, J.Modifier.Type.Private, emptyList()))),
+                            .withModifiers(singletonList(new J.Modifier(randomId(), Space.EMPTY, Markers.EMPTY, null, J.Modifier.Type.Private, emptyList()))),
                     p, getCursor()
             );
             b = b.withStatements(ListUtils.concat(field, b.getStatements()));

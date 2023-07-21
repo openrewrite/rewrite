@@ -17,8 +17,10 @@ package org.openrewrite.java.tree;
 
 import org.openrewrite.marker.Markers;
 
+import java.util.Collections;
 import java.util.Scanner;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -58,7 +60,7 @@ public interface TypeTree extends NameTree {
 
             if (i == 0) {
                 fullName = part;
-                expr = new Identifier(randomId(), Space.format(whitespaceBefore.toString()), Markers.EMPTY, part, null, null);
+                expr = new Identifier(randomId(), Space.format(whitespaceBefore.toString()), Markers.EMPTY, emptyList(), part, null, null);
             } else {
                 fullName += "." + part;
                 expr = new J.FieldAccess(
@@ -72,6 +74,7 @@ public interface TypeTree extends NameTree {
                                         randomId(),
                                         Space.format(whitespaceBefore.toString()),
                                         Markers.EMPTY,
+                                        emptyList(),
                                         part.trim(),
                                         null,
                                         null

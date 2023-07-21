@@ -226,7 +226,7 @@ public class GroovyParserVisitor {
             J.ClassDeclaration.Kind kind = new J.ClassDeclaration.Kind(randomId(), kindPrefix, Markers.EMPTY, emptyList(), kindType);
             Space namePrefix = whitespace();
             String simpleName = name();
-            J.Identifier name = new J.Identifier(randomId(), namePrefix, Markers.EMPTY, simpleName, typeMapping.type(clazz), null);
+            J.Identifier name = new J.Identifier(randomId(), namePrefix, Markers.EMPTY, emptyList(), simpleName, typeMapping.type(clazz), null);
             JContainer<J.TypeParameter> typeParameterContainer = null;
             if (clazz.isUsingGenerics() && clazz.getGenericsTypes() != null) {
                 typeParameterContainer = visitTypeParameters(clazz.getGenericsTypes());
@@ -364,7 +364,7 @@ public class GroovyParserVisitor {
             TypeTree typeExpr = visitTypeTree(field.getOriginType());
 
             J.Identifier name = new J.Identifier(randomId(), sourceBefore(field.getName()), Markers.EMPTY,
-                    field.getName(), typeMapping.type(field.getOriginType()), typeMapping.variableType(field));
+                    emptyList(), field.getName(), typeMapping.type(field.getOriginType()), typeMapping.variableType(field));
 
             J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
                     randomId(),
@@ -425,7 +425,7 @@ public class GroovyParserVisitor {
                                         cursor = saveCursor;
                                     }
                                     argPrefix = sourceBefore(arg.getKey());
-                                    J.Identifier argName = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, arg.getKey(), null, null);
+                                    J.Identifier argName = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), arg.getKey(), null, null);
                                     J.Assignment assign = new J.Assignment(randomId(), argPrefix, Markers.EMPTY,
                                             argName, padLeft(sourceBefore("="), bodyVisitor.visit(arg.getValue())),
                                             null);
@@ -457,6 +457,7 @@ public class GroovyParserVisitor {
             J.Identifier name = new J.Identifier(randomId(),
                     sourceBefore(method.getName()),
                     Markers.EMPTY,
+                    emptyList(),
                     method.getName(),
                     null, null);
 
@@ -478,13 +479,13 @@ public class GroovyParserVisitor {
 
                 TypeTree paramType;
                 if (param.isDynamicTyped()) {
-                    paramType = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, "", JavaType.ShallowClass.build("java.lang.Object"), null);
+                    paramType = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", JavaType.ShallowClass.build("java.lang.Object"), null);
                 } else {
                     paramType = visitTypeTree(param.getOriginType());
                 }
                 JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
                         new J.VariableDeclarations.NamedVariable(randomId(), EMPTY, Markers.EMPTY,
-                                new J.Identifier(randomId(), whitespace(), Markers.EMPTY, param.getName(), null, null),
+                                new J.Identifier(randomId(), whitespace(), Markers.EMPTY, emptyList(), param.getName(), null, null),
                                 emptyList(), null, null)
                 );
                 cursor += param.getName().length();
@@ -902,7 +903,7 @@ public class GroovyParserVisitor {
             if ("java.lang.Exception".equals(param.getType().getName())
                 && !source.startsWith("Exception", cursor)
                 && !source.startsWith("java.lang.Exception", cursor)) {
-                paramType = new J.Identifier(randomId(), paramPrefix, Markers.EMPTY, "",
+                paramType = new J.Identifier(randomId(), paramPrefix, Markers.EMPTY, emptyList(), "",
                         JavaType.ShallowClass.build("java.lang.Exception"), null);
             } else {
                 paramType = visitTypeTree(param.getOriginType()).withPrefix(paramPrefix);
@@ -910,7 +911,7 @@ public class GroovyParserVisitor {
 
             JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
                     new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
-                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, param.getName(), null, null),
+                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), param.getName(), null, null),
                             emptyList(), null, null)
             );
             cursor += param.getName().length();
@@ -935,7 +936,7 @@ public class GroovyParserVisitor {
                             null :
                             new J.Identifier(randomId(),
                                     sourceBefore(statement.getLabel()),
-                                    Markers.EMPTY, statement.getLabel(), null, null))
+                                    Markers.EMPTY, emptyList(), statement.getLabel(), null, null))
             );
         }
 
@@ -961,7 +962,7 @@ public class GroovyParserVisitor {
                     Markers.EMPTY,
                     J.Case.Type.Statement,
                     null,
-                    JContainer.build(singletonList(JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, skip("default"), null, null)))),
+                    JContainer.build(singletonList(JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), skip("default"), null, null)))),
                     JContainer.build(sourceBefore(":"),
                             convertStatements(statement.getStatements(), t -> Space.EMPTY), Markers.EMPTY),
                     null
@@ -1007,7 +1008,7 @@ public class GroovyParserVisitor {
                             singletonList(
                                     JRightPadded.build(
                                             new J.VariableDeclarations.NamedVariable(randomId(), sourceBefore(p.getName()), Markers.EMPTY,
-                                                    new J.Identifier(randomId(), EMPTY, Markers.EMPTY, p.getName(), type, null),
+                                                    new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), p.getName(), type, null),
                                                     emptyList(), null,
                                                     typeMapping.variableType(p.getName(), staticType(p)))
                                     )
@@ -1219,7 +1220,7 @@ public class GroovyParserVisitor {
                 // Could iterate over those in reverse order, but feels safer to just take the count and go off source code alone
                 for (int i = 0; i < statement.getStatementLabels().size(); i++) {
                     labels.add(new J.Label(randomId(), whitespace(), Markers.EMPTY, JRightPadded.build(
-                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, name(), null, null)).withAfter(sourceBefore(":")),
+                            new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), name(), null, null)).withAfter(sourceBefore(":")),
                             new J.Empty(randomId(), EMPTY, Markers.EMPTY)));
                 }
             }
@@ -1271,7 +1272,7 @@ public class GroovyParserVisitor {
                         visitTypeTree(param.getOriginType()) : null;
                 JRightPadded<J.VariableDeclarations.NamedVariable> paramName = JRightPadded.build(
                         new J.VariableDeclarations.NamedVariable(randomId(), whitespace(), Markers.EMPTY,
-                                new J.Identifier(randomId(), EMPTY, Markers.EMPTY, param.getName(), null, null),
+                                new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), param.getName(), null, null),
                                 emptyList(), null, null)
                 );
                 cursor += param.getName().length();
@@ -1443,7 +1444,7 @@ public class GroovyParserVisitor {
             J.Identifier name;
             if (call.getMethodAsString().equals(source.substring(cursor, cursor + call.getMethodAsString().length()))) {
                 name = new J.Identifier(randomId(), sourceBefore(call.getMethodAsString()), Markers.EMPTY,
-                        call.getMethodAsString(), null, null);
+                        emptyList(), call.getMethodAsString(), null, null);
 
             } else if (select != null && select.getElement() instanceof J.Identifier) {
                 name = (J.Identifier) select.getElement();
@@ -1562,7 +1563,7 @@ public class GroovyParserVisitor {
             MethodNode methodNode = (MethodNode) call.getNodeMetaData().get(StaticTypesMarker.DIRECT_METHOD_CALL_TARGET);
             JavaType.Method methodType = typeMapping.methodType(methodNode);
             J.Identifier name = new J.Identifier(randomId(), sourceBefore(call.getMethodAsString()), Markers.EMPTY,
-                    call.getMethodAsString(), methodType, null);
+                    emptyList(), call.getMethodAsString(), methodType, null);
 
             // Method invocations may have type information that can enrich the type information of its parameters
             Markers markers = Markers.EMPTY;
@@ -1624,7 +1625,7 @@ public class GroovyParserVisitor {
             if (name instanceof J.Literal) {
                 String nameStr = ((J.Literal) name).getValueSource();
                 assert nameStr != null;
-                name = new J.Identifier(randomId(), name.getPrefix(), Markers.EMPTY, nameStr, null, null);
+                name = new J.Identifier(randomId(), name.getPrefix(), Markers.EMPTY, emptyList(), nameStr, null, null);
             }
             if (prop.isSpreadSafe()) {
                 name = name.withMarkers(name.getMarkers().add(new StarDot(randomId())));
@@ -1848,6 +1849,7 @@ public class GroovyParserVisitor {
                 return new J.Identifier(randomId(),
                         sourceBefore("def"),
                         Markers.EMPTY,
+                        emptyList(),
                         "def",
                         type, null);
             }
@@ -1855,6 +1857,7 @@ public class GroovyParserVisitor {
             J.Identifier ident = new J.Identifier(randomId(),
                     EMPTY,
                     Markers.EMPTY,
+                    emptyList(),
                     expression.getOriginType().getUnresolvedName(),
                     type, null);
             if (type instanceof JavaType.Parameterized) {
@@ -1875,6 +1878,7 @@ public class GroovyParserVisitor {
             queue.add(new J.Identifier(randomId(),
                     sourceBefore(expression.getName()),
                     Markers.EMPTY,
+                    emptyList(),
                     expression.getName(),
                     type, null)
             );
@@ -1972,7 +1976,7 @@ public class GroovyParserVisitor {
             int endOfWhitespace = indexOfNextNonWhitespace(cursor, source);
             if (endOfWhitespace + 2 <= source.length() && "as".equals(source.substring(endOfWhitespace, endOfWhitespace + 2))) {
                 String simpleName = importNode.getAlias();
-                alias = padLeft(sourceBefore("as"), new J.Identifier(randomId(), sourceBefore(simpleName), Markers.EMPTY, simpleName, null, null));
+                alias = padLeft(sourceBefore("as"), new J.Identifier(randomId(), sourceBefore(simpleName), Markers.EMPTY, emptyList(), simpleName, null, null));
             }
 
             J.Import anImport = new J.Import(randomId(), prefix, Markers.EMPTY, statik, qualid, alias);
@@ -2078,7 +2082,7 @@ public class GroovyParserVisitor {
             String part = parts[i];
             if (i == 0) {
                 fullName = part;
-                expr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, part, typeMapping.type(classNode), null);
+                expr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), part, typeMapping.type(classNode), null);
             } else {
                 fullName += "." + part;
 
@@ -2095,7 +2099,7 @@ public class GroovyParserVisitor {
                         EMPTY,
                         Markers.EMPTY,
                         expr,
-                        padLeft(namePrefix, new J.Identifier(randomId(), identFmt, Markers.EMPTY, part.trim(), null, null)),
+                        padLeft(namePrefix, new J.Identifier(randomId(), identFmt, Markers.EMPTY, emptyList(), part.trim(), null, null)),
                         (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?
                                 JavaType.ShallowClass.build(fullName) :
                                 null
@@ -2176,7 +2180,7 @@ public class GroovyParserVisitor {
         Space fmt = whitespace();
         if (cursor < source.length() && source.startsWith("def", cursor)) {
             cursor += 3;
-            return new J.Identifier(randomId(), fmt, Markers.EMPTY, "def",
+            return new J.Identifier(randomId(), fmt, Markers.EMPTY, emptyList(), "def",
                     JavaType.ShallowClass.build("java.lang.Object"), null);
         } else {
             cursor = saveCursor;
@@ -2189,31 +2193,31 @@ public class GroovyParserVisitor {
         List<J.Modifier> unorderedModifiers = new ArrayList<>();
 
         if ((modifiers & Opcodes.ACC_ABSTRACT) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, J.Modifier.Type.Abstract, emptyList()));
+            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Abstract, emptyList()));
         }
         if ((modifiers & Opcodes.ACC_FINAL) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, J.Modifier.Type.Final, emptyList()));
+            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Final, emptyList()));
         }
         if ((modifiers & Opcodes.ACC_PRIVATE) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, J.Modifier.Type.Private, emptyList()));
+            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Private, emptyList()));
         }
         if ((modifiers & Opcodes.ACC_PROTECTED) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, J.Modifier.Type.Protected, emptyList()));
+            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Protected, emptyList()));
         }
         if ((modifiers & Opcodes.ACC_PUBLIC) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, J.Modifier.Type.Public, emptyList()));
+            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Public, emptyList()));
         }
         if ((modifiers & Opcodes.ACC_STATIC) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, J.Modifier.Type.Static, emptyList()));
+            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Static, emptyList()));
         }
         if ((modifiers & Opcodes.ACC_SYNCHRONIZED) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, J.Modifier.Type.Synchronized, emptyList()));
+            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Synchronized, emptyList()));
         }
         if ((modifiers & Opcodes.ACC_TRANSIENT) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, J.Modifier.Type.Transient, emptyList()));
+            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Transient, emptyList()));
         }
         if ((modifiers & Opcodes.ACC_VOLATILE) != 0) {
-            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, J.Modifier.Type.Volatile, emptyList()));
+            unorderedModifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Volatile, emptyList()));
         }
 
         List<J.Modifier> orderedModifiers = new ArrayList<>(unorderedModifiers.size());

@@ -24,6 +24,8 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
+import static java.util.Collections.emptyList;
+
 @ToString
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Getter
@@ -90,6 +92,7 @@ public class NoStaticImport extends Recipe {
                     m = m.withSelect(new J.Identifier(Tree.randomId(),
                             Space.EMPTY,
                             Markers.EMPTY,
+                            emptyList(),
                             receiverType.getClassName(),
                             receiverType,
                             null));

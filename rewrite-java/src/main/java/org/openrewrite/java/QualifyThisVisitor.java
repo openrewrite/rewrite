@@ -24,6 +24,8 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
+import static java.util.Collections.emptyList;
+
 public class QualifyThisVisitor extends JavaVisitor<ExecutionContext> {
     @Override
     public J visitIdentifier(J.Identifier ident, ExecutionContext executionContext) {
@@ -39,6 +41,7 @@ public class QualifyThisVisitor extends JavaVisitor<ExecutionContext> {
                             Tree.randomId(),
                             Space.EMPTY,
                             Markers.EMPTY,
+                            emptyList(),
                             type.getClassName(),
                             type,
                             null

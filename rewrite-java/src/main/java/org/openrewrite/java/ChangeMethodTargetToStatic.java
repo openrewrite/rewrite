@@ -27,6 +27,7 @@ import org.openrewrite.marker.Markers;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -141,6 +142,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
                                             Space.EMPTY :
                                             method.getSelect().getPrefix(),
                                     Markers.EMPTY,
+                                    emptyList(),
                                     classType.getClassName(),
                                     classType,
                                     null

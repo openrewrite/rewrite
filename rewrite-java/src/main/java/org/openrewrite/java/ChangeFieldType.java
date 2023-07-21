@@ -23,6 +23,8 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
+import static java.util.Collections.emptyList;
+
 @EqualsAndHashCode(callSuper = true)
 @Data
 public class ChangeFieldType<P> extends JavaIsoVisitor<P> {
@@ -49,6 +51,7 @@ public class ChangeFieldType<P> extends JavaIsoVisitor<P> {
                     new J.Identifier(mv.getTypeExpression().getId(),
                             mv.getTypeExpression().getPrefix(),
                             Markers.EMPTY,
+                            emptyList(),
                             newFieldType.getClassName(),
                             newFieldType,
                             null
