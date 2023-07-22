@@ -40,7 +40,6 @@ import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitUnitTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
-import org.jetbrains.kotlin.lexer.KtKeywordToken;
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
@@ -1453,15 +1452,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitFunctionTypeRef(FirFunctionTypeRef functionTypeRef, ExecutionContext ctx) {
+        Space prefix = whitespace();
 
-        J.Annotation annotation = null;
-        if (functionTypeRef.isSuspend()) {
-            Space suspendPrefix = whitespace();
-            annotation = convertToAnnotation(mapModifier(suspendPrefix, emptyList()));
-        } else if (source.startsWith("noinline", cursor)) {
-            annotation = convertToAnnotation(mapModifier(EMPTY, emptyList()));
-        } else if (source.startsWith("crossinline", cursor)) {
-            annotation = convertToAnnotation(mapModifier(EMPTY, emptyList()));
+        List<J.Modifier> modifiers = new ArrayList<>();
+        List<J.Annotation> leadingAnnotations = emptyList();
+
+        PsiElement node = getRealPsiElement(functionTypeRef);
+        KtModifierList modifierList = getModifierList(node);
+        if (modifierList != null) {
+            leadingAnnotations = new ArrayList<>();
+            modifiers = mapModifierList(modifierList, functionTypeRef.getAnnotations(), leadingAnnotations, emptyList());
         }
 
         List<JRightPadded<J>> paramExprs = new ArrayList<>(functionTypeRef.getValueParameters().size());
@@ -1473,9 +1473,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             skip(".");
         }
 
-        Space prefix = whitespace();
-        boolean parenthesized = source.charAt(cursor) == '(';
-        skip("(");
+        KtParameterList list = PsiTreeUtil.findChildOfType(node, KtParameterList.class);
+        boolean parenthesized = list != null && list.getText().startsWith("(");
+        Space before = sourceBefore("(");
 
         JavaType closureType = typeMapping.type(functionTypeRef);
         if (!functionTypeRef.getValueParameters().isEmpty()) {
@@ -1515,7 +1515,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         J.Lambda lambda = new J.Lambda(
                 randomId(),
-                prefix,
+                before,
                 omitBraces ? Markers.EMPTY.addIfAbsent(new OmitBraces(randomId())) : Markers.EMPTY,
                 params,
                 arrow,
@@ -1524,8 +1524,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         return new K.FunctionType(
                 randomId(),
+                prefix,
+                Markers.EMPTY,
                 lambda,
-                annotation,
+                leadingAnnotations,
+                modifiers,
                 receiver);
     }
 
@@ -1641,11 +1644,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         KtModifierList modifierList = getModifierList(propertyNode);
 
         List<J.Modifier> modifiers = new ArrayList<>();
-        List<J.Annotation> leadingAnnotations = new ArrayList<>();
-        List<J.Annotation> trailingAnnotations = new ArrayList<>();
+        List<J.Annotation> leadingAnnotations = emptyList();
+        List<J.Annotation> lastAnnotations = null;
 
         if (modifierList != null) {
-            modifiers = mapModifierList(modifierList, collectFirAnnotations(property), leadingAnnotations, trailingAnnotations);
+            leadingAnnotations = new ArrayList<>();
+            lastAnnotations = new ArrayList<>();
+            modifiers = mapModifierList(modifierList, collectFirAnnotations(property), leadingAnnotations, lastAnnotations);
         }
 
         // FIXME. may be removed.
@@ -1654,11 +1659,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         PsiElement varOrVar = ((KtValVarKeywordOwner) propertyNode).getValOrVarKeyword();
         if (varOrVar != null) {
             if ("val".equals(varOrVar.getText())) {
-                modifiers.add(new J.Modifier(randomId(), sourceBefore("val"), Markers.EMPTY, null, J.Modifier.Type.Final, trailingAnnotations));
+                modifiers.add(new J.Modifier(randomId(), sourceBefore("val"), Markers.EMPTY, null, J.Modifier.Type.Final, lastAnnotations));
             } else {
-                modifiers.add(new J.Modifier(randomId(), sourceBefore("var"), Markers.EMPTY, "var", J.Modifier.Type.LanguageExtension, trailingAnnotations));
+                modifiers.add(new J.Modifier(randomId(), sourceBefore("var"), Markers.EMPTY, "var", J.Modifier.Type.LanguageExtension, lastAnnotations));
             }
-            trailingAnnotations = null;
+            lastAnnotations = null;
         }
 
         J.VariableDeclarations receiver = null;
@@ -1750,8 +1755,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         } else {
             Space namePrefix = whitespace();
             J.Identifier name = createIdentifier(property.getName().asString(), property);
-            if (trailingAnnotations != null) {
-                name = name.withAnnotations(trailingAnnotations);
+            if (lastAnnotations != null && !lastAnnotations.isEmpty()) {
+                name = name.withAnnotations(lastAnnotations);
             }
 
             Space exprPrefix = EMPTY;
@@ -1787,7 +1792,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     if (j instanceof TypeTree) {
                         typeExpression = (TypeTree) j;
                     } else {
-                        typeExpression = new K.FunctionType(randomId(), (TypedTree) j, null, null);
+                        typeExpression = new K.FunctionType(randomId(), EMPTY, Markers.EMPTY, (TypedTree) j, emptyList(), emptyList(), null);
                     }
                 }
             }
@@ -1826,7 +1831,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     boolean hasAnnotationBeforeAccessors = maybeModifier.isPresent();
                     List<J.Annotation> annos = new ArrayList<>();
                     if (hasAnnotationBeforeAccessors) {
-                        mapModifierList(maybeModifier.get(), collectFirAnnotations(property), annos);
+                        mapModifierList(maybeModifier.get(), collectFirAnnotations(property), emptyList(), annos);
                     }
 
                     Space accessorPrefix = whitespace();
@@ -2224,15 +2229,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Markers markers = Markers.EMPTY;
 
         PsiElement functionNode = getRealPsiElement(simpleFunction);
-        List<J.Modifier> modifiers = new ArrayList<>();
-        List<J.Annotation> leadingAnnotations = new ArrayList<>();
-        List<J.Annotation> trailingAnnotations = new ArrayList<>();
+        List<J.Modifier> modifiers = new ArrayList<>(1);
+        List<J.Annotation> leadingAnnotations = emptyList();
+        List<J.Annotation> lastAnnotations = emptyList();
         KtModifierList modifierList = getModifierList(functionNode);
         if (modifierList != null) {
-            modifiers = mapModifierList(modifierList, simpleFunction.getAnnotations(), leadingAnnotations, trailingAnnotations);
+            leadingAnnotations = new ArrayList<>();
+            lastAnnotations = new ArrayList<>();
+            modifiers = mapModifierList(modifierList, simpleFunction.getAnnotations(), leadingAnnotations, lastAnnotations);
         }
 
-        modifiers.add(new J.Modifier(randomId(), sourceBefore("fun"), Markers.EMPTY, "fun", J.Modifier.Type.LanguageExtension, trailingAnnotations));
+        modifiers.add(new J.Modifier(randomId(), sourceBefore("fun"), Markers.EMPTY, "fun", J.Modifier.Type.LanguageExtension, lastAnnotations));
 
         J.TypeParameters typeParameters = null;
         if (!simpleFunction.getTypeParameters().isEmpty()) {
@@ -2281,9 +2288,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         J.Identifier name = createIdentifier(methodName, simpleFunction);
 
-        JContainer<Statement> params;
         Space before = sourceBefore("(");
-        params = !simpleFunction.getValueParameters().isEmpty() ?
+        JContainer<Statement> params = !simpleFunction.getValueParameters().isEmpty() ?
                 JContainer.build(before, convertAllToExpressions(simpleFunction.getValueParameters(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY) :
                 JContainer.build(before, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
 
@@ -2447,48 +2453,36 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         Markers markers = Markers.EMPTY;
 
-        List<J.Annotation> annotations = mapModifiers(typeAlias.getAnnotations(), "typealias");
-        Space aliasPrefix = whitespace();
-        J.Annotation aliasAnnotation = new J.Annotation(
-                randomId(),
-                aliasPrefix,
-                Markers.EMPTY.addIfAbsent(new Modifier(randomId())),
-                createIdentifier("typealias"),
-                JContainer.empty());
-        annotations.add(aliasAnnotation);
-
-        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1); // adjust size if necessary
-
-        String valueName = "";
-        if ("<no name provided>".equals(typeAlias.getName().toString())) {
-            KtSourceElement sourceElement = typeAlias.getSource();
-            if (sourceElement == null) {
-                throw new IllegalStateException("Unexpected null source.");
-            }
-        } else {
-            valueName = typeAlias.getName().asString();
+        PsiElement aliasNode = getRealPsiElement(typeAlias);
+        List<J.Modifier> modifiers = new ArrayList<>();
+        List<J.Annotation> leadingAnnotations = emptyList();
+        List<J.Annotation> lastAnnotations = emptyList();
+        KtModifierList modifierList = getModifierList(aliasNode);
+        if (modifierList != null) {
+            leadingAnnotations = new ArrayList<>();
+            lastAnnotations = new ArrayList<>();
+            modifiers = mapModifierList(modifierList, typeAlias.getAnnotations(), leadingAnnotations, lastAnnotations);
         }
-        J.Identifier name = createIdentifier(valueName, typeMapping.type(typeAlias.getExpandedTypeRef()), null);
+        modifiers.add(new J.Modifier(randomId(), sourceBefore("typealias"), markers, "typealias", J.Modifier.Type.LanguageExtension, lastAnnotations));
 
+        J.Identifier name = createIdentifier(typeAlias.getName().asString(), typeAlias);
         TypeTree typeExpression = typeAlias.getTypeParameters().isEmpty() ? name : new J.ParameterizedType(
                 randomId(),
                 name.getPrefix(),
                 Markers.EMPTY,
                 name.withPrefix(EMPTY),
                 JContainer.build(sourceBefore("<"), convertAllToExpressions(typeAlias.getTypeParameters(), commaDelim, t -> sourceBefore(">"), ctx), Markers.EMPTY),
-                null
+                name.getType()
         );
-
-        // Dimensions do not exist in Kotlin, and array is declared based on the type. I.E., IntArray
-        List<JLeftPadded<Space>> dimensionsAfterName = emptyList();
 
         Space initializerPrefix = sourceBefore("=");
         Expression expr = convertToExpression(typeAlias.getExpandedTypeRef(), ctx);
-        JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = maybeSemicolon(
-                new J.VariableDeclarations.NamedVariable(
+        JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable =
+                padRight(new J.VariableDeclarations.NamedVariable(
                         randomId(),
                         EMPTY,
                         Markers.EMPTY,
+                        // typealias does not have a name.
                         new J.Identifier(
                                 randomId(),
                                 EMPTY,
@@ -2497,19 +2491,18 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                                 "",
                                 null,
                                 null),
-                        dimensionsAfterName,
+                        emptyList(),
                         padLeft(initializerPrefix, expr),
-                        null
-                )
-        );
+                        null), EMPTY);
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1);
         vars.add(namedVariable);
 
         return new J.VariableDeclarations(
                 randomId(),
                 prefix,
                 markers,
-                annotations,
-                emptyList(),
+                leadingAnnotations,
+                modifiers,
                 typeExpression,
                 null,
                 null,
@@ -2774,24 +2767,41 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             firAnnotations.addAll(collectFirAnnotations(generatedFirProperties.get(range)));
         }
 
-        List<J.Annotation> annotations = mapModifiers(firAnnotations, valueParameter.getName().asString());
+        List<J.Modifier> modifiers = new ArrayList<>();
+        List<J.Annotation> leadingAnnotations = emptyList();
+        List<J.Annotation> lastAnnotations = emptyList();
 
-        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1); // adjust size if necessary
+        KtParameter node = (KtParameter) getRealPsiElement(valueParameter);
+        KtModifierList modifierList = getModifierList(node);
+        if (modifierList != null) {
+            leadingAnnotations = new ArrayList<>();
+            lastAnnotations = new ArrayList<>();
+            modifiers = mapModifierList(modifierList, firAnnotations, leadingAnnotations, lastAnnotations);
+        }
+
+        if (node == null) {
+            throw new IllegalStateException("No node found for " + valueParameter);
+        }
+
+        PsiElement varOrVar = ((KtValVarKeywordOwner) node).getValOrVarKeyword();
+        if (varOrVar != null) {
+            modifiers.add(mapToJModifier(varOrVar.getText(), lastAnnotations));
+            lastAnnotations = null;
+        }
+
         Space namePrefix = EMPTY;
         String valueName = "";
-        if ("<no name provided>".equals(valueParameter.getName().toString())) {
-            KtSourceElement sourceElement = valueParameter.getSource();
-            if (sourceElement == null) {
-                throw new IllegalStateException("Unexpected null source.");
-            }
-        } else if ("<unused var>".equals(valueParameter.getName().toString())) {
+        if ("<unused var>".equals(valueParameter.getName().toString())) {
             valueName = "_";
             namePrefix = whitespace();
-        } else {
+        } else if (!"<no name provided>".equals(valueParameter.getName().toString())){
             valueName = valueParameter.getName().asString();
             namePrefix = whitespace();
         }
         J.Identifier name = createIdentifier(valueName, valueParameter);
+        if (lastAnnotations != null) {
+            name = name.withAnnotations(lastAnnotations);
+        }
 
         TypeTree typeExpression = null;
         if (valueParameter.getReturnTypeRef() instanceof FirResolvedTypeRef && (valueParameter.getReturnTypeRef().getSource() == null || !(valueParameter.getReturnTypeRef().getSource().getKind() instanceof KtFakeSourceElementKind))) {
@@ -2807,7 +2817,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 if (j instanceof TypeTree) {
                     typeExpression = (TypeTree) j;
                 } else {
-                    typeExpression = new K.FunctionType(randomId(), (TypedTree) j, null, null);
+                    typeExpression = new K.FunctionType(randomId(), EMPTY, Markers.EMPTY, (TypedTree) j, emptyList(), emptyList(), null);
                 }
             } else if ("_".equals(valueName)) {
                 int savedCursor = cursor;
@@ -2819,16 +2829,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     if (j instanceof TypeTree) {
                         typeExpression = (TypeTree) j;
                     } else {
-                        typeExpression = new K.FunctionType(randomId(), (TypedTree) j, null, null);
+                        typeExpression = new K.FunctionType(randomId(), EMPTY, Markers.EMPTY, (TypedTree) j, emptyList(), emptyList(), null);
                     }
                 } else {
                     cursor = savedCursor;
                 }
             }
         }
-
-        // Dimensions do not exist in Kotlin, and array is declared based on the type. I.E., IntArray
-        List<JLeftPadded<Space>> dimensionsAfterName = emptyList();
 
         FirExpression initializer = valueParameter.getInitializer() != null ? valueParameter.getInitializer() : valueParameter.getDefaultValue() != null ? valueParameter.getDefaultValue() : null;
         JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = maybeSemicolon(
@@ -2837,22 +2844,23 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         namePrefix,
                         Markers.EMPTY,
                         name,
-                        dimensionsAfterName,
+                        emptyList(),
                         initializer != null ? padLeft(sourceBefore("="), convertToExpression(initializer, ctx)) : null,
                         typeMapping.variableType(valueParameter.getSymbol(), null, getCurrentFile())
                 )
         );
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1);
         vars.add(namedVariable);
 
         return new J.VariableDeclarations(
                 randomId(),
                 prefix,
                 markers,
-                annotations,
-                emptyList(),
+                leadingAnnotations.isEmpty() ? emptyList() : leadingAnnotations,
+                modifiers.isEmpty() ? emptyList() : modifiers,
                 typeExpression,
                 null,
-                dimensionsAfterName,
+                emptyList(),
                 vars);
     }
 
@@ -3163,7 +3171,19 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
         Markers markers = Markers.EMPTY;
 
-        List<J.Annotation> annotations = mapModifiers(constructor.getAnnotations(), "constructor");
+        List<J.Modifier> modifiers = new ArrayList<>();
+        List<J.Annotation> leadingAnnotations = emptyList();
+        List<J.Annotation> lastAnnotations = emptyList();
+
+        KtSecondaryConstructor node = (KtSecondaryConstructor) getRealPsiElement(constructor);
+        KtModifierList modifierList = getModifierList(node);
+        if (modifierList != null) {
+            leadingAnnotations = new ArrayList<>();
+            lastAnnotations = new ArrayList<>();
+            modifiers = mapModifierList(modifierList, constructor.getAnnotations(), leadingAnnotations, lastAnnotations);
+        }
+
+        modifiers.add(mapToJModifier("constructor", lastAnnotations));
 
         JRightPadded<J.VariableDeclarations.NamedVariable> infixReceiver = null;
         if (constructor.getReceiverTypeRef() != null) {
@@ -3183,9 +3203,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     .withAfter(sourceBefore("."));
         }
 
-        String methodName = "constructor";
-
-        J.Identifier name = createIdentifier(methodName, constructor);
+        int saveCursor = cursor;
+        J.Identifier name = createIdentifier(node.getName(), constructor).withMarkers(Markers.build(singletonList(new Implicit(randomId()))));
+        cursor = saveCursor;
 
         JContainer<Statement> params;
         Space before = sourceBefore("(");
@@ -3212,7 +3232,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             params = params.getPadding().withElements(newStatements);
         }
 
-        int saveCursor = cursor;
+        saveCursor = cursor;
         TypeTree returnTypeExpression = null;
         before = whitespace();
         if (source.startsWith(":", cursor)) {
@@ -3238,7 +3258,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         null,
                         type instanceof JavaType.Method ? (JavaType.Method) type : null
                 );
-                returnTypeExpression = new K.FunctionType(randomId(), newClass, null, null);
+                returnTypeExpression = new K.FunctionType(randomId(), EMPTY, Markers.EMPTY, newClass, emptyList(), emptyList(), null);
             } else {
                 returnTypeExpression = (TypeTree) visitElement(constructor.getReturnTypeRef(), ctx);
             }
@@ -3278,8 +3298,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 randomId(),
                 prefix,
                 markers,
-                annotations,
-                emptyList(),
+                leadingAnnotations,
+                modifiers,
                 null,
                 returnTypeExpression,
                 new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
@@ -3430,13 +3450,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
         Markers markers = Markers.EMPTY;
 
-        PsiElement classNode = getRealPsiElement(regularClass);
-        KtModifierList modifierList = getModifierList(classNode);
+        PsiElement node = getRealPsiElement(regularClass);
+        KtModifierList modifierList = getModifierList(node);
 
-        List<J.Modifier> modifiers = new ArrayList<>();
-        List<J.Annotation> leadingAnnotations = new ArrayList<>();;
-        List<J.Annotation> kindAnnotations = new ArrayList<>();;
+        List<J.Modifier> modifiers = emptyList();
+        List<J.Annotation> leadingAnnotations = emptyList();
+        List<J.Annotation> kindAnnotations = emptyList();
         if (modifierList != null) {
+            leadingAnnotations = new ArrayList<>();
+            kindAnnotations = new ArrayList<>();
             modifiers = mapModifierList(modifierList, regularClass.getAnnotations(), leadingAnnotations, kindAnnotations);
         }
 
@@ -3454,18 +3476,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         J.Identifier name;
-        if (ClassKind.OBJECT == classKind && kindAnnotations.stream().anyMatch(a -> a.getAnnotationType() instanceof J.Identifier && "companion".equals(((J.Identifier) a.getAnnotationType()).getSimpleName()))) {
-            name = new J.Identifier(
-                    randomId(),
-                    EMPTY,
-                    Markers.EMPTY,
-                    emptyList(),
-                    "",
-                    null,
-                    null
-            );
-        } else {
+        if (classKind != ClassKind.OBJECT || ((KtObjectDeclaration) node).getNameIdentifier() != null) {
             name = createIdentifier(regularClass.getName().asString(), regularClass);
+        } else {
+            int saveCursor = cursor;
+            name = createIdentifier("", regularClass);
+            name = name
+                    .withSimpleName(regularClass.getName().asString())
+                    .withPrefix(EMPTY)
+                    .withMarkers(name.getMarkers().addIfAbsent(new Implicit(randomId())));
+            cursor = saveCursor;
         }
 
         // KotlinTypeParameters with multiple bounds are defined outside the TypeParameter container.
@@ -3507,51 +3527,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
         }
 
-        int saveCursor = cursor;
-        Space before = whitespace();
-        JContainer<Statement> primaryConstructor = null;
-        boolean inlineConstructor = (source.startsWith("internal", cursor) || source.startsWith("constructor", cursor) || source.startsWith("(", cursor)) && firPrimaryConstructor != null;
-        if (inlineConstructor) {
-            if (source.startsWith("internal", cursor)) {
-                cursor = saveCursor;
-                J.Annotation annotation = mapKModifierToAnnotation("internal");
-                annotation = annotation.withMarkers(annotation.getMarkers().addIfAbsent(new ExplicitInlineConstructor(randomId())));
-                annotation = annotation.withMarkers(annotation.getMarkers().addIfAbsent(new Modifier(randomId())));
-                leadingAnnotations.add(annotation);
-                before = whitespace();
-            }
-
-            if (source.startsWith("constructor", cursor)) {
-                J.Annotation annotation = new J.Annotation(randomId(), before, Markers.EMPTY, createIdentifier("constructor", regularClass), null);
-                annotation = annotation.withMarkers(annotation.getMarkers().addIfAbsent(new ExplicitInlineConstructor(randomId())));
-                annotation = annotation.withMarkers(annotation.getMarkers().addIfAbsent(new Modifier(randomId())));
-                leadingAnnotations.add(annotation);
-                before = whitespace();
-            }
-            skip("(");
-            if (firPrimaryConstructor.getValueParameters().isEmpty()) {
-                primaryConstructor = JContainer.build(before, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
-            } else {
-                List<JRightPadded<Statement>> statements = new ArrayList<>(firPrimaryConstructor.getValueParameters().size());
-                List<FirValueParameter> valueParameters = firPrimaryConstructor.getValueParameters();
-                for (int i = 0; i < valueParameters.size(); i++) {
-                    J j = visitElement(valueParameters.get(i), ctx);
-                    if (j instanceof Expression && !(j instanceof Statement)) {
-                        j = new K.ExpressionStatement(randomId(), (Expression) j);
-                    }
-                    statements.add(padRight((Statement) j, i == valueParameters.size() - 1 ? sourceBefore(")") : sourceBefore(",")));
-                }
-                primaryConstructor = JContainer.build(before, statements, Markers.EMPTY);
-            }
-        } else {
-            cursor(saveCursor);
+        Statement primaryConstructor = null;
+        if (((KtClassOrObject) node).getPrimaryConstructor() != null) {
+            markers = markers.addIfAbsent(new PrimaryConstructor(randomId()));
+            primaryConstructor = mapPrimaryConstructor(firPrimaryConstructor);
         }
 
         JContainer<TypeTree> implementings = null;
         List<JRightPadded<TypeTree>> superTypes = null;
 
-        saveCursor = cursor;
-        before = whitespace();
+        int saveCursor = cursor;
+        Space before = whitespace();
         if (source.startsWith(":", cursor)) {
             skip(":");
         }
@@ -3584,7 +3570,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                             null,
                             null
                     );
-                    element = new K.FunctionType(randomId(), newClass, null, null);
+                    element = new K.FunctionType(randomId(), EMPTY, Markers.EMPTY, newClass, emptyList(), emptyList(), null);
                 }
                 superTypes.add(JRightPadded.build(element)
                         .withAfter(i == regularClass.getSuperTypeRefs().size() - 1 ? EMPTY : sourceBefore(",")));
@@ -3657,6 +3643,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     members, sourceBefore("}"));
         }
 
+        if (primaryConstructor != null) {
+            body = body.withStatements(ListUtils.concat(
+                    primaryConstructor,
+                    body.getStatements()
+            ));
+        }
         return new J.ClassDeclaration(
                 randomId(),
                 prefix,
@@ -3666,7 +3658,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 kind,
                 name,
                 typeParams,
-                primaryConstructor,
+                null,
                 null,
                 implementings,
                 null,
@@ -3674,12 +3666,60 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 (JavaType.FullyQualified) typeMapping.type(regularClass));
     }
 
-    private List<J.Modifier> mapModifierList(KtModifierList currentNode, List<FirAnnotation> annotations, List<J.Annotation> lastAnnotations) {
-        return mapModifierList(currentNode, annotations, null, lastAnnotations);
+    private Statement mapPrimaryConstructor(FirPrimaryConstructor primaryConstructor) {
+        Space prefix = whitespace();
+        List<J.Modifier> modifiers = new ArrayList<>();
+        List<J.Annotation> leadingAnnotations = null;
+        List<J.Annotation> lastAnnotations = null;
+
+        KtPrimaryConstructor node = (KtPrimaryConstructor) getRealPsiElement(primaryConstructor);
+        KtModifierList modifierList = getModifierList(node);
+        if (modifierList != null) {
+            leadingAnnotations = new ArrayList<>();
+            lastAnnotations = new ArrayList<>();
+            modifiers = mapModifierList(modifierList, primaryConstructor.getAnnotations(), leadingAnnotations, lastAnnotations);
+        }
+
+        PsiElement cKeyword = node.getConstructorKeyword();
+        if (cKeyword != null) {
+            modifiers.add(mapToJModifier("constructor", lastAnnotations));
+        }
+
+        JavaType type = typeMapping.type(primaryConstructor);
+        J.Identifier name = new J.Identifier(
+                randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                emptyList(),
+                node.getName(),
+                type instanceof JavaType.Method ? type : null,
+                null
+        );
+
+        Space before = sourceBefore("(");
+        JContainer<Statement> params = !primaryConstructor.getValueParameters().isEmpty() ?
+                JContainer.build(before, convertAllToExpressions(primaryConstructor.getValueParameters(), commaDelim, t -> sourceBefore(")"), ctx), Markers.EMPTY) :
+                JContainer.build(before, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)), Markers.EMPTY);
+
+        return new J.MethodDeclaration(
+                randomId(),
+                prefix,
+                Markers.build(singletonList(new PrimaryConstructor(randomId()))),
+                leadingAnnotations == null ? emptyList() : leadingAnnotations,
+                modifiers.isEmpty() ? emptyList() : modifiers,
+                null,
+                name,
+                new J.MethodDeclaration.IdentifierWithAnnotations(name.withMarkers(name.getMarkers().addIfAbsent(new Implicit(randomId()))), emptyList()),
+                params,
+                null,
+                null,
+                null,
+                type instanceof JavaType.Method ? (JavaType.Method) type : null
+        );
     }
 
     private List<J.Modifier> mapModifierList(KtModifierList currentNode, List<FirAnnotation> annotations,
-                                             @Nullable List<J.Annotation> leadingAnnotations, List<J.Annotation> lastAnnotations) {
+                                             List<J.Annotation> leadingAnnotations, List<J.Annotation> lastAnnotations) {
         Map<Integer, FirAnnotation> annotationsMap = new HashMap<>();
         for (FirAnnotation annotation : annotations) {
             annotationsMap.put(annotation.getSource().getStartOffset(), annotation);
@@ -3692,19 +3732,15 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         while (iterator.hasNext()) {
             PsiElement it = iterator.next();
             if (it instanceof LeafPsiElement && it.getNode().getElementType() instanceof KtModifierKeywordToken) {
-                if (isJModifier(it.getText())) {
-                    if (leading) {
-                        leading = false;
-                        if (leadingAnnotations != null && !currentAnnotations.isEmpty()) {
-                            leadingAnnotations.addAll(currentAnnotations);
-                            currentAnnotations.clear();
-                        }
+                if (leading) {
+                    leading = false;
+                    if (!currentAnnotations.isEmpty()) {
+                        leadingAnnotations.addAll(currentAnnotations);
+                        currentAnnotations = new ArrayList<>();
                     }
-                    modifiers.add(mapToJModifier(it.getText(), currentAnnotations));
-                    currentAnnotations = new ArrayList<>();
-                } else {
-                    currentAnnotations.add(mapKModifierToAnnotation(it.getText()));
                 }
+                modifiers.add(mapToJModifier(it.getText(), currentAnnotations));
+                currentAnnotations = new ArrayList<>();
             } else if (it instanceof KtAnnotationEntry) {
                 if (annotationsMap.containsKey(it.getTextRange().getStartOffset())) {
                     J.Annotation annotation = (J.Annotation) visitElement(annotationsMap.get(it.getTextRange().getStartOffset()), null);
@@ -4245,23 +4281,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         ).withMarkers(Markers.EMPTY.addIfAbsent(new Implicit(randomId())));
     }
 
-    private J.Annotation convertToAnnotation(K.Modifier modifier) {
-        J.Identifier name = new J.Identifier(randomId(),
-                EMPTY,
-                Markers.EMPTY,
-                emptyList(),
-                modifier.getType().name().toLowerCase(),
-                null,
-                null);
-
-        return new J.Annotation(
-                randomId(),
-                modifier.getPrefix(),
-                Markers.EMPTY.addIfAbsent(new Modifier(randomId())),
-                name,
-                JContainer.empty());
-    }
-
     @Nullable
     private List<J.Annotation> mapAnnotations(List<FirAnnotation> firAnnotations) {
         if (firAnnotations.isEmpty()) {
@@ -4274,18 +4293,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             annotations.add(a);
         }
         return annotations;
-    }
-
-    private J.Annotation mapAnnotation(List<FirAnnotation> firAnnotations) {
-        if (firAnnotations.isEmpty()) {
-            throw new IllegalArgumentException("Unexpected empty list of FIR Annotations.");
-        }
-
-        FirAnnotation firAnnotation = firAnnotations.get(0);
-        J.Annotation annotation = (J.Annotation) visitElement(firAnnotation, null);
-
-        firAnnotations.remove(firAnnotation);
-        return annotation;
     }
 
     private J.ControlParentheses<Expression> mapControlParentheses(FirElement firElement) {
@@ -4379,91 +4386,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return label != null ? label.withStatement(statement) : statement;
     }
 
-    private List<J.Annotation> mapModifiers(List<FirAnnotation> firAnnotations, String stopWord) {
-        if ("<no name provided>".equals(stopWord)) {
-            List<J.Annotation> annotations = mapAnnotations(firAnnotations);
-            return annotations == null ? emptyList() : annotations;
-        }
-
-        List<FirAnnotation> findMatch = new ArrayList<>(firAnnotations.size());
-        findMatch.addAll(firAnnotations);
-
-        List<J.Annotation> modifiers = new ArrayList<>();
-        int count = 0;
-        while (count < 10) {
-            int saveCursor = cursor;
-            Space prefix = whitespace();
-
-            if (cursor == source.length() - 1 ||
-                    // Matched stop word.
-                    (source.startsWith(stopWord, cursor) && (source.length() - 1 == cursor + stopWord.length() ||
-                            (Character.isWhitespace(source.charAt(cursor + stopWord.length())) ||
-                                    isDelimiter(source.charAt(cursor + stopWord.length())))))) {
-                cursor(saveCursor);
-                return modifiers;
-            } else if (source.startsWith("@", cursor)) {
-                cursor(saveCursor);
-                J.Annotation annotation = mapAnnotation(findMatch);
-                modifiers.add(annotation);
-            } else if ((source.startsWith("val", cursor) || source.startsWith("var", cursor)) &&
-                    (Character.isWhitespace(source.charAt(cursor + 3)) ||
-                            isDelimiter(source.charAt(cursor + 3)))) {
-                String word = source.startsWith("val", cursor) ? "val" : "var";
-
-                J.Identifier name = createIdentifier(word);
-                modifiers.add(new J.Annotation(
-                        randomId(),
-                        prefix,
-                        Markers.EMPTY.addIfAbsent(new Modifier(randomId())),
-                        name,
-                        JContainer.empty()));
-            } else {
-                K.Modifier modifier = mapModifier(prefix, emptyList());
-                if (modifier == null) {
-                    cursor(saveCursor);
-                    return modifiers;
-                }
-                J.Annotation annotation = convertToAnnotation(modifier);
-                modifiers.add(annotation);
-            }
-
-            count++;
-        }
-
-        return modifiers;
-    }
-
-    private boolean isDelimiter(char c) {
-        return c == '(' || c == ')' || c == '{' || c == '}' || c == '<' || c == '>' || c == ':' || c == '.' || c == ',';
-    }
-
-    private boolean isJModifier(String modifier) {
-        switch (modifier) {
-            case "public":
-            case "protected":
-            case "private":
-            case "final":
-            case "abstract":
-                return true;
-        }
-        return false;
-    }
-
-    private J.Annotation mapKModifierToAnnotation(String kModifier) {
-        Space prefix = whitespace();
-        J.Identifier name = createIdentifier(kModifier);
-        return new J.Annotation(
-                randomId(),
-                prefix,
-                Markers.EMPTY.addIfAbsent(new Modifier(randomId())),
-                name,
-                JContainer.empty());
-    }
-
     private J.Modifier mapToJModifier(String text, List<J.Annotation> annotations) {
         Space prefix = whitespace();
 
         J.Modifier.Type type;
+        String keyword = null;
         switch (text) {
             case "public":
                 type = J.Modifier.Type.Public;
@@ -4474,87 +4401,18 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             case "private":
                 type = J.Modifier.Type.Private;
                 break;
-            case "final":
-                type = J.Modifier.Type.Final;
-                break;
             case "abstract":
                 type = J.Modifier.Type.Abstract;
                 break;
+            case "val":
+                type = J.Modifier.Type.Final;
+                break;
             default:
-                throw new IllegalArgumentException("Unknown modifier " + text);
+                type = J.Modifier.Type.LanguageExtension;
+                keyword = text;
         }
         skip(text);
-        return new J.Modifier(randomId(), prefix, Markers.EMPTY, null, type, annotations);
-    }
-
-    @Nullable
-    private K.Modifier mapModifier(Space prefix, List<J.Annotation> annotations) {
-        K.Modifier.Type type;
-        // Ordered based on kotlin requirements.
-        if (source.startsWith("public", cursor)) {
-            type = K.Modifier.Type.Public;
-        } else if (source.startsWith("protected", cursor)) {
-            type = K.Modifier.Type.Protected;
-        } else if (source.startsWith("private", cursor)) {
-            type = K.Modifier.Type.Private;
-        } else if (source.startsWith("internal", cursor)) {
-            type = K.Modifier.Type.Internal;
-        } else if (source.startsWith("expect", cursor)) {
-            type = K.Modifier.Type.Expect;
-        } else if (source.startsWith("actual", cursor)) {
-            type = K.Modifier.Type.Actual;
-        } else if (source.startsWith("final", cursor)) {
-            type = K.Modifier.Type.Final;
-        } else if (source.startsWith("open", cursor)) {
-            type = K.Modifier.Type.Open;
-        } else if (source.startsWith("abstract", cursor)) {
-            type = K.Modifier.Type.Abstract;
-        } else if (source.startsWith("sealed", cursor)) {
-            type = K.Modifier.Type.Sealed;
-        } else if (source.startsWith("const", cursor)) {
-            type = K.Modifier.Type.Const;
-        } else if (source.startsWith("external", cursor)) {
-            type = K.Modifier.Type.External;
-        } else if (source.startsWith("override", cursor)) {
-            type = K.Modifier.Type.Override;
-        } else if (source.startsWith("lateinit", cursor)) {
-            type = K.Modifier.Type.LateInit;
-        } else if (source.startsWith("tailrec", cursor)) {
-            type = K.Modifier.Type.TailRec;
-        } else if (source.startsWith("vararg", cursor)) {
-            type = K.Modifier.Type.Vararg;
-        } else if (source.startsWith("suspend", cursor)) {
-            type = K.Modifier.Type.Suspend;
-        } else if (source.startsWith("inner", cursor)) {
-            type = K.Modifier.Type.Inner;
-        } else if (source.startsWith("enum", cursor)) {
-            type = K.Modifier.Type.Enum;
-        } else if (source.startsWith("annotation", cursor)) {
-            type = K.Modifier.Type.Annotation;
-        } else if (source.startsWith("fun", cursor)) {
-            type = K.Modifier.Type.Fun;
-        } else if (source.startsWith("companion", cursor)) {
-            type = K.Modifier.Type.Companion;
-        } else if (source.startsWith("inline", cursor)) {
-            type = K.Modifier.Type.Inline;
-        } else if (source.startsWith("noinline", cursor)) {
-            type = K.Modifier.Type.NoInline;
-        } else if (source.startsWith("crossinline", cursor)) {
-            type = K.Modifier.Type.CrossInline;
-        } else if (source.startsWith("value", cursor)) {
-            type = K.Modifier.Type.Value;
-        } else if (source.startsWith("infix", cursor)) {
-            type = K.Modifier.Type.Infix;
-        } else if (source.startsWith("operator", cursor)) {
-            type = K.Modifier.Type.Operator;
-        } else if (source.startsWith("data", cursor)) {
-            type = K.Modifier.Type.Data;
-        } else {
-            return null;
-        }
-
-        cursor += type.name().length();
-        return new K.Modifier(randomId(), prefix, Markers.EMPTY, type, annotations);
+        return new J.Modifier(randomId(), prefix, Markers.EMPTY, keyword, type, annotations);
     }
 
     private J.Binary.Type mapOperation(FirOperation firOp) {
@@ -4644,10 +4502,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return null;
         }
         return ((KtRealPsiSourceElement) element.getSource()).getPsi();
-    }
-
-    private boolean isFakeSource(@Nullable FirElement element) {
-        return element != null && element.getSource() != null && element.getSource() instanceof KtFakeSourceElement;
     }
 
     @SuppressWarnings("unchecked")

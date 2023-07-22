@@ -52,33 +52,32 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitCompilationUnit(K.CompilationUnit sourceFile, PrintOutputCapture<P> p) {
-        K.CompilationUnit cu = sourceFile;
-
-        beforeSyntax(cu, Space.Location.COMPILATION_UNIT_PREFIX, p);
+        beforeSyntax(sourceFile, Space.Location.COMPILATION_UNIT_PREFIX, p);
 
         visit((sourceFile).getAnnotations(), p);
 
-        JRightPadded<J.Package> pkg = cu.getPadding().getPackageDeclaration();
+        JRightPadded<J.Package> pkg = sourceFile.getPadding().getPackageDeclaration();
         if (pkg != null) {
             visit(pkg.getElement(), p);
             visitSpace(pkg.getAfter(), Space.Location.PACKAGE_SUFFIX, p);
         }
 
-        for (JRightPadded<J.Import> import_ : cu.getPadding().getImports()) {
+        for (JRightPadded<J.Import> import_ : sourceFile.getPadding().getImports()) {
             visitRightPadded(import_, KRightPadded.Location.TOP_LEVEL_STATEMENT_SUFFIX, p);
         }
 
-        for (JRightPadded<Statement> statement : cu.getPadding().getStatements()) {
+        for (JRightPadded<Statement> statement : sourceFile.getPadding().getStatements()) {
             visitRightPadded(statement, KRightPadded.Location.TOP_LEVEL_STATEMENT_SUFFIX, p);
         }
 
-        visitSpace(cu.getEof(), Space.Location.COMPILATION_UNIT_EOF, p);
-        afterSyntax(cu, p);
-        return cu;
+        visitSpace(sourceFile.getEof(), Space.Location.COMPILATION_UNIT_EOF, p);
+        afterSyntax(sourceFile, p);
+        return sourceFile;
     }
 
     @Override
     public J visitBinary(K.Binary binary, PrintOutputCapture<P> p) {
+        beforeSyntax(binary, Space.Location.BINARY_PREFIX, p);
         String keyword = "";
         switch (binary.getOperator()) {
             case Contains:
@@ -94,7 +93,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 keyword = "..";
                 break;
         }
-        beforeSyntax(binary, KSpace.Location.BINARY_PREFIX, p);
         visit(binary.getLeft(), p);
         visitSpace(binary.getPadding().getOperator().getBefore(), KSpace.Location.BINARY_OPERATOR, p);
         p.append(keyword);
@@ -108,20 +106,19 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         visitSpace(binary.getAfter(), KSpace.Location.BINARY_SUFFIX, p);
         if (binary.getOperator() == K.Binary.Type.Get) {
             p.append("]");
-            Optional<CheckNotNull> maybeCheckNotNullMarker = binary.getMarkers().findFirst(CheckNotNull.class);
-            if (maybeCheckNotNullMarker.isPresent()) {
-                visitSpace(maybeCheckNotNullMarker.get().getPrefix(), KSpace.Location.CHECK_NOT_NULL_PREFIX, p);
-                p.append("!!");
-            }
+            checkNotNull(binary.getMarkers(), p);
         }
         return binary;
     }
 
     @Override
     public J visitFunctionType(K.FunctionType functionType, PrintOutputCapture<P> p) {
-        if (functionType.getSuspendModifier() != null) {
-            visitAnnotation(functionType.getSuspendModifier(), p);
+        beforeSyntax(functionType, KSpace.Location.FUNCTION_TYPE_PREFIX, p);
+        visit(functionType.getLeadingAnnotations(), p);
+        for (J.Modifier modifier : functionType.getModifiers()) {
+            delegate.visitModifier(modifier, p);
         }
+
         if (functionType.getReceiver() != null) {
             visitRightPadded(functionType.getReceiver(), KRightPadded.Location.FUNCTION_TYPE_RECEIVER, p);
             p.append(".");
@@ -189,7 +186,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     public J visitListLiteral(K.ListLiteral listLiteral, PrintOutputCapture<P> p) {
         beforeSyntax(listLiteral, KSpace.Location.LIST_LITERAL_PREFIX, p);
         visitContainer("[", listLiteral.getPadding().getElements(), KContainer.Location.LIST_LITERAL_ELEMENTS,
-                ",", "]", p);
+                "]", p);
         afterSyntax(listLiteral, p);
         return listLiteral;
     }
@@ -208,7 +205,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitWhenBranch(K.WhenBranch whenBranch, PrintOutputCapture<P> p) {
         beforeSyntax(whenBranch, KSpace.Location.WHEN_BRANCH_PREFIX, p);
-        visitContainer("", whenBranch.getPadding().getExpressions(), KContainer.Location.WHEN_BRANCH_EXPRESSION, ",", "->", p);
+        visitContainer("", whenBranch.getPadding().getExpressions(), KContainer.Location.WHEN_BRANCH_EXPRESSION, "->", p);
         visit(whenBranch.getBody(), p);
         return whenBranch;
     }
@@ -358,24 +355,19 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
         @Override
         public J visitClassDeclaration(J.ClassDeclaration classDecl, PrintOutputCapture<P> p) {
+            beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
+            visit(classDecl.getLeadingAnnotations(), p);
+            for (J.Modifier m : classDecl.getModifiers()) {
+                visitModifier(m, p);
+            }
+
             String kind;
             if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Class || classDecl.getKind() == J.ClassDeclaration.Kind.Type.Enum || classDecl.getKind() == J.ClassDeclaration.Kind.Type.Annotation) {
                 kind = "class";
             } else if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Interface) {
                 kind = "interface";
             } else {
-                throw new IllegalStateException("Implement me.");
-            }
-
-            beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
-            visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
-            classDecl.getLeadingAnnotations().forEach(a -> {
-                if (!a.getMarkers().findFirst(ExplicitInlineConstructor.class).isPresent()) {
-                    visit(a, p);
-                }
-            });
-            for (J.Modifier m : classDecl.getModifiers()) {
-                visitModifier(m, p);
+                throw new UnsupportedOperationException("Class kind is not supported: " + classDecl.getKind());
             }
 
             visit(classDecl.getAnnotations().getKind().getAnnotations(), p);
@@ -384,7 +376,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             KObject KObject = classDecl.getMarkers().findFirst(KObject.class).orElse(null);
             if (KObject != null) {
                 p.append("object");
-                if (classDecl.getLeadingAnnotations().stream().noneMatch(a -> a.getAnnotationType() instanceof J.Identifier && "companion".equals(((J.Identifier) a.getAnnotationType()).getSimpleName()))) {
+                if (!classDecl.getName().getMarkers().findFirst(Implicit.class).isPresent()) {
                     visit(classDecl.getName(), p);
                 }
             } else {
@@ -392,17 +384,31 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 visit(classDecl.getName(), p);
             }
 
-            classDecl.getLeadingAnnotations().forEach(a -> {
-                if (a.getMarkers().findFirst(ExplicitInlineConstructor.class).isPresent()) {
-                    visit(a, p);
-                }
-            });
-
             visitContainer("<", classDecl.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
 
-            if (classDecl.getPrimaryConstructor() != null) {
-                // Record state vector is misleading and should, but is the only Java equivalent in the model.
-                visitContainer("(", classDecl.getPadding().getPrimaryConstructor(), JContainer.Location.RECORD_STATE_VECTOR, ",", ")", p);
+            if (classDecl.getMarkers().findFirst(PrimaryConstructor.class).isPresent()) {
+                for (Statement statement : classDecl.getBody().getStatements()) {
+                    if (statement instanceof J.MethodDeclaration &&
+                            statement.getMarkers().findFirst(PrimaryConstructor.class).isPresent()) {
+                        J.MethodDeclaration method = (J.MethodDeclaration) statement;
+                        beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
+                        visit(method.getLeadingAnnotations(), p);
+                        for (J.Modifier modifier : method.getModifiers()) {
+                            visitModifier(modifier, p);
+                        }
+                        JContainer<Statement> params = method.getPadding().getParameters();
+                        beforeSyntax(params.getBefore(), params.getMarkers(), JContainer.Location.METHOD_DECLARATION_PARAMETERS.getBeforeLocation(), p);
+                        p.append("(");
+                        List<JRightPadded<Statement>> elements = params.getPadding().getElements();
+                        for (int i = 0;i < elements.size(); i++) {
+                            printMethodParameters(p, i, elements);
+                        }
+                        afterSyntax(params.getMarkers(), p);
+                        p.append(")");
+                        afterSyntax(method, p);
+                        break;
+                    }
+                }
             }
 
             if (classDecl.getImplements() != null) {
@@ -462,11 +468,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 KotlinPrinter.this.visitSpace(isNullable.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p);
                 p.append("?");
             }
-            CheckNotNull checkNotNull = ident.getMarkers().findFirst(CheckNotNull.class).orElse(null);
-            if (checkNotNull != null) {
-                KotlinPrinter.this.visitSpace(checkNotNull.getPrefix(), KSpace.Location.CHECK_NOT_NULL_PREFIX, p);
-                p.append("!!");
-            }
+            checkNotNull(ident.getMarkers(), p);
             afterSyntax(ident, p);
             return ident;
         }
@@ -577,12 +579,14 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
         @Override
         public J visitMethodDeclaration(J.MethodDeclaration method, PrintOutputCapture<P> p) {
-            if (method.getMarkers().findFirst(Implicit.class).isPresent()) {
-                return method;
+            // Do not print generated methods.
+            for (Marker marker : method.getMarkers().getMarkers()) {
+                if (marker instanceof Implicit || marker instanceof PrimaryConstructor) {
+                    return method;
+                }
             }
 
             beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
-            visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
             visit(method.getLeadingAnnotations(), p);
             for (J.Modifier m : method.getModifiers()) {
                 visitModifier(m, p);
@@ -605,7 +609,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 visitRightPadded(receiver, JRightPadded.Location.NAMED_VARIABLE, ".", p);
             }
 
-            visit(method.getName(), p);
+            if (!method.getName().getMarkers().findFirst(Implicit.class).isPresent()) {
+                visit(method.getName(), p);
+            }
 
             JContainer<Statement> params = method.getPadding().getParameters();
             beforeSyntax(params.getBefore(), params.getMarkers(), JContainer.Location.METHOD_DECLARATION_PARAMETERS.getBeforeLocation(), p);
@@ -613,12 +619,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             int i = hasReceiverType ? 1 : 0;
             List<JRightPadded<Statement>> elements = params.getPadding().getElements();
             for (;i < elements.size(); i++) {
-                JRightPadded<Statement> element = elements.get(i);
-                if (element.getElement().getMarkers().findFirst(Implicit.class).isPresent()) {
-                    continue;
-                }
-                String suffix = i == elements.size() - 1 ? "" : ",";
-                visitRightPadded(element, JContainer.Location.METHOD_DECLARATION_PARAMETERS.getElementLocation(), suffix, p);
+                printMethodParameters(p, i, elements);
             }
             afterSyntax(params.getMarkers(), p);
             p.append(")");
@@ -632,6 +633,15 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visit(method.getBody(), p);
             afterSyntax(method, p);
             return method;
+        }
+
+        private void printMethodParameters(PrintOutputCapture<P> p, int i, List<JRightPadded<Statement>> elements) {
+            JRightPadded<Statement> element = elements.get(i);
+            if (element.getElement().getMarkers().findFirst(Implicit.class).isPresent()) {
+                return;
+            }
+            String suffix = i == elements.size() - 1 ? "" : ",";
+            visitRightPadded(element, JContainer.Location.METHOD_DECLARATION_PARAMETERS.getElementLocation(), suffix, p);
         }
 
         @Override
@@ -687,11 +697,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 }
             }
 
-            CheckNotNull checkNotNull = method.getMarkers().findFirst(CheckNotNull.class).orElse(null);
-            if (checkNotNull != null) {
-                KotlinPrinter.this.visitSpace(checkNotNull.getPrefix(), KSpace.Location.CHECK_NOT_NULL_PREFIX, p);
-                p.append("!!");
-            }
+            checkNotNull(method.getMarkers(), p);
             afterSyntax(method, p);
             return method;
         }
@@ -816,7 +822,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
 
             beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
-            visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
 
             visit(multiVariable.getLeadingAnnotations(), p);
             for (J.Modifier m : multiVariable.getModifiers()) {
@@ -929,19 +934,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
-        protected void visitContainer(String before, @Nullable JContainer<? extends J> container, JContainer.Location location,
-                                      String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
-            if (container == null) {
-                return;
-            }
-            beforeSyntax(container.getBefore(), container.getMarkers(), location.getBeforeLocation(), p);
-            p.append(before);
-            visitRightPadded(container.getPadding().getElements(), location.getElementLocation(), suffixBetween, p);
-            afterSyntax(container.getMarkers(), p);
-            p.append(after == null ? "" : after);
-        }
-
-        @Override
         public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
             if (marker instanceof Semicolon) {
                 p.append(';');
@@ -1010,6 +1002,14 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
     }
 
+    private void checkNotNull(Markers markers, PrintOutputCapture<P> p) {
+        Optional<CheckNotNull> checkNotNull = markers.findFirst(CheckNotNull.class);
+        if (checkNotNull.isPresent()) {
+            KotlinPrinter.this.visitSpace(checkNotNull.get().getPrefix(), KSpace.Location.CHECK_NOT_NULL_PREFIX, p);
+            p.append("!!");
+        }
+    }
+
     @Override
     public Space visitSpace(Space space, KSpace.Location loc, PrintOutputCapture<P> p) {
         return delegate.visitSpace(space, Space.Location.LANGUAGE_EXTENSION, p);
@@ -1021,23 +1021,23 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     protected void visitContainer(String before, @Nullable JContainer<? extends J> container, KContainer.Location location,
-                                  String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
+                                  @Nullable String after, PrintOutputCapture<P> p) {
         if (container == null) {
             return;
         }
         visitSpace(container.getBefore(), location.getBeforeLocation(), p);
         p.append(before);
-        visitRightPadded(container.getPadding().getElements(), location.getElementLocation(), suffixBetween, p);
+        visitRightPadded(container.getPadding().getElements(), location.getElementLocation(), p);
         p.append(after == null ? "" : after);
     }
 
-    protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, KRightPadded.Location location, String suffixBetween, PrintOutputCapture<P> p) {
+    protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, KRightPadded.Location location, PrintOutputCapture<P> p) {
         for (int i = 0; i < nodes.size(); i++) {
             JRightPadded<? extends J> node = nodes.get(i);
             visit(node.getElement(), p);
             visitSpace(node.getAfter(), location.getAfterLocation(), p);
             if (i < nodes.size() - 1) {
-                p.append(suffixBetween);
+                p.append(",");
             }
         }
     }
@@ -1052,10 +1052,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
     private void beforeSyntax(K k, KSpace.Location loc, PrintOutputCapture<P> p) {
         beforeSyntax(k.getPrefix(), k.getMarkers(), loc, p);
-    }
-
-    private void beforeSyntax(J j, Space.Location loc, PrintOutputCapture<P> p) {
-        beforeSyntax(j.getPrefix(), j.getMarkers(), loc, p);
     }
 
     private void beforeSyntax(Space prefix, Markers markers, @Nullable KSpace.Location loc, PrintOutputCapture<P> p) {
@@ -1080,7 +1076,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             p.append(p.getMarkerPrinter().beforePrefix(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
         }
         if (loc != null) {
-            visitSpace(prefix, loc, p);
+            delegate.visitSpace(prefix, loc, p);
         }
         visitMarkers(markers, p);
         for (Marker marker : markers.getMarkers()) {

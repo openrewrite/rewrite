@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-@SuppressWarnings({"RedundantSuppression", "RedundantNullableReturnType", "RedundantVisibilityModifier"})
+@SuppressWarnings({"RedundantSuppression", "RedundantNullableReturnType", "RedundantVisibilityModifier", "UnusedReceiverParameter", "SortModifiers"})
 class AnnotationTest implements RewriteTest {
 
     @Test
@@ -173,7 +173,7 @@ class AnnotationTest implements RewriteTest {
           kotlin("@Repeatable annotation class A"),
           kotlin(
             """
-              class Example ( @get : A @set : A var foo: String , @get : A val bar: String )
+              class Example ( /**/  /**/ @get : A /**/ /**/ @set : A /**/ /**/ var foo: String , @get : A val bar: String )
               """
           )
         );

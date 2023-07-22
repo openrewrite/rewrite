@@ -75,6 +75,8 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
 
     public J visitFunctionType(K.FunctionType functionType, P p) {
         K.FunctionType f = functionType;
+        f = f.withLeadingAnnotations(ListUtils.map(f.getLeadingAnnotations(), a -> visitAndCast(a, p)));
+        f = f.withModifiers(ListUtils.map(f.getModifiers(), e -> visitAndCast(e, p)));
         f = f.withReceiver(visitRightPadded(f.getReceiver(), KRightPadded.Location.FUNCTION_TYPE_RECEIVER, p));
         f = f.withTypedTree(visitAndCast(f.getTypedTree(), p));
         return f;

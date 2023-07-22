@@ -33,7 +33,6 @@ import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -275,6 +274,7 @@ public interface K extends J {
         }
     }
 
+    @SuppressWarnings("unused")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -444,33 +444,15 @@ public interface K extends J {
     class FunctionType implements K, Expression, Statement, TypeTree {
 
         UUID id;
+        Space prefix;
+        Markers markers;
         TypedTree typedTree;
 
-        @Nullable
-        J.Annotation suspendModifier;
+        List<J.Annotation> leadingAnnotations;
+        List<J.Modifier> modifiers;
 
         @Nullable
         JRightPadded<NameTree> receiver;
-
-        @Override
-        public Space getPrefix() {
-            return typedTree.getPrefix();
-        }
-
-        @Override
-        public <J2 extends J> J2 withPrefix(Space space) {
-            return (J2) withTypedTree(typedTree.withPrefix(space));
-        }
-
-        @Override
-        public Markers getMarkers() {
-            return typedTree.getMarkers();
-        }
-
-        @Override
-        public <J2 extends Tree> J2 withMarkers(Markers markers) {
-            return (J2) withTypedTree(typedTree.withMarkers(markers));
-        }
 
         @Override
         public @Nullable JavaType getType() {
@@ -650,45 +632,7 @@ public interface K extends J {
         }
     }
 
-//    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-//    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-//    @Data
-//    final class AnnotationCallSite implements K, Statement {
-//
-//        @With
-//        @EqualsAndHashCode.Include
-//        UUID id;
-//
-//        @With
-//        Space prefix;
-//
-//        @With
-//        Markers markers;
-//
-//        @With
-//        @Nullable
-//        JRightPadded<J.Identifier> name;
-//
-//        @With
-//        J.Annotation annotation;
-//
-//        @Override
-//        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
-//            return v.visitAnnotationCallSite(this, p);
-//        }
-//
-//        @Override
-//        @Transient
-//        public CoordinateBuilder.Statement getCoordinates() {
-//            return new CoordinateBuilder.Statement(this);
-//        }
-//
-//        @Override
-//        public String toString() {
-//            return withPrefix(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
-//        }
-//    }
-
+    @SuppressWarnings("unused")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -738,14 +682,14 @@ public interface K extends J {
         }
 
         public Padding getPadding() {
-            Padding p;
+            ListLiteral.Padding p;
             if (this.padding == null) {
-                p = new Padding(this);
+                p = new ListLiteral.Padding(this);
                 this.padding = new WeakReference<>(p);
             } else {
                 p = this.padding.get();
                 if (p == null || p.t != this) {
-                    p = new Padding(this);
+                    p = new ListLiteral.Padding(this);
                     this.padding = new WeakReference<>(p);
                 }
             }
@@ -763,74 +707,6 @@ public interface K extends J {
             public ListLiteral withElements(JContainer<Expression> elements) {
                 return t.elements == elements ? t : new ListLiteral(t.id, t.prefix, t.markers, elements, t.type);
             }
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    final class Modifier implements K {
-        public static boolean hasModifier(Collection<K.Modifier> modifiers, K.Modifier.Type modifier) {
-            return modifiers.stream().anyMatch(m -> m.getType() == modifier);
-        }
-
-        @With
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        Space prefix;
-
-        @With
-        Markers markers;
-
-        @With
-        K.Modifier.Type type;
-
-        @With
-        @Getter
-        List<Annotation> annotations;
-
-        @Override
-        public String toString() {
-            return type.toString().toLowerCase();
-        }
-
-        /**
-         * These types are sorted in order of their recommended appearance in a list of modifiers, as defined in the
-         * <a href="https://kotlinlang.org/docs/coding-conventions.html#modifiers-order">KLS</a>.
-         */
-        public enum Type {
-            // TODO: trim as needed.
-            Public,
-            Protected,
-            Private,
-            Internal,
-            Expect,
-            Actual,
-            Final,
-            Open,
-            Abstract,
-            Sealed,
-            Const,
-            External,
-            Override,
-            LateInit,
-            TailRec,
-            Vararg,
-            Suspend,
-            Inner,
-            Enum,
-            Annotation,
-            Fun,
-            Companion,
-            Inline,
-            NoInline,
-            CrossInline,
-            Value,
-            Infix,
-            Operator,
-            Data
         }
     }
 
@@ -986,6 +862,7 @@ public interface K extends J {
         }
     }
 
+    @SuppressWarnings("unused")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
