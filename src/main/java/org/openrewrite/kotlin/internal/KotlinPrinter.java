@@ -818,11 +818,14 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
             visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
 
+            visit(multiVariable.getLeadingAnnotations(), p);
             for (J.Modifier m : multiVariable.getModifiers()) {
                 visitModifier(m, p);
+                if (m.getType() == J.Modifier.Type.Final) {
+                    p.append("val");
+                }
             }
 
-            visit(multiVariable.getLeadingAnnotations(), p);
             boolean containsTypeReceiver = multiVariable.getMarkers().findFirst(ReceiverType.class).isPresent();
             // This may be changed after K.VariableDeclaration is added and getters and setters exist on the model.
             // The implicit receiver should be added to the first position of the methods.
@@ -947,6 +950,63 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
 
             return super.visitMarker(marker, p);
+        }
+
+
+        /**
+         * Does not print the final modifier, as it is not supported in Kotlin.
+         */
+        @Override
+        protected void visitModifier(J.Modifier mod, PrintOutputCapture<P> p) {
+            visit(mod.getAnnotations(), p);
+            String keyword = "";
+            switch (mod.getType()) {
+                case Default:
+                    keyword = "default";
+                    break;
+                case Public:
+                    keyword = "public";
+                    break;
+                case Protected:
+                    keyword = "protected";
+                    break;
+                case Private:
+                    keyword = "private";
+                    break;
+                case Abstract:
+                    keyword = "abstract";
+                    break;
+                case Static:
+                    keyword = "static";
+                    break;
+                case Native:
+                    keyword = "native";
+                    break;
+                case NonSealed:
+                    keyword = "non-sealed";
+                    break;
+                case Sealed:
+                    keyword = "sealed";
+                    break;
+                case Strictfp:
+                    keyword = "strictfp";
+                    break;
+                case Synchronized:
+                    keyword = "synchronized";
+                    break;
+                case Transient:
+                    keyword = "transient";
+                    break;
+                case Volatile:
+                    keyword = "volatile";
+                    break;
+                case LanguageExtension:
+                    keyword = mod.getKeyword();
+                    break;
+            }
+            beforeSyntax(mod, Space.Location.MODIFIER_PREFIX, p);
+            p.append(keyword);
+            afterSyntax(mod, p);
         }
     }
 

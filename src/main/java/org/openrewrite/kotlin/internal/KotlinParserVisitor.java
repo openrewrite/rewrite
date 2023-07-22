@@ -1632,49 +1632,33 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 typeMapping.type(namedArgumentExpression.getTypeRef()));
     }
 
-    /**
-     * Check whether the giving property (include destructing) AST Node has `val` or `var` modifier.
-     *
-     * @param propertyNode the property AST Node to check
-     * @return `val` or `var` if the property node has `val` or `var` modifier. otherwise return null.
-     */
-    @Nullable
-    private static String getValOrVarModifier(@Nullable PsiElement propertyNode) {
-        if (propertyNode == null) {
-            return null;
-        }
-        Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(propertyNode).iterator();
-        while (iterator.hasNext()) {
-            PsiElement it = iterator.next();
-            if (it instanceof LeafPsiElement &&
-                    it.getNode().getElementType() instanceof KtKeywordToken) {
-                String keyword = ((KtKeywordToken) it.getNode().getElementType()).getValue();
-                if (keyword.equals("val") || keyword.equals("var")) {
-                    return keyword;
-                }
-            }
-        }
-        return null;
-    }
-
     @Override
     public J visitProperty(FirProperty property, ExecutionContext ctx) {
         Space prefix = whitespace();
         Markers markers = Markers.EMPTY;
 
-        List<J.Modifier> modifiers = emptyList();
         PsiElement propertyNode = getRealPsiElement(property);
-        List<PsiElement> propertyNodeChildren = Arrays.asList(propertyNode.getChildren());
+        KtModifierList modifierList = getModifierList(propertyNode);
 
-        KtModifierList modifierList = PsiTreeUtil.findChildOfType(propertyNode, KtModifierList.class);
-        List<J.Annotation> annotations = new ArrayList<>();
-        if (modifierList != null && modifierList.getTextRange().getStartOffset() == cursor) {
-            modifiers = mapModifierList(modifierList, collectFirAnnotations(property), annotations);
+        List<J.Modifier> modifiers = new ArrayList<>();
+        List<J.Annotation> leadingAnnotations = new ArrayList<>();
+        List<J.Annotation> trailingAnnotations = new ArrayList<>();
+
+        if (modifierList != null) {
+            modifiers = mapModifierList(modifierList, collectFirAnnotations(property), leadingAnnotations, trailingAnnotations);
         }
 
-        String maybeValOrVarModifier = getValOrVarModifier(propertyNode);
-        if (maybeValOrVarModifier != null) {
-            annotations.add(mapKModifierToAnnotation(maybeValOrVarModifier));
+        // FIXME. may be removed.
+        List<PsiElement> propertyNodeChildren = Arrays.asList(propertyNode.getChildren());
+
+        PsiElement varOrVar = ((KtValVarKeywordOwner) propertyNode).getValOrVarKeyword();
+        if (varOrVar != null) {
+            if ("val".equals(varOrVar.getText())) {
+                modifiers.add(new J.Modifier(randomId(), sourceBefore("val"), Markers.EMPTY, null, J.Modifier.Type.Final, trailingAnnotations));
+            } else {
+                modifiers.add(new J.Modifier(randomId(), sourceBefore("var"), Markers.EMPTY, "var", J.Modifier.Type.LanguageExtension, trailingAnnotations));
+            }
+            trailingAnnotations = null;
         }
 
         J.VariableDeclarations receiver = null;
@@ -1766,6 +1750,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         } else {
             Space namePrefix = whitespace();
             J.Identifier name = createIdentifier(property.getName().asString(), property);
+            if (trailingAnnotations != null) {
+                name = name.withAnnotations(trailingAnnotations);
+            }
 
             Space exprPrefix = EMPTY;
             J initializer;
@@ -1933,8 +1920,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 randomId(),
                 prefix,
                 markers,
-                annotations,
-                modifiers,
+                leadingAnnotations.isEmpty() ? emptyList() : leadingAnnotations,
+                modifiers.isEmpty() ? emptyList() : modifiers,
                 typeExpression,
                 null,
                 emptyList(),
@@ -2236,7 +2223,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
         Markers markers = Markers.EMPTY;
 
-        List<J.Annotation> annotations = mapModifiers(simpleFunction.getAnnotations(), simpleFunction.getName().asString());
+        PsiElement functionNode = getRealPsiElement(simpleFunction);
+        List<J.Modifier> modifiers = new ArrayList<>();
+        List<J.Annotation> leadingAnnotations = new ArrayList<>();
+        List<J.Annotation> trailingAnnotations = new ArrayList<>();
+        KtModifierList modifierList = getModifierList(functionNode);
+        if (modifierList != null) {
+            modifiers = mapModifierList(modifierList, simpleFunction.getAnnotations(), leadingAnnotations, trailingAnnotations);
+        }
+
+        modifiers.add(new J.Modifier(randomId(), sourceBefore("fun"), Markers.EMPTY, "fun", J.Modifier.Type.LanguageExtension, trailingAnnotations));
 
         J.TypeParameters typeParameters = null;
         if (!simpleFunction.getTypeParameters().isEmpty()) {
@@ -2354,8 +2350,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 randomId(),
                 prefix,
                 markers,
-                annotations,
-                emptyList(),
+                leadingAnnotations.isEmpty() ? emptyList() : leadingAnnotations,
+                modifiers.isEmpty() ? emptyList() : modifiers,
                 typeParameters,
                 returnTypeExpression,
                 new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
@@ -3434,11 +3430,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
         Markers markers = Markers.EMPTY;
 
-        List<J.Modifier> modifiers = emptyList();
-        KtModifierList modifierList = PsiTreeUtil.findChildOfType(getRealPsiElement(regularClass), KtModifierList.class);
-        List<J.Annotation> leadingAnnotations = new ArrayList<>();
-        List<J.Annotation> kindAnnotations = new ArrayList<>();
-        if (modifierList != null && modifierList.getTextRange().getStartOffset() == cursor) {
+        PsiElement classNode = getRealPsiElement(regularClass);
+        KtModifierList modifierList = getModifierList(classNode);
+
+        List<J.Modifier> modifiers = new ArrayList<>();
+        List<J.Annotation> leadingAnnotations = new ArrayList<>();;
+        List<J.Annotation> kindAnnotations = new ArrayList<>();;
+        if (modifierList != null) {
             modifiers = mapModifierList(modifierList, regularClass.getAnnotations(), leadingAnnotations, kindAnnotations);
         }
 
@@ -3663,8 +3661,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 randomId(),
                 prefix,
                 markers,
-                leadingAnnotations,
-                modifiers,
+                leadingAnnotations.isEmpty() ? emptyList() : leadingAnnotations,
+                modifiers.isEmpty() ? emptyList() : modifiers,
                 kind,
                 name,
                 typeParams,
@@ -4622,9 +4620,22 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     }
 
     @Nullable
-    private KtModifierList getModifierList(@Nullable FirElement element) {
-        PsiElement psiElement = getRealPsiElement(element);
-        return psiElement == null ? null : PsiTreeUtil.findChildOfType(psiElement, KtModifierList.class);
+    private KtModifierList getModifierList(@Nullable PsiElement element) {
+        if (element == null) {
+            return null;
+        }
+
+        KtModifierList modifierList = PsiTreeUtil.findChildOfType(element, KtModifierList.class);
+        if (modifierList != null) {
+            // There may be multiple modifier lists in the element, and we only want the modifier list for the element.
+            for (PsiElement child : element.getChildren()) {
+                // The element's start offset will be at the last leading comment.
+                if (child instanceof KtModifierList && modifierList.getTextRange().getStartOffset() == child.getTextRange().getStartOffset()) {
+                    return modifierList;
+                }
+            }
+        }
+        return null;
     }
 
     @Nullable
