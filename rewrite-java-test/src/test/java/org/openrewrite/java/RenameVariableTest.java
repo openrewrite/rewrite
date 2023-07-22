@@ -171,6 +171,43 @@ class RenameVariableTest implements RewriteTest {
     }
 
     @Test
+    void renameFieldWithSameNameAsParameterWithJavaDoc() {
+        rewriteRun(
+            spec -> spec.recipe(renameVariableTest("name", "_name", false)),
+            java(
+                """
+                public class A {
+                    private String name;
+                    
+                    /**
+                     * The length of <code>name</code> added to the length of {@link #name}.
+                     *
+                     * @param name My parameter.
+                     */
+                    int fooA(String name) {
+                        return name.length() + this.name.length();
+                    }
+                }
+                """,
+                """
+                public class A {
+                    private String _name;
+                    
+                    /**
+                     * The length of <code>name</code> added to the length of {@link #_name}.
+                     *
+                     * @param name My parameter.
+                     */
+                    int fooA(String name) {
+                        return name.length() + this._name.length();
+                    }
+                }
+                """
+                )
+            );
+    }
+    
+    @Test
     void doNotChangeToJavaKeyword() {
         rewriteRun(
           spec -> spec.recipe(renameVariableTest("v", "int", true)),
