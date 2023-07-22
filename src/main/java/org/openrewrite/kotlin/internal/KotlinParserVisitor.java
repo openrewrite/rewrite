@@ -41,6 +41,7 @@ import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef;
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitUnitTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
+import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.openrewrite.ExecutionContext;
@@ -57,6 +58,7 @@ import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.KotlinTypeMapping;
 import org.openrewrite.kotlin.marker.*;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 
@@ -634,13 +636,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         List<JRightPadded<Statement>> statements = new ArrayList<>(firStatements.size());
         for (int i = 0; i < firStatements.size(); i++) {
             FirElement firElement = firStatements.get(i);
-            // Skip receiver of the unary post increment or decrement.
+            PsiElement element = getRealPsiElement(firElement);
+
             if (firElement.getSource() != null && firElement.getSource().getKind() instanceof KtFakeSourceElementKind.DesugaredIncrementOrDecrement &&
                     !(firElement instanceof FirVariableAssignment)) {
                 continue;
             }
 
-            J expr = null;
+            J j = null;
             if (firElement instanceof FirBlock && ((FirBlock) firElement).getStatements().size() == 2) {
                 // For loops are wrapped in a block and split into two FirElements.
                 // The FirProperty at position 0 is the control of the for loop.
@@ -650,41 +653,31 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 if (check.getStatements().get(0) instanceof FirProperty &&
                         "<iterator>".equals(((FirProperty) check.getStatements().get(0)).getName().asString()) &&
                         check.getStatements().get(1) instanceof FirWhileLoop) {
-                    expr = mapForLoop(check);
+                    j = mapForLoop(check);
                 }
             }
 
             int skipImplicitDestructs = 0;
-            if (firElement instanceof FirProperty && "<destruct>".equals(((FirProperty) firElement).getName().asString())) {
-                // Destructs are represented as FirProperty with the name "<destruct>".
-                // The destruct property does not the values declared in the destruct `(a, b, ..., c)`.
-                // However, the property initialization IS a part of the FirProperty.
-                // The Kotlin compiler adds the values `a, b, ..., c` in the FirBlock after the destruct property.
-                // So, we need to skip the destruct values when mapping the FirProperty.
-                saveCursor = cursor;
-                sourceBefore("(");
-                skipImplicitDestructs = sourceBefore(")").getWhitespace().split(",").length;
-                cursor(saveCursor);
+            if (element instanceof KtDestructuringDeclaration) {
+                KtDestructuringDeclaration destruct = (KtDestructuringDeclaration) element;
+                j = mapDestructProperty(firStatements.subList(i, i + destruct.getEntries().size() + 1));
+                skipImplicitDestructs = destruct.getEntries().size();
             }
 
-            if (expr == null) {
-                expr = convertToExpression(firElement, ctx);
-                if (!(expr instanceof Statement)) {
-                    if (expr instanceof Expression) {
-                        expr = new K.ExpressionStatement(randomId(), (Expression) expr);
-                    } else {
-                        throw new IllegalStateException("Unexpected expression type " + expr.getClass().getSimpleName());
-                    }
+            if (j == null) {
+                j = visitElement(firElement, ctx);
+                if (!(j instanceof Statement) && j instanceof Expression) {
+                    j = new K.ExpressionStatement(randomId(), (Expression) j);
                 }
-                i += skipImplicitDestructs;
             }
 
-            JRightPadded<Statement> stat = JRightPadded.build((Statement) expr);
+            i += skipImplicitDestructs;
+
+            JRightPadded<Statement> stat = JRightPadded.build((Statement) j);
             saveCursor = cursor;
             Space beforeSemicolon = whitespace();
             if (cursor < source.length() && source.charAt(cursor) == ';') {
-                stat = stat
-                        .withMarkers(stat.getMarkers().add(new Semicolon(randomId())))
+                stat = stat.withMarkers(stat.getMarkers().add(new Semicolon(randomId())))
                         .withAfter(beforeSemicolon);
                 skip(";");
             } else {
@@ -1121,6 +1114,114 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         return receiver;
+    }
+
+    private K.DestructuringDeclaration mapDestructProperty(List<FirStatement> properties) {
+        Space prefix = whitespace();
+        FirProperty initializer = (FirProperty) properties.get(0);
+        KtDestructuringDeclaration destructuringDeclaration = (KtDestructuringDeclaration) getRealPsiElement(initializer);
+
+        List<J.Modifier> modifiers = new ArrayList<>();
+        List<J.Annotation> leadingAnnotations = new ArrayList<>();
+        List<J.Annotation> trailingAnnotations = new ArrayList<>();
+        KtModifierList modifierList = getModifierList(destructuringDeclaration);
+        if (modifierList != null) {
+            modifiers = mapModifierList(modifierList, initializer.getAnnotations(), leadingAnnotations, trailingAnnotations);
+        }
+
+        PsiElement keyword = destructuringDeclaration.getValOrVarKeyword();
+        if ("val".equals(keyword.getText())) {
+            modifiers.add(new J.Modifier(
+                    randomId(),
+                    sourceBefore("val"),
+                    Markers.EMPTY,
+                    null,
+                    J.Modifier.Type.Final,
+                    trailingAnnotations
+            ));
+            trailingAnnotations = null;
+        } else if ("var".equals(keyword.getText())) {
+            modifiers.add(mapToJModifier("var", trailingAnnotations));
+            trailingAnnotations = null;
+        }
+
+        Space before = sourceBefore("(");
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(properties.size() - 1);
+        JLeftPadded<Expression> paddedInitializer = null;
+        for (int i = 1; i < properties.size(); i++) {
+            FirProperty property = (FirProperty) properties.get(i);
+            KtDestructuringDeclarationEntry entry = (KtDestructuringDeclarationEntry) getRealPsiElement(property);
+
+            List<J.Annotation> annotations = new ArrayList<>();
+            PsiElement propNode = getRealPsiElement(property);
+            KtModifierList modifierListVar = getModifierList(propNode);
+            if (modifierListVar != null) {
+                mapModifierList(modifierListVar, property.getAnnotations(), emptyList(), annotations);
+            }
+            JavaType.Variable vt = (JavaType.Variable) typeMapping.type(property, getCurrentFile());
+            J.Identifier nameVar = createIdentifier(entry.getName(), vt.getType(), vt).withAnnotations(annotations);
+            nameVar = trailingAnnotations == null ? nameVar : nameVar.withAnnotations(trailingAnnotations);
+            J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
+                    randomId(),
+                    EMPTY,
+                    Markers.EMPTY,
+                    nameVar,
+                    emptyList(),
+                    null,
+                    vt);
+            trailingAnnotations = null;
+
+            J j = visitComponentCall((FirComponentCall) property.getInitializer(), ctx, true);
+            if (!(j instanceof Expression) && j instanceof Statement) {
+                j = new K.StatementExpression(randomId(), (Statement) j);
+            }
+            namedVariable = namedVariable.getPadding().withInitializer(padLeft(Space.build(" ", emptyList()), (Expression) j));
+            JRightPadded<J.VariableDeclarations.NamedVariable> paddedVariable;
+            if (i == properties.size() - 1) {
+                Space after = sourceBefore(")");
+                paddedInitializer = padLeft(sourceBefore("="), convertToExpression(initializer.getInitializer(), ctx));
+                paddedVariable = padRight(namedVariable, after);
+            } else {
+                paddedVariable = padRight(namedVariable, sourceBefore(","));
+            }
+
+            vars.add(paddedVariable);
+        }
+
+        J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
+                randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                leadingAnnotations,
+                modifiers,
+                null,
+                null,
+                emptyList(),
+                singletonList(padRight(new J.VariableDeclarations.NamedVariable(
+                        randomId(),
+                        EMPTY,
+                        Markers.EMPTY,
+                        new J.Identifier(
+                                randomId(),
+                                Space.build(" ", emptyList()),
+                                Markers.EMPTY,
+                                emptyList(),
+                                initializer.getName().asString(),
+                                null,
+                                null
+                        ),
+                        emptyList(),
+                        paddedInitializer,
+                        null
+                ), EMPTY))
+        );
+        return new K.DestructuringDeclaration(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                variableDeclarations,
+                JContainer.build(before, vars, Markers.EMPTY)
+        );
     }
 
     @Nullable
@@ -1640,8 +1741,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
         Markers markers = Markers.EMPTY;
 
-        PsiElement propertyNode = getRealPsiElement(property);
-        KtModifierList modifierList = getModifierList(propertyNode);
+        PsiElement node = getRealPsiElement(property);
+        KtModifierList modifierList = getModifierList(node);
 
         List<J.Modifier> modifiers = new ArrayList<>();
         List<J.Annotation> leadingAnnotations = emptyList();
@@ -1653,34 +1754,21 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             modifiers = mapModifierList(modifierList, collectFirAnnotations(property), leadingAnnotations, lastAnnotations);
         }
 
-        // FIXME. may be removed.
-        List<PsiElement> propertyNodeChildren = Arrays.asList(propertyNode.getChildren());
-
-        PsiElement varOrVar = ((KtValVarKeywordOwner) propertyNode).getValOrVarKeyword();
+        PsiElement varOrVar = node == null ? null : ((KtValVarKeywordOwner) node).getValOrVarKeyword();
         if (varOrVar != null) {
             if ("val".equals(varOrVar.getText())) {
                 modifiers.add(new J.Modifier(randomId(), sourceBefore("val"), Markers.EMPTY, null, J.Modifier.Type.Final, lastAnnotations));
             } else {
                 modifiers.add(new J.Modifier(randomId(), sourceBefore("var"), Markers.EMPTY, "var", J.Modifier.Type.LanguageExtension, lastAnnotations));
             }
-            lastAnnotations = null;
         }
 
-        J.VariableDeclarations receiver = null;
+        JRightPadded<Statement> receiver = null;
         if (property.getReceiverTypeRef() != null) {
             // Generates a VariableDeclaration to represent the receiver similar to how it is done in the Kotlin compiler.
             TypeTree receiverName = (TypeTree) visitElement(property.getReceiverTypeRef(), ctx);
             markers = markers.addIfAbsent(new ReceiverType(randomId()));
-            J.VariableDeclarations.NamedVariable receiverVar = new J.VariableDeclarations.NamedVariable(
-                    randomId(),
-                    EMPTY,
-                    Markers.EMPTY,
-                    new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "", null, null),
-                    emptyList(),
-                    null,
-                    null
-            );
-            receiver = new J.VariableDeclarations(
+            receiver = padRight(new J.VariableDeclarations(
                     randomId(),
                     EMPTY,
                     Markers.EMPTY,
@@ -1689,105 +1777,43 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     receiverName,
                     null,
                     emptyList(),
-                    singletonList(padRight(receiverVar, sourceBefore(".")))
-            ).withMarkers(Markers.EMPTY.addIfAbsent(new Implicit(randomId())));
+                    emptyList()), sourceBefore("."));
         }
 
-        boolean isDestruct = "<destruct>".equals(property.getName().asString()) && property.getReturnTypeRef() instanceof FirResolvedTypeRef;
-        int initialCapacity = isDestruct ?
-                ((FirResolvedTypeRef) property.getReturnTypeRef()).getType().getTypeArguments().length : 1;
-        List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = new ArrayList<>(initialCapacity);
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables;
 
+        J.MethodDeclaration getter = null;
+        J.MethodDeclaration setter = null;
+        boolean isSetterFirst = false;
         TypeTree typeExpression = null;
-        if (isDestruct) {
-            // Destructuring declarations do not fit well into the `J.VariableDeclarations` model.
-            // So, the position of prefixes are slightly adjusted to preserve the prefix of `(` and the suffix of `)`.
-            Space destructPrefix = sourceBefore("(");
-            int saveCursor = cursor;
-            String params = sourceBefore(")").getWhitespace();
-            String[] paramNames = params.split(",");
-            cursor(saveCursor);
 
-            ConeTypeProjection[] typeArguments = null;
-            if (property.getReturnTypeRef() instanceof FirResolvedTypeRef && (property.getReturnTypeRef().getSource() == null || !(property.getReturnTypeRef().getSource().getKind() instanceof KtFakeSourceElementKind))) {
-                FirResolvedTypeRef typeRef = (FirResolvedTypeRef) property.getReturnTypeRef();
-                typeArguments = typeRef.getType().getTypeArguments();
-            }
+        Space namePrefix = whitespace();
+        J.Identifier name = createIdentifier(property.getName().asString(), property);
 
-            JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = null;
-            for (int j = 0; j < paramNames.length; j++) {
-                String paramName = paramNames[j].trim();
-                JavaType type = typeArguments == null || j >= typeArguments.length ? null : typeMapping.type(typeArguments[j]);
-                J.Identifier name = createIdentifier(paramName, type, null);
-                namedVariable = JRightPadded.build(
-                        new J.VariableDeclarations.NamedVariable(
-                                randomId(),
-                                destructPrefix == null ? EMPTY : destructPrefix,
-                                Markers.EMPTY,
-                                name,
-                                emptyList(),
-                                null,
-                                typeMapping.variableType(property.getSymbol(), null, getCurrentFile())
-                        ));
-                if (j != paramNames.length - 1) {
-                    namedVariable = namedVariable.withAfter(sourceBefore(","));
-                    variables.add(namedVariable);
-                } else {
-                    // The variable is not added here, because an initializer might be present.
-                    namedVariable = namedVariable.withAfter(sourceBefore(")"));
-                }
-                destructPrefix = null;
-            }
-
-            J expr = null;
-            saveCursor = cursor;
-            Space exprPrefix = whitespace();
-            if (property.getInitializer() != null && source.startsWith("=", cursor)) {
-                skip("=");
-                expr = convertToExpression(property.getInitializer(), ctx);
-            } else {
-                exprPrefix = EMPTY;
-                cursor(saveCursor);
-            }
-            assert namedVariable != null;
-            namedVariable = namedVariable.withElement(namedVariable.getElement().getPadding().withInitializer(expr == null ? null : padLeft(exprPrefix, (Expression) expr)));
-            variables.add(namedVariable);
-        } else {
-            Space namePrefix = whitespace();
-            J.Identifier name = createIdentifier(property.getName().asString(), property);
-            if (lastAnnotations != null && !lastAnnotations.isEmpty()) {
-                name = name.withAnnotations(lastAnnotations);
-            }
-
-            Space exprPrefix = EMPTY;
-            J initializer;
-            List<J> expressions = null;
+        JLeftPadded<Expression> initializer = null;
+        if (node != null) {
             Markers initMarkers = Markers.EMPTY;
             if (property.getDelegate() != null) {
                 if (property.getDelegate() instanceof FirFunctionCall && "lazy".equals(((FirFunctionCall) property.getDelegate()).getCalleeReference().getName().asString())) {
-                    exprPrefix = whitespace();
-                    String current = source.substring(cursor);
-                    J.Identifier delegateName = createIdentifier(current.substring(0, current.indexOf(((FirFunctionCall) property.getDelegate()).getCalleeReference().getName().asString())).trim());
-                    skip(delegateName.getSimpleName());
+                    PsiElement prev = PsiTreeUtil.skipWhitespacesAndCommentsBackward(getRealPsiElement(property.getDelegate()));
+                    Space before = sourceBefore(prev.getText());
 
-                    initializer = convertToExpression(property.getDelegate(), ctx);
-                    // TODO: make sure the marker is on the correct element.
                     initMarkers = initMarkers.addIfAbsent(new By(randomId()));
-                    expressions = new ArrayList<>(1);
-                    expressions.add(initializer);
+                    initializer = padLeft(before, convertToExpression(property.getDelegate(), ctx));
                 } else {
                     throw new UnsupportedOperationException(generateUnsupportedMessage("Unexpected property delegation. FirProperty#delegate for name: " +
                             ((FirFunctionCall) property.getDelegate()).getCalleeReference().getName().asString()));
                 }
-            } else if (property.getReturnTypeRef() instanceof FirResolvedTypeRef && (property.getReturnTypeRef().getSource() == null || !(property.getReturnTypeRef().getSource().getKind() instanceof KtFakeSourceElementKind))) {
+            } else if (property.getReturnTypeRef() instanceof FirResolvedTypeRef &&
+                    (property.getReturnTypeRef().getSource() == null || !(property.getReturnTypeRef().getSource().getKind() instanceof KtFakeSourceElementKind))) {
                 FirResolvedTypeRef typeRef = (FirResolvedTypeRef) property.getReturnTypeRef();
                 if (typeRef.getDelegatedTypeRef() != null) {
-                    Space delimiterPrefix = whitespace();
-                    boolean addTypeReferencePrefix = source.startsWith(":", cursor);
-                    skip(":");
+                    PsiElement prev = PsiTreeUtil.skipWhitespacesAndCommentsBackward(getRealPsiElement(typeRef.getDelegatedTypeRef()));
+                    boolean addTypeReferencePrefix = prev instanceof LeafPsiElement && ((LeafPsiElement) prev).getElementType() == KtTokens.COLON;
                     if (addTypeReferencePrefix) {
-                        markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), delimiterPrefix));
+                        markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), sourceBefore(":")));
                     }
+
                     J j = visitElement(typeRef, ctx);
                     if (j instanceof TypeTree) {
                         typeExpression = (TypeTree) j;
@@ -1797,140 +1823,92 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 }
             }
 
-            if (property.getInitializer() != null && source.substring(cursor).trim().startsWith("=")) {
-                exprPrefix = whitespace();
-                expressions = new ArrayList<>(1);
-                skip("=");
-                initializer = convertToExpression(property.getInitializer(), ctx);
-                expressions.add(initializer);
-            } else if (initMarkers.getMarkers().isEmpty()) {
+            PsiElement equals = null;
+            KtProperty propertyNode = null;
+            if (node instanceof KtProperty) {
+                propertyNode = (KtProperty) node;
+                equals = propertyNode.getEqualsToken();
+            } else if (node instanceof KtParameter) {
+                KtParameter parameterNode = (KtParameter) node;
+                equals = parameterNode.getEqualsToken();
+            }
+
+            if (equals != null) {
+                initializer = padLeft(sourceBefore("="), convertToExpression(property.getInitializer(), ctx));
+            } else if (initMarkers.getMarkers().isEmpty()){
                 initMarkers = initMarkers.addIfAbsent(new OmitEquals(randomId()));
             }
 
-            // getters and setter may be auto-generated by the compiler, so we need to check if they are valid.
-            // ... the order of the getter and setter is not preserved by compiler, so we have to sort them out.
-            J.MethodDeclaration getter;
-            J.MethodDeclaration setter;
-            if (isValidGetter(property.getGetter()) && isValidSetter(property.getSetter())) {
-                if (expressions == null) {
-                    expressions = new ArrayList<>(2);
-                }
-                List<KtPropertyAccessor> accessors = propertyNodeChildren.stream()
-                        .filter(KtPropertyAccessor.class::isInstance)
-                        .map(KtPropertyAccessor.class::cast)
-                        .collect(toList());
-                if (accessors.size() > 2) {
-                    throw new RuntimeException("Detected over sized explicit property accessors from a property, should have setter/getter only");
-                }
-
-                for (KtPropertyAccessor ktPropertyAccessor : accessors) {
-                    Optional<KtDeclarationModifierList> maybeModifier = Arrays.stream(ktPropertyAccessor.getChildren())
-                            .filter(KtDeclarationModifierList.class::isInstance)
-                            .map(KtDeclarationModifierList.class::cast)
-                            .findFirst();
-                    boolean hasAnnotationBeforeAccessors = maybeModifier.isPresent();
-                    List<J.Annotation> annos = new ArrayList<>();
-                    if (hasAnnotationBeforeAccessors) {
-                        mapModifierList(maybeModifier.get(), collectFirAnnotations(property), emptyList(), annos);
-                    }
-
-                    Space accessorPrefix = whitespace();
-                    LeafPsiElement accessorNode = getGetterOrSetterNode(ktPropertyAccessor);
-                    if (accessorNode == null) {
-                        throw new RuntimeException("a ktPropertyAccessor node should have get or set");
-                    }
-
-                    FirPropertyAccessor firPropertyAccessor = null;
-                    if (accessorNode.getText().equals("get")) {
-                        firPropertyAccessor = property.getGetter();
-                    } else if (accessorNode.getText().equals("set")) {
-                        firPropertyAccessor = property.getSetter();
-                    }
-
-                    J.MethodDeclaration m = (J.MethodDeclaration) visitElement(firPropertyAccessor, ctx);
-                    m = m.withPrefix(accessorPrefix);
-                    if (receiver != null) {
-                        m = m.withParameters(ListUtils.concat(receiver, m.getParameters()));
-                    }
-                    if (hasAnnotationBeforeAccessors) {
-                        m = m.withLeadingAnnotations(annos)
-                            .withName(m.getName().withPrefix(accessorPrefix))
-                            .withPrefix(EMPTY);
-                    }
-                    expressions.add(m);
-                }
-            } else if (isValidGetter(property.getGetter()) && !isValidSetter(property.getSetter())) {
-                if (expressions == null) {
-                    expressions = new ArrayList<>(2);
-                }
-
-                getter = (J.MethodDeclaration) visitElement(property.getGetter(), ctx);
-                if (receiver != null) {
-                    getter = getter.withParameters(ListUtils.concat(receiver, getter.getParameters()));
-
-                    setter = createImplicitMethodDeclaration("set").withParameters(singletonList(receiver));
-                    expressions.add(setter);
-                }
-                expressions.add(getter);
-            } else if (!isValidGetter(property.getGetter()) && isValidSetter(property.getSetter())) {
-                if (expressions == null) {
-                    expressions = new ArrayList<>(2);
-                }
-
-                setter = (J.MethodDeclaration) visitElement(property.getSetter(), ctx);
-                if (receiver != null) {
-                    setter = setter.withParameters(ListUtils.concat(receiver, setter.getParameters()));
-
-                    getter = createImplicitMethodDeclaration("get").withParameters(singletonList(receiver));
-                    expressions.add(getter);
-                }
-                expressions.add(setter);
-            } else if (receiver != null) {
-                if (expressions == null) {
-                    expressions = new ArrayList<>(2);
-                }
-
-                getter = createImplicitMethodDeclaration("get").withParameters(singletonList(receiver));
-                expressions.add(getter);
-
-                setter = createImplicitMethodDeclaration("set").withParameters(singletonList(receiver));
-                expressions.add(setter);
+            for (Marker marker : initMarkers.getMarkers()) {
+                markers = markers.addIfAbsent(marker);
             }
 
-            Expression expr = null;
-            if (expressions != null) {
-                expr = new K.NamedVariableInitializer(
-                        randomId(),
-                        EMPTY,
-                        initMarkers,
-                        expressions
-                );
+            List<KtPropertyAccessor> accessors = propertyNode != null ? propertyNode.getAccessors() : null;
+            isSetterFirst = accessors != null && !accessors.isEmpty() && accessors.get(0).isSetter();
+            if (isSetterFirst) {
+                if (isValidSetter(property.getSetter())) {
+                    setter = (J.MethodDeclaration) visitElement(property.getSetter(), ctx);
+                }
+
+                if (isValidGetter(property.getGetter())) {
+                    getter = (J.MethodDeclaration) visitElement(property.getGetter(), ctx);
+                }
+            } else {
+                if (isValidGetter(property.getGetter())) {
+                    getter = (J.MethodDeclaration) visitElement(property.getGetter(), ctx);
+                }
+
+                if (isValidSetter(property.getSetter())) {
+                    setter = (J.MethodDeclaration) visitElement(property.getSetter(), ctx);
+                }
             }
 
-            JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = maybeSemicolon(
-                    new J.VariableDeclarations.NamedVariable(
-                            randomId(),
-                            namePrefix,
-                            Markers.EMPTY,
-                            name,
-                            emptyList(),
-                            expr == null ? null : padLeft(exprPrefix, expr),
-                            typeMapping.variableType(property.getSymbol(), null, getCurrentFile())
-                    ));
+            if (receiver != null) {
+                if (getter == null) {
+                    getter = createImplicitMethodDeclaration("get");
+                }
+                getter = getter.getPadding().withParameters(getter.getPadding().getParameters().getPadding().withElements(singletonList(receiver)));
 
-            variables.add(namedVariable);
+                if (setter == null) {
+                    setter = createImplicitMethodDeclaration("set");
+                }
+                setter = setter.getPadding().withParameters(setter.getPadding().getParameters().getPadding().withElements(singletonList(receiver)));
+            }
         }
 
-        return new J.VariableDeclarations(
+        JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = maybeSemicolon(
+                new J.VariableDeclarations.NamedVariable(
+                        randomId(),
+                        namePrefix,
+                        Markers.EMPTY,
+                        name,
+                        emptyList(),
+                        initializer,
+                        typeMapping.variableType(property.getSymbol(), null, getCurrentFile())
+                ));
+        variables = new ArrayList<>(1);
+        variables.add(namedVariable);
+
+        J.VariableDeclarations variableDeclarations =  new J.VariableDeclarations(
                 randomId(),
                 prefix,
                 markers,
-                leadingAnnotations.isEmpty() ? emptyList() : leadingAnnotations,
-                modifiers.isEmpty() ? emptyList() : modifiers,
+                leadingAnnotations,
+                modifiers,
                 typeExpression,
                 null,
                 emptyList(),
                 variables);
+        return getter == null && setter == null ? variableDeclarations :
+                new K.Property(
+                        randomId(),
+                        variableDeclarations.getPrefix(),
+                        Markers.EMPTY,
+                        variableDeclarations.withPrefix(EMPTY),
+                        getter,
+                        setter,
+                        isSetterFirst
+        );
     }
 
 
@@ -1966,20 +1944,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return firAnnotations;
     }
 
-    @Nullable
-    private LeafPsiElement getGetterOrSetterNode(KtPropertyAccessor accessor) {
-        Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(accessor).iterator();
-        while (iterator.hasNext()) {
-            PsiElement psiElement = iterator.next();
-            if (psiElement instanceof LeafPsiElement &&
-                    (psiElement.getText().equals("get") || psiElement.getText().equals("set"))) {
-                return (LeafPsiElement) psiElement;
-            }
-        }
-
-        return null;
-    }
-
     @Override
     public J visitPropertyAccessExpression(FirPropertyAccessExpression propertyAccessExpression, ExecutionContext ctx) {
         JavaType type = typeMapping.type(propertyAccessExpression);
@@ -2010,12 +1974,18 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitPropertyAccessor(FirPropertyAccessor propertyAccessor, ExecutionContext ctx) {
-        Space prefix = whitespace();
         if (propertyAccessor.isGetter() || propertyAccessor.isSetter()) {
+            Space prefix = whitespace();
             Markers markers = Markers.EMPTY;
 
-            List<J.Annotation> annotations = emptyList();
-
+            PsiElement accessorNode = getRealPsiElement(propertyAccessor);
+            List<J.Annotation> leadingAnnotations = new ArrayList<>();
+            List<J.Annotation> lastAnnotations = new ArrayList<>();
+            List<J.Modifier> modifiers = emptyList();
+            KtModifierList modifierList = getModifierList(accessorNode);
+            if (modifierList != null) {
+                modifiers = mapModifierList(modifierList, propertyAccessor.getAnnotations(), leadingAnnotations, lastAnnotations);
+            }
             J.TypeParameters typeParameters = null;
             if (!propertyAccessor.getTypeParameters().isEmpty()) {
                 Space before = sourceBefore("<");
@@ -2030,9 +2000,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         randomId(),
                         before,
                         Markers.EMPTY,
-                        emptyList(),
+                        lastAnnotations.isEmpty() ? emptyList() : lastAnnotations,
                         params
                 );
+                lastAnnotations = null;
             }
 
             String methodName = propertyAccessor.isGetter() ? "get" : "set";
@@ -2092,11 +2063,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     randomId(),
                     prefix,
                     markers,
-                    annotations,
-                    emptyList(),
+                    leadingAnnotations.isEmpty() ? emptyList() : leadingAnnotations,
+                    modifiers,
                     typeParameters,
                     returnTypeExpression,
-                    new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
+                    new J.MethodDeclaration.IdentifierWithAnnotations(name, lastAnnotations == null ? emptyList() : lastAnnotations),
                     params,
                     null,
                     body,
@@ -2117,10 +2088,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitReturnExpression(FirReturnExpression returnExpression, ExecutionContext ctx) {
         Space prefix = whitespace();
         J.Identifier label = null;
-        boolean explicitReturn = source.startsWith("return", cursor);
+        KtReturnExpression node = (KtReturnExpression) getRealPsiElement(returnExpression);
+        boolean explicitReturn = node != null;
         if (explicitReturn) {
             skip("return");
-            if (source.startsWith("@", cursor)) {
+            if (node.getLabeledExpression() != null) {
                 skip("@");
                 label = createIdentifier(returnExpression.getTarget().getLabelName());
             }
@@ -2465,7 +2437,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
         modifiers.add(new J.Modifier(randomId(), sourceBefore("typealias"), markers, "typealias", J.Modifier.Type.LanguageExtension, lastAnnotations));
 
-        J.Identifier name = createIdentifier(typeAlias.getName().asString(), typeAlias);
+        J.Identifier name = createIdentifier(typeAlias.getName().asString(), typeMapping.type(typeAlias.getExpandedTypeRef()), null);
         TypeTree typeExpression = typeAlias.getTypeParameters().isEmpty() ? name : new J.ParameterizedType(
                 randomId(),
                 name.getPrefix(),
@@ -3312,7 +3284,35 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitComponentCall(FirComponentCall componentCall, ExecutionContext ctx) {
-        throw new UnsupportedOperationException(generateUnsupportedMessage("FirComponentCall"));
+        return visitComponentCall(componentCall, ctx, false);
+    }
+
+    @Nullable
+    private J visitComponentCall(FirComponentCall componentCall, ExecutionContext ctx, boolean synthetic) {
+        Space prefix;
+        JRightPadded<Expression> receiver;
+        J.Identifier name;
+        JavaType.Method type = typeMapping.methodInvocationType(componentCall, getCurrentFile());
+        if (synthetic) {
+            prefix = Space.build(" ", emptyList());
+            receiver = null;
+            name = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), componentCall.getCalleeReference().getName().asString(), null, null);
+        } else {
+            prefix = whitespace();
+            receiver = padRight(convertToExpression(componentCall.getExplicitReceiver(), ctx), sourceBefore("."));
+            name = createIdentifier(componentCall.getCalleeReference().getName().asString(), type, null);
+        }
+
+        return new J.MethodInvocation(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                receiver,
+                null,
+                name,
+                JContainer.empty(),
+                type
+        );
     }
 
     @Override

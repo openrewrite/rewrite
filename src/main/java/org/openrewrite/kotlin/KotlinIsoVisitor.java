@@ -33,6 +33,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
+    public K.DestructuringDeclaration visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, P p) {
+        return (K.DestructuringDeclaration) super.visitDestructuringDeclaration(destructuringDeclaration, p);
+    }
+
+    @Override
     public K.FunctionType visitFunctionType(K.FunctionType functionType, P p) {
         return (K.FunctionType) super.visitFunctionType(functionType, p);
     }
@@ -60,6 +65,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     @Override
     public K.ListLiteral visitListLiteral(K.ListLiteral listLiteral, P p) {
         return (K.ListLiteral) super.visitListLiteral(listLiteral, p);
+    }
+
+    @Override
+    public K.Property visitProperty(K.Property property, P p) {
+        return (K.Property) super.visitProperty(property, p);
     }
 
     @Override

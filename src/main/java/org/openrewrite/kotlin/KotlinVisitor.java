@@ -67,17 +67,40 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
             b = (K.Binary) temp;
         }
         b = b.withLeft(visitAndCast(b.getLeft(), p));
-        b = b.getPadding().withOperator(visitLeftPadded(b.getPadding().getOperator(), KLeftPadded.Location.BINARY_OPERATOR, p));
+        b = b.getPadding().withOperator(visitLeftPadded(b.getPadding().getOperator(), p));
         b = b.withRight(visitAndCast(b.getRight(), p));
         b = b.withType(visitType(b.getType(), p));
         return b;
     }
 
+    public J visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, P p) {
+        K.DestructuringDeclaration d = destructuringDeclaration;
+        d = d.withPrefix(visitSpace(d.getPrefix(), KSpace.Location.DESTRUCTURING_DECLARATION_PREFIX, p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(d, p);
+        if (!(temp instanceof K.DestructuringDeclaration)) {
+            return temp;
+        } else {
+            d = (K.DestructuringDeclaration) temp;
+        }
+        d = d.withInitializer(visitAndCast(d.getInitializer(), p));
+        d = d.getPadding().withAssignments(visitContainer(d.getPadding().getAssignments(), p));
+        return d;
+    }
+
     public J visitFunctionType(K.FunctionType functionType, P p) {
         K.FunctionType f = functionType;
+        f = f.withPrefix(visitSpace(f.getPrefix(), KSpace.Location.FUNCTION_TYPE_PREFIX, p));
+        f = f.withMarkers(visitMarkers(f.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(f, p);
+        if (!(temp instanceof K.FunctionType)) {
+            return temp;
+        } else {
+            f = (K.FunctionType) temp;
+        }
         f = f.withLeadingAnnotations(ListUtils.map(f.getLeadingAnnotations(), a -> visitAndCast(a, p)));
         f = f.withModifiers(ListUtils.map(f.getModifiers(), e -> visitAndCast(e, p)));
-        f = f.withReceiver(visitRightPadded(f.getReceiver(), KRightPadded.Location.FUNCTION_TYPE_RECEIVER, p));
+        f = f.withReceiver(visitRightPadded(f.getReceiver(), p));
         f = f.withTypedTree(visitAndCast(f.getTypedTree(), p));
         return f;
     }
@@ -86,6 +109,12 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         K.KReturn r = kReturn;
         r = r.withPrefix(visitSpace(r.getPrefix(), KSpace.Location.KRETURN_PREFIX, p));
         r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(r, p);
+        if (!(temp instanceof K.KReturn)) {
+            return temp;
+        } else {
+            r = (K.KReturn) temp;
+        }
         r = r.withExpression(visitAndCast(r.getExpression(), p));
         r = r.withLabel(visitAndCast(r.getLabel(), p));
         return r;
@@ -139,17 +168,25 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         } else {
             l = (K.ListLiteral) temp;
         }
-        l = l.getPadding().withElements(visitContainer(l.getPadding().getElements(), KContainer.Location.LIST_LITERAL_ELEMENTS, p));
+        l = l.getPadding().withElements(visitContainer(l.getPadding().getElements(), p));
         l = l.withType(visitType(l.getType(), p));
         return l;
     }
 
-    public J visitNamedVariableInitializer(K.NamedVariableInitializer namedVariableInitializer, P p) {
-        K.NamedVariableInitializer n = namedVariableInitializer;
-        n = n.withPrefix(visitSpace(n.getPrefix(), KSpace.Location.NAMED_VARIABLE_INITIALIZER_PREFIX, p));
-        n = n.withMarkers(visitMarkers(n.getMarkers(), p));
-        n = n.withInitializations(ListUtils.map(n.getInitializations(), it -> visitAndCast(it, p)));
-        return n;
+    public J visitProperty(K.Property property, P p) {
+        K.Property pr = property;
+        pr = pr.withPrefix(visitSpace(pr.getPrefix(), KSpace.Location.PROPERTY_PREFIX, p));
+        pr = pr.withMarkers(visitMarkers(pr.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(pr, p);
+        if (!(temp instanceof K.Property)) {
+            return temp;
+        } else {
+            pr = (K.Property) temp;
+        }
+        pr = pr.withVariableDeclarations(visitAndCast(pr.getVariableDeclarations(), p));
+        pr = pr.withGetter(visitAndCast(pr.getGetter(), p));
+        pr = pr.withSetter(visitAndCast(pr.getSetter(), p));
+        return pr;
     }
 
     public J visitWhen(K.When when, P p) {
@@ -178,16 +215,16 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         } else {
             w = (K.WhenBranch) temp;
         }
-        w = w.getPadding().withExpressions(visitContainer(w.getPadding().getExpressions(), KContainer.Location.WHEN_BRANCH_EXPRESSION, p));
+        w = w.getPadding().withExpressions(visitContainer(w.getPadding().getExpressions(), p));
         w = w.getPadding().withBody(visitRightPadded(w.getPadding().getBody(), JRightPadded.Location.CASE_BODY, p));
         return w;
     }
 
-    public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, KRightPadded.Location loc, P p) {
+    public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, P p) {
         return super.visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, p);
     }
 
-    public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, KLeftPadded.Location loc, P p) {
+    public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, P p) {
         return super.visitLeftPadded(left, JLeftPadded.Location.LANGUAGE_EXTENSION, p);
     }
 
@@ -195,7 +232,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return visitSpace(space, Space.Location.LANGUAGE_EXTENSION, p);
     }
 
-    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, KContainer.Location loc, P p) {
+    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, P p) {
         return super.visitContainer(container, JContainer.Location.LANGUAGE_EXTENSION, p);
     }
 }

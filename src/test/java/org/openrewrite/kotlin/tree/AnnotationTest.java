@@ -30,7 +30,7 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              @file : Suppress ( "DEPRECATION_ERROR" , "RedundantUnitReturnType" )
+              @file : Suppress ( "DEPRECATION_ERROR" )
 
               class A
               """
@@ -260,6 +260,20 @@ class AnnotationTest implements RewriteTest {
               class Example {
                   @setparam : A
                   var name: String = ""
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void destructuringVariableDeclaration() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class A
+              fun example ( ) {
+                val ( @A a , @A b , @A c ) = Triple ( 1 , 2 , 3 )
               }
               """
           )

@@ -17,6 +17,7 @@ package org.openrewrite.kotlin.tree;
 
 public class KContainer {
     public enum Location {
+        DESTRUCT_ASSIGNMENTS(KSpace.Location.DESTRUCT_ELEMENTS, KRightPadded.Location.DESTRUCT_SUFFIX),
         LIST_LITERAL_ELEMENTS(KSpace.Location.LIST_LITERAL_ELEMENTS, KRightPadded.Location.LIST_LITERAL_ELEMENT_SUFFIX),
         WHEN_BRANCH_EXPRESSION(KSpace.Location.WHEN_BRANCH_EXPRESSION, KRightPadded.Location.WHEN_BRANCH_EXPRESSION);
 

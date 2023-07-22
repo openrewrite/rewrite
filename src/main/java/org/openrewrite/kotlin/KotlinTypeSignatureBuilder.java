@@ -81,7 +81,7 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
         } else if (type instanceof FirBasedSymbol<?>) {
             return signature(((FirBasedSymbol<?>) type).getFir(), ownerSymbol);
         } else if (type instanceof FirFile) {
-            return ((FirFile) type).getName();
+            return convertFileNameToFqn(((FirFile) type).getName());
         } else if (type instanceof FirJavaTypeRef) {
             return signature(((FirJavaTypeRef) type).getType());
         } else if (type instanceof org.jetbrains.kotlin.load.java.structure.JavaType) {
@@ -664,6 +664,10 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
      */
     public static String convertClassIdToFqn(@Nullable ClassId classId) {
         return classId == null ? "{undefined}" : convertKotlinFqToJavaFq(classId.toString());
+    }
+
+    public static String convertFileNameToFqn(String name) {
+        return name.replace("/", ".").replace("\\", ".").replace(".kt", "Kt");
     }
 
     /**

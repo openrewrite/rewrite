@@ -19,37 +19,36 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.test.RecipeSpec;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.RewriteTest;
 
-import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 public class MethodMatcherTest implements RewriteTest {
 
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
-            private final String pattern = "openRewriteFile0.kt function()";
-            private final MethodMatcher methodMatcher = new MethodMatcher(pattern);
-
-            @Override
-            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
-                if (methodMatcher.matches(method.getMethodType())) {
-                    assertThat(method.getName().getSimpleName()).isEqualTo("function");
-                }
-                return super.visitMethodDeclaration(method, p);
-            }
-        }));
-    }
-
     @Test
     void matchesTopLevelFunction() {
         rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
+              private static final MethodMatcher methodMatcher = new MethodMatcher("openRewriteFile0Kt function(..)");
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext p) {
+                  if (methodMatcher.matches(method.getMethodType())) {
+                      return SearchResult.found(method);
+                  }
+                  return super.visitMethodDeclaration(method, p);
+              }
+          })),
           kotlin(
             """
               fun function() {}
+              fun usesFunction() {
+                  function()
+              }
+              """,
+            """
+              /*~~>*/fun function() {}
               fun usesFunction() {
                   function()
               }

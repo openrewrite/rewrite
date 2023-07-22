@@ -367,6 +367,89 @@ public interface K extends J {
         }
     }
 
+    @SuppressWarnings("unused")
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class DestructuringDeclaration implements K, Statement {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<K.DestructuringDeclaration.Padding> padding;
+
+        @Getter
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        J.VariableDeclarations initializer;
+
+        JContainer<J.VariableDeclarations.NamedVariable> assignments;
+
+        public List<J.VariableDeclarations.NamedVariable> getAssignments() {
+            return assignments.getElements();
+        }
+
+        public K.DestructuringDeclaration withAssignments(List<J.VariableDeclarations.NamedVariable> assignments) {
+            return getPadding().withAssignments(requireNonNull(JContainer.withElementsNullable(this.assignments, assignments)));
+        }
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitDestructuringDeclaration(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        public K.DestructuringDeclaration.Padding getPadding() {
+            K.DestructuringDeclaration.Padding p;
+            if (this.padding == null) {
+                p = new K.DestructuringDeclaration.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new K.DestructuringDeclaration.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final K.DestructuringDeclaration t;
+
+            public JContainer<J.VariableDeclarations.NamedVariable> getAssignments() {
+                return t.assignments;
+            }
+
+            public DestructuringDeclaration withAssignments(JContainer<J.VariableDeclarations.NamedVariable> assignments) {
+                return t.assignments == assignments ? t : new DestructuringDeclaration(t.id, t.prefix, t.markers, t.initializer, assignments);
+            }
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
+        }
+    }
+
     @SuppressWarnings("unchecked")
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -710,36 +793,41 @@ public interface K extends J {
         }
     }
 
-    @Value
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
-    class NamedVariableInitializer implements K, Expression {
+    @Data
+    final class Property implements K, Statement {
 
+        @EqualsAndHashCode.Include
         UUID id;
 
         Space prefix;
         Markers markers;
+        J.VariableDeclarations variableDeclarations;
 
-        List<J> initializations;
+        @Nullable
+        J.MethodDeclaration getter;
 
-        @Override
-        public @Nullable JavaType getType() {
-            return null;
-        }
+        @Nullable
+        J.MethodDeclaration setter;
 
-        @Override
-        public <T extends J> T withType(@Nullable JavaType type) {
-            throw new UnsupportedOperationException("NamedVariableInitializer cannot have a type");
-        }
-
-        @Override
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
-        }
+        boolean isSetterFirst;
 
         @Override
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
-            return v.visitNamedVariableInitializer(this, p);
+            return v.visitProperty(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
         }
     }
 
