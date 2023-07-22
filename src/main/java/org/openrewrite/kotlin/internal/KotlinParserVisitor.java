@@ -119,7 +119,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<J.Annotation> annotations = null;
 
-        KtFileAnnotationList annotationList = PsiTreeUtil.findChildOfType(getPsiElement(file), KtFileAnnotationList.class);
+        KtFileAnnotationList annotationList = PsiTreeUtil.findChildOfType(getRealPsiElement(file), KtFileAnnotationList.class);
         if (annotationList != null) {
             annotations = mapFileAnnotations(annotationList, file.getAnnotations());
         }
@@ -1663,7 +1663,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Markers markers = Markers.EMPTY;
 
         List<J.Modifier> modifiers = emptyList();
-        PsiElement propertyNode = getPsiElement(property);
+        PsiElement propertyNode = getRealPsiElement(property);
         List<PsiElement> propertyNodeChildren = Arrays.asList(propertyNode.getChildren());
 
         KtModifierList modifierList = PsiTreeUtil.findChildOfType(propertyNode, KtModifierList.class);
@@ -3435,7 +3435,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Markers markers = Markers.EMPTY;
 
         List<J.Modifier> modifiers = emptyList();
-        KtModifierList modifierList = PsiTreeUtil.findChildOfType(getPsiElement(regularClass), KtModifierList.class);
+        KtModifierList modifierList = PsiTreeUtil.findChildOfType(getRealPsiElement(regularClass), KtModifierList.class);
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
         List<J.Annotation> kindAnnotations = new ArrayList<>();
         if (modifierList != null && modifierList.getTextRange().getStartOffset() == cursor) {
@@ -4621,8 +4621,22 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         return t.getSource().getEndOffset();
     }
 
-    private PsiElement getPsiElement(FirElement element) {
-        return element.getSource() == null ? null : ((KtRealPsiSourceElement) element.getSource()).getPsi();
+    @Nullable
+    private KtModifierList getModifierList(@Nullable FirElement element) {
+        PsiElement psiElement = getRealPsiElement(element);
+        return psiElement == null ? null : PsiTreeUtil.findChildOfType(psiElement, KtModifierList.class);
+    }
+
+    @Nullable
+    private PsiElement getRealPsiElement(@Nullable FirElement element) {
+        if (element == null || element.getSource() == null || element.getSource() instanceof KtFakeSourceElement) {
+            return null;
+        }
+        return ((KtRealPsiSourceElement) element.getSource()).getPsi();
+    }
+
+    private boolean isFakeSource(@Nullable FirElement element) {
+        return element != null && element.getSource() != null && element.getSource() instanceof KtFakeSourceElement;
     }
 
     @SuppressWarnings("unchecked")
