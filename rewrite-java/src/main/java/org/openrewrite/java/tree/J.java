@@ -2349,6 +2349,7 @@ public interface J extends Tree {
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor
     @With
     class Identifier implements J, TypeTree, Expression {
         @Getter
@@ -2370,6 +2371,20 @@ public interface J extends Tree {
 
         @Nullable
         JavaType.Variable fieldType;
+
+        /**
+         * @deprecated Use {@link #Identifier(UUID, Space, Markers, List, String, JavaType, JavaType.Variable)} instead.
+         */
+        @Deprecated
+        public Identifier(UUID id, Space prefix, Markers markers, String simpleName, @Nullable JavaType type, @Nullable JavaType.Variable fieldType) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.annotations = emptyList();
+            this.simpleName = simpleName;
+            this.type = type;
+            this.fieldType = fieldType;
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -3784,6 +3799,7 @@ public interface J extends Tree {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor
     @Data
     final class Modifier implements J {
         public static boolean hasModifier(Collection<Modifier> modifiers, Modifier.Type modifier) {
@@ -3814,6 +3830,19 @@ public interface J extends Tree {
         @With
         @Getter
         List<Annotation> annotations;
+
+        /**
+         * @deprecated Use {@link #Modifier(UUID, Space, Markers, String, Type, List)} instead.
+         */
+        @Deprecated
+        public Modifier(UUID id, Space prefix, Markers markers, Type type, List<Annotation> annotations) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.keyword = null;
+            this.type = type;
+            this.annotations = annotations;
+        }
 
         @Override
         public String toString() {
