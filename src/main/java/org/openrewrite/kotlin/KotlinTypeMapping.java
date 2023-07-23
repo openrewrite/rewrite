@@ -57,8 +57,7 @@ import java.util.List;
 
 import static java.util.Collections.singletonList;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
-import static org.openrewrite.kotlin.KotlinTypeSignatureBuilder.convertClassIdToFqn;
-import static org.openrewrite.kotlin.KotlinTypeSignatureBuilder.convertKotlinFqToJavaFq;
+import static org.openrewrite.kotlin.KotlinTypeSignatureBuilder.*;
 
 @Incubating(since = "0.0")
 public class KotlinTypeMapping implements JavaTypeMapping<Object> {
@@ -104,7 +103,7 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         } else if (type instanceof FirVariable) {
             return variableType(((FirVariable) type).getSymbol(), null, ownerFallBack);
         } else if (type instanceof FirFile) {
-            return JavaType.ShallowClass.build(((FirFile) type).getName());
+            return JavaType.ShallowClass.build(convertFileNameToFqn(((FirFile) type).getName()));
         } else if (type instanceof FirJavaTypeRef) {
             return type(((FirJavaTypeRef) type).getType(), ownerFallBack);
         } else if (type instanceof org.jetbrains.kotlin.load.java.structure.JavaType) {
@@ -245,8 +244,6 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
                     functions.add((FirFunction) declaration);
                 } else if (declaration instanceof FirConstructor) {
                     functions.add((FirFunction) declaration);
-                } else if (declaration instanceof FirRegularClass) {
-                    // Skipped since inner classes don't exist on the JavaType$Class.
                 } else if (declaration instanceof FirEnumEntry) {
                     enumEntries.add((FirEnumEntry) declaration);
                 }

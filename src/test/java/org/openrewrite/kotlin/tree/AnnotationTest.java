@@ -22,7 +22,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-@SuppressWarnings({"RedundantSuppression", "RedundantNullableReturnType", "RedundantVisibilityModifier"})
+@SuppressWarnings({"RedundantSuppression", "RedundantNullableReturnType", "RedundantVisibilityModifier", "UnusedReceiverParameter", "SortModifiers"})
 class AnnotationTest implements RewriteTest {
 
     @Test
@@ -30,7 +30,7 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              @file : Suppress ( "DEPRECATION_ERROR" , "RedundantUnitReturnType" )
+              @file : Suppress ( "DEPRECATION_ERROR" )
 
               class A
               """
@@ -173,7 +173,7 @@ class AnnotationTest implements RewriteTest {
           kotlin("@Repeatable annotation class A"),
           kotlin(
             """
-              class Example ( @get : A @set : A var foo: String , @get : A val bar: String )
+              class Example ( /**/  /**/ @get : A /**/ /**/ @set : A /**/ /**/ var foo: String , @get : A val bar: String )
               """
           )
         );
@@ -260,6 +260,20 @@ class AnnotationTest implements RewriteTest {
               class Example {
                   @setparam : A
                   var name: String = ""
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void destructuringVariableDeclaration() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class A
+              fun example ( ) {
+                val ( @A a , @A b , @A c ) = Triple ( 1 , 2 , 3 )
               }
               """
           )

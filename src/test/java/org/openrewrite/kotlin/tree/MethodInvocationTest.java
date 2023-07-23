@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-@SuppressWarnings({"RedundantVisibilityModifier", "PropertyName", "RedundantNullableReturnType", "UnusedReceiverParameter"})
+@SuppressWarnings({"RedundantVisibilityModifier", "PropertyName", "RedundantNullableReturnType", "UnusedReceiverParameter", "ConstantConditionIf", "MoveLambdaOutsideParentheses"})
 class MethodInvocationTest implements RewriteTest {
 
     @Test
@@ -399,6 +399,7 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("RedundantSuspendModifier")
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/92")
     @Test
     void receiverWithModifier() {
