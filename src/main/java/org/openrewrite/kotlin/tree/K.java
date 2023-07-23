@@ -571,6 +571,9 @@ public interface K extends J {
         UUID id;
 
         @With
+        List<J.Annotation> annotations;
+
+        @With
         J.Return expression;
 
         @With

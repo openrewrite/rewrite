@@ -23,6 +23,6 @@ import java.util.UUID;
 
 @Value
 @With
-public class ReceiverType implements Marker {
+public class Extension implements Marker {
     UUID id;
 }

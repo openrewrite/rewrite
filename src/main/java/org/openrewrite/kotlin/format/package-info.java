@@ -13,18 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.kotlin.marker;
+@NonNullApi
+@NonNullFields
+package org.openrewrite.kotlin.format;
 
-import lombok.Value;
-import lombok.With;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.marker.Marker;
-
-import java.util.UUID;
-
-@Value
-@With
-public class KObject implements Marker {
-    UUID id;
-    Space prefix;
-}
+import org.openrewrite.internal.lang.NonNullApi;
+import org.openrewrite.internal.lang.NonNullFields;

@@ -20,7 +20,9 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.kotlin.marker.*;
 import org.openrewrite.kotlin.tree.*;
+import org.openrewrite.marker.Marker;
 
 /**
  * Visit K types.
@@ -115,6 +117,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         } else {
             r = (K.KReturn) temp;
         }
+        r = r.withAnnotations(ListUtils.map(r.getAnnotations(), a -> visitAndCast(a, p)));
         r = r.withExpression(visitAndCast(r.getExpression(), p));
         r = r.withLabel(visitAndCast(r.getLabel(), p));
         return r;
@@ -234,5 +237,34 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
 
     public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, P p) {
         return super.visitContainer(container, JContainer.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    @Override
+    public <M extends Marker> M visitMarker(Marker marker, P p) {
+        Marker m = super.visitMarker(marker, p);
+        if (m instanceof AnnotationCallSite) {
+            AnnotationCallSite acs = (AnnotationCallSite) marker;
+            m = acs.withSuffix(visitSpace(acs.getSuffix(), KSpace.Location.ANNOTATION_CALL_SITE_PREFIX, p));
+        } else if (marker instanceof CheckNotNull) {
+            CheckNotNull cnn = (CheckNotNull) marker;
+            m = cnn.withPrefix(visitSpace(cnn.getPrefix(), KSpace.Location.CHECK_NOT_NULL_PREFIX, p));
+        } else if (marker instanceof IsNullable) {
+            IsNullable isn = (IsNullable) marker;
+            m = isn.withPrefix(visitSpace(isn.getPrefix(), KSpace.Location.IS_NULLABLE_PREFIX, p));
+        } else if (marker instanceof IsNullSafe) {
+            IsNullSafe ins = (IsNullSafe) marker;
+            m = ins.withPrefix(visitSpace(ins.getPrefix(), KSpace.Location.IS_NULLABLE_PREFIX, p));
+        } else if (marker instanceof KObject) {
+            KObject ko = (KObject) marker;
+            m = ko.withPrefix(visitSpace(ko.getPrefix(), KSpace.Location.OBJECT_PREFIX, p));
+        } else if (marker instanceof SpreadArgument) {
+            SpreadArgument sa = (SpreadArgument) marker;
+            m = sa.withPrefix(visitSpace(sa.getPrefix(), KSpace.Location.SPREAD_ARGUMENT_PREFIX, p));
+        } else if (marker instanceof TypeReferencePrefix) {
+            TypeReferencePrefix tr = (TypeReferencePrefix) marker;
+            m = tr.withPrefix(visitSpace(tr.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p));
+        }
+        //noinspection unchecked
+        return (M) m;
     }
 }

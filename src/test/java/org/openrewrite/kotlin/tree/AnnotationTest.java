@@ -15,7 +15,7 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -24,6 +24,30 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings({"RedundantSuppression", "RedundantNullableReturnType", "RedundantVisibilityModifier", "UnusedReceiverParameter", "SortModifiers"})
 class AnnotationTest implements RewriteTest {
+
+    @Language("kotlin")
+    private static final String ANNOTATION =
+            """
+              @Target(
+                  AnnotationTarget.CLASS,
+                  AnnotationTarget.ANNOTATION_CLASS,
+                  AnnotationTarget.TYPE_PARAMETER,
+                  AnnotationTarget.PROPERTY,
+                  AnnotationTarget.FIELD,
+                  AnnotationTarget.LOCAL_VARIABLE,
+                  AnnotationTarget.VALUE_PARAMETER,
+                  AnnotationTarget.CONSTRUCTOR,
+                  AnnotationTarget.FUNCTION,
+                  AnnotationTarget.PROPERTY_GETTER,
+                  AnnotationTarget.PROPERTY_SETTER,
+                  AnnotationTarget.TYPE,
+                  AnnotationTarget.EXPRESSION,
+                  AnnotationTarget.FILE,
+                  AnnotationTarget.TYPEALIAS
+              )
+              @Retention(AnnotationRetention.SOURCE)
+              annotation class Ann
+              """;
 
     @Test
     void fileScope() {
@@ -41,14 +65,12 @@ class AnnotationTest implements RewriteTest {
     @Test
     void multipleFileScope() {
         rewriteRun(
+          kotlin(ANNOTATION),
           kotlin(
             """
-              @file : A ( "1" )
-              @file : A ( "2" )
-              @file : A ( "3" )
-
-              @Repeatable
-              annotation class A ( val s : String )
+              @file : Ann
+              @file : Ann
+              @file : Ann
               """
           )
         );
@@ -73,8 +95,7 @@ class AnnotationTest implements RewriteTest {
             """
               @Target ( AnnotationTarget . LOCAL_VARIABLE )
               @Retention ( AnnotationRetention . SOURCE )
-              annotation class Test ( val values : Array < String > ) {
-              }
+              annotation class Test ( val values : Array < String > )
               """
           ),
           kotlin(
@@ -105,13 +126,12 @@ class AnnotationTest implements RewriteTest {
     @Test
     void annotationUseSiteTargetAnnotationOnly() {
         rewriteRun(
+          kotlin(ANNOTATION),
           kotlin(
             """
-              @Repeatable
-              annotation class A (val s : String)
               class TestA {
-                  @get : A ( "1" )
-                  @set : A ( "2" )
+                  @get : Ann
+                  @set : Ann
                   var name : String = ""
               }
               """
@@ -123,16 +143,13 @@ class AnnotationTest implements RewriteTest {
     @Test
     void annotationUseSiteTarget() {
         rewriteRun(
-          kotlin("""
-              @Repeatable
-              annotation class A ( val s : String )
-          """),
+          kotlin(ANNOTATION),
           kotlin(
             """
               class TestA {
-                  @get : A ( "1" )
+                  @get : Ann
                   public
-                  @set : A ( "2" )
+                  @set : Ann
                   var name: String = ""
               }
               """
@@ -141,8 +158,8 @@ class AnnotationTest implements RewriteTest {
             """
               class TestB {
                   public
-                  @get : A ( "1" )
-                  @set : A ( "2" )
+                  @get : Ann
+                  @set : Ann
                   var name : String = ""
               }
               """
@@ -154,9 +171,9 @@ class AnnotationTest implements RewriteTest {
     @Test
     void constructorParameterWithAnnotation() {
         rewriteRun(
+          kotlin(ANNOTATION),
           kotlin(
             """
-              annotation class Ann
               class Example(
                   @get : Ann
                   val bar : String
@@ -170,10 +187,10 @@ class AnnotationTest implements RewriteTest {
     @Test
     void getUseSiteOnConstructorParams() {
         rewriteRun(
-          kotlin("@Repeatable annotation class A"),
+          kotlin(ANNOTATION),
           kotlin(
             """
-              class Example ( /**/  /**/ @get : A /**/ /**/ @set : A /**/ /**/ var foo: String , @get : A val bar: String )
+              class Example ( /**/  /**/ @get : Ann /**/ /**/ @set : Ann /**/ /**/ var foo: String , @get : Ann val bar: String )
               """
           )
         );
@@ -182,16 +199,16 @@ class AnnotationTest implements RewriteTest {
     @Test
     void annotationOnExplicitGetter() {
         rewriteRun(
+          kotlin(ANNOTATION),
           kotlin(
             """
-              annotation class A
               class Test {
                   public var stringRepresentation : String = ""
-                      @A
+                      @Ann
                       // comment
                       get ( ) = field
 
-                      @A
+                      @Ann
                       set ( value ) {
                           field = value
                       }
@@ -204,9 +221,9 @@ class AnnotationTest implements RewriteTest {
     @Test
     void conditionalParameter() {
         rewriteRun(
+          kotlin("annotation class A ( val s : String )"),
           kotlin(
             """
-              annotation class A ( val s : String )
               @A ( if ( true ) "1" else "2" )
               class Test
               """
@@ -217,9 +234,9 @@ class AnnotationTest implements RewriteTest {
     @Test
     void paramAnnotation() {
         rewriteRun(
+          kotlin(ANNOTATION),
           kotlin(
             """
-              annotation class Ann
               class Example ( @param : Ann val quux : String )
               """
           )
@@ -229,23 +246,22 @@ class AnnotationTest implements RewriteTest {
     @Test
     void fieldAnnotation() {
         rewriteRun(
+          kotlin(ANNOTATION),
           kotlin(
             """
-              annotation class Ann
               class Example ( @field : Ann val foo : String )
               """
           )
         );
     }
 
-    @Disabled
     @Test
     void receiverAnnotationUseSiteTarget() {
         rewriteRun(
+          kotlin(ANNOTATION),
           kotlin(
             """
-              annotation class Ann
-              fun @receiver : Ann String.myExtension() { }
+              fun @receiver : Ann String . myExtension ( ) { }
               """
           )
         );
@@ -254,11 +270,11 @@ class AnnotationTest implements RewriteTest {
     @Test
     void setParamAnnotationUseSiteTarget() {
         rewriteRun(
+          kotlin(ANNOTATION),
           kotlin(
             """
-              annotation class A
               class Example {
-                  @setparam : A
+                  @setparam : Ann
                   var name: String = ""
               }
               """
@@ -269,15 +285,38 @@ class AnnotationTest implements RewriteTest {
     @Test
     void destructuringVariableDeclaration() {
         rewriteRun(
+          kotlin(ANNOTATION),
           kotlin(
             """
-              annotation class A
               fun example ( ) {
-                val ( @A a , @A b , @A c ) = Triple ( 1 , 2 , 3 )
+                val ( @Ann a , @Ann b , @Ann c ) = Triple ( 1 , 2 , 3 )
               }
               """
           )
         );
     }
 
+    @Test
+    void annotationsInManyLocations() {
+        rewriteRun(
+          kotlin(ANNOTATION),
+          kotlin(
+            """
+              @Ann
+              open class Test < @Ann in Number > ( @Ann val s : String ) {
+                  @Ann var n : Int = 42
+                      @Ann get ( ) = 42
+                      @Ann set ( @Ann value ) {
+                          field = value
+                      }
+              
+                  @Ann inline fun < @Ann reified T > m ( @Ann s : @Ann String ) : String {
+                      @Ann return s
+                  }
+              }
+              @Ann typealias Other = @Ann String
+              """
+          )
+        );
+    }
 }
