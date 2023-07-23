@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.internal;
 
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.Tree;
@@ -105,8 +106,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         visitSpace(binary.getAfter(), KSpace.Location.BINARY_SUFFIX, p);
         if (binary.getOperator() == K.Binary.Type.Get) {
             p.append("]");
-            trailingMarkers(binary.getMarkers(), p);
         }
+        trailingMarkers(binary.getMarkers(), p);
         afterSyntax(binary, p);
         return binary;
     }
@@ -264,16 +265,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
 
             if (nv.getInitializer() != null) {
-                String equals = "=";
-                for (Marker marker : vd.getMarkers().getMarkers()) {
-                    if (marker instanceof By) {
-                        equals = "by";
-                        break;
-                    } else if (marker instanceof OmitEquals) {
-                        equals = "";
-                        break;
-                    }
-                }
+                String equals = getEqualsText(vd);
 
                 visitSpace(Objects.requireNonNull(nv.getPadding().getInitializer()).getBefore(), Space.Location.VARIABLE_INITIALIZER, p);
                 p.append(equals);
@@ -971,16 +963,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 }
 
                 if (variable.getElement().getInitializer() != null) {
-                    String equals = "=";
-                    for (Marker marker : multiVariable.getMarkers().getMarkers()) {
-                        if (marker instanceof By) {
-                            equals = "by";
-                            break;
-                        } else if (marker instanceof OmitEquals) {
-                            equals = "";
-                            break;
-                        }
-                    }
+                    String equals = getEqualsText(multiVariable);
 
                     visitSpace(Objects.requireNonNull(variable.getElement().getPadding().getInitializer()).getBefore(), Space.Location.VARIABLE_INITIALIZER, p);
                     p.append(equals);
@@ -1163,7 +1146,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         if (loc != null) {
             visitSpace(prefix, loc, p);
         }
-        visitMarkers(markers, p);
+        KotlinPrinter.this.visitMarkers(markers, p);
         for (Marker marker : markers.getMarkers()) {
             p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
         }
@@ -1180,7 +1163,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         if (loc != null) {
             delegate.visitSpace(prefix, loc, p);
         }
-        visitMarkers(markers, p);
+        KotlinPrinter.this.visitMarkers(markers, p);
         for (Marker marker : markers.getMarkers()) {
             p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
         }
@@ -1194,5 +1177,20 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         for (Marker marker : markers.getMarkers()) {
             p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(getCursor(), marker), JAVA_MARKER_WRAPPER));
         }
+    }
+
+    @NotNull
+    private static String getEqualsText(J.VariableDeclarations vd) {
+        String equals = "=";
+        for (Marker marker : vd.getMarkers().getMarkers()) {
+            if (marker instanceof By) {
+                equals = "by";
+                break;
+            } else if (marker instanceof OmitEquals) {
+                equals = "";
+                break;
+            }
+        }
+        return equals;
     }
 }

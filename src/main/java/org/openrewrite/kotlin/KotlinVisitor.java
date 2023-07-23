@@ -20,8 +20,9 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.kotlin.marker.AnnotationCallSite;
+import org.openrewrite.kotlin.marker.*;
 import org.openrewrite.kotlin.tree.*;
+import org.openrewrite.marker.Marker;
 
 /**
  * Visit K types.
@@ -222,35 +223,6 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return w;
     }
 
-    @Override
-    public J visitAnnotation(J.Annotation annotation, P p) {
-        J.Annotation a = annotation;
-        a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.ANNOTATION_PREFIX, p));
-        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
-        Expression temp = (Expression) visitExpression(a, p);
-        if (!(temp instanceof J.Annotation)) {
-            return temp;
-        } else {
-            a = (J.Annotation) temp;
-        }
-
-        a = a.withMarkers(a.getMarkers().withMarkers(ListUtils.map(a.getMarkers().getMarkers(), m -> {
-            if (m instanceof AnnotationCallSite) {
-                AnnotationCallSite acs = (AnnotationCallSite) m;
-                acs = acs.withSuffix(visitSpace(acs.getSuffix(), Space.Location.LANGUAGE_EXTENSION, p));
-                return acs;
-            }
-            return m;
-        })));
-
-        if (a.getPadding().getArguments() != null) {
-            a = a.getPadding().withArguments(visitContainer(a.getPadding().getArguments(), JContainer.Location.ANNOTATION_ARGUMENTS, p));
-        }
-        a = a.withAnnotationType(visitAndCast(a.getAnnotationType(), p));
-        a = a.withAnnotationType(visitTypeName(a.getAnnotationType(), p));
-        return a;
-    }
-
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, P p) {
         return super.visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, p);
     }
@@ -265,5 +237,34 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
 
     public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, P p) {
         return super.visitContainer(container, JContainer.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    @Override
+    public <M extends Marker> M visitMarker(Marker marker, P p) {
+        Marker m = super.visitMarker(marker, p);
+        if (m instanceof AnnotationCallSite) {
+            AnnotationCallSite acs = (AnnotationCallSite) marker;
+            m = acs.withSuffix(visitSpace(acs.getSuffix(), KSpace.Location.ANNOTATION_CALL_SITE_PREFIX, p));
+        } else if (marker instanceof CheckNotNull) {
+            CheckNotNull cnn = (CheckNotNull) marker;
+            m = cnn.withPrefix(visitSpace(cnn.getPrefix(), KSpace.Location.CHECK_NOT_NULL_PREFIX, p));
+        } else if (marker instanceof IsNullable) {
+            IsNullable isn = (IsNullable) marker;
+            m = isn.withPrefix(visitSpace(isn.getPrefix(), KSpace.Location.IS_NULLABLE_PREFIX, p));
+        } else if (marker instanceof IsNullSafe) {
+            IsNullSafe ins = (IsNullSafe) marker;
+            m = ins.withPrefix(visitSpace(ins.getPrefix(), KSpace.Location.IS_NULLABLE_PREFIX, p));
+        } else if (marker instanceof KObject) {
+            KObject ko = (KObject) marker;
+            m = ko.withPrefix(visitSpace(ko.getPrefix(), KSpace.Location.OBJECT_PREFIX, p));
+        } else if (marker instanceof SpreadArgument) {
+            SpreadArgument sa = (SpreadArgument) marker;
+            m = sa.withPrefix(visitSpace(sa.getPrefix(), KSpace.Location.SPREAD_ARGUMENT_PREFIX, p));
+        } else if (marker instanceof TypeReferencePrefix) {
+            TypeReferencePrefix tr = (TypeReferencePrefix) marker;
+            m = tr.withPrefix(visitSpace(tr.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p));
+        }
+        //noinspection unchecked
+        return (M) m;
     }
 }

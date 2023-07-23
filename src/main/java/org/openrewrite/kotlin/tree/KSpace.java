@@ -17,7 +17,7 @@ package org.openrewrite.kotlin.tree;
 
 public class KSpace {
     public enum Location {
-        OBJECT_PREFIX,
+        ANNOTATION_CALL_SITE_PREFIX,
         BINARY_PREFIX,
         BINARY_OPERATOR,
         BINARY_SUFFIX,
@@ -29,6 +29,7 @@ public class KSpace {
         FUNCTION_TYPE_PREFIX,
         FUNCTION_TYPE_RECEIVER,
         IS_NULLABLE_PREFIX,
+        IS_NULL_SAFE_PREFIX,
         KRETURN_PREFIX,
         KSTRING_PREFIX,
         KSTRING_SUFFIX,
@@ -39,6 +40,7 @@ public class KSpace {
         LIST_LITERAL_ELEMENTS,
         LIST_LITERAL_ELEMENT_SUFFIX,
         NAMED_VARIABLE_INITIALIZER_PREFIX,
+        OBJECT_PREFIX,
         PROPERTY_PREFIX,
         SPREAD_ARGUMENT_PREFIX,
         TOP_LEVEL_STATEMENT,

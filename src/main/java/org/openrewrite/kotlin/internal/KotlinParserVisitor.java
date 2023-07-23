@@ -1435,7 +1435,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
                 break;
             case "get":
-                // TODO: Check if the function call may be safely changed to a J.ArrayAccess. Note: must cover not null checks: `!!`.
                 left = convertToExpression(functionCall.getExplicitReceiver(), ctx);
 
                 opPrefix = sourceBefore("[");
@@ -2135,10 +2134,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
             J j = visitElement(resolvedTypeRef.getDelegatedTypeRef(), ctx);
             JavaType type = typeMapping.type(resolvedTypeRef);
+            if (j instanceof TypeTree) {
+                j = ((TypeTree) j).withType(type);
+            }
             if (j instanceof J.Identifier) {
                 j = ((J.Identifier) j).withAnnotations(annotations);
-            } else if (j instanceof TypeTree) {
-                j = ((TypeTree) j).withType(type);
             }
 
             if (j instanceof J.ParameterizedType) {
@@ -2775,7 +2775,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             lastAnnotations = null;
         }
 
-        Space namePrefix = EMPTY;
         String valueName = "";
         if ("<unused var>".equals(valueParameter.getName().toString())) {
             valueName = "_";
@@ -2825,7 +2824,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = maybeSemicolon(
                 new J.VariableDeclarations.NamedVariable(
                         randomId(),
-                        namePrefix,
+                        EMPTY,
                         Markers.EMPTY,
                         name,
                         emptyList(),
