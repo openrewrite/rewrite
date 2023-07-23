@@ -44,6 +44,8 @@ import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
 import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
+import org.jetbrains.kotlin.types.ConstantValueKind;
+import org.jetbrains.kotlin.types.Variance;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.ParseExceptionResult;
@@ -241,6 +243,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         } else if (annotationCall.getUseSiteTarget() == AnnotationUseSiteTarget.FIELD) {
             skip("field");
             markers = markers.addIfAbsent(new AnnotationCallSite(randomId(), "field", sourceBefore(":")));
+        } else if (annotationCall.getUseSiteTarget() == AnnotationUseSiteTarget.RECEIVER) {
+            skip("receiver");
+            markers = markers.addIfAbsent(new AnnotationCallSite(randomId(), "receiver", sourceBefore(":")));
         } else if (annotationCall.getUseSiteTarget() == AnnotationUseSiteTarget.SETTER_PARAMETER) {
             skip("setparam");
             markers = markers.addIfAbsent(new AnnotationCallSite(randomId(), "setparam", sourceBefore(":")));
@@ -770,10 +775,11 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public <T> J visitConstExpression(FirConstExpression<T> constExpression, ExecutionContext ctx) {
         Space prefix = EMPTY;
-        if (!(constExpression.getValue() instanceof String) || constExpression.getValue() instanceof String &&
-                (((String) constExpression.getValue()).isEmpty() || !((String) constExpression.getValue()).trim().isEmpty())) {
+        PsiElement psiElement = getRealPsiElement(constExpression);
+        if (!(constExpression.getKind() instanceof ConstantValueKind.String) || psiElement != null && psiElement.getText().contains("\"")) {
             prefix = whitespace();
         }
+
         String valueSource = source.substring(cursor, cursor + constExpression.getSource().getEndOffset() - constExpression.getSource().getStartOffset());
         skip(valueSource);
 
@@ -1017,7 +1023,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             JRightPadded<Expression> select = null;
 
             if (isInfix) {
-                markers = markers.addIfAbsent(new ReceiverType(randomId()));
+                markers = markers.addIfAbsent(new Extension(randomId()));
             }
 
             if (!(functionCall instanceof FirImplicitInvokeCall)) {
@@ -1033,7 +1039,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         skip(".");
                     } else if (source.startsWith("?.", cursor)) {
                         skip("?.");
-                        markers = markers.addIfAbsent(new IsNullable(randomId(), EMPTY));
+                        selectExpr = selectExpr.withMarkers(selectExpr.getMarkers().addIfAbsent(new IsNullSafe(randomId(), EMPTY)));
                     }
 
                     select = JRightPadded.build(selectExpr)
@@ -1767,7 +1773,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         if (property.getReceiverTypeRef() != null) {
             // Generates a VariableDeclaration to represent the receiver similar to how it is done in the Kotlin compiler.
             TypeTree receiverName = (TypeTree) visitElement(property.getReceiverTypeRef(), ctx);
-            markers = markers.addIfAbsent(new ReceiverType(randomId()));
+            markers = markers.addIfAbsent(new Extension(randomId()));
             receiver = padRight(new J.VariableDeclarations(
                     randomId(),
                     EMPTY,
@@ -1835,7 +1841,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
             if (equals != null) {
                 initializer = padLeft(sourceBefore("="), convertToExpression(property.getInitializer(), ctx));
-            } else if (initMarkers.getMarkers().isEmpty()){
+            } else if (initMarkers.getMarkers().isEmpty()) {
                 initMarkers = initMarkers.addIfAbsent(new OmitEquals(randomId()));
             }
 
@@ -1889,7 +1895,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         variables = new ArrayList<>(1);
         variables.add(namedVariable);
 
-        J.VariableDeclarations variableDeclarations =  new J.VariableDeclarations(
+        J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
                 randomId(),
                 prefix,
                 markers,
@@ -1908,9 +1914,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         getter,
                         setter,
                         isSetterFirst
-        );
+                );
     }
-
 
     private boolean isValidGetter(@Nullable FirPropertyAccessor getter) {
         return getter != null && !(getter instanceof FirDefaultPropertyGetter) &&
@@ -1936,7 +1941,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
             if (!setter.getValueParameters().isEmpty()) {
                 setter.getValueParameters().forEach(vp ->
-                    firAnnotations.addAll(vp.getAnnotations())
+                        firAnnotations.addAll(vp.getAnnotations())
                 );
             }
         }
@@ -1956,7 +1961,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 skip(".");
             } else if (source.startsWith("?.", cursor)) {
                 skip("?.");
-                markers = markers.addIfAbsent(new IsNullable(randomId(), EMPTY));
+                markers = markers.addIfAbsent(new IsNullSafe(randomId(), EMPTY));
             }
 
             JLeftPadded<J.Identifier> name = padLeft(before, (J.Identifier) visitElement(propertyAccessExpression.getCalleeReference(), ctx));
@@ -2086,12 +2091,22 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitReturnExpression(FirReturnExpression returnExpression, ExecutionContext ctx) {
-        Space prefix = whitespace();
+        List<J.Annotation> annotations;
+        if (returnExpression.getAnnotations().isEmpty()) {
+            annotations = emptyList();
+        } else {
+            annotations = new ArrayList<>(returnExpression.getAnnotations().size());
+            for (FirAnnotation annotation : returnExpression.getAnnotations()) {
+                annotations.add((J.Annotation) visitElement(annotation, ctx));
+            }
+        }
+
         J.Identifier label = null;
         KtReturnExpression node = (KtReturnExpression) getRealPsiElement(returnExpression);
         boolean explicitReturn = node != null;
+        Space prefix = EMPTY;
         if (explicitReturn) {
-            skip("return");
+            prefix = sourceBefore("return");
             if (node.getLabeledExpression() != null) {
                 skip("@");
                 label = createIdentifier(returnExpression.getTarget().getLabelName());
@@ -2102,16 +2117,27 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         if (!(returnExpression.getResult() instanceof FirUnitExpression)) {
             returnExpr = convertToExpression(returnExpression.getResult(), ctx);
         }
-        K.KReturn k = new K.KReturn(randomId(), new J.Return(randomId(), prefix, Markers.EMPTY, returnExpr), label);
+        K.KReturn k = new K.KReturn(randomId(), annotations, new J.Return(randomId(), prefix, Markers.EMPTY, returnExpr), label);
         return explicitReturn ? k : k.withMarkers(k.getMarkers().addIfAbsent(new ImplicitReturn(randomId())));
     }
 
     @Override
     public J visitResolvedTypeRef(FirResolvedTypeRef resolvedTypeRef, ExecutionContext ctx) {
         if (resolvedTypeRef.getDelegatedTypeRef() != null) {
+            List<J.Annotation> annotations;
+            if (resolvedTypeRef.getDelegatedTypeRef().getAnnotations().isEmpty()) {
+                annotations = emptyList();
+            } else {
+                annotations = new ArrayList<>(resolvedTypeRef.getDelegatedTypeRef().getAnnotations().size());
+                for (FirAnnotation annotation : resolvedTypeRef.getDelegatedTypeRef().getAnnotations()) {
+                    annotations.add((J.Annotation) visitElement(annotation, ctx));
+                }
+            }
             J j = visitElement(resolvedTypeRef.getDelegatedTypeRef(), ctx);
             JavaType type = typeMapping.type(resolvedTypeRef);
-            if (j instanceof TypeTree) {
+            if (j instanceof J.Identifier) {
+                j = ((J.Identifier) j).withAnnotations(annotations);
+            } else if (j instanceof TypeTree) {
                 j = ((TypeTree) j).withType(type);
             }
 
@@ -2237,12 +2263,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             // Infix functions are de-sugared during the backend phase of the compiler.
             // The de-sugaring process moves the infix receiver to the first position of the method declaration.
             // The infix receiver is added as to the `J.MethodInvocation` parameters, and marked to distinguish the parameter.
-            markers = markers.addIfAbsent(new ReceiverType(randomId()));
+            markers = markers.addIfAbsent(new Extension(randomId()));
             Expression receiver = convertToExpression(simpleFunction.getReceiverTypeRef(), ctx);
             infixReceiver = JRightPadded.build(new J.VariableDeclarations.NamedVariable(
                             randomId(),
                             EMPTY,
-                            Markers.EMPTY.addIfAbsent(new ReceiverType(randomId())),
+                            Markers.EMPTY.addIfAbsent(new Extension(randomId())),
                             new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "<receiverType>", null, null),
                             emptyList(),
                             padLeft(EMPTY, receiver),
@@ -2270,7 +2296,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             J.VariableDeclarations implicitParam = new J.VariableDeclarations(
                     randomId(),
                     EMPTY,
-                    Markers.EMPTY.addIfAbsent(new ReceiverType(randomId())),
+                    Markers.EMPTY.addIfAbsent(new Extension(randomId())),
                     emptyList(),
                     emptyList(),
                     null,
@@ -2555,13 +2581,13 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     @Override
     public J visitTypeParameter(FirTypeParameter typeParameter, ExecutionContext ctx) {
-        if (!typeParameter.getAnnotations().isEmpty()) {
-            throw new IllegalStateException("Implement me.");
-        }
-
         Space prefix = whitespace();
         Markers markers = Markers.EMPTY;
-        List<J.Annotation> annotations = new ArrayList<>(typeParameter.getAnnotations().size() + (typeParameter.isReified() ? 1 : 0));
+
+        List<J.Annotation> annotations = new ArrayList<>(typeParameter.getAnnotations().size());
+        for (FirAnnotation annotation : typeParameter.getAnnotations()) {
+            annotations.add((J.Annotation) visitElement(annotation, ctx));
+        }
 
         if (typeParameter.isReified()) {
             // Add reified as an annotation to preserve whitespace.
@@ -2579,66 +2605,54 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             annotations.add(reified);
         }
 
-
         List<FirTypeRef> nonImplicitParams = new ArrayList<>(typeParameter.getBounds().size());
-        boolean hasImplicitAny = false;
         for (FirTypeRef bound : typeParameter.getBounds()) {
-            if (bound instanceof FirImplicitNullableAnyTypeRef) {
-                hasImplicitAny = true;
-            } else {
+            if (!(bound instanceof FirImplicitNullableAnyTypeRef)) {
                 nonImplicitParams.add(bound);
             }
         }
 
-        // Generate a J.WildCard if there is an implicit any bound.
-        if (hasImplicitAny && (source.startsWith("in", cursor) || source.startsWith("out", cursor))) {
-            J.Wildcard.Bound bound;
-            if (source.startsWith("in", cursor)) {
-                skip("in");
-                bound = J.Wildcard.Bound.Super;
-            } else {
-                skip("out");
-                bound = J.Wildcard.Bound.Extends;
-            }
-            NameTree name = createIdentifier(typeParameter.getName().asString(), typeParameter);
-            J.Wildcard wc = new J.Wildcard(
-                    randomId(),
-                    prefix,
-                    Markers.EMPTY,
-                    padLeft(EMPTY, bound),
-                    name
-            );
-            return new J.TypeParameter(
+        Variance variance = typeParameter.getVariance();
+        Expression name;
+        JContainer<TypeTree> bounds = null;
+        if (variance == Variance.IN_VARIANCE) {
+            markers = markers.addIfAbsent(new GenericType(randomId(), GenericType.Variance.CONTRAVARIANT));
+            name = new J.Identifier(
                     randomId(),
                     EMPTY,
                     Markers.build(singletonList(new Implicit(randomId()))),
-                    annotations,
-                    new J.Identifier(
-                            randomId(),
-                            EMPTY,
-                            Markers.EMPTY,
-                            emptyList(),
-                            "",
-                            null,
-                            null),
-                    JContainer.build(singletonList(padRight(wc, EMPTY)))
+                    emptyList(),
+                    "Any",
+                    null,
+                    null
             );
+            bounds = JContainer.build(sourceBefore("in"), singletonList(padRight(createIdentifier(typeParameter.getName().asString(), typeParameter), EMPTY)), Markers.EMPTY);
+        } else if (variance == Variance.OUT_VARIANCE) {
+            markers = markers.addIfAbsent(new GenericType(randomId(), GenericType.Variance.COVARIANT));
+            name = new J.Identifier(
+                    randomId(),
+                    EMPTY,
+                    Markers.build(singletonList(new Implicit(randomId()))),
+                    emptyList(),
+                    "Any",
+                    null,
+                    null
+            );
+            bounds = JContainer.build(sourceBefore("out"), singletonList(padRight(createIdentifier(typeParameter.getName().asString(), typeParameter), EMPTY)), Markers.EMPTY);
         } else {
-            Expression name = createIdentifier(typeParameter.getName().asString(), typeParameter);
-
-            JContainer<TypeTree> bounds = null;
+            name = createIdentifier(typeParameter.getName().asString(), typeParameter);
             if (nonImplicitParams.size() == 1) {
                 bounds = JContainer.build(sourceBefore(":"), singletonList(padRight((TypeTree) visitElement(nonImplicitParams.get(0), ctx), EMPTY)), Markers.EMPTY);
             }
-
-            return new J.TypeParameter(
-                    randomId(),
-                    prefix,
-                    markers,
-                    annotations,
-                    name,
-                    bounds);
         }
+
+        return new J.TypeParameter(
+                randomId(),
+                prefix,
+                markers,
+                annotations,
+                name,
+                bounds);
     }
 
     @Override
@@ -2765,10 +2779,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         String valueName = "";
         if ("<unused var>".equals(valueParameter.getName().toString())) {
             valueName = "_";
-            namePrefix = whitespace();
-        } else if (!"<no name provided>".equals(valueParameter.getName().toString())){
+        } else if (!"<no name provided>".equals(valueParameter.getName().toString())) {
             valueName = valueParameter.getName().asString();
-            namePrefix = whitespace();
         }
         J.Identifier name = createIdentifier(valueName, valueParameter);
         if (lastAnnotations != null) {
@@ -3162,12 +3174,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             // Infix functions are de-sugared during the backend phase of the compiler.
             // The de-sugaring process moves the infix receiver to the first position of the method declaration.
             // The infix receiver is added as to the `J.MethodInvocation` parameters, and marked to distinguish the parameter.
-            markers = markers.addIfAbsent(new ReceiverType(randomId()));
+            markers = markers.addIfAbsent(new Extension(randomId()));
             Expression receiver = convertToExpression(constructor.getReceiverTypeRef(), ctx);
             infixReceiver = JRightPadded.build(new J.VariableDeclarations.NamedVariable(
                             randomId(),
                             EMPTY,
-                            Markers.EMPTY.addIfAbsent(new ReceiverType(randomId())),
+                            Markers.EMPTY.addIfAbsent(new Extension(randomId())),
                             new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), "<receiverType>", null, null),
                             emptyList(),
                             padLeft(EMPTY, receiver),
@@ -3190,7 +3202,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             J.VariableDeclarations implicitParam = new J.VariableDeclarations(
                     randomId(),
                     EMPTY,
-                    Markers.EMPTY.addIfAbsent(new ReceiverType(randomId())),
+                    Markers.EMPTY.addIfAbsent(new Extension(randomId())),
                     emptyList(),
                     emptyList(),
                     null,
@@ -4206,8 +4218,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         JavaType type = typeMapping.type(firElement, getCurrentFile());
 
         return createIdentifier(name,
-            type instanceof JavaType.Variable ? ((JavaType.Variable) type).getType() : type,
-            type instanceof JavaType.Variable ? (JavaType.Variable) type : null);
+                type instanceof JavaType.Variable ? ((JavaType.Variable) type).getType() : type,
+                type instanceof JavaType.Variable ? (JavaType.Variable) type : null);
     }
 
     private J.Identifier createIdentifier(String name, FirResolvedNamedReference namedReference) {

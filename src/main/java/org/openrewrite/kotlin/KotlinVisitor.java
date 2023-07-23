@@ -20,6 +20,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.kotlin.marker.AnnotationCallSite;
 import org.openrewrite.kotlin.tree.*;
 
 /**
@@ -115,6 +116,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         } else {
             r = (K.KReturn) temp;
         }
+        r = r.withAnnotations(ListUtils.map(r.getAnnotations(), a -> visitAndCast(a, p)));
         r = r.withExpression(visitAndCast(r.getExpression(), p));
         r = r.withLabel(visitAndCast(r.getLabel(), p));
         return r;
@@ -218,6 +220,35 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         w = w.getPadding().withExpressions(visitContainer(w.getPadding().getExpressions(), p));
         w = w.getPadding().withBody(visitRightPadded(w.getPadding().getBody(), JRightPadded.Location.CASE_BODY, p));
         return w;
+    }
+
+    @Override
+    public J visitAnnotation(J.Annotation annotation, P p) {
+        J.Annotation a = annotation;
+        a = a.withPrefix(visitSpace(a.getPrefix(), Space.Location.ANNOTATION_PREFIX, p));
+        a = a.withMarkers(visitMarkers(a.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(a, p);
+        if (!(temp instanceof J.Annotation)) {
+            return temp;
+        } else {
+            a = (J.Annotation) temp;
+        }
+
+        a = a.withMarkers(a.getMarkers().withMarkers(ListUtils.map(a.getMarkers().getMarkers(), m -> {
+            if (m instanceof AnnotationCallSite) {
+                AnnotationCallSite acs = (AnnotationCallSite) m;
+                acs = acs.withSuffix(visitSpace(acs.getSuffix(), Space.Location.LANGUAGE_EXTENSION, p));
+                return acs;
+            }
+            return m;
+        })));
+
+        if (a.getPadding().getArguments() != null) {
+            a = a.getPadding().withArguments(visitContainer(a.getPadding().getArguments(), JContainer.Location.ANNOTATION_ARGUMENTS, p));
+        }
+        a = a.withAnnotationType(visitAndCast(a.getAnnotationType(), p));
+        a = a.withAnnotationType(visitTypeName(a.getAnnotationType(), p));
+        return a;
     }
 
     public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, P p) {

@@ -24,7 +24,7 @@ import java.util.UUID;
 
 @Value
 @With
-public class KObject implements Marker {
+public class IsNullSafe implements Marker {
     UUID id;
     Space prefix;
 }

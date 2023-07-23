@@ -17,14 +17,19 @@ package org.openrewrite.kotlin.marker;
 
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
 @Value
 @With
-public class KObject implements Marker {
+public class GenericType implements Marker {
     UUID id;
-    Space prefix;
+    Variance variance;
+
+    public enum Variance {
+        INVARIANT,
+        COVARIANT,
+        CONTRAVARIANT
+    }
 }
