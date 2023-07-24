@@ -111,4 +111,38 @@ class BinaryAlignWhenMultilineTest implements RewriteTest {
         );
     }
 
+    // This is something we can do better than IntelliJ.
+    @Test
+    void withComments() {
+        rewriteRun(
+          java(
+            """
+              public class Test {
+                  public void num() {
+                      int something =
+                            1 // comment1
+                        +
+                         /* comment2 */ 2
+                          + // comment3
+                            3 
+                              /* comment4 */ + 4;
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  public void num() {
+                      int something =
+                            1 // comment1
+                            +
+                            /* comment2 */ 2
+                            + // comment3
+                            3
+                            /* comment4 */ + 4;
+                  }
+              }
+              """
+          )
+        );
+    }
 }

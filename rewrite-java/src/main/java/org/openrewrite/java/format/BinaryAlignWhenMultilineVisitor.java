@@ -18,12 +18,14 @@ package org.openrewrite.java.format;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.tree.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -59,6 +61,18 @@ public class BinaryAlignWhenMultilineVisitor<P> extends TreeVisitor<Tree, P> {
             // align operator
             JLeftPadded<J.Binary.Type> op = binary.getPadding().getOperator();
             Space opPrefix = op.getBefore();
+            if (!opPrefix.getComments().isEmpty()) {
+                String suffix = opPrefix.getComments().get(opPrefix.getComments().size() - 1).getSuffix();
+                if (suffix.contains("\n")) {
+                    String newSuffix = replaceLeadingSpaces(suffix, offset);
+                    if (!newSuffix.equals(suffix)) {
+                        List<Comment> newComments = ListUtils.mapLast(opPrefix.getComments(), c -> c.withSuffix(newSuffix));
+                        opPrefix = opPrefix.withComments(newComments);
+                        binary = binary.withOperator(op.withBefore(opPrefix));
+                    }
+                }
+            }
+
             if (opPrefix.getWhitespace().contains("\n")) {
                 opPrefix = opPrefix.withWhitespace(replaceLeadingSpaces(opPrefix.getWhitespace(), offset));
                 binary = binary.withOperator(op.withBefore(opPrefix));
