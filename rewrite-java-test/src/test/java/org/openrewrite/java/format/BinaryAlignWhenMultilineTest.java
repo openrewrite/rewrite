@@ -76,4 +76,39 @@ class BinaryAlignWhenMultilineTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void chainedBinary() {
+        rewriteRun(
+          java(
+            """
+              public class Test {
+                  public void num() {
+                      int something =
+                            1
+                        +
+                         2
+                          +
+                            3 
+                               + 4;
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  public void num() {
+                      int something = 
+                            1
+                            +
+                            2
+                            +
+                            3
+                            + 4;
+                  }
+              }
+              """
+          )
+        );
+    }
+
 }

@@ -110,7 +110,7 @@ public class BinaryAlignWhenMultilineVisitor<P> extends TreeVisitor<Tree, P> {
 
             Map<J.Binary, Integer> offsetMap = p.getContext();
             offsetMap.put(binary, offset);
-            return binary;
+            return super.visitBinary(binary, p);
         }
 
         private static int findLastNewlineDistance(StringBuilder sb) {
