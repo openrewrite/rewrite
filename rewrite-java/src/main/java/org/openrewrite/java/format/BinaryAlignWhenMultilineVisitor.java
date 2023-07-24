@@ -21,10 +21,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaPrinter;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JLeftPadded;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -35,7 +32,7 @@ public class BinaryAlignWhenMultilineVisitor<P> extends TreeVisitor<Tree, P> {
 
     @Override
     public @Nullable Tree visit(@Nullable Tree tree, P p) {
-        if (tree instanceof SourceFile) {
+        if (tree instanceof JavaSourceFile) {
             return new BinaryAlignWhenMultilineJavaVisitor<>().visit(tree, p);
         }
         return tree;
@@ -45,9 +42,11 @@ public class BinaryAlignWhenMultilineVisitor<P> extends TreeVisitor<Tree, P> {
         final Map<J.Binary, Integer> binaryOffsetMap = new HashMap<>();
 
         @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
-            new CollectBinaryOffset().collect(cu, binaryOffsetMap);
-            return super.visitCompilationUnit(cu, p);
+        public @Nullable J visit(@Nullable Tree tree, P p) {
+            if (tree instanceof JavaSourceFile) {
+                new CollectBinaryOffset().collect((JavaSourceFile) tree, binaryOffsetMap);
+            }
+            return super.visit(tree, p);
         }
 
         @Override
@@ -86,7 +85,7 @@ public class BinaryAlignWhenMultilineVisitor<P> extends TreeVisitor<Tree, P> {
     }
 
     private static String replaceLeadingSpaces(String input, int fixedSpaces) {
-        Pattern pattern =  Pattern.compile("(?<=\\n)(\\s+)"); // Pattern.compile("^(\\s+)");
+        Pattern pattern =  Pattern.compile("(?<=\\n)(\\s+)");
         Matcher matcher = pattern.matcher(input);
         String replacement = generateSpaces(fixedSpaces);
         return matcher.replaceFirst(replacement);
