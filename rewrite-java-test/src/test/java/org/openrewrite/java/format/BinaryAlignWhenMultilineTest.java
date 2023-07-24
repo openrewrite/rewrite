@@ -21,12 +21,13 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("all")
 class BinaryAlignWhenMultilineTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new BinaryAlignWhenMultiline());
+        spec.recipe(toRecipe(() -> new BinaryAlignWhenMultilineVisitor<>()));
     }
 
     @DocumentExample

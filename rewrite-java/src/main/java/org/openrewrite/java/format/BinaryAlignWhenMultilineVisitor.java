@@ -58,7 +58,7 @@ public class BinaryAlignWhenMultilineVisitor<P> extends TreeVisitor<Tree, P> {
             int offset = binaryOffsetMap.get(binary);
 
             // align operator
-            JLeftPadded<J.Binary.Type> op = binary.getLeftPaddedType();
+            JLeftPadded<J.Binary.Type> op = binary.getPadding().getOperator();
             Space opPrefix = op.getBefore();
             if (opPrefix.getWhitespace().contains("\n")) {
                 opPrefix = opPrefix.withWhitespace(replaceLeadingSpaces(opPrefix.getWhitespace(), offset));
