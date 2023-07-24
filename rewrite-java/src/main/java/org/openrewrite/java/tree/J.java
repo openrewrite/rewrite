@@ -620,6 +620,14 @@ public interface J extends Tree {
 
         JLeftPadded<Type> operator;
 
+        public JLeftPadded<Type> getLeftPaddedType() {
+            return operator;
+        }
+
+        public Binary withOperator(JLeftPadded<Type> leftPadded) {
+            return getPadding().withOperator(leftPadded);
+        }
+
         public Type getOperator() {
             return operator.getElement();
         }
