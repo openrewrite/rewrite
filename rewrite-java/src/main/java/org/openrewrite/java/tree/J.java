@@ -2349,7 +2349,7 @@ public interface J extends Tree {
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
     @With
     class Identifier implements J, TypeTree, Expression {
         @Getter
@@ -3799,7 +3799,7 @@ public interface J extends Tree {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
     @Data
     final class Modifier implements J {
         public static boolean hasModifier(Collection<Modifier> modifiers, Modifier.Type modifier) {
