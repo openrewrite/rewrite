@@ -2237,6 +2237,18 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             modifiers = mapModifierList(modifierList, simpleFunction.getAnnotations(), leadingAnnotations, lastAnnotations);
         }
 
+        boolean isOpen = false;
+        for (J.Modifier modifier : modifiers) {
+            if (modifier.getType() == J.Modifier.Type.LanguageExtension && "open".equals(modifier.getKeyword())) {
+                isOpen = true;
+                break;
+            }
+        }
+
+        if (!isOpen) {
+            modifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Final, emptyList()));
+        }
+
         modifiers.add(new J.Modifier(randomId(), sourceBefore("fun"), Markers.EMPTY, "fun", J.Modifier.Type.LanguageExtension, lastAnnotations));
 
         J.TypeParameters typeParameters = null;
@@ -3464,13 +3476,24 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         PsiElement node = getRealPsiElement(regularClass);
         KtModifierList modifierList = getModifierList(node);
 
-        List<J.Modifier> modifiers = emptyList();
+        List<J.Modifier> modifiers = new ArrayList<>();
         List<J.Annotation> leadingAnnotations = emptyList();
         List<J.Annotation> kindAnnotations = emptyList();
         if (modifierList != null) {
             leadingAnnotations = new ArrayList<>();
             kindAnnotations = new ArrayList<>();
             modifiers = mapModifierList(modifierList, regularClass.getAnnotations(), leadingAnnotations, kindAnnotations);
+        }
+
+        boolean isOpen = false;
+        for (J.Modifier modifier : modifiers) {
+            if (modifier.getType() == J.Modifier.Type.LanguageExtension && "open".equals(modifier.getKeyword())) {
+                isOpen = true;
+                break;
+            }
+        }
+        if (!isOpen) {
+            modifiers.add(new J.Modifier(randomId(), EMPTY, Markers.EMPTY, null, J.Modifier.Type.Final, emptyList()));
         }
 
         ClassKind classKind = regularClass.getClassKind();

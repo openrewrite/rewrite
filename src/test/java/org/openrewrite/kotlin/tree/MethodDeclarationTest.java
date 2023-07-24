@@ -17,8 +17,11 @@ package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings({"UnusedReceiverParameter", "RedundantSuspendModifier"})
@@ -235,6 +238,22 @@ class MethodDeclarationTest implements RewriteTest {
                 noinline block : ( ) -> Unit
               ) : Unit = Unit
               """)
+        );
+    }
+
+    @Test
+    void hasFinalModifier() {
+        rewriteRun(
+          kotlin(
+            "fun method() {}",
+            spec -> spec.afterRecipe(cu -> {
+                for (Statement statement : cu.getStatements()) {
+                    if (statement instanceof J.MethodDeclaration) {
+                        J.Modifier.hasModifier(((J.MethodDeclaration) statement).getModifiers(), J.Modifier.Type.Final);
+                        assertThat(J.Modifier.hasModifier(((J.MethodDeclaration) statement).getModifiers(), J.Modifier.Type.Final)).isTrue();
+                    }
+                }
+            }))
         );
     }
 }

@@ -18,8 +18,11 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings("ALL")
@@ -424,6 +427,21 @@ class ClassDeclarationTest implements RewriteTest {
               @A ( "1" ) open @A ( "2" ) public class TestB
               """
           )
+        );
+    }
+
+    @Test
+    void hasFinalModifier() {
+        rewriteRun(
+          kotlin("class A",
+            spec -> spec.afterRecipe(cu -> {
+                for (Statement statement : cu.getStatements()) {
+                    if (statement instanceof J.ClassDeclaration) {
+                        J.Modifier.hasModifier(((J.ClassDeclaration) statement).getModifiers(), J.Modifier.Type.Final);
+                        assertThat(J.Modifier.hasModifier(((J.ClassDeclaration) statement).getModifiers(), J.Modifier.Type.Final)).isTrue();
+                    }
+                }
+            }))
         );
     }
 }

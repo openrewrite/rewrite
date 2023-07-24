@@ -19,11 +19,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-@SuppressWarnings({"UnusedReceiverParameter", "PropertyName", "RemoveCurlyBracesFromTemplate", "UnnecessaryStringEscape", "RedundantGetter"})
+@SuppressWarnings({"UnusedReceiverParameter", "PropertyName", "RemoveCurlyBracesFromTemplate", "UnnecessaryStringEscape", "RedundantGetter", "ConstantConditionIf", "RedundantSetter"})
 class VariableDeclarationTest implements RewriteTest {
 
     @ParameterizedTest
@@ -398,13 +401,31 @@ class VariableDeclarationTest implements RewriteTest {
     @Test
     void checkNonNull() {
         rewriteRun(
-          kotlin("""
-            fun foo() {
-                val l = listOf ( "x" )
-                val a = l [ 0 ] !!
-            }
-            """)
+          kotlin(
+            """
+              fun foo() {
+                  val l = listOf ( "x" )
+                  val a = l [ 0 ] !!
+              }
+              """
+          )
         );
     }
 
+    @Test
+    void hasFinalModifier() {
+        rewriteRun(
+          kotlin(
+            """
+              val l = 42
+              """, spec -> spec.afterRecipe(cu -> {
+                for (Statement statement : cu.getStatements()) {
+                    if (statement instanceof J.VariableDeclarations) {
+                        J.Modifier.hasModifier(((J.VariableDeclarations) statement).getModifiers(), J.Modifier.Type.Final);
+                        assertThat(J.Modifier.hasModifier(((J.VariableDeclarations) statement).getModifiers(), J.Modifier.Type.Final)).isTrue();
+                    }
+                }
+              }))
+        );
+    }
 }
