@@ -38,10 +38,7 @@ import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.semver.DependencyMatcher;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 import static java.util.Objects.requireNonNull;
 
@@ -208,9 +205,11 @@ public class ChangeDependency extends Recipe {
                         }
                     }
                 } else if (m.getArguments().get(0) instanceof G.GString) {
-                    List<J> strings = ((G.GString) depArgs.get(0)).getStrings();
+                    G.GString gstring = (G.GString) depArgs.get(0);
+                    List<J> strings = gstring.getStrings();
                     if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
-                        Dependency original = DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
+                        J.Literal literal = (J.Literal) strings.get(0);
+                        Dependency original = DependencyStringNotationConverter.parse((String)literal.getValue());
                         if (depMatcher.matches(original.getGroupId(), original.getArtifactId())) {
                             Dependency updated = original;
                             if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
@@ -236,10 +235,9 @@ public class ChangeDependency extends Recipe {
                             }
                             if (original != updated) {
                                 String replacement = updated.toStringNotation();
-                                m = m.withArguments(ListUtils.mapFirst(depArgs, arg -> {
-                                    G.GString gString = (G.GString) arg;
-                                    return gString.withStrings(ListUtils.mapFirst(gString.getStrings(), l -> ((J.Literal) l).withValue(replacement).withValueSource(replacement)));
-                                }));
+                                J.Literal newLiteral = literal.withValue(replacement)
+                                        .withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter());
+                                m = m.withArguments(Collections.singletonList(newLiteral));
                             }
                         }
                     }

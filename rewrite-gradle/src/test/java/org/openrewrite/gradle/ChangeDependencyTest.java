@@ -177,6 +177,43 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void worksWithGString() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              def version = '2.6'
+              dependencies {
+                  implementation platform("commons-lang:commons-lang:${version}")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+
+              def version = '2.6'
+              dependencies {
+                  implementation platform("org.apache.commons:commons-lang3:3.11")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void changeDependencyWithLowerVersionAfter() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency("org.openrewrite", "plugin", "io.moderne", "moderne-gradle-plugin", "0.x", null, null)),
