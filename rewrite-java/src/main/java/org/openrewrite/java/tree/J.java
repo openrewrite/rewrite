@@ -628,10 +628,6 @@ public interface J extends Tree {
             return getPadding().withOperator(this.operator.withElement(operator));
         }
 
-        public Binary withOperator(JLeftPadded<Type> leftPadded) {
-            return getPadding().withOperator(leftPadded);
-        }
-
         @With
         Expression right;
 

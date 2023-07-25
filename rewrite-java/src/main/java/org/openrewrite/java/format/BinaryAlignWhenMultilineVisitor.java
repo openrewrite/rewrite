@@ -68,14 +68,14 @@ public class BinaryAlignWhenMultilineVisitor<P> extends TreeVisitor<Tree, P> {
                     if (!newSuffix.equals(suffix)) {
                         List<Comment> newComments = ListUtils.mapLast(opPrefix.getComments(), c -> c.withSuffix(newSuffix));
                         opPrefix = opPrefix.withComments(newComments);
-                        binary = binary.withOperator(op.withBefore(opPrefix));
+                        binary = binary.getPadding().withOperator(op.withBefore(opPrefix));
                     }
                 }
             }
 
             if (opPrefix.getWhitespace().contains("\n")) {
                 opPrefix = opPrefix.withWhitespace(replaceLeadingSpaces(opPrefix.getWhitespace(), offset));
-                binary = binary.withOperator(op.withBefore(opPrefix));
+                binary = binary.getPadding().withOperator(op.withBefore(opPrefix));
             }
 
             // align RHS
@@ -88,7 +88,7 @@ public class BinaryAlignWhenMultilineVisitor<P> extends TreeVisitor<Tree, P> {
             binary = binary.withRight(rhs);
             return super.visitBinary(binary, p);
         }
-    };
+    }
 
     private static String generateSpaces(int n) {
         StringBuilder sb = new StringBuilder();
