@@ -15,8 +15,8 @@
  */
 package org.openrewrite.gradle;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.*;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
@@ -46,6 +46,7 @@ import java.util.Optional;
 import static java.util.Objects.requireNonNull;
 
 @Value
+@AllArgsConstructor(onConstructor_ = {@JsonCreator})
 @EqualsAndHashCode(callSuper = true)
 public class ChangeDependency extends Recipe {
     @Option(displayName = "Old groupId",
@@ -89,6 +90,20 @@ public class ChangeDependency extends Recipe {
             required = false)
     @Nullable
     String versionPattern;
+
+    @Option(displayName = "Override managed version",
+            description = "If the old dependency has a managed version, this flag can be used to explicitly set the version on the new dependency. " +
+                    "WARNING: No check is done on the NEW dependency to verify if it is managed, it relies on whether the OLD dependency had a managed version. " +
+                    "The default for this flag is `false`.",
+            required = false)
+    @Nullable
+    Boolean overrideManagedVersion;
+
+
+    // Added constructor for compatibility with previous API
+    public ChangeDependency(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
+        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, null);
+    }
 
     @Override
     public String getDisplayName() {
@@ -157,7 +172,7 @@ public class ChangeDependency extends Recipe {
                             if (!StringUtils.isBlank(newArtifactId) && !updated.getArtifactId().equals(newArtifactId)) {
                                 updated = updated.withArtifactId(newArtifactId);
                             }
-                            if (!StringUtils.isBlank(newVersion)) {
+                            if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(original.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
                                 List<MavenRepository> repositories = "classpath".equals(m.getSimpleName()) ?
                                         gradleProject.getMavenPluginRepositories() :
                                         gradleProject.getMavenRepositories();

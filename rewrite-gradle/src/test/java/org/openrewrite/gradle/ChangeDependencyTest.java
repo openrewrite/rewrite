@@ -244,4 +244,42 @@ class ChangeDependencyTest implements RewriteTest {
               """)
         );
     }
+
+    @Test
+    void pinWhenOverrideManagedVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, true)),
+          buildGradle(
+            """
+              plugins {
+                id 'java'
+                id 'org.springframework.boot' version '2.6.1'
+                id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+              }
+              
+              repositories {
+                 mavenCentral()
+              }
+              
+              dependencies {
+                  runtimeOnly 'mysql:mysql-connector-java'
+              }
+              """,
+            """
+              plugins {
+                id 'java'
+                id 'org.springframework.boot' version '2.6.1'
+                id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+              }
+              
+              repositories {
+                 mavenCentral()
+              }
+              
+              dependencies {
+                  runtimeOnly 'com.mysql:mysql-connector-j:8.0.33'
+              }
+              """)
+        );
+    }
 }
