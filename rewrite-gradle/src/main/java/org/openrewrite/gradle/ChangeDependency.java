@@ -209,8 +209,7 @@ public class ChangeDependency extends Recipe {
                     }
                 } else if (m.getArguments().get(0) instanceof G.GString) {
                     List<J> strings = ((G.GString) depArgs.get(0)).getStrings();
-                    if (strings.size() >= 2 &&
-                            strings.get(0) instanceof J.Literal) {
+                    if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
                         Dependency original = DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
                         if (depMatcher.matches(original.getGroupId(), original.getArtifactId())) {
                             Dependency updated = original;
@@ -278,7 +277,7 @@ public class ChangeDependency extends Recipe {
                             version = valueValue;
                         }
                     }
-                    if (groupId == null || artifactId == null || version == null) {
+                    if (groupId == null || artifactId == null) {
                         return m;
                     }
                     if (!depMatcher.matches(groupId, artifactId)) {
@@ -293,7 +292,7 @@ public class ChangeDependency extends Recipe {
                         updatedArtifactId = newArtifactId;
                     }
                     String updatedVersion = version;
-                    if (!StringUtils.isBlank(newVersion)) {
+                    if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(version) || Boolean.TRUE.equals(overrideManagedVersion))) {
                         List<MavenRepository> repositories = "classpath".equals(m.getSimpleName()) ?
                                 gradleProject.getMavenPluginRepositories() :
                                 gradleProject.getMavenRepositories();
@@ -309,7 +308,7 @@ public class ChangeDependency extends Recipe {
                         }
                     }
 
-                    if (!updatedGroupId.equals(groupId) || !updatedArtifactId.equals(artifactId) || !updatedVersion.equals(version)) {
+                    if (!updatedGroupId.equals(groupId) || !updatedArtifactId.equals(artifactId) || updatedVersion != null && !updatedVersion.equals(version)) {
                         G.MapEntry finalGroup = groupEntry;
                         String finalGroupIdValue = updatedGroupId;
                         G.MapEntry finalArtifact = artifactEntry;

@@ -246,6 +246,44 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void doNotPinWhenNotVersionedOnMap() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, null)),
+          buildGradle(
+            """
+              plugins {
+                id 'java'
+                id 'org.springframework.boot' version '2.6.1'
+                id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+              }
+              
+              repositories {
+                 mavenCentral()
+              }
+              
+              dependencies {
+                  runtimeOnly group: 'mysql', name: 'mysql-connector-java'
+              }
+              """,
+            """
+              plugins {
+                id 'java'
+                id 'org.springframework.boot' version '2.6.1'
+                id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+              }
+              
+              repositories {
+                 mavenCentral()
+              }
+              
+              dependencies {
+                  runtimeOnly group: 'com.mysql', name: 'mysql-connector-j'
+              }
+              """)
+        );
+    }
+
+    @Test
     void pinWhenOverrideManagedVersion() {
         rewriteRun(
           spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, true)),
