@@ -15,8 +15,8 @@
  */
 package org.openrewrite.gradle;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import lombok.*;
 import org.openrewrite.*;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
 import org.openrewrite.gradle.marker.GradleProject;
@@ -38,10 +38,7 @@ import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.maven.tree.ResolvedGroupArtifactVersion;
 import org.openrewrite.semver.DependencyMatcher;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 import static java.util.Objects.requireNonNull;
 
@@ -89,6 +86,35 @@ public class ChangeDependency extends Recipe {
             required = false)
     @Nullable
     String versionPattern;
+
+    @Option(displayName = "Override managed version",
+            description = "If the old dependency has a managed version, this flag can be used to explicitly set the version on the new dependency. " +
+                    "WARNING: No check is done on the NEW dependency to verify if it is managed, it relies on whether the OLD dependency had a managed version. " +
+                    "The default for this flag is `false`.",
+            required = false)
+    @Nullable
+    Boolean overrideManagedVersion;
+
+
+    /**
+     * Keeping this constructor just for compatibility purposes
+     * @deprecated Use {@link ChangeDependency#ChangeDependency(String, String, String, String, String, String, Boolean)}
+     */
+    @Deprecated
+    public ChangeDependency(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
+        this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, null);
+    }
+
+    @JsonCreator
+    public ChangeDependency(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion) {
+        this.oldGroupId = oldGroupId;
+        this.oldArtifactId = oldArtifactId;
+        this.newGroupId = newGroupId;
+        this.newArtifactId = newArtifactId;
+        this.newVersion = newVersion;
+        this.versionPattern = versionPattern;
+        this.overrideManagedVersion = overrideManagedVersion;
+    }
 
     @Override
     public String getDisplayName() {
@@ -157,7 +183,7 @@ public class ChangeDependency extends Recipe {
                             if (!StringUtils.isBlank(newArtifactId) && !updated.getArtifactId().equals(newArtifactId)) {
                                 updated = updated.withArtifactId(newArtifactId);
                             }
-                            if (!StringUtils.isBlank(newVersion)) {
+                            if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(original.getVersion()) || Boolean.TRUE.equals(overrideManagedVersion))) {
                                 List<MavenRepository> repositories = "classpath".equals(m.getSimpleName()) ?
                                         gradleProject.getMavenPluginRepositories() :
                                         gradleProject.getMavenRepositories();
@@ -179,10 +205,11 @@ public class ChangeDependency extends Recipe {
                         }
                     }
                 } else if (m.getArguments().get(0) instanceof G.GString) {
-                    List<J> strings = ((G.GString) depArgs.get(0)).getStrings();
-                    if (strings.size() >= 2 &&
-                            strings.get(0) instanceof J.Literal) {
-                        Dependency original = DependencyStringNotationConverter.parse((String) ((J.Literal) strings.get(0)).getValue());
+                    G.GString gstring = (G.GString) depArgs.get(0);
+                    List<J> strings = gstring.getStrings();
+                    if (strings.size() >= 2 && strings.get(0) instanceof J.Literal) {
+                        J.Literal literal = (J.Literal) strings.get(0);
+                        Dependency original = DependencyStringNotationConverter.parse((String)literal.getValue());
                         if (depMatcher.matches(original.getGroupId(), original.getArtifactId())) {
                             Dependency updated = original;
                             if (!StringUtils.isBlank(newGroupId) && !updated.getGroupId().equals(newGroupId)) {
@@ -208,10 +235,9 @@ public class ChangeDependency extends Recipe {
                             }
                             if (original != updated) {
                                 String replacement = updated.toStringNotation();
-                                m = m.withArguments(ListUtils.mapFirst(depArgs, arg -> {
-                                    G.GString gString = (G.GString) arg;
-                                    return gString.withStrings(ListUtils.mapFirst(gString.getStrings(), l -> ((J.Literal) l).withValue(replacement).withValueSource(replacement)));
-                                }));
+                                J.Literal newLiteral = literal.withValue(replacement)
+                                        .withValueSource(gstring.getDelimiter() + replacement + gstring.getDelimiter());
+                                m = m.withArguments(Collections.singletonList(newLiteral));
                             }
                         }
                     }
@@ -249,7 +275,7 @@ public class ChangeDependency extends Recipe {
                             version = valueValue;
                         }
                     }
-                    if (groupId == null || artifactId == null || version == null) {
+                    if (groupId == null || artifactId == null) {
                         return m;
                     }
                     if (!depMatcher.matches(groupId, artifactId)) {
@@ -264,7 +290,7 @@ public class ChangeDependency extends Recipe {
                         updatedArtifactId = newArtifactId;
                     }
                     String updatedVersion = version;
-                    if (!StringUtils.isBlank(newVersion)) {
+                    if (!StringUtils.isBlank(newVersion) && (!StringUtils.isBlank(version) || Boolean.TRUE.equals(overrideManagedVersion))) {
                         List<MavenRepository> repositories = "classpath".equals(m.getSimpleName()) ?
                                 gradleProject.getMavenPluginRepositories() :
                                 gradleProject.getMavenRepositories();
@@ -280,7 +306,7 @@ public class ChangeDependency extends Recipe {
                         }
                     }
 
-                    if (!updatedGroupId.equals(groupId) || !updatedArtifactId.equals(artifactId) || !updatedVersion.equals(version)) {
+                    if (!updatedGroupId.equals(groupId) || !updatedArtifactId.equals(artifactId) || updatedVersion != null && !updatedVersion.equals(version)) {
                         G.MapEntry finalGroup = groupEntry;
                         String finalGroupIdValue = updatedGroupId;
                         G.MapEntry finalArtifact = artifactEntry;
