@@ -46,7 +46,6 @@ import java.util.Optional;
 import static java.util.Objects.requireNonNull;
 
 @Value
-@AllArgsConstructor(onConstructor_ = {@JsonCreator})
 @EqualsAndHashCode(callSuper = true)
 public class ChangeDependency extends Recipe {
     @Option(displayName = "Old groupId",
@@ -103,6 +102,17 @@ public class ChangeDependency extends Recipe {
     // Added constructor for compatibility with previous API
     public ChangeDependency(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
         this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, null);
+    }
+
+    @JsonCreator
+    public ChangeDependency(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern, @Nullable Boolean overrideManagedVersion) {
+        this.oldGroupId = oldGroupId;
+        this.oldArtifactId = oldArtifactId;
+        this.newGroupId = newGroupId;
+        this.newArtifactId = newArtifactId;
+        this.newVersion = newVersion;
+        this.versionPattern = versionPattern;
+        this.overrideManagedVersion = overrideManagedVersion;
     }
 
     @Override
