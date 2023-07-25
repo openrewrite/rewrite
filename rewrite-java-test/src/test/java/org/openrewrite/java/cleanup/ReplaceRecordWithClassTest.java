@@ -33,6 +33,7 @@ class ReplaceRecordWithClassTest implements RewriteTest {
     void simpleRecord() {
         rewriteRun(
           version(
+            //language=java
             java(
               """
               package com.example;
@@ -67,10 +68,7 @@ class ReplaceRecordWithClassTest implements RewriteTest {
                       if (this == obj) {
                           return true;
                       }
-                      if (obj == null) {
-                          return false;
-                      }
-                      if (getClass() != obj.getClass()) {
+                      if (obj == null || getClass() != obj.getClass()) {
                           return false;
                       }
                       Vehicle other = (Vehicle) obj;
@@ -95,6 +93,7 @@ class ReplaceRecordWithClassTest implements RewriteTest {
     void genericType() {
         rewriteRun(
           version(
+            //language=java
             java(
               """
               package com.example;
@@ -123,10 +122,7 @@ class ReplaceRecordWithClassTest implements RewriteTest {
                       if (this == obj) {
                           return true;
                       }
-                      if (obj == null) {
-                          return false;
-                      }
-                      if (getClass() != obj.getClass()) {
+                      if (obj == null || getClass() != obj.getClass()) {
                           return false;
                       }
                       Vehicle other = (Vehicle) obj;
@@ -151,34 +147,31 @@ class ReplaceRecordWithClassTest implements RewriteTest {
     void genericRecord() {
         rewriteRun(
           version(
+            //language=java
             java(
               """
               package com.example;
 
-              import java.util.List;
-
-              public record Vehicle<T>(T data, List<T> contents) {
+              public record Vehicle<T>(T data) {
               }
               """),
             14));
     }
 
     @Test
-    void implementsInterface() {
+    void canonicalConstructor() {
         rewriteRun(
           version(
+            //language=java
             java(
               """
               package com.example;
 
-              public interface Product {
-                  String model();
-              }
-
-              /**
-                * A DTO implementing an interface.
-                */
-              public record Vehicle(String model) implements Product {
+              public record Vehicle(String model, int power) {
+                  public Vehicle(String model, int power) {
+                      this.model = model.toUpperCase();
+                      this.power = power;
+                  }
               }
               """,
               """
@@ -186,14 +179,211 @@ class ReplaceRecordWithClassTest implements RewriteTest {
 
               import java.util.Objects;
 
-              public interface Product {
-                  String model();
-              }
+              public final class Vehicle {
+                  private final String model;
+                  private final int power;
 
-              /**
-                * A DTO implementing an interface.
-                */
-              public final class Vehicle implements Product {
+                  public Vehicle(String model, int power) {
+                      this.model = model.toUpperCase();
+                      this.power = power;
+                  }
+
+                  public String model() {
+                      return model;
+                  }
+
+                  public int power() {
+                      return power;
+                  }
+
+                  @Override
+                  public boolean equals(Object obj) {
+                      if (this == obj) {
+                          return true;
+                      }
+                      if (obj == null || getClass() != obj.getClass()) {
+                          return false;
+                      }
+                      Vehicle other = (Vehicle) obj;
+                      return Objects.equals(model, other.model) && power == other.power;
+                  }
+
+                  @Override
+                  public int hashCode() {
+                      return Objects.hash(model, power);
+                  }
+
+                  @Override
+                  public String toString() {
+                      return "Vehicle[model=" + model + ", power=" + power + "]";
+                  }
+              }
+              """),
+            14));
+    }
+
+    @Test
+    void nonCanonicalConstructor() {
+        rewriteRun(
+          version(
+            //language=java
+            java(
+              """
+              package com.example;
+
+              public record Vehicle(String model, int power) {
+                  public Vehicle(String model) {
+                      this(model, 100);
+                  }
+
+                  public Vehicle() {
+                      this("default", 100);
+                  }
+              }
+              """,
+              """
+              package com.example;
+
+              import java.util.Objects;
+
+              public final class Vehicle {
+                  private final String model;
+                  private final int power;
+
+                  public Vehicle(String model, int power) {
+                      this.model = model;
+                      this.power = power;
+                  }
+
+                  public Vehicle(String model) {
+                      this(model, 100);
+                  }
+
+                  public Vehicle() {
+                      this("default", 100);
+                  }
+
+                  public String model() {
+                      return model;
+                  }
+
+                  public int power() {
+                      return power;
+                  }
+
+                  @Override
+                  public boolean equals(Object obj) {
+                      if (this == obj) {
+                          return true;
+                      }
+                      if (obj == null || getClass() != obj.getClass()) {
+                          return false;
+                      }
+                      Vehicle other = (Vehicle) obj;
+                      return Objects.equals(model, other.model) && power == other.power;
+                  }
+
+                  @Override
+                  public int hashCode() {
+                      return Objects.hash(model, power);
+                  }
+
+                  @Override
+                  public String toString() {
+                      return "Vehicle[model=" + model + ", power=" + power + "]";
+                  }
+              }
+              """),
+            14));
+    }
+
+    @Test
+    void compactConstructor() {
+        rewriteRun(
+          version(
+            //language=java
+            java(
+              """
+              package com.example;
+
+              import java.util.Objects;
+
+              public record Vehicle(String model, int power) {
+                  public Vehicle {
+                      Objects.requireNonNull(model);
+                  }
+              }
+              """,
+              """
+              package com.example;
+
+              import java.util.Objects;
+
+              public final class Vehicle {
+                  private final String model;
+                  private final int power;
+
+                  public Vehicle(String model, int power) {
+                      Objects.requireNonNull(model);
+                      this.model = model;
+                      this.power = power;
+                  }
+
+                  public String model() {
+                      return model;
+                  }
+
+                  public int power() {
+                      return power;
+                  }
+
+                  @Override
+                  public boolean equals(Object obj) {
+                      if (this == obj) {
+                          return true;
+                      }
+                      if (obj == null || getClass() != obj.getClass()) {
+                          return false;
+                      }
+                      Vehicle other = (Vehicle) obj;
+                      return Objects.equals(model, other.model) && power == other.power;
+                  }
+
+                  @Override
+                  public int hashCode() {
+                      return Objects.hash(model, power);
+                  }
+
+                  @Override
+                  public String toString() {
+                      return "Vehicle[model=" + model + ", power=" + power + "]";
+                  }
+              }
+              """),
+            14));
+    }
+
+    @Test
+    void staticField() {
+        rewriteRun(
+          version(
+            //language=java
+            java(
+              """
+              package com.example;
+
+              public record Vehicle(String model) {
+                  public static final String DEFAULT_MODEL = "default";
+              }
+              """,
+              """
+              package com.example;
+
+              import java.util.Objects;
+
+              public final class Vehicle {
+                  public static final String DEFAULT_MODEL = "default";
+
                   private final String model;
 
                   public Vehicle(String model) {
@@ -209,10 +399,7 @@ class ReplaceRecordWithClassTest implements RewriteTest {
                       if (this == obj) {
                           return true;
                       }
-                      if (obj == null) {
-                          return false;
-                      }
-                      if (getClass() != obj.getClass()) {
+                      if (obj == null || getClass() != obj.getClass()) {
                           return false;
                       }
                       Vehicle other = (Vehicle) obj;
@@ -234,16 +421,449 @@ class ReplaceRecordWithClassTest implements RewriteTest {
     }
 
     @Test
-    void statementsNotSupported() {
+    void customMethod() {
         rewriteRun(
           version(
+            //language=java
             java(
               """
               package com.example;
 
               public record Vehicle(String model) {
-                  public Vehicle() {
-                      this("default");
+                  public boolean isDefault() {
+                      return "default".equals(model);
+                  }
+              }
+              """,
+              """
+              package com.example;
+
+              import java.util.Objects;
+
+              public final class Vehicle {
+                  private final String model;
+
+                  public Vehicle(String model) {
+                      this.model = model;
+                  }
+
+                  public String model() {
+                      return model;
+                  }
+
+                  public boolean isDefault() {
+                      return "default".equals(model);
+                  }
+
+                  @Override
+                  public boolean equals(Object obj) {
+                      if (this == obj) {
+                          return true;
+                      }
+                      if (obj == null || getClass() != obj.getClass()) {
+                          return false;
+                      }
+                      Vehicle other = (Vehicle) obj;
+                      return Objects.equals(model, other.model);
+                  }
+
+                  @Override
+                  public int hashCode() {
+                      return Objects.hash(model);
+                  }
+
+                  @Override
+                  public String toString() {
+                      return "Vehicle[model=" + model + "]";
+                  }
+              }
+              """),
+            14));
+    }
+
+    @Test
+    void customGetter() {
+        rewriteRun(
+          version(
+            //language=java
+            java(
+              """
+              package com.example;
+
+              public record Vehicle(String model) {
+                  public String model() {
+                      return model.toUpperCase();
+                  }
+              }
+              """,
+              """
+              package com.example;
+
+              import java.util.Objects;
+
+              public final class Vehicle {
+                  private final String model;
+
+                  public Vehicle(String model) {
+                      this.model = model;
+                  }
+
+                  public String model() {
+                      return model.toUpperCase();
+                  }
+
+                  @Override
+                  public boolean equals(Object obj) {
+                      if (this == obj) {
+                          return true;
+                      }
+                      if (obj == null || getClass() != obj.getClass()) {
+                          return false;
+                      }
+                      Vehicle other = (Vehicle) obj;
+                      return Objects.equals(model, other.model);
+                  }
+
+                  @Override
+                  public int hashCode() {
+                      return Objects.hash(model);
+                  }
+
+                  @Override
+                  public String toString() {
+                      return "Vehicle[model=" + model + "]";
+                  }
+              }
+              """),
+            14));
+    }
+
+    @Test
+    void methodNamedAsGetter() {
+        rewriteRun(
+          version(
+            //language=java
+            java(
+              """
+              package com.example;
+
+              public record Vehicle(String model) {
+                  public String model(boolean upperCase) {
+                      return upperCase ? model.toUpperCase() : model;
+                  }
+              }
+              """,
+              """
+              package com.example;
+
+              import java.util.Objects;
+
+              public final class Vehicle {
+                  private final String model;
+
+                  public Vehicle(String model) {
+                      this.model = model;
+                  }
+
+                  public String model() {
+                      return model;
+                  }
+
+                  public String model(boolean upperCase) {
+                      return upperCase ? model.toUpperCase() : model;
+                  }
+
+                  @Override
+                  public boolean equals(Object obj) {
+                      if (this == obj) {
+                          return true;
+                      }
+                      if (obj == null || getClass() != obj.getClass()) {
+                          return false;
+                      }
+                      Vehicle other = (Vehicle) obj;
+                      return Objects.equals(model, other.model);
+                  }
+
+                  @Override
+                  public int hashCode() {
+                      return Objects.hash(model);
+                  }
+
+                  @Override
+                  public String toString() {
+                      return "Vehicle[model=" + model + "]";
+                  }
+              }
+              """),
+            14));
+    }
+
+    @Test
+    void customOverridenMethod() {
+        rewriteRun(
+          version(
+            //language=java
+            java(
+              """
+              package com.example;
+
+              public record Vehicle(String model) {
+                  @Override
+                  public boolean equals(Object obj) {
+                      if (this == obj) {
+                          return true;
+                      }
+                      if (obj == null || getClass() != obj.getClass()) {
+                          return false;
+                      }
+                      return Objects.equals(model(), ((Vehicle) obj).model());
+                  }
+
+                  @Override
+                  public int hashCode() {
+                      return model.hashCode();
+                  }
+
+                  @Override
+                  public String toString() {
+                      return "Vehicle(" + model + ")";
+                  }
+              }
+              """,
+              """
+              package com.example;
+
+              public final class Vehicle {
+                  private final String model;
+
+                  public Vehicle(String model) {
+                      this.model = model;
+                  }
+
+                  public String model() {
+                      return model;
+                  }
+
+                  @Override
+                  public boolean equals(Object obj) {
+                      if (this == obj) {
+                          return true;
+                      }
+                      if (obj == null || getClass() != obj.getClass()) {
+                          return false;
+                      }
+                      return Objects.equals(model(), ((Vehicle) obj).model());
+                  }
+
+                  @Override
+                  public int hashCode() {
+                      return model.hashCode();
+                  }
+
+                  @Override
+                  public String toString() {
+                      return "Vehicle(" + model + ")";
+                  }
+              }
+              """),
+            14));
+    }
+
+    @Test
+    void implementsInterface() {
+        rewriteRun(
+          version(
+            //language=java
+            java(
+              """
+              package com.example;
+
+              public interface Product {
+                  String model();
+              }
+
+              public record Vehicle(String model) implements Product {
+              }
+              """,
+              """
+              package com.example;
+
+              import java.util.Objects;
+
+              public interface Product {
+                  String model();
+              }
+
+              public final class Vehicle implements Product {
+                  private final String model;
+
+                  public Vehicle(String model) {
+                      this.model = model;
+                  }
+
+                  @Override
+                  public String model() {
+                      return model;
+                  }
+
+                  @Override
+                  public boolean equals(Object obj) {
+                      if (this == obj) {
+                          return true;
+                      }
+                      if (obj == null || getClass() != obj.getClass()) {
+                          return false;
+                      }
+                      Vehicle other = (Vehicle) obj;
+                      return Objects.equals(model, other.model);
+                  }
+
+                  @Override
+                  public int hashCode() {
+                      return Objects.hash(model);
+                  }
+
+                  @Override
+                  public String toString() {
+                      return "Vehicle[model=" + model + "]";
+                  }
+              }
+              """),
+            14));
+    }
+
+    @Test
+    void localRecord() {
+        rewriteRun(
+          version(
+            //language=java
+            java(
+              """
+              package com.example;
+
+              public class SomeClass {
+                  public void printRecord(String model) {
+                      record Vehicle(String model) {}
+                      System.out.println(new Vehicle(model));
+                  }
+              }
+              """,
+              """
+              package com.example;
+
+              import java.util.Objects;
+
+              public class SomeClass {
+                  public void printRecord(String model) {
+                      final class Vehicle {
+                          private final String model;
+
+                          public Vehicle(String model) {
+                              this.model = model;
+                          }
+
+                          public String model() {
+                              return model;
+                          }
+
+                          @Override
+                          public boolean equals(Object obj) {
+                              if (this == obj) {
+                                  return true;
+                              }
+                              if (obj == null || getClass() != obj.getClass()) {
+                                  return false;
+                              }
+                              Vehicle other = (Vehicle) obj;
+                              return Objects.equals(model, other.model);
+                          }
+
+                          @Override
+                          public int hashCode() {
+                              return Objects.hash(model);
+                          }
+
+                          @Override
+                          public String toString() {
+                              return "Vehicle[model=" + model + "]";
+                          }
+                      }
+                      System.out.println(new Vehicle(model));
+                  }
+              }
+              """),
+            14));
+    }
+
+    @Test
+    void comments() {
+        rewriteRun(
+          version(
+            //language=java
+            java(
+              """
+              package com.example;
+
+              /**
+               * The vehicle class.
+               */
+              public record Vehicle(String model) {
+                  // Constructor
+                  public Vehicle {
+                      // Model is required
+                      Objects.requireNonNull(model);
+                  }
+
+                  // Predefined getter
+                  public String model() {
+                      return model;
+                  }
+              }
+              """,
+              """
+              package com.example;
+
+              import java.util.Objects;
+
+              /**
+               * The vehicle class.
+               */
+              public final class Vehicle {
+                  private final String model;
+
+                  // Constructor
+                  public Vehicle(String model) {
+                      // Model is required
+                      Objects.requireNonNull(model);
+                      this.model = model;
+                  }
+
+                  // Predefined getter
+                  public String model() {
+                      return model;
+                  }
+
+                  @Override
+                  public boolean equals(Object obj) {
+                      if (this == obj) {
+                          return true;
+                      }
+                      if (obj == null || getClass() != obj.getClass()) {
+                          return false;
+                      }
+                      Vehicle other = (Vehicle) obj;
+                      return Objects.equals(model, other.model);
+                  }
+
+                  @Override
+                  public int hashCode() {
+                      return Objects.hash(model);
+                  }
+
+                  @Override
+                  public String toString() {
+                      return "Vehicle[model=" + model + "]";
                   }
               }
               """),
