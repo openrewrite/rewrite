@@ -129,7 +129,10 @@ public class KotlinTypeSignatureBuilder implements JavaTypeSignatureBuilder {
                     return genericSignature(classifierSymbol.getFir());
                 }
             } else if (coneKotlinType instanceof ConeFlexibleType) {
-                return typeRefClassSignature(((ConeFlexibleType) coneKotlinType).getLowerBound());
+                if (((ConeFlexibleType) coneKotlinType).getLowerBound().getTypeArguments().length == 0) {
+                    return typeRefClassSignature(((ConeFlexibleType) coneKotlinType).getLowerBound());
+                }
+                return parameterizedTypeRef(((ConeFlexibleType) coneKotlinType).getLowerBound());
             }
             return coneKotlinType.getTypeArguments().length > 0 ? parameterizedTypeRef(coneKotlinType) : typeRefClassSignature(coneKotlinType);
         } else if (type instanceof FirTypeParameter) {
