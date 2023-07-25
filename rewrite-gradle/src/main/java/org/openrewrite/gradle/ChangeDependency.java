@@ -99,7 +99,11 @@ public class ChangeDependency extends Recipe {
     Boolean overrideManagedVersion;
 
 
-    // Added constructor for compatibility with previous API
+    /**
+     * Keeping this constructor just for compatibility purposes
+     * @deprecated Use {@link ChangeDependency#ChangeDependency(String, String, String, String, String, String, Boolean)}
+     */
+    @Deprecated
     public ChangeDependency(String oldGroupId, String oldArtifactId, @Nullable String newGroupId, @Nullable String newArtifactId, @Nullable String newVersion, @Nullable String versionPattern) {
         this(oldGroupId, oldArtifactId, newGroupId, newArtifactId, newVersion, versionPattern, null);
     }

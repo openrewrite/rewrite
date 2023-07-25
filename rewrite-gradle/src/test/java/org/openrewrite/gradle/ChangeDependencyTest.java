@@ -33,7 +33,7 @@ class ChangeDependencyTest implements RewriteTest {
     @Test
     void relocateDependency() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null)),
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
           buildGradle(
             """
               plugins {
@@ -70,7 +70,7 @@ class ChangeDependencyTest implements RewriteTest {
     @Test
     void changeGroupIdOnly() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", null, null, null)),
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", null, null, null, null)),
           buildGradle(
             """
               plugins {
@@ -107,7 +107,7 @@ class ChangeDependencyTest implements RewriteTest {
     @Test
     void changeArtifactIdOnly() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", null, "commons-lang3", null, null)),
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", null, "commons-lang3", null, null, null)),
           buildGradle(
             """
               plugins {
@@ -144,7 +144,7 @@ class ChangeDependencyTest implements RewriteTest {
     @Test
     void worksWithPlatform() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null)),
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
           buildGradle(
             """
               plugins {
@@ -179,7 +179,7 @@ class ChangeDependencyTest implements RewriteTest {
     @Test
     void changeDependencyWithLowerVersionAfter() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("org.openrewrite", "plugin", "io.moderne", "moderne-gradle-plugin", "0.x", null)),
+          spec -> spec.recipe(new ChangeDependency("org.openrewrite", "plugin", "io.moderne", "moderne-gradle-plugin", "0.x", null, null)),
           buildGradle(
             """
               buildscript {
@@ -210,7 +210,7 @@ class ChangeDependencyTest implements RewriteTest {
     @Test
     void doNotPinWhenNotVersioned() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null)),
+          spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, null)),
           buildGradle(
             """
               plugins {
