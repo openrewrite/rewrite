@@ -87,6 +87,53 @@ class FormatPreservingReader extends Reader {
         return read;
     }
 
+    /**
+     * Processes a stream of bytes, and returns a Stream of Unicode codepoints
+     * associated with the characters derived from that byte stream.
+     *
+     * @param bais ByteArrayInputStream to be processed.
+     * @return A stream of Unicode codepoints derived from UTF-8 characters in the supplied stream.
+     */
+//    private static Stream<Integer> processByteStream(ByteArrayInputStream bais) {
+//
+//        int nextByte = 0;
+//        byte b = 0;
+//        byte[] utf8Bytes = null;
+//        int byteCount = 0;
+//        List<Integer> codePoints = new ArrayList<>();
+//
+//        while ((nextByte = bais.read()) != -1) {
+//            b = (byte) nextByte;
+//            byteCount = Main.getByteCount(b);
+//            utf8Bytes = new byte[byteCount];
+//            utf8Bytes[0] = (byte) nextByte;
+//            for (int i = 1; i < byteCount; i++) { // Get any subsequent bytes for this UTF-8 character.
+//                nextByte = bais.read();
+//                utf8Bytes[i] = (byte) nextByte;
+//            }
+//            int codePoint = new String(utf8Bytes, StandardCharsets.UTF_8).codePointAt(0);
+//            codePoints.add(codePoint);
+//        }
+//        return codePoints.stream();
+//    }
+
+    /**
+     * Returns the number of bytes in a UTF-8 character based on the bit pattern
+     * of the supplied byte. The only valid values are 1, 2 3 or 4. If the
+     * byte has an invalid bit pattern an IllegalArgumentException is thrown.
+     *
+     * @param b The first byte of a UTF-8 character.
+     * @return The number of bytes for this UTF-* character.
+     * @throws IllegalArgumentException if the bit pattern is invalid.
+     */
+    private static int getByteCount(byte b) throws IllegalArgumentException {
+        if ((b >= 0)) return 1;                                             // Pattern is 0xxxxxxx.
+        if ((b >= (byte) 0b11000000) && (b <= (byte) 0b11011111)) return 2; // Pattern is 110xxxxx.
+        if ((b >= (byte) 0b11100000) && (b <= (byte) 0b11101111)) return 3; // Pattern is 1110xxxx.
+        if ((b >= (byte) 0b11110000) && (b <= (byte) 0b11110111)) return 4; // Pattern is 11110xxx.
+        throw new IllegalArgumentException(); // Invalid first byte for UTF-8 character.
+    }
+
     @Override
     public void close() throws IOException {
         delegate.close();

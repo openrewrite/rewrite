@@ -15,11 +15,12 @@
  */
 package org.openrewrite.yaml;
 
-import lombok.Getter;
+import lombok.*;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.tree.ParseError;
@@ -35,9 +36,7 @@ import org.yaml.snakeyaml.reader.StreamReader;
 import org.yaml.snakeyaml.scanner.Scanner;
 import org.yaml.snakeyaml.scanner.ScannerImpl;
 
-import java.io.IOException;
 import java.io.StringReader;
-import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -47,6 +46,7 @@ import java.util.stream.Stream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespaceHashComments;
 
 public class YamlParser implements org.openrewrite.Parser {
     private static final Pattern VARIABLE_PATTERN = Pattern.compile(":\\s*(@[^\n\r@]+@)");
@@ -71,7 +71,6 @@ public class YamlParser implements org.openrewrite.Parser {
                         return ParseError.build(this, sourceFile, relativeTo, ctx, t);
                     }
                 })
-                .map(this::unwrapPrefixedMappings)
                 .map(sourceFile -> {
                     if (sourceFile instanceof Yaml.Documents) {
                         Yaml.Documents docs = (Yaml.Documents) sourceFile;
@@ -86,32 +85,54 @@ public class YamlParser implements org.openrewrite.Parser {
                 });
     }
 
-    private Yaml.Documents parseFromInput(Path sourceFile, EncodingDetectingInputStream source) {
-        String yamlSource = source.readFully();
+    private int cursor = 0;
+    private String source = "";
+    private String whitespace() {
+        int lastIndex = source.length() -1;
+        int start = Math.min(lastIndex, cursor);
+        int i =  Math.min(lastIndex, indexOfNextNonWhitespaceHashComments(start, source));
+        String whitespace;
+        if(i == -1) {
+            whitespace = source.substring(cursor);
+            cursor = lastIndex;
+        } else {
+            whitespace = source.substring(start, i);
+            cursor += whitespace.length();
+        }
+        return whitespace;
+    }
+    private boolean isNext(char c) {
+        int lastIndex = source.length() - 1;
+        boolean result = source.charAt(Math.min(lastIndex, cursor)) == c;
+        if(result) {
+            cursor++;
+        }
+        return result;
+    }
+    private Yaml.Documents parseFromInput(Path sourceFile, EncodingDetectingInputStream is) {
+        cursor = 0;
+        source = is.readFully();
         Map<String, String> variableByUuid = new HashMap<>();
 
         StringBuilder yamlSourceWithVariablePlaceholders = new StringBuilder();
-        Matcher variableMatcher = VARIABLE_PATTERN.matcher(yamlSource);
+        Matcher variableMatcher = VARIABLE_PATTERN.matcher(source);
         int pos = 0;
-        while (pos < yamlSource.length() && variableMatcher.find(pos)) {
-            yamlSourceWithVariablePlaceholders.append(yamlSource, pos, variableMatcher.start(1));
+        while (pos < source.length() && variableMatcher.find(pos)) {
+            yamlSourceWithVariablePlaceholders.append(source, pos, variableMatcher.start(1));
             String uuid = UUID.randomUUID().toString();
             variableByUuid.put(uuid, variableMatcher.group(1));
             yamlSourceWithVariablePlaceholders.append(uuid);
             pos = variableMatcher.end(1);
         }
 
-        if (pos < yamlSource.length() - 1) {
-            yamlSourceWithVariablePlaceholders.append(yamlSource, pos, yamlSource.length());
+        if (pos < source.length() - 1) {
+            yamlSourceWithVariablePlaceholders.append(source, pos, source.length());
         }
 
-        try (StringReader stringReader = new StringReader(yamlSourceWithVariablePlaceholders.toString());
-             FormatPreservingReader reader = new FormatPreservingReader(stringReader)) {
-            StreamReader streamReader = new StreamReader(reader);
+        try (StringReader stringReader = new StringReader(yamlSourceWithVariablePlaceholders.toString())) {
+            StreamReader streamReader = new StreamReader(stringReader);
             Scanner scanner = new ScannerImpl(streamReader, new LoaderOptions());
             Parser parser = new ParserImpl(scanner);
-
-            int lastEnd = 0;
 
             List<Yaml.Document> documents = new ArrayList<>();
             // https://yaml.org/spec/1.2.2/#3222-anchors-and-aliases, section: 3.2.2.2. Anchors and Aliases.
@@ -119,70 +140,67 @@ public class YamlParser implements org.openrewrite.Parser {
             Map<String, Yaml.Anchor> anchors = new HashMap<>();
             Yaml.Document document = null;
             Stack<BlockBuilder> blockStack = new Stack<>();
-            String newLine = "";
 
             for (Event event = parser.getEvent(); event != null; event = parser.getEvent()) {
+                System.out.println(event.getEventId().name());
                 switch (event.getEventId()) {
                     case DocumentEnd: {
-                        String fmt = newLine + reader.prefix(lastEnd, event);
-                        newLine = "";
-
                         assert document != null;
                         documents.add(document.withEnd(new Yaml.Document.End(
                                 randomId(),
-                                fmt,
+                                whitespace(),
                                 Markers.EMPTY,
                                 ((DocumentEndEvent) event).getExplicit()
                         )));
-                        lastEnd = event.getEndMark().getIndex();
                         break;
                     }
                     case DocumentStart: {
-                        String fmt = newLine + reader.prefix(lastEnd, event);
-                        newLine = "";
                         document = new Yaml.Document(
                                 randomId(),
-                                fmt,
+                                whitespace(),
                                 Markers.EMPTY,
                                 ((DocumentStartEvent) event).getExplicit(),
                                 new Yaml.Mapping(randomId(), Markers.EMPTY, null, emptyList(), null, null),
                                 null
                         );
-                        lastEnd = event.getEndMark().getIndex();
                         break;
                     }
                     case MappingStart: {
-                        String fmt = newLine + reader.prefix(lastEnd, event);
-                        newLine = "";
-
+                        String fmt = whitespace();
+                        boolean dash = isNext('-'); // mapping may be within a sequence
                         MappingStartEvent mappingStartEvent = (MappingStartEvent) event;
                         Yaml.Anchor anchor = null;
                         if (mappingStartEvent.getAnchor() != null) {
-                            anchor = buildYamlAnchor(reader, lastEnd, fmt, mappingStartEvent.getAnchor(), event.getEndMark().getIndex(), false);
-                            anchors.put(mappingStartEvent.getAnchor(), anchor);
-
-                            lastEnd = lastEnd + mappingStartEvent.getAnchor().length() + fmt.length() + 1;
-                            fmt = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex());
-                            int dashPrefixIndex = commentAwareIndexOf('-', fmt);
-                            if (dashPrefixIndex > -1) {
-                                fmt = fmt.substring(0, dashPrefixIndex);
-                            }
+                            //TODO
+                            throw new RuntimeException("not implemented");
+//                            String fmt = whitespace();
+//                            anchor = buildYamlAnchor(source, cursor, fmt, mappingStartEvent.getAnchor(), event.getEndMark().getIndex(), false);
+//                            anchors.put(mappingStartEvent.getAnchor(), anchor);
+//
+//                            cursor += mappingStartEvent.getAnchor().length();
+//                            fmt = source.substring(cursor, event.getEndMark().getIndex());
+//                            int dashPrefixIndex = commentAwareIndexOf('-', fmt);
+//                            if (dashPrefixIndex > -1) {
+//                                fmt = fmt.substring(0, dashPrefixIndex);
+//                            }
                         }
 
-                        String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex() - 1);
                         String startBracePrefix = null;
-                        int openingBraceIndex = commentAwareIndexOf('{', fullPrefix);
-                        if (openingBraceIndex != -1) {
-                            int startIndex = commentAwareIndexOf(':', fullPrefix) + 1;
-                            startBracePrefix = fullPrefix.substring(startIndex, openingBraceIndex);
-                            lastEnd = event.getEndMark().getIndex();
+                        if(isNext('{')) {
+                            startBracePrefix = fmt;
+                            fmt = "";
                         }
-                        blockStack.push(new MappingBuilder(fmt, startBracePrefix, anchor));
+
+                        blockStack.push(new MappingBuilder(dash, fmt, startBracePrefix, anchor));
                         break;
                     }
                     case Scalar: {
-                        String fmt = newLine + reader.prefix(lastEnd, event);
-                        newLine = "";
+                        String fmt = whitespace();
+                        String dashPrefix = null;
+                        if(isNext('-')) {
+                            dashPrefix = fmt;
+                            fmt = whitespace();
+                        }
 
                         ScalarEvent scalar = (ScalarEvent) event;
                         String scalarValue = scalar.getValue();
@@ -192,9 +210,14 @@ public class YamlParser implements org.openrewrite.Parser {
 
                         Yaml.Anchor anchor = null;
                         if (scalar.getAnchor() != null) {
-                            anchor = buildYamlAnchor(reader, lastEnd, fmt, scalar.getAnchor(), event.getEndMark().getIndex(), true);
+                            int saveCursor = cursor;
+                            cursor += scalar.getAnchor().length() + 1;
+                            anchor = new Yaml.Anchor(randomId(), "", whitespace(), Markers.EMPTY, scalar.getAnchor());
                             anchors.put(scalar.getAnchor(), anchor);
+                            cursor = saveCursor;
                         }
+                        // Use event length rather than scalarValue.length() to account for escape characters and quotes
+                        cursor += event.getEndMark().getIndex() - event.getStartMark().getIndex();
 
                         Yaml.Scalar.Style style;
                         switch (scalar.getScalarStyle()) {
@@ -205,40 +228,33 @@ public class YamlParser implements org.openrewrite.Parser {
                                 style = Yaml.Scalar.Style.SINGLE_QUOTED;
                                 break;
                             case LITERAL:
+                                //TODO
                                 style = Yaml.Scalar.Style.LITERAL;
-                                scalarValue = reader.readStringFromBuffer(event.getStartMark().getIndex() + 1, event.getEndMark().getIndex() - 1);
+                                scalarValue = source.substring(event.getStartMark().getIndex() + 1, event.getEndMark().getIndex() - 1);
                                 if (scalarValue.endsWith("\n")) {
-                                    newLine = "\n";
+//                                    newLine = "\n";
                                     scalarValue = scalarValue.substring(0, scalarValue.length() - 1);
                                 }
                                 break;
                             case FOLDED:
                                 style = Yaml.Scalar.Style.FOLDED;
-                                scalarValue = reader.readStringFromBuffer(event.getStartMark().getIndex() + 1, event.getEndMark().getIndex() - 1);
+                                scalarValue = source.substring(event.getStartMark().getIndex() + 1, event.getEndMark().getIndex() - 1);
                                 break;
                             case PLAIN:
                             default:
                                 style = Yaml.Scalar.Style.PLAIN;
                                 break;
                         }
+
                         BlockBuilder builder = blockStack.isEmpty() ? null : blockStack.peek();
-                        if (builder instanceof SequenceBuilder) {
-                            // Inline sequences like [1, 2] need to keep track of any whitespace between the element
-                            // and its trailing comma.
-                            SequenceBuilder sequenceBuilder = (SequenceBuilder) builder;
-                            String betweenEvents = reader.readStringFromBuffer(event.getEndMark().getIndex(), parser.peekEvent().getStartMark().getIndex() - 1);
-                            int commaIndex = commentAwareIndexOf(',', betweenEvents);
-                            String commaPrefix = null;
-                            if (commaIndex != -1) {
-                                commaPrefix = betweenEvents.substring(0, commaIndex);
-
+                        if (builder != null) {
+                            int saveCursor = cursor;
+                            String commaPrefix = whitespace();
+                            if(!isNext(',')) {
+                                cursor = saveCursor;
+                                commaPrefix = null;
                             }
-                            lastEnd = event.getEndMark().getIndex() + commaIndex + 1;
-                            sequenceBuilder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue), commaPrefix);
-
-                        } else if (builder != null) {
-                            builder.push(new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue));
-                            lastEnd = event.getEndMark().getIndex();
+                            builder.push(dashPrefix, new Yaml.Scalar(randomId(), fmt, Markers.EMPTY, style, anchor, scalarValue), commaPrefix);
                         }
                         break;
                     }
@@ -248,61 +264,54 @@ public class YamlParser implements org.openrewrite.Parser {
                         if (mappingOrSequence instanceof Yaml.Sequence) {
                             Yaml.Sequence seq = (Yaml.Sequence) mappingOrSequence;
                             if (seq.getOpeningBracketPrefix() != null) {
-                                String s = reader.readStringFromBuffer(lastEnd, event.getStartMark().getIndex());
-                                int closingBracketIndex = commentAwareIndexOf(']', s);
-                                lastEnd = lastEnd + closingBracketIndex + 1;
-                                mappingOrSequence = seq.withClosingBracketPrefix(s.substring(0, closingBracketIndex));
+                                mappingOrSequence = seq.withClosingBracketPrefix(whitespace());
+                                cursor++;
                             }
                         }
                         if (mappingOrSequence instanceof Yaml.Mapping) {
                             Yaml.Mapping map = (Yaml.Mapping) mappingOrSequence;
                             if (map.getOpeningBracePrefix() != null) {
-                                String s = reader.readStringFromBuffer(lastEnd, event.getStartMark().getIndex());
-                                int closingBraceIndex = commentAwareIndexOf('}', s);
-                                lastEnd = lastEnd + closingBraceIndex + 1;
-                                mappingOrSequence = map.withClosingBracePrefix(s.substring(0, closingBraceIndex));
+                                mappingOrSequence = map.withClosingBracePrefix(whitespace());
+                                cursor++;
                             }
                         }
                         if (blockStack.isEmpty()) {
                             assert document != null;
                             document = document.withBlock(mappingOrSequence);
                         } else {
-                            blockStack.peek().push(mappingOrSequence);
+                            blockStack.peek().push(null, mappingOrSequence, null);
                         }
                         break;
                     }
                     case SequenceStart: {
-                        String fmt = newLine + reader.prefix(lastEnd, event);
-                        newLine = "";
-
+                        String fmt = whitespace();
+                        boolean dash = isNext('-');
                         SequenceStartEvent sse = (SequenceStartEvent) event;
                         Yaml.Anchor anchor = null;
                         if (sse.getAnchor() != null) {
-                            anchor = buildYamlAnchor(reader, lastEnd, fmt, sse.getAnchor(), event.getEndMark().getIndex(), false);
-                            anchors.put(sse.getAnchor(), anchor);
-
-                            lastEnd = lastEnd + sse.getAnchor().length() + fmt.length() + 1;
-                            fmt = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex());
-                            int dashPrefixIndex = commentAwareIndexOf('-', fmt);
-                            if (dashPrefixIndex > -1) {
-                                fmt = fmt.substring(0, dashPrefixIndex);
-                            }
+                            throw new RuntimeException("TODO");
+//                            anchor = buildYamlAnchor(source, cursor, fmt, sse.getAnchor(), event.getEndMark().getIndex(), false);
+//                            anchors.put(sse.getAnchor(), anchor);
+//
+//                            cursor = cursor + sse.getAnchor().length() + fmt.length() + 1;
+//                            fmt = source.substring(cursor, event.getEndMark().getIndex());
+//                            int dashPrefixIndex = commentAwareIndexOf('-', fmt);
+//                            if (dashPrefixIndex > -1) {
+//                                fmt = fmt.substring(0, dashPrefixIndex);
+//                            }
                         }
 
-                        String fullPrefix = reader.readStringFromBuffer(lastEnd, event.getEndMark().getIndex());
                         String startBracketPrefix = null;
-                        int openingBracketIndex = commentAwareIndexOf('[', fullPrefix);
-                        if (openingBracketIndex != -1) {
-                            int startIndex = commentAwareIndexOf(':', fullPrefix) + 1;
-                            startBracketPrefix = fullPrefix.substring(startIndex, openingBracketIndex);
-                            lastEnd = event.getEndMark().getIndex();
+                        if(isNext('[')) {
+                            startBracketPrefix = fmt;
+                            fmt = "";
                         }
-                        blockStack.push(new SequenceBuilder(fmt, startBracketPrefix, anchor));
+
+                        blockStack.push(new SequenceBuilder(dash, fmt, startBracketPrefix, anchor));
                         break;
                     }
                     case Alias: {
-                        String fmt = newLine + reader.prefix(lastEnd, event);
-                        newLine = "";
+                        String fmt = whitespace();
 
                         AliasEvent alias = (AliasEvent) event;
                         Yaml.Anchor anchor = anchors.get(alias.getAnchor());
@@ -310,12 +319,12 @@ public class YamlParser implements org.openrewrite.Parser {
                             throw new UnsupportedOperationException("Unknown anchor: " + alias.getAnchor());
                         }
                         BlockBuilder builder = blockStack.peek();
-                        builder.push(new Yaml.Alias(randomId(), fmt, Markers.EMPTY, anchor));
-                        lastEnd = event.getEndMark().getIndex();
+                        cursor += alias.getAnchor().length() + 1;
+                        builder.push(null, new Yaml.Alias(randomId(), fmt, Markers.EMPTY, anchor), null);
                         break;
                     }
                     case StreamEnd: {
-                        String fmt = newLine + reader.prefix(lastEnd, event);
+                        String fmt = whitespace();
                         if (document == null && !fmt.isEmpty()) {
                             documents.add(
                                     new Yaml.Document(
@@ -331,53 +340,9 @@ public class YamlParser implements org.openrewrite.Parser {
                 }
             }
 
-            return new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, FileAttributes.fromPath(sourceFile), source.getCharset().name(), source.isCharsetBomMarked(), null, documents);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            return new Yaml.Documents(randomId(), Markers.EMPTY, sourceFile, FileAttributes.fromPath(sourceFile),
+                    is.getCharset().name(), is.isCharsetBomMarked(), null, documents);
         }
-    }
-
-    private Yaml.Anchor buildYamlAnchor(FormatPreservingReader reader, int lastEnd, String eventPrefix, String anchorKey, int eventEndIndex, boolean isForScalar) {
-        int anchorLength = isForScalar ? anchorKey.length() + 1 : anchorKey.length();
-        String whitespaceAndScalar = reader.prefix(
-                lastEnd + eventPrefix.length() + anchorLength, eventEndIndex);
-
-        StringBuilder postFix = new StringBuilder();
-        for (char c : whitespaceAndScalar.toCharArray()) {
-            if (c != ' ' && c != '\t') {
-                break;
-            }
-            postFix.append(c);
-        }
-
-        int prefixStart = commentAwareIndexOf(':', eventPrefix);
-        String prefix = "";
-        if (!isForScalar) {
-            prefix = (prefixStart > -1 && eventPrefix.length() > prefixStart + 1) ? eventPrefix.substring(prefixStart + 1) : "";
-        }
-        return new Yaml.Anchor(randomId(), prefix, postFix.toString(), Markers.EMPTY, anchorKey);
-    }
-
-    /**
-     * Return the index of the target character if it appears in a non-comment portion of the String, or -1 if it does not appear.
-     */
-    private static int commentAwareIndexOf(char target, String s) {
-        boolean inComment = false;
-        for (int i = 0; i < s.length(); i++) {
-            char c = s.charAt(i);
-            if (inComment) {
-                if (c == '\n') {
-                    inComment = false;
-                }
-            } else {
-                if (c == target) {
-                    return i;
-                } else if (c == '#') {
-                    inComment = true;
-                }
-            }
-        }
-        return -1;
     }
 
     @Override
@@ -393,11 +358,11 @@ public class YamlParser implements org.openrewrite.Parser {
 
     private interface BlockBuilder {
         Yaml.Block build();
-
-        void push(Yaml.Block block);
+        void push(@Nullable String dashPrefix, Yaml.Block block, @Nullable String commaPrefix);
     }
 
-    private static class MappingBuilder implements BlockBuilder {
+    private class MappingBuilder implements BlockBuilder {
+        boolean dash;
         private final String prefix;
 
         @Nullable
@@ -411,47 +376,57 @@ public class YamlParser implements org.openrewrite.Parser {
         @Nullable
         private YamlKey key;
 
-        private MappingBuilder(String prefix, @Nullable String startBracePrefix, @Nullable Yaml.Anchor anchor) {
+        private String keyValueSeparatorPrefix = "";
+
+        private MappingBuilder(boolean dash, String prefix, @Nullable String startBracePrefix, @Nullable Yaml.Anchor anchor) {
+            this.dash = dash;
             this.prefix = prefix;
             this.startBracePrefix = startBracePrefix;
             this.anchor = anchor;
         }
 
         @Override
-        public void push(Yaml.Block block) {
-            if (key == null && block instanceof Yaml.Scalar) {
-                key = (Yaml.Scalar) block;
-            } else if (key == null && block instanceof Yaml.Alias) {
-                key = (Yaml.Alias) block;
+        public void push(@Nullable String dashPrefix, Yaml.Block block, @Nullable String commaPrefix) {
+            if (key == null && (block instanceof Yaml.Scalar || block instanceof Yaml.Alias)) {
+                key = (YamlKey) block;
+                keyValueSeparatorPrefix = whitespace();
+                cursor += 1; // pass over ':'
             } else {
-                String keySuffix = block.getPrefix();
-                block = block.withPrefix(keySuffix.substring(commentAwareIndexOf(':', keySuffix) + 1));
-
-                // Begin moving whitespace from the key to the entry that contains the key
-                String originalKeyPrefix = key.getPrefix();
+                if(key == null) {
+                    throw new IllegalStateException("Expected key to be set");
+                }
+                // Follow the convention of placing whitespace on the outermost possible element
+                String entryPrefix;
+                if(entries.isEmpty()) {
+                    // By convention Yaml.Mapping have no prefix of their own, donating it to their first entry
+                    entryPrefix = prefix;
+                    if(dash) {
+                        // If this mapping is part of a sequence, put the dash _back_ into its prefix for now.
+                        // SequenceBuilder will remove it later and put it in the appropriate place.
+                        entryPrefix += '-';
+                    }
+                    entryPrefix += key.getPrefix();
+                } else {
+                    entryPrefix = key.getPrefix();
+                }
                 key = key.withPrefix("");
-
-                // When a dash, indicating the beginning of a sequence, is present whitespace before it will be handled by the SequenceEntry
-                // Similarly if the prefix includes a ':', it will be owned by the mapping that contains this mapping
-                // So this entry's prefix begins after any such delimiter
-                int entryPrefixStartIndex = Math.max(
-                        commentAwareIndexOf('-', originalKeyPrefix),
-                        commentAwareIndexOf(':', originalKeyPrefix)) + 1;
-                String entryPrefix = originalKeyPrefix.substring(entryPrefixStartIndex);
-                String beforeMappingValueIndicator = keySuffix.substring(0,
-                        Math.max(commentAwareIndexOf(':', keySuffix), 0));
-                entries.add(new Yaml.Mapping.Entry(randomId(), entryPrefix, Markers.EMPTY, key, beforeMappingValueIndicator, block));
+                Yaml.Mapping.Entry entry = new Yaml.Mapping.Entry(randomId(), entryPrefix, Markers.EMPTY, key, keyValueSeparatorPrefix, block);
+                entries.add(entry);
                 key = null;
             }
         }
 
         @Override
-        public MappingWithPrefix build() {
-            return new MappingWithPrefix(prefix, startBracePrefix, entries, null, anchor);
+        public Yaml.Mapping build() {
+            return new Yaml.Mapping(randomId(), Markers.EMPTY, startBracePrefix, entries, null, anchor);
         }
     }
 
-    private static class SequenceBuilder implements BlockBuilder {
+    @SuppressWarnings("InnerClassMayBeStatic")
+    private class SequenceBuilder implements BlockBuilder {
+
+        private final boolean dash;
+
         private final String prefix;
         @Nullable
         private final String startBracketPrefix;
@@ -461,104 +436,44 @@ public class YamlParser implements org.openrewrite.Parser {
 
         private final List<Yaml.Sequence.Entry> entries = new ArrayList<>();
 
-        private SequenceBuilder(String prefix, @Nullable String startBracketPrefix, @Nullable Yaml.Anchor anchor) {
+        private SequenceBuilder(@Nullable boolean dash, String prefix, @Nullable String startBracketPrefix, @Nullable Yaml.Anchor anchor) {
+            this.dash = dash;
             this.prefix = prefix;
             this.startBracketPrefix = startBracketPrefix;
             this.anchor = anchor;
         }
 
         @Override
-        public void push(Yaml.Block block) {
-            push(block, null);
-        }
-
-        public void push(Yaml.Block block, @Nullable String commaPrefix) {
-            String rawPrefix = block.getPrefix();
-            int dashIndex = commentAwareIndexOf('-', rawPrefix);
-            String entryPrefix;
-            String blockPrefix;
-            boolean hasDash = dashIndex != -1;
-            if (hasDash) {
-                entryPrefix = rawPrefix.substring(0, dashIndex);
-                blockPrefix = rawPrefix.substring(dashIndex + 1);
+        public void push(@Nullable String dashPrefix, Yaml.Block block, @Nullable String commaPrefix) {
+            String entryPrefix = "";
+            boolean thisDash = dash;
+            if(dashPrefix == null) {
+                // If the dash has ended up inside the entryPrefix of the element, bring it back out
+                if(block instanceof Yaml.Mapping) {
+                    Yaml.Mapping mapping = (Yaml.Mapping) block;
+                    Yaml.Mapping.Entry entry = mapping.getEntries().get(0);
+                    String mappingEntryPrefix = entry.getPrefix();
+                    int maybeDashIndex = StringUtils.indexOfNextNonWhitespaceHashComments(0, mappingEntryPrefix);
+                    if(maybeDashIndex >= 0 && mappingEntryPrefix.charAt(maybeDashIndex) == '-') {
+                        thisDash = true;
+                        entryPrefix = mappingEntryPrefix.substring(0, maybeDashIndex);
+                        String afterDash = mappingEntryPrefix.substring(maybeDashIndex + 1);
+                        block = mapping.withEntries(ListUtils.concat(entry.withPrefix(afterDash), mapping.getEntries().subList(1, mapping.getEntries().size())));
+                    }
+                }
             } else {
-                entryPrefix = "";
-                blockPrefix = rawPrefix;
+                entryPrefix = dashPrefix;
             }
-            entries.add(new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, block.withPrefix(blockPrefix), hasDash, commaPrefix));
+            if(entries.isEmpty()) {
+                entryPrefix = prefix + entryPrefix;
+            }
+            entries.add(new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, block, thisDash, commaPrefix));
         }
 
         @Override
-        public SequenceWithPrefix build() {
-            return new SequenceWithPrefix(prefix, startBracketPrefix, entries, null, anchor);
+        public Yaml.Sequence build() {
+            return new Yaml.Sequence(randomId(), Markers.EMPTY, startBracketPrefix, entries, null, anchor);
         }
-    }
-
-    @Getter
-    private static class MappingWithPrefix extends Yaml.Mapping {
-        private String prefix;
-
-        public MappingWithPrefix(String prefix, @Nullable String startBracePrefix, List<Yaml.Mapping.Entry> entries, @Nullable String endBracePrefix, @Nullable Anchor anchor) {
-            super(randomId(), Markers.EMPTY, startBracePrefix, entries, endBracePrefix, anchor);
-            this.prefix = prefix;
-        }
-
-        @Override
-        public Mapping withPrefix(String prefix) {
-            this.prefix = prefix;
-            return this;
-        }
-    }
-
-    @Getter
-    private static class SequenceWithPrefix extends Yaml.Sequence {
-        private String prefix;
-
-        public SequenceWithPrefix(String prefix, @Nullable String startBracketPrefix, List<Yaml.Sequence.Entry> entries, @Nullable String endBracketPrefix, @Nullable Anchor anchor) {
-            super(randomId(), Markers.EMPTY, startBracketPrefix, entries, endBracketPrefix, anchor);
-            this.prefix = prefix;
-        }
-
-        @Override
-        public Sequence withPrefix(String prefix) {
-            this.prefix = prefix;
-            return this;
-        }
-    }
-
-    private SourceFile unwrapPrefixedMappings(SourceFile y) {
-        if (!(y instanceof Yaml.Documents)) {
-            return y;
-        }
-        //noinspection ConstantConditions
-        return (Yaml.Documents) new YamlIsoVisitor<Integer>() {
-            @Override
-            public Yaml.Sequence visitSequence(Yaml.Sequence sequence, Integer p) {
-                if (sequence instanceof SequenceWithPrefix) {
-                    SequenceWithPrefix sequenceWithPrefix = (SequenceWithPrefix) sequence;
-                    return super.visitSequence(
-                            new Yaml.Sequence(
-                                    sequenceWithPrefix.getId(),
-                                    sequenceWithPrefix.getMarkers(),
-                                    sequenceWithPrefix.getOpeningBracketPrefix(),
-                                    ListUtils.mapFirst(sequenceWithPrefix.getEntries(), e -> e.withPrefix(sequenceWithPrefix.getPrefix())),
-                                    sequenceWithPrefix.getClosingBracketPrefix(),
-                                    sequenceWithPrefix.getAnchor()
-                            ), p);
-                }
-                return super.visitSequence(sequence, p);
-            }
-
-            @Override
-            public Yaml.Mapping visitMapping(Yaml.Mapping mapping, Integer p) {
-                if (mapping instanceof MappingWithPrefix) {
-                    MappingWithPrefix mappingWithPrefix = (MappingWithPrefix) mapping;
-                    return super.visitMapping(new Yaml.Mapping(mappingWithPrefix.getId(),
-                            mappingWithPrefix.getMarkers(), mappingWithPrefix.getOpeningBracePrefix(), mappingWithPrefix.getEntries(), null, mappingWithPrefix.getAnchor()), p);
-                }
-                return super.visitMapping(mapping, p);
-            }
-        }.visit(y, 0);
     }
 
     public static Builder builder() {

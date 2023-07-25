@@ -745,4 +745,37 @@ public class StringUtils {
         }
         return delimIndex;
     }
+
+    /**
+     * Considering "#" to initiate a comment that lasts until a "\n" is seen, return the index of the next non-comment,
+     * non-whitespace character.
+     *
+     * Yaml, Properties, and Python use this comment style.
+     *
+     * @param cursor
+     * @param source
+     * @return
+     */
+    public static int indexOfNextNonWhitespaceHashComments(int cursor, String source) {
+        boolean inSingleLineComment = false;
+
+        int delimIndex = cursor;
+        for (; delimIndex < source.length(); delimIndex++) {
+            if (inSingleLineComment) {
+                if (source.charAt(delimIndex) == '\n') {
+                    inSingleLineComment = false;
+                }
+            } else if (source.length() > delimIndex + 1 && source.charAt(delimIndex) == '#') {
+                inSingleLineComment = true;
+                delimIndex++;
+                continue;
+            }
+            if (!inSingleLineComment) {
+                if (!Character.isWhitespace(source.substring(delimIndex, delimIndex + 1).charAt(0))) {
+                    return delimIndex;
+                }
+            }
+        }
+        return -1;
+    }
 }

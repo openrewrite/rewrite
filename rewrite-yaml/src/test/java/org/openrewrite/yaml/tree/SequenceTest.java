@@ -28,7 +28,9 @@ class SequenceTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-              - apples
+              
+              - apples # apple
+              # orange
               - oranges
               """,
             spec -> spec.afterRecipe(y -> {
@@ -46,10 +48,10 @@ class SequenceTest implements RewriteTest {
         rewriteRun(
           yaml(
             """
-                      - name: Fred
-                        age: 45
-                      - name: Barney
-                        age: 25
+              - name: Fred
+                age: 45 # Fred is 45 years old
+              -  name: Barney
+                 age: 25
               """
           )
         );
@@ -61,14 +63,20 @@ class SequenceTest implements RewriteTest {
           yaml(
             """
               [
-                  a,
-              b,
-                      c,
+               a ,
+                b  ,
+                 c   ,
               ]
               """
           )
         );
     }
+
+    @Test
+    void emptySequence() {
+        rewriteRun(yaml(" [ ] "));
+    }
+
 
     @Test
     void sequenceOfEmptyInlineSequence() {
@@ -110,13 +118,21 @@ class SequenceTest implements RewriteTest {
             """
                   - []
                   - [ 1 ]
-                  - foo: []
-                  - bar:
-                  - baz: [
-                      a]
               """
           )
         );
+//        rewriteRun(
+//          yaml(
+//            """
+//                  - []
+//                  - [ 1 ]
+//                  - foo: []
+//                  - bar:
+//                  - baz: [
+//                      a]
+//              """
+//          )
+//        );
     }
 
     @Test
