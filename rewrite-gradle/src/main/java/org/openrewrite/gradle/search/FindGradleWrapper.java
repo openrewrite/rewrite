@@ -121,7 +121,7 @@ public class FindGradleWrapper extends Recipe {
                             return SearchResult.found(entry);
                         }
                     } else {
-                        SearchResult.found(entry);
+                        return SearchResult.found(entry);
                     }
                 }
                 return entry;
