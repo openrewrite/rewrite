@@ -138,7 +138,7 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
             }.visitCompilationUnit(cu, 0);
 
             String delimiter = singleQuote.get() < doubleQuote.get() ? "\"" : "'";
-            List<Statement> statements = GradleParser.builder().build()
+            Statement statement = GradleParser.builder().build()
                     .parseInputs(
                             singletonList(
                                     Parser.Input.fromString("plugins {\n" +
@@ -150,7 +150,8 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                     .findFirst()
                     .map(G.CompilationUnit.class::cast)
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse"))
-                    .getStatements();
+                    .getStatements()
+                    .get(0);
 
             if (FindMethods.find(cu, "RewriteGradleProject plugins(..)").isEmpty() && FindMethods.find(cu, "RewriteSettings plugins(..)").isEmpty()) {
                 Space leadingSpace = Space.firstPrefix(cu.getStatements());
@@ -158,21 +159,20 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                     && !cu.getStatements().isEmpty()
                     && cu.getStatements().get(0) instanceof J.MethodInvocation
                     && ((J.MethodInvocation) cu.getStatements().get(0)).getSimpleName().equals("pluginManagement")) {
-                    return cu.withStatements(ListUtils.concatAll(ListUtils.concat(cu.getStatements().get(0), Space.formatFirstPrefix(statements, leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace()))),
-                            Space.formatFirstPrefix(cu.getStatements().subList(1, cu.getStatements().size()), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace()))));
+                    return cu.withStatements(ListUtils.insert(cu.getStatements(), autoFormat(statement.withPrefix(Space.format("\n\n")), ctx, getCursor()), 1));
                 } else {
                     int insertAtIdx = 0;
                     for (int i = 0; i < cu.getStatements().size(); i++) {
-                        Statement statement = cu.getStatements().get(i);
-                        if (statement instanceof J.MethodInvocation && ((J.MethodInvocation) statement).getSimpleName().equals("buildscript")) {
+                        Statement existingStatement = cu.getStatements().get(i);
+                        if (existingStatement instanceof J.MethodInvocation && ((J.MethodInvocation) existingStatement).getSimpleName().equals("buildscript")) {
                             insertAtIdx = i + 1;
                             break;
                         }
                     }
                     if (insertAtIdx == 0) {
-                        return cu.withStatements(ListUtils.insert(Space.formatFirstPrefix(cu.getStatements(), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace())), statements.get(0), insertAtIdx));
+                        return cu.withStatements(ListUtils.insert(Space.formatFirstPrefix(cu.getStatements(), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace())), autoFormat(statement, ctx, getCursor()), insertAtIdx));
                     } else {
-                        return cu.withStatements(ListUtils.insertAll(cu.getStatements(), insertAtIdx, Space.formatFirstPrefix(statements, Space.format("\n\n"))));
+                        return cu.withStatements(ListUtils.insert(cu.getStatements(), autoFormat(statement.withPrefix(Space.format("\n\n")), ctx, getCursor()), insertAtIdx));
                     }
                 }
             } else {
@@ -182,7 +182,7 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                     if (stat instanceof J.MethodInvocation) {
                         J.MethodInvocation m = (J.MethodInvocation) stat;
                         if (buildPluginsMatcher.matches(m) || settingsPluginsMatcher.matches(m)) {
-                            J.MethodInvocation pluginDef = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) ((J.MethodInvocation) statements.get(0)).getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
+                            J.MethodInvocation pluginDef = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) ((J.MethodInvocation) autoFormat(statement, ctx, getCursor())).getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
                             m = m.withArguments(ListUtils.map(m.getArguments(), a -> {
                                 if (a instanceof J.Lambda) {
                                     J.Lambda l = (J.Lambda) a;
