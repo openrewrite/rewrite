@@ -161,8 +161,19 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                     return cu.withStatements(ListUtils.concatAll(ListUtils.concat(cu.getStatements().get(0), Space.formatFirstPrefix(statements, leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace()))),
                             Space.formatFirstPrefix(cu.getStatements().subList(1, cu.getStatements().size()), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace()))));
                 } else {
-                    return cu.withStatements(ListUtils.concatAll(statements,
-                            Space.formatFirstPrefix(cu.getStatements(), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace()))));
+                    int insertAtIdx = 0;
+                    for (int i = 0; i < cu.getStatements().size(); i++) {
+                        Statement statement = cu.getStatements().get(i);
+                        if (statement instanceof J.MethodInvocation && ((J.MethodInvocation) statement).getSimpleName().equals("buildscript")) {
+                            insertAtIdx = i + 1;
+                            break;
+                        }
+                    }
+                    if (insertAtIdx == 0) {
+                        return cu.withStatements(ListUtils.insert(Space.formatFirstPrefix(cu.getStatements(), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace())), statements.get(0), insertAtIdx));
+                    } else {
+                        return cu.withStatements(ListUtils.insertAll(cu.getStatements(), insertAtIdx, Space.formatFirstPrefix(statements, Space.format("\n\n"))));
+                    }
                 }
             } else {
                 MethodMatcher buildPluginsMatcher = new MethodMatcher("RewriteGradleProject plugins(groovy.lang.Closure)");
