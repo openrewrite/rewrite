@@ -42,7 +42,7 @@ class MappingTest implements RewriteTest {
             """
               {
                 "data": {
-                  "prometheus.yml" : "global:\\n  scrape_interval: 10s\\n  scrape_timeout: 9s"
+                  "prometheus.yml": "global:\\n  scrape_interval: 10s\\n  scrape_timeout: 9s"
                 }
               }
               """

@@ -94,7 +94,7 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
 
     @Override
     public Yaml visitMapping(Yaml.Mapping mapping, PrintOutputCapture<P> p) {
-        beforeSyntax(mapping, p);
+        visitMarkers(mapping.getMarkers(), p);
         if (mapping.getAnchor() != null) {
             visit(mapping.getAnchor(), p);
         }
@@ -161,7 +161,8 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     }
 
     public Yaml visitAnchor(Yaml.Anchor anchor, PrintOutputCapture<P> p) {
-        beforeSyntax(anchor, p);
+        visitMarkers(anchor.getMarkers(), p);
+        p.append(anchor.getPrefix());
         p.append("&");
         p.append(anchor.getKey());
         p.append(anchor.getPostfix());

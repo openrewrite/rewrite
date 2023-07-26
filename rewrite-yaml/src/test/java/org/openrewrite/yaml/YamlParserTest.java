@@ -16,16 +16,18 @@
 package org.openrewrite.yaml;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.SourceFile;
-import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.List;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.yaml.Assertions.yaml;
 
-class YamlParserTest implements RewriteTest {
+class YamlParserTest {
 
     @Test
     void ascii() {
@@ -45,13 +47,15 @@ class YamlParserTest implements RewriteTest {
         assertThat(title.getValue()).isEqualTo("b");
     }
 
-    @Test
-    void unicodeCharacterSpanningMultipleBytes() {
-        rewriteRun(
-          yaml("""
-            # 🛠
-            🛠: "🛠"
-          """)
-        );
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "🛠",
+      "🛠🛠",
+      "🛠 🛠"
+    })
+    void unicodeParseError(String input ) {
+        Stream<SourceFile> yamlSources = YamlParser.builder().build().parse("a: %s\n".formatted(input));
+        assertThat(yamlSources).singleElement().isInstanceOf(ParseError.class);
     }
+
 }
