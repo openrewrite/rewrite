@@ -25,6 +25,7 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 
+import java.util.Arrays;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -75,7 +76,9 @@ public class FindAndReplace extends Recipe {
 
     @Option(displayName = "File pattern",
             description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
-                          "When not set, all source files are searched.",
+                          "Multiple patterns may be specified, separated by a semicolon `;`. " +
+                          "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. " +
+                          "When not set, all source files are searched. ",
             example = "**/*.java")
     @Nullable
     String filePattern;
@@ -141,8 +144,14 @@ public class FindAndReplace extends Recipe {
                         .withMarkers(sourceFile.getMarkers().add(new AlreadyReplaced(randomId())));
             }
         };
+        //noinspection DuplicatedCode
         if(filePattern != null) {
-            visitor = Preconditions.check(new HasSourcePath<>(filePattern), visitor);
+            //noinspection unchecked
+            TreeVisitor<?, ExecutionContext> check = Preconditions.or(Arrays.stream(filePattern.split(";"))
+                    .map(HasSourcePath<ExecutionContext>::new)
+                    .toArray(TreeVisitor[]::new));
+
+            visitor = Preconditions.check(check, visitor);
         }
         return visitor;
     }
