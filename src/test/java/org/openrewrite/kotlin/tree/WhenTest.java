@@ -84,7 +84,7 @@ class WhenTest implements RewriteTest {
           kotlin(
             """
               fun method ( i : Int ) : String {
-                  when ( i ) {
+                  return when ( i ) {
                       in 1 .. 10 -> return "in range 1"
                       !in 10 .. 20 -> return "not in range 2"
                       else -> "42"
