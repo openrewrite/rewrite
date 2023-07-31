@@ -52,7 +52,7 @@ public class PrintOutputCapture<P> implements Cloneable {
     }
 
     public PrintOutputCapture<P> append(@Nullable String text) {
-        if (text == null) {
+        if (text == null || text.isEmpty()) {
             return this;
         }
         out.append(text);

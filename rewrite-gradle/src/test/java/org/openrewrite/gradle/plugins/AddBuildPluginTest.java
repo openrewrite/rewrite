@@ -119,4 +119,29 @@ class AddBuildPluginTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addPluginAfterBuildscriptBlock() {
+        rewriteRun(
+          spec -> spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null)),
+          buildGradle(
+            """
+              import java.util.List
+              
+              buildscript {
+              }
+              """,
+            """
+              import java.util.List
+              
+              buildscript {
+              }
+              
+              plugins {
+                  id 'com.jfrog.bintray' version '1.0'
+              }
+              """
+          )
+        );
+    }
 }

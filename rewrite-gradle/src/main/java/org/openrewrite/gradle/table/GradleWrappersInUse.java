@@ -13,36 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.table;
+package org.openrewrite.gradle.table;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Value;
 import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
-import org.openrewrite.marker.LstProvenance;
 
 @JsonIgnoreType
-public class LstProvenanceTable extends DataTable<LstProvenanceTable.Row> {
-
-    public LstProvenanceTable(Recipe recipe) {
-        super(recipe,
-                "LST Provenance",
-                "Table showing which tools were used to produce LSTs.");
+public class GradleWrappersInUse extends DataTable<GradleWrappersInUse.Row> {
+    public GradleWrappersInUse(Recipe recipe) {
+        super(recipe, Row.class,
+                GradleWrappersInUse.class.getName(),
+                "Gradle wrappers in use",
+                "Gradle wrappers in use.");
     }
 
     @Value
     public static class Row {
-        @Column(displayName = "Build tool type",
-                description = "The type of tool which produced the LST.")
-        LstProvenance.Type buildToolType;
+        @Column(displayName = "Wrapper version",
+                description = "The version of the Gradle wrapper in use.")
+        String version;
 
-        @Column(displayName = "Build tool version",
-                description = "The version of the build tool which produced the LST.")
-        String buildToolVersion;
-
-        @Column(displayName = "LST serializer version",
-                description = "The version of LST serializer which produced the LST.")
-        String lstSerializerVersion;
+        @Column(displayName = "Wrapper distribution",
+                description = "The distribution type of the Gradle wrapper in use.")
+        String distribution;
     }
 }

@@ -33,7 +33,7 @@ class ChangeDependencyTest implements RewriteTest {
     @Test
     void relocateDependency() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null)),
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
           buildGradle(
             """
               plugins {
@@ -70,7 +70,7 @@ class ChangeDependencyTest implements RewriteTest {
     @Test
     void changeGroupIdOnly() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", null, null, null)),
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", null, null, null, null)),
           buildGradle(
             """
               plugins {
@@ -107,7 +107,7 @@ class ChangeDependencyTest implements RewriteTest {
     @Test
     void changeArtifactIdOnly() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", null, "commons-lang3", null, null)),
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", null, "commons-lang3", null, null, null)),
           buildGradle(
             """
               plugins {
@@ -144,7 +144,7 @@ class ChangeDependencyTest implements RewriteTest {
     @Test
     void worksWithPlatform() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null)),
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
           buildGradle(
             """
               plugins {
@@ -177,9 +177,46 @@ class ChangeDependencyTest implements RewriteTest {
     }
 
     @Test
+    void worksWithGString() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("commons-lang", "commons-lang", "org.apache.commons", "commons-lang3", "3.11.x", null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              def version = '2.6'
+              dependencies {
+                  implementation platform("commons-lang:commons-lang:${version}")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+
+              def version = '2.6'
+              dependencies {
+                  implementation platform("org.apache.commons:commons-lang3:3.11")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void changeDependencyWithLowerVersionAfter() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeDependency("org.openrewrite", "plugin", "io.moderne", "moderne-gradle-plugin", "0.x", null)),
+          spec -> spec.recipe(new ChangeDependency("org.openrewrite", "plugin", "io.moderne", "moderne-gradle-plugin", "0.x", null, null)),
           buildGradle(
             """
               buildscript {
@@ -204,6 +241,120 @@ class ChangeDependencyTest implements RewriteTest {
               }
               """
           )
+        );
+    }
+    
+    @Test
+    void doNotPinWhenNotVersioned() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, null)),
+          buildGradle(
+            """
+              plugins {
+                id 'java'
+                id 'org.springframework.boot' version '2.6.1'
+                id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+              }
+              
+              repositories {
+                 mavenCentral()
+              }
+              
+              dependencies {
+                  runtimeOnly 'mysql:mysql-connector-java'
+              }
+              """,
+            """
+              plugins {
+                id 'java'
+                id 'org.springframework.boot' version '2.6.1'
+                id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+              }
+              
+              repositories {
+                 mavenCentral()
+              }
+              
+              dependencies {
+                  runtimeOnly 'com.mysql:mysql-connector-j'
+              }
+              """)
+        );
+    }
+
+    @Test
+    void doNotPinWhenNotVersionedOnMap() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, null)),
+          buildGradle(
+            """
+              plugins {
+                id 'java'
+                id 'org.springframework.boot' version '2.6.1'
+                id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+              }
+              
+              repositories {
+                 mavenCentral()
+              }
+              
+              dependencies {
+                  runtimeOnly group: 'mysql', name: 'mysql-connector-java'
+              }
+              """,
+            """
+              plugins {
+                id 'java'
+                id 'org.springframework.boot' version '2.6.1'
+                id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+              }
+              
+              repositories {
+                 mavenCentral()
+              }
+              
+              dependencies {
+                  runtimeOnly group: 'com.mysql', name: 'mysql-connector-j'
+              }
+              """)
+        );
+    }
+
+    @Test
+    void pinWhenOverrideManagedVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeDependency("mysql", "mysql-connector-java", "com.mysql", "mysql-connector-j", "8.0.x", null, true)),
+          buildGradle(
+            """
+              plugins {
+                id 'java'
+                id 'org.springframework.boot' version '2.6.1'
+                id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+              }
+              
+              repositories {
+                 mavenCentral()
+              }
+              
+              dependencies {
+                  runtimeOnly 'mysql:mysql-connector-java'
+              }
+              """,
+            """
+              plugins {
+                id 'java'
+                id 'org.springframework.boot' version '2.6.1'
+                id 'io.spring.dependency-management' version '1.0.11.RELEASE'
+              }
+              
+              repositories {
+                 mavenCentral()
+              }
+              
+              dependencies {
+                  runtimeOnly 'com.mysql:mysql-connector-j:8.0.33'
+              }
+              """)
         );
     }
 }
