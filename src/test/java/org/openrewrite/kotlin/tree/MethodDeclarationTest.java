@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
@@ -238,6 +239,21 @@ class MethodDeclarationTest implements RewriteTest {
                 noinline block : ( ) -> Unit
               ) : Unit = Unit
               """)
+        );
+    }
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/205")
+    @Test
+    void genericTypeConstraint() {
+        rewriteRun(
+          kotlin(
+            """
+              fun <T> foo(): Int where T: List<T> {
+                  return 0
+              }
+              """
+          )
         );
     }
 
