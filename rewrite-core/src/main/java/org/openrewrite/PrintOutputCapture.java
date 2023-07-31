@@ -47,10 +47,6 @@ public class PrintOutputCapture<P> implements Cloneable {
         return out.toString();
     }
 
-    public StringBuilder getOutSb() {
-        return out;
-    }
-
     public PrintOutputCapture<P> append(@Nullable String text) {
         if (text == null || text.isEmpty()) {
             return this;

@@ -117,7 +117,7 @@ public class BinaryAlignWhenMultilineVisitor<P> extends TreeVisitor<Tree, P> {
             int offset;
             int prefixNewLineOffset = binary.getPrefix().getWhitespace().indexOf('\n');
             if (prefixNewLineOffset == -1) {
-                offset = findLastNewlineDistance(p.getOutSb()) + binary.getPrefix().getWhitespace().length();
+                offset = findLastNewlineDistance(p.out) + binary.getPrefix().getWhitespace().length();
             } else {
                 offset = binary.getPrefix().getWhitespace().length() - 1 - prefixNewLineOffset;
             }
