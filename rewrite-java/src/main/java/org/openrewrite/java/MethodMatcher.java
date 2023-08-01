@@ -51,7 +51,7 @@ import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
  * <P><PRE>
  * EXAMPLES:
  * <p>
- * * *(..)                                 - All method invocations
+ * *..* *(..)                              - All method invocations
  * java.util.* *(..)                       - All method invocations to classes belonging to java.util (including sub-packages)
  * java.util.Collections *(..)             - All method invocations on java.util.Collections class
  * java.util.Collections unmodifiable*(..) - All method invocations starting with "unmodifiable" on java.util.Collections
