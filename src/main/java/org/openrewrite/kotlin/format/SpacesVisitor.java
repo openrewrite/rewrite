@@ -20,8 +20,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-//import org.openrewrite.java.style.EmptyForInitializerPadStyle;
-//import org.openrewrite.java.style.EmptyForIteratorPadStyle;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.kotlin.internal.KotlinPrinter;
 import org.openrewrite.kotlin.marker.OmitBraces;
@@ -45,14 +43,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     // Unconfigurable default formatting in IntelliJ's Kotlin formatting.
     private static final boolean beforeKeywords = true;
     private static final boolean beforeLeftBrace = true;
-    private static final boolean beforeSemiColon = false;
     private static final boolean withinParentheses = false;
-
-//    @Nullable
-//    private final EmptyForInitializerPadStyle emptyForInitializerPadStyle;
-
-//    @Nullable
-//    private final EmptyForIteratorPadStyle emptyForIteratorPadStyle;
 
     public SpacesVisitor(SpacesStyle style) {
         this(style, null);
@@ -60,8 +51,6 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
 
     public SpacesVisitor(SpacesStyle style, @Nullable Tree stopAfter) {
         this.style = style;
-//        this.emptyForInitializerPadStyle = emptyForInitializerPadStyle;
-//        this.emptyForIteratorPadStyle = emptyForIteratorPadStyle;
         this.stopAfter = stopAfter;
     }
 
@@ -203,25 +192,21 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
-        if (c.getBody() != null) {
-            c = c.withBody(spaceBefore(c.getBody(), beforeLeftBrace));
-            if (c.getBody().getStatements().isEmpty()) {
-                if (c.getKind() != J.ClassDeclaration.Kind.Type.Enum) {
-                    // Defaulted to `false` in IntelliJ's Kotlin formatting.
-                    boolean withinCodeBraces = false;
-                    if (!withinCodeBraces && c.getBody().getEnd().getWhitespace().equals(" ")) {
-                        c = c.withBody(
-                                c.getBody().withEnd(
-                                        c.getBody().getEnd().withWhitespace("")
-                                )
-                        );
-                    }
-                } else {
-                    // Defaulted to `false` in IntelliJ's Kotlin formatting.
-                    boolean withinCodeBraces = false;
-                    if (!withinCodeBraces && c.getBody().getEnd().getWhitespace().equals(" ")) {
-                        c = c.withBody(c.getBody().withEnd(c.getBody().getEnd().withWhitespace("")));
-                    }
+        c = c.withBody(spaceBefore(c.getBody(), beforeLeftBrace));
+        if (c.getBody().getStatements().isEmpty()) {
+            if (c.getKind() != J.ClassDeclaration.Kind.Type.Enum) {
+                // withinCodeBraces is defaulted to `false` in IntelliJ's Kotlin formatting.
+                if (c.getBody().getEnd().getWhitespace().equals(" ")) {
+                    c = c.withBody(
+                            c.getBody().withEnd(
+                                    c.getBody().getEnd().withWhitespace("")
+                            )
+                    );
+                }
+            } else {
+                // withinCodeBraces is defaulted to `false` in IntelliJ's Kotlin formatting.
+                if (c.getBody().getEnd().getWhitespace().equals(" ")) {
+                    c = c.withBody(c.getBody().withEnd(c.getBody().getEnd().withWhitespace("")));
                 }
             }
         }
@@ -234,8 +219,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
             );
         }
         if (c.getPadding().getTypeParameters() != null) {
-            // Defaulted to `false` in IntelliJ's Kotlin formatting.
-            boolean spaceWithinAngleBrackets = false;
+            // spaceWithinAngleBrackets is defaulted to `false` in IntelliJ's Kotlin formatting.
             int typeParametersSize = c.getPadding().getTypeParameters().getElements().size();
             c = c.getPadding().withTypeParameters(
                     c.getPadding().getTypeParameters().getPadding().withElements(
@@ -243,7 +227,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                                     (index, elemContainer) -> {
                                         if (index == 0) {
                                             elemContainer = elemContainer.withElement(
-                                                    spaceBefore(elemContainer.getElement(), spaceWithinAngleBrackets)
+                                                    spaceBefore(elemContainer.getElement(), false)
                                             );
                                         } else {
                                             elemContainer = elemContainer.withElement(
@@ -252,7 +236,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                                             );
                                         }
                                         if (index == typeParametersSize - 1) {
-                                            elemContainer = spaceAfter(elemContainer, spaceWithinAngleBrackets);
+                                            elemContainer = spaceAfter(elemContainer, false);
                                         }
                                         return elemContainer;
                                     }
@@ -267,10 +251,9 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
 
-        // Defaulted to `false` in IntelliJ's Kotlin formatting.
-        boolean beforeParenthesesOfMethodDeclaration = false;
+        // beforeParenthesesOfMethodDeclaration is defaulted to `false` in IntelliJ's Kotlin formatting.
         m = m.getPadding().withParameters(
-                spaceBefore(m.getPadding().getParameters(), beforeParenthesesOfMethodDeclaration, false));
+                spaceBefore(m.getPadding().getParameters(), false, false));
 
         // handle space before comma
         JContainer<Statement> jc = m.getPadding().getParameters();
@@ -333,8 +316,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         }
 
         if (m.getAnnotations().getTypeParameters() != null) {
-            // Defaulted to `false` in IntelliJ's Kotlin formatting.
-            boolean spaceWithinAngleBrackets = false;
+            // spaceWithinAngleBrackets is defaulted to `false` in IntelliJ's Kotlin formatting.
             int typeParametersSize = m.getAnnotations().getTypeParameters().getTypeParameters().size();
             m = m.getAnnotations().withTypeParameters(
                     m.getAnnotations().getTypeParameters().getPadding().withTypeParameters(
@@ -342,7 +324,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                                     (index, elemContainer) -> {
                                         if (index == 0) {
                                             elemContainer = elemContainer.withElement(
-                                                    spaceBefore(elemContainer.getElement(), spaceWithinAngleBrackets)
+                                                    spaceBefore(elemContainer.getElement(), false)
                                             );
                                         } else {
                                             elemContainer = elemContainer.withElement(
@@ -351,7 +333,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                                             );
                                         }
                                         if (index == typeParametersSize - 1) {
-                                            elemContainer = spaceAfter(elemContainer, spaceWithinAngleBrackets);
+                                            elemContainer = spaceAfter(elemContainer, false);
                                         }
                                         return elemContainer;
                                     })
@@ -374,12 +356,11 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         // Defaulted to `false` if parens exist and to `true` if parens are omitted in Kotlin's formatting.
         m = m.getPadding().withArguments(spaceBefore(m.getPadding().getArguments(), noParens, false));
         if (m.getArguments().isEmpty() || m.getArguments().iterator().next() instanceof J.Empty) {
-            // Defaulted to `false` in IntelliJ's Kotlin formatting.
-            boolean withInEmptyMethodCallParentheses = false;
+            // withInEmptyMethodCallParentheses is defaulted to `false` in IntelliJ's Kotlin formatting.
             m = m.getPadding().withArguments(
                     m.getPadding().getArguments().getPadding().withElements(
                             ListUtils.map(m.getPadding().getArguments().getPadding().getElements(),
-                                    arg -> arg.withElement(spaceBefore(arg.getElement(), withInEmptyMethodCallParentheses))
+                                    arg -> arg.withElement(spaceBefore(arg.getElement(), false))
                             )
                     )
             );
@@ -411,15 +392,12 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         }
 
         if (m.getPadding().getTypeParameters() != null) {
-            // Defaulted to `false` in IntelliJ's Kotlin formatting.
-            boolean typeArgumentsBeforeOpeningAngleBracket = false;
+            // typeArgumentsBeforeOpeningAngleBracket is defaulted to `false` in IntelliJ's Kotlin formatting.
             m = m.getPadding().withTypeParameters(
-                    spaceBefore(m.getPadding().getTypeParameters(),
-                            typeArgumentsBeforeOpeningAngleBracket, true)
+                    spaceBefore(m.getPadding().getTypeParameters(), false, true)
             );
-            // Defaulted to `false` in IntelliJ's Kotlin formatting.
-            boolean typeArgumentsAfterOpeningAngleBracket = false;
-            m = m.withName(spaceBefore(m.getName(), typeArgumentsAfterOpeningAngleBracket));
+            // typeArgumentsAfterOpeningAngleBracket is defaulted to `false` in IntelliJ's Kotlin formatting.
+            m = m.withName(spaceBefore(m.getName(), false));
         }
         if (m.getPadding().getTypeParameters() != null) {
             m = m.getPadding().withTypeParameters(
@@ -473,16 +451,15 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
 
         i = i.getPadding().withThenPart(spaceBeforeRightPaddedElement(i.getPadding().getThenPart(), beforeLeftBrace));
 
-        // Defaulted to `false` in IntelliJ's Kotlin formatting.
-        boolean useSpaceWithinIfParentheses = false;
+        // useSpaceWithinIfParentheses is defaulted to `false` in IntelliJ's Kotlin formatting.
         i = i.withIfCondition(
                 i.getIfCondition().getPadding().withTree(
                         spaceAfter(
                                 i.getIfCondition().getPadding().getTree().withElement(
-                                        spaceBefore(i.getIfCondition().getPadding().getTree().getElement(), useSpaceWithinIfParentheses
+                                        spaceBefore(i.getIfCondition().getPadding().getTree().getElement(), false
                                         )
                                 ),
-                                useSpaceWithinIfParentheses
+                                false
                         )
                 )
         );
@@ -645,10 +622,8 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     public J.Annotation visitAnnotation(J.Annotation annotation, P p) {
         J.Annotation a = super.visitAnnotation(annotation, p);
         if (a.getPadding().getArguments() != null) {
-            // Defaulted to `false` in IntelliJ's Kotlin formatting.
-            boolean beforeParenthesesOfAnnotation = false;
-            a = a.getPadding().withArguments(spaceBefore(a.getPadding().getArguments(),
-                    beforeParenthesesOfAnnotation, true));
+            // beforeParenthesesOfAnnotation is defaulted to `false` in IntelliJ's Kotlin formatting.
+            a = a.getPadding().withArguments(spaceBefore(a.getPadding().getArguments(), false, true));
         }
         if (a.getPadding().getArguments() != null) {
             int argsSize = a.getPadding().getArguments().getElements().size();
@@ -734,13 +709,11 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
             v = v.getPadding().withInitializer(spaceBefore(v.getPadding().getInitializer(), style.getAroundOperators().getAssignment()));
         }
         if (v.getPadding().getInitializer() != null) {
-            if (v.getPadding().getInitializer().getElement() != null) {
-                v = v.getPadding().withInitializer(
-                        v.getPadding().getInitializer().withElement(
-                                spaceBefore(v.getPadding().getInitializer().getElement(), style.getAroundOperators().getAssignment())
-                        )
-                );
-            }
+            v = v.getPadding().withInitializer(
+                    v.getPadding().getInitializer().withElement(
+                            spaceBefore(v.getPadding().getInitializer().getElement(), style.getAroundOperators().getAssignment())
+                    )
+            );
         }
         return v;
     }
@@ -1034,19 +1007,17 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public J.MemberReference visitMemberReference(J.MemberReference memberRef, P p) {
         J.MemberReference m = super.visitMemberReference(memberRef, p);
-        // Defaulted to `false` in IntelliJ's Kotlin formatting.
-        boolean aroundOperatorsAfterMethodReferenceDoubleColon = false;
+        // aroundOperatorsAfterMethodReferenceDoubleColon is defaulted to `false` in IntelliJ's Kotlin formatting.
         m = m.getPadding().withContaining(
-                spaceAfter(m.getPadding().getContaining(), aroundOperatorsAfterMethodReferenceDoubleColon)
+                spaceAfter(m.getPadding().getContaining(), false)
         );
 
-        // Defaulted to `false` in IntelliJ's Kotlin formatting.
-        boolean aroundOperatorsBeforeMethodReferenceDoubleColon = false;
+        // aroundOperatorsBeforeMethodReferenceDoubleColon is defaulted to `false` in IntelliJ's Kotlin formatting.
         if (m.getPadding().getTypeParameters() != null) {
-            m.getPadding().withTypeParameters(spaceBefore(m.getPadding().getTypeParameters(), aroundOperatorsBeforeMethodReferenceDoubleColon, true));
+            m.getPadding().withTypeParameters(spaceBefore(m.getPadding().getTypeParameters(), false, true));
         } else {
             m = m.getPadding().withReference(
-                    spaceBefore(m.getPadding().getReference(), aroundOperatorsBeforeMethodReferenceDoubleColon)
+                    spaceBefore(m.getPadding().getReference(), false)
             );
         }
         return m;
