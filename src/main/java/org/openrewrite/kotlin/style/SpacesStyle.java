@@ -57,7 +57,7 @@ public class SpacesStyle implements KotlinStyle {
         Boolean beforeComma;
         Boolean afterComma;
         Boolean beforeColonAfterDeclarationName;
-        Boolean afterColonAfterDeclarationType;
+        Boolean afterColonBeforeDeclarationType;
         Boolean beforeColonInNewTypeDefinition;
         Boolean afterColonInNewTypeDefinition;
         Boolean inSimpleOneLineMethods;

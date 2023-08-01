@@ -18,6 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -52,6 +53,7 @@ class AnnotationTest implements RewriteTest {
     @Test
     void fileScope() {
         rewriteRun(
+          spec -> spec.parser(KotlinParser.builder().classpath()),
           kotlin(
             """
               @file : Suppress ( "DEPRECATION_ERROR" )

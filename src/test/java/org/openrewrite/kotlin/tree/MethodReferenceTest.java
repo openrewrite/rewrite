@@ -39,6 +39,21 @@ class MethodReferenceTest implements RewriteTest {
     }
 
     @Test
+    void fieldReferenceWithTypeParameter() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test < T: Number > ( val answer : T )
+              fun method ( ) {
+                  val l = listOf ( Test ( 42 ) )
+                  l . map { Test < Int > :: answer }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void methodReference() {
         rewriteRun(
           kotlin("val str = 42 :: toString ")

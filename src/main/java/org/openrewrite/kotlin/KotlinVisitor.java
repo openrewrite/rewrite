@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -56,6 +57,42 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, P p) {
         throw new UnsupportedOperationException("Kotlin has a different structure for its compilation unit. See K.CompilationUnit.");
+    }
+
+    @Override
+    public <J2 extends J> J2 autoFormat(J2 j, P p) {
+        // FIXME, use Kotlin auto format instead
+        return j;
+    }
+
+    @Override
+    public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, P p, Cursor cursor) {
+        // FIXME, use Kotlin auto format instead
+        return j;
+    }
+
+    @Override
+    public <J2 extends J> J2 autoFormat(J2 j, P p, Cursor cursor) {
+        // FIXME, use Kotlin auto format instead
+        return j;
+    }
+
+    @Override
+    public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p) {
+        // FIXME, use Kotlin auto format instead
+        return after;
+    }
+
+    @Override
+    public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p, Cursor cursor) {
+        // FIXME, use Kotlin auto format instead
+        return after;
+    }
+
+    @Override
+    public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, @Nullable J stopAfter, P p, Cursor cursor) {
+        // FIXME, use Kotlin auto format instead
+        return after;
     }
 
     public J visitBinary(K.Binary binary, P p) {

@@ -519,14 +519,23 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     TypeUtils.asFullyQualified(typeMapping.type(callableReferenceAccess.getExplicitReceiver())), getCurrentFile());
         }
 
+        // FirElement receiver = callableReferenceAccess.getExplicitReceiver() != null ? callableReferenceAccess.getExplicitReceiver() : callableReferenceAccess.getDispatchReceiver();
+        FirElement receiver = callableReferenceAccess.getExplicitReceiver();
+        Expression receiverExpr = convertToExpression(receiver, ctx);
+
+        JRightPadded<Expression> paddedExr;
+        JContainer<Expression> typeArgs = null;
+        if (!callableReferenceAccess.getTypeArguments().isEmpty()) {
+            typeArgs = mapTypeArguments(callableReferenceAccess.getTypeArguments());
+        }
+
+        paddedExr = padRight(receiverExpr, sourceBefore("::"));
         return new J.MemberReference(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
-                padRight(callableReferenceAccess.getExplicitReceiver() == null ?
-                        new J.Empty(randomId(), EMPTY, Markers.EMPTY) :
-                        convertToExpression(callableReferenceAccess.getExplicitReceiver(), ctx), sourceBefore("::")),
-                callableReferenceAccess.getTypeArguments().isEmpty() ? null : mapTypeArguments(callableReferenceAccess.getTypeArguments()),
+                paddedExr,
+                typeArgs,
                 padLeft(whitespace(), (J.Identifier) visitElement(callableReferenceAccess.getCalleeReference(), ctx)),
                 typeMapping.type(callableReferenceAccess.getCalleeReference()),
                 methodReferenceType,
@@ -1500,17 +1509,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     private J mapBinaryOperation(FirFunctionCall functionCall) {
         Space prefix = whitespace();
-        Space binaryPrefix;
-
-        boolean isParenthesized = false;
-        if (!(functionCall.getDispatchReceiver() instanceof FirFunctionCall) && source.startsWith("(", cursor)) {
-            isParenthesized = true;
-            skip("(");
-            // The next whitespace is prefix of the binary operation.
-            binaryPrefix = whitespace();
-        } else {
-            binaryPrefix = prefix;
-        }
 
         FirElement receiver = functionCall.getExplicitReceiver() != null ? functionCall.getExplicitReceiver() : functionCall.getDispatchReceiver();
         Expression left = convertToExpression(receiver, ctx);
@@ -1545,15 +1543,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
         Expression right = convertToExpression(functionCall.getArgumentList().getArguments().get(0), ctx);
 
-        J.Binary binary = new J.Binary(
+        return new J.Binary(
                 randomId(),
-                binaryPrefix,
+                prefix,
                 Markers.EMPTY,
                 left,
                 padLeft(opPrefix, javaBinaryType),
                 right,
                 typeMapping.type(functionCall));
-        return !isParenthesized ? binary : new J.Parentheses<Expression>(randomId(), prefix, Markers.EMPTY, padRight(binary, sourceBefore(")")));
     }
 
     @Override
@@ -2208,6 +2205,16 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         if (resolvedQualifier.getRelativeClassFqName() != null) {
             typeTree = typeTree.withType(typeMapping.type(resolvedQualifier));
         }
+        if (!resolvedQualifier.getTypeArguments().isEmpty()) {
+            JContainer<Expression> typeArgs = mapTypeArguments(resolvedQualifier.getTypeArguments());
+            typeTree = new J.ParameterizedType(
+                    randomId(),
+                    EMPTY,
+                    Markers.EMPTY,
+                    typeTree,
+                    typeArgs,
+                    typeMapping.type(resolvedQualifier));
+        }
         return typeTree;
     }
 
@@ -2524,11 +2531,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space prefix = whitespace();
         FirExpression expression = typeOperatorCall.getArgumentList().getArguments().get(0);
         Markers markers = Markers.EMPTY;
-        boolean includeParentheses = false;
-        if (typeOperatorCall.getOperation() == FirOperation.AS && source.startsWith("(", cursor)) {
-            skip("(");
-            includeParentheses = true;
-        }
 
         Expression element;
         // A when subject expression does not have a target because it's implicit
@@ -2562,9 +2564,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         if (typeOperatorCall.getOperation() == FirOperation.AS || typeOperatorCall.getOperation() == FirOperation.SAFE_AS) {
-            if (!includeParentheses) {
-                markers = markers.addIfAbsent(new OmitParentheses(randomId()));
-            }
             return new J.TypeCast(
                     randomId(),
                     prefix,
@@ -2573,8 +2572,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                             randomId(),
                             after,
                             Markers.EMPTY,
-                            JRightPadded.build((TypeTree) visitElement(typeOperatorCall.getConversionTypeRef(), ctx))
-                                    .withAfter(includeParentheses ? sourceBefore(")") : EMPTY)),
+                            JRightPadded.build((TypeTree) visitElement(typeOperatorCall.getConversionTypeRef(), ctx))),
                     element);
         } else {
             JRightPadded<Expression> expr = JRightPadded.build(element).withAfter(after);
@@ -2865,79 +2863,85 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 ((FirFunctionCall) variableAssignment.getRValue()).getOrigin() == FirFunctionCallOrigin.Operator &&
                 ((FirFunctionCall) variableAssignment.getRValue()).getCalleeReference() instanceof FirResolvedNamedReference &&
                 isUnaryOperation((((FirFunctionCall) variableAssignment.getRValue()).getCalleeReference()).getName().asString());
-
-        if (unaryAssignment) {
+        KtBinaryExpression node = (KtBinaryExpression) getRealPsiElement(variableAssignment);
+        if (unaryAssignment && node == null) {
             return visitElement(variableAssignment.getRValue(), ctx);
+        }
+
+        Space prefix = whitespace();
+
+        Expression variable;
+        if (variableAssignment.getExplicitReceiver() != null) {
+            Expression target = convertToExpression(variableAssignment.getExplicitReceiver(), ctx);
+            JLeftPadded<J.Identifier> name = padLeft(sourceBefore("."), (J.Identifier) visitElement(variableAssignment.getLValue(), ctx));
+            variable = new J.FieldAccess(
+                    randomId(),
+                    EMPTY,
+                    Markers.EMPTY,
+                    target,
+                    name,
+                    typeMapping.type(variableAssignment, getCurrentFile()));
         } else {
-            Space prefix = whitespace();
+            variable = convertToExpression(variableAssignment.getLValue(), ctx);
+        }
 
-            Expression variable;
-            if (variableAssignment.getExplicitReceiver() != null) {
-                Expression target = convertToExpression(variableAssignment.getExplicitReceiver(), ctx);
-                JLeftPadded<J.Identifier> name = padLeft(sourceBefore("."), (J.Identifier) visitElement(variableAssignment.getLValue(), ctx));
-                variable = new J.FieldAccess(
-                        randomId(),
-                        EMPTY,
-                        Markers.EMPTY,
-                        target,
-                        name,
-                        typeMapping.type(variableAssignment, getCurrentFile()));
-            } else {
-                variable = convertToExpression(variableAssignment.getLValue(), ctx);
-            }
+        int saveCursor = cursor;
+        whitespace();
+        String opText = node.getOperationReference().getNode().getText();
+        boolean isCompoundAssignment = opText.equals("-=") ||
+                opText.equals("+=") ||
+                opText.equals("*=") ||
+                opText.equals("/=");
+        cursor(saveCursor);
 
-            int saveCursor = cursor;
-            whitespace();
-            boolean isCompoundAssignment = source.startsWith("-=", cursor) ||
-                    source.startsWith("+=", cursor) ||
-                    source.startsWith("*=", cursor) ||
-                    source.startsWith("/=", cursor);
-            cursor(saveCursor);
-
-            if (isCompoundAssignment) {
-                Space opPrefix = whitespace();
-                J.AssignmentOperation.Type op;
-                if (source.startsWith("-=", cursor)) {
+        if (isCompoundAssignment) {
+            Space opPrefix = whitespace();
+            J.AssignmentOperation.Type op;
+            switch (opText) {
+                case "-=":
                     skip("-=");
                     op = J.AssignmentOperation.Type.Subtraction;
-                } else if (source.startsWith("+=", cursor)) {
+                    break;
+                case "+=":
                     skip("+=");
                     op = J.AssignmentOperation.Type.Addition;
-                } else if (source.startsWith("*=", cursor)) {
+                    break;
+                case "*=":
                     skip("*=");
                     op = J.AssignmentOperation.Type.Multiplication;
-                } else if (source.startsWith("/=", cursor)) {
+                    break;
+                case "/=":
                     skip("/=");
                     op = J.AssignmentOperation.Type.Division;
-                } else {
+                    break;
+                default:
                     throw new IllegalArgumentException("Unexpected compound assignment.");
-                }
-
-                if (!(variableAssignment.getRValue() instanceof FirFunctionCall) ||
-                        ((FirFunctionCall) variableAssignment.getRValue()).getArgumentList().getArguments().size() != 1) {
-                    throw new IllegalArgumentException("Unexpected compound assignment.");
-                }
-
-                FirElement rhs = ((FirFunctionCall) variableAssignment.getRValue()).getArgumentList().getArguments().get(0);
-                return new J.AssignmentOperation(
-                        randomId(),
-                        prefix,
-                        Markers.EMPTY,
-                        variable,
-                        padLeft(opPrefix, op),
-                        convertToExpression(rhs, ctx),
-                        typeMapping.type(variableAssignment));
-            } else {
-                Space exprPrefix = sourceBefore("=");
-                Expression expr = convertToExpression(variableAssignment.getRValue(), ctx);
-                return new J.Assignment(
-                        randomId(),
-                        prefix,
-                        Markers.EMPTY,
-                        variable,
-                        padLeft(exprPrefix, expr),
-                        typeMapping.type(variableAssignment));
             }
+
+            if (!(variableAssignment.getRValue() instanceof FirFunctionCall) ||
+                    ((FirFunctionCall) variableAssignment.getRValue()).getArgumentList().getArguments().size() != 1) {
+                throw new IllegalArgumentException("Unexpected compound assignment.");
+            }
+
+            FirElement rhs = ((FirFunctionCall) variableAssignment.getRValue()).getArgumentList().getArguments().get(0);
+            return new J.AssignmentOperation(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    variable,
+                    padLeft(opPrefix, op),
+                    convertToExpression(rhs, ctx),
+                    typeMapping.type(variableAssignment));
+        } else {
+            Space exprPrefix = sourceBefore("=");
+            Expression expr = convertToExpression(variableAssignment.getRValue(), ctx);
+            return new J.Assignment(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    variable,
+                    padLeft(exprPrefix, expr),
+                    typeMapping.type(variableAssignment));
         }
     }
 
