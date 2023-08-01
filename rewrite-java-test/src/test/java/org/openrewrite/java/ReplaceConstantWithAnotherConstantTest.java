@@ -71,6 +71,43 @@ public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
     }
 
     @Test
+    void replaceConstantInCurlyBracesInAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("com.google.common.base.Charsets.UTF_8", "com.google.common.base.Charsets.UTF_16")),
+          java(
+            """
+              import com.google.common.base.Charsets;
+              
+              @SuppressWarnings({Charsets.UTF_8})
+              class Test {
+                  @SuppressWarnings({Charsets.UTF_8})
+                  private String bar;
+                  
+                  @SuppressWarnings({Charsets.UTF_8})
+                  void foo() {
+                      System.out.println("Annotation");
+                  }
+              }
+              """,
+            """
+              import com.google.common.base.Charsets;
+              
+              @SuppressWarnings({Charsets.UTF_16})
+              class Test {
+                  @SuppressWarnings({Charsets.UTF_16})
+                  private String bar;
+              
+                  @SuppressWarnings({Charsets.UTF_16})
+                  void foo() {
+                      System.out.println("Annotation");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void replaceConstant() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("com.google.common.base.Charsets.UTF_8", "java.io.File.separator")),
