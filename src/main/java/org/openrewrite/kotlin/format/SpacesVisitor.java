@@ -298,6 +298,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         if (m.getBody() != null) {
             m = m.withBody(spaceBefore(m.getBody(), beforeLeftBrace));
         }
+
         if (m.getParameters().isEmpty() || m.getParameters().iterator().next() instanceof J.Empty) {
             m = m.getPadding().withParameters(
                     m.getPadding().getParameters().getPadding().withElements(
@@ -306,7 +307,31 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                             )
                     )
             );
+        } else {
+            final int paramsSize = m.getParameters().size();
+            m = m.getPadding().withParameters(
+                    m.getPadding().getParameters().getPadding().withElements(
+                            ListUtils.map(m.getPadding().getParameters().getPadding().getElements(),
+                                    (index, param) -> {
+                                        if (index == 0) {
+                                            param = param.withElement(spaceBefore(param.getElement(), false));
+                                        } else {
+                                            param = param.withElement(
+                                                    spaceBefore(param.getElement(), style.getOther().getAfterComma())
+                                            );
+                                        }
+                                        if (index == paramsSize - 1) {
+                                            param = spaceAfter(param, false);
+                                        } else {
+                                            param = spaceAfter(param, style.getOther().getBeforeComma());
+                                        }
+                                        return param;
+                                    }
+                            )
+                    )
+            );
         }
+
         if (m.getAnnotations().getTypeParameters() != null) {
             // Defaulted to `false` in IntelliJ's Kotlin formatting.
             boolean spaceWithinAngleBrackets = false;

@@ -2289,7 +2289,353 @@ class SpacesTest implements RewriteTest {
             }
 
 
+            @Test
+            void withinArrayInitializerBracesFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun foo() {
+                              val x = intArrayOf( 1,2,3 )
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo() {
+                              val x = intArrayOf(1, 2, 3)
+                          }
+                      }
+                      """
+                  )
+                );
+            }
 
+            @Test
+            void withinGroupingParenthesesTrue() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun foo(x: Int) {
+                              var y = ( x + 1 )
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo(x: Int) {
+                              var y = (x + 1)
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void withinMethodDeclarationParenthesesFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun foo(    x: Int   ,   y: Int   ) {
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo(x: Int, y: Int) {
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void withinEmptyMethodDeclarationParenthesesFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun foo( ) {
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo() {
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void withinMethodCallParenthesesFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun bar(x: Int) {
+                          }
+                          fun foo() {
+                              bar( 1 )
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun bar(x: Int) {
+                          }
+                          fun foo() {
+                              bar(1)
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void withinEmptyMethodCallParenthesesFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun bar() {
+                          }
+                          fun foo() {
+                              bar( );
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun bar() {
+                          }
+                          fun foo() {
+                              bar();
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void withinIfParenthesesFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun foo() {
+                              if ( true ) {
+                              }
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo() {
+                              if (true) {
+                              }
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void withinForParenthesesFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun foo() {
+                              for (  i in 0..10   ) {
+                              }
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo() {
+                              for (i in 0..10) {
+                              }
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void withinWhileParenthesesFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun foo() {
+                              while ( true ) {
+                              }
+                              do {
+                              } while ( true )
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo() {
+                              while (true) {
+                              }
+                              do {
+                              } while (true)
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void withinCatchParenthesesFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun foo() {
+                              try {
+                              } catch (  e: Exception ) {
+                              }
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo() {
+                              try {
+                              } catch (e: Exception) {
+                              }
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void withinAngleBracketsFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      import java.util.ArrayList
+                       
+                      class Test< T, U > {
+                          fun < T2 : T > foo(): T2? {
+                              val myList: List<T2> = ArrayList()
+                              return null
+                          }
+                      }
+                      """,
+                    """
+                      import java.util.ArrayList
+
+                      class Test <T, U> {
+                          fun <T2 : T> foo(): T2? {
+                              val myList: List<T2> = ArrayList()
+                              return null
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void typeArgumentsAfterComma() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      import java.util.HashMap
+
+                      class Test {
+                          fun foo() {
+                              val m: Map<String,String> = HashMap()
+                              Test.bar<String,Int>()
+                          }
+
+                          companion object {
+                              fun <A,B> bar() {
+                              }
+                          }
+                      }
+                      """,
+                    """
+                      import java.util.HashMap
+
+                      class Test {
+                          fun foo() {
+                              val m: Map<String,String> = HashMap()
+                              Test.bar<String, Int>()
+                          }
+
+                          companion object {
+                              fun <A, B> bar() {
+                              }
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void otherInsideOneLineEnumBracesFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      enum class Test { }
+                      """,
+                    """
+                      enum class Test {}
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void typeParametersBeforeOpeningAngleBracketFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test   <T> {
+                      }
+                      """,
+                    """
+                      class Test <T> {
+                      }
+                      """
+                  )
+                );
+            }
         }
     }
 }
