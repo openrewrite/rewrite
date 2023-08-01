@@ -34,6 +34,7 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpecs;
 
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
@@ -1838,6 +1839,457 @@ class SpacesTest implements RewriteTest {
                   )
                 );
             }
+        }
+
+
+        @Nested
+        class otherDefaults {
+
+            @Test
+            void beforeParensTryParentheses() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      fun foo() {
+                          try{
+                          } catch (e: Exception) {
+                          }
+                      }
+                      """,
+                    """
+                      fun foo() {
+                          try {
+                          } catch (e: Exception) {
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void beforeLeftBraceClassLeftBrace() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test{
+                      }
+                      """,
+                    """
+                      class Test {
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void beforeLeftBraceMethodLeftBrace() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test{
+                          fun foo(){
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo() {
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+
+            @Test
+            void beforeLeftBraceIfLeftBraceFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test{
+                          fun foo() {
+                              if (true){
+                              }
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo() {
+                              if (true) {
+                              }
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+
+            @Test
+            void beforeLeftBraceElseLeftBraceFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test{
+                          fun foo() {
+                              if (true) {
+                              } else{
+                              }
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo() {
+                              if (true) {
+                              } else {
+                              }
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void beforeLeftBraceForLeftBraceFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      fun foo() {
+                          for (i in 0..10){
+                          }
+                      }
+                      """,
+                    """
+                      fun foo() {
+                          for (i in 0..10) {
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void beforeLeftBraceWhileLeftBraceFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      fun foo() {
+                          while (true != false){
+                          }
+                      }
+                      """,
+                    """
+                      fun foo() {
+                          while (true != false) {
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void beforeLeftBraceDoLeftBraceFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun foo() {
+                              do{
+                              } while (true != false);
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo() {
+                              do {
+                              } while (true != false);
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void beforeLeftBraceTryLeftBraceFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun foo() {
+                              try{
+                              } catch (e: Exception) {
+                              }
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo() {
+                              try {
+                              } catch (e: Exception) {
+                              }
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void beforeLeftBraceCatchLeftBraceFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun foo() {
+                              try {
+                              } catch (e: Exception){
+                              }
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo() {
+                              try {
+                              } catch (e: Exception) {
+                              }
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void beforeLeftBraceFinallyLeftBraceFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun foo() {
+                              try {
+                              } catch (e: Exception) {
+                              } finally{
+                              }
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo() {
+                              try {
+                              } catch (e: Exception) {
+                              } finally {
+                              }
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void beforeLeftBraceAnnotationArrayInitializerLeftBraceTrue() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      annotation class MyAnno(
+                          val names: Array<String>,
+                          val counts: IntArray
+                      )
+
+                      @MyAnno(names =["a","b"], counts = [1,2])
+                      class Test {
+                      }
+                      """,
+                    """
+                      annotation class MyAnno(
+                          val names: Array<String>,
+                          val counts: IntArray
+                      )
+
+                      @MyAnno(names = ["a","b"], counts = [1,2])
+                      class Test {
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void beforeKeywordsElseKeywordTrue() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun foo() {
+                              if (true) {
+                              }else {
+                              }
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo() {
+                              if (true) {
+                              } else {
+                              }
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void beforeKeywordsWhileKeywordTrue() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun foo() {
+                              do {
+                              }while (true)
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo() {
+                              do {
+                              } while (true)
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void beforeKeywordsCatchKeywordTrue() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun foo() {
+                              try {
+                              }catch (e: Exception) {
+                              }
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo() {
+                              try {
+                              } catch (e: Exception) {
+                              }
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void beforeKeywordsFinallyKeywordTrue() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun foo() {
+                              try {
+                              } catch (e: Exception) {
+                              }finally {
+                              }
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo() {
+                              try {
+                              } catch (e: Exception) {
+                              } finally {
+                              }
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+
+            @Test
+            void withinCodeBracesFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test { }
+                      interface ITest { }
+                      """,
+                    """
+                      class Test {}
+                      interface ITest {}
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void withinBracketsFalse() {
+                rewriteRun(
+                  spaces(),
+                  kotlin(
+                    """
+                      class Test {
+                          fun foo(a: IntArray) {
+                              var x = a[   0   ]
+                          }
+                      }
+                      """,
+                    """
+                      class Test {
+                          fun foo(a: IntArray) {
+                              var x = a[0]
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+
+
         }
     }
 }

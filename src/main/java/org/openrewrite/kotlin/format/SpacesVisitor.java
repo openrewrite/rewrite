@@ -767,7 +767,11 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         K.Binary.Type operator = b.getOperator();
         switch (operator) {
             case Contains:
+                break;
             case Get:
+                // withinBrackets defaults to False
+                b = b.withAfter(updateSpace(b.getAfter(), false));
+                b = b.withRight(spaceBefore(b.getRight(), false));
                 break;
             case IdentityEquals:
             case IdentityNotEquals:
