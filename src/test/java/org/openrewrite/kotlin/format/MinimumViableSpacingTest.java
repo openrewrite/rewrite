@@ -126,6 +126,22 @@ class MinimumViableSpacingTest implements RewriteTest {
     }
 
     @Test
+    void ifElse() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method(a: Int, b: Int) {
+                  val max = if (a > b) a else   b
+              }
+              """,
+            """
+              fun method(a:Int,b:Int){val max=if(a>b)a else b}
+              """
+          )
+        );
+    }
+
+    @Test
     void variableDeclaration() {
         rewriteRun(
           kotlin(

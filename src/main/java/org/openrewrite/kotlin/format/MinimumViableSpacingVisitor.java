@@ -211,6 +211,17 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
     }
 
     @Override
+    public J.If visitIf(J.If iff, P p) {
+        J.If updatedIff = super.visitIf(iff, p);
+
+        if (updatedIff.getElsePart() != null) {
+            updatedIff = updatedIff.withElsePart(spaceBefore(updatedIff.getElsePart(), true));
+            updatedIff = updatedIff.withElsePart(updatedIff.getElsePart().withBody(spaceBefore(updatedIff.getElsePart().getBody(), true)));
+        }
+        return updatedIff;
+    }
+
+    @Override
     public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, P p) {
         J.ForEachLoop.Control c = super.visitForEachControl(control, p);
         c = c.getPadding().withVariable(c.getPadding().getVariable().withAfter(updateSpace(c.getPadding().getVariable().getAfter(), true)));
