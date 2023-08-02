@@ -428,4 +428,17 @@ class VariableDeclarationTest implements RewriteTest {
               }))
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/207")
+    @Test
+    void preserveTrailingSemicolon() {
+        rewriteRun(
+          kotlin(
+            """
+              val a  =   1    ;
+              val    b   =  2 ;
+              """
+          )
+        );
+    }
 }

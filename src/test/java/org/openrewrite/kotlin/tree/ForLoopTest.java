@@ -78,7 +78,7 @@ class ForLoopTest implements RewriteTest {
           kotlin(
             """
               fun method ( array : Array < Int > ) {
-                  for ( ( index , value ) in array . withIndex ( ) ) {
+                  for (  (   index    ,    value   )  in array . withIndex ( ) ) {
                   }
               }
               """

@@ -948,20 +948,27 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     visit(multiVariable.getTypeExpression(), p);
                 }
 
+                if (variable.getElement().getPadding().getInitializer() != null) {
+                    visitSpace(variable.getElement().getPadding().getInitializer().getBefore(), Space.Location.VARIABLE_INITIALIZER, p);
+                }
+
+                if (variable.getElement().getInitializer() != null) {
+                    String equals = getEqualsText(multiVariable);
+                    p.append(equals);
+                }
+
+                visit(variable.getElement().getInitializer(), p);
                 visitSpace(variable.getAfter(), Space.Location.VARIABLE_INITIALIZER, p);
+
                 if (i < variables.size() - 1) {
                     p.append(",");
                 } else if (variables.size() > 1 && !containsTypeReceiver) {
                     p.append(")");
                 }
 
-                if (variable.getElement().getInitializer() != null) {
-                    String equals = getEqualsText(multiVariable);
-
-                    visitSpace(Objects.requireNonNull(variable.getElement().getPadding().getInitializer()).getBefore(), Space.Location.VARIABLE_INITIALIZER, p);
-                    p.append(equals);
+                if (variable.getMarkers().findFirst(Semicolon.class).isPresent()) {
+                    p.append(";");
                 }
-                visit(variable.getElement().getInitializer(), p);
             }
 
             afterSyntax(multiVariable, p);
