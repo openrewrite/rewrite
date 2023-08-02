@@ -1748,7 +1748,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         List<J.Modifier> modifiers = new ArrayList<>();
         List<J.Annotation> leadingAnnotations = emptyList();
-        List<J.Annotation> lastAnnotations = null;
+        List<J.Annotation> lastAnnotations = emptyList();
 
         if (modifierList != null) {
             leadingAnnotations = new ArrayList<>();
