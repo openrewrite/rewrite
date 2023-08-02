@@ -213,6 +213,14 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return l;
     }
 
+    public J visitNamedVariableInitializer(K.NamedVariableInitializer namedVariableInitializer, P p) {
+        K.NamedVariableInitializer n = namedVariableInitializer;
+        n = n.withPrefix(visitSpace(n.getPrefix(), KSpace.Location.NAMED_VARIABLE_INITIALIZER_PREFIX, p));
+        n = n.withMarkers(visitMarkers(n.getMarkers(), p));
+        n = n.withInitializations(ListUtils.map(n.getInitializations(), it -> visitAndCast(it, p)));
+        return n;
+    }
+
     public J visitProperty(K.Property property, P p) {
         K.Property pr = property;
         pr = pr.withPrefix(visitSpace(pr.getPrefix(), KSpace.Location.PROPERTY_PREFIX, p));
