@@ -34,18 +34,16 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.test.SourceSpecs;
 
 import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
-import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-@SuppressWarnings({"ControlFlowWithEmptyBody", "ConstantConditionIf", "CatchMayIgnoreException", "KotlinConstantConditions", "SimplifyBooleanWithConstants"})
+@SuppressWarnings("All")
 class SpacesTest implements RewriteTest {
 
     private static Consumer<RecipeSpec> spaces() {
