@@ -29,10 +29,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.FindMethods;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.maven.MavenDownloadingException;
 import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.tree.GroupArtifact;
@@ -41,6 +38,7 @@ import org.openrewrite.maven.tree.MavenRepository;
 import org.openrewrite.semver.*;
 
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -99,6 +97,41 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                         repositories);
     }
 
+    private static @Nullable Comment getLicenseHeader(G.CompilationUnit cu) {
+        if (!cu.getStatements().isEmpty()) {
+            Statement firstStatement = cu.getStatements().get(0);
+            if (!firstStatement.getComments().isEmpty()) {
+                Comment firstComment = firstStatement.getComments().get(0);
+                if (isLicenseHeader(firstComment)) {
+                    return firstComment;
+                }
+            }
+        } else if (cu.getEof() != null && !cu.getEof().getComments().isEmpty()) {
+            Comment firstComment = cu.getEof().getComments().get(0);
+            if (isLicenseHeader(firstComment)) {
+                // Adding suffix so when we later use it, formats well.
+                return firstComment.withSuffix("\n\n");
+            }
+        }
+        return null;
+    }
+
+    private static boolean isLicenseHeader(Comment comment) {
+        return comment instanceof TextComment && comment.isMultiline() &&
+                ((TextComment) comment).getText().contains("License");
+    }
+
+    private static G.CompilationUnit removeLicenseHeader(G.CompilationUnit cu) {
+        if (!cu.getStatements().isEmpty()) {
+            return cu.withStatements(ListUtils.mapFirst(cu.getStatements(),
+                    s -> s.withComments(s.getComments().subList(1, s.getComments().size()))
+            ));
+        } else {
+            List<Comment> eofComments = cu.getEof().getComments();
+            return cu.withEof(cu.getEof().withComments(eofComments.subList(1, eofComments.size())));
+        }
+    }
+
     @Override
     public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
         if (FindPlugins.find(cu, pluginId).isEmpty()) {
@@ -154,7 +187,6 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                     .get(0);
 
             if (FindMethods.find(cu, "RewriteGradleProject plugins(..)").isEmpty() && FindMethods.find(cu, "RewriteSettings plugins(..)").isEmpty()) {
-                Space leadingSpace = Space.firstPrefix(cu.getStatements());
                 if (cu.getSourcePath().endsWith(Paths.get("settings.gradle"))
                     && !cu.getStatements().isEmpty()
                     && cu.getStatements().get(0) instanceof J.MethodInvocation
@@ -170,7 +202,16 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                         }
                     }
                     if (insertAtIdx == 0) {
-                        return cu.withStatements(ListUtils.insert(Space.formatFirstPrefix(cu.getStatements(), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace())), autoFormat(statement, ctx, getCursor()), insertAtIdx));
+                        Comment licenseHeader = getLicenseHeader(cu);
+                        if (licenseHeader != null) {
+                            cu = removeLicenseHeader(cu);
+                            statement = statement.withComments(Collections.singletonList(licenseHeader));
+                        }
+                        Space leadingSpace = Space.firstPrefix(cu.getStatements());
+                        return cu.withStatements(ListUtils.insert(
+                                Space.formatFirstPrefix(cu.getStatements(), leadingSpace.withWhitespace("\n\n" + leadingSpace.getWhitespace())),
+                                autoFormat(statement, ctx, getCursor()),
+                                insertAtIdx));
                     } else {
                         return cu.withStatements(ListUtils.insert(cu.getStatements(), autoFormat(statement.withPrefix(Space.format("\n\n")), ctx, getCursor()), insertAtIdx));
                     }
@@ -178,11 +219,11 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
             } else {
                 MethodMatcher buildPluginsMatcher = new MethodMatcher("RewriteGradleProject plugins(groovy.lang.Closure)");
                 MethodMatcher settingsPluginsMatcher = new MethodMatcher("RewriteSettings plugins(groovy.lang.Closure)");
+                J.MethodInvocation pluginDef = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) ((J.MethodInvocation) autoFormat(statement, ctx, getCursor())).getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
                 return cu.withStatements(ListUtils.map(cu.getStatements(), stat -> {
                     if (stat instanceof J.MethodInvocation) {
                         J.MethodInvocation m = (J.MethodInvocation) stat;
                         if (buildPluginsMatcher.matches(m) || settingsPluginsMatcher.matches(m)) {
-                            J.MethodInvocation pluginDef = (J.MethodInvocation) ((J.Return) ((J.Block) ((J.Lambda) ((J.MethodInvocation) autoFormat(statement, ctx, getCursor())).getArguments().get(0)).getBody()).getStatements().get(0)).getExpression();
                             m = m.withArguments(ListUtils.map(m.getArguments(), a -> {
                                 if (a instanceof J.Lambda) {
                                     J.Lambda l = (J.Lambda) a;
