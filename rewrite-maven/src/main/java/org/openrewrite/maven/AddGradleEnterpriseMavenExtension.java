@@ -103,13 +103,13 @@ public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleE
     Boolean uploadInBackground;
 
     @Option(displayName = "Publish Criteria",
-            description = "When set to `always` the extension will publish build scans of every single build. " +
+            description = "When set to `Always` the extension will publish build scans of every single build. " +
                           "This is the default behavior when omitted." +
-                          "When set to `failure` the extension will only publish build scans when the build fails. " +
-                          "When set to `demand` the extension will only publish build scans when explicitly requested.",
+                          "When set to `Failure` the extension will only publish build scans when the build fails. " +
+                          "When set to `Demand` the extension will only publish build scans when explicitly requested.",
             required = false,
-            valid = {"always", "failure", "demand"},
-            example = "true")
+            valid = {"Always", "Failure", "Demand"},
+            example = "Always")
     @Nullable
     PublishCriteria publishCriteria;
 
