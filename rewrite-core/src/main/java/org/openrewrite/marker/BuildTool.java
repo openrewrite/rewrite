@@ -34,6 +34,7 @@ public class BuildTool implements Marker {
     public enum Type {
         Gradle,
         Maven,
-        Bazel
+        Bazel,
+        ModerneCli
     }
 }

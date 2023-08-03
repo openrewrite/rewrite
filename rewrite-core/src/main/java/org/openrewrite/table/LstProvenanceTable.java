@@ -27,8 +27,8 @@ public class LstProvenanceTable extends DataTable<LstProvenanceTable.Row> {
 
     public LstProvenanceTable(Recipe recipe) {
         super(recipe,
-                "Parser failures",
-                "A list of files that failed to parse along with stack traces of their failures.");
+                "LST Provenance",
+                "Table showing which tools were used to produce LSTs.");
     }
 
     @Value

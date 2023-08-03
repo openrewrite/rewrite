@@ -147,7 +147,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitAnnotation(Annotation annotation, PrintOutputCapture<P> p) {
         beforeSyntax(annotation, Space.Location.ANNOTATION_PREFIX, p);
-        p.append("@");
+        p.append('@');
         visit(annotation.getAnnotationType(), p);
         visitContainer("(", annotation.getPadding().getArguments(), JContainer.Location.ANNOTATION_ARGUMENTS, ",", ")", p);
         afterSyntax(annotation, p);
@@ -166,7 +166,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitArrayDimension(ArrayDimension arrayDimension, PrintOutputCapture<P> p) {
         beforeSyntax(arrayDimension, Space.Location.DIMENSION_PREFIX, p);
-        p.append("[");
+        p.append('[');
         visitRightPadded(arrayDimension.getPadding().getIndex(), JRightPadded.Location.ARRAY_INDEX, "]", p);
         afterSyntax(arrayDimension, p);
         return arrayDimension;
@@ -496,7 +496,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
         visitRightPadded(cu.getPadding().getPackageDeclaration(), JRightPadded.Location.PACKAGE, ";", p);
         visitRightPadded(cu.getPadding().getImports(), JRightPadded.Location.IMPORT, ";", p);
         if (!cu.getImports().isEmpty()) {
-            p.append(";");
+            p.append(';');
         }
         visit(cu.getClasses(), p);
         afterSyntax(cu, p);
@@ -746,9 +746,9 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
             visit(typeParameters.getAnnotations(), p);
             visitSpace(typeParameters.getPrefix(), Space.Location.TYPE_PARAMETERS, p);
             visitMarkers(typeParameters.getMarkers(), p);
-            p.append("<");
+            p.append('<');
             visitRightPadded(typeParameters.getPadding().getTypeParameters(), JRightPadded.Location.TYPE_PARAMETER, ",", p);
-            p.append(">");
+            p.append('>');
         }
         visit(method.getReturnTypeExpression(), p);
         visit(method.getAnnotations().getName().getAnnotations(), p);
@@ -905,7 +905,7 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     @Override
     public <T extends J> J visitParentheses(Parentheses<T> parens, PrintOutputCapture<P> p) {
         beforeSyntax(parens, Space.Location.PARENTHESES_PREFIX, p);
-        p.append("(");
+        p.append('(');
         visitRightPadded(parens.getPadding().getTree(), JRightPadded.Location.PARENTHESES, ")", p);
         afterSyntax(parens, p);
         return parens;
@@ -1041,20 +1041,20 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                 p.append("--");
                 break;
             case Positive:
-                p.append("+");
+                p.append('+');
                 visit(unary.getExpression(), p);
                 break;
             case Negative:
-                p.append("-");
+                p.append('-');
                 visit(unary.getExpression(), p);
                 break;
             case Complement:
-                p.append("~");
+                p.append('~');
                 visit(unary.getExpression(), p);
                 break;
             case Not:
             default:
-                p.append("!");
+                p.append('!');
                 visit(unary.getExpression(), p);
         }
         afterSyntax(unary, p);

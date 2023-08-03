@@ -13,28 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.table;
+package org.openrewrite.gradle.table;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Value;
 import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
 
-public class SourcesFiles extends DataTable<SourcesFiles.Row> {
-
-    public SourcesFiles(Recipe recipe) {
-        super(recipe, "Source files that matched",
-                "Source files that matched some criteria.");
+@JsonIgnoreType
+public class GradleWrappersInUse extends DataTable<GradleWrappersInUse.Row> {
+    public GradleWrappersInUse(Recipe recipe) {
+        super(recipe, Row.class,
+                GradleWrappersInUse.class.getName(),
+                "Gradle wrappers in use",
+                "Gradle wrappers in use.");
     }
 
     @Value
     public static class Row {
-        @Column(displayName = "Source path before the run",
-                description = "The source path of the file before the run.")
-        String sourcePath;
+        @Column(displayName = "Wrapper version",
+                description = "The version of the Gradle wrapper in use.")
+        String version;
 
-        @Column(displayName = "LST type",
-                description = "The LST model type that the file is parsed as.")
-        String type;
+        @Column(displayName = "Wrapper distribution",
+                description = "The distribution type of the Gradle wrapper in use.")
+        String distribution;
     }
 }
