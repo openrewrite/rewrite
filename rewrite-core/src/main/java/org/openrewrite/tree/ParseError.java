@@ -29,22 +29,14 @@ import java.util.UUID;
 import static java.util.Collections.singletonList;
 
 @Value
+@With
 public class ParseError implements SourceFile {
-    @With
     @EqualsAndHashCode.Include
-    @Getter
     UUID id;
 
-    @With
-    @Getter
     Markers markers;
-
-    @With
-    @Getter
     Path sourcePath;
 
-    @With
-    @Getter
     @Nullable
     FileAttributes fileAttributes;
 
@@ -68,17 +60,20 @@ public class ParseError implements SourceFile {
         return withCharsetName(charset.name());
     }
 
-    @With
-    @Getter
     boolean charsetBomMarked;
 
-    @With
-    @Getter
     @Nullable
     Checksum checksum;
 
-    @With
     String text;
+
+    /**
+     * A parsed LST that was determined at parsing time to be erroneous, for
+     * example if it doesn't faithfully produce the original source text at
+     * printing time.
+     */
+    @Nullable
+    SourceFile erroneous;
 
     @Override
     public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
@@ -105,7 +100,8 @@ public class ParseError implements SourceFile {
                 parser.getCharset(ctx).name(),
                 is.isCharsetBomMarked(),
                 null,
-                is.readFully()
+                is.readFully(),
+                null
         );
     }
 }
