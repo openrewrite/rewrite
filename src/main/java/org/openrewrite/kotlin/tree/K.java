@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 public interface K extends J {
@@ -527,8 +528,23 @@ public interface K extends J {
     class FunctionType implements K, Expression, Statement, TypeTree {
 
         UUID id;
+
         Space prefix;
+
+        public Space getPrefix() {
+            // For backwards compatibility with older LST before there was a prefix field
+            //noinspection ConstantValue
+            return prefix == null ? typedTree.getPrefix() : prefix;
+        }
+
         Markers markers;
+
+        public Markers getMarkers() {
+            // For backwards compatibility with older LST before there was a prefix field
+            //noinspection ConstantValue
+            return markers == null ? typedTree.getMarkers() : markers;
+        }
+
         TypedTree typedTree;
 
         List<J.Annotation> leadingAnnotations;
