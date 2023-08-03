@@ -255,4 +255,35 @@ class AddGradleEnterpriseGradlePluginTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addNewSettingsPluginsBlockWithLicenseHeader() {
+        rewriteRun(
+          spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1"))),
+          buildGradle(
+            ""
+          ),
+          settingsGradle(
+            """
+              /*
+               * Licensed to...
+               */
+               
+              rootProject.name = 'my-project'
+              """,
+            interpolateResolvedVersion("""
+              /*
+               * Licensed to...
+               */
+               
+              plugins {
+                  id 'com.gradle.enterprise' version '%s'
+              }
+                            
+              rootProject.name = 'my-project'
+              """
+            )
+          )
+        );
+    }
 }
