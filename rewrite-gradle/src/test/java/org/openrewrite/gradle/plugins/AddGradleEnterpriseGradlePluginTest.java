@@ -279,7 +279,7 @@ class AddGradleEnterpriseGradlePluginTest implements RewriteTest {
               plugins {
                   id 'com.gradle.enterprise' version '%s'
               }
-              
+                            
               rootProject.name = 'my-project'
               """
             )

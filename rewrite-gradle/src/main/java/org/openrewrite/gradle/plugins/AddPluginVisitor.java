@@ -81,7 +81,7 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
     }
 
     private static Optional<String> findNewerVersion(String groupId, String artifactId, String version, VersionComparator versionComparator,
-                                              List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
+                                                     List<MavenRepository> repositories, ExecutionContext ctx) throws MavenDownloadingException {
         try {
             MavenMetadata mavenMetadata = downloadMetadata(groupId, artifactId, repositories, ctx);
             return versionComparator.upgrade(version, mavenMetadata.getVersioning().getVersions());
@@ -175,8 +175,8 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
                     .parseInputs(
                             singletonList(
                                     Parser.Input.fromString("plugins {\n" +
-                                                            "    id " + delimiter + pluginId + delimiter + (version.map(s -> " version " + delimiter + s + delimiter).orElse("")) + "\n" +
-                                                            "}")),
+                                            "    id " + delimiter + pluginId + delimiter + (version.map(s -> " version " + delimiter + s + delimiter).orElse("")) + "\n" +
+                                            "}")),
                             null,
                             ctx
                     )
@@ -188,9 +188,9 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
             if (FindMethods.find(cu, "RewriteGradleProject plugins(..)").isEmpty() && FindMethods.find(cu, "RewriteSettings plugins(..)").isEmpty()) {
                 if (cu.getSourcePath().endsWith(Paths.get("settings.gradle"))
-                    && !cu.getStatements().isEmpty()
-                    && cu.getStatements().get(0) instanceof J.MethodInvocation
-                    && ((J.MethodInvocation) cu.getStatements().get(0)).getSimpleName().equals("pluginManagement")) {
+                        && !cu.getStatements().isEmpty()
+                        && cu.getStatements().get(0) instanceof J.MethodInvocation
+                        && ((J.MethodInvocation) cu.getStatements().get(0)).getSimpleName().equals("pluginManagement")) {
                     return cu.withStatements(ListUtils.insert(cu.getStatements(), autoFormat(statement.withPrefix(Space.format("\n\n")), ctx, getCursor()), 1));
                 } else {
                     int insertAtIdx = 0;
