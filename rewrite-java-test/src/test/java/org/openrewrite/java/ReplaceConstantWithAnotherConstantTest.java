@@ -16,12 +16,13 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
+class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -71,6 +72,7 @@ public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/3448")
     void replaceConstantInCurlyBracesInAnnotation() {
         rewriteRun(
           spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("com.google.common.base.Charsets.UTF_8", "com.google.common.base.Charsets.UTF_16")),
@@ -78,29 +80,17 @@ public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
             """
               import com.google.common.base.Charsets;
               
-              @SuppressWarnings({Charsets.UTF_8})
               class Test {
                   @SuppressWarnings({Charsets.UTF_8})
                   private String bar;
-                  
-                  @SuppressWarnings({Charsets.UTF_8})
-                  void foo() {
-                      System.out.println("Annotation");
-                  }
               }
               """,
             """
               import com.google.common.base.Charsets;
               
-              @SuppressWarnings({Charsets.UTF_16})
               class Test {
                   @SuppressWarnings({Charsets.UTF_16})
                   private String bar;
-              
-                  @SuppressWarnings({Charsets.UTF_16})
-                  void foo() {
-                      System.out.println("Annotation");
-                  }
               }
               """
           )
