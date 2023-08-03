@@ -171,6 +171,7 @@ class RenameVariableTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/3434")
     void renameFieldWithSameNameAsParameterWithJavaDoc() {
         rewriteRun(
             spec -> spec.recipe(renameVariableTest("name", "_name", false)),
