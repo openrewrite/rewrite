@@ -169,7 +169,7 @@ public class ReloadableJava11Parser implements JavaParser {
                 J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
                 cuByPath.setValue(null); // allow memory used by this JCCompilationUnit to be released
                 parsingListener.parsed(input, cu);
-                return cu;
+                return requirePrintIdempotence(cu, input, relativeTo, ctx);
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
                 return ParseError.build(this, input, relativeTo, ctx, t);

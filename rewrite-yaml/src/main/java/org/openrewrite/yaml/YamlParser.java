@@ -60,15 +60,16 @@ public class YamlParser implements org.openrewrite.Parser {
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles)
-                .map(sourceFile -> {
-                    Path path = sourceFile.getRelativePath(relativeTo);
-                    try (EncodingDetectingInputStream is = sourceFile.getSource(ctx)) {
+                .map(input -> {
+                    Path path = input.getRelativePath(relativeTo);
+                    try (EncodingDetectingInputStream is = input.getSource(ctx)) {
                         Yaml.Documents yaml = parseFromInput(path, is);
-                        parsingListener.parsed(sourceFile, yaml);
-                        return yaml.withFileAttributes(sourceFile.getFileAttributes());
+                        parsingListener.parsed(input, yaml);
+                        yaml = yaml.withFileAttributes(input.getFileAttributes());
+                        return requirePrintIdempotence(yaml, input, relativeTo, ctx);
                     } catch (Throwable t) {
                         ctx.getOnError().accept(t);
-                        return ParseError.build(this, sourceFile, relativeTo, ctx, t);
+                        return ParseError.build(this, input, relativeTo, ctx, t);
                     }
                 })
                 .map(this::unwrapPrefixedMappings)
