@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.Getter;
 import lombok.Value;
 import lombok.experimental.NonFinal;
 import org.openrewrite.Cursor;
@@ -29,12 +30,15 @@ import org.openrewrite.template.SourceTemplate;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.function.Consumer;
 
-@SuppressWarnings("unused")
+@SuppressWarnings({"unused", "LombokGetterMayBeUsed"})
 public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
+    @Getter
     private final String code;
     private final int parameterCount;
     private final Consumer<String> onAfterVariableSubstitution;
@@ -46,10 +50,6 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.parameterCount = StringUtils.countOccurrences(code, "#{");
         this.templateParser = new JavaTemplateParser(contextSensitive, javaParser, onAfterVariableSubstitution, onBeforeParseTemplate, imports);
-    }
-
-    public String getCode() {
-        return code;
     }
 
     @Override
@@ -143,6 +143,10 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
 
         public Builder imports(String... fullyQualifiedTypeNames) {
+            return imports(Arrays.asList(fullyQualifiedTypeNames));
+        }
+
+        public Builder imports(Collection<String> fullyQualifiedTypeNames) {
             for (String typeName : fullyQualifiedTypeNames) {
                 validateImport(typeName);
                 this.imports.add("import " + typeName + ";\n");
@@ -151,6 +155,10 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
 
         public Builder staticImports(String... fullyQualifiedMemberTypeNames) {
+            return staticImports(Arrays.asList(fullyQualifiedMemberTypeNames));
+        }
+
+        public Builder staticImports(Collection<String> fullyQualifiedMemberTypeNames) {
             for (String typeName : fullyQualifiedMemberTypeNames) {
                 validateImport(typeName);
                 this.imports.add("import static " + typeName + ";\n");
