@@ -1142,4 +1142,107 @@ class AddImportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void crlfNewLinesWithoutPreviousImports() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+          java(
+            """
+              package a;
+              class A {}
+              """.replace("\n", "\r\n"),
+            """
+              package a;
+                            
+              import java.util.List;
+                            
+              class A {}
+              """.replace("\n", "\r\n")
+          )
+        );
+    }
+
+    @Test
+    void crlfNewLinesWithPreviousImports() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+          java(
+            """
+              package a;
+              
+              import java.util.Set;
+              
+              class A {}
+              """.replace("\n", "\r\n"),
+            """
+              package a;
+                            
+              import java.util.List;
+              import java.util.Set;
+                            
+              class A {}
+              """.replace("\n", "\r\n")
+          )
+        );
+    }
+
+    @Test
+    void crlfNewLinesWithPreviousImportsNoPackage() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+          java(
+            """
+              import java.util.Set;
+              
+              class A {}
+              """.replace("\n", "\r\n"),
+            """        
+              import java.util.List;
+              import java.util.Set;
+                            
+              class A {}
+              """.replace("\n", "\r\n")
+          )
+        );
+    }
+
+    @Test
+    void crlfNewLinesWithPreviousImportsNoClass() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+          java(
+            """
+              package a;
+              
+              import java.util.Arrays;
+              import java.util.Set;
+              """.replace("\n", "\r\n"),
+            """
+              package a;
+              
+              import java.util.Arrays;
+              import java.util.List;
+              import java.util.Set;
+              """.replace("\n", "\r\n")
+          )
+        );
+    }
+    @Test
+    void crlfNewLinesWithPreviousImportsNoPackageNoClass() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+          java(
+            """
+              import java.util.Arrays;
+              import java.util.Set;
+              """.replace("\n", "\r\n"),
+            """
+              import java.util.Arrays;
+              import java.util.List;
+              import java.util.Set;
+              """.replace("\n", "\r\n")
+          )
+        );
+    }
 }

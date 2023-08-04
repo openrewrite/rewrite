@@ -28,6 +28,7 @@ import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.style.GeneralFormatStyle;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -37,6 +38,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
+import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
 
 /**
  * A Java refactoring visitor that can be used to add an import (or static import) to a given compilation unit.
@@ -132,15 +134,9 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                             .withComments(ListUtils.map(firstClassPrefix.getComments(), comment -> comment instanceof Javadoc ? null : comment))
                             .withWhitespace(""));
 
-                    cu = cu.withClasses(ListUtils.map(cu.getClasses(), (i, clazz) -> {
-                        Space prefix = clazz.getPrefix();
-                        return i == 0 ?
-                                clazz.withPrefix(prefix.withComments(ListUtils.map(prefix.getComments(),
-                                        comment -> comment instanceof Javadoc ? comment : null))) :
-                                clazz;
-                    }));
-                } else {
-                    importToAdd = importToAdd.withPrefix(Space.format("\n\n"));
+                    cu = cu.withClasses(ListUtils.mapFirst(cu.getClasses(), clazz ->
+                            clazz.withComments(ListUtils.map(clazz.getComments(), comment -> comment instanceof Javadoc ? comment : null))
+                    ));
                 }
             }
 
@@ -151,21 +147,34 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                     .map(JavaSourceSet::getClasspath)
                     .orElse(Collections.emptyList());
 
-            cu = cu.getPadding().withImports(layoutStyle.addImport(cu.getPadding().getImports(), importToAdd,
-                    cu.getPackageDeclaration(), classpath));
+            List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath);
+
+            // ImportLayoutStile::addImport adds always `\n` as newlines. Checking if we need to fix them
+            newImports = checkCRLF(cu, newImports);
+
+            cu = cu.getPadding().withImports(newImports);
 
             JavaSourceFile c = cu;
-            cu = cu.withClasses(ListUtils.map(cu.getClasses(), (i, clazz) -> {
-                if (i == 0) {
-                    J.ClassDeclaration cl = autoFormat(clazz, clazz.getName(), p, new Cursor(null, c));
-                    clazz = clazz.withPrefix(clazz.getPrefix().withWhitespace(cl.getPrefix().getWhitespace()));
-                }
-                return clazz;
+            cu = cu.withClasses(ListUtils.mapFirst(cu.getClasses(), clazz -> {
+                J.ClassDeclaration cl = autoFormat(clazz, clazz.getName(), p, new Cursor(null, c));
+                return clazz.withPrefix(clazz.getPrefix().withWhitespace(cl.getPrefix().getWhitespace()));
             }));
 
             j = cu;
         }
         return j;
+    }
+
+    private List<JRightPadded<J.Import>> checkCRLF(JavaSourceFile cu, List<JRightPadded<J.Import>> newImports) {
+        GeneralFormatStyle generalFormatStyle = Optional.ofNullable(((SourceFile) cu).getStyle(GeneralFormatStyle.class))
+                .orElse(autodetectGeneralFormatStyle(cu));
+        if (generalFormatStyle.isUseCRLFNewLines()) {
+            return ListUtils.map(newImports, rp -> rp.map(
+                    i -> i.withPrefix(i.getPrefix().withWhitespace(i.getPrefix().getWhitespace()
+                            .replaceAll("(?<!\r)\n", "\r\n")))
+            ));
+        }
+        return newImports;
     }
 
     private boolean isTypeReference(NameTree t) {
