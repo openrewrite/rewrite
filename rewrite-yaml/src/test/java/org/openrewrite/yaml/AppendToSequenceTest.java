@@ -40,17 +40,17 @@ class AppendToSequenceTest implements RewriteTest {
             )),
           yaml(
             """
-                  things:
-                    fruit:
-                      - apple
-                      - blueberry
+              things:
+                fruit:
+                  - apple
+                  - blueberry
               """,
             """
-                  things:
-                    fruit:
-                      - apple
-                      - blueberry
-                      - strawberry
+              things:
+                fruit:
+                  - apple
+                  - blueberry
+                  - strawberry
               """
           )
         );
@@ -68,17 +68,17 @@ class AppendToSequenceTest implements RewriteTest {
             )),
           yaml(
             """
-                  things:
-                    fruit:
-                      - 'apple'
-                      - 'blueberry'
+              things:
+                fruit:
+                  - 'apple'
+                  - 'blueberry'
               """,
             """
-                  things:
-                    fruit:
-                      - 'apple'
-                      - 'blueberry'
-                      - 'strawberry'
+              things:
+                fruit:
+                  - 'apple'
+                  - 'blueberry'
+                  - 'strawberry'
               """
           )
         );
@@ -96,17 +96,17 @@ class AppendToSequenceTest implements RewriteTest {
             )),
           yaml(
             """
-                  things:
-                    fruit:
-                      - apple
-                      - blueberry
+              things:
+                fruit:
+                  - apple
+                  - blueberry
               """,
             """
-                  things:
-                    fruit:
-                      - apple
-                      - blueberry
-                      - strawberry
+              things:
+                fruit:
+                  - apple
+                  - blueberry
+                  - strawberry
               """
           )
         );
@@ -124,17 +124,17 @@ class AppendToSequenceTest implements RewriteTest {
             )),
           yaml(
             """
-                  things:
-                    fruit:
-                      - apple
-                      - blueberry
+              things:
+                fruit:
+                  - apple
+                  - blueberry
               """,
             """
-                  things:
-                    fruit:
-                      - apple
-                      - blueberry
-                      - strawberry
+              things:
+                fruit:
+                  - apple
+                  - blueberry
+                  - strawberry
               """
           )
         );
@@ -152,10 +152,10 @@ class AppendToSequenceTest implements RewriteTest {
             )),
           yaml(
             """
-                  things:
-                    fruit:
-                      - apple
-                      - blueberry
+              things:
+                fruit:
+                  - apple
+                  - blueberry
               """
           )
         );
@@ -173,23 +173,23 @@ class AppendToSequenceTest implements RewriteTest {
             )),
           yaml(
             """
-                  things:
-                    fruit:
-                      - name: apple
-                      - name: blueberry
-                    animals:
-                      - cat
-                      - dog
+              things:
+                fruit:
+                  - name: apple
+                  - name: blueberry
+                animals:
+                  - cat
+                  - dog
               """,
             """
-                  things:
-                    fruit:
-                      - name: apple
-                      - name: blueberry
-                      - name: strawberry
-                    animals:
-                      - cat
-                      - dog
+              things:
+                fruit:
+                  - name: apple
+                  - name: blueberry
+                  - name: strawberry
+                animals:
+                  - cat
+                  - dog
               """
           )
         );
@@ -207,23 +207,23 @@ class AppendToSequenceTest implements RewriteTest {
             )),
           yaml(
             """
-                  things:
-                    fruit:
-                      - name: apple
-                      - name: blueberry
-                    animals:
-                      - cat
-                      - dog
+              things:
+                fruit:
+                  - name: apple
+                  - name: blueberry
+                animals:
+                  - cat
+                  - dog
               """,
             """
-                  things:
-                    fruit:
-                      - name: apple
-                      - name: blueberry
-                      - name: strawberry
-                    animals:
-                      - cat
-                      - dog
+              things:
+                fruit:
+                  - name: apple
+                  - name: blueberry
+                  - name: strawberry
+                animals:
+                  - cat
+                  - dog
               """
           )
         );
@@ -241,18 +241,18 @@ class AppendToSequenceTest implements RewriteTest {
             )),
           yaml(
             """
-                  things:
-                    fruit: [apple, blueberry]
-                    animals:
-                      - cat
-                      - dog
+              things:
+                fruit: [apple, blueberry]
+                animals:
+                  - cat
+                  - dog
               """,
             """
-                  things:
-                    fruit: [apple, blueberry, strawberry]
-                    animals:
-                      - cat
-                      - dog
+              things:
+                fruit: [apple, blueberry, strawberry]
+                animals:
+                  - cat
+                  - dog
               """
           )
         );
@@ -270,18 +270,18 @@ class AppendToSequenceTest implements RewriteTest {
             )),
           yaml(
             """
-                  things:
-                    fruit: ['apple', 'blueberry']
-                    animals:
-                      - cat
-                      - dog
+              things:
+                fruit: ['apple', 'blueberry']
+                animals:
+                  - cat
+                  - dog
               """,
             """
-                  things:
-                    fruit: ['apple', 'blueberry', 'strawberry']
-                    animals:
-                      - cat
-                      - dog
+              things:
+                fruit: ['apple', 'blueberry', 'strawberry']
+                animals:
+                  - cat
+                  - dog
               """
           )
         );
@@ -299,18 +299,18 @@ class AppendToSequenceTest implements RewriteTest {
             )),
           yaml(
             """
-                  things:
-                    fruit: ["apple", "blueberry"]
-                    animals:
-                      - cat
-                      - dog
+              things:
+                fruit: ["apple", "blueberry"]
+                animals:
+                  - cat
+                  - dog
               """,
             """
-                  things:
-                    fruit: ["apple", "blueberry", "strawberry"]
-                    animals:
-                      - cat
-                      - dog
+              things:
+                fruit: ["apple", "blueberry", "strawberry"]
+                animals:
+                  - cat
+                  - dog
               """
           )
         );
@@ -328,12 +328,12 @@ class AppendToSequenceTest implements RewriteTest {
             )),
           yaml(
             """
-                  things:
-                    fruit: []
+              things:
+                fruit: []
               """,
             """
-                  things:
-                    fruit: [strawberry]
+              things:
+                fruit: [strawberry]
               """
           )
         );
@@ -351,21 +351,21 @@ class AppendToSequenceTest implements RewriteTest {
             )),
           yaml(
             """
-                  prod:
-                    regions:
-                      - name: us-bar-1
-                      - name: us-foo-1
-                    other:
-                      - name: outerspace-1
+              prod:
+                regions:
+                  - name: us-bar-1
+                  - name: us-foo-1
+                other:
+                  - name: outerspace-1
               """,
             """
-                  prod:
-                    regions:
-                      - name: us-bar-1
-                      - name: us-foo-1
-                      - name: us-foo-2
-                    other:
-                      - name: outerspace-1
+              prod:
+                regions:
+                  - name: us-bar-1
+                  - name: us-foo-1
+                  - name: us-foo-2
+                other:
+                  - name: outerspace-1
               """
           )
         );
@@ -383,13 +383,13 @@ class AppendToSequenceTest implements RewriteTest {
             )),
           yaml(
             """
-                  prod:
-                    regions:
-                      - name: us-bar-1
-                      - name: us-foo-1
-                      - name: us-foo-2
-                    other:
-                      - name: outerspace-1
+              prod:
+                regions:
+                  - name: us-bar-1
+                  - name: us-foo-1
+                  - name: us-foo-2
+                other:
+                  - name: outerspace-1
               """
           )
         );

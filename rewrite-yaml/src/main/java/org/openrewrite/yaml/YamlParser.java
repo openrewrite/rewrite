@@ -66,13 +66,13 @@ public class YamlParser implements org.openrewrite.Parser {
                         Yaml.Documents yaml = parseFromInput(path, is);
                         parsingListener.parsed(input, yaml);
                         yaml = yaml.withFileAttributes(input.getFileAttributes());
+                        yaml = unwrapPrefixedMappings(yaml);
                         return requirePrintIdempotence(yaml, input, relativeTo, ctx);
                     } catch (Throwable t) {
                         ctx.getOnError().accept(t);
                         return ParseError.build(this, input, relativeTo, ctx, t);
                     }
                 })
-                .map(this::unwrapPrefixedMappings)
                 .map(sourceFile -> {
                     if (sourceFile instanceof Yaml.Documents) {
                         Yaml.Documents docs = (Yaml.Documents) sourceFile;
@@ -527,10 +527,7 @@ public class YamlParser implements org.openrewrite.Parser {
         }
     }
 
-    private SourceFile unwrapPrefixedMappings(SourceFile y) {
-        if (!(y instanceof Yaml.Documents)) {
-            return y;
-        }
+    private Yaml.Documents unwrapPrefixedMappings(Yaml.Documents y) {
         //noinspection ConstantConditions
         return (Yaml.Documents) new YamlIsoVisitor<Integer>() {
             @Override
