@@ -84,6 +84,7 @@ public class Find extends Recipe {
                           "Multiple patterns may be specified, separated by a semicolon `;`. " +
                           "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. " +
                           "When not set, all source files are searched. ",
+            required = false,
             example = "**/*.java")
     @Nullable
     String filePattern;
