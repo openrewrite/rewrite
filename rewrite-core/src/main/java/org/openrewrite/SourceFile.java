@@ -15,15 +15,23 @@
  */
 package org.openrewrite;
 
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
+import org.openrewrite.tree.ParseError;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 public interface SourceFile extends Tree {
     /**
@@ -115,5 +123,50 @@ public interface SourceFile extends Tree {
             }
         }.visit(this, n);
         return n.get();
+    }
+
+    /**
+     * Transforms the SourceFiles into ParseErrors if they are not idempotent.
+     * @param sources the original source files
+     * @param basePath the base path to the source files
+     * @param ctx execution context
+     * @return an updated stream of source files
+     */
+    static Stream<SourceFile> checkPrintIdempotent(Stream<SourceFile> sources, @Nullable Path basePath, ExecutionContext ctx) {
+        return sources.map(s -> {
+            Path sourcePath = s.getSourcePath();
+            if (basePath != null) {
+                sourcePath = basePath.resolve(sourcePath);
+            }
+            File file = sourcePath.toFile();
+            if (file.exists()) {
+                try {
+                    String originalContent = new String(Files.readAllBytes(file.toPath()), s.getCharset());
+                    if (s.isPrintIdempotent(
+                            Parser.Input.fromString(sourcePath, originalContent, s.getCharset()), ctx)) {
+                        return s;
+                    } else {
+                        return new ParseError(UUID.randomUUID(), s.getMarkers(),
+                                s.getSourcePath(), s.getFileAttributes(),
+                                s.getCharset().name(), s.isCharsetBomMarked(),
+                                s.getChecksum(), originalContent, s);
+                    }
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            } else {
+                return s;
+            }
+        });
+    }
+
+    /**
+     * Does this source file, when printed produce a byte-for-byte identical result to the input?
+     *
+     * @param input The input source.
+     * @return <code>true</code> if the parse-to-print loop is idempotent, <code>false</code> otherwise.
+     */
+    default boolean isPrintIdempotent(Parser.Input input, ExecutionContext ctx) {
+        return printAll().equals(StringUtils.readFully(input.getSource(ctx)));
     }
 }
