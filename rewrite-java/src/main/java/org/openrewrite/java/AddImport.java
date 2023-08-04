@@ -170,7 +170,9 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 .orElse(autodetectGeneralFormatStyle(cu));
         if (generalFormatStyle.isUseCRLFNewLines()) {
             return ListUtils.map(newImports, rp -> rp.map(
-                    i -> i.withPrefix(i.getPrefix().withWhitespace(i.getPrefix().getWhitespace().replace("\n", "\r\n")))
+                    i -> i.withPrefix(i.getPrefix().withWhitespace(i.getPrefix().getWhitespace()
+                            .replace("\n", "\r\n")
+                            .replaceAll("\r+", "\r")))
             ));
         }
         return newImports;
