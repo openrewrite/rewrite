@@ -33,11 +33,11 @@ import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static java.util.Collections.emptyList;
 import static java.util.Objects.requireNonNull;
 
 public interface K extends J {
@@ -528,12 +528,11 @@ public interface K extends J {
     class FunctionType implements K, Expression, Statement, TypeTree {
 
         UUID id;
-
         Space prefix;
 
         public Space getPrefix() {
             // For backwards compatibility with older LST before there was a prefix field
-            //noinspection ConstantValue
+            //noinspection ConstantConditions
             return prefix == null ? typedTree.getPrefix() : prefix;
         }
 
@@ -541,14 +540,27 @@ public interface K extends J {
 
         public Markers getMarkers() {
             // For backwards compatibility with older LST before there was a prefix field
-            //noinspection ConstantValue
+            //noinspection ConstantConditions
             return markers == null ? typedTree.getMarkers() : markers;
         }
 
         TypedTree typedTree;
 
         List<J.Annotation> leadingAnnotations;
+
+        public List<Annotation> getLeadingAnnotations() {
+            // for backwards compatibility with older LST before there was a leading annotations field
+            //noinspection ConstantConditions
+            return leadingAnnotations == null ? Collections.emptyList() : leadingAnnotations;
+        }
+
         List<J.Modifier> modifiers;
+
+        public List<Modifier> getModifiers() {
+            // for backwards compatibility with older LST before there was a modifiers field
+            //noinspection ConstantConditions
+            return modifiers == null ? Collections.emptyList() : modifiers;
+        }
 
         @Nullable
         JRightPadded<NameTree> receiver;
