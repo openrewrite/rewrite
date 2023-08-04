@@ -38,6 +38,7 @@ dependencies {
     implementation("org.apache.commons:commons-text:latest.release")
 
     testImplementation(project(":rewrite-test"))
+    testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.+")
     testImplementation("com.squareup.okio:okio-jvm:3.0.0")
     testImplementation("org.mapdb:mapdb:latest.release")
