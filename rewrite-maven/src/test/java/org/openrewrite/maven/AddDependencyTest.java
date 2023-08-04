@@ -524,7 +524,6 @@ class AddDependencyTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite/issues/3458")
     void addDependencyOopsAllComments() {
         rewriteRun(
@@ -552,13 +551,13 @@ class AddDependencyTest implements RewriteTest {
                         <artifactId>my-app</artifactId>
                         <version>1</version>
                         <dependencies>
-                            <!-- my cool dependencies section -->
-                            <!-- etc -->
                             <dependency>
                                 <groupId>com.google.guava</groupId>
                                 <artifactId>guava</artifactId>
                                 <version>29.0-jre</version>
                             </dependency>
+                            <!-- my cool dependencies section -->
+                            <!-- etc -->
                         </dependencies>
                     </project>
                 """
