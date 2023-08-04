@@ -1142,4 +1142,24 @@ class AddImportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void crlfNewLines() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+          java(
+            """
+              package a;
+              class A {}
+              """.replace("\n", "\r\n"),
+            """
+              package a;
+                            
+              import java.util.List;
+                            
+              class A {}
+              """.replace("\n", "\r\n")
+          )
+        );
+    }
 }
