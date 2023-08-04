@@ -67,7 +67,7 @@ public class YamlParser implements org.openrewrite.Parser {
                         parsingListener.parsed(input, yaml);
                         yaml = yaml.withFileAttributes(input.getFileAttributes());
                         yaml = unwrapPrefixedMappings(yaml);
-                        return requirePrintIdempotence(yaml, input, relativeTo, ctx);
+                        return requirePrintEqualsInput(yaml, input, relativeTo, ctx);
                     } catch (Throwable t) {
                         ctx.getOnError().accept(t);
                         return ParseError.build(this, input, relativeTo, ctx, t);

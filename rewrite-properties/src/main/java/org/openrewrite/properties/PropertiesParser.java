@@ -47,7 +47,7 @@ public class PropertiesParser implements Parser {
                 Properties.File file = parseFromInput(path, is)
                         .withFileAttributes(input.getFileAttributes());
                 parsingListener.parsed(input, file);
-                return requirePrintIdempotence(file, input, relativeTo, ctx);
+                return requirePrintEqualsInput(file, input, relativeTo, ctx);
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
                 return ParseError.build(this, input, relativeTo, ctx, t);

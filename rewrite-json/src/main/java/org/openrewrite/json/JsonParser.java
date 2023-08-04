@@ -50,7 +50,7 @@ public class JsonParser implements Parser {
                         input.getSource(ctx)
                 ).visitJson5(parser.json5());
                 parsingListener.parsed(input, document);
-                return requirePrintIdempotence(document, input, relativeTo, ctx);
+                return requirePrintEqualsInput(document, input, relativeTo, ctx);
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
                 return ParseError.build(this, input, relativeTo, ctx, t);

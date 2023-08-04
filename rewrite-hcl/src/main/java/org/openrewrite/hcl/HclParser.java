@@ -70,7 +70,7 @@ public class HclParser implements Parser {
                 configFile = configFile.withMarkers(Markers.build(styles));
 
                 parsingListener.parsed(input, configFile);
-                return requirePrintIdempotence(configFile, input, relativeTo, ctx);
+                return requirePrintEqualsInput(configFile, input, relativeTo, ctx);
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
                 return ParseError.build(this, input, relativeTo, ctx, t);

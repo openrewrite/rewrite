@@ -39,9 +39,10 @@ import java.util.stream.StreamSupport;
 import static java.util.stream.Collectors.toList;
 
 public interface Parser {
-    default SourceFile requirePrintIdempotence(SourceFile sourceFile, Parser.Input input, @Nullable Path relativeTo, ExecutionContext ctx) {
-        if (ctx.getMessage(ExecutionContext.REQUIRE_PRINT_IDEMPOTENCE, true) &&
-            !sourceFile.isPrintIdempotent(input, ctx)) {
+    @Incubating(since = "8.2.0")
+    default SourceFile requirePrintEqualsInput(SourceFile sourceFile, Parser.Input input, @Nullable Path relativeTo, ExecutionContext ctx) {
+        if (ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true) &&
+            !sourceFile.printEqualsInput(input, ctx)) {
             return ParseError.build(
                     this,
                     input,

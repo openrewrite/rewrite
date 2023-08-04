@@ -61,7 +61,7 @@ public class ProtoParser implements Parser {
                                 is.isCharsetBomMarked()
                         ).visitProto(parser.proto());
                         parsingListener.parsed(input, document);
-                        return requirePrintIdempotence(document, input, relativeTo, ctx);
+                        return requirePrintEqualsInput(document, input, relativeTo, ctx);
                     } catch (Throwable t) {
                         ctx.getOnError().accept(t);
                         return ParseError.build(this, input, relativeTo, ctx, t);

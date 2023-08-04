@@ -55,7 +55,7 @@ public class XmlParser implements Parser {
                         is.isCharsetBomMarked()
                 ).visitDocument(parser.document());
                 parsingListener.parsed(input, document);
-                return requirePrintIdempotence(document, input, relativeTo, ctx);
+                return requirePrintEqualsInput(document, input, relativeTo, ctx);
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
                 return ParseError.build(this, input, relativeTo, ctx, t);

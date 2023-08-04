@@ -19,24 +19,23 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
-import org.openrewrite.tree.ParseError;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
-import java.util.stream.Stream;
 
 public interface SourceFile extends Tree {
 
     /**
-     * Does this source file, when printed produce a byte-for-byte identical result to the input?
+     * Does this source file represented as an LST, when printed, produce a byte-for-byte identical
+     * result to the original input source file?
      *
      * @param input The input source.
      * @return <code>true</code> if the parse-to-print loop is idempotent, <code>false</code> otherwise.
      */
-    default boolean isPrintIdempotent(Parser.Input input, ExecutionContext ctx) {
+    default boolean printEqualsInput(Parser.Input input, ExecutionContext ctx) {
         return printAll().equals(StringUtils.readFully(input.getSource(ctx)));
     }
 
