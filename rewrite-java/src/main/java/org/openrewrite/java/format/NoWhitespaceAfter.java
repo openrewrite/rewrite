@@ -22,6 +22,7 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
+import org.openrewrite.java.tree.Space;
 
 import static java.util.Objects.requireNonNull;
 
@@ -111,9 +112,9 @@ public class NoWhitespaceAfter extends Recipe {
         public J.ArrayType visitArrayType(J.ArrayType arrayType, ExecutionContext ctx) {
             J.ArrayType a = super.visitArrayType(arrayType, ctx);
             if (Boolean.TRUE.equals(noWhitespaceAfterStyle.getArrayDeclarator())) {
-                if (a.getDimensions().stream().anyMatch(d -> d.getElement().getWhitespace().contains(" "))) {
+                if (a.getDimensions().stream().anyMatch(d -> d.getSpace().getElement().getWhitespace().contains(" "))) {
                     a = a.withDimensions(ListUtils.map(a.getDimensions(), d -> {
-                        d = d.withElement(d.getElement().withWhitespace(""));
+                        d = d.withSpace(d.getSpace().withElement(d.getSpace().getElement().withWhitespace("")));
                         return d;
                     }));
                 }

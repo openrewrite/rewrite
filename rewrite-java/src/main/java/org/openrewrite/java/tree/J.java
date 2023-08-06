@@ -309,7 +309,7 @@ public interface J extends Tree {
         TypeTree elementType;
 
         @With
-        List<JRightPadded<Space>> dimensions;
+        List<AnnotatedDimension> dimensions;
 
         @Override
         public JavaType getType() {
@@ -337,6 +337,23 @@ public interface J extends Tree {
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
+
+        /**
+         * The annotation for a single ArrayType's dimension. e.g:
+         * int   @NotNull    [   ]
+         *    (1)        (2)  (3)
+         * (1) is stored in Annotation.before
+         * (2) is stored in Space
+         * (3) is stored in JRightPadded.after
+         */
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @Data
+        public static class AnnotatedDimension {
+            @With
+            List<Annotation> annotations;
+            @With
+            JRightPadded<Space> space;
+        };
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

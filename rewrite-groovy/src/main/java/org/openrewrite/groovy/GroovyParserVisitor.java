@@ -2118,11 +2118,16 @@ public class GroovyParserVisitor {
         return expr.withPrefix(prefix);
     }
 
-    private List<JRightPadded<Space>> arrayDimensionsFrom(ClassNode classNode) {
-        List<JRightPadded<Space>> result = new ArrayList<>();
+    private List<J.ArrayType.AnnotatedDimension> arrayDimensionsFrom(ClassNode classNode) {
+        List<J.ArrayType.AnnotatedDimension> result = new ArrayList<>();
         while(classNode != null && classNode.isArray()) {
             classNode = classNode.getComponentType();
-            result.add(JRightPadded.build(sourceBefore("[")).withAfter(sourceBefore("]")));
+
+            // TODO: add support for getting each dimensions' annotations from classNode
+            result.add(new J.ArrayType.AnnotatedDimension (
+                emptyList(),
+                JRightPadded.build(sourceBefore("[")).withAfter(sourceBefore("]"))
+            ));
         }
         return result;
     }

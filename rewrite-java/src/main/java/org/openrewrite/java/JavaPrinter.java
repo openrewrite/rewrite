@@ -176,10 +176,11 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     public J visitArrayType(ArrayType arrayType, PrintOutputCapture<P> p) {
         beforeSyntax(arrayType, Space.Location.ARRAY_TYPE_PREFIX, p);
         visit(arrayType.getElementType(), p);
-        for (JRightPadded<Space> d : arrayType.getDimensions()) {
-            visitSpace(d.getElement(), Space.Location.DIMENSION, p);
+        for (ArrayType.AnnotatedDimension d : arrayType.getDimensions()) {
+            d.getAnnotations().forEach(ann -> visitAnnotation(ann, p));
+            visitSpace(d.getSpace().getElement(), Space.Location.DIMENSION, p);
             p.append('[');
-            visitSpace(d.getAfter(), Space.Location.DIMENSION_SUFFIX, p);
+            visitSpace(d.getSpace().getAfter(), Space.Location.DIMENSION_SUFFIX, p);
             p.append(']');
         }
         afterSyntax(arrayType, p);

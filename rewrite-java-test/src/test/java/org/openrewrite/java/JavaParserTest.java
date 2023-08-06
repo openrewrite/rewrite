@@ -68,6 +68,26 @@ class JavaParserTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3453")
+    @Test
+    void annotationBetweenDimensions() {
+        rewriteRun(
+          java(
+            """
+              import javax.annotation.Nonnull;
+
+              class ArrayNotNull {
+                  int[][] ints = new int[2][2];
+
+                  public int   @Nonnull    [] @Nonnull [] getInts() {
+                      return ints;
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2313")
     @Test
     void annotationCommentWithSpaceParsesCorrectly() {

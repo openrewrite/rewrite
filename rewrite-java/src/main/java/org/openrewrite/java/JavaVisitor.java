@@ -264,9 +264,14 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         a = a.withElementType(visitTypeName(a.getElementType(), p));
         a = a.withDimensions(
                 ListUtils.map(a.getDimensions(), dim ->
-                        visitRightPadded(dim.withElement(
-                                visitSpace(dim.getElement(), Space.Location.DIMENSION, p)
-                        ), JRightPadded.Location.DIMENSION, p)
+                        dim.withAnnotations(
+                                ListUtils.map(dim.getAnnotations(), ann ->
+                                        (J.Annotation) visitAnnotation(ann, p))
+                        ).withSpace(
+                                visitRightPadded(dim.getSpace().withElement(
+                                        visitSpace(dim.getSpace().getElement(), Space.Location.DIMENSION, p)
+                                ), JRightPadded.Location.DIMENSION, p)
+                        )
                 )
         );
         return a;

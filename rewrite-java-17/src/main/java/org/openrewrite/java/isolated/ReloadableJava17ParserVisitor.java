@@ -175,31 +175,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitArrayType(ArrayTypeTree node, Space fmt) {
-        Tree typeIdent = node.getType();
-        int dimCount = 1;
-
-        while (typeIdent instanceof ArrayTypeTree) {
-            dimCount++;
-            typeIdent = ((ArrayTypeTree) typeIdent).getType();
-        }
-
-        TypeTree elemType = convert(typeIdent);
-
-        List<JRightPadded<Space>> dimensions = emptyList();
-        if (dimCount > 0) {
-            dimensions = new ArrayList<>(dimCount);
-            for (int n = 0; n < dimCount; n++) {
-                dimensions.add(padRight(sourceBefore("["), sourceBefore("]")));
-            }
-        }
-
-        return new J.ArrayType(
-                randomId(),
-                fmt,
-                Markers.EMPTY,
-                elemType,
-                dimensions
-        );
+        return visitAnnotatedArrayType(node, fmt);
     }
 
     @Override
@@ -1308,8 +1284,55 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitAnnotatedType(AnnotatedTypeTree node, Space fmt) {
+        if (node.getUnderlyingType() instanceof ArrayTypeTree) {
+            return visitAnnotatedArrayType(node, fmt);
+        }
         return new J.AnnotatedType(randomId(), fmt, Markers.EMPTY, convertAll(node.getAnnotations()),
                 convert(node.getUnderlyingType()));
+    }
+
+    private J visitAnnotatedArrayType(Tree node, Space fmt) {
+        if (!(node instanceof ArrayTypeTree) && !(node instanceof AnnotatedTypeTree)) {
+            throw new IllegalArgumentException("Unexpected Tree subtype " + node.getClass().getName());
+        }
+        Tree currentNode = node;
+        // traverse tree to leaf identifier to get identifier
+        // repass again from top to collect annotations + brackets
+        while (currentNode instanceof ArrayTypeTree || currentNode instanceof AnnotatedTypeTree) {
+            if (currentNode instanceof ArrayTypeTree) {
+                currentNode = ((ArrayTypeTree) currentNode).getType();
+            } else {
+                currentNode = ((AnnotatedTypeTree) currentNode).getUnderlyingType();
+            }
+        }
+
+        TypeTree elemType = convert(currentNode);
+
+        List<J.ArrayType.AnnotatedDimension> dimensions = new ArrayList<>();
+        currentNode = node;
+        while (currentNode instanceof ArrayTypeTree || currentNode instanceof AnnotatedTypeTree) {
+            List<J.Annotation> annotations = new ArrayList<>();
+            if (currentNode instanceof AnnotatedTypeTree) {
+                annotations = convertAll(((AnnotatedTypeTree) currentNode).getAnnotations());
+                currentNode = ((AnnotatedTypeTree) currentNode).getUnderlyingType();
+            }
+
+            if (currentNode instanceof ArrayTypeTree) {
+                JRightPadded<Space> dimension = padRight(sourceBefore("["), sourceBefore("]"));
+                dimensions.add(new J.ArrayType.AnnotatedDimension(annotations, dimension));
+                currentNode = ((ArrayTypeTree) currentNode).getType();
+            }
+
+
+        }
+
+        return new J.ArrayType(
+                randomId(),
+                fmt,
+                Markers.EMPTY,
+                elemType,
+                dimensions
+        );
     }
 
     @Override
