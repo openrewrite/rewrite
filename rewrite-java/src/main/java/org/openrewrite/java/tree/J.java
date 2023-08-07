@@ -339,7 +339,9 @@ public interface J extends Tree {
         }
 
         /**
-         * The annotation for a single ArrayType's dimension. e.g:
+         * The annotation and whitespace for a single array dimension.
+         * Each of the three whitespace elements are stored as follows:
+         *
          * int   @NotNull    [   ]
          *    (1)        (2)  (3)
          * (1) is stored in Annotation.before

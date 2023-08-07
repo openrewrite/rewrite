@@ -78,6 +78,10 @@ class JavaParserTest implements RewriteTest {
 
               class ArrayNotNull {
                   int[][] ints = new int[2][2];
+                  
+                  Integer[] @Nonnull [] integers = new Integer[1][1];
+                  
+                  Integer @Nonnull [] foo = new Integer[1];
 
                   public int   @Nonnull    [] @Nonnull [] getInts() {
                       return ints;

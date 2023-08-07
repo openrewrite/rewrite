@@ -1296,8 +1296,6 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             throw new IllegalArgumentException("Unexpected Tree subtype " + node.getClass().getName());
         }
         Tree currentNode = node;
-        // traverse tree to leaf identifier to get identifier
-        // repass again from top to collect annotations + brackets
         while (currentNode instanceof ArrayTypeTree || currentNode instanceof AnnotatedTypeTree) {
             if (currentNode instanceof ArrayTypeTree) {
                 currentNode = ((ArrayTypeTree) currentNode).getType();

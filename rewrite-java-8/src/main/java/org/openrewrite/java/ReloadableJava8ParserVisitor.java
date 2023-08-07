@@ -977,7 +977,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                     convert(dim, t -> sourceBefore("]"))));
         }
 
-        while(true) {
+        while (true) {
             int beginBracket = indexOfNextNonWhitespace(cursor, source);
             if (source.charAt(beginBracket) == '[') {
                 int endBracket = indexOfNextNonWhitespace(beginBracket + 1, source);
@@ -1211,8 +1211,6 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             throw new IllegalArgumentException("Unexpected Tree subtype " + node.getClass().getName());
         }
         Tree currentNode = node;
-        // traverse tree to leaf identifier to get identifier
-        // repass again from top to collect annotations + brackets
         while (currentNode instanceof ArrayTypeTree || currentNode instanceof AnnotatedTypeTree) {
             if (currentNode instanceof ArrayTypeTree) {
                 currentNode = ((ArrayTypeTree) currentNode).getType();
@@ -1722,7 +1720,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                     char c2 = source.charAt(delimIndex + 1);
                     switch (c1) {
                         case '/':
-                            switch(c2) {
+                            switch (c2) {
                                 case '/':
                                     inSingleLineComment = true;
                                     delimIndex++;
@@ -1734,7 +1732,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                             }
                             break;
                         case '*':
-                            if(c2 == '/') {
+                            if (c2 == '/') {
                                 inMultiLineComment = false;
                                 delimIndex += 2;
                             }
@@ -1843,7 +1841,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 } else {
                     leadingAnnotations.add(annotation);
                 }
-                i = cursor -1;
+                i = cursor - 1;
                 lastAnnotationPosition = cursor;
                 continue;
             }
