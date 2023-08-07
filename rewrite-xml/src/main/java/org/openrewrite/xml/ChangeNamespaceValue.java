@@ -49,13 +49,15 @@ public class ChangeNamespaceValue extends Recipe {
     @Nullable
     @Option(displayName = "Element name",
             description = "The name of the element whose attribute's value is to be changed. Interpreted as an XPath Expression.",
-            example = "property")
+            example = "property",
+            required = false)
     String elementName;
 
     @Nullable
     @Option(displayName = "Old value",
             description = "Only change the property value if it matches the configured `oldValue`.",
-            example = "newfoo.bar.attribute.value.string")
+            example = "newfoo.bar.attribute.value.string",
+            required = false)
     String oldValue;
 
     @Option(displayName = "New value",
@@ -66,7 +68,8 @@ public class ChangeNamespaceValue extends Recipe {
     @Nullable
     @Option(displayName = "Resource version",
             description = "The version of resource to change",
-            example = "1.1")
+            example = "1.1",
+            required = false)
     String versionMatcher;
 
     @Option(displayName = "Search All Namespaces",
@@ -101,7 +104,7 @@ public class ChangeNamespaceValue extends Recipe {
                     t = t.withAttributes(ListUtils.map(t.getAttributes(), this::visitChosenElementAttribute));
                 }
 
-                if(this.version != null) {
+                if (this.version != null) {
                     //change namespace
                     t = t.withAttributes(ListUtils.map(t.getAttributes(), this::visitChosenElementAttribute));
                 }
@@ -112,21 +115,21 @@ public class ChangeNamespaceValue extends Recipe {
                 boolean isXmlnsAttr = (searchAllNamespaces && attribute.getKeyAsString().startsWith(XMLNS_PREFIX) ||
                         !searchAllNamespaces && attribute.getKeyAsString().equals(XMLNS_PREFIX));
                 boolean isVersionAttr = attribute.getKeyAsString().startsWith(VERSION_PREFIX);
-                if(oldValue != null && (!isXmlnsAttr || !attribute.getValueAsString().equals(oldValue))) {
+                if (oldValue != null && (!isXmlnsAttr || !attribute.getValueAsString().equals(oldValue))) {
                     return attribute;
                 }
 
-                if(oldValue == null && (this.version == null && !isVersionAttr || this.version != null && !isXmlnsAttr)) {
+                if (oldValue == null && (this.version == null && !isVersionAttr || this.version != null && !isXmlnsAttr)) {
                     return attribute;
                 }
 
-                if(this.version != null && Semver.validate(this.version, versionMatcher).isValid() || oldValue != null) {
+                if (this.version != null && Semver.validate(this.version, versionMatcher).isValid() || oldValue != null) {
                     return attribute.withValue(
-                        new Xml.Attribute.Value(attribute.getId(),
-                            "",
-                            attribute.getMarkers(),
-                            attribute.getValue().getQuote(),
-                                newValue));
+                            new Xml.Attribute.Value(attribute.getId(),
+                                    "",
+                                    attribute.getMarkers(),
+                                    attribute.getValue().getQuote(),
+                                    newValue));
                 } else {
                     this.version = attribute.getValueAsString();
                     return attribute;
@@ -134,5 +137,5 @@ public class ChangeNamespaceValue extends Recipe {
             }
         };
     }
-    
+
 }
