@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Value
@@ -30,6 +31,7 @@ public class LstProvenance implements Marker {
     Type buildToolType;
     String buildToolVersion;
     String lstSerializerVersion;
+    Instant timestampUtc;
 
     public enum Type {
         Gradle,
