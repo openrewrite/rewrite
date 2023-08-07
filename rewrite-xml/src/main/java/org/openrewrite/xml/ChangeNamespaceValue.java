@@ -120,7 +120,7 @@ public class ChangeNamespaceValue extends Recipe {
                     return attribute;
                 }
 
-                if(this.version != null && Semver.validate(this.version, versionMatcher).isValid() || attribute.getValueAsString().equals(oldValue)) {
+                if(this.version != null && Semver.validate(this.version, versionMatcher).isValid() || oldValue != null) {
                     return attribute.withValue(
                         new Xml.Attribute.Value(attribute.getId(),
                             "",
