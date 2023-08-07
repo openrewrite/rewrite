@@ -387,12 +387,95 @@ class BlankLinesTest implements RewriteTest {
             }
         }
 
-
         @Nested
         class BeforeDeclarationWithCommentOrAnnotationTest {
-            // TODO
-        }
 
+            @Test
+            void BeforeDeclarationWithComment() {
+                rewriteRun(
+                  blankLines(style -> style.withMinimum(style.getMinimum().withBeforeDeclarationWithCommentOrAnnotation(3))),
+                  kotlin(
+                    """
+                      annotation class Annotation
+
+                      class Bar {
+                          fun d() = Unit
+
+                          // smth
+                          fun e() {
+                              d()
+                          }
+                      }
+                      """,
+                    """
+                      annotation class Annotation
+
+                      class Bar {
+                          fun d() = Unit
+
+
+
+                          // smth
+                          fun e() {
+                              d()
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void BeforeAnnotation() {
+                rewriteRun(
+                  blankLines(style -> style.withMinimum(style.getMinimum().withBeforeDeclarationWithCommentOrAnnotation(3))),
+                  kotlin(
+                    """
+                      annotation class Annotation
+
+                      class Bar {
+                          @Annotation
+                          val a = 42
+
+                          @Annotation
+                          val b = 43
+
+                          @Annotation
+                          var c = 44
+
+                          @Annotation
+                          fun method() {
+                          }
+                      }
+                      """,
+                    """
+                      annotation class Annotation
+
+                      class Bar {
+                          @Annotation
+                          val a = 42
+
+
+
+                          @Annotation
+                          val b = 43
+
+
+
+                          @Annotation
+                          var c = 44
+
+
+
+                          @Annotation
+                          fun method() {
+                          }
+                      }
+                      """
+                  )
+                );
+            }
+        }
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/621")

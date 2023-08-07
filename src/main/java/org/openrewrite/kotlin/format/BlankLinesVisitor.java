@@ -258,9 +258,53 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
 
     @Override
     public J.Block visitBlock(J.Block block, P p) {
-        J.Block j = super.visitBlock(block, p);
-        j = j.withEnd(keepMaximumLines(j.getEnd(), style.getKeepMaximum().getBeforeEndOfBlock()));
-        return j;
+        J.Block b = super.visitBlock(block, p);
+        b = b.withEnd(keepMaximumLines(b.getEnd(), style.getKeepMaximum().getBeforeEndOfBlock()));
+
+        List<Statement> blockStatements = b.getStatements();
+        blockStatements = ListUtils.map(blockStatements, (index, statement) -> {
+            if (index == 0) {
+                return statement;
+            }
+
+            if (statement instanceof J.MethodDeclaration) {
+                J.MethodDeclaration m = (J.MethodDeclaration) statement;
+                if (!m.getPrefix().getComments().isEmpty()) {
+                    return minimumLines(m, style.getMinimum().getBeforeDeclarationWithCommentOrAnnotation());
+                }
+
+                boolean hasAnnotation = false;
+                for (J.Modifier mod: m.getModifiers()) {
+                    if (!mod.getAnnotations().isEmpty()) {
+                        hasAnnotation = true;
+                        break;
+                    }
+                }
+
+                if (hasAnnotation) {
+                    return minimumLines(m, style.getMinimum().getBeforeDeclarationWithCommentOrAnnotation());
+                }
+            } else if (statement instanceof J.VariableDeclarations) {
+                J.VariableDeclarations v = (J.VariableDeclarations) statement;
+
+                boolean hasAnnotation = false;
+                for (J.Modifier mod: v.getModifiers()) {
+                    if (!mod.getAnnotations().isEmpty()) {
+                        hasAnnotation = true;
+                        break;
+                    }
+                }
+
+                if (hasAnnotation) {
+                    return minimumLines(v, style.getMinimum().getBeforeDeclarationWithCommentOrAnnotation());
+                }
+            }
+
+            return statement;
+        });
+
+        b = b.withStatements(blockStatements);
+        return b;
     }
 
     @Override
