@@ -58,7 +58,8 @@ public class ChangeNamespaceValue extends Recipe {
 
 
     @JsonCreator
-    public ChangeNamespaceValue(@NonNull @JsonProperty("elementName") String elementName, @NonNull @JsonProperty("newValue") String newValue,
+    public ChangeNamespaceValue(@NonNull @JsonProperty("elementName") String elementName,
+                                @NonNull @JsonProperty("newValue") String newValue,
                                 @NonNull @JsonProperty("versionMatcher") String versionMatcher) {
         this.elementName = elementName;
         this.newValue = newValue;
@@ -80,7 +81,7 @@ public class ChangeNamespaceValue extends Recipe {
                     t = t.withAttributes(ListUtils.map(t.getAttributes(), this::visitChosenElementAttribute));
                 }
 
-                if(this.version != null) {
+                if (this.version != null) {
                     //change namespace
                     t = t.withAttributes(ListUtils.map(t.getAttributes(), this::visitChosenElementAttribute));
                 }
@@ -90,16 +91,16 @@ public class ChangeNamespaceValue extends Recipe {
             public boolean matchesVersion() {
                 String[] versions = versionMatcher.split(",");
                 double dVersion = Double.parseDouble(this.version);
-                for(String splitVersion: versions) {
+                for (String splitVersion : versions) {
                     boolean checkGreaterThan = false;
                     double dVersionExpected;
-                    if(splitVersion.endsWith("+")) {
-                        splitVersion = splitVersion.substring(0, splitVersion.length()-1);
+                    if (splitVersion.endsWith("+")) {
+                        splitVersion = splitVersion.substring(0, splitVersion.length() - 1);
                         checkGreaterThan = true;
                     }
                     try {
                         dVersionExpected = Double.parseDouble(splitVersion);
-                    } catch(NumberFormatException e) {
+                    } catch (NumberFormatException e) {
                         return false;
                     }
                     if (!checkGreaterThan && dVersionExpected == dVersion || checkGreaterThan && dVersionExpected <= dVersion) {
@@ -110,18 +111,18 @@ public class ChangeNamespaceValue extends Recipe {
             }
 
             public Xml.Attribute visitChosenElementAttribute(Xml.Attribute attribute) {
-                if(this.version == null && !attribute.getKeyAsString().equals("version") ||
-                        this.version != null && !attribute.getKeyAsString().equals("xmlns")) {
+                if (this.version == null && !attribute.getKeyAsString().equals("version") ||
+                    this.version != null && !attribute.getKeyAsString().equals("xmlns")) {
                     return attribute;
                 }
 
-                if(this.version != null && matchesVersion()) {
+                if (this.version != null && matchesVersion()) {
                     return attribute.withValue(
-                        new Xml.Attribute.Value(attribute.getId(),
-                            "",
-                            attribute.getMarkers(),
-                            attribute.getValue().getQuote(),
-                                newValue));
+                            new Xml.Attribute.Value(attribute.getId(),
+                                    "",
+                                    attribute.getMarkers(),
+                                    attribute.getValue().getQuote(),
+                                    newValue));
                 } else {
                     this.version = attribute.getValueAsString();
                     return attribute;
@@ -129,5 +130,5 @@ public class ChangeNamespaceValue extends Recipe {
             }
         };
     }
-    
+
 }
