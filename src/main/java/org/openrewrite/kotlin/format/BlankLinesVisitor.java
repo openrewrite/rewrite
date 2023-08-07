@@ -39,7 +39,7 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
 
     // Unconfigurable default formatting in IntelliJ's Kotlin formatting.
     private static final int keepMaximumBlankLines_BetweenHeaderAndPackage = 2;
-    private static final int minimumBlankLines_BeforePackageStatement = 0;
+    // private static final int minimumBlankLines_BeforePackageStatement = 0;
     private static final int minimumBlankLines_AfterPackageStatement = 1;
     private static final int minimumBlankLines_BeforeImports = 1;
     private static final int minimumBlankLines_AfterImports = 1;
@@ -71,18 +71,20 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
         if (tree instanceof K.CompilationUnit) {
             K.CompilationUnit cu = (K.CompilationUnit) requireNonNull(tree);
             if (cu.getPackageDeclaration() != null) {
-                if (!cu.getPrefix().getComments().isEmpty()) {
-                    cu = cu.withComments(ListUtils.mapLast(cu.getComments(), c -> {
+                J.Package pa =  cu.getPackageDeclaration();
+                if (!pa.getPrefix().getComments().isEmpty()) {
+                    List<Comment> updatedComments =  ListUtils.mapLast(pa.getPrefix().getComments(), c -> {
                         String suffix = keepMaximumLines(c.getSuffix(), keepMaximumBlankLines_BetweenHeaderAndPackage);
                         suffix = minimumLines(suffix, keepMaximumBlankLines_BetweenHeaderAndPackage);
                         return c.withSuffix(suffix);
-                    }));
+                    });
+                    cu = cu.withPackageDeclaration(pa.withPrefix(pa.getPrefix().withComments(updatedComments)));
                 } else {
-                /*
-                 if comments are empty and package is present, leading whitespace is on the compilation unit and
-                 should be removed
-                 */
-                    cu = cu.withPrefix(Space.EMPTY);
+                    /*
+                     if comments are empty and package is present, leading whitespace is on the compilation unit and
+                     should be removed
+                     */
+                    cu = cu.withPackageDeclaration(pa.withPrefix(Space.EMPTY));
                 }
             }
 
@@ -110,27 +112,26 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration j = super.visitClassDeclaration(classDecl, p);
-        if (j.getBody() != null) {
-            List<JRightPadded<Statement>> statements = j.getBody().getPadding().getStatements();
-            J.ClassDeclaration.Kind.Type classKind = j.getKind();
-            j = j.withBody(j.getBody().getPadding().withStatements(ListUtils.map(statements, (i, s) -> {
-                if (i == 0) {
-                    if (classKind != J.ClassDeclaration.Kind.Type.Enum) {
-                        s = minimumLines(s, style.getMinimum().getAfterClassHeader());
-                    }
-                } else if (statements.get(i - 1).getElement() instanceof J.Block) {
-                    s = minimumLines(s, minimumBlankLines_AroundInitializer);
-                } else if (s.getElement() instanceof J.ClassDeclaration) {
-                    // Apply `style.getMinimum().getAroundClass()` to inner classes.
-                    s = minimumLines(s, minimumBlankLines_AroundClass);
+
+        List<JRightPadded<Statement>> statements = j.getBody().getPadding().getStatements();
+        J.ClassDeclaration.Kind.Type classKind = j.getKind();
+        j = j.withBody(j.getBody().getPadding().withStatements(ListUtils.map(statements, (i, s) -> {
+            if (i == 0) {
+                if (classKind != J.ClassDeclaration.Kind.Type.Enum) {
+                    s = minimumLines(s, style.getMinimum().getAfterClassHeader());
                 }
+            } else if (statements.get(i - 1).getElement() instanceof J.Block) {
+                s = minimumLines(s, minimumBlankLines_AroundInitializer);
+            } else if (s.getElement() instanceof J.ClassDeclaration) {
+                // Apply `style.getMinimum().getAroundClass()` to inner classes.
+                s = minimumLines(s, minimumBlankLines_AroundClass);
+            }
 
-                return s;
-            })));
+            return s;
+        })));
 
-            j = j.withBody(j.getBody().withEnd(minimumLines(j.getBody().getEnd(),
-                    minimumBlankLines_BeforeClassEnd)));
-        }
+        j = j.withBody(j.getBody().withEnd(minimumLines(j.getBody().getEnd(),
+                minimumBlankLines_BeforeClassEnd)));
 
         JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
         boolean hasImports = !cu.getImports().isEmpty();
