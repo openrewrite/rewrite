@@ -29,23 +29,29 @@ import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 
 @SuppressWarnings("ConstantConditions")
 public class KotlinTypeMappingTest {
     private static final String goat = StringUtils.readFully(KotlinTypeMappingTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
 
-    @SuppressWarnings("OptionalGetWithoutIsPresent")
-    private static final J.ClassDeclaration goatClassDeclaration =
-            requireNonNull(((K.CompilationUnit) KotlinParser.builder()
-                    .logCompilationWarningsAndErrors(true)
-                    .build()
-                    .parse(new InMemoryExecutionContext(), goat)
-                    .findFirst()
-                    .get())
-                    .getClasses()
-                    .get(0)
-            );
+    private static final J.ClassDeclaration goatClassDeclaration;
+
+    static {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        ctx.putMessage(REQUIRE_PRINT_EQUALS_INPUT, false);
+        //noinspection OptionalGetWithoutIsPresent
+        goatClassDeclaration = requireNonNull(((K.CompilationUnit) KotlinParser.builder()
+                .logCompilationWarningsAndErrors(true)
+                .build()
+                .parse(ctx, goat)
+                .findFirst()
+                .get())
+                .getClasses()
+                .get(0)
+        );
+    }
 
     private static final JavaType.Parameterized goatType =
             requireNonNull(TypeUtils.asParameterized(goatClassDeclaration.getType()));

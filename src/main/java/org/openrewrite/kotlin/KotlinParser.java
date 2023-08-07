@@ -161,10 +161,10 @@ public class KotlinParser implements Parser {
         FirSession firSession = compilerCus.getFirSession();
         return Stream.concat(
                         compilerCus.getSources().stream()
-                                .map(compiled -> {
+                                .map(kotlinSource -> {
                                     try {
                                         KotlinParserVisitor mappingVisitor = new KotlinParserVisitor(
-                                                compiled,
+                                                kotlinSource,
                                                 relativeTo,
                                                 styles,
                                                 typeCache,
@@ -172,12 +172,12 @@ public class KotlinParser implements Parser {
                                                 ctx
                                         );
 
-                                        SourceFile kcu = (SourceFile) mappingVisitor.visitFile(compiled.getFirFile(), new InMemoryExecutionContext());
-                                        parsingListener.parsed(compiled.getInput(), kcu);
-                                        return kcu;
+                                        SourceFile kcu = (SourceFile) mappingVisitor.visitFile(kotlinSource.getFirFile(), new InMemoryExecutionContext());
+                                        parsingListener.parsed(kotlinSource.getInput(), kcu);
+                                        return requirePrintEqualsInput(kcu, kotlinSource.getInput(), relativeTo, ctx);
                                     } catch (Throwable t) {
                                         ctx.getOnError().accept(t);
-                                        return ParseError.build(this, compiled.getInput(), relativeTo, ctx, t);
+                                        return ParseError.build(this, kotlinSource.getInput(), relativeTo, ctx, t);
                                     }
                                 }),
                         Stream.generate(() -> {
