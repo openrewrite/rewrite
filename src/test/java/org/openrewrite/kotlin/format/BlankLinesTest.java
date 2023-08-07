@@ -343,16 +343,53 @@ class BlankLinesTest implements RewriteTest {
             }
         }
 
-
         @Nested
-        class AroundWhenBranchesWithBlock {
-            // TODO
+        class AroundWhenBranchesWithBlockTest {
+            @Test
+            void AroundWhenBranchesWithBlock() {
+                rewriteRun(
+                  blankLines(style -> style.withMinimum(style.getMinimum().withAroundWhenBranchWithBraces(2))),
+                  kotlin(
+                    """
+                      fun foo1(condition: Int) {
+                          when (condition) {
+                              1 -> {
+                                  println("1")
+                              }
+                              2 -> {
+                                  println("2")
+                              }
+                              3 -> println("3")
+                              4 -> println("4")
+                          }
+                      }
+                      """,
+                    """
+                      fun foo1(condition: Int) {
+                          when (condition) {
+                              1 -> {
+                                  println("1")
+                              }
 
+
+                              2 -> {
+                                  println("2")
+                              }
+
+
+                              3 -> println("3")
+                              4 -> println("4")
+                          }
+                      }
+                      """
+                  )
+                );
+            }
         }
 
 
         @Nested
-        class BeforeDeclarationWithCommentOrAnnotation {
+        class BeforeDeclarationWithCommentOrAnnotationTest {
             // TODO
         }
 

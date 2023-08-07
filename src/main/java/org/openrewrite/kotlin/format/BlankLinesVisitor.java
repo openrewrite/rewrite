@@ -21,6 +21,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
+import org.openrewrite.kotlin.marker.OmitBraces;
 import org.openrewrite.kotlin.style.BlankLinesStyle;
 import org.openrewrite.kotlin.tree.K;
 
@@ -260,6 +261,36 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
         J.Block j = super.visitBlock(block, p);
         j = j.withEnd(keepMaximumLines(j.getEnd(), style.getKeepMaximum().getBeforeEndOfBlock()));
         return j;
+    }
+
+    @Override
+    public K.When visitWhen(K.When when, P p) {
+        K.When kwhen = super.visitWhen(when, p);
+        final J.Block branches = kwhen.getBranches();
+
+        List<Statement> statements = ListUtils.map(branches.getStatements(), (index, s) -> {
+            if (index == 0) {
+                return s;
+            }
+
+            if (s instanceof K.WhenBranch &&
+                    branches.getStatements().get(index - 1) instanceof K.WhenBranch
+            ) {
+                K.WhenBranch branch = (K.WhenBranch) s;
+                K.WhenBranch previousBranch = (K.WhenBranch) branches.getStatements().get(index - 1);
+                boolean isPreviousWhenBranchWithBlock = previousBranch.getBody() instanceof J.Block &&
+                        !previousBranch.getBody().getMarkers().findFirst(OmitBraces.class).isPresent();
+                if (!isPreviousWhenBranchWithBlock) {
+                    return s;
+                }
+
+                return branch.withExpressions(ListUtils.mapFirst(branch.getExpressions(), s1 -> minimumLines(s1, style.getMinimum().getAroundWhenBranchWithBraces())));
+            }
+
+            return s;
+        });
+
+        return kwhen.withBranches(branches.withStatements(statements));
     }
 
     private <J2 extends J> J2 keepMaximumLines(J2 tree, int max) {
