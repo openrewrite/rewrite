@@ -80,7 +80,7 @@ public class ImportLayoutStyle implements KotlinStyle {
 
         // Divide the blocks into those that accept imports from any package ("catchalls") and those that accept imports from only specific packages
         Map<Boolean, List<Block>> blockGroups = layout.stream()
-                .collect(Collectors.partitioningBy(block -> block instanceof Block.AllOthers));
+                .collect(Collectors.partitioningBy(org.openrewrite.kotlin.style.ImportLayoutStyle.Block.AllOthers.class::isInstance));
         blocksNoCatchalls = blockGroups.get(false);
         blocksOnlyCatchalls = blockGroups.get(true);
     }

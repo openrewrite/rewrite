@@ -67,7 +67,7 @@ public class KotlinTypeMappingTest {
 
     public J.VariableDeclarations getField(String fieldName) {
         return goatClassDeclaration.getBody().getStatements().stream()
-                .filter(s -> s instanceof J.VariableDeclarations)
+                .filter(org.openrewrite.java.tree.J.VariableDeclarations.class::isInstance)
                 .map(J.VariableDeclarations.class::cast)
                 .filter(mv -> mv.getVariables().stream().anyMatch(v -> v.getSimpleName().equals(fieldName)))
                 .findFirst()
