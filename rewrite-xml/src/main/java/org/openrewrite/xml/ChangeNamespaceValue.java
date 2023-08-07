@@ -25,11 +25,16 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.NonNull;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.tree.Xml;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ChangeNamespaceValue extends Recipe {
+
+    private static final String XMLNS_PREFIX = "xmlns";
+    private static final String VERSION_PREFIX = "version";
 
     @Override
     public String getDisplayName() {
@@ -41,41 +46,57 @@ public class ChangeNamespaceValue extends Recipe {
         return "Alters XML Attribute value within specified element of a specific resource versions.";
     }
 
+    @Nullable
     @Option(displayName = "Element name",
             description = "The name of the element whose attribute's value is to be changed. Interpreted as an XPath Expression.",
             example = "property")
     String elementName;
 
+    @Nullable
+    @Option(displayName = "Old value",
+            description = "Only change the property value if it matches the configured `oldValue`.",
+            example = "newfoo.bar.attribute.value.string")
+    String oldValue;
+
     @Option(displayName = "New value",
-            description = "The new value to be used for key specified by `attributeName`, Set to null if you want to remove the attribute.",
+            description = "The new value to be used for the namespace.",
             example = "newfoo.bar.attribute.value.string")
     String newValue;
 
+    @Nullable
     @Option(displayName = "Resource version",
             description = "The version of resource to change",
             example = "1.1")
     String versionMatcher;
 
+    @Option(displayName = "Search All Namespaces",
+            description = "Specify whether evaluate all namespaces",
+            example = "true")
+    boolean searchAllNamespaces;
+
 
     @JsonCreator
-    public ChangeNamespaceValue(@NonNull @JsonProperty("elementName") String elementName, @NonNull @JsonProperty("newValue") String newValue,
-                                @NonNull @JsonProperty("versionMatcher") String versionMatcher) {
+    public ChangeNamespaceValue(@Nullable @JsonProperty("elementName") String elementName, @Nullable @JsonProperty("oldValue") String oldValue,
+                                @NonNull @JsonProperty("newValue") String newValue, @Nullable @JsonProperty("versionMatcher") String versionMatcher,
+                                @NonNull @JsonProperty("searchAllNamespaces") boolean searchAllNamespaces) {
         this.elementName = elementName;
+        this.oldValue = oldValue;
         this.newValue = newValue;
         this.versionMatcher = versionMatcher;
+        this.searchAllNamespaces = searchAllNamespaces;
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new XmlVisitor<ExecutionContext>() {
+        return new XmlIsoVisitor<ExecutionContext>() {
 
             String version = null;
 
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = super.visitTag(tag, ctx);
                 this.version = null;
-                if (new XPathMatcher(elementName).matches(getCursor())) {
+                if (elementName == null || new XPathMatcher(elementName).matches(getCursor())) {
                     // find versions
                     t = t.withAttributes(ListUtils.map(t.getAttributes(), this::visitChosenElementAttribute));
                 }
@@ -87,35 +108,19 @@ public class ChangeNamespaceValue extends Recipe {
                 return t;
             }
 
-            public boolean matchesVersion() {
-                String[] versions = versionMatcher.split(",");
-                double dVersion = Double.parseDouble(this.version);
-                for(String splitVersion: versions) {
-                    boolean checkGreaterThan = false;
-                    double dVersionExpected;
-                    if(splitVersion.endsWith("+")) {
-                        splitVersion = splitVersion.substring(0, splitVersion.length()-1);
-                        checkGreaterThan = true;
-                    }
-                    try {
-                        dVersionExpected = Double.parseDouble(splitVersion);
-                    } catch(NumberFormatException e) {
-                        return false;
-                    }
-                    if (!checkGreaterThan && dVersionExpected == dVersion || checkGreaterThan && dVersionExpected <= dVersion) {
-                        return true;
-                    }
-                }
-                return false;
-            }
-
             public Xml.Attribute visitChosenElementAttribute(Xml.Attribute attribute) {
-                if(this.version == null && !attribute.getKeyAsString().equals("version") ||
-                        this.version != null && !attribute.getKeyAsString().equals("xmlns")) {
+                boolean isXmlnsAttr = (searchAllNamespaces && attribute.getKeyAsString().startsWith(XMLNS_PREFIX) ||
+                        !searchAllNamespaces && attribute.getKeyAsString().equals(XMLNS_PREFIX));
+                boolean isVersionAttr = attribute.getKeyAsString().startsWith(VERSION_PREFIX);
+                if(oldValue != null && (!isXmlnsAttr || !attribute.getValueAsString().equals(oldValue))) {
                     return attribute;
                 }
 
-                if(this.version != null && matchesVersion()) {
+                if(oldValue == null && (this.version == null && !isVersionAttr || this.version != null && !isXmlnsAttr)) {
+                    return attribute;
+                }
+
+                if(this.version != null && Semver.validate(this.version, versionMatcher).isValid() || attribute.getValueAsString().equals(oldValue)) {
                     return attribute.withValue(
                         new Xml.Attribute.Value(attribute.getId(),
                             "",
