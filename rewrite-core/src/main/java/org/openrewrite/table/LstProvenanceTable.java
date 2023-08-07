@@ -27,7 +27,7 @@ public class LstProvenanceTable extends DataTable<LstProvenanceTable.Row> {
 
     public LstProvenanceTable(Recipe recipe) {
         super(recipe,
-                "LST Provenance",
+                "LST provenance",
                 "Table showing which tools were used to produce LSTs.");
     }
 
