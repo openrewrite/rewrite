@@ -86,7 +86,4 @@ public class ChangeNamespace extends Recipe {
         };
     }
 
-    public String toString() {
-        return "ChangeNamespace(newNamespace=" + this.getNewNamespace() + ", oldNamespace=" + this.getOldNamespace() + ")";
-    }
 }
