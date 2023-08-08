@@ -71,16 +71,18 @@ public class ChangeNamespaceValue extends Recipe {
             required = false)
     String versionMatcher;
 
+    @Nullable
     @Option(displayName = "Search All Namespaces",
-            description = "Specify whether evaluate all namespaces",
-            example = "true")
-    boolean searchAllNamespaces;
+            description = "Specify whether evaluate all namespaces. Defaults to true",
+            example = "true",
+            required = false)
+    Boolean searchAllNamespaces;
 
 
     @JsonCreator
     public ChangeNamespaceValue(@Nullable @JsonProperty("elementName") String elementName, @Nullable @JsonProperty("oldValue") String oldValue,
                                 @NonNull @JsonProperty("newValue") String newValue, @Nullable @JsonProperty("versionMatcher") String versionMatcher,
-                                @NonNull @JsonProperty("searchAllNamespaces") boolean searchAllNamespaces) {
+                                @Nullable @JsonProperty("searchAllNamespaces") Boolean searchAllNamespaces) {
         this.elementName = elementName;
         this.oldValue = oldValue;
         this.newValue = newValue;
@@ -90,7 +92,11 @@ public class ChangeNamespaceValue extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+
         return new XmlIsoVisitor<ExecutionContext>() {
+
+            @Nullable
+            private final XPathMatcher elementNameMatcher = elementName != null ? new XPathMatcher(elementName) : null;
 
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
@@ -104,14 +110,17 @@ public class ChangeNamespaceValue extends Recipe {
             }
 
             private boolean matchesElementName(Cursor cursor) {
-                return elementName == null || new XPathMatcher(elementName).matches(cursor);
+                return elementNameMatcher == null || elementNameMatcher.matches(cursor);
             }
 
             private boolean matchesVersion(Xml.Tag tag) {
                 if (versionMatcher != null) {
-                    return tag.getAttributes().stream()
-                            .filter(this::isVersionAttribute)
-                            .anyMatch(this::isVersionMatch);
+                    for (Xml.Attribute attribute : tag.getAttributes()) {
+                        if (isVersionAttribute(attribute) && isVersionMatch(attribute)) {
+                            return true;
+                        }
+                    }
+                    return false;
                 }
                 return true;
             }
@@ -129,8 +138,9 @@ public class ChangeNamespaceValue extends Recipe {
             }
 
             private boolean isXmlnsAttribute(Xml.Attribute attribute) {
-                return searchAllNamespaces && attribute.getKeyAsString().startsWith(XMLNS_PREFIX) ||
-                        !searchAllNamespaces && attribute.getKeyAsString().equals(XMLNS_PREFIX);
+                boolean searchAll = searchAllNamespaces == null || Boolean.TRUE.equals(searchAllNamespaces);
+                return searchAll && attribute.getKeyAsString().startsWith(XMLNS_PREFIX) ||
+                        !searchAll && attribute.getKeyAsString().equals(XMLNS_PREFIX);
             }
 
             private boolean isVersionAttribute(Xml.Attribute attribute) {
