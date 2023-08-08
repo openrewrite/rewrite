@@ -114,15 +114,15 @@ public class ChangeNamespaceValue extends Recipe {
             }
 
             private boolean matchesVersion(Xml.Tag tag) {
-                if (versionMatcher != null) {
-                    for (Xml.Attribute attribute : tag.getAttributes()) {
-                        if (isVersionAttribute(attribute) && isVersionMatch(attribute)) {
-                            return true;
-                        }
-                    }
-                    return false;
+                if (versionMatcher == null) {
+                    return true;
                 }
-                return true;
+                for (Xml.Attribute attribute : tag.getAttributes()) {
+                    if (isVersionAttribute(attribute) && isVersionMatch(attribute)) {
+                        return true;
+                    }
+                }
+                return false;
             }
 
             private Xml.Attribute maybeReplaceNamespaceAttribute(Xml.Attribute attribute) {
