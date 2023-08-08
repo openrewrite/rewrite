@@ -19,15 +19,14 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.tree.Xml;
+
+import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -93,47 +92,57 @@ public class ChangeNamespaceValue extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new XmlIsoVisitor<ExecutionContext>() {
 
-            String version = null;
-
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
-                this.version = null;
-                if (elementName == null || new XPathMatcher(elementName).matches(getCursor())) {
-                    // find versions
-                    t = t.withAttributes(ListUtils.map(t.getAttributes(), this::visitChosenElementAttribute));
+
+                if (matchesElementName(getCursor()) && matchesVersion(t)) {
+                    t = t.withAttributes(ListUtils.map(t.getAttributes(), this::maybeReplaceNamespaceAttribute));
                 }
 
-                if (this.version != null) {
-                    //change namespace
-                    t = t.withAttributes(ListUtils.map(t.getAttributes(), this::visitChosenElementAttribute));
-                }
                 return t;
             }
 
-            public Xml.Attribute visitChosenElementAttribute(Xml.Attribute attribute) {
-                boolean isXmlnsAttr = (searchAllNamespaces && attribute.getKeyAsString().startsWith(XMLNS_PREFIX) ||
-                        !searchAllNamespaces && attribute.getKeyAsString().equals(XMLNS_PREFIX));
-                boolean isVersionAttr = attribute.getKeyAsString().startsWith(VERSION_PREFIX);
-                if (oldValue != null && (!isXmlnsAttr || !attribute.getValueAsString().equals(oldValue))) {
-                    return attribute;
-                }
+            private boolean matchesElementName(Cursor cursor) {
+                return elementName == null || new XPathMatcher(elementName).matches(cursor);
+            }
 
-                if (oldValue == null && (this.version == null && !isVersionAttr || this.version != null && !isXmlnsAttr)) {
-                    return attribute;
+            private boolean matchesVersion(Xml.Tag tag) {
+                if (versionMatcher != null) {
+                    return tag.getAttributes().stream()
+                            .filter(this::isVersionAttribute)
+                            .anyMatch(this::isVersionMatch);
                 }
+                return true;
+            }
 
-                if (this.version != null && Semver.validate(this.version, versionMatcher).isValid() || oldValue != null) {
+            private Xml.Attribute maybeReplaceNamespaceAttribute(Xml.Attribute attribute) {
+                if (isXmlnsAttribute(attribute) && isOldValue(attribute)) {
                     return attribute.withValue(
                             new Xml.Attribute.Value(attribute.getId(),
                                     "",
                                     attribute.getMarkers(),
                                     attribute.getValue().getQuote(),
                                     newValue));
-                } else {
-                    this.version = attribute.getValueAsString();
-                    return attribute;
                 }
+                return attribute;
+            }
+
+            private boolean isXmlnsAttribute(Xml.Attribute attribute) {
+                return searchAllNamespaces && attribute.getKeyAsString().startsWith(XMLNS_PREFIX) ||
+                        !searchAllNamespaces && attribute.getKeyAsString().equals(XMLNS_PREFIX);
+            }
+
+            private boolean isVersionAttribute(Xml.Attribute attribute) {
+                return attribute.getKeyAsString().startsWith(VERSION_PREFIX);
+            }
+
+            private boolean isOldValue(Xml.Attribute attribute) {
+                return oldValue == null || attribute.getValueAsString().equals(oldValue);
+            }
+
+            private boolean isVersionMatch(Xml.Attribute attribute) {
+                return versionMatcher == null || Semver.validate(attribute.getValueAsString(), versionMatcher).isValid();
             }
         };
     }
