@@ -33,6 +33,14 @@ public class TabsAndIndentsStyle implements KotlinStyle {
     Integer continuationIndent;
     Boolean keepIndentsOnEmptyLines;
 
+    FunctionDeclarationParameters functionDeclarationParameters;
+
+    @Value
+    @With
+    public static class FunctionDeclarationParameters {
+        Boolean alignWhenMultiple;
+    }
+
     @Override
     public Style applyDefaults() {
         return StyleHelper.merge(IntelliJ.tabsAndIndents(), this);

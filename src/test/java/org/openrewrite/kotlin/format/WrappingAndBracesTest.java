@@ -18,7 +18,6 @@ package org.openrewrite.kotlin.format;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.Tree;
-import org.openrewrite.java.format.TabsAndIndents;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.style.IntelliJ;
 import org.openrewrite.kotlin.style.SpacesStyle;
@@ -49,8 +48,7 @@ class WrappingAndBracesTest implements RewriteTest {
         return spec -> spec
           .recipes(
             toRecipe(() -> new WrappingAndBracesVisitor<>(wrapping.apply(IntelliJ.wrappingAndBraces()))),
-            // TODO, replace with kotlin version TabsAndIndents
-            new TabsAndIndents(),
+            toRecipe(() -> new TabsAndIndentsVisitor<>(IntelliJ.tabsAndIndents())),
             toRecipe(() -> new SpacesVisitor<>(spaces.apply(IntelliJ.spaces())))
           )
           .parser(KotlinParser.builder().styles(singletonList(
