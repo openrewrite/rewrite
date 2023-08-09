@@ -15,9 +15,11 @@
  */
 package org.openrewrite.java.tree;
 
+import org.openrewrite.Incubating;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.TypesInUse;
+import org.openrewrite.java.service.ImportService;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -50,6 +52,15 @@ public interface JavaSourceFile extends J {
     Path getSourcePath();
 
     SourceFile withSourcePath(Path path);
+
+    @Incubating(since = "8.1.16")
+    @SuppressWarnings("unchecked")
+    default <S> S service(Class<S> service) {
+        if (service == ImportService.class) {
+            return (S) new ImportService();
+        }
+        throw new UnsupportedOperationException("Service " + service + " not supported");
+    }
 
     interface Padding {
         List<JRightPadded<Import>> getImports();

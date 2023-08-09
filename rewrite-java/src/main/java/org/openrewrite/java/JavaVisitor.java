@@ -15,13 +15,11 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.format.AutoFormatVisitor;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -122,9 +120,10 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public void maybeAddImport(String fullyQualifiedName, @Nullable String statik, boolean onlyIfReferenced) {
-        AddImport<P> op = new AddImport<>(fullyQualifiedName, statik, onlyIfReferenced);
-        if (!getAfterVisit().contains(op)) {
-            doAfterVisit(op);
+        ImportService service = getCursor().firstEnclosingOrThrow(JavaSourceFile.class).service(ImportService.class);
+        JavaVisitor<P> visitor = service.addImportVisitor(fullyQualifiedName, statik, onlyIfReferenced);
+        if (!getAfterVisit().contains(visitor)) {
+            doAfterVisit(visitor);
         }
     }
 
