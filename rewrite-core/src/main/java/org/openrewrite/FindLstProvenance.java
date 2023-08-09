@@ -60,10 +60,11 @@ public class FindLstProvenance extends ScanningRecipe<FindLstProvenance.Accumula
                 if (lstProvenance == null) {
                     return tree;
                 }
-                if(acc.seenProvenance.add(lstProvenance)) {
+                if (acc.seenProvenance.add(lstProvenance)) {
                     provenanceTable.insertRow(ctx, new LstProvenanceTable.Row(lstProvenance.getBuildToolType(),
                             lstProvenance.getBuildToolVersion(), lstProvenance.getLstSerializerVersion(),
-                            lstProvenance.getTimestampUtc().toEpochMilli(), lstProvenance.getTimestampUtc().atZone(UTC).toString()));
+                            lstProvenance.getTimestampUtc() == null ? null : lstProvenance.getTimestampUtc().toEpochMilli(),
+                            lstProvenance.getTimestampUtc() == null ? null : lstProvenance.getTimestampUtc().atZone(UTC).toString()));
                 }
                 return tree;
             }

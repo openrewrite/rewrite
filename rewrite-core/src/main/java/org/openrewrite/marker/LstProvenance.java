@@ -18,6 +18,7 @@ package org.openrewrite.marker;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -31,6 +32,11 @@ public class LstProvenance implements Marker {
     Type buildToolType;
     String buildToolVersion;
     String lstSerializerVersion;
+
+    /**
+     * Nullable for backwards compatibility with older LSTs.
+     */
+    @Nullable
     Instant timestampUtc;
 
     public enum Type {
