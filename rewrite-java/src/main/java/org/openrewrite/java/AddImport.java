@@ -149,7 +149,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
             List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath);
 
-            // ImportLayoutStile::addImport adds always `\n` as newlines. Checking if we need to fix them
+            // ImportLayoutStyle::addImport adds always `\n` as newlines. Checking if we need to fix them
             newImports = checkCRLF(cu, newImports);
 
             cu = cu.getPadding().withImports(newImports);
