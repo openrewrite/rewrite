@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
@@ -69,6 +70,33 @@ public class ChangePropertyKey extends Recipe {
     @Nullable
     List<String> except;
 
+    @Option(displayName = "Key Separator",
+            description = "The separator used in `oldPropertyKey` and `newPropertyKey` to split the elements of the yaml path. " +
+                    "By default, this is `.`, but if any of your keys have this character, you might want to change it to not split the key.",
+            required = false)
+    @Nullable
+    String keySeparator;
+
+    public ChangePropertyKey(String oldPropertyKey, String newPropertyKey, @Nullable Boolean relaxedBinding, @Nullable List<String> except) {
+        this(oldPropertyKey, newPropertyKey, relaxedBinding, except, null);
+    }
+
+    @JsonCreator
+    public ChangePropertyKey(String oldPropertyKey, String newPropertyKey, @Nullable Boolean relaxedBinding, @Nullable List<String> except, @Nullable String keySeparator) {
+        this.oldPropertyKey = oldPropertyKey;
+        this.newPropertyKey = newPropertyKey;
+        this.relaxedBinding = relaxedBinding;
+        this.except = except;
+        this.keySeparator = keySeparator;
+    }
+
+    public String getKeySeparator() {
+        if (keySeparator == null) {
+            return ".";
+        }
+        return keySeparator;
+    }
+
     @Override
     public String getDisplayName() {
         return "Change property key";
@@ -98,7 +126,7 @@ public class ChangePropertyKey extends Recipe {
 
             String prop = stream(spliteratorUnknownSize(propertyEntries.descendingIterator(), 0), false)
                     .map(e2 -> e2.getKey().getValue())
-                    .collect(Collectors.joining("."));
+                    .collect(Collectors.joining(getKeySeparator()));
 
             if (newPropertyKey.startsWith(oldPropertyKey)
                     && (matches(prop, newPropertyKey) || matches(prop, newPropertyKey + ".*") || childMatchesNewPropertyKey(entry, prop))) {
@@ -110,7 +138,7 @@ public class ChangePropertyKey extends Recipe {
                 Iterator<Yaml.Mapping.Entry> propertyEntriesLeftToRight = propertyEntries.descendingIterator();
                 while (propertyEntriesLeftToRight.hasNext()) {
                     Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();
-                    String value = propertyEntry.getKey().getValue() + ".";
+                    String value = propertyEntry.getKey().getValue() + getKeySeparator();
 
                     if ((!propertyToTest.startsWith(value ) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext()))
                         && hasNonExcludedValues(propertyEntry)) {
@@ -131,7 +159,7 @@ public class ChangePropertyKey extends Recipe {
                     Iterator<Yaml.Mapping.Entry> propertyEntriesLeftToRight = propertyEntries.descendingIterator();
                     while (propertyEntriesLeftToRight.hasNext()) {
                         Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();
-                        String value = propertyEntry.getKey().getValue() + ".";
+                        String value = propertyEntry.getKey().getValue() + getKeySeparator();
 
                         if (!propertyToTest.startsWith(value ) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext())) {
                             doAfterVisit(new InsertSubpropertyVisitor<>(
@@ -184,17 +212,17 @@ public class ChangePropertyKey extends Recipe {
     private boolean anyMatch(Yaml.Mapping.Entry entry, List<String> subKeys) {
         for (String subKey : subKeys) {
             if (entry.getKey().getValue().equals(subKey)
-                    || entry.getKey().getValue().startsWith(subKey + ".")) {
+                    || entry.getKey().getValue().startsWith(subKey + getKeySeparator())) {
                 return true;
             }
         }
         return false;
     }
 
-    private static boolean noneMatch(Yaml.Mapping.Entry entry, List<String> subKeys) {
+    private boolean noneMatch(Yaml.Mapping.Entry entry, List<String> subKeys) {
         for (String subKey : subKeys) {
             if (entry.getKey().getValue().equals(subKey)
-                    || entry.getKey().getValue().startsWith(subKey + ".")) {
+                    || entry.getKey().getValue().startsWith(subKey + getKeySeparator())) {
                 return false;
             }
         }
@@ -203,7 +231,7 @@ public class ChangePropertyKey extends Recipe {
 
     private boolean noneMatch(String key, String basePattern, List<String> excludedSubKeys) {
         for (String subkey : excludedSubKeys) {
-            String subKeyPattern = basePattern + "." + subkey;
+            String subKeyPattern = basePattern + getKeySeparator() + subkey;
             if (matches(key, subKeyPattern) || matches(key, subKeyPattern + ".*")) {
                 return false;
             }
@@ -232,19 +260,36 @@ public class ChangePropertyKey extends Recipe {
             this.entryToReplace = entryToReplace;
         }
 
+        private Yaml.Mapping.Entry buildEntry(String prefix, String beforeMappingValueIndicator, String key, Yaml.Block value) {
+            int idx = key.indexOf(getKeySeparator());
+            if (idx > 0) {
+                value = new Yaml.Mapping(
+                        randomId(),
+                        Markers.EMPTY,
+                        null,
+                        Collections.singletonList(
+                                buildEntry(prefix+"  ", beforeMappingValueIndicator, key.substring(idx + 1), value)),
+                        null,
+                        null);
+                key = key.substring(0, idx);
+            }
+            return new Yaml.Mapping.Entry(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    new Yaml.Scalar(randomId(), "", Markers.EMPTY,
+                            Yaml.Scalar.Style.PLAIN, null, key),
+                    beforeMappingValueIndicator,
+                    value);
+        }
+
         @Override
         public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
             Yaml.Mapping m = super.visitMapping(mapping, p);
             if (m.getEntries().contains(scope)) {
                 String newEntryPrefix = scope.getPrefix();
-                Yaml.Mapping.Entry newEntry = new Yaml.Mapping.Entry(randomId(),
-                        newEntryPrefix,
-                        Markers.EMPTY,
-                        new Yaml.Scalar(randomId(), "", Markers.EMPTY,
-                                Yaml.Scalar.Style.PLAIN, null, subproperty),
-                        scope.getBeforeMappingValueIndicator(),
-                        removeExclusions(entryToReplace.getValue().copyPaste()));
-
+                Yaml.Mapping.Entry newEntry = buildEntry(newEntryPrefix, scope.getBeforeMappingValueIndicator(),
+                        subproperty, removeExclusions(entryToReplace.getValue().copyPaste()));
                 if (hasExcludedValues(entryToReplace)) {
                     m = m.withEntries(ListUtils.concat(m.getEntries(), newEntry));
                 } else {
