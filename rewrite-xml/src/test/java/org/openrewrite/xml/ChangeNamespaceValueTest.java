@@ -20,7 +20,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.xml.Assertions.xml;
 
-public class ChangeNamespaceValueTest implements RewriteTest {
+class ChangeNamespaceValueTest implements RewriteTest {
 
     @Test
     void replaceVersion24Test() {
@@ -142,6 +142,23 @@ public class ChangeNamespaceValueTest implements RewriteTest {
                       id="WebApp_ID">
                       <display-name>testWebDDNamespace</display-name>
                   </web-app>
+              """
+          )
+        );
+    }
+
+    @Test
+    void invalidVersionTest() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeNamespaceValue("web-app", null, "http://java.sun.com/xml/ns/j2ee", "2.5", false)),
+          xml(
+            """
+              <web-app xmlns="http://java.sun.com/xml/ns/javaee" version="2.4"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://java.sun.com/xml/ns/j2ee http://java.sun.com/xml/ns/j2ee/web-app_2_4.xsd"
+                  id="WebApp_ID">
+                  <display-name>testWebDDNamespace</display-name>
+              </web-app>
               """
           )
         );
