@@ -20,10 +20,10 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.AddImport;
 import org.openrewrite.java.JavaVisitor;
 
-@Incubating(since = "8.1.16")
+@Incubating(since = "8.2.0")
 public class ImportService {
 
-    public <P> JavaVisitor<P> addImportVisitor(String packageName, @Nullable String typeName, boolean onlyIfReferenced) {
-        return new AddImport<>(packageName, typeName, onlyIfReferenced);
+    public <P> JavaVisitor<P> addImportVisitor(@Nullable String packageName, String typeName, @Nullable String member, boolean onlyIfReferenced) {
+        return new AddImport<>(packageName, typeName, member, onlyIfReferenced);
     }
 }

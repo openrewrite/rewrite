@@ -112,19 +112,26 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
      * is idempotent and calling this method multiple times with the same arguments will only add an import once.
      *
      * @param fullyQualifiedName Fully-qualified name of the class.
-     * @param statik             The static method or field to be imported. A wildcard "*" may also be used to statically import all methods/fields.
+     * @param member             The static method or field to be imported. A wildcard "*" may also be used to statically import all methods/fields.
      */
-    public void maybeAddImport(String fullyQualifiedName, String statik) {
-        maybeAddImport(fullyQualifiedName, statik, true);
+    public void maybeAddImport(String fullyQualifiedName, String member) {
+        maybeAddImport(fullyQualifiedName, member, true);
     }
 
     public void maybeAddImport(String fullyQualifiedName, boolean onlyIfReferenced) {
         maybeAddImport(fullyQualifiedName, null, onlyIfReferenced);
     }
 
-    public void maybeAddImport(String fullyQualifiedName, @Nullable String statik, boolean onlyIfReferenced) {
+    public void maybeAddImport(String fullyQualifiedName, @Nullable String member, boolean onlyIfReferenced) {
+        int lastDotIdx = fullyQualifiedName.lastIndexOf('.');
+        String packageName = lastDotIdx != -1 ? fullyQualifiedName.substring(0, lastDotIdx) : null;
+        String typeName = lastDotIdx != -1 ? fullyQualifiedName.substring(lastDotIdx + 1) : fullyQualifiedName;
+        maybeAddImport(packageName, typeName, member, onlyIfReferenced);
+    }
+
+    public void maybeAddImport(@Nullable String packageName, String typeName, @Nullable String member, boolean onlyIfReferenced) {
         ImportService service = getCursor().firstEnclosingOrThrow(JavaSourceFile.class).service(ImportService.class);
-        JavaVisitor<P> visitor = service.addImportVisitor(fullyQualifiedName, statik, onlyIfReferenced);
+        JavaVisitor<P> visitor = service.addImportVisitor(packageName, typeName, member, onlyIfReferenced);
         if (!getAfterVisit().contains(visitor)) {
             doAfterVisit(visitor);
         }

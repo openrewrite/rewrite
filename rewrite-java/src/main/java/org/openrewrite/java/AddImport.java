@@ -37,40 +37,55 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
 import static org.openrewrite.java.format.AutodetectGeneralFormatStyle.autodetectGeneralFormatStyle;
+import static org.openrewrite.java.tree.TypeUtils.isOfClassType;
 
 /**
  * A Java refactoring visitor that can be used to add an import (or static import) to a given compilation unit.
  * This visitor can also be configured to only add the import if the imported class/method are referenced within the
  * compilation unit.
- * <P><P>
- * The {@link AddImport#type} must be supplied and represents a fully qualified class name.
- * <P><P>
- * The {@link AddImport#statik} is an optional method within the imported type. The staticMethod can be set to "*"
+ * <p>
+ * The {@link AddImport#typeName} must be supplied and together with the optional {@link AddImport#packageName}
+ * represents the fully qualified class name.
+ * <p>
+ * The {@link AddImport#member} is an optional method within the imported type. The staticMethod can be set to "*"
  * to represent a static wildcard import.
- * <P><P>
+ * <p>
  * The {@link AddImport#onlyIfReferenced} is a flag (defaulted to true) to indicate if the import should only be added
  * if there is a reference to the imported class/method.
  */
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class AddImport<P> extends JavaIsoVisitor<P> {
+
+    @Nullable
+    private final String packageName;
+
+    private final String typeName;
+
     @EqualsAndHashCode.Include
-    private final String type;
+    private final String fullyQualifiedName;
 
     @EqualsAndHashCode.Include
     @Nullable
-    private final String statik;
+    private final String member;
 
     @EqualsAndHashCode.Include
     private final boolean onlyIfReferenced;
 
-    private final JavaType.Class classType;
+    public AddImport(String type, @Nullable String member, boolean onlyIfReferenced) {
+        int lastDotIdx = type.lastIndexOf('.');
+        this.packageName = lastDotIdx != -1 ? type.substring(0, lastDotIdx) : null;
+        this.typeName = lastDotIdx != -1 ? type.substring(lastDotIdx + 1) : type;
+        this.fullyQualifiedName = type;
+        this.member = member;
+        this.onlyIfReferenced = onlyIfReferenced;
+    }
 
-    public AddImport(String type, @Nullable String statik, boolean onlyIfReferenced) {
-        this.type = type;
-        this.classType = JavaType.ShallowClass.build(type);
-        this.statik = statik;
+    public AddImport(@Nullable String packageName, String typeName, @Nullable String member, boolean onlyIfReferenced) {
+        this.packageName = packageName;
+        this.typeName = typeName.replace('.', '$');
+        this.fullyQualifiedName = packageName == null ? typeName : packageName + "." + typeName;
+        this.member = member;
         this.onlyIfReferenced = onlyIfReferenced;
     }
 
@@ -80,36 +95,28 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         J j = tree;
         if (tree instanceof JavaSourceFile) {
             JavaSourceFile cu = (JavaSourceFile) tree;
-            if (JavaType.Primitive.fromKeyword(classType.getFullyQualifiedName()) != null) {
+            if (packageName == null || JavaType.Primitive.fromKeyword(fullyQualifiedName) != null) {
                 return cu;
             }
 
-            int dotIndex = classType.getFullyQualifiedName().lastIndexOf('.');
-            if (dotIndex >= 0) {
-                String packageName = classType.getFullyQualifiedName().substring(0, dotIndex);
-                // No need to add imports if the class to import is in java.lang, or if the classes are within the same package
-                if (("java.lang".equals(packageName) && StringUtils.isBlank(statik)) || (cu.getPackageDeclaration() != null &&
-                        packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor())))) {
-                    return cu;
-                }
+            // No need to add imports if the class to import is in java.lang, or if the classes are within the same package
+            if (("java.lang".equals(packageName) && StringUtils.isBlank(member)) || (cu.getPackageDeclaration() != null &&
+                                                                                     packageName.equals(cu.getPackageDeclaration().getExpression().printTrimmed(getCursor())))) {
+                return cu;
             }
 
             if (onlyIfReferenced && !hasReference(cu)) {
                 return cu;
             }
 
-            if (classType.getPackageName().isEmpty()) {
-                return cu;
-            }
-
             if (cu.getImports().stream().anyMatch(i -> {
                 String ending = i.getQualid().getSimpleName();
-                if (statik == null) {
-                    return !i.isStatic() && i.getPackageName().equals(classType.getPackageName()) &&
-                            (ending.equals(classType.getClassName()) || "*".equals(ending));
+                if (member == null) {
+                    return !i.isStatic() && i.getPackageName().equals(packageName) &&
+                           (ending.equals(typeName) || "*".equals(ending));
                 }
-                return i.isStatic() && i.getTypeName().equals(classType.getFullyQualifiedName()) &&
-                        (ending.equals(statik) || "*".equals(ending));
+                return i.isStatic() && i.getTypeName().equals(fullyQualifiedName) &&
+                       (ending.equals(member) || "*".equals(ending));
             })) {
                 return cu;
             }
@@ -117,10 +124,10 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             J.Import importToAdd = new J.Import(randomId(),
                     Space.EMPTY,
                     Markers.EMPTY,
-                    new JLeftPadded<>(statik == null ? Space.EMPTY : Space.format(" "),
-                            statik != null, Markers.EMPTY),
-                    TypeTree.build(classType.getFullyQualifiedName() +
-                            (statik == null ? "" : "." + statik)).withPrefix(Space.format(" ")),
+                    new JLeftPadded<>(member == null ? Space.EMPTY : Space.SINGLE_SPACE,
+                            member != null, Markers.EMPTY),
+                    TypeTree.build(fullyQualifiedName +
+                                   (member == null ? "" : "." + member)).withPrefix(Space.SINGLE_SPACE),
                     null);
 
             List<JRightPadded<J.Import>> imports = new ArrayList<>(cu.getPadding().getImports());
@@ -180,7 +187,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     private boolean isTypeReference(NameTree t) {
         boolean isTypRef = true;
         if (t instanceof J.FieldAccess) {
-            isTypRef = isOfClassType(((J.FieldAccess) t).getTarget().getType(), type);
+            isTypRef = isOfClassType(((J.FieldAccess) t).getTarget().getType(), fullyQualifiedName);
         }
         return isTypRef;
     }
@@ -197,11 +204,11 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
      */
     //Note that using anyMatch when a stream is empty ends up returning true, which is not the behavior needed here!
     private boolean hasReference(JavaSourceFile compilationUnit) {
-        if (statik == null) {
+        if (member == null) {
             //Non-static imports, we just look for field accesses.
-            for (NameTree t : FindTypes.find(compilationUnit, type)) {
-                if ((!(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(type)) &&
-                        isTypeReference(t)) {
+            for (NameTree t : FindTypes.find(compilationUnit, fullyQualifiedName)) {
+                if ((!(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(fullyQualifiedName)) &&
+                    isTypeReference(t)) {
                     return true;
                 }
             }
@@ -209,11 +216,11 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         }
 
         // For static method imports, we are either looking for a specific method or a wildcard.
-        for (J invocation : FindMethods.find(compilationUnit, type + " *(..)")) {
+        for (J invocation : FindMethods.find(compilationUnit, fullyQualifiedName + " *(..)")) {
             if (invocation instanceof J.MethodInvocation) {
                 J.MethodInvocation mi = (J.MethodInvocation) invocation;
                 if (mi.getSelect() == null &&
-                        ("*".equals(statik) || mi.getName().getSimpleName().equals(statik))) {
+                    ("*".equals(member) || mi.getName().getSimpleName().equals(member))) {
                     return true;
                 }
             }
@@ -230,7 +237,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, AtomicReference<Boolean> found) {
             // If the type isn't used there's no need to proceed further
             for (JavaType.Variable varType : cu.getTypesInUse().getVariables()) {
-                if (varType.getName().equals(statik) && isOfClassType(varType.getType(), type)) {
+                if (varType.getName().equals(member) && isOfClassType(varType.getType(), fullyQualifiedName)) {
                     return super.visitCompilationUnit(cu, found);
                 }
             }
@@ -240,8 +247,8 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, AtomicReference<Boolean> found) {
             assert getCursor().getParent() != null;
-            if (identifier.getSimpleName().equals(statik) && isOfClassType(identifier.getType(), type) &&
-                    !(getCursor().getParent().firstEnclosingOrThrow(J.class) instanceof J.FieldAccess)) {
+            if (identifier.getSimpleName().equals(member) && isOfClassType(identifier.getType(), fullyQualifiedName) &&
+                !(getCursor().getParent().firstEnclosingOrThrow(J.class) instanceof J.FieldAccess)) {
                 found.set(true);
             }
             return identifier;
