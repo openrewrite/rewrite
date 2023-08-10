@@ -3849,6 +3849,11 @@ public interface J extends Tree {
             return type.toString().toLowerCase();
         }
 
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitModifier(this, p);
+        }
+
         /**
          * These types are sorted in order of their recommended appearance in a list of modifiers, as defined in the
          * <a href="https://rules.sonarsource.com/java/tag/convention/RSPEC-1124">JLS</a>.

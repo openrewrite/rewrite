@@ -858,6 +858,12 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return m;
     }
 
+    public J visitModifier(J.Modifier modifier, P p) {
+        J.Modifier m = modifier;
+        m = m.withAnnotations(ListUtils.map(m.getAnnotations(), mod -> visitAndCast(mod, p)));
+        return m;
+    }
+
     public J visitMultiCatch(J.MultiCatch multiCatch, P p) {
         J.MultiCatch m = multiCatch;
         m = m.withPrefix(visitSpace(m.getPrefix(), Space.Location.MULTI_CATCH_PREFIX, p));
