@@ -842,7 +842,7 @@ class MergeYamlTest implements RewriteTest {
     }
 
     @Test
-    void collapsedKey() {
+    void incomingCollapsedKey() {
         rewriteRun(
           spec -> spec.recipe(new MergeYaml(
             "$",
@@ -859,6 +859,31 @@ class MergeYamlTest implements RewriteTest {
               management:
                 context-path: /admin
                 endpoints.jmx.unique-names: true
+              """
+          )
+        );
+    }
+
+    @Disabled("fix not implemented yet, but potentially an issue")
+    @Test
+    void existingCollapsedKeyOn() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            "management.endpoints.jmx.unique-names: true",
+            true,
+            null
+          )),
+          yaml(
+            """
+              management:
+                endpoints.jmx.other: /admin
+              """, """
+              management:
+                endpoints.jmx:
+                  other: /admin
+                  unique-names: true
               """
           )
         );
