@@ -113,7 +113,7 @@ public class ChangePropertyKey extends Recipe {
                     String value = propertyEntry.getKey().getValue() + ".";
 
                     if ((!propertyToTest.startsWith(value) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext()))
-                        && hasNonExcludedValues(propertyEntry)) {
+                            && hasNonExcludedValues(propertyEntry)) {
                         doAfterVisit(new InsertSubpropertyVisitor<>(
                                 propertyEntry,
                                 propertyToTest,

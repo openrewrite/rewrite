@@ -110,13 +110,13 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     if (keyMatches(existingEntry, testKey)) {
                         String remainingKey = getRelativeKey(incomingEntry.getKey().getValue(), testKey);
 
-                            return existingEntry.withValue((Yaml.Block) new MergeYamlVisitor<>(existingEntry.getValue(),
-                                    remainingKey.isEmpty() ? incomingEntry.getValue() :
-                                            m2.withEntries(Collections.singletonList(
-                                                    incomingEntry.withKey(keyWithValue(incomingEntry.getKey(), remainingKey))
-                                            )),
-                                    acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
-                                    .visit(existingEntry.getValue(), p, new Cursor(cursor, existingEntry)));
+                        return existingEntry.withValue((Yaml.Block) new MergeYamlVisitor<>(existingEntry.getValue(),
+                                remainingKey.isEmpty() ? incomingEntry.getValue() :
+                                        m2.withEntries(Collections.singletonList(
+                                                incomingEntry.withKey(keyWithValue(incomingEntry.getKey(), remainingKey))
+                                        )),
+                                acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
+                                .visit(existingEntry.getValue(), p, new Cursor(cursor, existingEntry)));
                     }
                     testKey = getParentKey(testKey);
                 }
@@ -222,12 +222,11 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
                     Tree.randomId(),
                     original.getPrefix(),
                     original.getMarkers(),
-                    ((Yaml.Scalar)original).getStyle(),
-                    ((Yaml.Scalar)original).getAnchor(),
+                    ((Yaml.Scalar) original).getStyle(),
+                    ((Yaml.Scalar) original).getAnchor(),
                     newValue
             );
-        }
-        else {
+        } else {
             // Right now, only Anchor, which makes no sense
             throw new UnsupportedOperationException("Cannot change value of " + original.getClass().getSimpleName() + " key");
         }
