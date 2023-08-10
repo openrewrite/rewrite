@@ -17,7 +17,6 @@ package org.openrewrite.java.tree;
 
 import org.openrewrite.marker.Markers;
 
-import java.util.Collections;
 import java.util.Scanner;
 
 import static java.util.Collections.emptyList;
@@ -28,11 +27,12 @@ import static org.openrewrite.Tree.randomId;
  * array, or parameterized type).
  */
 public interface TypeTree extends NameTree {
-    static <T extends TypeTree & Expression> T build(String fullyQualifiedName) {
-        Scanner scanner = new Scanner(fullyQualifiedName.replace('$', '.'));
-        scanner.useDelimiter("\\.");
 
-        String fullName = "";
+    static <T extends TypeTree & Expression> T build(String fullyQualifiedName) {
+        Scanner scanner = new Scanner(fullyQualifiedName);
+        scanner.useDelimiter("[.$]");
+
+        StringBuilder fullName = new StringBuilder();
         Expression expr = null;
         String nextLeftPad = "";
         for (int i = 0; scanner.hasNext(); i++) {
@@ -40,7 +40,9 @@ public interface TypeTree extends NameTree {
             StringBuilder partBuilder = null;
             StringBuilder whitespaceBeforeNext = new StringBuilder();
 
-            for (char c : scanner.next().toCharArray()) {
+            String segment = scanner.next();
+            for (int j = 0; j < segment.length(); j++) {
+                char c = segment.charAt(j);
                 if (!Character.isWhitespace(c)) {
                     if (partBuilder == null) {
                         partBuilder = new StringBuilder();
@@ -59,10 +61,10 @@ public interface TypeTree extends NameTree {
             String part = partBuilder.toString();
 
             if (i == 0) {
-                fullName = part;
+                fullName.append(part);
                 expr = new Identifier(randomId(), Space.format(whitespaceBefore.toString()), Markers.EMPTY, emptyList(), part, null, null);
             } else {
-                fullName += "." + part;
+                fullName.append('.').append(part);
                 expr = new J.FieldAccess(
                         randomId(),
                         Space.EMPTY,
@@ -75,14 +77,14 @@ public interface TypeTree extends NameTree {
                                         Space.format(whitespaceBefore.toString()),
                                         Markers.EMPTY,
                                         emptyList(),
-                                        part.trim(),
+                                        part,
                                         null,
                                         null
                                 ),
                                 Markers.EMPTY
                         ),
-                        (Character.isUpperCase(part.charAt(0))) ?
-                                JavaType.ShallowClass.build(fullName) :
+                        Character.isUpperCase(part.charAt(0)) ?
+                                JavaType.ShallowClass.build(fullName.toString()) :
                                 null
                 );
             }
