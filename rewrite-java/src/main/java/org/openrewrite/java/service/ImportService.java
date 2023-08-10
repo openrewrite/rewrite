@@ -16,13 +16,14 @@
 package org.openrewrite.java.service;
 
 import org.openrewrite.Incubating;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.AddImport;
 import org.openrewrite.java.JavaVisitor;
 
 @Incubating(since = "8.1.16")
 public class ImportService {
 
-    public <P> JavaVisitor<P> addImportVisitor(String packageName, String typeName, boolean onlyIfReferenced) {
+    public <P> JavaVisitor<P> addImportVisitor(String packageName, @Nullable String typeName, boolean onlyIfReferenced) {
         return new AddImport<>(packageName, typeName, onlyIfReferenced);
     }
 }
