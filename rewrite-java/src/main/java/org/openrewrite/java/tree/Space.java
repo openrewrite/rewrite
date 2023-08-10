@@ -47,6 +47,7 @@ public class Space {
      * So use flyweights to avoid storing many instances of functionally identical spaces
      */
     private static final Map<String, Space> flyweights = new WeakHashMap<>();
+
     static {
         flyweights.put(" ", SINGLE_SPACE);
     }
@@ -133,6 +134,12 @@ public class Space {
     }
 
     public static Space format(String formatting) {
+        if (formatting.isEmpty()) {
+            return Space.EMPTY;
+        } else if (" ".equals(formatting)) {
+            return Space.SINGLE_SPACE;
+        }
+
         StringBuilder prefix = new StringBuilder();
         StringBuilder comment = new StringBuilder();
         List<Comment> comments = new ArrayList<>();
@@ -142,8 +149,8 @@ public class Space {
 
         char last = 0;
 
-        char[] charArray = formatting.toCharArray();
-        for (char c : charArray) {
+        for (int i = 0; i < formatting.length(); i++) {
+            char c = formatting.charAt(i);
             switch (c) {
                 case '/':
                     if (inSingleLineComment) {
@@ -196,7 +203,7 @@ public class Space {
             last = c;
         }
         // If a file ends with a single-line comment there may be no terminating newline
-        if(!comment.toString().isEmpty()) {
+        if (!comment.toString().isEmpty()) {
             comments.add(new TextComment(false, comment.toString(), prefix.toString(), Markers.EMPTY));
         }
 
@@ -258,9 +265,8 @@ public class Space {
         StringBuilder printedWs = new StringBuilder();
         int lastNewline = 0;
         if (whitespace != null) {
-            char[] charArray = whitespace.toCharArray();
-            for (int i = 0; i < charArray.length; i++) {
-                char c = charArray[i];
+            for (int i = 0; i < whitespace.length(); i++) {
+                char c = whitespace.charAt(i);
                 if (c == '\n') {
                     printedWs.append("\\n");
                     lastNewline = i + 1;
@@ -276,8 +282,8 @@ public class Space {
         }
 
         return "Space(" +
-                "comments=<" + (comments.size() == 1 ? "1 comment" : comments.size() + " comments") +
-                ">, whitespace='" + printedWs + "')";
+               "comments=<" + (comments.size() == 1 ? "1 comment" : comments.size() + " comments") +
+               ">, whitespace='" + printedWs + "')";
     }
 
     public enum Location {
