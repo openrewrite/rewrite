@@ -19,11 +19,14 @@ import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.tree.Yaml;
+import org.openrewrite.yaml.tree.YamlKey;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -82,8 +85,8 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         return super.visitMapping(existingMapping, p);
     }
 
-    private static boolean keyMatches(Yaml.Mapping.Entry e1, Yaml.Mapping.Entry e2) {
-        return e1.getKey().getValue().equals(e2.getKey().getValue());
+    private static boolean keyMatches(Yaml.Mapping.Entry e1, String key2) {
+        return e1.getKey().getValue().equals(key2);
     }
 
     private boolean keyMatches(Yaml.Mapping m1, Yaml.Mapping m2) {
@@ -102,10 +105,20 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
     private Yaml.Mapping mergeMapping(Yaml.Mapping m1, Yaml.Mapping m2, P p, Cursor cursor) {
         List<Yaml.Mapping.Entry> mutatedEntries = ListUtils.map(m1.getEntries(), existingEntry -> {
             for (Yaml.Mapping.Entry incomingEntry : m2.getEntries()) {
-                if (keyMatches(existingEntry, incomingEntry)) {
-                    return existingEntry.withValue((Yaml.Block) new MergeYamlVisitor<>(existingEntry.getValue(),
-                            incomingEntry.getValue(), acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
-                            .visit(existingEntry.getValue(), p, new Cursor(cursor, existingEntry)));
+                String testKey = incomingEntry.getKey().getValue();
+                while (!testKey.isEmpty()) {
+                    if (keyMatches(existingEntry, testKey)) {
+                        String remainingKey = getRelativeKey(incomingEntry.getKey().getValue(), testKey);
+
+                            return existingEntry.withValue((Yaml.Block) new MergeYamlVisitor<>(existingEntry.getValue(),
+                                    remainingKey.isEmpty() ? incomingEntry.getValue() :
+                                            m2.withEntries(Collections.singletonList(
+                                                    incomingEntry.withKey(keyWithValue(incomingEntry.getKey(), remainingKey))
+                                            )),
+                                    acceptTheirs, objectIdentifyingProperty, shouldAutoFormat)
+                                    .visit(existingEntry.getValue(), p, new Cursor(cursor, existingEntry)));
+                    }
+                    testKey = getParentKey(testKey);
                 }
             }
             return existingEntry;
@@ -113,8 +126,12 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
         mutatedEntries = ListUtils.concatAll(mutatedEntries, ListUtils.map(m2.getEntries(), incomingEntry -> {
             for (Yaml.Mapping.Entry existingEntry : m1.getEntries()) {
-                if (keyMatches(existingEntry, incomingEntry)) {
-                    return null;
+                String testKey = incomingEntry.getKey().getValue();
+                while (!testKey.isEmpty()) {
+                    if (keyMatches(existingEntry, testKey)) {
+                        return null;
+                    }
+                    testKey = getParentKey(testKey);
                 }
             }
             if (shouldAutoFormat) {
@@ -182,5 +199,37 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
         String s1 = y1.getValue();
         String s2 = y2.getValue();
         return !s1.equals(s2) && !acceptTheirs ? y1.withValue(s2) : y1;
+    }
+
+    private static String getParentKey(String key) {
+        int idx = key.lastIndexOf(".");
+        if (idx > 0) {
+            return key.substring(0, idx);
+        }
+        return "";
+    }
+
+    private static String getRelativeKey(String key, String relativeTo) {
+        if (key.equals(relativeTo) || !key.startsWith(relativeTo)) {
+            return "";
+        }
+        return key.substring(relativeTo.length() + 1);
+    }
+
+    private static YamlKey keyWithValue(YamlKey original, String newValue) {
+        if (original instanceof Yaml.Scalar) {
+            return new Yaml.Scalar(
+                    Tree.randomId(),
+                    original.getPrefix(),
+                    original.getMarkers(),
+                    ((Yaml.Scalar)original).getStyle(),
+                    ((Yaml.Scalar)original).getAnchor(),
+                    newValue
+            );
+        }
+        else {
+            // Right now, only Anchor, which makes no sense
+            throw new UnsupportedOperationException("Cannot change value of " + original.getClass().getSimpleName() + " key");
+        }
     }
 }

@@ -841,4 +841,26 @@ class MergeYamlTest implements RewriteTest {
         );
     }
 
+    @Test
+    void collapsedKey() {
+        rewriteRun(
+          spec -> spec.recipe(new MergeYaml(
+            "$",
+            //language=yaml
+            "management.endpoints.jmx.unique-names: true",
+            true,
+            null
+          )),
+          yaml(
+            """
+              management:
+                context-path: /admin
+              """, """
+              management:
+                context-path: /admin
+                endpoints.jmx.unique-names: true
+              """
+          )
+        );
+    }
 }
