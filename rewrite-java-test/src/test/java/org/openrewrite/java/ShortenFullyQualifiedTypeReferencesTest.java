@@ -228,7 +228,7 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               @SuppressWarnings("DataFlowIssue")
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                   if (method.getSimpleName().equals("m1")) {
-                      return (J.MethodDeclaration) new ShortenFullyQualifiedTypeReferences().getVisitor().visit(method, ctx);
+                      return (J.MethodDeclaration) new ShortenFullyQualifiedTypeReferences().getVisitor().visit(method, ctx, getCursor().getParent());
                   }
                   return super.visitMethodDeclaration(method, ctx);
               }
