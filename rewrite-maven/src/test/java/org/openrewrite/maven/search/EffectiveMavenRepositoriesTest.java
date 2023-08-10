@@ -56,7 +56,7 @@ public class EffectiveMavenRepositoriesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new EffectiveMavenRepositories());
+        spec.recipe(new EffectiveMavenRepositories(true));
     }
 
     @DocumentExample
@@ -165,6 +165,47 @@ public class EffectiveMavenRepositoriesTest implements RewriteTest {
                 <version>1</version>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void producesDataTable() {
+        rewriteRun(
+          spec -> spec
+            .recipe(new EffectiveMavenRepositories(false))
+            .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+              .setMavenSettings(SPRING_MILESTONES_SETTINGS, "repo"))
+            .dataTableAsCsv(EffectiveMavenRepositoriesTable.class.getName(), """
+              pomPath,repositoryUri
+              pom.xml,"https://repo.spring.io/milestone"
+              pom.xml,"https://repo.maven.apache.org/maven2"
+              module/pom.xml,"https://repo.spring.io/milestone"
+              module/pom.xml,"https://repo.maven.apache.org/maven2"
+              """)
+            .recipeExecutionContext(new InMemoryExecutionContext()),
+          pomXml(
+            """
+              <project>
+                  <groupId>org.openrewrite.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <modules>
+                      <module>module</module>
+                  </modules>
+              </project>
+              """,
+            spec -> spec.path("pom.xml")
+          ),
+          pomXml(
+            """
+              <project>
+                  <groupId>org.openrewrite.example</groupId>
+                  <artifactId>module</artifactId>
+                  <version>1</version>
+              </project>
+              """,
+            spec -> spec.path("module/pom.xml")
           )
         );
     }
