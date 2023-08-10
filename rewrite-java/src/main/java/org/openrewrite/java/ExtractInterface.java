@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.FindAnnotations;
@@ -116,7 +117,9 @@ public class ExtractInterface {
             JavaType.ShallowClass type = JavaType.ShallowClass.build(fullyQualifiedInterfaceName);
 
             J.Block body = classDecl.getBody();
-            J.ClassDeclaration implementing = (J.ClassDeclaration) new ImplementInterface<>(classDecl, type).visitNonNull(classDecl, ctx);
+            Cursor parent = getCursor().getParent();
+            assert parent != null;
+            J.ClassDeclaration implementing = (J.ClassDeclaration) new ImplementInterface<>(classDecl, type).visitNonNull(classDecl, ctx, parent);
 
             return (J.ClassDeclaration) new JavaIsoVisitor<ExecutionContext>() {
                 @Override
