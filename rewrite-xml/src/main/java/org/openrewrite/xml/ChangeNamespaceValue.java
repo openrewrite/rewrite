@@ -23,10 +23,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.semver.Semver;
 import org.openrewrite.xml.tree.Xml;
-
-import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -152,7 +149,25 @@ public class ChangeNamespaceValue extends Recipe {
             }
 
             private boolean isVersionMatch(Xml.Attribute attribute) {
-                return versionMatcher == null || Semver.validate(attribute.getValueAsString(), versionMatcher).isValid();
+                String[] versions = versionMatcher.split(",");
+                double dversion = Double.parseDouble(attribute.getValueAsString());
+                for (String splitVersion : versions) {
+                    boolean checkGreaterThan = false;
+                    double dversionExpected;
+                    if (splitVersion.endsWith("+")) {
+                        splitVersion = splitVersion.substring(0, splitVersion.length() - 1);
+                        checkGreaterThan = true;
+                    }
+                    try {
+                        dversionExpected = Double.parseDouble(splitVersion);
+                    } catch (NumberFormatException e) {
+                        return false;
+                    }
+                    if (!checkGreaterThan && dversionExpected == dversion || checkGreaterThan && dversionExpected <= dversion) {
+                        return true;
+                    }
+                }
+                return false;
             }
         };
     }
