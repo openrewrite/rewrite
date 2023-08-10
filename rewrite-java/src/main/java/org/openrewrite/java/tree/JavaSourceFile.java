@@ -53,7 +53,7 @@ public interface JavaSourceFile extends J {
 
     SourceFile withSourcePath(Path path);
 
-    @Incubating(since = "8.1.16")
+    @Incubating(since = "8.2.0")
     @SuppressWarnings("unchecked")
     default <S> S service(Class<S> service) {
         if (service == ImportService.class) {
