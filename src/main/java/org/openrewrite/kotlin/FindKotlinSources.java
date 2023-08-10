@@ -46,7 +46,7 @@ public class FindKotlinSources extends Recipe {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if(tree instanceof SourceFile) {
-                    SourceFile sourceFile = ((SourceFile) tree);
+                    SourceFile sourceFile = (SourceFile) tree;
                     if (sourceFile.getSourcePath().toString().endsWith(".kt")) {
                         KotlinSourceFile.SourceFileType sourceFileType = null;
                         if (sourceFile instanceof K.CompilationUnit) {

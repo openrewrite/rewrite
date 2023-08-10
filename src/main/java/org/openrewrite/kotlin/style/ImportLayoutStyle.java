@@ -211,7 +211,7 @@ public class ImportLayoutStyle implements KotlinStyle {
         class ImportPackage implements Block {
 
             // VisibleForTesting
-            final static Comparator<JRightPadded<J.Import>> IMPORT_SORTING = (i1, i2) -> {
+            static final Comparator<JRightPadded<J.Import>> IMPORT_SORTING = (i1, i2) -> {
                 String[] import1 = i1.getElement().getQualid().printTrimmed().split("\\.");
                 String[] import2 = i2.getElement().getQualid().printTrimmed().split("\\.");
 

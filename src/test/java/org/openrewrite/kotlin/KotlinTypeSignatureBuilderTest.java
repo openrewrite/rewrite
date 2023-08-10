@@ -40,7 +40,7 @@ public class KotlinTypeSignatureBuilderTest {
     private static final String goat = StringUtils.readFully(KotlinTypeSignatureBuilderTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
 
     private static final Disposable disposable = Disposer.newDisposable();
-    private static CompiledSource compiledSource = null;
+    private static CompiledSource compiledSource;
 
     @BeforeAll
     static void beforeAll() {

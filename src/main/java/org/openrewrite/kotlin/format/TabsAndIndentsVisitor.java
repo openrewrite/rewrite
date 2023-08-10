@@ -189,8 +189,8 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         int indent = getCursor().getNearestMessage("lastIndent", 0);
         if (right.getElement() instanceof J) {
             J elem = (J) right.getElement();
-            if ((right.getAfter().getLastWhitespace().contains("\n") ||
-                    elem.getPrefix().getLastWhitespace().contains("\n"))) {
+            if (right.getAfter().getLastWhitespace().contains("\n") ||
+                    elem.getPrefix().getLastWhitespace().contains("\n")) {
                 switch (loc) {
                     case FOR_CONDITION:
                     case FOR_UPDATE: {

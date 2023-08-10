@@ -340,7 +340,7 @@ public class KotlinParser implements Parser {
 
         FirProjectSessionProvider sessionProvider = new FirProjectSessionProvider();
 
-        Function1<DependencyListForCliModule.Builder, Unit> dependencyListBuilderProvider = (builder) -> {
+        Function1<DependencyListForCliModule.Builder, Unit> dependencyListBuilderProvider = builder -> {
             List<File> jvmContentFiles = JvmContentRootsKt.getJvmClasspathRoots(compilerConfiguration);
             List<Path> jvmContentPaths = new ArrayList<>(jvmContentFiles.size());
             for (File jvmContentFile : jvmContentFiles) {
@@ -357,7 +357,7 @@ public class KotlinParser implements Parser {
             return Unit.INSTANCE;
         };
 
-        Function1<FirSessionConfigurator, Unit> sessionConfigurator = (session) -> Unit.INSTANCE;
+        Function1<FirSessionConfigurator, Unit> sessionConfigurator = session -> Unit.INSTANCE;
 
         FirSession firSession = FirSessionFactory.INSTANCE.createSessionWithDependencies(
                 Name.identifier(moduleName),

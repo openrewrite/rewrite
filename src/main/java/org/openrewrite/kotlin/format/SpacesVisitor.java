@@ -196,7 +196,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         if (c.getBody().getStatements().isEmpty()) {
             if (c.getKind() != J.ClassDeclaration.Kind.Type.Enum) {
                 // withinCodeBraces is defaulted to `false` in IntelliJ's Kotlin formatting.
-                if (c.getBody().getEnd().getWhitespace().equals(" ")) {
+                if (" ".equals(c.getBody().getEnd().getWhitespace())) {
                     c = c.withBody(
                             c.getBody().withEnd(
                                     c.getBody().getEnd().withWhitespace("")
@@ -205,7 +205,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                 }
             } else {
                 // withinCodeBraces is defaulted to `false` in IntelliJ's Kotlin formatting.
-                if (c.getBody().getEnd().getWhitespace().equals(" ")) {
+                if (" ".equals(c.getBody().getEnd().getWhitespace())) {
                     c = c.withBody(c.getBody().withEnd(c.getBody().getEnd().withWhitespace("")));
                 }
             }
@@ -801,14 +801,14 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                 );
             }
         } else {
-            if (operator.getBefore().getWhitespace().equals(" ")) {
+            if (" ".equals(operator.getBefore().getWhitespace())) {
                 binary = padding.withOperator(
                         operator.withBefore(
                                 operator.getBefore().withWhitespace("")
                         )
                 );
             }
-            if (binary.getRight().getPrefix().getWhitespace().equals(" ")) {
+            if (" ".equals(binary.getRight().getPrefix().getWhitespace())) {
                 binary = binary.withRight(
                         binary.getRight().withPrefix(
                                 binary.getRight().getPrefix().withWhitespace("")
@@ -838,7 +838,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                 );
             }
         } else {
-            if (operator.getBefore().getWhitespace().equals(" ")) {
+            if (" ".equals(operator.getBefore().getWhitespace())) {
                 binary = padding.withOperator(
                         operator.withBefore(
                                 operator.getBefore().withWhitespace("")
@@ -884,7 +884,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                             unary.getExpression().getPrefix().withWhitespace(" ")
                     )
             );
-        } else if (!useAroundUnaryOperatorSpace && unary.getExpression().getPrefix().getWhitespace().equals(" ")) {
+        } else if (!useAroundUnaryOperatorSpace && " ".equals(unary.getExpression().getPrefix().getWhitespace())) {
             unary = unary.withExpression(
                     unary.getExpression().withPrefix(
                             unary.getExpression().getPrefix().withWhitespace("")
@@ -903,7 +903,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                             operator.getBefore().withWhitespace(" ")
                     )
             );
-        } else if (!useAroundUnaryOperatorSpace && operator.getBefore().getWhitespace().equals(" ")) {
+        } else if (!useAroundUnaryOperatorSpace && " ".equals(operator.getBefore().getWhitespace())) {
             u = padding.withOperator(
                     operator.withBefore(
                             operator.getBefore().withWhitespace("")
@@ -942,7 +942,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         List<JRightPadded<J>> parameters = l.getParameters().getPadding().getParams();
         if (!parameters.isEmpty()) {
             Space after = parameters.get(parameters.size() - 1).getAfter();
-            lastParamHasSpace = (after.getComments().isEmpty() && onlySpacesAndNotEmpty(after.getWhitespace()));
+            lastParamHasSpace = after.getComments().isEmpty() && onlySpacesAndNotEmpty(after.getWhitespace());
         }
 
         if (lastParamHasSpace) {
@@ -1026,7 +1026,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public J.ArrayAccess visitArrayAccess(J.ArrayAccess arrayAccess, P p) {
         J.ArrayAccess a = super.visitArrayAccess(arrayAccess, p);
-        if (a.getDimension().getPadding().getIndex().getElement().getPrefix().getWhitespace().equals(" ")) {
+        if (" ".equals(a.getDimension().getPadding().getIndex().getElement().getPrefix().getWhitespace())) {
             a = a.withDimension(
                     a.getDimension().getPadding().withIndex(
                             a.getDimension().getPadding().getIndex().withElement(
@@ -1037,7 +1037,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                     )
             );
         }
-        if (a.getDimension().getPadding().getIndex().getAfter().getWhitespace().equals(" ")) {
+        if (" ".equals(a.getDimension().getPadding().getIndex().getAfter().getWhitespace())) {
             a = a.withDimension(
                     a.getDimension().getPadding().withIndex(
                             a.getDimension().getPadding().getIndex().withAfter(
@@ -1053,7 +1053,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     public <T extends J> J.Parentheses<T> visitParentheses(J.Parentheses<T> parens, P p) {
         J.Parentheses<T> p2 = super.visitParentheses(parens, p);
 
-        if (p2.getPadding().getTree().getElement().getPrefix().getWhitespace().equals(" ")) {
+        if (" ".equals(p2.getPadding().getTree().getElement().getPrefix().getWhitespace())) {
             p2 = p2.getPadding().withTree(
                     p2.getPadding().getTree().withElement(
                             p2.getPadding().getTree().getElement().withPrefix(
@@ -1062,7 +1062,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                     )
             );
         }
-        if (p2.getPadding().getTree().getAfter().getWhitespace().equals(" ")) {
+        if (" ".equals(p2.getPadding().getTree().getAfter().getWhitespace())) {
             p2 = p2.getPadding().withTree(
                     p2.getPadding().getTree().withAfter(
                             p2.getPadding().getTree().getAfter().withWhitespace("")

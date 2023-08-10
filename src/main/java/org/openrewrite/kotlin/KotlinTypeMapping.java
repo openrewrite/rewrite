@@ -1163,7 +1163,9 @@ public class KotlinTypeMapping implements JavaTypeMapping<Object> {
         List<JavaType.FullyQualified> annotations = new ArrayList<>(firAnnotations.size());
         for (FirAnnotation firAnnotation : firAnnotations) {
             FirRegularClassSymbol symbol = TypeUtilsKt.toRegularClassSymbol(FirTypeUtilsKt.getConeType(firAnnotation.getTypeRef()), firSession);
-            if (skipAnnotation(symbol)) continue;
+            if (skipAnnotation(symbol)) {
+                continue;
+            }
             JavaType.FullyQualified fq = TypeUtils.asFullyQualified(type(firAnnotation.getTypeRef()));
             if (fq != null) {
                 annotations.add(fq);

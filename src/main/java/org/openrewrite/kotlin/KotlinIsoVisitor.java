@@ -336,8 +336,8 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
-    public J.Synchronized visitSynchronized(J.Synchronized _sync, P p) {
-        return (J.Synchronized) super.visitSynchronized(_sync, p);
+    public J.Synchronized visitSynchronized(J.Synchronized sync, P p) {
+        return (J.Synchronized) super.visitSynchronized(sync, p);
     }
 
     @Override

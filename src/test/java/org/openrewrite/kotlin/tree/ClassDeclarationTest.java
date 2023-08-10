@@ -32,10 +32,7 @@ class ClassDeclarationTest implements RewriteTest {
     void crlf() {
         rewriteRun(
           kotlin(
-            new StringBuilder()
-              .append("package some.other.name\r\n")
-              .append("class A { }\r\n")
-              .append("class B { }").toString()
+            "package some.other.name\r\n" + "class A { }\r\n" + "class B { }"
           )
         );
     }

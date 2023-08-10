@@ -128,7 +128,7 @@ class FieldAccessTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
               @Override
               public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
-                  if (variable.getSimpleName().equals("pattern")) {
+                  if ("pattern".equals(variable.getSimpleName())) {
                       JavaType.Variable variableType = variable.getVariableType();
                       assertThat(variableType).isNotNull();
                       assertThat(variableType.getName()).isEqualTo("pattern");
@@ -151,7 +151,7 @@ class FieldAccessTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new KotlinIsoVisitor<>() {
               @Override
               public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
-                  if (fieldAccess.getSimpleName().equals("MIN_VALUE")) {
+                  if ("MIN_VALUE".equals(fieldAccess.getSimpleName())) {
                       JavaType.Variable fieldType = fieldAccess.getName().getFieldType();
                       assertThat(fieldType).isNotNull();
                       assertThat(fieldType.getName()).isEqualTo("MIN_VALUE");

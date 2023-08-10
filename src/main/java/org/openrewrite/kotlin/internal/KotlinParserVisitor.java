@@ -2888,10 +2888,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         int saveCursor = cursor;
         whitespace();
         String opText = node.getOperationReference().getNode().getText();
-        boolean isCompoundAssignment = opText.equals("-=") ||
-                opText.equals("+=") ||
-                opText.equals("*=") ||
-                opText.equals("/=");
+        boolean isCompoundAssignment = "-=".equals(opText) ||
+                "+=".equals(opText) ||
+                "*=".equals(opText) ||
+                "/=".equals(opText);
         cursor(saveCursor);
 
         if (isCompoundAssignment) {

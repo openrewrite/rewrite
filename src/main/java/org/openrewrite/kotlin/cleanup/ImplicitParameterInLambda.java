@@ -88,7 +88,7 @@ public class ImplicitParameterInLambda extends Recipe {
             }
 
             J.VariableDeclarations.NamedVariable v = vs.getVariables().get(0);
-            if (v.getSimpleName().equals("it")) {
+            if ("it".equals(v.getSimpleName())) {
                 return true;
             }
         }

@@ -85,7 +85,7 @@ public class RenameTypeAlias extends Recipe {
             Object maybeVd = cursor.getParentTreeCursor().getValue();
             if (maybeVd instanceof J.VariableDeclarations) {
                 J.VariableDeclarations vd = (J.VariableDeclarations) maybeVd;
-                if (vd.getLeadingAnnotations().stream().anyMatch(it -> it.getSimpleName().equals("typealias"))) {
+                if (vd.getLeadingAnnotations().stream().anyMatch(it -> "typealias".equals(it.getSimpleName()))) {
                     return false;
                 }
             }
