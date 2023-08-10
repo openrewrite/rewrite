@@ -138,7 +138,7 @@ class ReloadableJava8Parser implements JavaParser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-
+        parsingListener.intermediateMessage("Compiling Java source files");
         if (classpath != null) { // override classpath
             if (context.get(JavaFileManager.class) != pfm) {
                 throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
@@ -180,6 +180,7 @@ class ReloadableJava8Parser implements JavaParser {
 
         return cus.entrySet().stream().map(cuByPath -> {
             Input input = cuByPath.getKey();
+            parsingListener.startedParsing(input);
             try {
                 ReloadableJava8ParserVisitor parser = new ReloadableJava8ParserVisitor(
                         input.getRelativePath(relativeTo),

@@ -39,6 +39,7 @@ public class ProtoParser implements Parser {
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).map(input -> {
+                    parsingListener.startedParsing(input);
                     Path path = input.getRelativePath(relativeTo);
                     try {
                         EncodingDetectingInputStream is = input.getSource(ctx);

@@ -19,7 +19,20 @@ import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 
 public interface ParsingEventListener {
-    ParsingEventListener NOOP = (input, sourceFile) -> {};
+    ParsingEventListener NOOP = new ParsingEventListener() {
+    };
 
-    void parsed(Parser.Input input, SourceFile sourceFile);
+    /**
+     * Parsers may call this one or more times before parsing begins on any one source file
+     * to indicate to listeners preparatory steps that are about to be taken.
+     * @param stateMessage The message to the listener.
+     */
+    default void intermediateMessage(String stateMessage) {
+    }
+
+    default void startedParsing(Parser.Input input) {
+    }
+
+    default void parsed(Parser.Input input, SourceFile sourceFile) {
+    }
 }

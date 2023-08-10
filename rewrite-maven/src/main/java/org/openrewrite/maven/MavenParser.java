@@ -26,6 +26,7 @@ import org.openrewrite.maven.tree.Parent;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.tree.ParseError;
+import org.openrewrite.tree.ParsingExecutionContextView;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
@@ -94,6 +95,7 @@ public class MavenParser implements Parser {
             }
         }
 
+        ParsingExecutionContextView.view(ctx).getParsingListener().intermediateMessage("Resolving Maven dependencies");
         MavenPomDownloader downloader = new MavenPomDownloader(projectPomsByPath, ctx);
 
         MavenExecutionContextView mavenCtx = MavenExecutionContextView.view(ctx);

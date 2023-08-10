@@ -148,9 +148,11 @@ public class ReloadableJava17Parser implements JavaParser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
+        parsingListener.intermediateMessage("Compiling Java source files");
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
         return cus.entrySet().stream().map(cuByPath -> {
             Input input = cuByPath.getKey();
+            parsingListener.startedParsing(input);
             try {
                 ReloadableJava17ParserVisitor parser = new ReloadableJava17ParserVisitor(
                         input.getRelativePath(relativeTo),

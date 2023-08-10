@@ -127,6 +127,7 @@ public class GroovyParser implements Parser {
                                 errorCollector
                         );
 
+                        pctx.getParsingListener().startedParsing(input);
                         CompilationUnit compUnit = new CompilationUnit(configuration, null, classLoader, classLoader);
                         compUnit.addSource(unit);
                         compUnit.compile(Phases.CANONICALIZATION);

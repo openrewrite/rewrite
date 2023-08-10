@@ -62,10 +62,11 @@ public class PlainTextParser implements Parser {
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo,
                                           ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        return StreamSupport.stream(sources.spliterator(), false).map(source -> {
-            Path path = source.getRelativePath(relativeTo);
+        return StreamSupport.stream(sources.spliterator(), false).map(input -> {
+            Path path = input.getRelativePath(relativeTo);
+            parsingListener.startedParsing(input);
             try {
-                EncodingDetectingInputStream is = source.getSource(ctx);
+                EncodingDetectingInputStream is = input.getSource(ctx);
                 String sourceStr = is.readFully();
                 PlainText plainText = new PlainText(
                         randomId(),
@@ -73,16 +74,16 @@ public class PlainTextParser implements Parser {
                         Markers.EMPTY,
                         is.getCharset().name(),
                         is.isCharsetBomMarked(),
-                        source.getFileAttributes(),
+                        input.getFileAttributes(),
                         null,
                         sourceStr,
                         null
                 );
-                parsingListener.parsed(source, plainText);
+                parsingListener.parsed(input, plainText);
                 return plainText;
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
-                return ParseError.build(this, source, relativeTo, ctx, t);
+                return ParseError.build(this, input, relativeTo, ctx, t);
             }
         });
     }

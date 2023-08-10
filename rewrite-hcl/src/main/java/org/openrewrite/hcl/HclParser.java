@@ -48,6 +48,7 @@ public class HclParser implements Parser {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles).map(input -> {
             try {
+                parsingListener.startedParsing(input);
                 EncodingDetectingInputStream is = input.getSource(ctx);
                 String sourceStr = is.readFully();
 
