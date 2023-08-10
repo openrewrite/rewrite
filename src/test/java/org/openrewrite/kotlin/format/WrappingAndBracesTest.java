@@ -361,6 +361,14 @@ class WrappingAndBracesTest implements RewriteTest {
                       @Suppress("ALL") var foo: Int
                   }
               }
+              """,
+            """
+              class Test {
+                  public fun doSomething() {
+                      @Suppress("ALL")
+               var foo: Int
+                  }
+              }
               """
           )
         );

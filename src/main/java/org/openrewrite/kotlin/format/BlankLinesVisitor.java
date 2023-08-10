@@ -273,13 +273,13 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
                     return minimumLines(m, style.getMinimum().getBeforeDeclarationWithCommentOrAnnotation());
                 }
 
-                if (hasAnnotation(m)) {
+                if (!m.getLeadingAnnotations().isEmpty()) {
                     return minimumLines(m, style.getMinimum().getBeforeDeclarationWithCommentOrAnnotation());
                 }
             } else if (statement instanceof J.VariableDeclarations) {
                 J.VariableDeclarations v = (J.VariableDeclarations) statement;
 
-                if (hasAnnotation(v)) {
+                if (!v.getLeadingAnnotations().isEmpty()) {
                     return minimumLines(v, style.getMinimum().getBeforeDeclarationWithCommentOrAnnotation());
                 }
             }
@@ -388,28 +388,6 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
             }
         }
         return newLineCount;
-    }
-
-    public static boolean hasAnnotation(J.MethodDeclaration m) {
-        boolean hasAnnotation = false;
-        for (J.Modifier mod: m.getModifiers()) {
-            if (!mod.getAnnotations().isEmpty()) {
-                hasAnnotation = true;
-                break;
-            }
-        }
-        return hasAnnotation;
-    }
-
-    public static boolean hasAnnotation(J.VariableDeclarations v) {
-        boolean hasAnnotation = false;
-        for (J.Modifier mod: v.getModifiers()) {
-            if (!mod.getAnnotations().isEmpty()) {
-                hasAnnotation = true;
-                break;
-            }
-        }
-        return hasAnnotation;
     }
 
     @Nullable

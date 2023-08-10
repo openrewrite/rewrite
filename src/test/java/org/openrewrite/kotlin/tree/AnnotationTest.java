@@ -18,9 +18,11 @@ package org.openrewrite.kotlin.tree;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings({"RedundantSuppression", "RedundantNullableReturnType", "RedundantVisibilityModifier", "UnusedReceiverParameter", "SortModifiers"})
@@ -86,6 +88,27 @@ class AnnotationTest implements RewriteTest {
               @SuppressWarnings ( "ConstantConditions" , "unchecked" )
               class A
               """
+          )
+        );
+    }
+
+    @Test
+    void leadingAnnotations() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Anno
+              annotation class Anno2
+              class Test {
+                  @Anno
+                  @Anno2
+                  val id: String = "1"
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations v = (J.VariableDeclarations) ((J.ClassDeclaration) cu.getStatements().get(2)).getBody().getStatements().get(0);
+                assertThat(v.getLeadingAnnotations().size()).isEqualTo(2);
+            })
           )
         );
     }

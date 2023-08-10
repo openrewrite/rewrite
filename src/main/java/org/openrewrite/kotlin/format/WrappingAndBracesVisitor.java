@@ -170,7 +170,15 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
         }
 
         if (!c.getLeadingAnnotations().isEmpty()) {
-            if (!c.getModifiers().isEmpty()) {
+            boolean hasModifier = false;
+            for (J.Modifier mod : c.getModifiers()) {
+                if (mod.getType() != J.Modifier.Type.Final) {
+                    hasModifier = true;
+                    break;
+                }
+            }
+
+            if (hasModifier) {
                 c = c.withModifiers(withNewline(c.getModifiers()));
             } else {
                 J.ClassDeclaration.Kind kind = c.getAnnotations().getKind();
@@ -180,7 +188,6 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
                     ));
                 }
             }
-
         }
         return c;
     }
