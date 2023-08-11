@@ -18,14 +18,19 @@ package org.openrewrite.gradle;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.gradle.util.Dependency;
+import org.openrewrite.gradle.util.DependencyStringNotationConverter;
 import org.openrewrite.groovy.GroovyVisitor;
+import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.semver.DependencyMatcher;
 
 import java.time.Duration;
+import java.util.List;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -85,11 +90,81 @@ public class ChangeDependencyConfiguration extends Recipe {
                     return m;
                 }
 
-                if (!newConfiguration.equals(m.getSimpleName())) {
-                    m = m.withName(m.getName().withSimpleName(newConfiguration));
+                DependencyMatcher dependencyMatcher = new DependencyMatcher(groupId, artifactId, null);
+                List<Expression> args = m.getArguments();
+                if (args.get(0) instanceof J.Literal) {
+                    J.Literal arg = (J.Literal) args.get(0);
+                    if (!(arg.getValue() instanceof String)) {
+                        return m;
+                    }
+
+                    Dependency dependency = DependencyStringNotationConverter.parse((String) arg.getValue());
+                    if (!dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                        return m;
+                    }
+                } else if (args.get(0) instanceof G.GString) {
+                    G.GString gString = (G.GString) args.get(0);
+                    List<J> strings = gString.getStrings();
+                    if (strings.size() != 2 || !(strings.get(0) instanceof J.Literal) || !(strings.get(1) instanceof G.GString.Value)) {
+                        return m;
+                    }
+                    J.Literal groupArtifact = (J.Literal) strings.get(0);
+                    if (!(groupArtifact.getValue() instanceof String)) {
+                        return m;
+                    }
+
+                    Dependency dependency = DependencyStringNotationConverter.parse((String) groupArtifact.getValue());
+                    if (!dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                        return m;
+                    }
+                } else if (args.get(0) instanceof G.MapEntry && args.size() >= 2) {
+                    Expression groupValue = ((G.MapEntry) args.get(0)).getValue();
+                    Expression artifactValue = ((G.MapEntry) args.get(1)).getValue();
+                    if (!(groupValue instanceof J.Literal) || !(artifactValue instanceof J.Literal)) {
+                        return m;
+                    }
+                    J.Literal groupLiteral = (J.Literal) groupValue;
+                    J.Literal artifactLiteral = (J.Literal) artifactValue;
+                    if (!(groupLiteral.getValue() instanceof String) || !(artifactLiteral.getValue() instanceof String)) {
+                        return m;
+                    }
+
+                    if (!dependencyMatcher.matches((String) groupLiteral.getValue(), (String) artifactLiteral.getValue())) {
+                        return m;
+                    }
+                } else if (args.get(0) instanceof J.MethodInvocation) {
+                    J.MethodInvocation inner = (J.MethodInvocation) args.get(0);
+                    if (!(inner.getSimpleName().equals("project") || inner.getSimpleName().equals("platform") || inner.getSimpleName().equals("enforcedPlatform"))) {
+                        return m;
+                    }
+                    List<Expression> innerArgs = inner.getArguments();
+                    if (!(innerArgs.get(0) instanceof J.Literal)) {
+                        return m;
+                    }
+                    J.Literal value = (J.Literal) innerArgs.get(0);
+                    if (!(value.getValue() instanceof String)) {
+                        return m;
+                    }
+
+                    Dependency dependency;
+                    if (inner.getSimpleName().equals("project")) {
+                        dependency = new Dependency("", ((String) value.getValue()).substring(1), null, null, null);
+                    } else {
+                        dependency = DependencyStringNotationConverter.parse((String) value.getValue());
+                    }
+
+                    if (!dependencyMatcher.matches(dependency.getGroupId(), dependency.getArtifactId())) {
+                        return m;
+                    }
+                } else {
+                    return m;
                 }
 
-                return m;
+                if (newConfiguration.equals(m.getSimpleName())) {
+                    return m;
+                }
+
+                return m.withName(m.getName().withSimpleName(newConfiguration));
             }
         });
     }
