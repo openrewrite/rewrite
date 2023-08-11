@@ -78,6 +78,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
     }
 
 
+    @SuppressWarnings("StatementWithEmptyBody")
     @Override
     @Nullable
     public J preVisit(@Nullable J tree, P p) {
@@ -96,8 +97,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                 tree instanceof J.ForEachLoop ||
                 tree instanceof J.WhileLoop ||
                 tree instanceof J.Case ||
-                tree instanceof J.EnumValueSet
-                ) {
+                tree instanceof J.EnumValueSet) {
             getCursor().putMessage("indentType", IndentType.INDENT);
         } else if (tree instanceof K.ExpressionStatement ||
                    tree instanceof K.StatementExpression ||
@@ -141,6 +141,14 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
             // when annotations are on their own line, other parts of the declaration that follow are aligned left to it
             alignToAnnotation = getCursor().pollNearestMessage("afterAnnotation") != null &&
                     !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);
+
+            if ((loc == Space.Location.CLASS_KIND || loc == Space.Location.METHOD_DECLARATION_PREFIX)
+                && getCursor().getValue() instanceof J.ClassDeclaration) {
+                J.ClassDeclaration c = (J.ClassDeclaration) getCursor().getValue();
+                if (!c.getLeadingAnnotations().isEmpty()) {
+                    alignToAnnotation = true;
+                }
+            }
         }
 
         if (space.getComments().isEmpty() && !space.getLastWhitespace().contains("\n") || parent == null) {

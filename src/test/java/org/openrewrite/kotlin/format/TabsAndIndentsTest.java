@@ -712,807 +712,822 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-//    @Test
-//    void tryCatchFinally() {
-//        rewriteRun(
-//          java(
-//            """
-//              public class Test {
-//              public void test(boolean a, int x, int y) {
-//              try {
-//              int someVariable = a ? x : y;
-//              } catch (Exception e) {
-//              e.printStackTrace();
-//              } finally {
-//              a = false;
-//              }
-//              }
-//              }
-//              """,
-//            """
-//              public class Test {
-//                  public void test(boolean a, int x, int y) {
-//                      try {
-//                          int someVariable = a ? x : y;
-//                      } catch (Exception e) {
-//                          e.printStackTrace();
-//                      } finally {
-//                          a = false;
-//                      }
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void doWhile() {
-//        rewriteRun(
-//          java(
-//            """
-//              public class Test {
-//              public void test() {
-//              do {
-//              }
-//              while(true);
-//
-//              labeled: do {
-//              }
-//              while(false);
-//              }
-//              }
-//              """,
-//            """
-//              public class Test {
-//                  public void test() {
-//                      do {
-//                      }
-//                      while(true);
-//
-//                      labeled: do {
-//                      }
-//                      while(false);
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void elseBody() {
-//        rewriteRun(
-//          java(
-//            """
-//              public class Test {
-//              public void test(boolean a, int x, int y, int z) {
-//              if (x > 0) {
-//              } else if (x < 0) {
-//              y += z;
-//              }
-//              }
-//              }
-//              """,
-//            """
-//              public class Test {
-//                  public void test(boolean a, int x, int y, int z) {
-//                      if (x > 0) {
-//                      } else if (x < 0) {
-//                          y += z;
-//                      }
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @ExpectedToFail
-//    @Test
-//    void forLoop() {
-//        rewriteRun(
-//          tabsAndIndents(style -> style.withContinuationIndent(2)),
-//          java(
-//            """
-//              public class Test {
-//                  public void test() {
-//                  int m = 0;
-//                  int n = 0;
-//                  for (
-//                   int i = 0
-//                   ;
-//                   i < 5
-//                   ;
-//                   i++, m++, n++
-//                  );
-//                  for (int i = 0;
-//                   i < 5;
-//                   i++, m++, n++);
-//                  labeled: for (int i = 0;
-//                   i < 5;
-//                   i++, m++, n++);
-//                  }
-//              }
-//              """,
-//            """
-//              public class Test {
-//                  public void test() {
-//                      int m = 0;
-//                      int n = 0;
-//                      for (
-//                        int i = 0
-//                        ;
-//                        i < 5
-//                        ;
-//                        i++, m++, n++
-//                      );
-//                      for (int i = 0;
-//                           i < 5;
-//                           i++, m++, n++);
-//                      labeled: for (int i = 0;
-//                                    i < 5;
-//                                    i++, m++, n++);
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void methodDeclaration() {
-//        rewriteRun(
-//          tabsAndIndents(style -> style.withContinuationIndent(2)),
-//          java(
-//            """
-//              public class Test {
-//                  public void test(int a,
-//                                   int b) {}
-//
-//                  public void test2(
-//                    int a,
-//                    int b) {}
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void lineComment() {
-//        rewriteRun(
-//          java(
-//            """
-//              public class A {
-//                // comment at indent 2
-//              public void method() {}
-//              }
-//              """,
-//            """
-//              public class A {
-//                  // comment at indent 2
-//                  public void method() {}
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void noIndexOutOfBoundsUsingSpaces() {
-//        rewriteRun(
-//          java(
-//            """
-//              public class A {
-//                // length = 1 from new line.
-//                    int valA = 10; // text.length = 1 + shift -2 == -1.
-//              }
-//              """,
-//            """
-//              public class A {
-//                  // length = 1 from new line.
-//                  int valA = 10; // text.length = 1 + shift -2 == -1.
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void noIndexOutOfBoundsUsingTabs() {
-//        rewriteRun(
-//          tabsAndIndents(style -> style.withUseTabCharacter(true).withTabSize(1).withIndentSize(1)),
-//          java(
-//            """
-//              class Test {
-//              	void test() {
-//              		System.out.println(); // comment
-//              	}
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void blockComment() {
-//        rewriteRun(
-//          java(
-//            """
-//              public class A {
-//              /*a
-//                b*/
-//              public void method() {}
-//              }
-//              """,
-//            """
-//              public class A {
-//                  /*a
-//                    b*/
-//                  public void method() {}
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @SuppressWarnings("TextBlockMigration")
-//    @Test
-//    void blockCommentCRLF() {
-//        rewriteRun(
-//          java(
-//            "public class A {\r\n" +
-//              "/*a\r\n" +
-//              "  b*/\r\n" +
-//              "public void method() {}\r\n" +
-//              "}",
-//            "public class A {\r\n" +
-//              "    /*a\r\n" +
-//              "      b*/\r\n" +
-//              "    public void method() {}\r\n" +
-//              "}"
-//          )
-//        );
-//    }
-//
-//    @SuppressWarnings("EmptyClassInitializer")
-//    @Test
-//    void initBlocks() {
-//        rewriteRun(
-//          java(
-//            """
-//              class Test {
-//                  static {
-//                      System.out.println("hi");
-//                  }
-//
-//                  {
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void moreAnnotations() {
-//        rewriteRun(
-//          java(
-//            """
-//              import lombok.EqualsAndHashCode;
-//              import java.util.UUID;
-//              class Test {
-//                  @SuppressWarnings(
-//                          value = "unchecked"
-//                  )
-//                  @EqualsAndHashCode.Include
-//                  UUID id;
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void annotations() {
-//        rewriteRun(
-//          java(
-//            """
-//              @Deprecated
-//              @SuppressWarnings("ALL")
-//              public class A {
-//              @Deprecated
-//              @SuppressWarnings("ALL")
-//                  class B {
-//                  }
-//              }
-//              """,
-//            """
-//              @Deprecated
-//              @SuppressWarnings("ALL")
-//              public class A {
-//                  @Deprecated
-//                  @SuppressWarnings("ALL")
-//                  class B {
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void javadoc() {
-//        rewriteRun(
-//          java(
-//            """
-//              public class A {
-//              /**
-//                      * This is a javadoc
-//                          */
-//                  public void method() {}
-//              }
-//              """,
-//            """
-//              public class A {
-//                  /**
-//                   * This is a javadoc
-//                   */
-//                  public void method() {}
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void tabs() {
-//        rewriteRun(
-//          // TIP: turn on "Show Whitespaces" in the IDE to see this test clearly
-//          tabsAndIndents(style -> style.withUseTabCharacter(true)),
-//          java(
-//            """
-//              public class A {
-//              	public void method() {
-//              	int n = 0;
-//              	}
-//              }
-//              """,
-//            """
-//              public class A {
-//              	public void method() {
-//              		int n = 0;
-//              	}
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void shiftRight() {
-//        rewriteRun(
-//          java(
-//            """
-//              public class Test {
-//                  public void test(boolean a, int x, int y) {
-//                      try {
-//                  int someVariable = a ? x : y;
-//                      } catch (Exception e) {
-//                          e.printStackTrace();
-//                      } finally {
-//                          a = false;
-//                      }
-//                  }
-//              }
-//              """,
-//            """
-//              public class Test {
-//                  public void test(boolean a, int x, int y) {
-//                      try {
-//                          int someVariable = a ? x : y;
-//                      } catch (Exception e) {
-//                          e.printStackTrace();
-//                      } finally {
-//                          a = false;
-//                      }
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void shiftRightTabs() {
-//        rewriteRun(
-//          tabsAndIndents(style -> style.withUseTabCharacter(true)),
-//          java(
-//            """
-//              public class Test {
-//              	public void test(boolean a, int x, int y) {
-//              		try {
-//              	int someVariable = a ? x : y;
-//              		} catch (Exception e) {
-//              			e.printStackTrace();
-//              		} finally {
-//              			a = false;
-//              		}
-//              	}
-//              }
-//              """,
-//            """
-//              public class Test {
-//              	public void test(boolean a, int x, int y) {
-//              		try {
-//              			int someVariable = a ? x : y;
-//              		} catch (Exception e) {
-//              			e.printStackTrace();
-//              		} finally {
-//              			a = false;
-//              		}
-//              	}
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void shiftLeft() {
-//        rewriteRun(
-//          java(
-//            """
-//              public class Test {
-//                  public void test(boolean a, int x, int y) {
-//                      try {
-//                                              int someVariable = a ? x : y;
-//                      } catch (Exception e) {
-//                          e.printStackTrace();
-//                      } finally {
-//                          a = false;
-//                      }
-//                  }
-//              }
-//              """,
-//            """
-//              public class Test {
-//                  public void test(boolean a, int x, int y) {
-//                      try {
-//                          int someVariable = a ? x : y;
-//                      } catch (Exception e) {
-//                          e.printStackTrace();
-//                      } finally {
-//                          a = false;
-//                      }
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void shiftLeftTabs() {
-//        rewriteRun(
-//          tabsAndIndents(style -> style.withUseTabCharacter(true)),
-//          java(
-//            """
-//              public class Test {
-//              	public void test(boolean a, int x, int y) {
-//              		try {
-//              				int someVariable = a ? x : y;
-//              		} catch (Exception e) {
-//              			e.printStackTrace();
-//              		} finally {
-//              			a = false;
-//              		}
-//              	}
-//              }
-//              """,
-//            """
-//              public class Test {
-//              	public void test(boolean a, int x, int y) {
-//              		try {
-//              			int someVariable = a ? x : y;
-//              		} catch (Exception e) {
-//              			e.printStackTrace();
-//              		} finally {
-//              			a = false;
-//              		}
-//              	}
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void nestedIfElse() {
-//        rewriteRun(
-//          java(
-//            """
-//              class Test {
-//                  void method() {
-//                      if (true) { // comment
-//                          if (true) {
-//                          } else {
-//                          }
-//                      }
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void annotationOnSameLine() {
-//        rewriteRun(
-//          java(
-//            """
-//              class Test {
-//                  @Deprecated int method() {
-//                      return 1;
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void newClassAsMethodArgument() {
-//        rewriteRun(
-//          java(
-//            """
-//              class Test {
-//                  Test(String s, int m) {
-//                  }
-//
-//                  void method(Test t) {
-//                      method(new Test("hello" +
-//                              "world",
-//                              1));
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void methodArgumentsThatDontStartOnNewLine() {
-//        rewriteRun(
-//          java(
-//            """
-//              import java.io.File;
-//              class Test {
-//                  void method(int n, File f, int m, int l) {
-//                      method(n, new File(
-//                                      "test"
-//                              ),
-//                              m,
-//                              l);
-//                  }
-//
-//                  void method2(int n, File f, int m) {
-//                      method(n, new File(
-//                                      "test"
-//                              ), m,
-//                              0);
-//                  }
-//
-//                  void method3(int n, File f) {
-//                      method2(n, new File(
-//                              "test"
-//                      ), 0);
-//                  }
-//
-//                  void method4(int n) {
-//                      method3(n, new File(
-//                              "test"
-//                      ));
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void methodArgumentsThatDontStartOnNewLine2() {
-//        rewriteRun(
-//          java(
-//            """
-//              class Test {
-//                  int method5(int n, int m) {
-//                      method5(1,
-//                              2);
-//                      return method5(method5(method5(method5(3,
-//                              4),
-//                              5),
-//                              6),
-//                              7);
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void identAndFieldAccess() {
-//        rewriteRun(
-//
-//          java(
-//            """
-//              import java.util.stream.Stream;
-//              class Test {
-//                  Test t = this;
-//                  Test method(Stream n, int m) {
-//                      this.t.t
-//                              .method(null, 1)
-//                              .t
-//                              .method(null, 2);
-//                      Stream
-//                              .of("a");
-//                      method(Stream
-//                                      .of("a"),
-//                              3
-//                      );
-//                      return this;
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void lambda() {
-//        rewriteRun(
-//          java(
-//            """
-//              import java.util.function.Supplier;
-//              public class Test {
-//                  public void method(int n) {
-//                      Supplier<Integer> ns = () ->
-//                          n;
-//                  }
-//              }
-//              """,
-//            """
-//              import java.util.function.Supplier;
-//              public class Test {
-//                  public void method(int n) {
-//                      Supplier<Integer> ns = () ->
-//                              n;
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void lambdaWithBlock() {
-//        rewriteRun(
-//          java(
-//            """
-//              import java.util.function.Supplier;
-//              class Test {
-//                  void method(Supplier<String> s, int n) {
-//                      method(() -> {
-//                                  return "hi";
-//                              },
-//                              n);
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void enums() {
-//        rewriteRun(
-//          java(
-//            """
-//              enum Scope {
-//                  None, // the root of a resolution tree
-//                  Compile,
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void twoThrows() {
-//        rewriteRun(
-//          java(
-//            """
-//              import java.io.IOException;
-//              class Test {
-//                  void method() throws IOException,
-//                          Exception {
-//                  }
-//
-//                  void method2()
-//                          throws IOException,
-//                          Exception {
-//                  }
-//              }
-//               """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void twoTypeParameters() {
-//        rewriteRun(
-//          java("interface A {}"),
-//          java("interface B{}"),
-//          java(
-//            """
-//              class Test<A,
-//                      B> {
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void twoImplements() {
-//        rewriteRun(
-//          java("interface A {}"),
-//          java("interface B{}"),
-//          java(
-//            """
-//              class Test implements A,
-//                      B {
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void fieldsWhereClassHasAnnotation() {
-//        rewriteRun(
-//          java(
-//            """
-//              @Deprecated
-//              class Test {
-//                  String groupId;
-//                  String artifactId;
-//              }
-//              """
-//          )
-//        );
-//    }
+    @Test
+    void tryCatchFinally() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+              fun test(a: Boolean, x: Int, y: Int) {
+              try {
+              var someVariable = if (a) x else y;
+              } catch (e: Exception) {
+              e.printStackTrace()
+              } finally {
+              var b = false
+              }
+              }
+              }
+              """,
+            """
+              class Test {
+                  fun test(a: Boolean, x: Int, y: Int) {
+                      try {
+                          var someVariable = if (a) x else y;
+                      } catch (e: Exception) {
+                          e.printStackTrace()
+                      } finally {
+                          var b = false
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doWhile() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+              public fun test() {
+              do {
+              }
+              while(true);
+
+              labeled@ do {
+              }
+              while(false);
+              }
+              }
+              """,
+            """
+              class Test {
+                  public fun test() {
+                      do {
+                      }
+                      while(true);
+
+                      labeled@ do {
+                      }
+                      while(false);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void elseBody() {
+        rewriteRun(
+          kotlin(
+            """
+              public class Test {
+              public fun test(a: Boolean, x: Int, y: Int, z: Int) {
+              if (x > 0) {
+              } else if (x < 0) {
+              var m = z
+              }
+              }
+              }
+              """,
+            """
+              public class Test {
+                  public fun test(a: Boolean, x: Int, y: Int, z: Int) {
+                      if (x > 0) {
+                      } else if (x < 0) {
+                          var m = z
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail
+    @Test
+    void forLoop() {
+        rewriteRun(
+          tabsAndIndents(style -> style.withContinuationIndent(2)),
+          kotlin(
+            """
+              class Test {
+              fun test() {
+              for (
+              i in 0..5
+              ) {
+              }
+
+              for (j
+              in 0..5
+              ) {
+              }
+
+              labeled@ for (i in
+              0..5) {
+              }
+              }
+              }
+              """,
+            """
+              class Test {
+                  fun test() {
+                      for (
+                      i in 0..5
+                      ) {
+                      }
+
+                      for (j
+                      in 0..5
+                      ) {
+                      }
+
+                      labeled@ for (i in
+                      0..5) {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodDeclaration() {
+        rewriteRun(
+          tabsAndIndents(style -> style.withContinuationIndent(2)),
+          kotlin(
+            """
+              public class Test {
+                  fun test(a: Int,
+                           b: Int) {
+                  }
+
+                  public fun test2(
+                    a: Int,
+                    b: Int) {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void lineComment() {
+        rewriteRun(
+          kotlin(
+            """
+              public class A {
+                // comment at indent 2
+              public fun method() {}
+              }
+              """,
+            """
+              public class A {
+                  // comment at indent 2
+                  public fun method() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noIndexOutOfBoundsUsingSpaces() {
+        rewriteRun(
+          kotlin(
+            """
+              public class A {
+                // length = 1 from new line.
+                    val valA = 10 // text.length = 1 + shift -2 == -1.
+              }
+              """,
+            """
+              public class A {
+                  // length = 1 from new line.
+                  val valA = 10 // text.length = 1 + shift -2 == -1.
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void noIndexOutOfBoundsUsingTabs() {
+        rewriteRun(
+          tabsAndIndents(style -> style.withUseTabCharacter(true).withTabSize(1).withIndentSize(1)),
+          kotlin(
+            """
+              class Test {
+              	fun test() {
+              		System.out.println() // comment
+              	}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void blockComment() {
+        rewriteRun(
+          kotlin(
+            """
+              public class A {
+              /*a
+                b*/
+              public fun method() {}
+              }
+              """,
+            """
+              public class A {
+                  /*a
+                    b*/
+                  public fun method() {}
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings("TextBlockMigration")
+    @Test
+    void blockCommentCRLF() {
+        rewriteRun(
+          kotlin(
+            "public class A {\r\n" +
+              "/*a\r\n" +
+              "  b*/\r\n" +
+              "public fun method() {}\r\n" +
+              "}",
+            "public class A {\r\n" +
+              "    /*a\r\n" +
+              "      b*/\r\n" +
+              "    public fun method() {}\r\n" +
+              "}"
+          )
+        );
+    }
+
+    @SuppressWarnings("EmptyClassInitializer")
+    @Test
+    void initBlocks() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  init {
+                      System.out.println("hi")
+                  }
+
+                  init {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void moreAnnotations() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Anno
+              
+              class Test {
+                  @Suppress(
+                          "unchecked"
+                  )
+                  @Anno
+                  var id: Int = 0
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotations() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Anno
+              
+              @Suppress("A")
+              @Anno
+                 class A {
+              @Anno
+              @Suppress("ALL")
+                 class B {
+              }
+              }
+              """,
+            """
+              annotation class Anno
+              
+              @Suppress("A")
+              @Anno
+              class A {
+                  @Anno
+                  @Suppress("ALL")
+                  class B {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Disabled("java doc is not parsed")
+    @Test
+    void javadoc() {
+        rewriteRun(
+          kotlin(
+            """
+              class A {
+              /**
+                      * This is a javadoc
+                          */
+                  fun method() {}
+              }
+              """,
+            """
+              class A {
+                  /**
+                   * This is a javadoc
+                   */
+                  fun method() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void tabs() {
+        rewriteRun(
+          // TIP: turn on "Show Whitespaces" in the IDE to see this test clearly
+          tabsAndIndents(style -> style.withUseTabCharacter(true)),
+          kotlin(
+            """
+              public class A {
+              	public fun method() {
+              	var n = 0
+              	}
+              }
+              """,
+            """
+              public class A {
+              	public fun method() {
+              		var n = 0
+              	}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void shiftRight() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  fun test(a: Boolean,  x: Int,  y: Int) {
+                      try {
+                  var someVariable = if (a) x else y
+                      } catch (e: Exception) {
+                          e.printStackTrace();
+                      } finally {
+                          var a = false;
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  fun test(a: Boolean,  x: Int,  y: Int) {
+                      try {
+                          var someVariable = if (a) x else y
+                      } catch (e: Exception) {
+                          e.printStackTrace();
+                      } finally {
+                          var a = false;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void shiftRightTabs() {
+        rewriteRun(
+          tabsAndIndents(style -> style.withUseTabCharacter(true)),
+          kotlin(
+            """
+              class Test {
+              	fun test(a: Boolean,  x: Int,  y: Int) {
+              		try {
+              	var someVariable = if (a) x else y
+              		} catch (e: Exception) {
+              			e.printStackTrace();
+              		} finally {
+              			var a = false;
+              		}
+              	}
+              }
+              """,
+            """
+              class Test {
+              	fun test(a: Boolean,  x: Int,  y: Int) {
+              		try {
+              			var someVariable = if (a) x else y
+              		} catch (e: Exception) {
+              			e.printStackTrace();
+              		} finally {
+              			var a = false;
+              		}
+              	}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void shiftLeft() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  fun test(a: Boolean,  x: Int,  y: Int) {
+                      try {
+                                                var someVariable = if (a) x else y
+                      } catch (e: Exception) {
+                          e.printStackTrace();
+                      } finally {
+                          var a = false;
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  fun test(a: Boolean,  x: Int,  y: Int) {
+                      try {
+                          var someVariable = if (a) x else y
+                      } catch (e: Exception) {
+                          e.printStackTrace();
+                      } finally {
+                          var a = false;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void shiftLeftTabs() {
+        rewriteRun(
+          tabsAndIndents(style -> style.withUseTabCharacter(true)),
+          kotlin(
+            """
+              class Test {
+              	fun test(a: Boolean,  x: Int,  y: Int) {
+              		try {
+              						var someVariable = if (a) x else y
+              		} catch (e: Exception) {
+              			e.printStackTrace();
+              		} finally {
+              			var a = false;
+              		}
+              	}
+              }
+              """,
+            """
+              class Test {
+              	fun test(a: Boolean,  x: Int,  y: Int) {
+              		try {
+              			var someVariable = if (a) x else y
+              		} catch (e: Exception) {
+              			e.printStackTrace();
+              		} finally {
+              			var a = false;
+              		}
+              	}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nestedIfElse() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  fun method() {
+                      if (true) { // comment
+                          if (true) {
+                          } else {
+                          }
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotationOnSameLine() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Anno
+              class Test {
+                  @Anno fun method(): Int {
+                      return 1
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void newClassAsMethodArgument() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  constructor(s: String, m: Int) {
+                  }
+
+                  fun method(t: Test) {
+                      method(Test("hello" +
+                              "world",
+                              1))
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodArgumentsThatDontStartOnNewLine() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.io.File;
+              class Test {
+                  fun method(n: Int,f: File,m: Int,l: Int) {
+                      method(n, File(
+                                      "test"
+                              ),
+                              m,
+                              l)
+                  }
+
+                  fun method2(n: Int,f: File,m: Int) {
+                      method(n, File(
+                                      "test"
+                              ), m,
+                              0)
+                  }
+
+                  fun method3(n: Int,f: File) {
+                      method2(n, File(
+                              "test"
+                      ), 0)
+                  }
+
+                  fun method4(n: Int) {
+                      method3(n, File(
+                              "test"
+                      ))
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void methodArgumentsThatDontStartOnNewLine2() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  fun method5(n: Int, m: Int) {
+                      method5(1,
+                              2);
+                      return method5(method5(method5(method5(3,
+                              4),
+                              5),
+                              6),
+                              7);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void identAndFieldAccess() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.util.stream.Stream;
+
+              class Test {
+                  var t: Test = this;
+                  fun method(n: Stream<*>?,m: Int): Test {
+                      this.t.t
+                              .method(null, 1)
+                              .t
+                              .method(null, 2);
+                      Stream
+                              .of("a");
+                      method(Stream
+                                      .of("a"),
+                              3
+                      );
+                      return this
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void lambda1() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.util.function.Supplier
+
+              class Test {
+                  fun method(n: Int) {
+                      val ns: Supplier<Int> = Supplier { ->
+                              n
+                      }
+                  }
+              }
+              """,
+            """
+              import java.util.function.Supplier
+
+              class Test {
+                  fun method(n: Int) {
+                      val ns: Supplier<Int> = Supplier { ->
+                          n
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void lambdaWithBlock() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.util.function.Supplier
+
+              class Test {
+                  fun method(s: Supplier<String>,  n: Int) {
+                      method({ ->
+                                  "hi"
+                              },
+                              n);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void enums() {
+        rewriteRun(
+          kotlin(
+            """
+              enum class Scope {
+                  None,
+                  Compile
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void twoThrows() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.io.IOException
+
+              class Test {
+                  @Throws(
+                          IOException::class,
+                          Exception::class)
+                      fun method() {
+                      }
+
+                  @Throws(IOException::class, Exception::class)
+                      fun method2() {
+                      }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void twoTypeParameters() {
+        rewriteRun(
+          kotlin(
+            """
+              interface A
+              interface B
+              class Test<A,
+                      B> {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void twoImplements() {
+        rewriteRun(
+          kotlin(
+            """
+              interface A
+              interface B
+
+              class Test : A, B {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldsWhereClassHasAnnotation() {
+        rewriteRun(
+          kotlin(
+            """
+              @Suppress("ALL")
+              class Test {
+                  val groupId: String = ""
+                  val artifactId: String = ""
+              }
+              """
+          )
+        );
+    }
 //
 //    @Test
 //    void methodWithAnnotation() {
 //        rewriteRun(
-//          java(
+//          kotlin(
 //            """
+//              annotation class Anno
+//
 //              class Test {
-//                  @Deprecated
-//                  @SuppressWarnings("all")
-//              String getOnError() {
+//                  @Anno
+//                  @Suppress("all")
+//                 fun getOnError(): String {
 //                      return "uh oh";
 //                  }
 //              }
 //              """,
 //            """
+//              annotation class Anno
+//
 //              class Test {
-//                  @Deprecated
-//                  @SuppressWarnings("all")
-//                  String getOnError() {
+//                  @Anno
+//                  @Suppress("all")
+//                  fun getOnError(): String {
 //                      return "uh oh";
 //                  }
 //              }
@@ -1520,6 +1535,7 @@ class TabsAndIndentsTest implements RewriteTest {
 //          )
 //        );
 //    }
+
 //
 //    @SuppressWarnings({"CStyleArrayDeclaration", "EnhancedSwitchMigration"})
 //    @Test
