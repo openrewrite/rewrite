@@ -3003,6 +3003,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 int exprSize = whenBranch.getCondition() instanceof FirEqualityOperatorCall ?
                         ((FirEqualityOperatorCall) whenBranch.getCondition()).getArgumentList().getArguments().size() - 1 : 1;
                 List<JRightPadded<Expression>> expressions = new ArrayList<>(exprSize);
+                Space branchPrefix = whitespace();
 
                 if (whenBranch.getCondition() instanceof FirElseIfTrueCondition) {
                     expressions.add(padRight(createIdentifier("else"), sourceBefore("->")));
@@ -3029,7 +3030,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 J body = visitElement(whenBranch.getResult(), ctx);
                 K.WhenBranch branch = new K.WhenBranch(
                         randomId(),
-                        EMPTY,
+                        branchPrefix,
                         Markers.EMPTY,
                         expressionContainer,
                         padRight(body, EMPTY));

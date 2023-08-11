@@ -20,9 +20,11 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.style.TabsAndIndentsStyle;
+import org.openrewrite.kotlin.tree.K;
 
 import java.util.Iterator;
 import java.util.List;
@@ -75,6 +77,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         return visit(tree, p);
     }
 
+
     @Override
     @Nullable
     public J preVisit(@Nullable J tree, P p) {
@@ -93,8 +96,16 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                 tree instanceof J.ForEachLoop ||
                 tree instanceof J.WhileLoop ||
                 tree instanceof J.Case ||
-                tree instanceof J.EnumValueSet) {
+                tree instanceof J.EnumValueSet
+                ) {
             getCursor().putMessage("indentType", IndentType.INDENT);
+        } else if (tree instanceof K.ExpressionStatement ||
+                   tree instanceof K.StatementExpression ||
+                   tree instanceof K.KReturn ||
+                   tree instanceof K.When ||
+                   tree instanceof K.WhenBranch ||
+                   (tree != null && tree.getMarkers().findFirst(ImplicitReturn.class).isPresent())) {
+            // skip, do nothing
         } else {
             getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
         }
@@ -117,6 +128,11 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public Space visitSpace(Space space, Space.Location loc, P p) {
         getCursor().putMessage("lastLocation", loc);
+
+        if (loc == Space.Location.RETURN_PREFIX) {
+            return space;
+        }
+
         boolean alignToAnnotation = false;
         Cursor parent = getCursor().getParent();
         if (parent != null && parent.getValue() instanceof J.Annotation) {

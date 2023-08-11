@@ -312,7 +312,7 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
                     return s;
                 }
 
-                return branch.withExpressions(ListUtils.mapFirst(branch.getExpressions(), s1 -> minimumLines(s1, style.getMinimum().getAroundWhenBranchWithBraces())));
+                return minimumLines(branch, style.getMinimum().getAroundWhenBranchWithBraces());
             }
 
             return s;
