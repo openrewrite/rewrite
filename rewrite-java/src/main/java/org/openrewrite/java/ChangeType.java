@@ -21,7 +21,6 @@ import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesType;
-import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.marker.SearchResult;
@@ -176,14 +175,10 @@ public class ChangeType extends Recipe {
                     JavaType.FullyQualified owningClass = fullyQualifiedTarget.getOwningClass();
                     if (!(owningClass != null && topLevelClassnames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName()))) {
                         if (owningClass != null && !"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
-                            assert sf != null;
-                            sf = (JavaSourceFile) sf.service(ImportService.class).addImportVisitor(owningClass.getPackageName(), owningClass.getClassName(), null, true)
-                                    .visit(sf, ctx, getCursor());
+                            maybeAddImport(owningClass.getPackageName(), owningClass.getClassName(), null, true);
                         }
                         if (!"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
-                            assert sf != null;
-                            sf = (JavaSourceFile) sf.service(ImportService.class).addImportVisitor(fullyQualifiedTarget.getPackageName(), fullyQualifiedTarget.getClassName(), null, true)
-                                    .visit(sf, ctx, getCursor());
+                            maybeAddImport(fullyQualifiedTarget.getPackageName(), fullyQualifiedTarget.getClassName(), null, true);
                         }
                     }
                 }
