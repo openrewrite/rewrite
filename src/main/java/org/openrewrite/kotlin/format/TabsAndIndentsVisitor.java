@@ -142,10 +142,18 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
             alignToAnnotation = getCursor().pollNearestMessage("afterAnnotation") != null &&
                     !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);
 
-            if ((loc == Space.Location.CLASS_KIND || loc == Space.Location.METHOD_DECLARATION_PREFIX)
+            if ((loc == Space.Location.CLASS_KIND ||
+                    loc == Space.Location.METHOD_DECLARATION_PREFIX)
                 && getCursor().getValue() instanceof J.ClassDeclaration) {
                 J.ClassDeclaration c = (J.ClassDeclaration) getCursor().getValue();
                 if (!c.getLeadingAnnotations().isEmpty()) {
+                    alignToAnnotation = true;
+                }
+            }
+
+            if (loc == Space.Location.MODIFIER_PREFIX && getCursor().getValue() instanceof J.MethodDeclaration) {
+                J.MethodDeclaration m = (J.MethodDeclaration) getCursor().getValue();
+                if (!m.getLeadingAnnotations().isEmpty()) {
                     alignToAnnotation = true;
                 }
             }

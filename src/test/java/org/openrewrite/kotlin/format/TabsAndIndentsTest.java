@@ -1505,36 +1505,36 @@ class TabsAndIndentsTest implements RewriteTest {
           )
         );
     }
-//
-//    @Test
-//    void methodWithAnnotation() {
-//        rewriteRun(
-//          kotlin(
-//            """
-//              annotation class Anno
-//
-//              class Test {
-//                  @Anno
-//                  @Suppress("all")
-//                 fun getOnError(): String {
-//                      return "uh oh";
-//                  }
-//              }
-//              """,
-//            """
-//              annotation class Anno
-//
-//              class Test {
-//                  @Anno
-//                  @Suppress("all")
-//                  fun getOnError(): String {
-//                      return "uh oh";
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
+
+    @Test
+    void methodWithAnnotation() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Anno
+
+              class Test {
+                  @Anno
+                  @Suppress("all")
+                 fun getOnError(): String {
+                      return "uh oh";
+                  }
+              }
+              """,
+            """
+              annotation class Anno
+
+              class Test {
+                  @Anno
+                  @Suppress("all")
+                  fun getOnError(): String {
+                      return "uh oh";
+                  }
+              }
+              """
+          )
+        );
+    }
 
 //
 //    @SuppressWarnings({"CStyleArrayDeclaration", "EnhancedSwitchMigration"})
