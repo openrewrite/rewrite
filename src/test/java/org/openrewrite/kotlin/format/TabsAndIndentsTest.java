@@ -1449,12 +1449,12 @@ class TabsAndIndentsTest implements RewriteTest {
                   @Throws(
                           IOException::class,
                           Exception::class)
-                      fun method() {
-                      }
+                  fun method() {
+                  }
 
                   @Throws(IOException::class, Exception::class)
-                      fun method2() {
-                      }
+                  fun method2() {
+                  }
               }
               """
           )
@@ -1536,550 +1536,366 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void methodInvocations() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  fun method(n: Int): Test {
+                      return method(n)
+                              .method(n)
+                              .method(n);
+                  }
+
+                  fun method2(): Test {
+                      return method2().
+                              method2().
+                              method2();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void newClassAsArgument() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.io.File
+              
+              class Test {
+                  fun method(m: Int, f: File, f2: File) {
+                      method(m, File(
+                                      "test"
+                              ), 
+                              File("test", 
+                                      "test"
+                              ))
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void variableWithAnnotation() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  @Suppress("All")
+                  val scope: String = "a"
+
+                  @Suppress("All")
+                  val  classifier: String = "b"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void lambdaMethodParameter2() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.util.function.Function
+              
+              abstract class Test {
+                  abstract fun a(f: Function<Test, Test>): Test
+                  abstract fun b(f: Function<Test, Test>): Test
+                  abstract fun c(f: Function<Test, Test>): Test
+              
+                  fun method(f: Function<Test, Test>): Test {
+                      return a(f)
+                              .b { 
+                                      t ->
+                                  c(f)
+                              }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void lambdaMethodParameter() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.util.function.Function
+              
+              abstract class Test {
+                  abstract fun a(f: Function<Test, Test>): Test
+                  abstract fun b(f: Function<Test, Test>): Test
+                  abstract fun c(f: Function<Test, Test>): Test
+              
+                  fun method(f: Function<Test, Test>): Test {
+                      return a(f)
+                              .b {t ->
+                                  c(f)
+                              }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings("DuplicateCondition")
+    @Test
+    void methodInvocationsNotContinuationIndentedWhenPartOfBinaryExpression() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.util.stream.Stream
+              
+              class Test {
+                  var b: Boolean = false
+                  fun method(): Stream<Test> {
+                      if (b && method()
+                              .anyMatch { t -> b || 
+                                      b
+                              }) {
+                          // do nothing
+                      }
+                      return Stream.of(this)
+                  }
+              }
+              """
+          )
+        );
+    }
+
+
+    @Test
+    void newClass() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  constructor(t: Test)
+                  constructor()
+              
+                  fun method(t: Test) {
+                      method(
+                          Test(
+                              Test()
+                          )
+                      )
+                  }
+              }
+              """,
+            """
+              class Test {
+                  constructor(t: Test)
+                  constructor()
+              
+                  fun method(t: Test) {
+                      method(
+                              Test(
+                                      Test()
+                              )
+                      )
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Disabled("Parsing error")
+    @Issue("https://github.com/openrewrite/rewrite/issues/642")
+    @Test
+    void alignLineComments() {
+        rewriteRun(
+          kotlin(
+            """
+                      // shift left.
+              package org.openrewrite; // trailing comment.
+
+                      // shift left.
+                      public class A { // trailing comment at class.
+                // shift right.
+                      // shift left.
+                              public fun method(value: Int): Int { // trailing comment at method.
+                  // shift right.
+                          // shift left.
+                  if (value == 1) { // trailing comment at if.
+                // suffix contains new lines with whitespace.
+
+
+                      // shift right.
+                                   // shift left.
+                              var value = 10 // trailing comment.
+                      // shift right at end of block.
+                              // shift left at end of block.
+                                      } else {
+                          var value = 30
+                      // shift right at end of block.
+                              // shift left at end of block.
+                 }
+
+                              if (value == 11)
+                      // shift right.
+                              // shift left.
+                          method(1)
+
+                  return 1
+                  // shift right at end of block.
+                          // shift left at end of block.
+                          }
+                // shift right at end of block.
+                      // shift left at end of block.
+                          }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/659")
+    @Test
+    void alignMultipleBlockCommentsOnOneLine() {
+        rewriteRun(
+          kotlin(
+            """
+              public class A {
+                  public fun method() {
+                              /* comment 1 */ /* comment 2 */ /* comment 3 */
+                  }
+              }
+              """,
+            """
+              public class A {
+                  public fun method() {
+                      /* comment 1 */ /* comment 2 */ /* comment 3 */
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/pull/659")
+    @Test
+    void alignMultipleBlockComments() {
+        rewriteRun(
+          kotlin(
+            """
+              public class A {
+              /* Preserve whitespace
+                 alignment */
+
+                     /* Shift next blank line left
+
+                      * This line should be aligned
+                      */
+
+              /* This comment
+               * should be aligned */
+              public fun method() {}
+              }
+              """,
+            """
+              public class A {
+                  /* Preserve whitespace
+                     alignment */
+
+                  /* Shift next blank line left
+
+                   * This line should be aligned
+                   */
+
+                  /* This comment
+                   * should be aligned */
+                  public fun method() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/641")
+    @Test
+    void alignTryCatchFinally() {
+        rewriteRun(
+          kotlin(
+            """
+              public class Test {
+                  public fun method() {
+                      // inline try, catch, finally.
+                      try {
+
+                      } catch (ex: Exception) {
+
+                      } finally {
+
+                      }
+
+                      // new line try, catch, finally.
+                      try {
+
+                      }
+                      catch (ex: Exception) {
+
+                      }
+                      finally {
+
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 //
-//    @SuppressWarnings({"CStyleArrayDeclaration", "EnhancedSwitchMigration"})
+//    @Issue("https://github.com/openrewrite/rewrite/issues/663")
 //    @Test
-//    void containers() {
+//    void alignBlockPrefixes() {
 //        rewriteRun(
-//          java(
-//            """
-//              import java.io.ByteArrayInputStream;
-//              import java.io.InputStream;
-//              import java.io.Serializable;
-//              import java.lang.annotation.Retention;
-//              @Retention
-//              (value = "1.0")
-//              public
-//              class
-//              Test
-//              <T
-//              extends Object>
-//              implements
-//              Serializable {
-//                  Test method
-//                  ()
-//                  throws Exception {
-//                      try
-//                      (InputStream is = new ByteArrayInputStream(new byte[0])) {}
-//                      int n[] =
-//                      {0};
-//                      switch (1) {
-//                      case 1:
-//                      n
-//                      [0]++;
-//                      }
-//                      return new Test
-//                      ();
-//                  }
-//              }
-//              """,
-//            """
-//              import java.io.ByteArrayInputStream;
-//              import java.io.InputStream;
-//              import java.io.Serializable;
-//              import java.lang.annotation.Retention;
-//              @Retention
-//                      (value = "1.0")
-//              public
-//              class
-//              Test
-//                      <T
-//                              extends Object>
-//                      implements
-//                      Serializable {
-//                  Test method
-//                          ()
-//                          throws Exception {
-//                      try
-//                              (InputStream is = new ByteArrayInputStream(new byte[0])) {}
-//                      int n[] =
-//                              {0};
-//                      switch (1) {
-//                          case 1:
-//                              n
-//                                      [0]++;
-//                      }
-//                      return new Test
-//                              ();
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void methodInvocations() {
-//        rewriteRun(
-//          java(
-//            """
-//              class Test {
-//                  Test method(int n) {
-//                      return method(n)
-//                              .method(n)
-//                              .method(n);
-//                  }
-//
-//                  Test method2() {
-//                      return method2().
-//                              method2().
-//                              method2();
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void ternaries() {
-//        rewriteRun(
+//          spec -> spec.recipe(new AutoFormat()),
 //          java(
 //            """
 //              public class Test {
-//                  public Test method(int n) {
-//                      return n > 0 ?
-//                          this :
-//                          method(n).method(n);
-//                  }
-//              }
-//              """,
-//            """
-//              public class Test {
-//                  public Test method(int n) {
-//                      return n > 0 ?
-//                              this :
-//                              method(n).method(n);
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
 //
-//    @Test
-//    void newClassAsArgument() {
-//        rewriteRun(
-//          java(
-//            """
-//              import java.io.File;
-//              class Test {
-//                  void method(int m, File f, File f2) {
-//                      method(m, new File(
-//                                      "test"
-//                              ),
-//                              new File("test",
-//                                      "test"
-//                              ));
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void variableWithAnnotation() {
-//        rewriteRun(
-//          java(
-//            """
-//              public class Test {
-//                  @Deprecated
-//                  final String scope;
-//
-//                  @Deprecated
-//                  String classifier;
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void lambdaMethodParameter2() {
-//        rewriteRun(
-//          java(
-//            """
-//              import java.util.function.Function;
-//
-//              abstract class Test {
-//                  abstract Test a(Function<Test, Test> f);
-//                  abstract Test b(Function<Test, Test> f);
-//                  abstract Test c(Function<Test, Test> f);
-//
-//                  Test method(Function<Test, Test> f) {
-//                      return a(f)
-//                              .b(
-//                                      t ->
-//                                              c(f)
-//                              );
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void lambdaMethodParameter() {
-//        rewriteRun(
-//          java(
-//            """
-//              import java.util.function.Function;
-//              abstract class Test {
-//                  abstract Test a(Function<Test, Test> f);
-//                  abstract Test b(Function<Test, Test> f);
-//                  abstract Test c(Function<Test, Test> f);
-//
-//                  Test method(Function<Test, Test> f) {
-//                      return a(f)
-//                              .b(t ->
-//                                      c(f)
-//                              );
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void failure1() {
-//        rewriteRun(
-//          java(
-//            """
-//              public class Test {
-//                  public static DefaultRepositorySystemSession getRepositorySystemSession(RepositorySystem system, // comments here
-//                                                                                          @Nullable File localRepositoryDir) {
-//                      DefaultRepositorySystemSession repositorySystemSession = org.apache.maven.repository.internal.MavenRepositorySystemUtils
-//                              .newSession();
-//                      repositorySystemSession.setDependencySelector(
-//                              new AndDependencySelector(
-//                                      new ExclusionDependencySelector(), // some comments
-//                                      new ScopeDependencySelector(emptyList(), Arrays.asList("provided", "test")),
-//                                      // more comments
-//                                      new OptionalDependencySelector()
-//                              )
-//                      );
-//                      return repositorySystemSession;
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @SuppressWarnings("DuplicateCondition")
-//    @Test
-//    void methodInvocationsNotContinuationIndentedWhenPartOfBinaryExpression() {
-//        rewriteRun(
-//          java(
-//            """
-//              import java.util.stream.Stream;
-//              public class Test {
-//                  boolean b;
-//                  public Stream<Test> method() {
-//                      if (b && method()
-//                              .anyMatch(t -> b ||
-//                                      b
-//                              )) {
-//                          // do nothing
-//                      }
-//                      return Stream.of(this);
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @SuppressWarnings("CStyleArrayDeclaration")
-//    @Test
-//    void punctuation() {
-//        rewriteRun(
-//          tabsAndIndents(style -> style.withContinuationIndent(2)),
-//          java(
-//            """
-//              import java.util.function.Function;
-//              public class Test {
-//              int X[];
-//              public int plus(int x) {
-//                  return 0;
-//              }
-//              public void test(boolean a, int x, int y) {
-//              Function<Integer, Integer> op = this
-//              ::
-//              plus;
-//              if (x
-//              >
-//              0) {
-//              int someVariable = a ?
-//              x :
-//              y;
-//              int anotherVariable = a
-//              ?
-//              x
-//              :
-//              y;
-//              }
-//              x
-//              ++;
-//              X
-//              [
-//              1
-//              ]
-//              =
-//              0;
-//              }
-//              }
-//              """,
-//            """
-//              import java.util.function.Function;
-//              public class Test {
-//                  int X[];
-//                  public int plus(int x) {
-//                      return 0;
-//                  }
-//                  public void test(boolean a, int x, int y) {
-//                      Function<Integer, Integer> op = this
-//                        ::
-//                        plus;
-//                      if (x
-//                        >
-//                        0) {
-//                          int someVariable = a ?
-//                            x :
-//                            y;
-//                          int anotherVariable = a
-//                            ?
-//                            x
-//                            :
-//                            y;
-//                      }
-//                      x
-//                        ++;
-//                      X
-//                        [
-//                        1
-//                        ]
-//                        =
-//                        0;
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void newClass() {
-//        rewriteRun(
-//          java(
-//            """
-//              class Test {
-//                  Test(Test t) {}
-//                  Test() {}
-//                  void method(Test t) {
-//                      method(
-//                          new Test(
-//                              new Test()
-//                          )
-//                      );
-//                  }
-//              }
-//              """,
-//            """
-//              class Test {
-//                  Test(Test t) {}
-//                  Test() {}
-//                  void method(Test t) {
-//                      method(
-//                              new Test(
-//                                      new Test()
-//                              )
-//                      );
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Issue("https://github.com/openrewrite/rewrite/issues/642")
-//    @Test
-//    void alignLineComments() {
-//        rewriteRun(
-//          java(
-//            """
-//                      // shift left.
-//              package org.openrewrite; // trailing comment.
-//
-//                      // shift left.
-//                      public class A { // trailing comment at class.
-//                // shift right.
-//                      // shift left.
-//                              public int method(int value) { // trailing comment at method.
-//                  // shift right.
-//                          // shift left.
-//                  if (value == 1) { // trailing comment at if.
-//                // suffix contains new lines with whitespace.
-//
-//
-//                      // shift right.
-//                                   // shift left.
-//                              value += 10; // trailing comment.
-//                      // shift right at end of block.
-//                              // shift left at end of block.
-//                                      } else {
-//                          value += 30;
-//                      // shift right at end of block.
-//                              // shift left at end of block.
-//                 }
-//
-//                              if (value == 11)
-//                      // shift right.
-//                              // shift left.
-//                          value += 1;
-//
-//                  return value;
-//                  // shift right at end of block.
-//                          // shift left at end of block.
+//                  public void practiceA()
+//                  {
+//                      for (int i = 0; i < 10; ++i)
+//                      {
+//                          if (i % 2 == 0)
+//                          {
+//                              try
+//                              {
+//                                  Integer value = Integer.valueOf("100");
+//                              }
+//                              catch (Exception ex)
+//                              {
+//                                  throw new RuntimeException();
+//                              }
+//                              finally
+//                              {
+//                                  System.out.println("out");
+//                              }
 //                          }
-//                // shift right at end of block.
-//                      // shift left at end of block.
+//                      }
+//                  }
+//
+//                  public void practiceB() {
+//                      for (int i = 0; i < 10; ++i) {
+//                          if (i % 2 == 0) {
+//                              try {
+//                                  Integer value = Integer.valueOf("100");
+//                              } catch (Exception ex) {
+//                                  throw new RuntimeException();
+//                              } finally {
+//                                  System.out.println("out");
+//                              }
 //                          }
-//              """,
-//            """
-//              // shift left.
-//              package org.openrewrite; // trailing comment.
-//
-//              // shift left.
-//              public class A { // trailing comment at class.
-//                  // shift right.
-//                  // shift left.
-//                  public int method(int value) { // trailing comment at method.
-//                      // shift right.
-//                      // shift left.
-//                      if (value == 1) { // trailing comment at if.
-//                          // suffix contains new lines with whitespace.
-//
-//
-//                          // shift right.
-//                          // shift left.
-//                          value += 10; // trailing comment.
-//                          // shift right at end of block.
-//                          // shift left at end of block.
-//                      } else {
-//                          value += 30;
-//                          // shift right at end of block.
-//                          // shift left at end of block.
-//                      }
-//
-//                      if (value == 11)
-//                          // shift right.
-//                          // shift left.
-//                          value += 1;
-//
-//                      return value;
-//                      // shift right at end of block.
-//                      // shift left at end of block.
-//                  }
-//                  // shift right at end of block.
-//                  // shift left at end of block.
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Issue("https://github.com/openrewrite/rewrite/pull/659")
-//    @Test
-//    void alignMultipleBlockCommentsOnOneLine() {
-//        rewriteRun(
-//          java(
-//            """
-//              public class A {
-//                  public void method() {
-//                              /* comment 1 */ /* comment 2 */ /* comment 3 */
-//                  }
-//              }
-//              """,
-//            """
-//              public class A {
-//                  public void method() {
-//                      /* comment 1 */ /* comment 2 */ /* comment 3 */
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Issue("https://github.com/openrewrite/rewrite/pull/659")
-//    @Test
-//    void alignMultipleBlockComments() {
-//        rewriteRun(
-//          java(
-//            """
-//              public class A {
-//              /* Preserve whitespace
-//                 alignment */
-//
-//                     /* Shift next blank line left
-//
-//                      * This line should be aligned
-//                      */
-//
-//              /* This comment
-//               * should be aligned */
-//              public void method() {}
-//              }
-//              """,
-//            """
-//              public class A {
-//                  /* Preserve whitespace
-//                     alignment */
-//
-//                  /* Shift next blank line left
-//
-//                   * This line should be aligned
-//                   */
-//
-//                  /* This comment
-//                   * should be aligned */
-//                  public void method() {}
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Issue("https://github.com/openrewrite/rewrite/issues/641")
-//    @Test
-//    void alignTryCatchFinally() {
-//        rewriteRun(
-//          java(
-//            """
-//              public class Test {
-//                  public void method() {
-//                      // inline try, catch, finally.
-//                      try {
-//
-//                      } catch (Exception ex) {
-//
-//                      } finally {
-//
-//                      }
-//
-//                      // new line try, catch, finally.
-//                      try {
-//
-//                      }
-//                      catch (Exception ex) {
-//
-//                      }
-//                      finally {
-//
 //                      }
 //                  }
 //              }
@@ -2087,318 +1903,196 @@ class TabsAndIndentsTest implements RewriteTest {
 //          )
 //        );
 //    }
+
+
+    @Test
+    void alignInlineBlockComments() {
+        rewriteRun(
+          kotlin(
+            """
+              public class WhitespaceIsHard {
+              /* align comment */ public fun method() { /* tricky */
+              /* align comment */ var x = 10; /* tricky */
+              // align comment and end paren.
+              }
+              }
+              """,
+            """
+              public class WhitespaceIsHard {
+                  /* align comment */ public fun method() { /* tricky */
+                      /* align comment */ var x = 10; /* tricky */
+                      // align comment and end paren.
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingMultilineString() {
+        rewriteRun(
+          kotlin(
+            """
+              public class WhitespaceIsHard {
+                  public fun method() { /* tricky */
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/1076")
+    @Test
+    void javaDocsWithMultipleLeadingAsterisks() {
+        rewriteRun(
+          kotlin(
+            """
+                  /******** Align JavaDoc with multiple leading '*' in margin left.
+                   **** Align left
+                   */
+              public class Test {
+              /******** Align JavaDoc with multiple leading '*' in margin right.
+               **** Align right
+               */
+                  fun method() {
+                  }
+              }
+              """,
+            """
+              /******** Align JavaDoc with multiple leading '*' in margin left.
+                **** Align left
+                */
+              public class Test {
+                  /******** Align JavaDoc with multiple leading '*' in margin right.
+                   **** Align right
+                   */
+                  fun method() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Disabled("java doc is not parsed")
+    @Issue("https://github.com/openrewrite/rewrite/pull/659")
+    @Test
+    void alignJavaDocs() {
+        rewriteRun(
+          kotlin(
+            """
+                      /**
+                       * Align JavaDoc left that starts on 2nd line.
+                       */
+              public class A {
+              /** Align JavaDoc right that starts on 1st line.
+                * @param value test value.
+                * @return value + 1 */
+                      public fun methodOne(value: Int) : Int {
+                          return value + 1
+                      }
+
+                              /** Edge case formatting test.
+                 @param value test value.
+                               @return value + 1
+                               */
+                      public fun methodTwo(value: Int): Int {
+                          return value + 1
+                      }
+              }
+              """,
+            """
+              /**
+               * Align JavaDoc left that starts on 2nd line.
+               */
+              public class A {
+                  /** Align JavaDoc right that starts on 1st line.
+                   * @param value test value.
+                   * @return value + 1 */
+                  public fun methodOne(value: Int) : Int {
+                      return value + 1
+                  }
+
+                  /** Edge case formatting test.
+                   @param value test value.
+                   @return value + 1
+                   */
+                  public fun methodTwo(value: Int): Int {
+                      return value + 1
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Disabled("Parsing error")
+    @Issue("https://github.com/openrewrite/rewrite/issues/709")
+    @Test
+    void useContinuationIndentExtendsOnNewLine() {
+        rewriteRun(
+          kotlin("""
+            package org.a
+
+            open class A {}
+            """),
+          kotlin(
+            """
+              package org.b;
+              import org.a.A;
+              class B
+                  : A() {
+              }
+              """
+          )
+        );
+    }
+
 //
-////    @Issue("https://github.com/openrewrite/rewrite/issues/663")
-////    @Test
-////    void alignBlockPrefixes() {
-////        rewriteRun(
-////          spec -> spec.recipe(new AutoFormat()),
-////          java(
-////            """
-////              public class Test {
-////
-////                  public void practiceA()
-////                  {
-////                      for (int i = 0; i < 10; ++i)
-////                      {
-////                          if (i % 2 == 0)
-////                          {
-////                              try
-////                              {
-////                                  Integer value = Integer.valueOf("100");
-////                              }
-////                              catch (Exception ex)
-////                              {
-////                                  throw new RuntimeException();
-////                              }
-////                              finally
-////                              {
-////                                  System.out.println("out");
-////                              }
-////                          }
-////                      }
-////                  }
-////
-////                  public void practiceB() {
-////                      for (int i = 0; i < 10; ++i) {
-////                          if (i % 2 == 0) {
-////                              try {
-////                                  Integer value = Integer.valueOf("100");
-////                              } catch (Exception ex) {
-////                                  throw new RuntimeException();
-////                              } finally {
-////                                  System.out.println("out");
-////                              }
-////                          }
-////                      }
-////                  }
-////              }
-////              """
-////          )
-////        );
-////    }
-//
-//    @Test
-//    void alignInlineBlockComments() {
-//        rewriteRun(
-//          java(
-//            """
-//              public class WhitespaceIsHard {
-//              /* align comment */ public void method() { /* tricky */
-//              /* align comment */ int var = 10; /* tricky */
-//              // align comment and end paren.
-//              }
-//              }
-//              """,
-//            """
-//              public class WhitespaceIsHard {
-//                  /* align comment */ public void method() { /* tricky */
-//                      /* align comment */ int var = 10; /* tricky */
-//                      // align comment and end paren.
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Test
-//    void trailingMultilineString() {
-//        rewriteRun(
-//          java(
-//            """
-//              public class WhitespaceIsHard {
-//                  public void method() { /* tricky */
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Issue("https://github.com/openrewrite/rewrite/issues/1076")
-//    @Test
-//    void javaDocsWithMultipleLeadingAsterisks() {
-//        rewriteRun(
-//          java(
-//            """
-//                  /******** Align JavaDoc with multiple leading '*' in margin left.
-//                   **** Align left
-//                   */
-//              public class Test {
-//              /******** Align JavaDoc with multiple leading '*' in margin right.
-//               **** Align right
-//               */
-//                  void method() {
-//                  }
-//              }
-//              """,
-//            """
-//              /******** Align JavaDoc with multiple leading '*' in margin left.
-//               **** Align left
-//               */
-//              public class Test {
-//                  /******** Align JavaDoc with multiple leading '*' in margin right.
-//                   **** Align right
-//                   */
-//                  void method() {
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @SuppressWarnings("TextBlockMigration")
-//    @Issue("https://github.com/openrewrite/rewrite/issues/980")
-//    @Test
-//    void alignJavaDocsWithCRLF() {
-//        rewriteRun(
-//          java(
-//            "        /**\r\n" +
-//              "         * Align JavaDoc left that starts on 2nd line.\r\n" +
-//              "         */\r\n" +
-//              "public class A {\r\n" +
-//              "/** Align JavaDoc right that starts on 1st line.\r\n" +
-//              "  * @param value test value.\r\n" +
-//              "  * @return value + 1 */\r\n" +
-//              "        public int methodOne(int value) {\r\n" +
-//              "            return value + 1;\r\n" +
-//              "        }\r\n" +
-//              "\r\n" +
-//              "                /** Edge case formatting test.\r\n" +
-//              "   @param value test value.\r\n" +
-//              "                 @return value + 1\r\n" +
-//              "                 */\r\n" +
-//              "        public int methodTwo(int value) {\r\n" +
-//              "            return value + 1;\r\n" +
-//              "        }\r\n" +
-//              "}"
-//            ,
-//            "/**\r\n" +
-//              " * Align JavaDoc left that starts on 2nd line.\r\n" +
-//              " */\r\n" +
-//              "public class A {\r\n" +
-//              "    /** Align JavaDoc right that starts on 1st line.\r\n" +
-//              "     * @param value test value.\r\n" +
-//              "     * @return value + 1 */\r\n" +
-//              "    public int methodOne(int value) {\r\n" +
-//              "        return value + 1;\r\n" +
-//              "    }\r\n" +
-//              "\r\n" +
-//              "    /** Edge case formatting test.\r\n" +
-//              "     @param value test value.\r\n" +
-//              "     @return value + 1\r\n" +
-//              "     */\r\n" +
-//              "    public int methodTwo(int value) {\r\n" +
-//              "        return value + 1;\r\n" +
-//              "    }\r\n" +
-//              "}"
-//          )
-//        );
-//    }
-//
-//    @Issue("https://github.com/openrewrite/rewrite/pull/659")
-//    @Test
-//    void alignJavaDocs() {
-//        rewriteRun(
-//          java(
-//            """
-//                      /**
-//                       * Align JavaDoc left that starts on 2nd line.
-//                       */
-//              public class A {
-//              /** Align JavaDoc right that starts on 1st line.
-//                * @param value test value.
-//                * @return value + 1 */
-//                      public int methodOne(int value) {
-//                          return value + 1;
-//                      }
-//
-//                              /** Edge case formatting test.
-//                 @param value test value.
-//                               @return value + 1
-//                               */
-//                      public int methodTwo(int value) {
-//                          return value + 1;
-//                      }
-//              }
-//              """,
-//            """
-//              /**
-//               * Align JavaDoc left that starts on 2nd line.
-//               */
-//              public class A {
-//                  /** Align JavaDoc right that starts on 1st line.
-//                   * @param value test value.
-//                   * @return value + 1 */
-//                  public int methodOne(int value) {
-//                      return value + 1;
-//                  }
-//
-//                  /** Edge case formatting test.
-//                   @param value test value.
-//                   @return value + 1
-//                   */
-//                  public int methodTwo(int value) {
-//                      return value + 1;
-//                  }
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Issue("https://github.com/openrewrite/rewrite/issues/709")
-//    @Test
-//    void useContinuationIndentExtendsOnNewLine() {
-//        rewriteRun(
-//          java("package org.a; public class A {}"),
-//          java(
-//            """
-//              package org.b;
-//              import org.a.A;
-//              class B
-//                      extends A {
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Issue("https://github.com/openrewrite/rewrite/issues/883")
-//    @Test
-//    void alignIdentifierOnNewLine() {
-//        rewriteRun(
-//          java("package org.a; public class A {}"),
-//          java(
-//            """
-//              package org.b;
-//              import org.a.A;
-//              class B extends
-//                      A {
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Issue("https://github.com/openrewrite/rewrite/issues/1526")
-//    @Test
-//    void doNotFormatSingleLineCommentAtCol0() {
-//        rewriteRun(
-//          java(
-//            """
-//              class A {
-//              // DO NOT shift the whitespace of `Space` and the suffix of comment 1.
-//              // DOES shift the suffix of comment 2.
-//              void shiftRight() {}
-//              }
-//              """,
-//            """
-//              class A {
-//              // DO NOT shift the whitespace of `Space` and the suffix of comment 1.
-//              // DOES shift the suffix of comment 2.
-//                  void shiftRight() {}
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Issue("https://github.com/openrewrite/rewrite/issues/2968")
-//    @Test
-//    void recordComponents() {
-//        rewriteRun(
-//          java(
-//            """
-//              public record RenameRequest(
-//                  @NotBlank
-//                  @JsonProperty("name") String name) {
-//              }
-//              """
-//          )
-//        );
-//    }
-//
-//    @Issue("https://github.com/openrewrite/rewrite/issues/3089")
-//    @Test
-//    void enumConstants() {
-//        rewriteRun(
-//          java(
-//            """
-//              public enum WorkflowStatus {
-//                  @SuppressWarnings("value1")
-//                  VALUE1,
-//                  @SuppressWarnings("value2")
-//                  VALUE2,
-//                  @SuppressWarnings("value3")
-//                  VALUE3,
-//                  @SuppressWarnings("value4")
-//                  VALUE4
-//              }
-//              """
-//          )
-//        );
-//    }
+    @Issue("https://github.com/openrewrite/rewrite/issues/1526")
+    @Test
+    void doNotFormatSingleLineCommentAtCol0() {
+        rewriteRun(
+          kotlin(
+            """
+              class A {
+              // DO NOT shift the whitespace of `Space` and the suffix of comment 1.
+              // DOES shift the suffix of comment 2.
+              fun shiftRight() {}
+              }
+              """,
+            """
+              class A {
+              // DO NOT shift the whitespace of `Space` and the suffix of comment 1.
+              // DOES shift the suffix of comment 2.
+                  fun shiftRight() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Disabled("Weird alignment")
+    @Issue("https://github.com/openrewrite/rewrite/issues/3089")
+    @Test
+    void enumConstants() {
+        rewriteRun(
+          kotlin(
+            """
+              public enum class WorkflowStatus {
+                  @SuppressWarnings("value1")
+                  VALUE1,
+                  @SuppressWarnings("value2")
+                  VALUE2,
+                  @SuppressWarnings("value3")
+                  VALUE3,
+                  @SuppressWarnings("value4")
+                  VALUE4
+              }
+              """
+          )
+        );
+    }
 }
