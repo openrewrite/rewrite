@@ -15,9 +15,8 @@
  */
 package org.openrewrite.java.search;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.TreeVisitorAdapter;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
@@ -25,6 +24,7 @@ import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 import org.openrewrite.java.table.MethodCallGraph;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.marker.SearchResult;
 
 import java.util.Collections;
 import java.util.IdentityHashMap;
