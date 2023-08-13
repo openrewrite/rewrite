@@ -15,7 +15,6 @@
  */
 package org.openrewrite.search;
 
-import org.eclipse.jgit.lib.FileMode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
@@ -53,17 +52,13 @@ public class FindParseToPrintInequality extends Recipe {
                 if (tree instanceof ParseError) {
                     ParseError parseError = (ParseError) tree;
                     if (parseError.getErroneous() != null) {
-                        FileMode mode = parseError.getFileAttributes() != null && parseError.getFileAttributes()
-                                .isExecutable() ? FileMode.EXECUTABLE_FILE : FileMode.REGULAR_FILE;
                         try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
                                 parseError.getSourcePath(),
                                 parseError.getSourcePath(),
                                 null,
                                 parseError.getText(),
                                 parseError.getErroneous().printAll(),
-                                Collections.emptySet(),
-                                mode,
-                                mode
+                                Collections.emptySet()
                         )) {
                             inequalities.insertRow(ctx, new ParseToPrintInequalities.Row(
                                     parseError.getSourcePath().toString(),
