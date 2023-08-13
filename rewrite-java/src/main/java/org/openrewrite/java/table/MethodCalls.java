@@ -39,5 +39,13 @@ public class MethodCalls extends DataTable<MethodCalls.Row> {
         @Column(displayName = "Method call",
                 description = "The text of the method call.")
         String method;
+
+        @Column(displayName = "Class name",
+                description = "The class name of the method call.")
+        String className;
+
+        @Column(displayName = "Method name",
+                description = "The method name of the method call.")
+        String methodName;
     }
 }
