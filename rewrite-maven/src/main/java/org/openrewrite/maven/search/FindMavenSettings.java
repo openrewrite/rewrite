@@ -58,6 +58,11 @@ public class FindMavenSettings extends Recipe {
                     } catch (JsonProcessingException e) {
                         throw new UncheckedIOException(e);
                     }
+                } else {
+                    settings.insertRow(ctx, new EffectiveMavenSettings.Row(
+                            document.getSourcePath().toString(),
+                            ""
+                    ));
                 }
                 return document;
             }
