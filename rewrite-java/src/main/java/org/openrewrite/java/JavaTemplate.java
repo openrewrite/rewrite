@@ -42,10 +42,14 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
     private JavaTemplate(boolean contextSensitive, JvmParser.Builder<?, ?> parser, String code, Set<String> imports,
                          Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
+        this(code, StringUtils.countOccurrences(code, "#{"), onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, parser, onAfterVariableSubstitution, onBeforeParseTemplate, imports));
+    }
+
+    protected JavaTemplate(String code, int parameterCount, Consumer<String> onAfterVariableSubstitution, JavaTemplateParser templateParser) {
         this.code = code;
+        this.parameterCount = parameterCount;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
-        this.parameterCount = StringUtils.countOccurrences(code, "#{");
-        this.templateParser = new JavaTemplateParser(contextSensitive, parser, onAfterVariableSubstitution, onBeforeParseTemplate, imports);
+        this.templateParser = templateParser;
     }
 
     public String getCode() {
@@ -63,7 +67,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             throw new IllegalArgumentException("This template requires " + parameterCount + " parameters.");
         }
 
-        Substitutions substitutions = new Substitutions(code, parameters);
+        Substitutions substitutions = substitutions(parameters);
         String substitutedTemplate = substitutions.substitute();
         onAfterVariableSubstitution.accept(substitutedTemplate);
 
@@ -71,6 +75,10 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         return (J2) new JavaTemplateJavaExtension(templateParser, substitutions, substitutedTemplate, coordinates)
                 .getMixin()
                 .visit(scope.getValue(), 0, scope.getParentOrThrow());
+    }
+
+    protected Substitutions substitutions(Object[] parameters) {
+        return new Substitutions(code, parameters);
     }
 
     @Incubating(since = "8.0.0")
@@ -121,19 +129,19 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     @SuppressWarnings("unused")
     public static class Builder {
 
-        private final String code;
-        private final Set<String> imports = new HashSet<>();
+        protected final String code;
+        protected final Set<String> imports = new HashSet<>();
 
-        private boolean contextSensitive;
+        protected boolean contextSensitive;
 
-        private JvmParser.Builder<?, ?> parser = JavaParser.fromJavaVersion();
+        protected JvmParser.Builder<?, ?> parser = JavaParser.fromJavaVersion();
 
-        private Consumer<String> onAfterVariableSubstitution = s -> {
+        protected Consumer<String> onAfterVariableSubstitution = s -> {
         };
-        private Consumer<String> onBeforeParseTemplate = s -> {
+        protected Consumer<String> onBeforeParseTemplate = s -> {
         };
 
-        Builder(String code) {
+        protected Builder(String code) {
             this.code = code.trim();
         }
 

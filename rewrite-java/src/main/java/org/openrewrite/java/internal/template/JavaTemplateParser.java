@@ -84,13 +84,25 @@ public class JavaTemplateParser {
 
     public JavaTemplateParser(boolean contextSensitive, JvmParser.Builder<?, ?> parser, Consumer<String> onAfterVariableSubstitution,
                               Consumer<String> onBeforeParseTemplate, Set<String> imports) {
+        this(
+                parser,
+                onAfterVariableSubstitution,
+                onBeforeParseTemplate,
+                imports,
+                contextSensitive,
+                new BlockStatementTemplateGenerator(imports, contextSensitive),
+                new AnnotationTemplateGenerator(imports)
+        );
+    }
+
+    protected JavaTemplateParser(JvmParser.Builder<?, ?> parser, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate, Set<String> imports, boolean contextSensitive, BlockStatementTemplateGenerator statementTemplateGenerator, AnnotationTemplateGenerator annotationTemplateGenerator) {
         this.parser = parser;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.onBeforeParseTemplate = onBeforeParseTemplate;
         this.imports = imports;
         this.contextSensitive = contextSensitive;
-        this.statementTemplateGenerator = new BlockStatementTemplateGenerator(imports, contextSensitive);
-        this.annotationTemplateGenerator = new AnnotationTemplateGenerator(imports);
+        this.statementTemplateGenerator = statementTemplateGenerator;
+        this.annotationTemplateGenerator = annotationTemplateGenerator;
     }
 
     public List<Statement> parseParameters(Cursor cursor, String template) {
