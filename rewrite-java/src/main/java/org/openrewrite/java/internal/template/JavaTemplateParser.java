@@ -25,16 +25,10 @@ import org.openrewrite.Parser;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.java.Internals;
 import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.JvmParser;
 import org.openrewrite.java.RandomizeIdVisitor;
 import org.openrewrite.java.tree.*;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -57,24 +51,7 @@ public class JavaTemplateParser {
     @Language("java")
     private static final String SUBSTITUTED_ANNOTATION = "@java.lang.annotation.Documented public @interface SubAnnotation { int value(); }";
 
-    private static final Path TEMPLATE_CLASSPATH_DIR;
-
-    static {
-        try {
-            TEMPLATE_CLASSPATH_DIR = Files.createTempDirectory("java-template");
-            Path templateDir = Files.createDirectories(TEMPLATE_CLASSPATH_DIR.resolve("org/openrewrite/java/internal/template"));
-            try (InputStream in = JavaTemplateParser.class.getClassLoader().getResourceAsStream("org/openrewrite/java/internal/template/__M__.class")) {
-                Files.copy(in, templateDir.resolve("__M__.class"));
-            }
-            try (InputStream in = JavaTemplateParser.class.getClassLoader().getResourceAsStream("org/openrewrite/java/internal/template/__P__.class")) {
-                Files.copy(in, templateDir.resolve("__P__.class"));
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    private final JvmParser.Builder<?, ?> parser;
+    private final Parser.Builder parser;
     private final Consumer<String> onAfterVariableSubstitution;
     private final Consumer<String> onBeforeParseTemplate;
     private final Set<String> imports;
@@ -82,7 +59,7 @@ public class JavaTemplateParser {
     private final BlockStatementTemplateGenerator statementTemplateGenerator;
     private final AnnotationTemplateGenerator annotationTemplateGenerator;
 
-    public JavaTemplateParser(boolean contextSensitive, JvmParser.Builder<?, ?> parser, Consumer<String> onAfterVariableSubstitution,
+    public JavaTemplateParser(boolean contextSensitive, Parser.Builder parser, Consumer<String> onAfterVariableSubstitution,
                               Consumer<String> onBeforeParseTemplate, Set<String> imports) {
         this(
                 parser,
@@ -95,7 +72,7 @@ public class JavaTemplateParser {
         );
     }
 
-    protected JavaTemplateParser(JvmParser.Builder<?, ?> parser, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate, Set<String> imports, boolean contextSensitive, BlockStatementTemplateGenerator statementTemplateGenerator, AnnotationTemplateGenerator annotationTemplateGenerator) {
+    protected JavaTemplateParser(Parser.Builder parser, Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate, Set<String> imports, boolean contextSensitive, BlockStatementTemplateGenerator statementTemplateGenerator, AnnotationTemplateGenerator annotationTemplateGenerator) {
         this.parser = parser;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.onBeforeParseTemplate = onBeforeParseTemplate;
@@ -284,16 +261,7 @@ public class JavaTemplateParser {
 
     @NonNull
     private Parser newParser() {
-        JvmParser.Builder<?, ?> parserBuilder = parser.clone();
-        Collection<Path> classpath = Internals.getClasspath(parserBuilder);
-        if (classpath.isEmpty()) {
-            classpath = Collections.singletonList(TEMPLATE_CLASSPATH_DIR);
-        } else {
-            classpath = new ArrayList<>(classpath);
-            classpath.add(TEMPLATE_CLASSPATH_DIR);
-        }
-        parserBuilder.classpath(classpath);
-        return parserBuilder.build();
+        return parser.build();
     }
 
     /**

@@ -27,22 +27,46 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
 import org.openrewrite.template.SourceTemplate;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.HashSet;
-import java.util.Set;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
 import java.util.function.Consumer;
 
 @SuppressWarnings("unused")
 public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
+    protected static final Path TEMPLATE_CLASSPATH_DIR;
+
+    static {
+        try {
+            TEMPLATE_CLASSPATH_DIR = Files.createTempDirectory("java-template");
+            Path templateDir = Files.createDirectories(TEMPLATE_CLASSPATH_DIR.resolve("org/openrewrite/java/internal/template"));
+            try (InputStream in = JavaTemplateParser.class.getClassLoader().getResourceAsStream("org/openrewrite/java/internal/template/__M__.class")) {
+                Files.copy(in, templateDir.resolve("__M__.class"));
+            }
+            try (InputStream in = JavaTemplateParser.class.getClassLoader().getResourceAsStream("org/openrewrite/java/internal/template/__P__.class")) {
+                Files.copy(in, templateDir.resolve("__P__.class"));
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     private final String code;
     private final int parameterCount;
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
-    private JavaTemplate(boolean contextSensitive, JvmParser.Builder<?, ?> parser, String code, Set<String> imports,
+    private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> parser, String code, Set<String> imports,
                          Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
-        this(code, StringUtils.countOccurrences(code, "#{"), onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, parser, onAfterVariableSubstitution, onBeforeParseTemplate, imports));
+        this(code, StringUtils.countOccurrences(code, "#{"), onAfterVariableSubstitution, new JavaTemplateParser(contextSensitive, augmentClasspath(parser), onAfterVariableSubstitution, onBeforeParseTemplate, imports));
+    }
+
+    private static JavaParser.Builder<?,?> augmentClasspath(JavaParser.Builder<?,?> parserBuilder) {
+        return parserBuilder.addClasspath(TEMPLATE_CLASSPATH_DIR);
     }
 
     protected JavaTemplate(String code, int parameterCount, Consumer<String> onAfterVariableSubstitution, JavaTemplateParser templateParser) {
@@ -129,16 +153,16 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     @SuppressWarnings("unused")
     public static class Builder {
 
-        protected final String code;
-        protected final Set<String> imports = new HashSet<>();
+        private final String code;
+        private final Set<String> imports = new HashSet<>();
 
-        protected boolean contextSensitive;
+        private boolean contextSensitive;
 
-        protected JvmParser.Builder<?, ?> parser = JavaParser.fromJavaVersion();
+        private JavaParser.Builder<?, ?> parser = JavaParser.fromJavaVersion();
 
-        protected Consumer<String> onAfterVariableSubstitution = s -> {
+        private Consumer<String> onAfterVariableSubstitution = s -> {
         };
-        protected Consumer<String> onBeforeParseTemplate = s -> {
+        private Consumer<String> onBeforeParseTemplate = s -> {
         };
 
         protected Builder(String code) {
@@ -176,8 +200,8 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             }
         }
 
-        public Builder javaParser(JvmParser.Builder<?, ?> parser) {
-            this.parser = parser;
+        public Builder javaParser(JavaParser.Builder<?, ?> parser) {
+            this.parser = parser.clone();
             return this;
         }
 
