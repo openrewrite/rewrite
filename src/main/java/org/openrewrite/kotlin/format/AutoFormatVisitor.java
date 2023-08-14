@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.style.*;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.style.GeneralFormatStyle;
 
 import java.util.Optional;
 
@@ -70,21 +71,19 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
                 stopAfter
         ).visit(t, p, cursor.fork());
 
-        // todo
-//        t = new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
-//                .orElse(IntelliJ.tabsAndIndents()), stopAfter)
-//                .visit(t, p, cursor.fork());
+        t = new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
+                .orElse(IntelliJ.tabsAndIndents()), stopAfter)
+                .visit(t, p, cursor.fork());
 
         t = new TabsAndIndentsVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
                 .orElse(IntelliJ.tabsAndIndents()), stopAfter)
                 .visit(t, p, cursor.fork());
 
-        // todo
-//        t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(GeneralFormatStyle.class))
-//                .orElse(autodetectGeneralFormatStyle(cu)), stopAfter)
-//                .visit(t, p, cursor.fork());
-//
-//        t = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(t, p, cursor.fork());
+        t = new NormalizeLineBreaksVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(GeneralFormatStyle.class))
+                .orElse(new GeneralFormatStyle(false)), stopAfter)
+                .visit(t, p, cursor.fork());
+
+        t = new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(t, p, cursor.fork());
 
         return t;
     }
@@ -100,9 +99,7 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
                 return cu;
             }
 
-            // TODO
-            JavaSourceFile t = cu;
-            // JavaSourceFile t = (JavaSourceFile) new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(cu, p);
+            JavaSourceFile t = (JavaSourceFile) new RemoveTrailingWhitespaceVisitor<>(stopAfter).visit(cu, p);
 
             t = (JavaSourceFile) new BlankLinesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(BlankLinesStyle.class))
                     .orElse(IntelliJ.blankLines()), stopAfter)
@@ -117,10 +114,9 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
                     .orElse(IntelliJ.wrappingAndBraces()), stopAfter)
                     .visit(t, p);
 
-            // TODO
-//            t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
-//                    .orElse(IntelliJ.tabsAndIndents()), stopAfter)
-//                    .visit(t, p);
+            t = (JavaSourceFile) new NormalizeTabsOrSpacesVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
+                    .orElse(IntelliJ.tabsAndIndents()), stopAfter)
+                    .visit(t, p);
 
             t = (JavaSourceFile) new TabsAndIndentsVisitor<>(Optional.ofNullable(((SourceFile) cu).getStyle(TabsAndIndentsStyle.class))
                     .orElse(IntelliJ.tabsAndIndents()), stopAfter)
