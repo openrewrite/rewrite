@@ -75,20 +75,12 @@ public class Substitutions {
                             }
                         }
 
-                        s = "(/*__p" + i + "__*/new ";
-
-                        StringBuilder extraDim = new StringBuilder();
+                        int dimensions = 1;
                         for (; arrayType.getElemType() instanceof JavaType.Array; arrayType = (JavaType.Array) arrayType.getElemType()) {
-                            extraDim.append("[0]");
+                            dimensions++;
                         }
 
-                        if (arrayType.getElemType() instanceof JavaType.Primitive) {
-                            s += ((JavaType.Primitive) arrayType.getElemType()).getKeyword();
-                        } else if (arrayType.getElemType() instanceof JavaType.FullyQualified) {
-                            s += ((JavaType.FullyQualified) arrayType.getElemType()).getFullyQualifiedName().replace("$", ".");
-                        }
-
-                        s += "[0]" + extraDim + ")";
+                        s = "(" + newArrayParameter(arrayType.getElemType(), dimensions, i) + ")";
                     } else if ("any".equals(matcherName)) {
                         String fqn;
 
@@ -114,10 +106,9 @@ public class Substitutions {
                         fqn = fqn.replace("$", ".");
 
                         JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(fqn);
-                        s = "__P__." + (primitive == null || primitive.equals(JavaType.Primitive.String) ?
-                                "<" + fqn + ">/*__p" + i + "__*/p()" :
-                                "/*__p" + i + "__*/" + fqn + "p()"
-                        );
+                        s = primitive == null || primitive.equals(JavaType.Primitive.String) ?
+                                newObjectParameter(fqn, i) :
+                                newPrimitiveParameter(fqn, i);
 
                         parameters[i] = ((J) parameter).withPrefix(Space.EMPTY);
                     } else {
@@ -136,6 +127,26 @@ public class Substitutions {
         }
 
         return substituted;
+    }
+
+    protected String newObjectParameter(String fqn, int index) {
+        return "__P__." + "<" + fqn + ">/*__p" + index + "__*/p()";
+    }
+    protected String newPrimitiveParameter(String fqn, int index) {
+        return "__P__./*__p" + index + "__*/" + fqn + "p()";
+    }
+
+    protected String newArrayParameter(JavaType elemType, int dimensions, int index) {
+        StringBuilder builder = new StringBuilder("/*__p" + index + "__*/" + "new ");
+        if (elemType instanceof JavaType.Primitive) {
+            builder.append(((JavaType.Primitive) elemType).getKeyword());
+        } else if (elemType instanceof JavaType.FullyQualified) {
+            builder.append(((JavaType.FullyQualified) elemType).getFullyQualifiedName().replace("$", "."));
+        }
+        for (int i = 0; i < dimensions; i++) {
+            builder.append("[0]");
+        }
+        return builder.toString();
     }
 
     private String getTypeName(@Nullable JavaType type) {
@@ -288,7 +299,7 @@ public class Substitutions {
         public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol,
                                 int line, int charPositionInLine, String msg, RecognitionException e) {
             throw new IllegalArgumentException(
-                    String.format("Syntax error at line %d:%d %s.", line, charPositionInLine, msg), e);
+                    java.lang.String.format("Syntax error at line %d:%d %s.", line, charPositionInLine, msg), e);
         }
     }
 }
