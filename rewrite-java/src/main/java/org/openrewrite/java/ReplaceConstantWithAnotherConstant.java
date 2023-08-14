@@ -94,13 +94,17 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
 
             JavaTemplate.Builder templateBuilder;
             if (fieldAccess instanceof J.Identifier) {
-                maybeAddImport(owningType, newConstantName, false);
-                templateBuilder = JavaTemplate.builder(newConstantName)
-                        .staticImports(owningType + '.' + newConstantName);
+                templateBuilder = JavaTemplate.builder(newConstantName);
+                if (owningType.indexOf('.') != -1) {
+                    templateBuilder.staticImports(owningType + '.' + newConstantName);
+                    maybeAddImport(owningType, newConstantName, false);
+                }
             } else {
-                maybeAddImport(owningType, false);
-                templateBuilder = JavaTemplate.builder(owningType.substring(owningType.lastIndexOf('.') + 1) + '.' + newConstantName)
-                        .imports(owningType);
+                templateBuilder = JavaTemplate.builder(owningType.substring(owningType.lastIndexOf('.') + 1) + '.' + newConstantName);
+                if (owningType.indexOf('.') != -1) {
+                    templateBuilder.imports(owningType);
+                    maybeAddImport(owningType, false);
+                }
             }
 
             return templateBuilder.contextSensitive().build()

@@ -22,7 +22,6 @@ import io.github.classgraph.ScanResult;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
@@ -52,7 +51,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
-public interface JavaParser extends Parser {
+public interface JavaParser extends JvmParser {
 
     /**
      * Set to <code>true</code> on an {@link ExecutionContext} supplied to parsing to skip generation of
@@ -298,8 +297,7 @@ public interface JavaParser extends Parser {
     void setClasspath(Collection<Path> classpath);
 
     @SuppressWarnings("unchecked")
-    abstract class Builder<P extends JavaParser, B extends Builder<P, B>> extends Parser.Builder {
-        protected Collection<Path> classpath = Collections.emptyList();
+    abstract class Builder<P extends JavaParser, B extends Builder<P, B>> extends JvmParser.Builder<P, B> {
         protected Collection<byte[]> classBytesClasspath = Collections.emptyList();
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
 
@@ -339,16 +337,6 @@ public interface JavaParser extends Parser {
             this.dependsOn = Arrays.stream(inputsAsStrings)
                     .map(Input::fromString)
                     .collect(toList());
-            return (B) this;
-        }
-
-        public B classpath(Collection<Path> classpath) {
-            this.classpath = classpath;
-            return (B) this;
-        }
-
-        public B classpath(String... classpath) {
-            this.classpath = dependenciesFromClasspath(classpath);
             return (B) this;
         }
 

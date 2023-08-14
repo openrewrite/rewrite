@@ -21,12 +21,20 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
+import org.openrewrite.internal.lang.NonNull;
+import org.openrewrite.java.Internals;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.JvmParser;
 import org.openrewrite.java.RandomizeIdVisitor;
 import org.openrewrite.java.tree.*;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -49,7 +57,24 @@ public class JavaTemplateParser {
     @Language("java")
     private static final String SUBSTITUTED_ANNOTATION = "@java.lang.annotation.Documented public @interface SubAnnotation { int value(); }";
 
-    private final JavaParser.Builder<?, ?> parser;
+    private static final Path TEMPLATE_CLASSPATH_DIR;
+
+    static {
+        try {
+            TEMPLATE_CLASSPATH_DIR = Files.createTempDirectory("java-template");
+            Path templateDir = Files.createDirectories(TEMPLATE_CLASSPATH_DIR.resolve("org/openrewrite/java/internal/template"));
+            try (InputStream in = JavaTemplateParser.class.getClassLoader().getResourceAsStream("org/openrewrite/java/internal/template/__M__.class")) {
+                Files.copy(in, templateDir.resolve("__M__.class"));
+            }
+            try (InputStream in = JavaTemplateParser.class.getClassLoader().getResourceAsStream("org/openrewrite/java/internal/template/__P__.class")) {
+                Files.copy(in, templateDir.resolve("__P__.class"));
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private final JvmParser.Builder<?, ?> parser;
     private final Consumer<String> onAfterVariableSubstitution;
     private final Consumer<String> onBeforeParseTemplate;
     private final Set<String> imports;
@@ -57,7 +82,7 @@ public class JavaTemplateParser {
     private final BlockStatementTemplateGenerator statementTemplateGenerator;
     private final AnnotationTemplateGenerator annotationTemplateGenerator;
 
-    public JavaTemplateParser(boolean contextSensitive, JavaParser.Builder<?, ?> parser, Consumer<String> onAfterVariableSubstitution,
+    public JavaTemplateParser(boolean contextSensitive, JvmParser.Builder<?, ?> parser, Consumer<String> onAfterVariableSubstitution,
                               Consumer<String> onBeforeParseTemplate, Set<String> imports) {
         this.parser = parser;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
@@ -235,7 +260,7 @@ public class JavaTemplateParser {
         ExecutionContext ctx = new InMemoryExecutionContext();
         ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
         ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
-        JavaParser jp = parser.clone().build();
+        Parser jp = newParser();
         return (stub.contains("@SubAnnotation") ?
                 jp.reset().parse(ctx, stub, SUBSTITUTED_ANNOTATION) :
                 jp.reset().parse(ctx, stub))
@@ -243,6 +268,20 @@ public class JavaTemplateParser {
                 .filter(JavaSourceFile.class::isInstance) // Filters out ParseErrors
                 .map(JavaSourceFile.class::cast)
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+    }
+
+    @NonNull
+    private Parser newParser() {
+        JvmParser.Builder<?, ?> parserBuilder = parser.clone();
+        Collection<Path> classpath = Internals.getClasspath(parserBuilder);
+        if (classpath.isEmpty()) {
+            classpath = Collections.singletonList(TEMPLATE_CLASSPATH_DIR);
+        } else {
+            classpath = new ArrayList<>(classpath);
+            classpath.add(TEMPLATE_CLASSPATH_DIR);
+        }
+        parserBuilder.classpath(classpath);
+        return parserBuilder.build();
     }
 
     /**

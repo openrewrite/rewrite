@@ -40,12 +40,12 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     private final Consumer<String> onAfterVariableSubstitution;
     private final JavaTemplateParser templateParser;
 
-    private JavaTemplate(boolean contextSensitive, JavaParser.Builder<?, ?> javaParser, String code, Set<String> imports,
+    private JavaTemplate(boolean contextSensitive, JvmParser.Builder<?, ?> parser, String code, Set<String> imports,
                          Consumer<String> onAfterVariableSubstitution, Consumer<String> onBeforeParseTemplate) {
         this.code = code;
         this.onAfterVariableSubstitution = onAfterVariableSubstitution;
         this.parameterCount = StringUtils.countOccurrences(code, "#{");
-        this.templateParser = new JavaTemplateParser(contextSensitive, javaParser, onAfterVariableSubstitution, onBeforeParseTemplate, imports);
+        this.templateParser = new JavaTemplateParser(contextSensitive, parser, onAfterVariableSubstitution, onBeforeParseTemplate, imports);
     }
 
     public String getCode() {
@@ -126,7 +126,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
         private boolean contextSensitive;
 
-        private JavaParser.Builder<?, ?> javaParser = JavaParser.fromJavaVersion();
+        private JvmParser.Builder<?, ?> parser = JavaParser.fromJavaVersion();
 
         private Consumer<String> onAfterVariableSubstitution = s -> {
         };
@@ -168,8 +168,8 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             }
         }
 
-        public Builder javaParser(JavaParser.Builder<?, ?> javaParser) {
-            this.javaParser = javaParser;
+        public Builder javaParser(JvmParser.Builder<?, ?> parser) {
+            this.parser = parser;
             return this;
         }
 
@@ -184,7 +184,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
 
         public JavaTemplate build() {
-            return new JavaTemplate(contextSensitive, javaParser, code, imports,
+            return new JavaTemplate(contextSensitive, parser, code, imports,
                     onAfterVariableSubstitution, onBeforeParseTemplate);
         }
     }

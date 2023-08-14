@@ -45,23 +45,6 @@ import static org.openrewrite.java.tree.JavaCoordinates.Mode.REPLACEMENT;
 public class BlockStatementTemplateGenerator {
     private static final String TEMPLATE_COMMENT = "__TEMPLATE__";
     private static final String STOP_COMMENT = "__TEMPLATE_STOP__";
-    static final String EXPR_STATEMENT_PARAM = "class __P__ {" +
-                                               "  static native <T> T p();" +
-                                               "  static native <T> T[] arrp();" +
-                                               "  static native boolean booleanp();" +
-                                               "  static native byte bytep();" +
-                                               "  static native char charp();" +
-                                               "  static native double doublep();" +
-                                               "  static native int intp();" +
-                                               "  static native long longp();" +
-                                               "  static native short shortp();" +
-                                               "  static native float floatp();" +
-                                               "}";
-    private static final String METHOD_INVOCATION_STUBS = "class __M__ {" +
-                                                          "  static native Object any(Object o);" +
-                                                          "  static native Object any(java.util.function.Predicate<Boolean> o);" +
-                                                          "  static native <T> Object anyT();" +
-                                                          "}";
 
     private final Set<String> imports;
     private final boolean contextSensitive;
@@ -252,7 +235,7 @@ public class BlockStatementTemplateGenerator {
             after.append("\n}}");
         }
 
-        before.insert(0, EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
+        before.insert(0, "import org.openrewrite.java.internal.template.__M__;\nimport org.openrewrite.java.internal.template.__P__;\n");
         for (String anImport : imports) {
             before.insert(0, anImport);
         }
@@ -262,7 +245,7 @@ public class BlockStatementTemplateGenerator {
     private void contextTemplate(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
         J j = cursor.getValue();
         if (j instanceof JavaSourceFile) {
-            before.insert(0, EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
+            before.insert(0, "import org.openrewrite.java.internal.template.__M__;\nimport org.openrewrite.java.internal.template.__P__;\n");
 
             JavaSourceFile cu = (JavaSourceFile) j;
             for (J.Import anImport : cu.getImports()) {
