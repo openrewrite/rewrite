@@ -212,10 +212,10 @@ public class BlockStatementTemplateGenerator {
                     "Templating a method reference requires a cursor so that it can be properly parsed and type-attributed. " +
                     "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
         } else if (j instanceof Expression && !(j instanceof J.Assignment)) {
-            before.insert(0, "class Template {{\n");
+            before.insert(0, "class Template {\n");
             before.append("Object o = ");
             after.append(";");
-            after.append("\n}}");
+            after.append("\n}");
         } else if ((j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations || j instanceof J.Block || j instanceof J.ClassDeclaration)
                    && cursor.getValue() instanceof J.Block
                    && (cursor.getParent().getValue() instanceof J.ClassDeclaration || cursor.getParent().getValue() instanceof J.NewClass)) {
