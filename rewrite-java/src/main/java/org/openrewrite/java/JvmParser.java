@@ -23,7 +23,7 @@ import java.util.Collection;
 import java.util.Collections;
 
 public interface JvmParser extends Parser {
-    abstract class Builder<P extends JavaParser, B extends JavaParser.Builder<P, B>> extends Parser.Builder {
+    abstract class Builder<P extends JvmParser, B extends JvmParser.Builder<P, B>> extends Parser.Builder {
         protected Collection<Path> classpath = Collections.emptyList();
 
         Builder(Class<? extends SourceFile> sourceFileType) {
