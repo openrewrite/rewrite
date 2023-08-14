@@ -92,4 +92,39 @@ public class FindMavenSettingsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void producesDataTableImplicitSubmodule() {
+        rewriteRun(
+          spec -> spec
+            .executionContext(MavenExecutionContextView.view(new InMemoryExecutionContext())
+              .setMavenSettings(SPRING_MILESTONES_SETTINGS, "repo"))
+            .dataTable(EffectiveMavenSettings.Row.class, rows -> assertThat(rows).hasSize(2)),
+          pomXml(
+            """
+              <project>
+                  <groupId>org.openrewrite.example</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+              </project>
+              """,
+            spec -> spec.path("pom.xml")
+          ),
+          pomXml(
+            """
+              <project>
+                  <parent>
+                      <groupId>org.openrewrite.example</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                  </parent>
+                  <groupId>org.openrewrite.example</groupId>
+                  <artifactId>module</artifactId>
+                  <version>1</version>
+              </project>
+              """,
+            spec -> spec.path("module/pom.xml")
+          )
+        );
+    }
 }
