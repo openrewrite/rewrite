@@ -28,7 +28,6 @@ import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -83,8 +82,7 @@ public class FindMethods extends Recipe {
                                 method.getSimpleName(),
                                 method.getArguments().stream()
                                         .map(Expression::getType)
-                                        .filter(Objects::nonNull)
-                                        .map(Object::toString)
+                                        .map(String::valueOf)
                                         .collect(Collectors.joining(", "))
                         ));
                     }
@@ -106,8 +104,7 @@ public class FindMethods extends Recipe {
                                 memberRef.getMethodType().getName(),
                                 memberRef.getArguments().stream()
                                         .map(Expression::getType)
-                                        .filter(Objects::nonNull)
-                                        .map(Object::toString)
+                                        .map(String::valueOf)
                                         .collect(Collectors.joining(", "))
                         ));
                     }
@@ -129,8 +126,7 @@ public class FindMethods extends Recipe {
                                 "<constructor>",
                                 newClass.getArguments().stream()
                                         .map(Expression::getType)
-                                        .filter(Objects::nonNull)
-                                        .map(Object::toString)
+                                        .map(String::valueOf)
                                         .collect(Collectors.joining(", "))
                         ));
                     }
