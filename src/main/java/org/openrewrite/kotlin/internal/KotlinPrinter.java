@@ -162,11 +162,17 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitKReturn(K.KReturn kReturn, PrintOutputCapture<P> p) {
         visit(kReturn.getAnnotations(), p);
-        visit(kReturn.getExpression(), p);
+        J.Return return_ = kReturn.getExpression();
+        beforeSyntax(return_, Space.Location.RETURN_PREFIX, p);
+        p.append("return");
         if (kReturn.getLabel() != null) {
             p.append("@");
             visit(kReturn.getLabel(), p);
         }
+        if (return_.getExpression() != null) {
+            visit(return_.getExpression(), p);
+        }
+        afterSyntax(return_, p);
         return kReturn;
     }
 
