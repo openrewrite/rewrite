@@ -22,11 +22,13 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.table.MethodCalls;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -77,8 +79,13 @@ public class FindMethods extends Recipe {
                         methodCalls.insertRow(ctx, new MethodCalls.Row(
                                 javaSourceFile.getSourcePath().toString(),
                                 method.printTrimmed(getCursor()),
-                                m.getMethodType().getDeclaringType().getFullyQualifiedName(),
-                                m.getSimpleName()
+                                method.getMethodType().getDeclaringType().getFullyQualifiedName(),
+                                method.getSimpleName(),
+                                method.getArguments().stream()
+                                        .map(Expression::getType)
+                                        .filter(Objects::nonNull)
+                                        .map(Object::toString)
+                                        .collect(Collectors.joining(", "))
                         ));
                     }
                     m = SearchResult.found(m);
@@ -95,8 +102,13 @@ public class FindMethods extends Recipe {
                         methodCalls.insertRow(ctx, new MethodCalls.Row(
                                 javaSourceFile.getSourcePath().toString(),
                                 memberRef.printTrimmed(getCursor()),
-                                m.getMethodType().getDeclaringType().getFullyQualifiedName(),
-                                m.getMethodType().getName()
+                                memberRef.getMethodType().getDeclaringType().getFullyQualifiedName(),
+                                memberRef.getMethodType().getName(),
+                                memberRef.getArguments().stream()
+                                        .map(Expression::getType)
+                                        .filter(Objects::nonNull)
+                                        .map(Object::toString)
+                                        .collect(Collectors.joining(", "))
                         ));
                     }
                     m = m.withReference(SearchResult.found(m.getReference()));
@@ -113,8 +125,13 @@ public class FindMethods extends Recipe {
                         methodCalls.insertRow(ctx, new MethodCalls.Row(
                                 javaSourceFile.getSourcePath().toString(),
                                 newClass.printTrimmed(getCursor()),
-                                n.getType().toString(),
-                                "<constructor>"
+                                newClass.getType().toString(),
+                                "<constructor>",
+                                newClass.getArguments().stream()
+                                        .map(Expression::getType)
+                                        .filter(Objects::nonNull)
+                                        .map(Object::toString)
+                                        .collect(Collectors.joining(", "))
                         ));
                     }
                     n = SearchResult.found(n);

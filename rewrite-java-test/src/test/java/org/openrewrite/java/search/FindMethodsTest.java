@@ -215,15 +215,15 @@ class FindMethodsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.dataTableAsCsv(MethodCalls.class.getName(),
             """
-              sourceFile,method,className,methodName
-              A.java,"new B.C().foo()","B$C",foo
+              sourceFile,method,className,methodName,argumentTypes
+              A.java,"new B.C().foo(bar, 123)","B$C",foo,"java.lang.String, int"
               """
-          ).recipe(new FindMethods("B.C foo()", false)),
+          ).recipe(new FindMethods("B.C foo(..)", false)),
           java(
             """
               public class B {
                  public static class C {
-                     public void foo() {}
+                     public void foo(String bar, int baz) {}
                  }
               }
               """
@@ -231,15 +231,15 @@ class FindMethodsTest implements RewriteTest {
           java(
             """
               public class A {
-                   void test() {
-                       new B.C().foo();
+                   void test(String bar) {
+                       new B.C().foo(bar, 123);
                    }
               }
               """,
             """
               public class A {
-                   void test() {
-                       /*~~>*/new B.C().foo();
+                   void test(String bar) {
+                       /*~~>*/new B.C().foo(bar, 123);
                    }
               }
               """

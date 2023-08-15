@@ -47,5 +47,9 @@ public class MethodCalls extends DataTable<MethodCalls.Row> {
         @Column(displayName = "Method name",
                 description = "The method name of the method call.")
         String methodName;
+
+        @Column(displayName = "Argument types",
+                description = "The argument types of the method call.")
+        String argumentTypes;
     }
 }
