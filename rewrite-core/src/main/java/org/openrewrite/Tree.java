@@ -82,8 +82,11 @@ public interface Tree {
     <P> boolean isAcceptable(TreeVisitor<?, P> v, P p);
 
     default <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
-
         return cursor.firstEnclosingOrThrow(SourceFile.class).printer(cursor);
+    }
+
+    default <P> TreeVisitor<?, P> autoFormatter(Cursor cursor, @Nullable Tree stopAfter) {
+        return cursor.firstEnclosingOrThrow(SourceFile.class).autoFormatter(cursor, stopAfter);
     }
 
     default String print(Cursor cursor) {

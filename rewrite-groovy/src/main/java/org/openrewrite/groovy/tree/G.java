@@ -22,6 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.groovy.GroovyPrinter;
 import org.openrewrite.groovy.GroovyVisitor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -185,6 +186,11 @@ public interface G extends J {
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new GroovyPrinter<>();
+        }
+
+        @Override
+        public <P> TreeVisitor<?, P> autoFormatter(Cursor cursor, @Nullable Tree stopAfter) {
+            return new AutoFormatVisitor<>(stopAfter);
         }
 
         @Transient

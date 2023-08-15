@@ -107,6 +107,10 @@ public interface SourceFile extends Tree {
         throw new UnsupportedOperationException("SourceFile implementations should override this method");
     }
 
+    default <P> TreeVisitor<?, P> autoFormatter(Cursor cursor, @Nullable Tree stopAfter) {
+        throw new UnsupportedOperationException("SourceFile implementations should override this method");
+    }
+
     /**
      * A measure of the size of the AST by count of number of AST nodes or some other similar measure. Because perfect referential
      * uniqueness is space inefficient, this weight will always be approximate and is best used for comparative size between two ASTs

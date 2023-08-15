@@ -30,6 +30,7 @@ import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
+import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Markers;
@@ -1527,6 +1528,11 @@ public interface J extends Tree {
         @Override
         public <P> TreeVisitor<?, PrintOutputCapture<P>> printer(Cursor cursor) {
             return new JavaPrinter<>();
+        }
+
+        @Override
+        public <P> TreeVisitor<?, P> autoFormatter(Cursor cursor, @Nullable Tree stopAfter) {
+            return new AutoFormatVisitor<>(stopAfter);
         }
 
         @Transient
