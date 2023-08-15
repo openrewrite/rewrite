@@ -78,9 +78,6 @@ class FormatPreservingReader extends Reader {
             buffer.ensureCapacity(buffer.size() + read);
             for (int i = 0; i < read; i++) {
                 char e = cbuf[i];
-                if (Character.UnicodeBlock.of(e) != Character.UnicodeBlock.BASIC_LATIN) {
-                    throw new IllegalArgumentException("Only ASCII characters are supported for now");
-                }
                 buffer.add(e);
             }
         }
