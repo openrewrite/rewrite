@@ -69,7 +69,7 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
         Optional<String> version;
         if (versionComparator instanceof ExactVersion) {
-            version = Optional.of(newVersion);
+            version = versionComparator.upgrade(currentVersion, Collections.singletonList(newVersion));
         } else if (versionComparator instanceof LatestPatch && !versionComparator.isValid(currentVersion, currentVersion)) {
             // in the case of "latest.patch", a new version can only be derived if the
             // current version is a semantic version

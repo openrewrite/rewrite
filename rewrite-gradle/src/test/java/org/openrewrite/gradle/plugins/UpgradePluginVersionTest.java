@@ -141,4 +141,18 @@ class UpgradePluginVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void dontDowngradeWhenExactVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion("io.spring.dependency-management", "1.0.15.RELEASE", null)),
+          buildGradle(
+            """
+              plugins {
+                  id 'io.spring.dependency-management' version '1.1.0'
+              }
+              """
+          )
+        );
+    }
 }
