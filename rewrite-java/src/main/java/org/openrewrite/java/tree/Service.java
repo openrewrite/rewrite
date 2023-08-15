@@ -13,17 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.service;
+package org.openrewrite.java.tree;
 
-import org.openrewrite.Incubating;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.AddImport;
 import org.openrewrite.java.JavaVisitor;
 
-@Incubating(since = "8.2.0")
-public class ImportService {
+// Language specific service provider
+public interface Service {
+     <P> JavaVisitor<P> getAddImportVisitor(@Nullable String packageName, String typeName, @Nullable String member,
+                                         boolean onlyIfReferenced);
 
-    public <P> JavaVisitor<P> addImportVisitor(@Nullable String packageName, String typeName, @Nullable String member, boolean onlyIfReferenced) {
-        return new AddImport<>(packageName, typeName, member, onlyIfReferenced);
-    }
+     <P> JavaVisitor<P> getAutoFormatter(@Nullable Tree stopAfter);
 }

@@ -21,8 +21,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.format.AutoFormatVisitor;
-import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -92,7 +90,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
     public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, P p, Cursor cursor) {
-        return (J2) new AutoFormatVisitor<>(stopAfter).visit(j, p, cursor);
+        Service service = getCursor().firstEnclosingOrThrow(JavaSourceFile.class).getService();
+        return (J2) service.getAutoFormatter(stopAfter).visit(j, p, cursor);
     }
 
     /**
@@ -130,8 +129,9 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public void maybeAddImport(@Nullable String packageName, String typeName, @Nullable String member, boolean onlyIfReferenced) {
-        ImportService service = getCursor().firstEnclosingOrThrow(JavaSourceFile.class).service(ImportService.class);
-        JavaVisitor<P> visitor = service.addImportVisitor(packageName, typeName, member, onlyIfReferenced);
+        JavaVisitor<P> visitor = getCursor().firstEnclosingOrThrow(JavaSourceFile.class)
+                .getService()
+                .getAddImportVisitor(packageName, typeName, member, onlyIfReferenced);
         if (!getAfterVisit().contains(visitor)) {
             doAfterVisit(visitor);
         }

@@ -17,9 +17,12 @@ package org.openrewrite.java.tree;
 
 import org.openrewrite.Incubating;
 import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.AddImport;
+import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.internal.TypesInUse;
-import org.openrewrite.java.service.ImportService;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -54,12 +57,19 @@ public interface JavaSourceFile extends J {
     SourceFile withSourcePath(Path path);
 
     @Incubating(since = "8.2.0")
-    @SuppressWarnings("unchecked")
-    default <S> S service(Class<S> service) {
-        if (service == ImportService.class) {
-            return (S) new ImportService();
-        }
-        throw new UnsupportedOperationException("Service " + service + " not supported");
+    default Service getService() {
+        return new Service() {
+            @Override
+            public <P> JavaVisitor<P> getAddImportVisitor(@Nullable String packageName, String typeName,
+                                                       @Nullable String member, boolean onlyIfReferenced) {
+                return new AddImport<>(packageName, typeName, member, onlyIfReferenced);
+            }
+
+            @Override
+            public <P> JavaVisitor<P> getAutoFormatter(@Nullable Tree stopAfter) {
+                return new AutoFormatVisitor<>(stopAfter);
+            }
+        };
     }
 
     interface Padding {
