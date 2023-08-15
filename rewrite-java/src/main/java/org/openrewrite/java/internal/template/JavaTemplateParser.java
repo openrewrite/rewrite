@@ -24,7 +24,6 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.RandomizeIdVisitor;
 import org.openrewrite.java.tree.*;
@@ -249,7 +248,7 @@ public class JavaTemplateParser {
         ExecutionContext ctx = new InMemoryExecutionContext();
         ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
         ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
-        Parser jp = newParser();
+        Parser jp = parser.build();
         return (stub.contains("@SubAnnotation") ?
                 jp.reset().parse(ctx, stub, SUBSTITUTED_ANNOTATION) :
                 jp.reset().parse(ctx, stub))
@@ -257,11 +256,6 @@ public class JavaTemplateParser {
                 .filter(JavaSourceFile.class::isInstance) // Filters out ParseErrors
                 .map(JavaSourceFile.class::cast)
                 .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
-    }
-
-    @NonNull
-    private Parser newParser() {
-        return parser.build();
     }
 
     /**

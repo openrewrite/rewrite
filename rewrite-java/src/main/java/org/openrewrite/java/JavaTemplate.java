@@ -20,6 +20,7 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.template.JavaTemplateJavaExtension;
 import org.openrewrite.java.internal.template.JavaTemplateParser;
 import org.openrewrite.java.internal.template.Substitutions;
@@ -33,26 +34,34 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Consumer;
 
 @SuppressWarnings("unused")
 public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
-    protected static final Path TEMPLATE_CLASSPATH_DIR;
 
-    static {
-        try {
-            TEMPLATE_CLASSPATH_DIR = Files.createTempDirectory("java-template");
-            Path templateDir = Files.createDirectories(TEMPLATE_CLASSPATH_DIR.resolve("org/openrewrite/java/internal/template"));
-            try (InputStream in = JavaTemplateParser.class.getClassLoader().getResourceAsStream("org/openrewrite/java/internal/template/__M__.class")) {
-                Files.copy(in, templateDir.resolve("__M__.class"));
+    @Nullable
+    private static Path TEMPLATE_CLASSPATH_DIR;
+
+    protected static Path getTemplateClasspathDir() {
+        if (TEMPLATE_CLASSPATH_DIR == null) {
+            try {
+                TEMPLATE_CLASSPATH_DIR = Files.createTempDirectory("java-template");
+                Path templateDir = Files.createDirectories(TEMPLATE_CLASSPATH_DIR.resolve("org/openrewrite/java/internal/template"));
+                try (InputStream in = JavaTemplateParser.class.getClassLoader().getResourceAsStream("org/openrewrite/java/internal/template/__M__.class")) {
+                    assert in != null;
+                    Files.copy(in, templateDir.resolve("__M__.class"));
+                }
+                try (InputStream in = JavaTemplateParser.class.getClassLoader().getResourceAsStream("org/openrewrite/java/internal/template/__P__.class")) {
+                    assert in != null;
+                    Files.copy(in, templateDir.resolve("__P__.class"));
+                }
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
-            try (InputStream in = JavaTemplateParser.class.getClassLoader().getResourceAsStream("org/openrewrite/java/internal/template/__P__.class")) {
-                Files.copy(in, templateDir.resolve("__P__.class"));
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
         }
+        return TEMPLATE_CLASSPATH_DIR;
     }
 
     private final String code;
@@ -66,7 +75,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
     }
 
     private static JavaParser.Builder<?,?> augmentClasspath(JavaParser.Builder<?,?> parserBuilder) {
-        return parserBuilder.addClasspath(TEMPLATE_CLASSPATH_DIR);
+        return parserBuilder.addClasspath(getTemplateClasspathDir());
     }
 
     protected JavaTemplate(String code, int parameterCount, Consumer<String> onAfterVariableSubstitution, JavaTemplateParser templateParser) {
@@ -158,7 +167,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
 
         private boolean contextSensitive;
 
-        private JavaParser.Builder<?, ?> parser = JavaParser.fromJavaVersion();
+        private JavaParser.Builder<?, ?> parser = org.openrewrite.java.JavaParser.fromJavaVersion();
 
         private Consumer<String> onAfterVariableSubstitution = s -> {
         };
@@ -201,7 +210,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
 
         public Builder javaParser(JavaParser.Builder<?, ?> parser) {
-            this.parser = parser.clone();
+            this.parser = parser;
             return this;
         }
 
@@ -216,7 +225,7 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
         }
 
         public JavaTemplate build() {
-            return new JavaTemplate(contextSensitive, parser, code, imports,
+            return new JavaTemplate(contextSensitive, parser.clone(), code, imports,
                     onAfterVariableSubstitution, onBeforeParseTemplate);
         }
     }
