@@ -15,7 +15,10 @@
  */
 package org.openrewrite.kotlin.internal;
 
-import org.jetbrains.kotlin.*;
+import org.jetbrains.kotlin.KtFakeSourceElement;
+import org.jetbrains.kotlin.KtFakeSourceElementKind;
+import org.jetbrains.kotlin.KtLightSourceElement;
+import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
 import org.jetbrains.kotlin.com.intellij.openapi.util.TextRange;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
@@ -1638,7 +1641,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitImport(FirImport firImport, ExecutionContext ctx) {
         Space prefix = sourceBefore("import");
-        JLeftPadded<Boolean> static_ = padLeft(EMPTY, false);
+        @SuppressWarnings("KotlinInternalInJava") boolean hasParentClassId =
+                firImport instanceof org.jetbrains.kotlin.fir.declarations.impl.FirResolvedImportImpl
+                && ((org.jetbrains.kotlin.fir.declarations.impl.FirResolvedImportImpl) firImport).getResolvedParentClassId() != null;
+        JLeftPadded<Boolean> static_ = padLeft(EMPTY, hasParentClassId);
 
         Space space = whitespace();
         String packageName = firImport.getImportedFqName() == null ? "" : firImport.isAllUnder() ?
@@ -1658,12 +1664,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         JLeftPadded<J.Identifier> alias = null;
         if (firImport.getAliasName() != null) {
             Space asPrefix = sourceBefore("as");
-            Space aliasPrefix = whitespace();
             String aliasText = firImport.getAliasName().asString();
-            skip(aliasText);
             // FirImport does not contain type attribution information, so we cannot use the type mapping here.
-            J.Identifier aliasId = createIdentifier(aliasText)
-                    .withPrefix(aliasPrefix);
+            J.Identifier aliasId = createIdentifier(aliasText);
             alias = padLeft(asPrefix, aliasId);
         }
         return new J.Import(

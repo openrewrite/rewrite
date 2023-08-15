@@ -79,7 +79,13 @@ class ImportTest implements RewriteTest {
     @Test
     void alias() {
         rewriteRun(
-          kotlin("import kotlin.collections.List as L")
+          kotlin(
+            """
+              import kotlin.collections.List as L
+              import kotlin.collections.Set as S
+              
+              class T
+              """)
         );
     }
 }

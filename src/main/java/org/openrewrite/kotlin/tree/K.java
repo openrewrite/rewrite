@@ -22,9 +22,11 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.internal.TypesInUse;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.internal.KotlinPrinter;
+import org.openrewrite.kotlin.service.KotlinImportService;
 import org.openrewrite.marker.Markers;
 
 import java.beans.Transient;
@@ -272,6 +274,15 @@ public interface K extends J {
                 return t.statements == statements ? t : new K.CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath,
                         t.fileAttributes, t.charsetName, t.charsetBomMarked, t.checksum, t.annotations, t.packageDeclaration, t.imports, statements, t.eof);
             }
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public <S> S service(Class<S> service) {
+            if (service == ImportService.class || service == KotlinImportService.class) {
+                return (S) new KotlinImportService();
+            }
+            return JavaSourceFile.super.service(service);
         }
     }
 
