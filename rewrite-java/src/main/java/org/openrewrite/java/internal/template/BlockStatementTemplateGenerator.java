@@ -45,8 +45,9 @@ import static org.openrewrite.java.tree.JavaCoordinates.Mode.REPLACEMENT;
 public class BlockStatementTemplateGenerator {
     private static final String TEMPLATE_COMMENT = "__TEMPLATE__";
     private static final String STOP_COMMENT = "__TEMPLATE_STOP__";
+    protected static final String TEMPLATE_INTERNAL_IMPORTS = "import org.openrewrite.java.internal.template.__M__;\nimport org.openrewrite.java.internal.template.__P__;\n";
 
-    private final Set<String> imports;
+    protected final Set<String> imports;
     private final boolean contextSensitive;
 
     public String template(Cursor cursor, String template, Space.Location location, JavaCoordinates.Mode mode) {
@@ -235,7 +236,7 @@ public class BlockStatementTemplateGenerator {
             after.append("\n}}");
         }
 
-        before.insert(0, "import org.openrewrite.java.internal.template.__M__;\nimport org.openrewrite.java.internal.template.__P__;\n");
+        before.insert(0, TEMPLATE_INTERNAL_IMPORTS);
         for (String anImport : imports) {
             before.insert(0, anImport);
         }
@@ -245,7 +246,7 @@ public class BlockStatementTemplateGenerator {
     private void contextTemplate(Cursor cursor, J prior, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
         J j = cursor.getValue();
         if (j instanceof JavaSourceFile) {
-            before.insert(0, "import org.openrewrite.java.internal.template.__M__;\nimport org.openrewrite.java.internal.template.__P__;\n");
+            before.insert(0, TEMPLATE_INTERNAL_IMPORTS);
 
             JavaSourceFile cu = (JavaSourceFile) j;
             for (J.Import anImport : cu.getImports()) {
