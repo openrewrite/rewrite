@@ -22,10 +22,12 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.internal.TypesInUse;
+import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.internal.KotlinPrinter;
+import org.openrewrite.kotlin.service.KotlinAutoFormatService;
 import org.openrewrite.kotlin.service.KotlinImportService;
 import org.openrewrite.marker.Markers;
 
@@ -279,8 +281,13 @@ public interface K extends J {
         @Override
         @SuppressWarnings("unchecked")
         public <S> S service(Class<S> service) {
-            if (service == ImportService.class || service == KotlinImportService.class) {
+            String serviceName =  service.getName();
+            if (ImportService.class.getName().equals(serviceName) ||
+                KotlinImportService.class.getName().equals(serviceName)) {
                 return (S) new KotlinImportService();
+            } else if (AutoFormatService.class.getName().equals(serviceName) ||
+                       KotlinAutoFormatService.class.getName().equals(serviceName)) {
+                return (S) new KotlinAutoFormatService();
             }
             return JavaSourceFile.super.service(service);
         }
