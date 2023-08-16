@@ -98,6 +98,19 @@ class MethodDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void constructor() {
+        rewriteRun(
+          kotlin(
+            """
+              class A(i : Int) {
+                  constructor() : this  (1)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void infix() {
         rewriteRun(
           kotlin(
