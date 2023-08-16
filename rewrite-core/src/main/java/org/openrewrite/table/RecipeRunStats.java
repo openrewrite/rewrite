@@ -103,7 +103,7 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
         Integer sourceFiles;
 
         @Column(displayName = "Source file changed count",
-                description = "The number of source files which were changed in the recipe run. Includes files created, deleted, and edited")
+                description = "The number of source files which were changed in the recipe run. Includes files created, deleted, and edited.")
         Integer sourceFilesChanged;
 
         @Column(displayName = "Cumulative scanning time",
