@@ -16,11 +16,14 @@
 package org.openrewrite.maven.search;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.maven.table.EffectiveMavenSettings;
 import org.openrewrite.maven.tree.MavenResolutionResult;
@@ -28,8 +31,16 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.io.UncheckedIOException;
 
+@Value
+@EqualsAndHashCode(callSuper = false)
 public class FindMavenSettings extends Recipe {
-    final transient EffectiveMavenSettings settings = new EffectiveMavenSettings(this);
+    @Option(displayName = "Existence check only",
+            description = "Only record that a maven settings file exists; do not include its contents.",
+            required = false)
+    @Nullable
+    Boolean existenceCheckOnly;
+
+    transient EffectiveMavenSettings settings = new EffectiveMavenSettings(this);
 
     @Override
     public String getDisplayName() {
@@ -53,7 +64,9 @@ public class FindMavenSettings extends Recipe {
                     try {
                         settings.insertRow(ctx, new EffectiveMavenSettings.Row(
                                 document.getSourcePath().toString(),
-                                mapper.writerWithDefaultPrettyPrinter().writeValueAsString(mrr.getMavenSettings())
+                                Boolean.TRUE.equals(existenceCheckOnly) ?
+                                        "exists" :
+                                        mapper.writerWithDefaultPrettyPrinter().writeValueAsString(mrr.getMavenSettings())
                         ));
                     } catch (JsonProcessingException e) {
                         throw new UncheckedIOException(e);

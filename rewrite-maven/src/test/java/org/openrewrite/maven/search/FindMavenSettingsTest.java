@@ -57,7 +57,7 @@ public class FindMavenSettingsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindMavenSettings());
+        spec.recipe(new FindMavenSettings(null));
     }
 
     @Test
