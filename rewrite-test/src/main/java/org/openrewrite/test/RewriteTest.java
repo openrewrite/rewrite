@@ -22,6 +22,7 @@ import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
+import org.openrewrite.internal.InMemoryDiffEntry;
 import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
@@ -30,6 +31,7 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
+import org.openrewrite.tree.ParseError;
 
 import java.io.ByteArrayInputStream;
 import java.nio.file.Path;
@@ -435,9 +437,22 @@ public interface RewriteTest extends SourceSpecs {
         nextSourceFile:
         for (Map.Entry<SourceFile, SourceSpec<?>> specForSourceFile : specBySourceFile.entrySet()) {
             SourceSpec<?> sourceSpec = specForSourceFile.getValue();
+            SourceFile source = specForSourceFile.getKey();
+            if (source instanceof ParseError) {
+                ParseError parseError = (ParseError) source;
+                if (parseError.getErroneous() != null) {
+                    assertContentEquals(
+                            parseError,
+                            parseError.getText(),
+                            parseError.getErroneous().printAll(),
+                            "Bug in source parser or printer resulted in the following difference for"
+                    );
+                }
+            }
+
             for (Result result : allResults) {
-                if ((result.getBefore() == null && specForSourceFile.getKey() == null) ||
-                    (result.getBefore() != null && result.getBefore().getId().equals(specForSourceFile.getKey().getId()))) {
+                if ((result.getBefore() == null && source == null) ||
+                    (result.getBefore() != null && result.getBefore().getId().equals(source.getId()))) {
                     if (result.getAfter() != null) {
                         String expectedAfter = sourceSpec.after == null ? null :
                                 sourceSpec.after.apply(result.getAfter().printAll(out.clone()));
@@ -446,15 +461,7 @@ public interface RewriteTest extends SourceSpecs {
                             String expected = sourceSpec.noTrim ?
                                     expectedAfter :
                                     trimIndentPreserveCRLF(expectedAfter);
-                            assertThat(actual)
-                                    .as(() -> {
-                                        SourceFile expectedSourceFile = new DelegateSourceFileForDiff(result.getAfter(), expected);
-                                        String diff = new Result(expectedSourceFile, result.getAfter(), Collections.emptyList()).diff();
-                                        return String.format("Unexpected result in \"%s\"%s",
-                                                result.getAfter().getSourcePath(),
-                                                diff.isEmpty() ? "" : "\n" + diff);
-                                    })
-                                    .isEqualTo(expected);
+                            assertContentEquals(result.getAfter(), expected, actual, "Unexpected result in");
                             sourceSpec.eachResult.accept(result.getAfter(), testMethodSpec, testClassSpec);
                         } else {
                             boolean isRemote = result.getAfter() instanceof Remote;
@@ -503,8 +510,8 @@ public interface RewriteTest extends SourceSpecs {
             // if we get here, there was no result.
             if (sourceSpec.after != null) {
                 String actual = sourceSpec.noTrim ?
-                        specForSourceFile.getKey().printAll(out.clone()) :
-                        trimIndentPreserveCRLF(specForSourceFile.getKey().printAll(out.clone()));
+                        source.printAll(out.clone()) :
+                        trimIndentPreserveCRLF(source.printAll(out.clone()));
                 String before = sourceSpec.noTrim ?
                         sourceSpec.before :
                         trimIndentPreserveCRLF(sourceSpec.before);
@@ -515,11 +522,11 @@ public interface RewriteTest extends SourceSpecs {
                         .as("To assert that a Recipe makes no change, supply only \"before\" source.")
                         .isNotEqualTo(before);
                 assertThat(actual)
-                        .as("The recipe should have made the following change to \"" + specForSourceFile.getKey().getSourcePath() + "\"")
+                        .as("The recipe should have made the following change to \"" + source.getSourcePath() + "\"")
                         .isEqualTo(expected);
             }
             //noinspection unchecked
-            ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(specForSourceFile.getKey());
+            ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(source);
         }
 
         SoftAssertions newFilesGenerated = new SoftAssertions();
@@ -541,6 +548,28 @@ public interface RewriteTest extends SourceSpecs {
                 fail("The recipe added a source file \"" + result.getAfter().getSourcePath()
                      + "\" that was not expected.");
             }
+        }
+    }
+
+    static void assertContentEquals(SourceFile sourceFile, String expected, String actual, String errorMessagePrefix) {
+        try {
+            try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
+                    sourceFile.getSourcePath(),
+                    sourceFile.getSourcePath(),
+                    null,
+                    expected,
+                    actual,
+                    Collections.emptySet()
+            )) {
+                assertThat(actual)
+                        .as(errorMessagePrefix + " \"%s\":\n%s", sourceFile.getSourcePath(), diffEntry.getDiff())
+                        .isEqualTo(expected);
+            }
+        } catch (LinkageError e) {
+            // in case JGit fails to load properly
+            assertThat(actual)
+                    .as(errorMessagePrefix + " \"%s\"", sourceFile.getSourcePath())
+                    .isEqualTo(expected);
         }
     }
 
