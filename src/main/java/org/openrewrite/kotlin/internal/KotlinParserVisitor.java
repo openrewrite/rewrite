@@ -3247,7 +3247,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 Space thisPrefix = whitespace();
                 // The delegate constructor call is de-sugared during the backend phase of the compiler.
                 TypeTree delegateName = createIdentifier(constructor.getDelegatedConstructor().isThis() ? "this" : "super");
-                JContainer<Expression> args = mapFunctionalCallArguments(constructor.getDelegatedConstructor().getArgumentList().getArguments()).withBefore(before);
+                Space argsPrefix = whitespace();
+                JContainer<Expression> args = mapFunctionalCallArguments(constructor.getDelegatedConstructor().getArgumentList().getArguments()).withBefore(argsPrefix);
 
                 JavaType type = typeMapping.type(constructor);
                 J.NewClass newClass = new J.NewClass(
