@@ -17,10 +17,7 @@ package org.openrewrite.maven.search;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenExecutionContextView;
@@ -30,6 +27,8 @@ import org.openrewrite.maven.tree.MavenResolutionResult;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.StringJoiner;
+
+import static org.openrewrite.PathUtils.separatorsToUnix;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -65,19 +64,19 @@ public class EffectiveMavenRepositories extends Recipe {
                 for (MavenRepository repository : mrr.getPom().getRepositories()) {
                     repositories.add(repository.getUri());
                     table.insertRow(ctx, new EffectiveMavenRepositoriesTable.Row(
-                            document.getSourcePath().toString(),
+                            separatorsToUnix(document.getSourcePath().toString()),
                             repository.getUri()));
                 }
                 for (MavenRepository repository : MavenExecutionContextView.view(ctx)
                         .getRepositories(mrr.getMavenSettings(), mrr.getActiveProfiles())) {
                     repositories.add(repository.getUri());
                     table.insertRow(ctx, new EffectiveMavenRepositoriesTable.Row(
-                            document.getSourcePath().toString(),
+                            separatorsToUnix(document.getSourcePath().toString()),
                             repository.getUri()));
                 }
                 repositories.add(MavenRepository.MAVEN_CENTRAL.getUri());
                 table.insertRow(ctx, new EffectiveMavenRepositoriesTable.Row(
-                        document.getSourcePath().toString(),
+                        separatorsToUnix(document.getSourcePath().toString()),
                         MavenRepository.MAVEN_CENTRAL.getUri()));
                 if (Boolean.TRUE.equals(useMarkers)) {
                     return SearchResult.found(document, repositories.toString());
