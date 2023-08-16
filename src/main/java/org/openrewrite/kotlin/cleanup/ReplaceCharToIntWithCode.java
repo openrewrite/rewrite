@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.KotlinParser;
@@ -31,7 +32,8 @@ import org.openrewrite.kotlin.tree.K;
 @EqualsAndHashCode(callSuper = true)
 public class ReplaceCharToIntWithCode extends Recipe {
     private static final MethodMatcher CHAR_TO_INT_METHOD_MATCHER = new MethodMatcher("kotlin.Char toInt()");
-    private static J.FieldAccess charCodeTemplate = null;
+    @Nullable
+    private static J.FieldAccess charCodeTemplate;
 
     @Override
     public String getDisplayName() {

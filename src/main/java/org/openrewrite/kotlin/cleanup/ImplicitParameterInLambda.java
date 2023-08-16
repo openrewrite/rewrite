@@ -20,7 +20,6 @@ import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.KotlinVisitor;
 
@@ -48,7 +47,7 @@ public class ImplicitParameterInLambda extends Recipe {
     }
 
     @Override
-    public @Nullable Duration getEstimatedEffortPerOccurrence() {
+    public Duration getEstimatedEffortPerOccurrence() {
         return Duration.ofMinutes(2);
     }
 
