@@ -524,6 +524,61 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void upgradePluginDependencies() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite.recipe", "rewrite-spring", "5.0.6", "-android", null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>5.4.1</version>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.openrewrite.recipe</groupId>
+                          <artifactId>rewrite-spring</artifactId>
+                          <version>5.0.5</version>
+                        </dependency>
+                      </dependencies>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>5.4.1</version>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.openrewrite.recipe</groupId>
+                          <artifactId>rewrite-spring</artifactId>
+                          <version>5.0.6</version>
+                        </dependency>
+                      </dependencies>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/1334")
     void upgradeGuavaWithExplicitBlankVersionPattern() {
         rewriteRun(

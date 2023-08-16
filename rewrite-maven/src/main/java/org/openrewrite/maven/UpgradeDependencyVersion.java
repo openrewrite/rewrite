@@ -142,6 +142,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
         assert versionComparator != null;
 
         return new MavenIsoVisitor<ExecutionContext>() {
+            private final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
+
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
@@ -158,6 +160,8 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
                                 maybeUpdateModel();
                             }
                         }
+                    } else if (isPluginDependencyTag(groupId, artifactId)) {
+                        // TODO handle plugin dependencies
                     }
                 } catch (MavenDownloadingException e) {
                     return e.warn(t);
@@ -320,8 +324,4 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
             }
         };
     }
-
-    private static final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
-    private static final String DEPENDENCIES_XPATH = "/project/dependencies";
-    private static final String DEPENDENCY_MANAGEMENT_XPATH = "/project/dependencyManagement";
 }
