@@ -148,7 +148,7 @@ public class Space {
 
         StringBuilder prefix = new StringBuilder();
         StringBuilder comment = new StringBuilder();
-        List<Comment> comments = new ArrayList<>();
+        List<Comment> comments = new ArrayList<>(1);
 
         boolean inSingleLineComment = false;
         boolean inMultiLineComment = false;
@@ -163,13 +163,13 @@ public class Space {
                         comment.append(c);
                     } else if (last == '/' && !inMultiLineComment) {
                         inSingleLineComment = true;
-                        comment = new StringBuilder();
+                        comment.setLength(0);
                     } else if (last == '*' && inMultiLineComment && comment.length() > 0) {
                         inMultiLineComment = false;
                         comment.setLength(comment.length() - 1); // trim the last '*'
                         comments.add(new TextComment(true, comment.toString(), prefix.toString(), Markers.EMPTY));
-                        prefix = new StringBuilder();
-                        comment = new StringBuilder();
+                        prefix.setLength(0);
+                        comment.setLength(0);
                         continue;
                     } else {
                         comment.append(c);
@@ -180,8 +180,8 @@ public class Space {
                     if (inSingleLineComment) {
                         inSingleLineComment = false;
                         comments.add(new TextComment(false, comment.toString(), prefix.toString(), Markers.EMPTY));
-                        prefix = new StringBuilder();
-                        comment = new StringBuilder();
+                        prefix.setLength(0);
+                        comment.setLength(0);
                         prefix.append(c);
                     } else if (!inMultiLineComment) {
                         prefix.append(c);
@@ -194,7 +194,7 @@ public class Space {
                         comment.append(c);
                     } else if (last == '/' && !inMultiLineComment) {
                         inMultiLineComment = true;
-                        comment = new StringBuilder();
+                        comment.setLength(0);
                     } else {
                         comment.append(c);
                     }
@@ -209,7 +209,7 @@ public class Space {
             last = c;
         }
         // If a file ends with a single-line comment there may be no terminating newline
-        if (!comment.toString().isEmpty()) {
+        if (comment.length() > 0) {
             comments.add(new TextComment(false, comment.toString(), prefix.toString(), Markers.EMPTY));
             prefix = new StringBuilder();
         }
