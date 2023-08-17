@@ -23,6 +23,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
+import org.openrewrite.kotlin.tree.K;
 
 public class RemoveTrailingWhitespaceVisitor<P> extends KotlinIsoVisitor<P> {
     @Nullable
@@ -38,7 +39,7 @@ public class RemoveTrailingWhitespaceVisitor<P> extends KotlinIsoVisitor<P> {
     }
 
     @Override
-    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
+    public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, P p) {
         String eof = cu.getEof().getWhitespace();
         StringBuilder builder = new StringBuilder();
         for (char c : eof.toCharArray()) {
@@ -47,7 +48,7 @@ public class RemoveTrailingWhitespaceVisitor<P> extends KotlinIsoVisitor<P> {
             }
         }
         eof = builder.toString();
-        J.CompilationUnit c = super.visitCompilationUnit(cu, p);
+        K.CompilationUnit c = super.visitCompilationUnit(cu, p);
         return c.withEof(c.getEof().withWhitespace(eof));
     }
 
