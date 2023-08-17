@@ -1594,11 +1594,20 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 FirValueParameter p = parameters.get(i);
                 J expr = visitElement(p, ctx);
 
-                JRightPadded<J> param = JRightPadded.build(expr);
-                Space after = i < parameters.size() - 1 ? sourceBefore(",") : (parenthesized ? sourceBefore(")") : EMPTY);
-                param = param.withAfter(after);
+                JRightPadded<J> param;
+                if (i < parameters.size() - 1) {
+                    param = JRightPadded.build(expr).withAfter(whitespace());
+                    skip(",");
+                } else {
+                    Space after = parenthesized ? whitespace() : EMPTY;
+                    param = JRightPadded.build(expr).withAfter(after);
+                    if (parenthesized && skip(",")) {
+                        param = param.withMarkers(Markers.build(singletonList(new TrailingComma(randomId(), whitespace()))));
+                    }
+                }
                 paramExprs.add(param);
             }
+            skip(")");
         }
 
         J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, parenthesized, paramExprs);

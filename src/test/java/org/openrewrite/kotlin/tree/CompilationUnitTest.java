@@ -51,8 +51,6 @@ class CompilationUnitTest implements RewriteTest {
         );
     }
 
-    // TODO: check why this test now fails
-    @ExpectedToFail
     @Test
     void packageAndComments() {
         rewriteRun(
