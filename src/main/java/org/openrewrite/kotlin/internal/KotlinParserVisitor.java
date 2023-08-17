@@ -55,6 +55,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.KotlinTypeMapping;
@@ -284,7 +285,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         J.Label label = null;
         if (anonymousFunction.getLabel() != null && anonymousFunction.getLabel().getSource() != null &&
-                anonymousFunction.getLabel().getSource().getKind() != KtFakeSourceElementKind.GeneratedLambdaLabel.INSTANCE) {
+            anonymousFunction.getLabel().getSource().getKind() != KtFakeSourceElementKind.GeneratedLambdaLabel.INSTANCE) {
             label = (J.Label) visitElement(anonymousFunction.getLabel(), ctx);
         }
 
@@ -368,9 +369,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             // skip destructured property declarations.
             for (FirStatement statement : anonymousFunction.getBody().getStatements()) {
                 if (statement instanceof FirProperty && ((FirProperty) statement).getInitializer() instanceof FirComponentCall &&
-                        ((FirComponentCall) ((FirProperty) statement).getInitializer()).getDispatchReceiver() instanceof FirPropertyAccessExpression &&
-                        ((FirPropertyAccessExpression) ((FirComponentCall) ((FirProperty) statement).getInitializer()).getDispatchReceiver()).getCalleeReference() instanceof FirResolvedNamedReference &&
-                        "<destruct>".equals(((FirResolvedNamedReference) ((FirPropertyAccessExpression) ((FirComponentCall) ((FirProperty) statement).getInitializer()).getDispatchReceiver()).getCalleeReference()).getName().asString())) {
+                    ((FirComponentCall) ((FirProperty) statement).getInitializer()).getDispatchReceiver() instanceof FirPropertyAccessExpression &&
+                    ((FirPropertyAccessExpression) ((FirComponentCall) ((FirProperty) statement).getInitializer()).getDispatchReceiver()).getCalleeReference() instanceof FirResolvedNamedReference &&
+                    "<destruct>".equals(((FirResolvedNamedReference) ((FirPropertyAccessExpression) ((FirComponentCall) ((FirProperty) statement).getInitializer()).getDispatchReceiver()).getCalleeReference()).getName().asString())) {
                     skip.add(statement);
                 }
             }
@@ -439,8 +440,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Space before = whitespace();
         if (source.startsWith("(", cursor)) {
             if (!anonymousObject.getDeclarations().isEmpty() &&
-                    anonymousObject.getDeclarations().get(0) instanceof FirPrimaryConstructor &&
-                    !((FirPrimaryConstructor) anonymousObject.getDeclarations().get(0)).getDelegatedConstructor().getArgumentList().getArguments().isEmpty()) {
+                anonymousObject.getDeclarations().get(0) instanceof FirPrimaryConstructor &&
+                !((FirPrimaryConstructor) anonymousObject.getDeclarations().get(0)).getDelegatedConstructor().getArgumentList().getArguments().isEmpty()) {
                 cursor(saveCursor);
                 args = mapFunctionalCallArguments(((FirPrimaryConstructor) anonymousObject.getDeclarations().get(0)).getDelegatedConstructor().getArgumentList().getArguments());
             } else {
@@ -641,7 +642,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         for (FirStatement s : block.getStatements()) {
             // Skip FirElements that should not be processed.
             if (!skipStatements.contains(s) &&
-                    (s.getSource() == null || !(s.getSource().getKind() instanceof KtFakeSourceElementKind.ImplicitConstructor))) {
+                (s.getSource() == null || !(s.getSource().getKind() instanceof KtFakeSourceElementKind.ImplicitConstructor))) {
                 firStatements.add(s);
             }
         }
@@ -652,7 +653,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             PsiElement element = getRealPsiElement(firElement);
 
             if (firElement.getSource() != null && firElement.getSource().getKind() instanceof KtFakeSourceElementKind.DesugaredIncrementOrDecrement &&
-                    !(firElement instanceof FirVariableAssignment)) {
+                !(firElement instanceof FirVariableAssignment)) {
                 continue;
             }
 
@@ -664,8 +665,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 // So, the FirBlock is transformed to construct a J.ForEach that preserves source code.
                 FirBlock check = (FirBlock) firElement;
                 if (check.getStatements().get(0) instanceof FirProperty &&
-                        "<iterator>".equals(((FirProperty) check.getStatements().get(0)).getName().asString()) &&
-                        check.getStatements().get(1) instanceof FirWhileLoop) {
+                    "<iterator>".equals(((FirProperty) check.getStatements().get(0)).getName().asString()) &&
+                    check.getStatements().get(1) instanceof FirWhileLoop) {
                     j = mapForLoop(check);
                 }
             }
@@ -794,7 +795,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         Object value = constExpression.getValue();
         JavaType.Primitive type;
         if (constExpression.getTypeRef() instanceof FirResolvedTypeRef &&
-                ((FirResolvedTypeRef) constExpression.getTypeRef()).getType() instanceof ConeClassLikeType) {
+            ((FirResolvedTypeRef) constExpression.getTypeRef()).getType() instanceof ConeClassLikeType) {
             ConeClassLikeType coneClassLikeType = (ConeClassLikeType) ((FirResolvedTypeRef) constExpression.getTypeRef()).getType();
             type = typeMapping.primitive(coneClassLikeType);
         } else {
@@ -962,7 +963,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         FirNamedReference namedReference = functionCall.getCalleeReference();
         if (namedReference instanceof FirResolvedNamedReference &&
-                ((FirResolvedNamedReference) namedReference).getResolvedSymbol() instanceof FirConstructorSymbol) {
+            ((FirResolvedNamedReference) namedReference).getResolvedSymbol() instanceof FirConstructorSymbol) {
             TypeTree name;
             if (functionCall.getExplicitReceiver() != null) {
                 Expression expr = convertToExpression(functionCall.getExplicitReceiver(), null);
@@ -1300,31 +1301,38 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     }
                 }
 
-                List<JRightPadded<Expression>> expressions = new ArrayList<>(flattenedExpressions.size());
-                boolean isTrailingComma = false;
-                for (int i = 0; i < flattenedExpressions.size(); i++) {
+                int argumentCount = flattenedExpressions.size();
+                List<JRightPadded<Expression>> expressions = new ArrayList<>(argumentCount);
+                boolean isLastArgumentLambda = flattenedExpressions.get(argumentCount - 1) instanceof FirLambdaArgumentExpression;
+                boolean isTrailingLambda = false;
+                for (int i = 0; i < argumentCount; i++) {
                     FirExpression expression = flattenedExpressions.get(i);
                     Expression expr = convertToExpression(expression, ctx);
-                    if (isTrailingComma) {
+                    if (isTrailingLambda) {
                         expr = expr.withMarkers(expr.getMarkers().addIfAbsent(new TrailingLambdaArgument(randomId())));
                         expressions.add(padRight(expr, EMPTY));
                         break;
                     }
 
                     Space padding = whitespace();
-                    if (i < flattenedExpressions.size() - 1) {
-                        if (source.startsWith(",", cursor)) {
-                            skip(",");
-                        } else if (source.startsWith(")", cursor) && flattenedExpressions.get(i + 1) instanceof FirLambdaArgumentExpression) {
-                            // Trailing comma: https://kotlinlang.org/docs/coding-conventions.html#trailing-commas
-                            isTrailingComma = true;
-                            skip(")");
+                    if (isLastArgumentLambda && i == argumentCount - 2) {
+                        TrailingComma trailingComma = skip(",") ? new TrailingComma(randomId(), whitespace()) : null;
+                        if (skip(")")) {
+                            expr = trailingComma != null ? expr.withMarkers(expr.getMarkers().addIfAbsent(trailingComma)) : expr;
+                            // Trailing lambda: https://kotlinlang.org/docs/lambdas.html#passing-trailing-lambdas
+                            isTrailingLambda = true;
+                        } else if (skip(",")) {
+                            expr = expr.withMarkers(expr.getMarkers().addIfAbsent(new TrailingComma(randomId(), whitespace())));
                         }
+                    } else if (i == argumentCount - 1) {
+                        TrailingComma trailingComma = skip(",") ? new TrailingComma(randomId(), whitespace()) : null;
+                        expr = trailingComma != null ? expr.withMarkers(expr.getMarkers().addIfAbsent(trailingComma)) : expr;
                     } else {
-                        skip(")");
+                        skip(",");
                     }
                     expressions.add(padRight(expr, padding));
                 }
+                skip(")");
                 args = JContainer.build(containerPrefix, expressions, Markers.EMPTY);
             }
         }
@@ -1807,10 +1815,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     initializer = padLeft(before, convertToExpression(property.getDelegate(), ctx));
                 } else {
                     throw new UnsupportedOperationException(generateUnsupportedMessage("Unexpected property delegation. FirProperty#delegate for name: " +
-                            ((FirFunctionCall) property.getDelegate()).getCalleeReference().getName().asString()));
+                                                                                       ((FirFunctionCall) property.getDelegate()).getCalleeReference().getName().asString()));
                 }
             } else if (property.getReturnTypeRef() instanceof FirResolvedTypeRef &&
-                    (property.getReturnTypeRef().getSource() == null || !(property.getReturnTypeRef().getSource().getKind() instanceof KtFakeSourceElementKind))) {
+                       (property.getReturnTypeRef().getSource() == null || !(property.getReturnTypeRef().getSource().getKind() instanceof KtFakeSourceElementKind))) {
                 FirResolvedTypeRef typeRef = (FirResolvedTypeRef) property.getReturnTypeRef();
                 if (typeRef.getDelegatedTypeRef() != null) {
                     PsiElement prev = PsiTreeUtil.skipWhitespacesAndCommentsBackward(getRealPsiElement(typeRef.getDelegatedTypeRef()));
@@ -1918,12 +1926,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     private boolean isValidGetter(@Nullable FirPropertyAccessor getter) {
         return getter != null && !(getter instanceof FirDefaultPropertyGetter) &&
-                (getter.getSource() == null || !(getter.getSource().getKind() instanceof KtFakeSourceElementKind));
+               (getter.getSource() == null || !(getter.getSource().getKind() instanceof KtFakeSourceElementKind));
     }
 
     private boolean isValidSetter(@Nullable FirPropertyAccessor setter) {
         return setter != null && !(setter instanceof FirDefaultPropertySetter) &&
-                (setter.getSource() == null || !(setter.getSource().getKind() instanceof KtFakeSourceElementKind));
+               (setter.getSource() == null || !(setter.getSource().getKind() instanceof KtFakeSourceElementKind));
     }
 
     private List<FirAnnotation> collectFirAnnotations(FirProperty property) {
@@ -2863,9 +2871,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitVariableAssignment(FirVariableAssignment variableAssignment, ExecutionContext ctx) {
         boolean unaryAssignment = variableAssignment.getRValue() instanceof FirFunctionCall &&
-                ((FirFunctionCall) variableAssignment.getRValue()).getOrigin() == FirFunctionCallOrigin.Operator &&
-                ((FirFunctionCall) variableAssignment.getRValue()).getCalleeReference() instanceof FirResolvedNamedReference &&
-                isUnaryOperation((((FirFunctionCall) variableAssignment.getRValue()).getCalleeReference()).getName().asString());
+                                  ((FirFunctionCall) variableAssignment.getRValue()).getOrigin() == FirFunctionCallOrigin.Operator &&
+                                  ((FirFunctionCall) variableAssignment.getRValue()).getCalleeReference() instanceof FirResolvedNamedReference &&
+                                  isUnaryOperation((((FirFunctionCall) variableAssignment.getRValue()).getCalleeReference()).getName().asString());
         KtBinaryExpression node = (KtBinaryExpression) getRealPsiElement(variableAssignment);
         if (unaryAssignment && node == null) {
             return visitElement(variableAssignment.getRValue(), ctx);
@@ -2892,9 +2900,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         whitespace();
         String opText = node.getOperationReference().getNode().getText();
         boolean isCompoundAssignment = "-=".equals(opText) ||
-                "+=".equals(opText) ||
-                "*=".equals(opText) ||
-                "/=".equals(opText);
+                                       "+=".equals(opText) ||
+                                       "*=".equals(opText) ||
+                                       "/=".equals(opText);
         cursor(saveCursor);
 
         if (isCompoundAssignment) {
@@ -2922,7 +2930,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             }
 
             if (!(variableAssignment.getRValue() instanceof FirFunctionCall) ||
-                    ((FirFunctionCall) variableAssignment.getRValue()).getArgumentList().getArguments().size() != 1) {
+                ((FirFunctionCall) variableAssignment.getRValue()).getArgumentList().getArguments().size() != 1) {
                 throw new IllegalArgumentException("Unexpected compound assignment.");
             }
 
@@ -2954,7 +2962,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         if (source.startsWith("if", cursor)) {
             skip("if");
         } else if (!(whenBranch.getCondition() instanceof FirElseIfTrueCondition ||
-                whenBranch.getCondition() instanceof FirEqualityOperatorCall)) {
+                     whenBranch.getCondition() instanceof FirEqualityOperatorCall)) {
             throw new IllegalArgumentException("Unsupported condition type.");
         }
 
@@ -3243,7 +3251,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), before));
 
             if (constructor.getDelegatedConstructor() != null &&
-                    (constructor.getDelegatedConstructor().isThis() || constructor.getDelegatedConstructor().isSuper())) {
+                (constructor.getDelegatedConstructor().isThis() || constructor.getDelegatedConstructor().isSuper())) {
                 Space thisPrefix = whitespace();
                 // The delegate constructor call is de-sugared during the backend phase of the compiler.
                 TypeTree delegateName = createIdentifier(constructor.getDelegatedConstructor().isThis() ? "this" : "super");
@@ -3556,14 +3564,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             } else if (declaration instanceof FirPrimaryConstructor) {
                 firPrimaryConstructor = (FirPrimaryConstructor) declaration;
             } else if (declaration instanceof FirProperty &&
-                    declaration.getSource() != null &&
-                    declaration.getSource().getKind() instanceof KtFakeSourceElementKind.PropertyFromParameter) {
+                       declaration.getSource() != null &&
+                       declaration.getSource().getKind() instanceof KtFakeSourceElementKind.PropertyFromParameter) {
                 TextRange range = new TextRange(declaration.getSource().getStartOffset(), declaration.getSource().getEndOffset());
                 generatedFirProperties.put(range, (FirProperty) declaration);
             } else {
                 // We aren't interested in the generated values.
                 if (ClassKind.ENUM_CLASS == classKind && declaration.getSource() != null &&
-                        declaration.getSource().getKind() instanceof KtFakeSourceElementKind.PropertyFromParameter) {
+                    declaration.getSource().getKind() instanceof KtFakeSourceElementKind.PropertyFromParameter) {
                     continue;
                 }
                 membersMultiVariablesSeparated.add(declaration);
@@ -4491,10 +4499,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     private boolean isUnaryOperation(String name) {
         return "dec".equals(name) ||
-                "inc".equals(name) ||
-                "not".equals(name) ||
-                "unaryMinus".equals(name) ||
-                "unaryPlus".equals(name);
+               "inc".equals(name) ||
+               "not".equals(name) ||
+               "unaryMinus".equals(name) ||
+               "unaryPlus".equals(name);
     }
 
     @Nullable
@@ -4504,10 +4512,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     private final Function<FirElement, Space> commaDelim = ignored -> sourceBefore(",");
 
-    private void skip(@Nullable String token) {
+    private boolean skip(@Nullable String token) {
         if (token != null && source.startsWith(token, cursor)) {
             cursor += token.length();
+            return true;
         }
+        return false;
     }
 
     private void cursor(int n) {

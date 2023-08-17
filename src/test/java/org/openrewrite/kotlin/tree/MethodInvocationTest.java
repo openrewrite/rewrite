@@ -261,10 +261,6 @@ class MethodInvocationTest implements RewriteTest {
                   public fun ensure ( condition : Boolean , shift : ( ) -> R ) : Unit =
                       if ( condition ) Unit else shift ( shift ( ) )
               }
-              """
-          ),
-          kotlin(
-            """
               fun Test < String > . test ( ) : Int {
                   ensure ( false , { "failure" } )
                   return 1
@@ -284,10 +280,6 @@ class MethodInvocationTest implements RewriteTest {
                   public fun ensure ( condition : Boolean , shift : ( ) -> R ) : Unit =
                       if ( condition ) Unit else shift ( shift ( ) )
               }
-              """
-          ),
-          kotlin(
-            """
               fun Test < String > . test ( ) : Int {
                   ensure ( false ) { "failure" }
                   return 1
@@ -501,6 +493,54 @@ class MethodInvocationTest implements RewriteTest {
             """
               fun method ( s : String ) { }
               val x = method ( if ( true ) "foo" else "bar" )
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingComma() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method ( s : String ) { }
+              val x = method ( "foo", )
+              val y = method ( if ( true ) "foo" else "bar" /*c1*/ , /*c2*/ )
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaMultipleArguments() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  fun foo(a : Int, b : Int) = a + b
+                  fun bar(): Int =
+                      foo(1, 1,  ) + foo(
+                          a = 1,
+                          b = 1,
+                      )
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingCommaAndTrailingLambda() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  fun foo(a : Int, b : (Int) -> Int) = a + b(a)
+                  fun bar(): Int =
+                      foo(1,  ) { i -> i } + foo(
+                          a = 1,
+                      ) { i -> i }
+              }
               """
           )
         );

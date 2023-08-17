@@ -23,6 +23,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
 import org.openrewrite.kotlin.marker.*;
@@ -770,21 +771,26 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visitSpace(argContainer.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
             List<JRightPadded<Expression>> args = argContainer.getPadding().getElements();
             boolean omitParensOnMethod = method.getMarkers().findFirst(OmitParentheses.class).isPresent();
-            boolean isTrailingLambda = !args.isEmpty() && args.get(args.size() - 1).getElement().getMarkers().findFirst(TrailingLambdaArgument.class).isPresent();
-            for (int i = 0; i < args.size(); i++) {
+
+            int argCount = args.size();
+            boolean isTrailingLambda = !args.isEmpty() && args.get(argCount - 1).getElement().getMarkers().findFirst(TrailingLambdaArgument.class).isPresent();
+
+            if (!omitParensOnMethod) {
+                p.append('(');
+            }
+
+            for (int i = 0; i < argCount; i++) {
                 JRightPadded<Expression> arg = args.get(i);
 
                 // Print trailing lambda.
-                if (i == args.size() - 1 && isTrailingLambda) {
+                if (i == argCount - 1 && isTrailingLambda) {
                     visitSpace(arg.getAfter(), JRightPadded.Location.METHOD_INVOCATION_ARGUMENT.getAfterLocation(), p);
                     p.append(")");
                     visit(arg.getElement(), p);
                     break;
                 }
 
-                if (i == 0 && !omitParensOnMethod) {
-                    p.append('(');
-                } else if (i > 0 && omitParensOnMethod && (
+                if (i > 0 && omitParensOnMethod && (
                         !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() &&
                                 !args.get(0).getElement().getMarkers().findFirst(org.openrewrite.java.marker.OmitParentheses.class).isPresent())) {
                     p.append(')');
@@ -799,9 +805,13 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 }
                 visitRightPadded(arg, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT, p);
 
-                if (i == args.size() - 1 && !omitParensOnMethod) {
-                    p.append(')');
+                if (i == argCount - 1 || isTrailingLambda && i == argCount - 2) {
+                    kotlinPrinter.trailingMarkers(arg.getElement().getMarkers(), p);
                 }
+            }
+
+            if (!omitParensOnMethod && !isTrailingLambda) {
+                p.append(')');
             }
 
             kotlinPrinter.trailingMarkers(method.getMarkers(), p);
@@ -1094,6 +1104,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             } else if (marker instanceof IsNullable) {
                 KotlinPrinter.this.visitSpace(((IsNullable) marker).getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p);
                 p.append("?");
+            } else if (marker instanceof TrailingComma) {
+                p.append(",");
+                KotlinPrinter.this.visitSpace(((TrailingComma) marker).getSuffix(), Space.Location.LANGUAGE_EXTENSION, p);
             }
         }
     }
