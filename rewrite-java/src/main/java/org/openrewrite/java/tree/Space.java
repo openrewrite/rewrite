@@ -130,7 +130,7 @@ public class Space {
     }
 
     public static Space firstPrefix(@Nullable List<? extends J> trees) {
-        return trees == null || trees.isEmpty() ? Space.EMPTY : trees.iterator().next().getPrefix();
+        return trees == null || trees.isEmpty() ? Space.EMPTY : trees.get(0).getPrefix();
     }
 
     public static Space format(String formatting) {
