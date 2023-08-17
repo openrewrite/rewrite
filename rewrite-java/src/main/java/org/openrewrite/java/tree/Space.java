@@ -138,12 +138,12 @@ public class Space {
     }
 
     public static Space format(String formatting, int beginIndex, int toIndex) {
-        rangeCheck(formatting.length(), beginIndex, toIndex);
-
         if (beginIndex == toIndex) {
             return Space.EMPTY;
         } else if (toIndex == beginIndex + 1 && ' ' == formatting.charAt(beginIndex)) {
             return Space.SINGLE_SPACE;
+        } else {
+            rangeCheck(formatting.length(), beginIndex, toIndex);
         }
 
         StringBuilder prefix = new StringBuilder();
