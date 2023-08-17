@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.marker.*;
+import org.openrewrite.kotlin.service.KotlinAutoFormatService;
 import org.openrewrite.kotlin.tree.*;
 import org.openrewrite.marker.Marker;
 
@@ -68,7 +69,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
     @SuppressWarnings({"ConstantConditions", "unchecked"})
     @Override
     public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, P p, Cursor cursor) {
-        AutoFormatService service = getCursor().firstEnclosingOrThrow(JavaSourceFile.class).service(AutoFormatService.class);
+        KotlinAutoFormatService service = getCursor().firstEnclosingOrThrow(JavaSourceFile.class).service(KotlinAutoFormatService.class);
         return (J2) service.autoFormatVisitor(stopAfter).visit(j, p, cursor);
     }
 
