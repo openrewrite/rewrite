@@ -143,4 +143,36 @@ class SpaceTest {
         assertThat(Space.build("  \n   \n    ", emptyList()).getIndent())
                 .isEqualTo("    ");
     }
+
+    @Test
+    void singleLineCommentSuffix() {
+        var s1 = Space.format("""
+
+                //comment""");
+        TextComment c1 = (TextComment) s1.getComments().get(0);
+        assertThat(c1.getSuffix()).isEqualTo("");
+
+        var s2 = Space.format("""
+
+                //comment
+                """);
+        TextComment c2 = (TextComment) s2.getComments().get(0);
+        assertThat(c2.getSuffix()).isEqualTo("\n");
+    }
+
+    @Test
+    void MultiCommentsSuffix() {
+        String input = """
+
+                //c1
+                   //c2""";
+        var space = Space.format(input);
+        TextComment c1 = (TextComment) space.getComments().get(0);
+        assertThat(c1.getText()).isEqualTo("c1");
+        assertThat(c1.getSuffix()).isEqualTo("\n   ");
+
+        TextComment c2 = (TextComment) space.getComments().get(1);
+        assertThat(c2.getText()).isEqualTo("c2");
+        assertThat(c2.getSuffix()).isEqualTo("");
+    }
 }
