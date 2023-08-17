@@ -234,4 +234,22 @@ class WhenTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void trailingComma() {
+        rewriteRun(
+          kotlin(
+            """
+              fun isReferenceApplicable(myReference: kotlin.reflect.KClass<*>) = when (myReference) {
+                  Comparable::class,
+                  Iterable::class,
+                  String::class, // trailing comma
+                      -> true
+                  else -> false
+              }
+              """
+          )
+        );
+    }
+
 }

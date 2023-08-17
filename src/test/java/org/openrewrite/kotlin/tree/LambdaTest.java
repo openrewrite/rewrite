@@ -126,6 +126,17 @@ class LambdaTest implements RewriteTest {
         );
     }
 
+    @Test
+    void trailingComma() {
+        rewriteRun(
+          kotlin(
+            """
+              val sum: (Int, Int, ) -> Int = { x, y, -> x + y }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/110")
     @Test
     void unusedVar() {

@@ -338,9 +338,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     J.Lambda.Parameters destructParamsExpr = new J.Lambda.Parameters(randomId(), destructPrefix, Markers.EMPTY, true, destructParams);
                     paramExprs.add(JRightPadded.build(destructParamsExpr));
                 } else {
-                    JRightPadded<J> param = JRightPadded.build(visitElement(p, ctx));
+                    J lambda = visitElement(p, ctx);
+                    JRightPadded<J> param;
                     if (i != parameters.size() - 1) {
-                        param = param.withAfter(sourceBefore(","));
+                        param = new JRightPadded<>(lambda, sourceBefore(","), Markers.EMPTY);
+                    } else {
+                        param = maybeTrailingComma(lambda);
                     }
                     paramExprs.add(param);
                 }
@@ -3032,7 +3035,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         expressions.add(padRight(expr, sourceBefore("->")));
                     }
                 } else {
-                    expressions.add(padRight(convertToExpression(whenBranch.getCondition(), ctx), sourceBefore("->")));
+                    Expression expr = convertToExpression(whenBranch.getCondition(), ctx);
+                    JRightPadded<Expression> padded = maybeTrailingComma(expr);
+                    if (padded.getMarkers().getMarkers().isEmpty()) {
+                        padded = padded.withAfter(sourceBefore("->"));
+                    } else {
+                        skip("->");
+                    }
+                    expressions.add(padded);
                 }
 
                 JContainer<Expression> expressionContainer = JContainer.build(EMPTY, expressions, Markers.EMPTY);
