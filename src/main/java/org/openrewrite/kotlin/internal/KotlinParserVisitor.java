@@ -46,6 +46,7 @@ import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.jetbrains.kotlin.types.ConstantValueKind;
 import org.jetbrains.kotlin.types.Variance;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.ParseExceptionResult;
@@ -156,12 +157,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             try {
                 statement = (Statement) visitElement(declaration, ctx);
             } catch (Exception e) {
-                if (declaration.getSource() == null) {
+                if (declaration.getSource() == null && getRealPsiElement(declaration) == null) {
                     throw new KotlinParsingException("Failed to parse declaration", e);
                 }
                 cursor = savedCursor;
                 Space prefix = whitespace();
-                String text = declaration.getSource().getLighterASTNode().toString();
+                String text = getRealPsiElement(declaration).getText();
+                if (!prefix.getComments().isEmpty()) {
+                    Comment lastComment = prefix.getComments().get(prefix.getComments().size() - 1);
+                    String prefixText = lastComment.printComment(new Cursor(null, lastComment)) + lastComment.getSuffix();
+                    text = text.substring(prefixText.length());
+                }
                 skip(text);
                 statement = new J.Unknown(
                         randomId(),
@@ -4626,10 +4632,17 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 try {
                     j = convertToExpression(element, ctx);
                 } catch (Exception e) {
+                    if (element.getSource() == null && getRealPsiElement(element) == null) {
+                        throw new KotlinParsingException("Failed to parse declaration", e);
+                    }
                     cursor = saveCursor;
                     Space prefix = whitespace();
-                    String text = element.getSource().getLighterASTNode().toString();
-                    skip(text);
+                    String text = getRealPsiElement(element).getText();
+                    if (!prefix.getComments().isEmpty()) {
+                        Comment lastComment = prefix.getComments().get(prefix.getComments().size() - 1);
+                        String prefixText = lastComment.printComment(new Cursor(null, lastComment)) + lastComment.getSuffix();
+                        text = text.substring(prefixText.length());
+                    }
                     j = (J2) new J.Unknown(
                             randomId(),
                             prefix,
