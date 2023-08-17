@@ -804,10 +804,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.append("*");
                 }
                 visitRightPadded(arg, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT, p);
-
-                if (i == argCount - 1 || isTrailingLambda && i == argCount - 2) {
-                    kotlinPrinter.trailingMarkers(arg.getElement().getMarkers(), p);
-                }
             }
 
             if (!omitParensOnMethod && !isTrailingLambda) {
@@ -1033,6 +1029,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 p.append(';');
             } else if (marker instanceof Reified) {
                 p.append("reified");
+            } else if (marker instanceof TrailingComma) {
+                // TODO consider adding cursor message to only print for last element in list
+                // TODO the space should then probably be printed anyway (could contain a comment)
+                p.append(',');
+                visitSpace(((TrailingComma) marker).getSuffix(), Space.Location.LANGUAGE_EXTENSION, p);
             }
 
             return super.visitMarker(marker, p);
@@ -1104,9 +1105,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             } else if (marker instanceof IsNullable) {
                 KotlinPrinter.this.visitSpace(((IsNullable) marker).getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p);
                 p.append("?");
-            } else if (marker instanceof TrailingComma) {
-                p.append(",");
-                KotlinPrinter.this.visitSpace(((TrailingComma) marker).getSuffix(), Space.Location.LANGUAGE_EXTENSION, p);
             }
         }
     }

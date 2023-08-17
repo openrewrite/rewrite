@@ -1315,22 +1315,21 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     }
 
                     Space padding = whitespace();
+                    TrailingComma trailingComma = null;
                     if (isLastArgumentLambda && i == argumentCount - 2) {
-                        TrailingComma trailingComma = skip(",") ? new TrailingComma(randomId(), whitespace()) : null;
+                        trailingComma = skip(",") ? new TrailingComma(randomId(), whitespace()) : null;
                         if (skip(")")) {
-                            expr = trailingComma != null ? expr.withMarkers(expr.getMarkers().addIfAbsent(trailingComma)) : expr;
                             // Trailing lambda: https://kotlinlang.org/docs/lambdas.html#passing-trailing-lambdas
                             isTrailingLambda = true;
-                        } else if (skip(",")) {
-                            expr = expr.withMarkers(expr.getMarkers().addIfAbsent(new TrailingComma(randomId(), whitespace())));
                         }
                     } else if (i == argumentCount - 1) {
-                        TrailingComma trailingComma = skip(",") ? new TrailingComma(randomId(), whitespace()) : null;
-                        expr = trailingComma != null ? expr.withMarkers(expr.getMarkers().addIfAbsent(trailingComma)) : expr;
+                        trailingComma = skip(",") ? new TrailingComma(randomId(), whitespace()) : null;
                     } else {
                         skip(",");
                     }
-                    expressions.add(padRight(expr, padding));
+                    JRightPadded<Expression> padded = padRight(expr, padding);
+                    padded = trailingComma != null ? padded.withMarkers(padded.getMarkers().addIfAbsent(trailingComma)) : padded;
+                    expressions.add(padded);
                 }
                 skip(")");
                 args = JContainer.build(containerPrefix, expressions, Markers.EMPTY);
@@ -3657,7 +3656,10 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     J.EnumValue enumValue = (J.EnumValue) visitElement(jcEnum, ctx);
                     JRightPadded<J.EnumValue> paddedEnumValue;
                     if (i == jcEnums.size() - 1) {
-                        paddedEnumValue = maybeSemicolon(enumValue);
+                        paddedEnumValue = maybeTrailingComma(enumValue);
+                        if (skip(";")) {
+                            semicolonPresent.set(true);
+                        }
                     } else {
                         paddedEnumValue = padRight(enumValue, sourceBefore(","));
                     }
@@ -4639,9 +4641,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         int saveCursor = cursor;
         Space beforeSemi = whitespace();
         Semicolon semicolon = null;
-        if (cursor < source.length() && source.charAt(cursor) == ';') {
+        if (cursor < source.length() && skip(";")) {
             semicolon = new Semicolon(randomId());
-            cursor++;
         } else {
             beforeSemi = EMPTY;
             cursor(saveCursor);
@@ -4650,6 +4651,25 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         JRightPadded<K2> padded = JRightPadded.build(k).withAfter(beforeSemi);
         if (semicolon != null) {
             padded = padded.withMarkers(padded.getMarkers().add(semicolon));
+        }
+
+        return padded;
+    }
+
+    private <K2 extends J> JRightPadded<K2> maybeTrailingComma(K2 k) {
+        int saveCursor = cursor;
+        Space beforeComma = whitespace();
+        TrailingComma comma = null;
+        if (cursor < source.length() && skip(",")) {
+            comma = new TrailingComma(randomId(), whitespace());
+        } else {
+            beforeComma = EMPTY;
+            cursor(saveCursor);
+        }
+
+        JRightPadded<K2> padded = JRightPadded.build(k).withAfter(beforeComma);
+        if (comma != null) {
+            padded = padded.withMarkers(padded.getMarkers().add(comma));
         }
 
         return padded;
