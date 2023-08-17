@@ -205,6 +205,7 @@ public class Space {
         // If a file ends with a single-line comment there may be no terminating newline
         if (!comment.toString().isEmpty()) {
             comments.add(new TextComment(false, comment.toString(), prefix.toString(), Markers.EMPTY));
+            prefix = new StringBuilder();
         }
 
         // Shift the whitespace on each comment forward to be a suffix of the comment before it, and the
