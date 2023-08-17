@@ -15,10 +15,7 @@
  */
 package org.openrewrite.kotlin.internal;
 
-import org.jetbrains.kotlin.KtFakeSourceElement;
-import org.jetbrains.kotlin.KtFakeSourceElementKind;
-import org.jetbrains.kotlin.KtLightSourceElement;
-import org.jetbrains.kotlin.KtRealPsiSourceElement;
+import org.jetbrains.kotlin.*;
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
 import org.jetbrains.kotlin.com.intellij.openapi.util.TextRange;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
@@ -2954,7 +2951,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitWhenBranch(FirWhenBranch whenBranch, ExecutionContext ctx) {
         Space prefix = whitespace();
-        if (source.substring(cursor).startsWith("if")) {
+        if (source.startsWith("if", cursor)) {
             skip("if");
         } else if (!(whenBranch.getCondition() instanceof FirElseIfTrueCondition ||
                 whenBranch.getCondition() instanceof FirEqualityOperatorCall)) {
@@ -3634,7 +3631,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         OmitBraces omitBraces;
         J.Block body;
-        if (source.substring(cursor).isEmpty() || !source.substring(cursor).startsWith("{")) {
+        if (cursor == source.length() || !source.startsWith("{", cursor)) {
             cursor(saveCursor);
             omitBraces = new OmitBraces(randomId());
             body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY), emptyList(), Space.EMPTY);
@@ -3976,7 +3973,6 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
      * @param ctx        N/A. The FirVisitor requires a second parameter that is generally used for DataFlow analysis.
      * @return {@link J}
      */
-    @SuppressWarnings("UnstableApiUsage")
     @Nullable
     @Override
     public J visitElement(@Nullable FirElement firElement, ExecutionContext ctx) {
@@ -3989,35 +3985,26 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         ASTNode node = nodes.get(cursor);
         cursor = saveCursor;
         if (node != null) {
-            switch (node.getElementType().getDebugName()) {
-                case "PARENTHESIZED":
-                    if (node.getTextRange().getEndOffset() >= firElement.getSource().getEndOffset()) {
-                        return wrapInParens(firElement, ctx);
+            if (node.getElementType() == KtNodeTypes.PARENTHESIZED) {
+                if (node.getTextRange().getEndOffset() >= firElement.getSource().getEndOffset()) {
+                    return wrapInParens(firElement, ctx);
+                }
+            } else if (node.getElementType() == KtNodeTypes.REFERENCE_EXPRESSION) {
+                if (KtNodeTypes.POSTFIX_EXPRESSION == node.getTreeParent().getElementType() && firElement instanceof FirBlock) {
+                    firElement = ((FirBlock) firElement).getStatements().get(1);
+                }
+            } else if (node.getElementType() == KtNodeTypes.OPERATION_REFERENCE) {
+                if (KtNodeTypes.PREFIX_EXPRESSION == node.getTreeParent().getElementType() && firElement instanceof FirBlock) {
+                    firElement = ((FirBlock) firElement).getStatements().get(0);
+                }
+            } else if (node.getElementType() == KtNodeTypes.INTEGER_CONSTANT || node.getElementType() == KtNodeTypes.FLOAT_CONSTANT || node.getElementType() == KtNodeTypes.BOOLEAN_CONSTANT) {
+                if (firElement instanceof FirSingleExpressionBlock) {
+                    FirSingleExpressionBlock firBlock = (FirSingleExpressionBlock) firElement;
+                    FirStatement firStatement = firBlock.getStatement();
+                    if (firStatement instanceof FirConstExpression) {
+                        firElement = firStatement;
                     }
-                    break;
-                case "REFERENCE_EXPRESSION":
-                    if ("POSTFIX_EXPRESSION".equals(node.getTreeParent().getElementType().getDebugName()) && firElement instanceof FirBlock) {
-                        firElement = ((FirBlock) firElement).getStatements().get(1);
-                    }
-                    break;
-                case "OPERATION_REFERENCE":
-                    if ("PREFIX_EXPRESSION".equals(node.getTreeParent().getElementType().getDebugName()) && firElement instanceof FirBlock) {
-                        firElement = ((FirBlock) firElement).getStatements().get(0);
-                    }
-                    break;
-                case "INTEGER_CONSTANT":
-                case "FLOAT_CONSTANT":
-                case "BOOLEAN_CONSTANT":
-                    if (firElement instanceof FirSingleExpressionBlock) {
-                        FirSingleExpressionBlock firBlock = (FirSingleExpressionBlock) firElement;
-                        FirStatement firStatement = firBlock.getStatement();
-                        if (firStatement instanceof FirConstExpression) {
-                            firElement = firStatement;
-                        }
-                    }
-                    break;
-                default:
-                    break;
+                }
             }
         }
 
@@ -4292,11 +4279,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         boolean isQuotedSymbol = source.startsWith("`", cursor);
         String value;
         if (isQuotedSymbol) {
-            skip("`");
-            value = source.substring(cursor, cursor + source.substring(cursor).indexOf('`'));
-            skip(value);
-            skip("`");
-            value = "`" + value + "`";
+            int closingQuoteIdx = source.indexOf('`', cursor + 1);
+            value = source.substring(cursor, closingQuoteIdx + 1);
+            cursor += value.length();
         } else {
             value = name;
             skip(value);
@@ -4381,7 +4366,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         int additionalVariables = 0;
         if ("<destruct>".equals(receiver.getName().asString())) {
-            additionalVariables = source.substring(cursor, cursor + source.substring(cursor).indexOf(")") + 1).split(",").length;
+            additionalVariables = source.substring(cursor, source.indexOf(')', cursor) + 1).split(",").length;
 
             Space variablePrefix = sourceBefore("(");
             List<FirStatement> statements = forLoop.getBlock().getStatements();
