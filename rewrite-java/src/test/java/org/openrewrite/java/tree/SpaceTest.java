@@ -49,10 +49,14 @@ class SpaceTest {
 
     @Test
     void singleLineComment() {
-        @SuppressWarnings("TextBlockMigration") var cf = Space.format("  \n" +
-                                                                      "// I'm a little // teapot\n" +
-                                                                      "// Short and stout //\n    " +
-                                                                      "// Here is my handle\n  ");
+        var cf = Space.format("""
+                 \s
+                // I'm a little // teapot
+                // Short and stout //
+                    \
+                // Here is my handle
+                  \
+                """);
 
         assertThat(cf.getComments()).hasSize(3);
 
@@ -73,12 +77,15 @@ class SpaceTest {
 
     @Test
     void multiLineComment() {
-        @SuppressWarnings("TextBlockMigration") var cf = Space.format("  \n" +
-                                                                      "/*   /*    Here is my spout     */\n" +
-                                                                      "/* When I get all steamed up */\n" +
-                                                                      "/* /*\n" +
-                                                                      "Here me shout\n" +
-                                                                      "*/\n  ");
+        var cf = Space.format("""
+                 \s
+                /*   /*    Here is my spout     */
+                /* When I get all steamed up */
+                /* /*
+                Here me shout
+                */
+                  \
+                """);
 
         assertThat(cf.getComments()).hasSize(3);
 
@@ -99,12 +106,14 @@ class SpaceTest {
 
     @Test
     void javadocComment() {
-        @SuppressWarnings("TextBlockMigration") var cf = Space.format(
-                "  \n" +
-                "/**\n" +
-                " * /** Tip me over and pour me out!\n" +
-                " * https://somewhere/over/the/rainbow.txt\n" +
-                " */\n  "
+        var cf = Space.format("""
+                 \s
+                /**
+                 * /** Tip me over and pour me out!
+                 * https://somewhere/over/the/rainbow.txt
+                 */
+                  \
+                """
         );
 
         assertThat(cf.getComments()).hasSize(1);
