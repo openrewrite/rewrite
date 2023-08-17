@@ -43,6 +43,7 @@ public class LstProvenance implements Marker {
         Gradle,
         Maven,
         Bazel,
-        Cli
+        Cli,
+        CobolCli
     }
 }
