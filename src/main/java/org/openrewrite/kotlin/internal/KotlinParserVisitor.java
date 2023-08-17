@@ -3666,10 +3666,22 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                     J.EnumValue enumValue = (J.EnumValue) visitElement(jcEnum, ctx);
                     JRightPadded<J.EnumValue> paddedEnumValue;
                     if (i == jcEnums.size() - 1) {
-                        paddedEnumValue = maybeTrailingComma(enumValue);
-                        if (skip(";")) {
-                            semicolonPresent.set(true);
-                        }
+                        // special whitespace handling for last enum constant, as it can have a trailing comma, semicolon, both, or neither...
+                        // further, any trailing whitespace is expected to be saved as the `BLOCK_END` location on the block
+                        int saveCursor1 = cursor;
+                        Space padding1 = whitespace();
+                        boolean trailingComma = skip(",");
+                        saveCursor1 = trailingComma ? cursor : saveCursor1;
+                        Space padding2 = trailingComma ? whitespace() : EMPTY;
+                        boolean trailingSemicolon = skip(";");
+                        saveCursor1 = trailingSemicolon ? cursor : saveCursor1;
+                        paddedEnumValue = new JRightPadded<>(
+                                enumValue,
+                                trailingComma || trailingSemicolon ? padding1 : EMPTY,
+                                trailingComma ? Markers.build(singletonList(new TrailingComma(randomId(), trailingSemicolon ? padding2 : EMPTY))) : Markers.EMPTY
+                        );
+                        semicolonPresent.set(trailingSemicolon);
+                        cursor(saveCursor1);
                     } else {
                         paddedEnumValue = padRight(enumValue, sourceBefore(","));
                     }
