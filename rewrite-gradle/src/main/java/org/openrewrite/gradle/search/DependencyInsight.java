@@ -30,7 +30,6 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.table.DependenciesInUse;
-import org.openrewrite.maven.table.DependencyGraph;
 import org.openrewrite.maven.tree.Dependency;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
 import org.openrewrite.maven.tree.ResolvedDependency;
@@ -45,7 +44,6 @@ import static java.util.Objects.requireNonNull;
 @EqualsAndHashCode(callSuper = true)
 public class DependencyInsight extends Recipe {
     transient DependenciesInUse dependenciesInUse = new DependenciesInUse(this);
-    transient DependencyGraph dependencyGraph = new DependencyGraph(this);
 
     private static final MethodMatcher DEPENDENCY_CONFIGURATION_MATCHER = new MethodMatcher("DependencyHandlerSpec *(..)");
 
