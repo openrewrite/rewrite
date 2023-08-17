@@ -64,7 +64,7 @@ public class Space {
                 return Space.EMPTY;
             } else if (whitespace.length() <= 100) {
                 //noinspection StringOperationCanBeSimplified
-                return flyweights.computeIfAbsent(new String(whitespace), k -> new Space(whitespace, comments));
+                return flyweights.computeIfAbsent(whitespace, k -> new Space(new String(whitespace), comments));
             }
         }
         return new Space(whitespace, comments);
@@ -134,9 +134,15 @@ public class Space {
     }
 
     public static Space format(String formatting) {
-        if (formatting.isEmpty()) {
+        return format(formatting, 0, formatting.length());
+    }
+
+    public static Space format(String formatting, int beginIndex, int toIndex) {
+        rangeCheck(formatting.length(), beginIndex, toIndex);
+
+        if (beginIndex == toIndex) {
             return Space.EMPTY;
-        } else if (" ".equals(formatting)) {
+        } else if (toIndex == beginIndex + 1 && ' ' == formatting.charAt(beginIndex)) {
             return Space.SINGLE_SPACE;
         }
 
@@ -149,7 +155,7 @@ public class Space {
 
         char last = 0;
 
-        for (int i = 0; i < formatting.length(); i++) {
+        for (int i = beginIndex; i < toIndex; i++) {
             char c = formatting.charAt(i);
             switch (c) {
                 case '/':
@@ -436,5 +442,18 @@ public class Space {
         WILDCARD_BOUND,
         WILDCARD_PREFIX,
         YIELD_PREFIX,
+    }
+
+    static void rangeCheck(int arrayLength, int fromIndex, int toIndex) {
+        if (fromIndex > toIndex) {
+            throw new IllegalArgumentException(
+                    "fromIndex(" + fromIndex + ") > toIndex(" + toIndex + ")");
+        }
+        if (fromIndex < 0) {
+            throw new StringIndexOutOfBoundsException(fromIndex);
+        }
+        if (toIndex > arrayLength) {
+            throw new StringIndexOutOfBoundsException(toIndex);
+        }
     }
 }
