@@ -557,6 +557,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visit(fieldAccess.getTarget(), p);
             String prefix = fieldAccess.getMarkers().findFirst(IsNullSafe.class).isPresent() ? "?." : ".";
             visitLeftPadded(prefix, fieldAccess.getPadding().getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, p);
+            kotlinPrinter.trailingMarkers(fieldAccess.getMarkers(), p);
             afterSyntax(fieldAccess, p);
             return fieldAccess;
         }

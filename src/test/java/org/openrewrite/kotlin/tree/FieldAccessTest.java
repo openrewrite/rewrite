@@ -46,6 +46,20 @@ class FieldAccessTest implements RewriteTest {
         );
     }
 
+    @Test
+    void notNullAssertionAfterFieldAccess() {
+        rewriteRun(
+          kotlin(
+            """
+              class A {
+                val a : String? = null
+              }
+              val x = A().a!!
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/18")
     @Test
     void superAccess() {
