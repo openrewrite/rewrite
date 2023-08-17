@@ -132,6 +132,19 @@ class AnnotationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void trailingComma() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Test ( val values : Array < String > )
+              @Test( values = [ "a" , "b" , /* trailing comma */ ] )
+              val a = 42
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/80")
     @Test
     void jvmNameAnnotation() {
