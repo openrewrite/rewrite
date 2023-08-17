@@ -350,8 +350,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, false, paramExprs);
         int saveCursor = cursor;
         Space arrowPrefix = whitespace();
-        if (source.startsWith("->", cursor)) {
-            skip("->");
+        if (skip("->")) {
             if (params.getParameters().isEmpty()) {
                 params = params.getPadding().withParams(singletonList(JRightPadded
                         .build((J) new J.Empty(randomId(), EMPTY, Markers.EMPTY))
@@ -459,8 +458,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         J.Block body = null;
         Space bodyPrefix = whitespace();
 
-        if (source.startsWith("{", cursor)) {
-            skip("{");
+        if (skip("{")) {
             List<FirElement> declarations = new ArrayList<>(anonymousObject.getDeclarations().size());
             for (FirDeclaration declaration : anonymousObject.getDeclarations()) {
                 if (declaration.getSource() != null && declaration.getSource().getKind() instanceof KtFakeSourceElementKind) {
@@ -566,8 +564,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         Space beforeParens = EMPTY;
         boolean includeParentheses = false;
-        if (source.startsWith("(", cursor)) {
-            skip("(");
+        if (skip("(")) {
             beforeParens = prefix;
             prefix = whitespace();
             includeParentheses = true;
@@ -582,8 +579,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             skip("&&");
             op = J.Binary.Type.And;
         } else if (LogicOperationKind.OR == binaryLogicExpression.getKind()) {
-            if (source.startsWith(",", cursor)) {
-                skip(",");
+            if (skip(",")) {
                 markers = Markers.build(singletonList(new LogicalComma(randomId())));
             } else {
                 skip("||");
@@ -690,10 +686,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             JRightPadded<Statement> stat = JRightPadded.build((Statement) j);
             saveCursor = cursor;
             Space beforeSemicolon = whitespace();
-            if (cursor < source.length() && source.charAt(cursor) == ';') {
+            if (cursor < source.length() && skip(";")) {
                 stat = stat.withMarkers(stat.getMarkers().add(new Semicolon(randomId())))
                         .withAfter(beforeSemicolon);
-                skip(";");
             } else {
                 cursor(saveCursor);
             }
@@ -790,7 +785,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         }
 
         String valueSource = source.substring(cursor, cursor + constExpression.getSource().getEndOffset() - constExpression.getSource().getStartOffset());
-        skip(valueSource);
+        cursor += valueSource.length();
 
         Object value = constExpression.getValue();
         JavaType.Primitive type;
@@ -1044,10 +1039,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 if (receiver != null) {
                     Expression selectExpr = convertToExpression(receiver, ctx);
                     Space after = whitespace();
-                    if (source.startsWith(".", cursor)) {
-                        skip(".");
-                    } else if (source.startsWith("?.", cursor)) {
-                        skip("?.");
+                    //noinspection StatementWithEmptyBody
+                    if (skip(".")) {
+                    } else if (skip("?.")) {
                         selectExpr = selectExpr.withMarkers(selectExpr.getMarkers().addIfAbsent(new IsNullSafe(randomId(), EMPTY)));
                     }
 
@@ -1341,9 +1335,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
     private JContainer<Expression> mapTypeArguments(List<? extends FirElement> types) {
         Space prefix = whitespace();
-        if (source.startsWith("<", cursor)) {
-            skip("<");
-        }
+        skip("<");
         List<JRightPadded<Expression>> parameters = new ArrayList<>(types.size());
 
         for (int i = 0; i < types.size(); i++) {
@@ -1355,9 +1347,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             parameters.add(padded);
         }
 
-        if (source.startsWith(">", cursor)) {
-            skip(">");
-        }
+        skip(">");
         return JContainer.build(prefix, parameters, Markers.EMPTY);
     }
 
@@ -1371,8 +1361,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         // TODO: check if explicit receiver is needed.
         switch (name) {
             case "dec":
-                if (source.startsWith("--", cursor)) {
-                    skip("--");
+                if (skip("--")) {
                     op = padLeft(EMPTY, J.Unary.Type.PreDecrement);
                     expr = convertToExpression(functionCall.getDispatchReceiver(), ctx);
                 } else {
@@ -1385,8 +1374,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 }
                 break;
             case "inc":
-                if (source.startsWith("++", cursor)) {
-                    skip("++");
+                if (skip("++")) {
                     op = padLeft(EMPTY, J.Unary.Type.PreIncrement);
                     expr = convertToExpression(functionCall.getDispatchReceiver(), ctx);
                 } else {
@@ -1481,8 +1469,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                         typeMapping.type(typeMapping.type(functionCall.getArgumentList().getArguments().get(1))));
 
                 Space before = whitespace();
-                if (source.startsWith("=", cursor)) {
-                    skip("=");
+                //noinspection StatementWithEmptyBody
+                if (skip("=")) {
                 } else {
                     // Check for syntax de-sugaring.
                     throw new UnsupportedOperationException("Unsupported set operator type.");
@@ -1964,10 +1952,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             Expression target = convertToExpression(propertyAccessExpression.getExplicitReceiver(), ctx);
             Space before = whitespace();
             Markers markers = Markers.EMPTY;
-            if (source.startsWith(".", cursor)) {
-                skip(".");
-            } else if (source.startsWith("?.", cursor)) {
-                skip("?.");
+            //noinspection StatementWithEmptyBody
+            if (skip(".")) {
+            } else if (skip("?.")) {
                 markers = markers.addIfAbsent(new IsNullSafe(randomId(), EMPTY));
             }
 
@@ -2046,8 +2033,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             Space nextPrefix = whitespace();
             TypeTree returnTypeExpression = null;
             // Only add the type reference if it exists in source code.
-            if (!(propertyAccessor.getReturnTypeRef() instanceof FirImplicitUnitTypeRef) && source.startsWith(":", cursor)) {
-                skip(":");
+            if (!(propertyAccessor.getReturnTypeRef() instanceof FirImplicitUnitTypeRef) && skip(":")) {
                 markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), nextPrefix));
                 returnTypeExpression = (TypeTree) visitElement(propertyAccessor.getReturnTypeRef(), ctx);
             } else {
@@ -2058,8 +2044,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             saveCursor = cursor;
             Space blockPrefix = whitespace();
             if (propertyAccessor.getBody() instanceof FirSingleExpressionBlock) {
-                if (source.startsWith("=", cursor)) {
-                    skip("=");
+                if (skip("=")) {
                     SingleExpressionBlock singleExpressionBlock = new SingleExpressionBlock(randomId());
 
                     body = (J.Block) visitElement(propertyAccessor.getBody(), ctx);
@@ -2168,8 +2153,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 TypeTree typeTree = TypeTree.build(fullName).withPrefix(prefix);
                 int saveCursor = cursor;
                 Space nextPrefix = whitespace();
-                if (source.startsWith("?", cursor)) {
-                    skip("?");
+                if (skip("?")) {
                     if (typeTree instanceof J.FieldAccess) {
                         J.FieldAccess fa = (J.FieldAccess) typeTree;
                         typeTree = fa.withName(fa.getName().withMarkers(fa.getName().getMarkers().addIfAbsent(new IsNullable(randomId(), nextPrefix))));
@@ -2199,14 +2183,12 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         for (int i = 0; i < split.length; i++) {
             String part = split[i];
             name.append(whitespace().getWhitespace());
-            if (source.startsWith(part, cursor)) {
-                skip(part);
+            if (skip(part)) {
                 name.append(part);
             }
             if (i < split.length - 1) {
                 name.append(whitespace().getWhitespace());
-                if (source.startsWith(".", cursor)) {
-                    skip(".");
+                if (skip(".")) {
                     name.append(".");
                 }
             }
@@ -2343,8 +2325,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         int saveCursor = cursor;
         TypeTree returnTypeExpression = null;
         before = whitespace();
-        if (source.startsWith(":", cursor)) {
-            skip(":");
+        if (skip(":")) {
             markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), before));
 
             returnTypeExpression = (TypeTree) visitElement(simpleFunction.getReturnTypeRef(), ctx);
@@ -2812,8 +2793,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             FirResolvedTypeRef typeRef = (FirResolvedTypeRef) valueParameter.getReturnTypeRef();
             if (typeRef.getDelegatedTypeRef() != null) {
                 Space delimiterPrefix = whitespace();
-                boolean addTypeReferencePrefix = source.startsWith(":", cursor);
-                skip(":");
+                boolean addTypeReferencePrefix = skip(":");
                 if (addTypeReferencePrefix) {
                     markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), delimiterPrefix));
                 }
@@ -2826,8 +2806,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             } else if ("_".equals(valueName)) {
                 int savedCursor = cursor;
                 Space delimiterPrefix = whitespace();
-                if (source.startsWith(":", cursor)) {
-                    skip(":");
+                if (skip(":")) {
                     markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), delimiterPrefix));
                     J j = visitElement(typeRef, ctx);
                     if (j instanceof TypeTree) {
@@ -2959,8 +2938,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     @Override
     public J visitWhenBranch(FirWhenBranch whenBranch, ExecutionContext ctx) {
         Space prefix = whitespace();
-        if (source.startsWith("if", cursor)) {
-            skip("if");
+        //noinspection StatementWithEmptyBody
+        if (skip("if")) {
         } else if (!(whenBranch.getCondition() instanceof FirElseIfTrueCondition ||
                      whenBranch.getCondition() instanceof FirEqualityOperatorCall)) {
             throw new IllegalArgumentException("Unsupported condition type.");
@@ -2993,10 +2972,8 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
     public J visitWhenExpression(FirWhenExpression whenExpression, ExecutionContext ctx) {
         int saveCursor = cursor;
         Space prefix = whitespace();
-        if (source.startsWith("when", cursor)) {
+        if (skip("when")) {
             // Create the entire when expression here to simplify visiting `WhenBranch`, since `if` and `when` share the same data structure.
-            skip("when");
-
             J.ControlParentheses<Expression> controlParentheses = null;
             if (whenExpression.getSubject() != null) {
                 controlParentheses = new J.ControlParentheses<>(
@@ -3246,8 +3223,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         saveCursor = cursor;
         TypeTree returnTypeExpression = null;
         before = whitespace();
-        if (source.startsWith(":", cursor)) {
-            skip(":");
+        if (skip(":")) {
             markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), before));
 
             if (constructor.getDelegatedConstructor() != null &&
@@ -3291,8 +3267,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
         saveCursor = cursor;
         before = whitespace();
         if (constructor.getBody() instanceof FirSingleExpressionBlock) {
-            if (source.startsWith("=", cursor)) {
-                skip("=");
+            if (skip("=")) {
                 SingleExpressionBlock singleExpressionBlock = new SingleExpressionBlock(randomId());
 
                 body = (J.Block) visitElement(constructor.getBody(), ctx);
@@ -3589,9 +3564,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
 
         int saveCursor = cursor;
         Space before = whitespace();
-        if (source.startsWith(":", cursor)) {
-            skip(":");
-        }
+        skip(":");
 
         // Kotlin declared super class and interfaces differently than java. All types declared after the `:` are added into implementings.
         // This should probably exist on a K.ClassDeclaration view where the getters return the appropriate types.
