@@ -75,7 +75,6 @@ import java.util.function.Function;
 
 import static java.lang.Math.max;
 import static java.util.Collections.*;
-import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
@@ -1295,10 +1294,14 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 }
             } else {
                 Space containerPrefix = sourceBefore("(");
-                List<FirExpression> flattenedExpressions = firExpressions.stream()
-                        .map(e -> e instanceof FirVarargArgumentsExpression ? ((FirVarargArgumentsExpression) e).getArguments() : singletonList(e))
-                        .flatMap(Collection::stream)
-                        .collect(toList());
+                List<FirExpression> flattenedExpressions = new ArrayList<>(firExpressions.size());
+                for (FirExpression expression : firExpressions) {
+                    if (expression instanceof FirVarargArgumentsExpression) {
+                        flattenedExpressions.addAll(((FirVarargArgumentsExpression) expression).getArguments());
+                    } else {
+                        flattenedExpressions.add(expression);
+                    }
+                }
 
                 List<JRightPadded<Expression>> expressions = new ArrayList<>(flattenedExpressions.size());
                 boolean isTrailingComma = false;
