@@ -540,7 +540,6 @@ class BlankLinesTest implements RewriteTest {
     @Test
     void minimumBeforePackage() {
         rewriteRun(
-          // blankLines(style -> style.withMinimum(style.getMinimum().withBeforePackage(1))),
           blankLines(),
           kotlin(
             """
@@ -567,7 +566,6 @@ class BlankLinesTest implements RewriteTest {
     void minimumBeforeImportsWithPackage() {
         rewriteRun(
           // no blank lines if nothing preceding package
-          // blankLines(style -> style.withMinimum(style.getMinimum().withBeforeImports(1))),
           blankLines(),
           kotlin(
             """
