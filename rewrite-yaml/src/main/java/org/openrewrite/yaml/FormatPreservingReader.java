@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml;
 
+import lombok.Getter;
 import org.openrewrite.internal.lang.NonNull;
 import org.yaml.snakeyaml.events.Event;
 
@@ -31,6 +32,8 @@ class FormatPreservingReader extends Reader {
     private final Reader delegate;
 
     private ArrayList<Character> buffer = new ArrayList<>();
+
+    @Getter
     private int bufferIndex = 0;
 
     FormatPreservingReader(Reader delegate) {
