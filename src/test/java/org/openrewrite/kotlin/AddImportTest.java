@@ -223,6 +223,23 @@ public class AddImportTest implements RewriteTest {
         );
     }
 
+    @Test
+    void addJavaStaticImport() {
+        rewriteRun(
+          spec -> spec.recipe(importMemberRecipe("org.junit.jupiter.api.Assertions", "assertFalse")),
+          kotlin(
+            """
+              class Foo
+              """,
+            """
+              import org.junit.jupiter.api.Assertions.assertFalse
+              
+              class Foo
+              """
+          )
+        );
+    }
+
     static Recipe importTypeRecipe(String type) {
         return toRecipe(() -> new KotlinIsoVisitor<>() {
             @Override
