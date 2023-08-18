@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -545,4 +546,25 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/100")
+    @Test
+    void anonymousLambdaInSuperConstructorCall() {
+        rewriteRun(
+          kotlin(
+            """
+              abstract class Test(arg: () -> Unit) {
+                  init {
+                      arg()
+                  }
+              }
+              class ExtensionTest : Test({
+                  println("hello")
+              })
+              """
+          )
+        );
+    }
+
 }
