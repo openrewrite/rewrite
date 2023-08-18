@@ -15,11 +15,13 @@
  */
 package org.openrewrite.java.template;
 
+import org.openrewrite.Incubating;
 import org.openrewrite.java.tree.Expression;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Target;
 
+@Incubating(since = "8.3.0")
 @Target(ElementType.PARAMETER)
 public @interface Matches {
     Class<? extends Matcher<? super Expression>> value();
