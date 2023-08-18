@@ -241,8 +241,8 @@ public class Autodetect extends NamedStyles {
             int tabSize = (moreFrequentTabSize == 0) ? 4 : moreFrequentTabSize;
 
             IndentStatistic continuationFrequencies = useTabs ? tabContinuationIndentFrequencies : spaceContinuationIndentFrequencies;
+            int continuationIndent = continuationFrequencies.continuationIndent(useTabs ? 1 : tabSize) * (useTabs ? tabSize : 1);
 
-            int continuationIndent = continuationFrequencies.continuationIndent(tabSize);
             return new TabsAndIndentsStyle(
                     useTabs,
                     tabSize,

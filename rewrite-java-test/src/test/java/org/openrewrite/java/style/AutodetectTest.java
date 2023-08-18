@@ -32,6 +32,31 @@ class AutodetectTest implements RewriteTest {
         return JavaParser.fromJavaVersion().build();
     }
 
+    @Test
+    void continuationIndent() {
+        var cus = jp().parse(
+          """
+            class Test {
+            	boolean eq(){
+            		return (1 == 1 &&
+            				2 == 2 &&
+            				3 == 3);
+            	}
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+
+        assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(8);
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1221")
     @Test
     void springDemoApp() {
