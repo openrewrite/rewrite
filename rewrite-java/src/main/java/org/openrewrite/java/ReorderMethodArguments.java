@@ -68,7 +68,7 @@ public class ReorderMethodArguments extends Recipe {
 
     @Option(displayName = "Ignore type definition",
             description = "When set to `true` the definition of the old type will be left untouched. " +
-                          "This is useful when you're replacing usage of a class but don't want to rename it.",
+                    "This is useful when you're replacing usage of a class but don't want to rename it.",
             required = false)
     @Nullable
     Boolean ignoreDefinition;
@@ -135,6 +135,8 @@ public class ReorderMethodArguments extends Recipe {
 
                 int i = 0;
                 List<JRightPadded<Expression>> reordered = new ArrayList<>(originalArgs.size());
+                List<String> reorderedNames = new ArrayList<>(originalArgs.size());
+                List<JavaType> reorderedTypes = new ArrayList<>(originalArgs.size());
                 List<Space> formattings = new ArrayList<>(originalArgs.size());
                 List<Space> rightFormattings = new ArrayList<>(originalArgs.size());
 
@@ -144,12 +146,19 @@ public class ReorderMethodArguments extends Recipe {
                         // this is a varargs argument
                         List<JRightPadded<Expression>> varargs = originalArgs.subList(fromPos, originalArgs.size());
                         reordered.addAll(varargs);
+                        for (int j = 0; j < varargs.size(); j++) {
+                            reorderedNames.add(name + j);
+                            reorderedTypes.add(varargs.get(j).getElement().getType());
+                        }
                         for (JRightPadded<Expression> exp : originalArgs.subList(i, (i++) + varargs.size())) {
                             formattings.add(exp.getElement().getPrefix());
                             rightFormattings.add(exp.getAfter());
                         }
                     } else if (fromPos >= 0 && originalArgs.size() > fromPos) {
-                        reordered.add(originalArgs.get(fromPos));
+                        JRightPadded<Expression> originalArg = originalArgs.get(fromPos);
+                        reordered.add(originalArg);
+                        reorderedNames.add(name);
+                        reorderedTypes.add(originalArg.getElement().getType());
                         formattings.add(originalArgs.get(i).getElement().getPrefix());
                         rightFormattings.add(originalArgs.get(i++).getAfter());
                     }
@@ -169,7 +178,12 @@ public class ReorderMethodArguments extends Recipe {
                 }
 
                 if (changed) {
-                    m = m.getPadding().withArguments(m.getPadding().getArguments().getPadding().withElements(reordered));
+                    m = m.getPadding()
+                            .withArguments(m.getPadding().getArguments().getPadding().withElements(reordered))
+                            .withMethodType(m.getMethodType()
+                                    .withParameterNames(reorderedNames)
+                                    .withParameterTypes(reorderedTypes)
+                            );
                 }
             }
             return m;
