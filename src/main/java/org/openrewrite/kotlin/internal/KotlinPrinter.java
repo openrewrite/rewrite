@@ -67,8 +67,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
         JRightPadded<J.Package> pkg = sourceFile.getPadding().getPackageDeclaration();
         if (pkg != null) {
-            visit(pkg.getElement(), p);
-            visitSpace(pkg.getAfter(), Space.Location.PACKAGE_SUFFIX, p);
+            visitRightPadded(pkg, p);
         }
 
         for (JRightPadded<J.Import> import_ : sourceFile.getPadding().getImports()) {
