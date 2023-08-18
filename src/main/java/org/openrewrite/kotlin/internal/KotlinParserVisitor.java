@@ -198,7 +198,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
                 paddedPkg,
                 imports,
                 statements,
-                format(source.substring(cursor)));
+                format(source, cursor, source.length()));
     }
 
     @Override
@@ -2164,9 +2164,9 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             if (symbol != null) {
                 Space prefix = whitespace();
                 String name = symbol.getName().asString();
-                int pos = source.substring(cursor).indexOf(name);
+                int pos = source.indexOf(name, cursor);
                 String fullName = source.substring(cursor, cursor + pos + name.length());
-                skip(fullName);
+                cursor += fullName.length();
                 TypeTree typeTree = TypeTree.build(fullName).withPrefix(prefix);
                 int saveCursor = cursor;
                 Space nextPrefix = whitespace();
@@ -4756,14 +4756,18 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             return EMPTY; // unable to find this delimiter
         }
 
-        String prefix = source.substring(cursor, delimIndex);
-        cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
-        return Space.format(prefix);
+        Space space = format(source, cursor, delimIndex);
+        cursor = delimIndex + untilDelim.length(); // advance past the delimiter
+        return space;
     }
 
     private Space whitespace() {
-        String prefix = source.substring(cursor, indexOfNextNonWhitespace(cursor, source));
-        cursor += prefix.length();
-        return format(prefix);
+        int nextNonWhitespace = indexOfNextNonWhitespace(cursor, source);
+        if (nextNonWhitespace == cursor) {
+            return EMPTY;
+        }
+        Space space = format(source, cursor, nextNonWhitespace);
+        cursor = nextNonWhitespace;
+        return space;
     }
 }
