@@ -21,6 +21,10 @@ import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpecs;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.xml.Assertions.xml;
 
@@ -127,16 +131,22 @@ class AddGradleEnterpriseMavenExtensionTest implements RewriteTest {
           POM_XML_SOURCE_SPEC,
           xml(
             null,
-            """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <extensions>
-                <extension>
-                  <groupId>com.gradle</groupId>
-                  <artifactId>gradle-enterprise-maven-extension</artifactId>
-                </extension>
-              </extensions>
-              """,
-            spec -> spec.path(".mvn/extensions.xml")
+            spec -> spec.path(".mvn/extensions.xml").after(after -> {
+                Matcher versionMatcher = Pattern.compile("<version>(.*)</version>").matcher(after);
+                assertThat(versionMatcher.find()).isTrue();
+                String version = versionMatcher.group(1);
+                assertThat(version).isNotBlank();
+                return """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <extensions>
+                    <extension>
+                      <groupId>com.gradle</groupId>
+                      <artifactId>gradle-enterprise-maven-extension</artifactId>
+                      <version>%s</version>
+                    </extension>
+                  </extensions>
+                  """.formatted(version);
+            })
           ),
           xml(
             null,
