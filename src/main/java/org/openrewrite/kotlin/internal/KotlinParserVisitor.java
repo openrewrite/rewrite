@@ -257,7 +257,7 @@ public class KotlinParserVisitor extends FirDefaultVisitor<J, ExecutionContext> 
             markers = markers.addIfAbsent(new AnnotationCallSite(randomId(), "setparam", sourceBefore(":")));
         }
 
-        J.Identifier name = (J.Identifier) visitElement(annotationCall.getCalleeReference(), ctx);
+        NameTree name = (NameTree) visitElement(annotationCall.getAnnotationTypeRef(), ctx);
         JContainer<Expression> args = null;
         if (!annotationCall.getArgumentList().getArguments().isEmpty()) {
             Space argsPrefix = sourceBefore("(");

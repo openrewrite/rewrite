@@ -133,6 +133,19 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
+    void fullyQualifiedAnnotation() {
+        rewriteRun(
+          kotlin(
+            """
+              @java.lang.Deprecated
+              class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void trailingComma() {
         rewriteRun(
           kotlin(
