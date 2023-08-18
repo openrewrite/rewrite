@@ -42,7 +42,10 @@ import org.jetbrains.kotlin.fir.resolve.toFirRegularClassSymbol
 import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
-import org.jetbrains.kotlin.fir.symbols.impl.*
+import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
+import org.jetbrains.kotlin.fir.symbols.impl.FirVariableSymbol
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitUnitTypeRef
@@ -3945,6 +3948,7 @@ class KotlinParserVisitor(
                 var element = visitElement(typeRef, data) as TypeTree
                 if (symbol != null && ClassKind.CLASS == symbol.fir.classKind) {
                     // Wrap the element in a J.NewClass to preserve the whitespace and container of `( )`
+                    val args = mapFunctionalCallArguments(firPrimaryConstructor!!.delegatedConstructor!!.argumentList.arguments)
                     val newClass = J.NewClass(
                         randomId(),
                         element.prefix,
@@ -3952,11 +3956,7 @@ class KotlinParserVisitor(
                         null,
                         Space.EMPTY,
                         element.withPrefix(Space.EMPTY),
-                        JContainer.build(
-                            sourceBefore("("),
-                            listOf(JRightPadded.build(J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY))),
-                            Markers.EMPTY
-                        ),
+                        args,
                         null,
                         null
                     )

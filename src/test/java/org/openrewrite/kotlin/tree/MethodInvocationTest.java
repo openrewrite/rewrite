@@ -547,7 +547,6 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/100")
     @Test
     void anonymousLambdaInSuperConstructorCall() {
