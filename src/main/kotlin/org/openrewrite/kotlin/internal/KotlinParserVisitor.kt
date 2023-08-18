@@ -21,6 +21,7 @@ import org.jetbrains.kotlin.KtFakeSourceElementKind.GeneratedLambdaLabel
 import org.jetbrains.kotlin.KtLightSourceElement
 import org.jetbrains.kotlin.KtRealPsiSourceElement
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode
+import org.jetbrains.kotlin.com.intellij.lang.LighterASTNode
 import org.jetbrains.kotlin.com.intellij.openapi.util.TextRange
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.tree.LeafPsiElement
@@ -52,6 +53,7 @@ import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.allChildren
 import org.jetbrains.kotlin.types.ConstantValueKind
 import org.jetbrains.kotlin.types.Variance
+import org.jetbrains.kotlin.util.getChildren
 import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
 import org.openrewrite.FileAttributes
@@ -80,6 +82,7 @@ import java.util.function.Function
 import java.util.stream.Collectors
 import kotlin.math.max
 import kotlin.math.min
+
 
 class KotlinParserVisitor(
     kotlinSource: KotlinSource,
@@ -1753,9 +1756,20 @@ class KotlinParserVisitor(
         val hasParentClassId = (import is FirResolvedImport && import.resolvedParentClassId != null)
         val static = padLeft(Space.EMPTY, hasParentClassId)
         val space = whitespace()
-        val packageName =
-            if (import.importedFqName == null) "" else if (import.isAllUnder) import.importedFqName!!.asString() + ".*" else import.importedFqName!!.asString()
-        val qualid = if (packageName.contains(".")) (build(packageName) as J)
+        val importName: String =
+            if (import.importedFqName == null) {
+                ""
+            } else {
+                val importNodes: List<LighterASTNode> =
+                    import.source!!.lighterASTNode.getChildren(import.source!!.treeStructure)
+                // KtStubElementTypes.DOT_QUALIFIED_EXPRESSION
+                val importNameNode = importNodes[2]
+                source.substring(
+                    importNameNode.startOffset,
+                    if (import.isAllUnder) importNodes[importNodes.size - 1].endOffset else importNameNode.endOffset
+                )
+            }
+        val qualid = if (importName.contains(".")) (build(importName) as J)
             .withPrefix(space) else
             // Kotlin allows methods to be imported directly, so we need to create a fake field access to fit into J.Import.
             J.FieldAccess(
@@ -1763,10 +1777,10 @@ class KotlinParserVisitor(
                 Space.EMPTY,
                 Markers.EMPTY,
                 J.Empty(randomId(), Space.EMPTY, Markers.EMPTY),
-                padLeft(Space.EMPTY, createIdentifier(packageName).withPrefix(space)),
+                padLeft(Space.EMPTY, createIdentifier(importName).withPrefix(space)),
                 null
             )
-        skip(qualid.toString())
+        skip(importName)
         var alias: JLeftPadded<J.Identifier>? = null
         if (import.aliasName != null) {
             val asPrefix = sourceBefore("as")
@@ -1790,7 +1804,9 @@ class KotlinParserVisitor(
         val pkgPrefix = whitespace()
         skip("package")
         val pkgNamePrefix = whitespace()
-        val packageName = packageDirective.packageFqName.asString()
+        val packageNameNode =
+            packageDirective.source!!.lighterASTNode.getChildren(packageDirective.source!!.treeStructure)[2]
+        val packageName = source.substring(packageNameNode.startOffset, packageNameNode.endOffset)
         skip(packageName)
         return J.Package(
             randomId(),

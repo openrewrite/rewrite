@@ -38,6 +38,29 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void whitespaceInPackage() {
+        rewriteRun(
+          kotlin(
+            "package foo . bar"
+          )
+        );
+    }
+
+    @Test
+    void whitespaceInImport() {
+        rewriteRun(
+          kotlin(
+            """
+              import java . util . Collections as cs
+              import java . io . *
+              
+              class A
+              """
+          )
+        );
+    }
+
+    @Test
     void multipleClassDeclarationsInOneCompilationUnit() {
         rewriteRun(
           kotlin(
