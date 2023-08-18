@@ -16,13 +16,9 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class ReorderMethodArgumentsTest implements RewriteTest {
 
@@ -76,7 +72,7 @@ class ReorderMethodArgumentsTest implements RewriteTest {
     void reorderArgumentsWithNoSourceAttachment() {
         rewriteRun(
           spec -> spec.recipe(new ReorderMethodArguments("a.A foo(String,..)",
-              new String[]{"s", "n"}, new String[]{"n", "s"}, null, null)),
+            new String[]{"s", "n"}, new String[]{"n", "s"}, null, null)),
           java(
             """
               package a;
@@ -113,7 +109,7 @@ class ReorderMethodArgumentsTest implements RewriteTest {
     void reorderArgumentsWhereOneOfTheOriginalArgumentsIsVararg() {
         rewriteRun(
           spec -> spec.recipe(new ReorderMethodArguments("a.A foo(String,Integer,..)",
-              new String[]{"s", "o", "n"}, null, null, null)),
+            new String[]{"s", "o", "n"}, null, null, null)),
           java(
             """
               package a;
