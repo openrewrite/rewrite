@@ -552,19 +552,18 @@ public interface RewriteTest extends SourceSpecs {
     }
 
     static void assertContentEquals(SourceFile sourceFile, String expected, String actual, String errorMessagePrefix) {
-        try {
-            try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
-                    sourceFile.getSourcePath(),
-                    sourceFile.getSourcePath(),
-                    null,
-                    expected,
-                    actual,
-                    Collections.emptySet()
-            )) {
-                assertThat(actual)
-                        .as(errorMessagePrefix + " \"%s\":\n%s", sourceFile.getSourcePath(), diffEntry.getDiff())
-                        .isEqualTo(expected);
-            }
+        try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
+                sourceFile.getSourcePath(),
+                sourceFile.getSourcePath(),
+                null,
+                expected,
+                actual,
+                Collections.emptySet()
+        )) {
+            assertThat(actual)
+                    .as(errorMessagePrefix + " \"%s\":\n%s", sourceFile.getSourcePath(), diffEntry.getDiff())
+                    .isEqualTo(expected);
+
         } catch (LinkageError e) {
             // in case JGit fails to load properly
             assertThat(actual)
