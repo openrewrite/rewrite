@@ -526,7 +526,7 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     @Test
     void upgradePluginDependencies() {
         rewriteRun(
-          spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite.recipe", "rewrite-spring", "5.0.6", "-android", null, null)),
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite.recipe", "rewrite-spring", "5.0.6", "", null, null)),
           pomXml(
             """
               <project>
