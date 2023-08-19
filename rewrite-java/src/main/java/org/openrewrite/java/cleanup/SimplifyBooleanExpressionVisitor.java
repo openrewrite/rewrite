@@ -89,21 +89,29 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Equal) {
             if (isLiteralTrue(asBinary.getLeft())) {
-                maybeUnwrapParentheses();
-                j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
+                if (shouldSimplifyEqualsOn(asBinary.getRight())) {
+                    maybeUnwrapParentheses();
+                    j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
+                }
             } else if (isLiteralTrue(asBinary.getRight())) {
-                maybeUnwrapParentheses();
-                j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(" "));
+                if (shouldSimplifyEqualsOn(asBinary.getRight())) {
+                    maybeUnwrapParentheses();
+                    j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(" "));
+                }
             } else {
                 j = maybeReplaceCompareWithNull(asBinary, true);
             }
         } else if (asBinary.getOperator() == J.Binary.Type.NotEqual) {
             if (isLiteralFalse(asBinary.getLeft())) {
-                maybeUnwrapParentheses();
-                j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
+                if (shouldSimplifyEqualsOn(asBinary.getRight())) {
+                    maybeUnwrapParentheses();
+                    j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
+                }
             } else if (isLiteralFalse(asBinary.getRight())) {
-                maybeUnwrapParentheses();
-                j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(" "));
+                if (shouldSimplifyEqualsOn(asBinary.getRight())) {
+                    maybeUnwrapParentheses();
+                    j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(" "));
+                }
             } else {
                 j = maybeReplaceCompareWithNull(asBinary, false);
             }
@@ -231,5 +239,22 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 return Space.EMPTY;
             }
         }.visit(j, 0);
+    }
+
+    /**
+     * Override this method to disable simplification of equals expressions,
+     * specifically for Kotlin while that is not yet part of the OpenRewrite/rewrite.
+     *
+     * Comparing Kotlin nullable type `?` with tree/false can not be simplified,
+     * e.g. `X?.fun() == true` is not equivalent to `X?.fun()`
+     *
+     * Subclasses will want to check if the `org.openrewrite.kotlin.marker.IsNullSafe`
+     * marker is present.
+     *
+     * @param j the expression to simplify
+     * @return true by default, unless overridden
+     */
+    protected boolean shouldSimplifyEqualsOn(J j) {
+        return true;
     }
 }
