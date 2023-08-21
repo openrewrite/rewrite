@@ -951,7 +951,7 @@ class AutodetectTest implements RewriteTest {
           .as("While there are outlier 3 and 9 space indents, the most prevalent indentation is 6")
           .isEqualTo(6);
         assertThat(tabsAndIndents.getContinuationIndent())
-          .as("With no actual continuation indents to go off of, assume IntelliJ default of 2x the normal indent")
+          .as("With no actual continuation indents to go off of, assume IntelliJ IDEA default of 2x the normal indent")
           .isEqualTo(12);
     }
 

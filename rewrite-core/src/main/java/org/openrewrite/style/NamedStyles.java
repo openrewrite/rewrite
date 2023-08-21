@@ -30,7 +30,7 @@ import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 
 /**
- * A collection of styles by name, e.g. IntelliJ or Google Java Format.
+ * A collection of styles by name, e.g., IntelliJ IDEA or Google Java Format.
  */
 @Data
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
