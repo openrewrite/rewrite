@@ -382,18 +382,24 @@ class AutodetectTest implements RewriteTest {
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
     }
 
-    @Disabled
     @Test
-    void kotlinImportLayout() {
+    void defaultKotlinImportLayout() {
         var cus = kp().parse(
           """
+            import org.a.A
+            import org.a.B
+
             import java.util.Map
             import java.util.Set
+
+            import javax.lang.model.type.ArrayType
 
             import kotlin.math.PI
             import kotlin.math.sqrt
             import kotlin.random.Random
 
+            import kotlin.collections.Map as KMap
+            import kotlin.collections.Set as KSet
 
             class Test {
                 var a : Map<Int, Int>? = null
@@ -401,6 +407,11 @@ class AutodetectTest implements RewriteTest {
                 var c = PI;
                 var d = sqrt(1.0)
                 var e = Random(1)
+                var f : KMap<Int, String> = mapOf(1 to "one", 2 to "two", 3 to "three")
+                var g : KSet<Int> = setOf(1, 2, 3)
+                var h : ArrayType? = null
+                var i : A? = null
+                var j : B? = null
             }
             """
         );
@@ -410,36 +421,85 @@ class AutodetectTest implements RewriteTest {
         var styles = detector.build();
         var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
 
+        assertThat(importLayout.getLayout().size()).isEqualTo(5);
+
         assertThat(importLayout.getLayout().get(0)).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
-        assertThat(importLayout.getLayout().get(1)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
+
+        assertThat(importLayout.getLayout().get(1))
+          .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
+          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("java\\..+"));
 
         assertThat(importLayout.getLayout().get(2))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          // .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("org\\.openrewrite\\.internal\\..+"));
-
-        assertThat(importLayout.getLayout().get(3)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
-
-        assertThat(importLayout.getLayout().get(4))
-          .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          // .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
           .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("javax\\..+"));
 
-        assertThat(importLayout.getLayout().get(5))
+        assertThat(importLayout.getLayout().get(3))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          // .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("java\\..+"));
+          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("kotlin\\..+"));
 
-        assertThat(importLayout.getLayout().get(6)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
-
-        assertThat(importLayout.getLayout().get(7))
-          .isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
-          // .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).isStatic());
+        assertThat(importLayout.getLayout().get(4)).isInstanceOf(ImportLayoutStyle.Block.AllAliases.class);
     }
 
-    @Disabled
     @Test
-    void rewriteImportLayout() {
+    void customizedKotlinImportLayout() {
+        var cus = kp().parse(
+          """
+            import kotlin.collections.Map as KMap
+            import kotlin.collections.Set as KSet
+
+            import kotlin.math.PI
+            import kotlin.math.sqrt
+            import kotlin.random.Random
+
+            import javax.lang.model.type.ArrayType
+            
+            import java.util.Map
+            import java.util.Set
+
+            import org.a.A
+            import org.a.B
+
+            class Test {
+                var a : Map<Int, Int>? = null
+                var b : Set<Int>? = null
+                var c = PI;
+                var d = sqrt(1.0)
+                var e = Random(1)
+                var f : KMap<Int, String> = mapOf(1 to "one", 2 to "two", 3 to "three")
+                var g : KSet<Int> = setOf(1, 2, 3)
+                var h : ArrayType? = null
+                var i : A? = null
+                var j : B? = null
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
+
+        assertThat(importLayout.getLayout().size()).isEqualTo(5);
+
+        assertThat(importLayout.getLayout().get(0)).isInstanceOf(ImportLayoutStyle.Block.AllAliases.class);
+
+        assertThat(importLayout.getLayout().get(1))
+          .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
+          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("kotlin\\..+"));
+
+        assertThat(importLayout.getLayout().get(2))
+          .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
+          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("javax\\..+"));
+
+        assertThat(importLayout.getLayout().get(3))
+          .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
+          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("java\\..+"));
+
+        assertThat(importLayout.getLayout().get(4)).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
+    }
+
+    @Test
+    void partialImportLayout() {
         var cus = kp().parse(
           """
             import java.util.Map
@@ -466,31 +526,21 @@ class AutodetectTest implements RewriteTest {
         var styles = detector.build();
         var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
 
-        assertThat(importLayout.getLayout().get(0)).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
-        assertThat(importLayout.getLayout().get(1)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
-
-        assertThat(importLayout.getLayout().get(2))
+        assertThat(importLayout.getLayout().get(0))
           .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          // .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("org\\.openrewrite\\.internal\\..+"));
-
-        assertThat(importLayout.getLayout().get(3)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
-
-        assertThat(importLayout.getLayout().get(4))
-          .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          // .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
-          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("javax\\..+"));
-
-        assertThat(importLayout.getLayout().get(5))
-          .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
-          // .matches(b -> !((ImportLayoutStyle.Block.ImportPackage) b).isStatic())
           .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("java\\..+"));
 
-        assertThat(importLayout.getLayout().get(6)).isInstanceOf(ImportLayoutStyle.Block.BlankLines.class);
+        assertThat(importLayout.getLayout().get(1))
+          .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
+          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("kotlin\\..+"));
 
-        assertThat(importLayout.getLayout().get(7))
-          .isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
-          // .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).isStatic());
+        assertThat(importLayout.getLayout().get(2)).isInstanceOf(ImportLayoutStyle.Block.AllOthers.class);
+
+        assertThat(importLayout.getLayout().get(3))
+          .isInstanceOf(ImportLayoutStyle.Block.ImportPackage.class)
+          .matches(b -> ((ImportLayoutStyle.Block.ImportPackage) b).getPackageWildcard().toString().equals("javax\\..+"));
+
+        assertThat(importLayout.getLayout().get(4)).isInstanceOf(ImportLayoutStyle.Block.AllAliases.class);
     }
 
     @Disabled
@@ -554,8 +604,8 @@ class AutodetectTest implements RewriteTest {
         var styles = detector.build();
         var importLayout = NamedStyles.merge(ImportLayoutStyle.class, singletonList(styles));
 
-        assertThat(importLayout.getTopLevelSymbolsToUseStarImport()).isEqualTo(2147483647);
-        assertThat(importLayout.getJavaStaticsAndEnumsToUseStarImport()).isEqualTo(2147483647);
+        assertThat(importLayout.getTopLevelSymbolsToUseStarImport()).isEqualTo(5);
+        assertThat(importLayout.getJavaStaticsAndEnumsToUseStarImport()).isEqualTo(3);
     }
 
     @Test
