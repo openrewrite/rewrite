@@ -492,13 +492,14 @@ class KotlinParserVisitor(
         var typeExpressionPrefix = Space.EMPTY
         var prefix = Space.EMPTY
         var clazz: TypeTree? = null
-        if (source.startsWith("object", cursor)) {
-            skip("object")
+        if (skip("object")) {
             markers = markers.addIfAbsent(KObject(randomId(), objectPrefix))
-
-            typeExpressionPrefix = sourceBefore(":")
             prefix = whitespace()
-            clazz = visitElement(anonymousObject.superTypeRefs[0], data) as TypeTree?
+            if (skip(":")) {
+                typeExpressionPrefix = prefix
+                prefix = whitespace()
+                clazz = visitElement(anonymousObject.superTypeRefs[0], data) as TypeTree?
+            }
         } else {
             cursor(saveCursor)
         }
@@ -2564,8 +2565,7 @@ class KotlinParserVisitor(
         saveCursor = cursor
         before = whitespace()
         if (simpleFunction.body is FirSingleExpressionBlock) {
-            if (source.startsWith("=", cursor)) {
-                skip("=")
+            if (skip("=")) {
                 val singleExpressionBlock = SingleExpressionBlock(randomId())
                 body = visitElement(simpleFunction.body!!, data) as J.Block?
                 body = body!!.withPrefix(before)
@@ -2630,12 +2630,8 @@ class KotlinParserVisitor(
             var e = arguments[i]
             val savedCursor = cursor
             val before = whitespace()
-            if (source.startsWith("$", cursor)) {
-                skip("$")
-                val inBraces = source.startsWith("{", cursor)
-                if (inBraces) {
-                    skip("{")
-                }
+            if (skip("$")) {
+                val inBraces = skip("{")
                 if (e is FirConstExpression<*>) {
                     // Skip generated whitespace expression so that it's added to the prefix of the reference.
                     i += 1
