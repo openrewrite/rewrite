@@ -15,10 +15,7 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.service.AutoFormatService;
@@ -131,11 +128,15 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public void maybeAddImport(@Nullable String packageName, String typeName, @Nullable String member, boolean onlyIfReferenced) {
-        ImportService service = getCursor().firstEnclosingOrThrow(JavaSourceFile.class).service(ImportService.class);
-        JavaVisitor<P> visitor = service.addImportVisitor(packageName, typeName, member, onlyIfReferenced);
+        JavaVisitor<P> visitor = service(ImportService.class).addImportVisitor(packageName, typeName, member, onlyIfReferenced);
         if (!getAfterVisit().contains(visitor)) {
             doAfterVisit(visitor);
         }
+    }
+
+    @Incubating(since = "8.2.0")
+    public <S> S service(Class<S> service) {
+        return getCursor().firstEnclosingOrThrow(JavaSourceFile.class).service(service);
     }
 
     public void maybeRemoveImport(@Nullable JavaType.FullyQualified clazz) {
