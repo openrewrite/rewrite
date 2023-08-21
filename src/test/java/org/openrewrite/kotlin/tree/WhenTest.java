@@ -252,4 +252,19 @@ class WhenTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/240")
+    void subjectVariable() {
+        rewriteRun(
+          kotlin(
+            """
+              val x = when (val response = listOf(1, 2) as Collection<Int>) {
+                  is List -> "l"
+                  else -> ""
+              }
+              """
+          )
+        );
+    }
+
 }
