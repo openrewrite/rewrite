@@ -76,7 +76,7 @@ public class MergeYamlVisitor<P> extends YamlVisitor<P> {
 
     @Override
     public Yaml visitMapping(Yaml.Mapping existingMapping, P p) {
-        if (scope.isScope(existingMapping)) {
+        if (scope.isScope(existingMapping) && incoming instanceof Yaml.Mapping) {
             return mergeMapping(existingMapping, (Yaml.Mapping) incoming, p, getCursor());
         }
         return super.visitMapping(existingMapping, p);
