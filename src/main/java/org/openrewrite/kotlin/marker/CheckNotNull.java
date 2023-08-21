@@ -27,4 +27,9 @@ import java.util.UUID;
 public class CheckNotNull implements Marker {
     UUID id;
     Space prefix;
+
+    public CheckNotNull(UUID id, Space prefix) {
+        this.id = id;
+        this.prefix = prefix;
+    }
 }

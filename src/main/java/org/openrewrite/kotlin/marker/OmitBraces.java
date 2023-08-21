@@ -25,4 +25,8 @@ import java.util.UUID;
 @With
 public class OmitBraces implements Marker {
     UUID id;
+
+    public OmitBraces(UUID id) {
+        this.id = id;
+    }
 }

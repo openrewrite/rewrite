@@ -27,4 +27,9 @@ import java.util.UUID;
 public class KObject implements Marker {
     UUID id;
     Space prefix;
+
+    public KObject(UUID id, Space prefix) {
+        this.id = id;
+        this.prefix = prefix;
+    }
 }

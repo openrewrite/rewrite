@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin;
 
 import org.intellij.lang.annotations.Language;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
@@ -30,7 +29,6 @@ public class KotlinTypeGoatTest implements RewriteTest {
     @Language("kotlin")
     private static final String goat = StringUtils.readFully(KotlinTypeMappingTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
 
-    @Disabled
     @Test
     void printEqualsInput() {
         ExecutionContext ctx = new InMemoryExecutionContext();

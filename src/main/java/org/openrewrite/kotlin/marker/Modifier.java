@@ -25,4 +25,8 @@ import java.util.UUID;
 @With
 public class Modifier implements Marker {
     UUID id;
+
+    public Modifier(UUID id) {
+        this.id = id;
+    }
 }

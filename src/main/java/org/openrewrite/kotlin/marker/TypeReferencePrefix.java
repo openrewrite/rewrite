@@ -27,4 +27,9 @@ import java.util.UUID;
 public class TypeReferencePrefix implements Marker {
     UUID id;
     Space prefix;
+
+    public TypeReferencePrefix(UUID id, Space prefix) {
+        this.id = id;
+        this.prefix = prefix;
+    }
 }

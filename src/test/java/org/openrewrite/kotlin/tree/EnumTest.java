@@ -43,6 +43,28 @@ class EnumTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("RedundantEnumConstructorInvocation")
+    @Test
+    void enumWithInit() {
+        rewriteRun(
+          kotlin(
+            """
+              enum class A {
+                  B , C() ,
+                  D
+              }
+              """
+          ),
+          kotlin(
+            """
+              enum class EnumTypeB(val label: String) {
+                  FOO("foo")
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void innerEnum() {
         rewriteRun(

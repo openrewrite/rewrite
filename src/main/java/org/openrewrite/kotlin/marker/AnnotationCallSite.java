@@ -28,4 +28,11 @@ public class AnnotationCallSite implements Marker {
     UUID id;
     String name;
     Space suffix;
+
+
+    public AnnotationCallSite(UUID id, String name, Space suffix) {
+        this.id = id;
+        this.name = name;
+        this.suffix = suffix;
+    }
 }

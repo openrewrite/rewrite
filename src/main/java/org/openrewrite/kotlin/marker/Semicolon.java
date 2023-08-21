@@ -25,4 +25,8 @@ import java.util.UUID;
 @With
 public class Semicolon implements Marker {
     UUID id;
+
+    public Semicolon(UUID id) {
+        this.id = id;
+    }
 }

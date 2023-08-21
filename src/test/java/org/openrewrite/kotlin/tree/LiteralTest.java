@@ -45,7 +45,7 @@ class LiteralTest implements RewriteTest {
     @Test
     void literalCharacter() {
         rewriteRun(
-          kotlin("val c : Character = 'c' ")
+          kotlin("val c : Char = 'c' ")
         );
     }
 
@@ -95,8 +95,8 @@ class LiteralTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              val c1 : Character = '\uD800'
-              val c2 : Character = '\uDfFf'
+              val c1 : Char = '\uD800'
+              val c2 : Char = '\uDfFf'
               """
           )
         );

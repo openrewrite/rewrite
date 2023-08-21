@@ -17,6 +17,8 @@ package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -252,6 +254,18 @@ class MethodDeclarationTest implements RewriteTest {
                 noinline block : ( ) -> Unit
               ) : Unit = Unit
               """)
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "out Number",
+      "in String"
+    })
+    void variance(String param) {
+        rewriteRun(
+          kotlin("interface PT < T >"),
+          kotlin("fun generic ( n : PT < %s > ) { }".formatted(param))
         );
     }
 

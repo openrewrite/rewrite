@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.internal;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.jetbrains.kotlin.com.intellij.lang.impl.TokenSequence;
 import org.jetbrains.kotlin.com.intellij.openapi.util.TextRange;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;

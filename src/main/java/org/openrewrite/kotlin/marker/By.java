@@ -28,4 +28,8 @@ import java.util.UUID;
 @With
 public class By implements Marker {
     UUID id;
+
+    public By(UUID id) {
+        this.id = id;
+    }
 }

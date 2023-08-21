@@ -44,10 +44,10 @@ import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.java.FirProjectSessionProvider;
 import org.jetbrains.kotlin.fir.pipeline.AnalyseKt;
-import org.jetbrains.kotlin.fir.pipeline.BuildFirKt;
+import org.jetbrains.kotlin.fir.pipeline.FirUtilsKt;
 import org.jetbrains.kotlin.fir.resolve.ScopeSession;
 import org.jetbrains.kotlin.fir.session.FirSessionConfigurator;
-import org.jetbrains.kotlin.fir.session.FirSessionFactory;
+import org.jetbrains.kotlin.fir.session.FirSessionFactoryHelper;
 import org.jetbrains.kotlin.fir.session.environment.AbstractProjectFileSearchScope;
 import org.jetbrains.kotlin.idea.KotlinFileType;
 import org.jetbrains.kotlin.idea.KotlinLanguage;
@@ -110,6 +110,7 @@ public class KotlinParser implements Parser {
     private final boolean logCompilationWarningsAndErrors;
     private final JavaTypeCache typeCache;
     private final String moduleName;
+    private final KotlinLanguageLevel languageLevel;
 
     @Override
     public Stream<SourceFile> parse(@Language("kotlin") String... sources) {
@@ -172,6 +173,7 @@ public class KotlinParser implements Parser {
                                                 ctx
                                         );
 
+                                        assert kotlinSource.getFirFile() != null;
                                         SourceFile kcu = (SourceFile) mappingVisitor.visitFile(kotlinSource.getFirFile(), new InMemoryExecutionContext());
                                         parsingListener.parsed(kotlinSource.getInput(), kcu);
                                         return requirePrintEqualsInput(kcu, kotlinSource.getInput(), relativeTo, ctx);
@@ -237,6 +239,7 @@ public class KotlinParser implements Parser {
         private boolean logCompilationWarningsAndErrors;
         private final List<NamedStyles> styles = new ArrayList<>();
         private String moduleName = "main";
+        private KotlinLanguageLevel languageLevel = KotlinLanguageLevel.KOTLIN_1_9;
 
         public Builder() {
             super(K.CompilationUnit.class);
@@ -274,8 +277,13 @@ public class KotlinParser implements Parser {
             return this;
         }
 
+        public Builder languageLevel(KotlinLanguageLevel languageLevel) {
+            this.languageLevel = languageLevel;
+            return this;
+        }
+
         public KotlinParser build() {
-            return new KotlinParser(classpath, styles, logCompilationWarningsAndErrors, typeCache, moduleName);
+            return new KotlinParser(classpath, styles, logCompilationWarningsAndErrors, typeCache, moduleName, languageLevel);
         }
 
         @Override
@@ -301,9 +309,11 @@ public class KotlinParser implements Parser {
         addJvmClasspathRoot(compilerConfiguration, PathUtil.getResourcePathForClass(AnnotationTarget.class));
 
         K2JVMCompilerArguments arguments = new K2JVMCompilerArguments();
+        configureJdkHome(compilerConfiguration, arguments);
         configureJavaModulesContentRoots(compilerConfiguration, arguments);
         configureAdvancedJvmOptions(compilerConfiguration, arguments);
         configureKlibPaths(compilerConfiguration, arguments);
+        configureContentRootsFromClassPath(compilerConfiguration, arguments);
         configureJdkClasspathRoots(compilerConfiguration);
         configureBaseRoots(compilerConfiguration, arguments);
 
@@ -359,7 +369,7 @@ public class KotlinParser implements Parser {
 
         Function1<FirSessionConfigurator, Unit> sessionConfigurator = session -> Unit.INSTANCE;
 
-        FirSession firSession = FirSessionFactory.INSTANCE.createSessionWithDependencies(
+        FirSession firSession = FirSessionFactoryHelper.INSTANCE.createSessionWithDependencies(
                 Name.identifier(moduleName),
                 JvmPlatforms.INSTANCE.getUnspecifiedJvmPlatform(),
                 JvmPlatformAnalyzerServices.INSTANCE,
@@ -377,7 +387,7 @@ public class KotlinParser implements Parser {
                 sessionConfigurator
         );
 
-        List<FirFile> rawFir = BuildFirKt.buildFirFromKtFiles(firSession, ktFiles);
+        List<FirFile> rawFir = FirUtilsKt.buildFirFromKtFiles(firSession, ktFiles);
         Pair<ScopeSession, List<FirFile>> result = AnalyseKt.runResolution(firSession, rawFir);
         AnalyseKt.runCheckers(firSession, result.getFirst(), result.getSecond(), diagnosticsReporter);
         assert kotlinSources.size() == result.getSecond().size();
@@ -389,6 +399,19 @@ public class KotlinParser implements Parser {
         return new CompiledSource(firSession, kotlinSources);
     }
 
+    public enum KotlinLanguageLevel {
+       KOTLIN_1_0,
+       KOTLIN_1_1,
+       KOTLIN_1_2,
+       KOTLIN_1_3,
+       KOTLIN_1_4,
+       KOTLIN_1_5,
+       KOTLIN_1_6,
+       KOTLIN_1_7,
+       KOTLIN_1_8,
+       KOTLIN_1_9
+    }
+
     private CompilerConfiguration compilerConfiguration() {
         CompilerConfiguration compilerConfiguration = new CompilerConfiguration();
 
@@ -397,8 +420,7 @@ public class KotlinParser implements Parser {
                 new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true) :
                 MessageCollector.Companion.getNONE());
 
-        // TODO: Allow language version to be configurable.
-        compilerConfiguration.put(LANGUAGE_VERSION_SETTINGS, new LanguageVersionSettingsImpl(LanguageVersion.KOTLIN_1_8, ApiVersion.KOTLIN_1_8));
+        compilerConfiguration.put(LANGUAGE_VERSION_SETTINGS, new LanguageVersionSettingsImpl(getLanguageVersion(languageLevel), getApiVersion(languageLevel)));
 
         compilerConfiguration.put(USE_FIR, true);
         compilerConfiguration.put(DO_NOT_CLEAR_BINDING_CONTEXT, true);
@@ -408,5 +430,59 @@ public class KotlinParser implements Parser {
         addJvmSdkRoots(compilerConfiguration, PathUtil.getJdkClassesRootsFromCurrentJre());
 
         return compilerConfiguration;
+    }
+
+    private LanguageVersion getLanguageVersion(KotlinLanguageLevel languageLevel) {
+        switch (languageLevel) {
+            case KOTLIN_1_0:
+                return LanguageVersion.KOTLIN_1_0;
+            case KOTLIN_1_1:
+                return LanguageVersion.KOTLIN_1_1;
+            case KOTLIN_1_2:
+                return LanguageVersion.KOTLIN_1_2;
+            case KOTLIN_1_3:
+                return LanguageVersion.KOTLIN_1_3;
+            case KOTLIN_1_4:
+                return LanguageVersion.KOTLIN_1_4;
+            case KOTLIN_1_5:
+                return LanguageVersion.KOTLIN_1_5;
+            case KOTLIN_1_6:
+                return LanguageVersion.KOTLIN_1_6;
+            case KOTLIN_1_7:
+                return LanguageVersion.KOTLIN_1_7;
+            case KOTLIN_1_8:
+                return LanguageVersion.KOTLIN_1_8;
+            case KOTLIN_1_9:
+                return LanguageVersion.KOTLIN_1_9;
+            default:
+                throw new IllegalArgumentException("Unknown language level: " + languageLevel);
+        }
+    }
+
+    private ApiVersion getApiVersion(KotlinLanguageLevel languageLevel) {
+        switch (languageLevel) {
+            case KOTLIN_1_0:
+                return ApiVersion.KOTLIN_1_0;
+            case KOTLIN_1_1:
+                return ApiVersion.KOTLIN_1_1;
+            case KOTLIN_1_2:
+                return ApiVersion.KOTLIN_1_2;
+            case KOTLIN_1_3:
+                return ApiVersion.KOTLIN_1_3;
+            case KOTLIN_1_4:
+                return ApiVersion.KOTLIN_1_4;
+            case KOTLIN_1_5:
+                return ApiVersion.KOTLIN_1_5;
+            case KOTLIN_1_6:
+                return ApiVersion.KOTLIN_1_6;
+            case KOTLIN_1_7:
+                return ApiVersion.KOTLIN_1_7;
+            case KOTLIN_1_8:
+                return ApiVersion.KOTLIN_1_8;
+            case KOTLIN_1_9:
+                return ApiVersion.KOTLIN_1_9;
+            default:
+                throw new IllegalArgumentException("Unknown language level: " + languageLevel);
+        }
     }
 }

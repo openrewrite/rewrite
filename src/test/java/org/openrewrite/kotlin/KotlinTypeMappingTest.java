@@ -128,8 +128,8 @@ public class KotlinTypeMappingTest {
 
     @Test
     void primitive() {
-        JavaType.Class kotlinBasicType = (JavaType.Class) firstMethodParameter("primitive");
-        assertThat(kotlinBasicType.getFullyQualifiedName()).isEqualTo("kotlin.Int");
+        JavaType.Class kotlinPrimitive = (JavaType.Class) firstMethodParameter("primitive");
+        assertThat(kotlinPrimitive.getFullyQualifiedName()).isEqualTo("kotlin.Int");
     }
 
     @Test

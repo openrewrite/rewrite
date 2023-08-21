@@ -25,4 +25,8 @@ import java.util.UUID;
 @With
 public class OmitEquals implements Marker {
     UUID id;
+
+    public OmitEquals(UUID id) {
+        this.id = id;
+    }
 }

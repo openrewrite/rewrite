@@ -28,4 +28,8 @@ import java.util.UUID;
 @With
 public class NotIs implements Marker {
     UUID id;
+
+    public NotIs(UUID id) {
+        this.id = id;
+    }
 }

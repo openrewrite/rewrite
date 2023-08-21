@@ -25,4 +25,8 @@ import java.util.UUID;
 @With
 public class PrimaryConstructor implements Marker {
     UUID id;
+
+    public PrimaryConstructor(UUID id) {
+        this.id = id;
+    }
 }

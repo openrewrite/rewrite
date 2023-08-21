@@ -25,4 +25,8 @@ import java.util.UUID;
 @With
 public class SingleExpressionBlock implements Marker {
     UUID id;
+
+    public SingleExpressionBlock(UUID id) {
+        this.id = id;
+    }
 }

@@ -25,4 +25,8 @@ import java.util.UUID;
 @With
 public class LogicalComma implements Marker {
     UUID id;
+
+    public LogicalComma(UUID id) {
+        this.id = id;
+    }
 }

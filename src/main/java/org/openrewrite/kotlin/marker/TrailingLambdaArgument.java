@@ -25,4 +25,8 @@ import java.util.UUID;
 @With
 public class TrailingLambdaArgument implements Marker {
     UUID id;
+
+    public TrailingLambdaArgument(UUID id) {
+        this.id = id;
+    }
 }

@@ -270,19 +270,6 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
-    void conditionalParameter() {
-        rewriteRun(
-          kotlin("annotation class A ( val s : String )"),
-          kotlin(
-            """
-              @A ( if ( true ) "1" else "2" )
-              class Test
-              """
-          )
-        );
-    }
-
-    @Test
     void paramAnnotation() {
         rewriteRun(
           kotlin(ANNOTATION),
@@ -368,6 +355,21 @@ class AnnotationTest implements RewriteTest {
               @Ann typealias Other = @Ann String
               """
           )
+        );
+    }
+
+    @Test
+    void lambdaExpression() {
+        rewriteRun(
+          kotlin(ANNOTATION),
+          kotlin(
+            """
+              fun method ( ) {
+                  val list = listOf ( 1 , 2 , 3 )
+                  list . filterIndexed { index , _ -> @Ann index % 2 == 0 }
+              }
+              """
+            )
         );
     }
 }

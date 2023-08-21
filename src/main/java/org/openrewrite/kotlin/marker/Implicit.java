@@ -25,4 +25,8 @@ import java.util.UUID;
 @With
 public class Implicit implements Marker {
     UUID id;
+
+    public Implicit(UUID id) {
+        this.id = id;
+    }
 }
