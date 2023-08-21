@@ -50,7 +50,7 @@ class EnvironmentTest {
           .findAny()
           .orElseThrow();
         assertThat(intelliJStyle)
-          .as("Environment should be able to find and activate the IntelliJ style")
+          .as("Environment should be able to find and activate the IntelliJ IDEA style")
           .isNotNull();
     }
 }

@@ -916,9 +916,9 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         J.NewArray n = super.visitNewArray(newArray, p);
         if (getCursor().getParent() != null && getCursor().getParent().firstEnclosing(J.class) instanceof J.Annotation) {
             /*
-             * IntelliJ setting
+             * IntelliJ IDEA setting
              * Spaces -> Within -> Annotation parentheses
-             * when enabled supercedes
+             * when enabled supersedes
              * Spaces -> Before left brace -> Annotation array initializer left brace
              */
             if (!style.getWithin().getAnnotationParentheses()) {
