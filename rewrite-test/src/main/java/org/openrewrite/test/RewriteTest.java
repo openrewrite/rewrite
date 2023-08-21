@@ -382,7 +382,8 @@ public interface RewriteTest extends SourceSpecs {
                                 .as("Expected a new file for the source path but there was an existing file already present: " +
                                     sourceSpec.getSourcePath())
                                 .isNull();
-                        String actual = result.getAfter().printAll(out.clone()).trim();
+                        String actual = result.getAfter().printAll(out.clone());
+                        actual = sourceSpec.noTrim ? actual : actual.trim();
                         String expected = sourceSpec.noTrim ?
                                 sourceSpec.after.apply(actual) :
                                 trimIndentPreserveCRLF(sourceSpec.after.apply(actual));
@@ -648,6 +649,7 @@ class DelegateSourceFileForDiff implements SourceFile {
         return out.getOut();
     }
 
+    @SuppressWarnings("unused") // Lombok delegate exclude
     interface PrintAll {
         <P> String printAll(PrintOutputCapture<P> out);
     }
