@@ -26,6 +26,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
@@ -241,8 +242,7 @@ public class Autodetect extends NamedStyles {
             int tabSize = (moreFrequentTabSize == 0) ? 4 : moreFrequentTabSize;
 
             IndentStatistic continuationFrequencies = useTabs ? tabContinuationIndentFrequencies : spaceContinuationIndentFrequencies;
-
-            int continuationIndent = continuationFrequencies.continuationIndent(tabSize);
+            int continuationIndent = continuationFrequencies.continuationIndent(useTabs ? 1 : tabSize) * (useTabs ? tabSize : 1);
             return new TabsAndIndentsStyle(
                     useTabs,
                     tabSize,
@@ -863,7 +863,7 @@ public class Autodetect extends NamedStyles {
         }
 
         @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Integer integer) {
+        public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, Integer integer) {
             for (J.Import anImport : cu.getImports()) {
                 importedPackages.add(anImport.getPackageName() + ".");
 
