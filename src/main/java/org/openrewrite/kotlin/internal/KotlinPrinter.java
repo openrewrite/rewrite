@@ -825,7 +825,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
             beforeSyntax(newClass, Space.Location.NEW_CLASS_PREFIX, p);
 
-            if (kObject != null) {
+            if (kObject != null && newClass.getClazz() != null) {
                 p.append(":");
             }
 

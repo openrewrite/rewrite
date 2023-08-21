@@ -441,4 +441,15 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void anonymousObjectWithoutSupertype() {
+        rewriteRun(
+          kotlin(
+            """
+              val x: Any = object  {}   .    javaClass
+              """
+          )
+        );
+    }
 }
