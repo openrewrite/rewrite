@@ -196,4 +196,13 @@ public class UnnecessaryParenthesesVisitor extends JavaVisitor<ExecutionContext>
         }
         return fc;
     }
+
+    @Override
+    public J visitTernary(J.Ternary ternary, ExecutionContext ctx) {
+        J.Ternary te = (J.Ternary) super.visitTernary(ternary, ctx);
+        if (te.getCondition() instanceof J.Parentheses) {
+            te = (J.Ternary) new UnwrapParentheses<>((J.Parentheses<?>) te.getCondition()).visitNonNull(te, ctx, getCursor().getParentOrThrow());
+        }
+        return te;
+    }
 }

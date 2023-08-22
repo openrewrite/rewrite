@@ -898,4 +898,27 @@ class UnnecessaryParenthesesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @SuppressWarnings("SimplifiableConditionalExpression")
+    void ternaryCondition() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  boolean test(String s) {
+                      return (s == null) ? true : false;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  boolean test(String s) {
+                      return s == null ? true : false;
+                  }
+              }
+              """
+          )
+        );
+    }
 }
