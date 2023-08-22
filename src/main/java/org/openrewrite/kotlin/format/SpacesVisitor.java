@@ -1074,64 +1074,6 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         return p2;
     }
 
-    @Override
-    public J.TypeCast visitTypeCast(J.TypeCast typeCast, P p) {
-        J.TypeCast tc = super.visitTypeCast(typeCast, p);
-        tc = tc.withClazz(
-                tc.getClazz().withTree(
-                        spaceBefore(tc.getClazz().getTree(), withinParentheses)
-                )
-        );
-        tc = tc.withClazz(
-                tc.getClazz().getPadding().withTree(
-                        spaceAfter(tc.getClazz().getPadding().getTree(), withinParentheses)
-                )
-        );
-
-        // TODO
-//        tc = tc.withExpression(spaceBefore(tc.getExpression(), style.getOther().getAfterTypeCast()));
-        return tc;
-    }
-
-//    @Override
-//    public J.ParameterizedType visitParameterizedType(J.ParameterizedType type, P p) {
-//        J.ParameterizedType pt = super.visitParameterizedType(type, p);
-//        boolean spaceWithinAngleBrackets = style.getWithin().getAngleBrackets();
-//        if (pt.getPadding().getTypeParameters() != null) {
-//            pt = pt.getPadding().withTypeParameters(
-//                    spaceBefore(pt.getPadding().getTypeParameters(),
-//                            style.getTypeArguments().getBeforeOpeningAngleBracket())
-//            );
-//        }
-//        if (pt.getPadding().getTypeParameters() != null &&
-//                !(pt.getPadding().getTypeParameters().getElements().isEmpty() || pt.getPadding().getTypeParameters().getElements().iterator().next() instanceof J.Empty)) {
-//            int typeParametersSize = pt.getPadding().getTypeParameters().getElements().size();
-//            pt = pt.getPadding().withTypeParameters(
-//                    pt.getPadding().getTypeParameters().getPadding().withElements(
-//                            ListUtils.map(pt.getPadding().getTypeParameters().getPadding().getElements(),
-//                                    (index, elemContainer) -> {
-//                                        if (index == 0) {
-//                                            elemContainer = elemContainer.withElement(
-//                                                    spaceBefore(elemContainer.getElement(), spaceWithinAngleBrackets)
-//                                            );
-//                                        } else {
-//                                            elemContainer = elemContainer.withElement(
-//                                                    spaceBefore(elemContainer.getElement(),
-//                                                            style.getTypeArguments().getAfterComma())
-//                                            );
-//                                        }
-//                                        if (index == typeParametersSize - 1) {
-//                                            elemContainer = spaceAfter(elemContainer, spaceWithinAngleBrackets);
-//                                        }
-//                                        return elemContainer;
-//                                    }
-//                            )
-//                    )
-//            );
-//        }
-//        return pt;
-//    }
-
     @SuppressWarnings("ConstantValue")
     @Override
     public J.NewClass visitNewClass(J.NewClass newClass, P p) {

@@ -60,6 +60,20 @@ class SpacesTest implements RewriteTest {
           )));
     }
 
+    @Test
+    void spaceAfterAsKeyword() {
+        rewriteRun(
+          spaces(),
+          kotlin(
+            """
+              fun parseValue(input: Any) {
+                  val split = (input as String).split("-")
+              }
+              """
+          )
+        );
+    }
+
     @Nested
     class beforeParensTest {
         @DocumentExample
