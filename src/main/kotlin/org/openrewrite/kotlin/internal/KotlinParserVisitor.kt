@@ -2626,7 +2626,7 @@ class KotlinParserVisitor(
             var e = arguments[i]
             val savedCursor = cursor
             val before = whitespace()
-            if (skip("$")) {
+            if (cursor < e.source!!.endOffset && skip("$")) {
                 val inBraces = skip("{")
                 if (e is FirConstExpression<*>) {
                     // Skip generated whitespace expression so that it's added to the prefix of the reference.
