@@ -296,6 +296,17 @@ class BinaryTest implements RewriteTest {
         );
     }
 
+    @Test
+    void notIn() {
+        rewriteRun(
+          kotlin(
+            """
+              val x = "x" !in arrayOf("x")
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/149")
     @Test
     void explicitReceiver() {

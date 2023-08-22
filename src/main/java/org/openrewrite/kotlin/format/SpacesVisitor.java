@@ -764,6 +764,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         K.Binary b = super.visitBinary(binary, p);
         K.Binary.Type operator = b.getOperator();
         switch (operator) {
+            case NotContains:
             case Contains:
                 break;
             case Get:

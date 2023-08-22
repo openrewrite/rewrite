@@ -203,7 +203,7 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public K.Binary visitBinary(K.Binary binary, P p) {
         K.Binary kb = super.visitBinary(binary, p);
-        if (kb.getOperator() ==  K.Binary.Type.Contains) {
+        if (kb.getOperator() ==  K.Binary.Type.Contains || kb.getOperator() ==  K.Binary.Type.NotContains) {
             kb = kb.getPadding().withOperator(kb.getPadding().getOperator().withBefore(updateSpace(kb.getPadding().getOperator().getBefore(), true)));
             kb = kb.withRight(spaceBefore(kb.getRight(), true));
         }

@@ -1536,8 +1536,9 @@ class KotlinParserVisitor(
                 }
 
                 // The `in` keyword is a function call to `contains` applied to a primitive range. I.E., `IntRange`, `LongRange`.
-                opPrefix = sourceBefore("in")
-                kotlinBinaryType = Binary.Type.Contains
+                opPrefix = whitespace()
+                kotlinBinaryType = if (skip("!")) Binary.Type.NotContains else Binary.Type.Contains
+                skip("in")
                 val rhs: FirExpression =
                     if (functionCall.explicitReceiver != null) functionCall.explicitReceiver!! else functionCall.dispatchReceiver
                 right = convertToExpression(rhs, data)!!

@@ -91,6 +91,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             case Contains:
                 keyword = "in";
                 break;
+            case NotContains:
+                keyword = "!in";
+                break;
             case IdentityEquals:
                 keyword = "===";
                 break;
@@ -906,6 +909,20 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visitContainer(delimiter, typeParam.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, "&", "", p);
             afterSyntax(typeParam, p);
             return typeParam;
+        }
+
+        @Override
+        public J visitUnary(J.Unary unary, PrintOutputCapture<P> p) {
+            if (unary.getOperator() == J.Unary.Type.Not && unary.getExpression() instanceof K.Binary && ((K.Binary) unary.getExpression()).getOperator() == K.Binary.Type.NotContains) {
+                // This is a special case for the `!in` operator.
+                // The `!` is a unary operator, but the `in` is a binary operator.
+                // The `!` is printed as part of the binary operator.
+                beforeSyntax(unary, Space.Location.UNARY_PREFIX, p);
+                visit(unary.getExpression(), p);
+                afterSyntax(unary, p);
+                return unary;
+            }
+            return super.visitUnary(unary, p);
         }
 
         @Override
