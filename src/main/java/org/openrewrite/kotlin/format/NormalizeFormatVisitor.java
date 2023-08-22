@@ -39,6 +39,7 @@ public class NormalizeFormatVisitor<P> extends KotlinIsoVisitor<P> {
         this.stopAfter = stopAfter;
     }
 
+    @SuppressWarnings("unused")
     public NormalizeFormatVisitor() {
         this(null);
     }

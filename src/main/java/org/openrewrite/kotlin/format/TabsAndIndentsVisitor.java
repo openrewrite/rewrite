@@ -145,14 +145,14 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
             if ((loc == Space.Location.CLASS_KIND ||
                     loc == Space.Location.METHOD_DECLARATION_PREFIX)
                 && getCursor().getValue() instanceof J.ClassDeclaration) {
-                J.ClassDeclaration c = (J.ClassDeclaration) getCursor().getValue();
+                J.ClassDeclaration c = getCursor().getValue();
                 if (!c.getLeadingAnnotations().isEmpty()) {
                     alignToAnnotation = true;
                 }
             }
 
             if (loc == Space.Location.MODIFIER_PREFIX && getCursor().getValue() instanceof J.MethodDeclaration) {
-                J.MethodDeclaration m = (J.MethodDeclaration) getCursor().getValue();
+                J.MethodDeclaration m = getCursor().getValue();
                 if (!m.getLeadingAnnotations().isEmpty()) {
                     alignToAnnotation = true;
                 }
@@ -377,6 +377,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         return (after == right.getAfter() && t == right.getElement()) ? right : new JRightPadded<>(t, after, right.getMarkers());
     }
 
+    @SuppressWarnings("NullableProblems")
     @Override
     public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, JContainer.Location loc, P p) {
         setCursor(new Cursor(getCursor(), container));

@@ -36,6 +36,7 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
         this.stopAfter = stopAfter;
     }
 
+    @SuppressWarnings("unused")
     public MinimumViableSpacingVisitor() {
         this(null);
     }
@@ -184,8 +185,10 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
             }
         }
 
-        m = m.withBody(m.getBody().withStatements(ListUtils.map(m.getBody().getStatements(),
-                (i, st) -> (i != 0) ? st.withPrefix(st.getPrefix().withWhitespace("\n")) : st)));
+        if (m.getBody() != null) {
+            m = m.withBody(m.getBody().withStatements(ListUtils.map(m.getBody().getStatements(),
+                    (i, st) -> (i != 0) ? st.withPrefix(st.getPrefix().withWhitespace("\n")) : st)));
+        }
 
         return m;
     }
@@ -210,6 +213,7 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
         return kb;
     }
 
+    @SuppressWarnings("DataFlowIssue")
     @Override
     public J.If visitIf(J.If iff, P p) {
         J.If updatedIff = super.visitIf(iff, p);
@@ -282,6 +286,7 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
         return super.visit(tree, p);
     }
 
+    @SuppressWarnings("SameParameterValue")
     private static <T extends J> T spaceBefore(T j, boolean spaceBefore) {
         if (!j.getComments().isEmpty()) {
             return j;
@@ -296,6 +301,7 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
         }
     }
 
+    @SuppressWarnings("SameParameterValue")
     private static Space updateSpace(Space s, boolean haveSpace) {
         if (!s.getComments().isEmpty()) {
             return s;

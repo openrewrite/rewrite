@@ -119,6 +119,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         return container.withElement(spaceBefore(container.getElement(), spaceBefore));
     }
 
+    @SuppressWarnings("SameParameterValue")
     <T extends J> JRightPadded<T> spaceBeforeRightPaddedElement(JRightPadded<T> container, boolean spaceBefore) {
         return container.withElement(spaceBefore(container.getElement(), spaceBefore));
     }
@@ -1131,6 +1132,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
 //        return pt;
 //    }
 
+    @SuppressWarnings("ConstantValue")
     @Override
     public J.NewClass visitNewClass(J.NewClass newClass, P p) {
         J.NewClass nc = super.visitNewClass(newClass, p);
@@ -1158,6 +1160,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         return nc;
     }
 
+    @SuppressWarnings("ConstantValue")
     @Override
     public J.EnumValue visitEnumValue(J.EnumValue _enum, P p) {
         J.EnumValue e = super.visitEnumValue(_enum, p);

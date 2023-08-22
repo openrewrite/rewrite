@@ -35,6 +35,7 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
     @Nullable
     private final Tree stopAfter;
 
+    @SuppressWarnings("unused")
     public AutoFormatVisitor() {
         this(null);
     }
