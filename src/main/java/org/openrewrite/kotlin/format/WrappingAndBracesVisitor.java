@@ -19,14 +19,12 @@ package org.openrewrite.kotlin.format;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 
 import java.util.List;
+import java.util.Optional;
 
 public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
     @Nullable
@@ -48,7 +46,16 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
     public Statement visitStatement(Statement statement, P p) {
         Statement j = super.visitStatement(statement, p);
         J parentTree = getCursor().getParentTreeCursor().getValue();
+
         if (parentTree instanceof J.Block && !(j instanceof J.EnumValueSet)) {
+            if (j instanceof J.MethodDeclaration) {
+                J.MethodDeclaration m = (J.MethodDeclaration) j;
+                // no new line for constructor
+                if ("<constructor>".equals(Optional.ofNullable(m.getMethodType()).map(JavaType.Method::getName).orElse(""))) {
+                     return j;
+                }
+            }
+
             // for `J.EnumValueSet` the prefix is on the enum constants
             if (!j.getPrefix().getWhitespace().contains("\n")) {
                 j = j.withPrefix(withNewline(j.getPrefix()));

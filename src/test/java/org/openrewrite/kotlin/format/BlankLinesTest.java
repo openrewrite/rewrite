@@ -770,4 +770,35 @@ class BlankLinesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void copyrightBeforePackage() {
+        // keepMaximumBlankLines_BetweenHeaderAndPackage defaults to 2
+        rewriteRun(
+          blankLines(),
+          kotlin(
+            """
+              /*
+               *  Copyright 2023 XXX, Inc.
+               */
+
+              package org.a
+
+              class A {
+              }
+              """,
+            """
+              /*
+               *  Copyright 2023 XXX, Inc.
+               */
+
+
+              package org.a
+
+              class A {
+              }
+              """
+          )
+        );
+    }
 }

@@ -62,6 +62,21 @@ class WrappingAndBracesTest implements RewriteTest {
           )));
     }
 
+    @Test
+    void classConstructor() {
+        rewriteRun(
+          kotlin(
+            """
+              class A   (
+                      val type: Int = 1
+              ) {
+                   var a = 2
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings({"ClassInitializerMayBeStatic", "ReassignedVariable", "UnusedAssignment"})
     @Test
     void blockLevelStatements() {
