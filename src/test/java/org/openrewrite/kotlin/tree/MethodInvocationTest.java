@@ -33,10 +33,6 @@ class MethodInvocationTest implements RewriteTest {
               fun plugins ( input : ( ) -> String ) {
                   println ( input ( ) )
               }
-              """
-          ),
-          kotlin(
-            """
               fun main ( ) {
                   plugins {
                       "test"
@@ -61,29 +57,20 @@ class MethodInvocationTest implements RewriteTest {
                       return this
                   }
               }
-              """
-          ),
-          kotlin(
-            """
+
               class SpecScope  {
                   val delegate : Spec = Spec ( )
                   fun id ( id : String ) : Spec = delegate . id ( id )
               }
-              public infix fun Spec . version ( version : String ) : Spec = version ( version )
+              infix fun Spec . version ( version : String ) : Spec = version ( version )
               public inline val SpecScope . `java-library` : Spec get ( ) = id ( "org.gradle.java-library" )
-              """
-          ),
-          kotlin(
-            """
+
               class DSL  {
                   fun plugins ( block : SpecScope . ( ) -> Unit ) {
                       block ( SpecScope ( ) )
                   }
               }
-              """
-          ),
-          kotlin(
-            """
+
               fun method ( ) {
                   DSL ( ) .
                   
@@ -111,9 +98,9 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void methodWithLambda() {
         rewriteRun(
-          kotlin("fun method ( arg : Any ) { }"),
           kotlin(
             """
+              fun method ( arg : Any ) { }
               fun callMethodWithLambda ( ) {
                   method {
                   }
@@ -132,10 +119,6 @@ class MethodInvocationTest implements RewriteTest {
                   fun method ( ) {
                   }
               }
-              """
-          ),
-          kotlin(
-            """
               fun method ( test : Test ? ) {
                   val a = test ?. method ( )
               }
@@ -154,10 +137,6 @@ class MethodInvocationTest implements RewriteTest {
                       return ""
                   }
               }
-              """
-          ),
-          kotlin(
-            """
               val t = Test ( )
               fun method ( ) {
                   val a = t . method ( ) ?: null
@@ -196,9 +175,9 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void multipleTypesOfMethodArguments() {
         rewriteRun(
-          kotlin("fun methodA ( a : String , b : Int , c : Double ) { }"),
           kotlin(
             """
+              fun methodA ( a : String , b : Int , c : Double ) { }
               fun methodB ( ) {
                   methodA ( "a" , 1 , 2.0 )
               }
@@ -210,9 +189,9 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void parameterAssignment() {
         rewriteRun(
-          kotlin("fun apply ( plugin : String ? = null) { }"),
           kotlin(
             """
+              fun apply ( plugin : String ? = null) { }
               fun method ( ) {
                   apply ( plugin = "something" )
               }
@@ -224,9 +203,9 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void typeParameters() {
         rewriteRun(
-          kotlin("fun < T : Number > methodA ( type : T ) { }"),
           kotlin(
             """
+              fun < T : Number > methodA ( type : T ) { }
               fun methodB ( ) {
                   methodA < Int > ( 10 )
               }
@@ -238,9 +217,10 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void anonymousObject() {
         rewriteRun(
-          kotlin("open class Test"),
           kotlin(
             """
+              open class Test
+              
               fun test ( a : Test ) { }
               
               fun method ( ) {
@@ -414,7 +394,7 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              protected inline fun <reified TClass> default(arg: String) {
+              inline fun <reified TClass> default(arg: String) {
                   val v = TClass::class.qualifiedName
               }
               """
@@ -454,14 +434,9 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              package foo.bar
               fun format ( vararg params : String ) { }
-              """
-          ),
-          kotlin(
-            """
               fun test ( ) {
-                foo . bar . format ( * arrayOf ( "foo" , "bar" ) )
+                format ( * arrayOf ( "foo" , "bar" ) )
               }
               """)
         );
@@ -473,15 +448,10 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              package foo.bar
               fun format ( first: String, vararg params : String ) { }
-              """
-          ),
-          kotlin(
-            """
               fun test ( ) {
                 val x = arrayOf ( "foo" , "bar" )
-                foo . bar . format ( "" , * x )
+                format ( "" , * x )
               }
               """)
         );
@@ -525,6 +495,17 @@ class MethodInvocationTest implements RewriteTest {
                           b = 1,
                       )
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nullSafeOnMethodTarget() {
+        rewriteRun(
+          kotlin(
+            """
+              val l = "x".length?.let { it + 1 }
               """
           )
         );

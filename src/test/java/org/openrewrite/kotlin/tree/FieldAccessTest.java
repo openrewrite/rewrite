@@ -69,10 +69,6 @@ class FieldAccessTest implements RewriteTest {
               open class Super {
                   val id : String = ""
               }
-              """
-          ),
-          kotlin(
-            """
               class Test : Super() {
                   fun getId ( ) : String {
                       return super . id
@@ -91,10 +87,6 @@ class FieldAccessTest implements RewriteTest {
               class Test {
                   val property = 42
               }
-              """
-          ),
-          kotlin(
-            """
               fun method ( test : Test ? ) {
                   val a = test ?. property
               }
@@ -111,10 +103,6 @@ class FieldAccessTest implements RewriteTest {
               class Test {
                   val value : Int ? = 42
               }
-              """
-          ),
-          kotlin(
-            """
               fun method ( test : Test ) {
                   val a = test . value ?: null
               }

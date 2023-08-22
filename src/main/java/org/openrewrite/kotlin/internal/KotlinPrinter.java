@@ -761,7 +761,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
             visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, p);
             if (method.getSelect() != null && !method.getMarkers().findFirst(Extension.class).isPresent()) {
-                if (method.getSelect().getMarkers().findFirst(IsNullSafe.class).isPresent()) {
+                if (method.getMarkers().findFirst(IsNullSafe.class).isPresent()) {
                     p.append("?");
                 }
                 p.append(".");

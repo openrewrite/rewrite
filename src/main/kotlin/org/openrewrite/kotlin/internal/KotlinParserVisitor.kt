@@ -1124,20 +1124,11 @@ class KotlinParserVisitor(
                     var selectExpr =
                         convertToExpression<Expression>(receiver, data)!!
                     val after = whitespace()
-                    @Suppress("ControlFlowWithEmptyBody")
-                    if (skip(".")) {
-                    } else if (skip("?.")) {
-                        selectExpr = selectExpr.withMarkers(
-                            selectExpr.markers.addIfAbsent(
-                                IsNullSafe(
-                                    randomId(),
-                                    Space.EMPTY
-                                )
-                            )
-                        )
+                    if (skip("?")) {
+                        markers = markers.addIfAbsent(IsNullSafe(randomId(), Space.EMPTY))
                     }
-                    select = JRightPadded.build(selectExpr)
-                        .withAfter(after)
+                    skip(".")
+                    select = JRightPadded.build(selectExpr).withAfter(after)
                 }
             }
             val name = visitElement(namedReference, data) as J.Identifier
