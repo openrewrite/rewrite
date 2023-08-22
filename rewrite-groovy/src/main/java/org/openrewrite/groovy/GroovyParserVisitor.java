@@ -1157,6 +1157,19 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitContinueStatement(ContinueStatement statement) {
+            queue.add(new J.Continue(randomId(),
+                    sourceBefore("continue"),
+                    Markers.EMPTY,
+                    (statement.getLabel() == null) ?
+                            null :
+                            new J.Identifier(randomId(),
+                                    sourceBefore(statement.getLabel()),
+                                    Markers.EMPTY, emptyList(), statement.getLabel(), null, null))
+            );
+        }
+
+        @Override
         public void visitNotExpression(NotExpression expression) {
             Space fmt = sourceBefore("!");
             JLeftPadded<J.Unary.Type> op = padLeft(EMPTY, J.Unary.Type.Not);
