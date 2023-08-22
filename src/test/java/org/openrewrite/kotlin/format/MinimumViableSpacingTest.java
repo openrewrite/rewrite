@@ -270,4 +270,25 @@ class MinimumViableSpacingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void noSpaceAferAnnotation() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new MinimumViableSpacingVisitor<>())
+          ),
+          kotlin(
+            """
+              import org.junit.jupiter.api.Test
+
+              class A {
+                  @Test
+                  fun testA() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
 }

@@ -127,13 +127,13 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
 
         boolean first = m.getLeadingAnnotations().isEmpty();
         if (!m.getModifiers().isEmpty()) {
-            if (!first && Space.firstPrefix(m.getModifiers()).getWhitespace().isEmpty()) {
+            boolean firstFinal = m.getModifiers().get(0).getType() == J.Modifier.Type.Final;
+            int startPosition = firstFinal ? 1 : 0;
+
+            if (!first && !firstFinal && Space.firstPrefix(m.getModifiers()).getWhitespace().isEmpty()) {
                 m = m.withModifiers(Space.formatFirstPrefix(m.getModifiers(),
                         m.getModifiers().iterator().next().getPrefix().withWhitespace(" ")));
             }
-
-            boolean firstFinal = m.getModifiers().get(0).getType() == J.Modifier.Type.Final;
-            int startPosition = firstFinal ? 1 : 0;
 
             if (m.getModifiers().size() > 1) {
                 m = m.withModifiers(ListUtils.map(m.getModifiers(), (index, modifier) -> {
