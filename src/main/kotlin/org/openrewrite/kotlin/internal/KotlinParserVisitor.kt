@@ -19,6 +19,7 @@ import org.jetbrains.kotlin.KtFakeSourceElement
 import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.KtFakeSourceElementKind.GeneratedLambdaLabel
 import org.jetbrains.kotlin.KtLightSourceElement
+import org.jetbrains.kotlin.KtNodeTypes
 import org.jetbrains.kotlin.KtRealPsiSourceElement
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode
 import org.jetbrains.kotlin.com.intellij.lang.LighterASTNode
@@ -665,14 +666,7 @@ class KotlinParserVisitor(
         binaryLogicExpression: FirBinaryLogicExpression,
         data: ExecutionContext
     ): J {
-        var prefix = whitespace()
-        var beforeParens = Space.EMPTY
-        var includeParentheses = false
-        if (skip("(")) {
-            beforeParens = prefix
-            prefix = whitespace()
-            includeParentheses = true
-        }
+        val prefix = whitespace()
         val left =
             convertToExpression<Expression>(binaryLogicExpression.leftOperand, data)!!
         var markers = Markers.EMPTY
@@ -693,7 +687,7 @@ class KotlinParserVisitor(
         }
         val right =
             convertToExpression<Expression>(binaryLogicExpression.rightOperand, data)!!
-        val binary = J.Binary(
+        return J.Binary(
             randomId(),
             prefix,
             markers,
@@ -702,12 +696,6 @@ class KotlinParserVisitor(
             right,
             typeMapping.type(binaryLogicExpression)
         )
-        return if (includeParentheses) J.Parentheses(
-            randomId(),
-            beforeParens,
-            Markers.EMPTY,
-            JRightPadded.build(binary).withAfter(sourceBefore(")"))
-        ) else binary
     }
 
     override fun visitBlock(block: FirBlock, data: ExecutionContext): J {
@@ -4359,7 +4347,6 @@ class KotlinParserVisitor(
         return msg.toString()
     }
 
-    @Suppress("UnstableApiUsage")
     override fun visitElement(element: FirElement, data: ExecutionContext): J? {
         var firElement = element
         val saveCursor = cursor
@@ -4367,472 +4354,136 @@ class KotlinParserVisitor(
         val node = nodes[cursor]
         cursor = saveCursor
         if (node != null) {
-            when (node.elementType.debugName) {
-                "PARENTHESIZED" -> if (node.textRange.endOffset >= firElement.source!!.endOffset) {
+            when (node.elementType) {
+                KtNodeTypes.PARENTHESIZED -> if (node.textRange.endOffset >= firElement.source!!.endOffset)
                     return wrapInParens<J>(firElement, data)
-                }
 
-                "REFERENCE_EXPRESSION" -> if ("POSTFIX_EXPRESSION" == node.treeParent.elementType.debugName && firElement is FirBlock) {
+                KtNodeTypes.REFERENCE_EXPRESSION -> if (KtNodeTypes.POSTFIX_EXPRESSION == node.treeParent.elementType && firElement is FirBlock)
                     firElement = firElement.statements[1]
-                }
 
-                "OPERATION_REFERENCE" -> if ("PREFIX_EXPRESSION" == node.treeParent.elementType.debugName && firElement is FirBlock) {
+                KtNodeTypes.OPERATION_REFERENCE -> if (KtNodeTypes.PREFIX_EXPRESSION == node.treeParent.elementType && firElement is FirBlock)
                     firElement = firElement.statements[0]
-                }
 
-                "INTEGER_CONSTANT", "FLOAT_CONSTANT", "BOOLEAN_CONSTANT" -> if (firElement is FirSingleExpressionBlock) {
-                    val firStatement = firElement.statement
-                    if (firStatement is FirConstExpression<*>) {
-                        firElement = firStatement
-                    }
-                }
-
-                else -> {}
+                KtNodeTypes.INTEGER_CONSTANT, KtNodeTypes.FLOAT_CONSTANT, KtNodeTypes.BOOLEAN_CONSTANT -> if (firElement is FirSingleExpressionBlock)
+                    if (firElement.statement is FirConstExpression<*>)
+                        firElement = firElement.statement
             }
         }
 
-        when (firElement) {
+        return when (firElement) {
             // FIR error elements
-            is FirErrorNamedReference -> {
-                return visitErrorNamedReference(firElement, data)
-            }
-
-            is FirErrorExpression -> {
-                return visitErrorExpression(firElement, data)
-            }
-
-            is FirErrorFunction -> {
-                return visitErrorFunction(firElement, data)
-            }
-
-            is FirErrorImport -> {
-                return visitErrorImport(firElement, data)
-            }
-
-            is FirErrorLoop -> {
-                return visitErrorLoop(firElement, data)
-            }
-
-            is FirErrorProperty -> {
-                return visitErrorProperty(firElement, data)
-            }
-
-            is FirErrorResolvedQualifier -> {
-                return visitErrorResolvedQualifier(firElement, data)
-            }
-
-            is FirErrorTypeRef -> {
-                return visitErrorTypeRef(firElement, data)
-            }
+            is FirErrorNamedReference -> visitErrorNamedReference(firElement, data)
+            is FirErrorExpression -> visitErrorExpression(firElement, data)
+            is FirErrorFunction -> visitErrorFunction(firElement, data)
+            is FirErrorImport -> visitErrorImport(firElement, data)
+            is FirErrorLoop -> visitErrorLoop(firElement, data)
+            is FirErrorProperty -> visitErrorProperty(firElement, data)
+            is FirErrorResolvedQualifier -> visitErrorResolvedQualifier(firElement, data)
+            is FirErrorTypeRef -> visitErrorTypeRef(firElement, data)
 
             // FIR trees
-            is FirAnnotationCall -> {
-                return visitAnnotationCall(firElement, data)
-            }
-
-            is FirAnonymousFunction -> {
-                return visitAnonymousFunction(firElement, data)
-            }
-
-            is FirAnonymousFunctionExpression -> {
-                return visitAnonymousFunctionExpression(firElement, data)
-            }
-
-            is FirAnonymousObject -> {
-                return visitAnonymousObject(firElement, data)
-            }
-
-            is FirAnonymousObjectExpression -> {
-                return visitAnonymousObjectExpression(firElement, data)
-            }
-
-            is FirArrayOfCall -> {
-                return visitArrayOfCall(firElement, data)
-            }
-
-            is FirBackingFieldReference -> {
-                return visitBackingFieldReference(firElement, data)
-            }
-
-            is FirBinaryLogicExpression -> {
-                return visitBinaryLogicExpression(firElement, data)
-            }
-
-            is FirBlock -> {
-                return visitBlock(firElement, data)
-            }
-
-            is FirBreakExpression -> {
-                return visitBreakExpression(firElement, data)
-            }
-
-            is FirCallableReferenceAccess -> {
-                return visitCallableReferenceAccess(firElement, data)
-            }
-
-            is FirCatch -> {
-                return visitCatch(firElement, data)
-            }
-
-            is FirCheckNotNullCall -> {
-                return visitCheckNotNullCall(firElement, data)
-            }
-
-            is FirComparisonExpression -> {
-                return visitComparisonExpression(firElement, data)
-            }
-
-            is FirConstExpression<*> -> {
-                return visitConstExpression(firElement, data)
-            }
-
-            is FirConstructor -> {
-                return visitConstructor(firElement, data)
-            }
-
-            is FirContinueExpression -> {
-                return visitContinueExpression(firElement, data)
-            }
-
-            is FirDoWhileLoop -> {
-                return visitDoWhileLoop(firElement, data)
-            }
-
-            is FirElvisExpression -> {
-                return visitElvisExpression(firElement, data)
-            }
-
-            is FirEnumEntry -> {
-                return visitEnumEntry(firElement, data)
-            }
-
-            is FirEqualityOperatorCall -> {
-                return visitEqualityOperatorCall(firElement, data)
-            }
-
-            is FirFunctionCall -> {
-                return visitFunctionCall(firElement, data)
-            }
-
-            is FirFunctionTypeRef -> {
-                return visitFunctionTypeRef(firElement, data)
-            }
-
-            is FirGetClassCall -> {
-                return visitGetClassCall(firElement, data)
-            }
-
-            is FirLabel -> {
-                return visitLabel(firElement, data)
-            }
-
-            is FirLambdaArgumentExpression -> {
-                return visitLambdaArgumentExpression(firElement, data)
-            }
-
-            is FirNamedArgumentExpression -> {
-                return visitNamedArgumentExpression(firElement, data)
-            }
-
-            is FirProperty -> {
-                return visitProperty(firElement, data)
-            }
-
-            is FirPropertyAccessExpression -> {
-                return visitPropertyAccessExpression(firElement, data)
-            }
-
-            is FirPropertyAccessor -> {
-                return visitPropertyAccessor(firElement, data)
-            }
-
-            is FirReceiverParameter -> {
-                return visitReceiverParameter(firElement, data)
-            }
-
-            is FirRegularClass -> {
-                return visitRegularClass(firElement, data)
-            }
-
-            is FirResolvedNamedReference -> {
-                return visitResolvedNamedReference(firElement, data)
-            }
-
-            is FirResolvedTypeRef -> {
-                return visitResolvedTypeRef(firElement, data)
-            }
-
-            is FirResolvedQualifier -> {
-                return visitResolvedQualifier(firElement, data)
-            }
-
-            is FirReturnExpression -> {
-                return visitReturnExpression(firElement, data)
-            }
-
-            is FirSafeCallExpression -> {
-                return visitSafeCallExpression(firElement, data)
-            }
-
-            is FirCheckedSafeCallSubject -> {
-                return visitCheckedSafeCallSubject(firElement, data)
-            }
-
-            is FirSimpleFunction -> {
-                return visitSimpleFunction(firElement, data)
-            }
-
-            is FirSmartCastExpression -> {
-                return visitSmartCastExpression(firElement, data)
-            }
-
-            is FirStarProjection -> {
-                return visitStarProjection(firElement, data)
-            }
-
-            is FirStringConcatenationCall -> {
-                return visitStringConcatenationCall(firElement, data)
-            }
-
-            is FirSuperReference -> {
-                return visitSuperReference(firElement, data)
-            }
-
-            is FirThisReceiverExpression -> {
-                return visitThisReceiverExpression(firElement, data)
-            }
-
-            is FirThrowExpression -> {
-                return visitThrowExpression(firElement, data)
-            }
-
-            is FirTypeOperatorCall -> {
-                return visitTypeOperatorCall(firElement, data)
-            }
-
-            is FirTypeParameter -> {
-                return visitTypeParameter(firElement, data)
-            }
-
-            is FirTryExpression -> {
-                return visitTryExpression(firElement, data)
-            }
-
-            is FirTypeAlias -> {
-                return visitTypeAlias(firElement, data)
-            }
-
-            is FirTypeProjectionWithVariance -> {
-                return visitTypeProjectionWithVariance(firElement, data)
-            }
-
-            is FirUserTypeRef -> {
-                return visitUserTypeRef(firElement, data)
-            }
-
-            is FirValueParameter -> {
-                return visitValueParameter(firElement, data)
-            }
-
-            is FirVariableAssignment -> {
-                return visitVariableAssignment(firElement, data)
-            }
-
-            is FirWhenBranch -> {
-                return visitWhenBranch(firElement, data)
-            }
-
-            is FirWhenExpression -> {
-                return visitWhenExpression(firElement, data)
-            }
-
-            is FirWhenSubjectExpression -> {
-                return visitWhenSubjectExpression(firElement, data)
-            }
-
-            is FirWhileLoop -> {
-                return visitWhileLoop(firElement, data)
-            }
-
-            is FirArgumentList -> {
-                return visitArgumentList(firElement, data)
-            }
-
-            is FirAugmentedArraySetCall -> {
-                return visitAugmentedArraySetCall(firElement, data)
-            }
-
-            is FirAssignmentOperatorStatement -> {
-                return visitAssignmentOperatorStatement(firElement, data)
-            }
-
-            is FirAnonymousInitializer -> {
-                return visitAnonymousInitializer(firElement, data)
-            }
-
-            is FirAnnotationArgumentMapping -> {
-                return visitAnnotationArgumentMapping(firElement, data)
-            }
-
-            is FirBackingField -> {
-                return visitBackingField(firElement, data)
-            }
-
-            is FirLegacyRawContractDescription -> {
-                return visitLegacyRawContractDescription(firElement, data)
-            }
-
-            is FirRawContractDescription -> {
-                return visitRawContractDescription(firElement, data)
-            }
-
-            is FirResolvedContractDescription -> {
-                return visitResolvedContractDescription(firElement, data)
-            }
-
-            is FirContractDescription -> {
-                return visitContractDescription(firElement, data)
-            }
-
-            is FirContextReceiver -> {
-                return visitContextReceiver(firElement, data)
-            }
-
-            is FirContractDescriptionOwner -> {
-                return visitContractDescriptionOwner(firElement, data)
-            }
-
-            is FirQualifiedAccessExpression -> {
-                return visitQualifiedAccessExpression(firElement, data)
-            }
-
-            is FirContextReceiverArgumentListOwner -> {
-                return visitContextReceiverArgumentListOwner(firElement, data)
-            }
-
-            is FirClassReferenceExpression -> {
-                return visitClassReferenceExpression(firElement, data)
-            }
-
-            is FirClassLikeDeclaration -> {
-                return visitClassLikeDeclaration(firElement, data)
-            }
-
-            is FirCall -> {
-                return visitCall(firElement, data)
-            }
-
-            is FirDynamicTypeRef -> {
-                return visitDynamicTypeRef(firElement, data)
-            }
-
-            is FirResolvedDeclarationStatus -> {
-                return visitResolvedDeclarationStatus(firElement, data)
-            }
-
-            is FirDeclarationStatus -> {
-                return visitDeclarationStatus(firElement, data)
-            }
-
-            is FirEffectDeclaration -> {
-                return visitEffectDeclaration(firElement, data)
-            }
-
-            is FirField -> {
-                return visitField(firElement, data)
-            }
-
-            is FirFunction -> {
-                return visitFunction(firElement, data)
-            }
-
-            is FirFunctionTypeParameter -> {
-                return visitFunctionTypeParameter(firElement, data)
-            }
-
-            is FirImplicitTypeRef -> {
-                return visitImplicitTypeRef(firElement, data)
-            }
-
-            is FirIntersectionTypeRef -> {
-                return visitIntersectionTypeRef(firElement, data)
-            }
-
-            is FirLoopJump -> {
-                return visitLoopJump(firElement, data)
-            }
-
-            is FirJump<*> -> {
-                return visitJump(firElement as FirJump<out FirTargetElement>, data)
-            }
-
-            is FirNamedReference -> {
-                return visitNamedReference(firElement, data)
-            }
-
-            is FirPlaceholderProjection -> {
-                return visitPlaceholderProjection(firElement, data)
-            }
-
-            is FirThisReference -> {
-                return visitThisReference(firElement, data)
-            }
-
-            is FirReference -> {
-                return visitReference(firElement, data)
-            }
-
-            is FirResolvable -> {
-                return visitResolvable(firElement, data)
-            }
-
-            is FirResolvedImport -> {
-                return visitResolvedImport(firElement, data)
-            }
-
-            is FirResolvedReifiedParameterReference -> {
-                return visitResolvedReifiedParameterReference(firElement, data)
-            }
-
-            is FirSpreadArgumentExpression -> {
-                return visitSpreadArgumentExpression(firElement, data)
-            }
-
-            is FirTypeRefWithNullability -> {
-                return visitTypeRefWithNullability(firElement, data)
-            }
-
-            is FirTypeRef -> {
-                return visitTypeRef(firElement, data)
-            }
-
-            is FirTypeParameterRef -> {
-                return visitTypeParameterRef(firElement, data)
-            }
-
-            is FirTypeParametersOwner -> {
-                return visitTypeParametersOwner(firElement, data)
-            }
-
-            is FirTypeProjection -> {
-                return visitTypeProjection(firElement, data)
-            }
-
-            is FirVarargArgumentsExpression -> {
-                return visitVarargArgumentsExpression(firElement, data)
-            }
-
-            is FirWrappedArgumentExpression -> {
-                return visitWrappedArgumentExpression(firElement, data)
-            }
-
-            is FirWrappedExpression -> {
-                return visitWrappedExpression(firElement, data)
-            }
-
-            is FirNoReceiverExpression -> {
-                return visitNoReceiverExpression()
-            }
+            is FirAnnotationCall -> visitAnnotationCall(firElement, data)
+            is FirAnonymousFunction -> visitAnonymousFunction(firElement, data)
+            is FirAnonymousFunctionExpression -> visitAnonymousFunctionExpression(firElement, data)
+            is FirAnonymousObject -> visitAnonymousObject(firElement, data)
+            is FirAnonymousObjectExpression -> visitAnonymousObjectExpression(firElement, data)
+            is FirArrayOfCall -> visitArrayOfCall(firElement, data)
+            is FirBackingFieldReference -> visitBackingFieldReference(firElement, data)
+            is FirBinaryLogicExpression -> visitBinaryLogicExpression(firElement, data)
+            is FirBlock -> visitBlock(firElement, data)
+            is FirBreakExpression -> visitBreakExpression(firElement, data)
+            is FirCallableReferenceAccess -> visitCallableReferenceAccess(firElement, data)
+            is FirCatch -> visitCatch(firElement, data)
+            is FirCheckNotNullCall -> visitCheckNotNullCall(firElement, data)
+            is FirComparisonExpression -> visitComparisonExpression(firElement, data)
+            is FirConstExpression<*> -> visitConstExpression(firElement, data)
+            is FirConstructor -> visitConstructor(firElement, data)
+            is FirContinueExpression -> visitContinueExpression(firElement, data)
+            is FirDoWhileLoop -> visitDoWhileLoop(firElement, data)
+            is FirElvisExpression -> visitElvisExpression(firElement, data)
+            is FirEnumEntry -> visitEnumEntry(firElement, data)
+            is FirEqualityOperatorCall -> visitEqualityOperatorCall(firElement, data)
+            is FirFunctionCall -> visitFunctionCall(firElement, data)
+            is FirFunctionTypeRef -> visitFunctionTypeRef(firElement, data)
+            is FirGetClassCall -> visitGetClassCall(firElement, data)
+            is FirLabel -> visitLabel(firElement, data)
+            is FirLambdaArgumentExpression -> visitLambdaArgumentExpression(firElement, data)
+            is FirNamedArgumentExpression -> visitNamedArgumentExpression(firElement, data)
+            is FirProperty -> visitProperty(firElement, data)
+            is FirPropertyAccessExpression -> visitPropertyAccessExpression(firElement, data)
+            is FirPropertyAccessor -> visitPropertyAccessor(firElement, data)
+            is FirReceiverParameter -> visitReceiverParameter(firElement, data)
+            is FirRegularClass -> visitRegularClass(firElement, data)
+            is FirResolvedNamedReference -> visitResolvedNamedReference(firElement, data)
+            is FirResolvedTypeRef -> visitResolvedTypeRef(firElement, data)
+            is FirResolvedQualifier -> visitResolvedQualifier(firElement, data)
+            is FirReturnExpression -> visitReturnExpression(firElement, data)
+            is FirSafeCallExpression -> visitSafeCallExpression(firElement, data)
+            is FirCheckedSafeCallSubject -> visitCheckedSafeCallSubject(firElement, data)
+            is FirSimpleFunction -> visitSimpleFunction(firElement, data)
+            is FirSmartCastExpression -> visitSmartCastExpression(firElement, data)
+            is FirStarProjection -> visitStarProjection(firElement, data)
+            is FirStringConcatenationCall -> visitStringConcatenationCall(firElement, data)
+            is FirSuperReference -> visitSuperReference(firElement, data)
+            is FirThisReceiverExpression -> visitThisReceiverExpression(firElement, data)
+            is FirThrowExpression -> visitThrowExpression(firElement, data)
+            is FirTypeOperatorCall -> visitTypeOperatorCall(firElement, data)
+            is FirTypeParameter -> visitTypeParameter(firElement, data)
+            is FirTryExpression -> visitTryExpression(firElement, data)
+            is FirTypeAlias -> visitTypeAlias(firElement, data)
+            is FirTypeProjectionWithVariance -> visitTypeProjectionWithVariance(firElement, data)
+            is FirUserTypeRef -> visitUserTypeRef(firElement, data)
+            is FirValueParameter -> visitValueParameter(firElement, data)
+            is FirVariableAssignment -> visitVariableAssignment(firElement, data)
+            is FirWhenBranch -> visitWhenBranch(firElement, data)
+            is FirWhenExpression -> visitWhenExpression(firElement, data)
+            is FirWhenSubjectExpression -> visitWhenSubjectExpression(firElement, data)
+            is FirWhileLoop -> visitWhileLoop(firElement, data)
+            is FirArgumentList -> visitArgumentList(firElement, data)
+            is FirAugmentedArraySetCall -> visitAugmentedArraySetCall(firElement, data)
+            is FirAssignmentOperatorStatement -> visitAssignmentOperatorStatement(firElement, data)
+            is FirAnonymousInitializer -> visitAnonymousInitializer(firElement, data)
+            is FirAnnotationArgumentMapping -> visitAnnotationArgumentMapping(firElement, data)
+            is FirBackingField -> visitBackingField(firElement, data)
+            is FirLegacyRawContractDescription -> visitLegacyRawContractDescription(firElement, data)
+            is FirRawContractDescription -> visitRawContractDescription(firElement, data)
+            is FirResolvedContractDescription -> visitResolvedContractDescription(firElement, data)
+            is FirContractDescription -> visitContractDescription(firElement, data)
+            is FirContextReceiver -> visitContextReceiver(firElement, data)
+            is FirContractDescriptionOwner -> visitContractDescriptionOwner(firElement, data)
+            is FirQualifiedAccessExpression -> visitQualifiedAccessExpression(firElement, data)
+            is FirContextReceiverArgumentListOwner -> visitContextReceiverArgumentListOwner(firElement, data)
+            is FirClassReferenceExpression -> visitClassReferenceExpression(firElement, data)
+            is FirClassLikeDeclaration -> visitClassLikeDeclaration(firElement, data)
+            is FirCall -> visitCall(firElement, data)
+            is FirDynamicTypeRef -> visitDynamicTypeRef(firElement, data)
+            is FirResolvedDeclarationStatus -> visitResolvedDeclarationStatus(firElement, data)
+            is FirDeclarationStatus -> visitDeclarationStatus(firElement, data)
+            is FirEffectDeclaration -> visitEffectDeclaration(firElement, data)
+            is FirField -> visitField(firElement, data)
+            is FirFunction -> visitFunction(firElement, data)
+            is FirFunctionTypeParameter -> visitFunctionTypeParameter(firElement, data)
+            is FirImplicitTypeRef -> visitImplicitTypeRef(firElement, data)
+            is FirIntersectionTypeRef -> visitIntersectionTypeRef(firElement, data)
+            is FirLoopJump -> visitLoopJump(firElement, data)
+            is FirJump<*> -> visitJump(firElement as FirJump<out FirTargetElement>, data)
+            is FirNamedReference -> visitNamedReference(firElement, data)
+            is FirPlaceholderProjection -> visitPlaceholderProjection(firElement, data)
+            is FirThisReference -> visitThisReference(firElement, data)
+            is FirReference -> visitReference(firElement, data)
+            is FirResolvable -> visitResolvable(firElement, data)
+            is FirResolvedImport -> visitResolvedImport(firElement, data)
+            is FirResolvedReifiedParameterReference -> visitResolvedReifiedParameterReference(firElement, data)
+            is FirSpreadArgumentExpression -> visitSpreadArgumentExpression(firElement, data)
+            is FirTypeRefWithNullability -> visitTypeRefWithNullability(firElement, data)
+            is FirTypeRef -> visitTypeRef(firElement, data)
+            is FirTypeParameterRef -> visitTypeParameterRef(firElement, data)
+            is FirTypeParametersOwner -> visitTypeParametersOwner(firElement, data)
+            is FirTypeProjection -> visitTypeProjection(firElement, data)
+            is FirVarargArgumentsExpression -> visitVarargArgumentsExpression(firElement, data)
+            is FirWrappedArgumentExpression -> visitWrappedArgumentExpression(firElement, data)
+            is FirWrappedExpression -> visitWrappedExpression(firElement, data)
+            is FirNoReceiverExpression -> visitNoReceiverExpression()
 
             else -> throw IllegalArgumentException("Unsupported FirElement " + firElement.javaClass.name)
         }

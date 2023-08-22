@@ -265,6 +265,18 @@ class BinaryTest implements RewriteTest {
     }
 
     @Test
+    void doubleLogicParenthesized() {
+        rewriteRun(
+          kotlin(
+            """
+              val b : Boolean = true
+              val x = ((b || b) && (b || b))
+              """
+          )
+        );
+    }
+
+    @Test
     void rem() {
         rewriteRun(
           kotlin(
