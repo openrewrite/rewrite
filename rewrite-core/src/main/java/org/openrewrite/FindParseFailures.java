@@ -32,14 +32,15 @@ public class FindParseFailures extends Recipe {
     @Nullable
     Integer maxSnippetLength;
 
-    @Option(displayName = "Parser name",
-            description = "Only display specified parser failures.",
-            required = false)
+    @Option(displayName = "Parser type",
+            description = "Only display failures from parsers with this fully qualified name.",
+            required = false,
+            example = "org.openrewrite.yaml.YamlParser")
     @Nullable
     String parserType;
 
     @Option(displayName = "Stack trace",
-            description = "Only mark specified stack traces.",
+            description = "Only mark stack traces with a message containing this text.",
             required = false)
     @Nullable
     String stackTrace;
@@ -74,7 +75,7 @@ public class FindParseFailures extends Recipe {
                             }
 
                             String snippet = tree instanceof SourceFile ? null : tree.printTrimmed(getCursor());
-                            if(snippet != null && maxSnippetLength != null && snippet.length() > maxSnippetLength) {
+                            if (snippet != null && maxSnippetLength != null && snippet.length() > maxSnippetLength) {
                                 snippet = snippet.substring(0, maxSnippetLength);
                             }
 
