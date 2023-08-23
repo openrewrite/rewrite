@@ -26,7 +26,6 @@ import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.function.Predicate;
 
 import static java.util.Collections.emptySet;
 import static org.openrewrite.java.style.ImportLayoutStyle.isPackageAlwaysFolded;
@@ -45,7 +44,9 @@ public class RemoveUnusedImports extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Remove imports for types that are not referenced.";
+        return "Remove imports for types that are not referenced. As a precaution against incorrect changes no imports " +
+               "will be removed from any source where unknown types are referenced. The most common cause of unknown " +
+               "types is the use of annotation processors not supported by OpenRewrite, such as lombok.";
     }
 
     @Override
@@ -285,12 +286,6 @@ public class RemoveUnusedImports extends Recipe {
 
             return cu;
         }
-    }
-
-    private static String packageKey(String packageName, String className) {
-        return className.contains(".") ?
-                packageName + "." + className.substring(0, className.lastIndexOf('.')) :
-                packageName;
     }
 
     private static class ImportUsage {
