@@ -79,6 +79,7 @@ public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleE
 
     @Option(displayName = "Extension version",
             description = "A maven-compatible version number to select the gradle-enterprise-maven-extension version.",
+            required = false,
             example = "1.17.4")
     @Nullable
     String version;
