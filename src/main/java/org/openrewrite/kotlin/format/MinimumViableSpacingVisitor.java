@@ -23,6 +23,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
+import org.openrewrite.kotlin.marker.PrimaryConstructor;
 import org.openrewrite.kotlin.tree.K;
 
 import java.util.List;
@@ -125,6 +126,10 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
 
+        if (m.getMarkers().findFirst(PrimaryConstructor.class).isPresent()) {
+            return m;
+        }
+
         boolean first = m.getLeadingAnnotations().isEmpty();
         if (!m.getModifiers().isEmpty()) {
             boolean firstFinal = m.getModifiers().get(0).getType() == J.Modifier.Type.Final;
@@ -174,8 +179,9 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
             }
             first = false;
         }
+
         if (!first) {
-            m = m.withName(m.getName().withPrefix(m.getName().getPrefix().withWhitespace(" ")));
+            m = m.withName(m.getName().withPrefix(updateSpace(m.getName().getPrefix(), true)));
         }
 
         if (m.getPadding().getThrows() != null) {
@@ -258,10 +264,9 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
         }
 
         J firstEnclosing = getCursor().getParentOrThrow().firstEnclosing(J.class);
-        if (!(firstEnclosing instanceof J.Lambda)) {
-            if (Space.firstPrefix(v.getVariables()).getWhitespace().isEmpty() && !v.getModifiers().isEmpty()) {
-                v = v.withVariables(Space.formatFirstPrefix(v.getVariables(),
-                        v.getVariables().iterator().next().getPrefix().withWhitespace(" ")));
+        if (!v.getVariables().isEmpty() && !(firstEnclosing instanceof J.Lambda)) {
+            if (v.getVariables().get(0).getPrefix().getWhitespace().isEmpty() && !v.getModifiers().isEmpty()) {
+                v = v.withVariables(ListUtils.mapFirst(v.getVariables(), v0 -> v0.withName(v0.getName().withPrefix(v0.getName().getPrefix().withWhitespace(" ")))));
             }
         }
 

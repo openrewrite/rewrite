@@ -291,4 +291,22 @@ class MinimumViableSpacingTest implements RewriteTest {
         );
     }
 
+    @Test
+    void classConstructor() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new MinimumViableSpacingVisitor<>())
+          ),
+          kotlin(
+            """
+              package com.netflix.graphql.dgs.client.codegen
+
+              class BaseProjectionNode (
+                      val type: Int = 1
+                      ) {
+              }
+              """
+          )
+        );
+    }
 }
