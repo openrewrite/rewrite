@@ -1112,7 +1112,7 @@ class KotlinParserVisitor(
                     receiver = getReceiver(functionCall.dispatchReceiver)
                 }
                 if (receiver != null) {
-                    var selectExpr =
+                    val selectExpr =
                         convertToExpression<Expression>(receiver, data)!!
                     val after = whitespace()
                     if (skip("?")) {
@@ -1332,99 +1332,78 @@ class KotlinParserVisitor(
     }
 
     private fun mapFunctionalCallArguments(firExpressions: List<FirExpression>): JContainer<Expression> {
+        val flattenedExpressions = firExpressions.stream()
+            .map { e: FirExpression ->
+                if (e is FirVarargArgumentsExpression) e.arguments else listOf(e)
+            }
+            .flatMap { it.stream() }
+            .collect(Collectors.toList())
+        val argumentCount = flattenedExpressions.size
+        val expressions: MutableList<JRightPadded<Expression>> = ArrayList(flattenedExpressions.size)
+        val isLastArgumentLambda = flattenedExpressions.isNotEmpty() && flattenedExpressions[argumentCount - 1] is FirLambdaArgumentExpression
+
+        var markers = Markers.EMPTY
         val args: JContainer<Expression>
-        if (firExpressions.size == 1) {
-            val firExpression = firExpressions[0]
-            args = if (firExpression is FirVarargArgumentsExpression) {
-                val argumentsExpression = firExpressions[0] as FirVarargArgumentsExpression
+        var saveCursor = cursor
+        val containerPrefix = whitespace()
+        var parenOrBrace = source[cursor++]
+        val saveCursor2 = cursor
+        val before = whitespace()
+        val isCloseParen = parenOrBrace == '(' && source[cursor] == ')'
+        if (isCloseParen && isLastArgumentLambda) {
+            cursor++
+            saveCursor = cursor
+            parenOrBrace = source[cursor]
+        } else {
+            cursor(saveCursor2)
+        }
+        if (firExpressions.isEmpty()) {
+            args = if (parenOrBrace == '{') {
+                // function call arguments with no parens.
+                cursor(saveCursor)
                 JContainer.build(
-                    sourceBefore("("), if (argumentsExpression.arguments.isEmpty()) listOf(
-                        padRight(
-                            J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), Space.EMPTY
-                        )
-                    ) else convertAllToExpressions(
-                        argumentsExpression.arguments, ",", ")", data
-                    ),
-                    Markers.EMPTY
+                    containerPrefix,
+                    listOf(padRight(J.Empty(randomId(), Space.EMPTY, Markers.EMPTY), Space.EMPTY)),
+                    markers.addIfAbsent(OmitParentheses(randomId()))
                 )
             } else {
-                val before = sourceBefore("(")
-                val expressions = convertAllToExpressions<Expression>(
-                    listOf(firExpression), ",", ")", data
-                )
                 JContainer.build(
-                    before, expressions, Markers.EMPTY
+                    containerPrefix,
+                    listOf(padRight(J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), Space.EMPTY)
+                    ),
+                    markers
                 )
             }
         } else {
-            if (firExpressions.isEmpty()) {
-                val saveCursor = cursor
-                val before = whitespace()
-                args = if (source.startsWith("{", cursor)) {
-                    // function call arguments with no parens.
-                    cursor(saveCursor)
-                    JContainer.build(
-                        before,
-                        listOf(
-                            padRight(
-                                J.Empty(randomId(), Space.EMPTY, Markers.EMPTY), Space.EMPTY
-                            )
-                        ), Markers.EMPTY.addIfAbsent(
-                            OmitParentheses(randomId())
-                        )
-                    )
+            var isTrailingLambda = argumentCount == 1 && isCloseParen
+            for (i in flattenedExpressions.indices) {
+                val expression = flattenedExpressions[i]
+                var expr = convertToExpression<Expression>(expression, data)!!
+                if (isTrailingLambda && expr !is J.Empty) {
+                    expr = expr.withMarkers(expr.markers.addIfAbsent(TrailingLambdaArgument(randomId())))
+                    expressions.add(padRight(expr, Space.EMPTY))
+                    break
+                }
+                val padding = whitespace()
+                var trailingComma: TrailingComma? = null
+                if (isLastArgumentLambda && i == argumentCount - 2) {
+                    trailingComma = if (skip(",")) TrailingComma(randomId(), whitespace()) else null
+                    if (skip(")")) {
+                        // Trailing lambda: https://kotlinlang.org/docs/lambdas.html#passing-trailing-lambdas
+                        isTrailingLambda = true
+                    }
+                } else if (i == argumentCount - 1) {
+                    trailingComma = if (skip(",")) TrailingComma(randomId(), whitespace()) else null
                 } else {
-                    skip("(")
-                    JContainer.build(
-                        before,
-                        listOf(
-                            padRight(
-                                J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), Space.EMPTY
-                            )
-                        ), Markers.EMPTY
-                    )
+                    skip(",")
                 }
-            } else {
-                val containerPrefix = sourceBefore("(")
-                val flattenedExpressions = firExpressions.stream()
-                    .map { e: FirExpression ->
-                        if (e is FirVarargArgumentsExpression) e.arguments else listOf(e)
-                    }
-                    .flatMap { obj: List<FirExpression> -> obj.stream() }
-                    .collect(Collectors.toList())
-                val argumentCount = flattenedExpressions.size
-                val expressions: MutableList<JRightPadded<Expression>> = ArrayList(flattenedExpressions.size)
-                val isLastArgumentLambda = flattenedExpressions[argumentCount - 1] is FirLambdaArgumentExpression
-                var isTrailingLambda = false
-                for (i in flattenedExpressions.indices) {
-                    val expression = flattenedExpressions[i]
-                    var expr = convertToExpression<Expression>(expression, data)!!
-                    if (isTrailingLambda) {
-                        expr = expr.withMarkers(expr.markers.addIfAbsent(TrailingLambdaArgument(randomId())))
-                        expressions.add(padRight(expr, Space.EMPTY))
-                        break
-                    }
-                    val padding = whitespace()
-                    var trailingComma: TrailingComma? = null
-                    if (isLastArgumentLambda && i == argumentCount - 2) {
-                        trailingComma = if (skip(",")) TrailingComma(randomId(), whitespace()) else null
-                        if (skip(")")) {
-                            // Trailing lambda: https://kotlinlang.org/docs/lambdas.html#passing-trailing-lambdas
-                            isTrailingLambda = true
-                        }
-                    } else if (i == argumentCount - 1) {
-                        trailingComma = if (skip(",")) TrailingComma(randomId(), whitespace()) else null
-                    } else {
-                        skip(",")
-                    }
-                    var padded = padRight(expr, padding)
-                    padded =
-                        if (trailingComma != null) padded.withMarkers(padded.markers.addIfAbsent(trailingComma)) else padded
-                    expressions.add(padded)
-                }
-                skip(")")
-                args = JContainer.build(containerPrefix, expressions, Markers.EMPTY)
+                var padded = padRight(expr, padding)
+                padded =
+                    if (trailingComma != null) padded.withMarkers(padded.markers.addIfAbsent(trailingComma)) else padded
+                expressions.add(padded)
             }
+            skip(")")
+            args = JContainer.build(containerPrefix, expressions, markers)
         }
         return args
     }
@@ -4624,7 +4603,7 @@ class KotlinParserVisitor(
         skip("for")
         val controlPrefix = sourceBefore("(")
         val variable: J.VariableDeclarations?
-        var additionalVariables: Int
+        val additionalVariables: Int
         if ("<destruct>" == receiver.name.asString()) {
             additionalVariables =
                 source.substring(cursor, source.indexOf(')', cursor) + 1).split(",".toRegex())

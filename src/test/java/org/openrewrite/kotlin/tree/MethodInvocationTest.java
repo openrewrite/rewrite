@@ -271,6 +271,21 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void trailingLambdaArgumentWithParentheses() {
+        rewriteRun(
+          kotlin(
+            """
+              fun String.modify(block: () -> Unit) = this
+              
+              val spec = "test".modify() {
+                  println("Hello, world!")
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/78")
     @Test
     void infixTrailingLambdaDSL() {
@@ -296,10 +311,10 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              infix fun String . modify ( block : ( ) -> Unit ) = TODO ( )
+              infix fun String.modify(block: () -> Unit) = this
               
               val spec = "test" modify {
-                println ( "Hello, world!" )
+                  println("Hello, world!")
               }
               """
           )
