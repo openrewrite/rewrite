@@ -40,7 +40,7 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
 
     // Unconfigurable default formatting in IntelliJ's Kotlin formatting.
     private static final int keepMaximumBlankLines_BetweenHeaderAndPackage = 2;
-    // private static final int minimumBlankLines_BeforePackageStatement = 0;
+    private static final int minimumBlankLines_BeforePackageStatement = 0;
     private static final int minimumBlankLines_AfterPackageStatement = 1;
     private static final int minimumBlankLines_BeforeImports = 1;
     private static final int minimumBlankLines_AfterImports = 1;
@@ -76,7 +76,7 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
                 if (!pa.getPrefix().getComments().isEmpty()) {
                     List<Comment> updatedComments =  ListUtils.mapLast(pa.getPrefix().getComments(), c -> {
                         String suffix = keepMaximumLines(c.getSuffix(), keepMaximumBlankLines_BetweenHeaderAndPackage);
-                        suffix = minimumLines(suffix, keepMaximumBlankLines_BetweenHeaderAndPackage);
+                        suffix = minimumLines(suffix, minimumBlankLines_BeforePackageStatement);
                         return c.withSuffix(suffix);
                     });
                     cu = cu.withPackageDeclaration(pa.withPrefix(pa.getPrefix().withComments(updatedComments)));

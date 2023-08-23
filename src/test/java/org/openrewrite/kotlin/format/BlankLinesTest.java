@@ -772,7 +772,7 @@ class BlankLinesTest implements RewriteTest {
     }
 
     @Test
-    void copyrightBeforePackage() {
+    void maximumBlankLinesBetweenHeaderAndPackage() {
         // keepMaximumBlankLines_BetweenHeaderAndPackage defaults to 2
         rewriteRun(
           blankLines(),
@@ -781,6 +781,9 @@ class BlankLinesTest implements RewriteTest {
               /*
                *  Copyright 2023 XXX, Inc.
                */
+
+
+
 
               package org.a
 
@@ -801,4 +804,25 @@ class BlankLinesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void minimumBlankLinesBeforePackageStatement() {
+        // minimumBlankLines_BeforePackageStatement defaults to 0
+        rewriteRun(
+          blankLines(),
+          kotlin(
+            """
+              /*
+               *  Copyright 2023 XXX, Inc.
+               */
+
+              package org.a
+
+              class A {
+              }
+              """
+          )
+        );
+    }
+
 }
