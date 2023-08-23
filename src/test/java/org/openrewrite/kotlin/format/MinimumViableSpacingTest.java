@@ -190,6 +190,24 @@ class MinimumViableSpacingTest implements RewriteTest {
     }
 
     @Test
+    void variableDeclarationsInClass2() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new MinimumViableSpacingVisitor<>())
+          ),
+          kotlin(
+            """
+              class A {
+                  val zero: Int = 0
+                  var one: Int = 1
+              }
+              """
+          )
+        );
+    }
+
+
+    @Test
     void variableDeclarationsInMethod() {
         rewriteRun(
           kotlin(
@@ -309,4 +327,22 @@ class MinimumViableSpacingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void spaceAfterPublic() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new MinimumViableSpacingVisitor<>())
+          ),
+          kotlin(
+            """
+              class A {
+                  public fun me() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
 }

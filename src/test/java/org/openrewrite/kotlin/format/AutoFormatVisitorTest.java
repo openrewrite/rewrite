@@ -28,6 +28,8 @@ class AutoFormatVisitorTest implements RewriteTest {
         spec.recipe(new AutoFormat());
     }
 
+
+
     @Test
     void keepMaximumBetweenHeaderAndPackage() {
         rewriteRun(
@@ -180,5 +182,30 @@ class AutoFormatVisitorTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void composite() {
+        rewriteRun(
+          kotlin(
+            """
+              package com.netflix.graphql.dgs.client.codegen
+
+              import org.junit.jupiter.api.Test
+
+              class GraphQLMultiQueryRequestTest {
+                  @Suppress
+                  @Test
+                  fun testSerializeInputClassWithProjectionAndMultipleQueries() {
+                  }
+
+                  public fun me() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+
 }
 

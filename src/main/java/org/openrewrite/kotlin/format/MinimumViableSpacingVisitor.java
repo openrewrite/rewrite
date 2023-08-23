@@ -117,9 +117,43 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
         }
 
         c = c.withBody(c.getBody().withStatements(ListUtils.map(c.getBody().getStatements(),
-                (i, st) -> (i != 0) ? st.withPrefix(st.getPrefix().withWhitespace("\n")) : st)));
+                (i, st) -> (i != 0) ? st.withPrefix(addNewline(st.getPrefix())) : st)));
 
         return c;
+    }
+
+    private Space addNewline(Space prefix) {
+        if (prefix.getComments().isEmpty() ||
+                prefix.getWhitespace().contains("\n") ||
+                prefix.getComments().get(0) instanceof Javadoc ||
+                (prefix.getComments().get(0).isMultiline() && prefix.getComments().get(0)
+                        .printComment(getCursor()).contains("\n"))) {
+            return prefix.withWhitespace(minimumLines(prefix.getWhitespace()));
+        }
+
+        // the first comment is a trailing comment on the previous line
+        return prefix.withComments(ListUtils.map(prefix.getComments(), (i, c) -> i == 0 ?
+                c.withSuffix(minimumLines(c.getSuffix())) : c));
+    }
+
+    private String minimumLines(String whitespace) {
+        String minWhitespace = whitespace;
+
+        if (getNewLineCount(whitespace) == 0) {
+            minWhitespace = "\n" + minWhitespace;
+        }
+
+        return minWhitespace;
+    }
+
+    private static int getNewLineCount(String whitespace) {
+        int newLineCount = 0;
+        for (char c : whitespace.toCharArray()) {
+            if (c == '\n') {
+                newLineCount++;
+            }
+        }
+        return newLineCount;
     }
 
     @Override
@@ -142,7 +176,9 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
 
             if (m.getModifiers().size() > 1) {
                 m = m.withModifiers(ListUtils.map(m.getModifiers(), (index, modifier) -> {
-                    if (index > startPosition && modifier.getPrefix().getWhitespace().isEmpty()) {
+                    if (index > startPosition &&
+                            modifier.getType() != J.Modifier.Type.Final &&
+                            modifier.getPrefix().getWhitespace().isEmpty()) {
                         return modifier.withPrefix(modifier.getPrefix().withWhitespace(" "));
                     }
                     return modifier;
