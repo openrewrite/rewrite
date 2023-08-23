@@ -136,12 +136,6 @@ public class NormalizeFormatVisitor<P> extends KotlinIsoVisitor<P> {
             return v;
         }
 
-        if (v.getTypeExpression() != null) {
-            v = concatenatePrefix(v, v.getTypeExpression().getPrefix());
-            v = v.withTypeExpression(v.getTypeExpression().withPrefix(Space.EMPTY));
-            return v;
-        }
-
         return v;
     }
 

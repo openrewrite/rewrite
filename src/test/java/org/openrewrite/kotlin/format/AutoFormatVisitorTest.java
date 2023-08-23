@@ -111,7 +111,7 @@ class AutoFormatVisitorTest implements RewriteTest {
               """,
             """
               open class Some {
-                  private val f: (Int) -> Int = {   a: Int ->
+                  private val f: (Int) -> Int = { a: Int ->
                        a * 2
                   }
 
@@ -148,9 +148,9 @@ class AutoFormatVisitorTest implements RewriteTest {
                   }
 
                   fun multilineMethod(
-                            foo: String,
-                            bar: String
-                            ) {
+                          foo: String,
+                          bar: String
+                          ) {
                       foo
                               .length
                   }
@@ -206,6 +206,24 @@ class AutoFormatVisitorTest implements RewriteTest {
         );
     }
 
+    @Test
+    void composite2() {
+        rewriteRun(
+          kotlin(
+            """
+              package com.netflix.graphql.dgs.client.codegen
+
+              import org.junit.jupiter.api.Test
+
+              class GraphQLMultiQueryRequestTest {
+                  private fun listAllFiles(suffix: String): String {
+                      return ""
+                  }
+              }
+              """
+          )
+        );
+    }
 
 }
 
