@@ -300,17 +300,12 @@ public class BlockStatementTemplateGenerator {
                                          .withLeadingAnnotations(emptyList())
                                          .withPrefix(Space.EMPTY)
                                          .printTrimmed(cursor).trim() + '{');
-            } else if (parent instanceof J.Block || parent instanceof J.Lambda || parent instanceof J.Label || parent instanceof Loop) {
+            } else {
                 J.Block b = (J.Block) j;
 
                 // variable declarations up to the point of insertion
                 addLeadingVariableDeclarations(cursor, prior, b, before, insertionPoint);
 
-                before.insert(0, "{\n");
-                if (b.isStatic()) {
-                    before.insert(0, "static");
-                }
-            } else {
                 before.insert(0, "{\n");
             }
 
