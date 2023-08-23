@@ -21,6 +21,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
+import org.openrewrite.kotlin.marker.OmitBraces;
 import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 
 import java.util.List;
@@ -48,6 +49,12 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
         J parentTree = getCursor().getParentTreeCursor().getValue();
 
         if (parentTree instanceof J.Block && !(j instanceof J.EnumValueSet)) {
+            J.Block parentBlock = (J.Block) parentTree;
+            if (parentBlock.getMarkers().findFirst(OmitBraces.class).isPresent()) {
+                return j;
+            }
+
+
             if (j instanceof J.MethodDeclaration) {
                 J.MethodDeclaration m = (J.MethodDeclaration) j;
                 // no new line for constructor
@@ -214,7 +221,7 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public J.Block visitBlock(J.Block block, P p) {
         J.Block b = super.visitBlock(block, p);
-        if(!b.getEnd().getWhitespace().contains("\n")) {
+        if (!b.getMarkers().findFirst(OmitBraces.class).isPresent() && !b.getEnd().getWhitespace().contains("\n")) {
             b = b.withEnd(withNewline(b.getEnd()));
         }
         return b;

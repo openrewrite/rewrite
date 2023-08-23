@@ -104,16 +104,14 @@ class AutoFormatVisitorTest implements RewriteTest {
                   }
 
                   fun expressionBodyMethod() =
-                      "abc"
+                  "abc"
               }
 
               class AnotherClass<T : Any> : Some()
               """,
             """
               open class Some {
-                  private val f: (Int) -> Int = { a: Int ->
-                       a * 2
-                  }
+                  private val f: (Int) -> Int = { a: Int -> a * 2 }
 
                   fun foo(): Int {
                       val test: Int = 12
@@ -131,15 +129,9 @@ class AutoFormatVisitorTest implements RewriteTest {
                       }
                       try {
                           when (test) {
-                              12 ->
-                                  println("foo")
-                             \s
-                               in 10..42 ->
-                                  println("baz")
-                             \s
-                              else ->
-                                  println("bar")
-                             \s
+                              12 -> println("foo")
+                               in 10..42 -> println("baz")
+                              else -> println("bar")
                           }
                       } catch (e: Exception) {
                       } finally {
@@ -156,9 +148,7 @@ class AutoFormatVisitorTest implements RewriteTest {
                   }
 
                   fun expressionBodyMethod() =
-                     \s
-                          "abc"
-                 \s
+                      "abc"
               }
 
               class AnotherClass <T : Any> : Some()

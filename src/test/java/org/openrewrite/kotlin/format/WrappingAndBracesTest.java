@@ -516,4 +516,41 @@ class WrappingAndBracesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void singleStatementFunctionNoNewLines() {
+        rewriteRun(
+          kotlin(
+            """
+              class A {
+                  fun name(): String =
+                          "123"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void nonSingleStatementFunctionNeedNewLines() {
+        // An equivalent code with above test singleStatementFunctionNoNewLines, but not a single statement function
+        rewriteRun(
+          kotlin(
+            """
+              class A {
+                  fun name(): String {   return "123" }
+              }
+              """,
+            """
+              class A {
+                  fun name(): String {
+                 return "123"
+               }
+              }
+              """
+          )
+        );
+    }
+
+
 }
