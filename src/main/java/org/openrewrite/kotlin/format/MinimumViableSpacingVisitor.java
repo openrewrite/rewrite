@@ -23,6 +23,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
+import org.openrewrite.kotlin.marker.Implicit;
 import org.openrewrite.kotlin.marker.PrimaryConstructor;
 import org.openrewrite.kotlin.tree.K;
 
@@ -84,7 +85,8 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
             first = false;
         }
 
-        if (!first && c.getName().getPrefix().getWhitespace().isEmpty()) {
+        if (!first && !c.getName().getMarkers().findFirst(Implicit.class).isPresent() &&
+                c.getName().getPrefix().getWhitespace().isEmpty()) {
             c = c.withName(c.getName().withPrefix(c.getName().getPrefix().withWhitespace(" ")));
         }
 

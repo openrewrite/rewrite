@@ -28,8 +28,6 @@ class AutoFormatVisitorTest implements RewriteTest {
         spec.recipe(new AutoFormat());
     }
 
-
-
     @Test
     void keepMaximumBetweenHeaderAndPackage() {
         rewriteRun(
@@ -208,6 +206,22 @@ class AutoFormatVisitorTest implements RewriteTest {
               class GraphQLMultiQueryRequestTest {
                   private fun listAllFiles(suffix: String): String {
                       return ""
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void companionType() {
+        rewriteRun(
+          kotlin(
+            """
+              class A {
+                  companion object {
+                      @JvmField
+                      val GRANT_TYPE = "password"
                   }
               }
               """
