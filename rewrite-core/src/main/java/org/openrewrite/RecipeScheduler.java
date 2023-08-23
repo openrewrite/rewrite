@@ -241,6 +241,7 @@ public class RecipeScheduler {
                             // that later fails to apply on a freshly cloned repository
                             return sourceFile;
                         }
+                        recipeRunStats.recordSourceFileChanged(sourceFile, after);
                     }
                 } catch (Throwable t) {
                     after = handleError(recipe, sourceFile, after, t);

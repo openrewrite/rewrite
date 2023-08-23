@@ -22,8 +22,11 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -32,11 +35,20 @@ import static java.util.Objects.requireNonNull;
 
 public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
     private final MeterRegistry registry = new SimpleMeterRegistry();
+    private final Set<Path> sourceFileChanged = new HashSet<>();
 
     public RecipeRunStats(Recipe recipe) {
         super(recipe,
                 "Recipe performance",
                 "Statistics used in analyzing the performance of recipes.");
+    }
+
+    public void recordSourceFileChanged(@Nullable SourceFile before, @Nullable SourceFile after) {
+        if(after != null) {
+            sourceFileChanged.add(after.getSourcePath());
+        } else if(before != null) {
+            sourceFileChanged.add(before.getSourcePath());
+        }
     }
 
     public void recordScan(Recipe recipe, Callable<SourceFile> scan) throws Exception {
@@ -63,6 +75,7 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
             Row row = new Row(
                     recipeName,
                     Long.valueOf(editor.count()).intValue(),
+                    sourceFileChanged.size(),
                     scanner == null ? 0 : (long) scanner.totalTime(TimeUnit.NANOSECONDS),
                     scanner == null ? 0 : scanner.takeSnapshot().percentileValues()[0].percentile(),
                     scanner == null ? 0 : (long) scanner.max(TimeUnit.NANOSECONDS),
@@ -85,9 +98,13 @@ public class RecipeRunStats extends DataTable<RecipeRunStats.Row> {
                 description = "The recipe whose stats are being measured both individually and cumulatively.")
         String recipe;
 
-        @Column(displayName = "Source files",
+        @Column(displayName = "Source file count",
                 description = "The number of source files the recipe ran over.")
         Integer sourceFiles;
+
+        @Column(displayName = "Source file changed count",
+                description = "The number of source files which were changed in the recipe run. Includes files created, deleted, and edited.")
+        Integer sourceFilesChanged;
 
         @Column(displayName = "Cumulative scanning time",
                 description = "The total time spent across the scanning phase of this recipe.")
