@@ -164,5 +164,21 @@ class AutoFormatVisitorTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void classConstructor() {
+        rewriteRun(
+          kotlin(
+            """
+              package com.netflix.graphql.dgs.client.codegen
+
+              class BaseProjectionNode (
+                      val type: Int = 1
+                      ) {
+              }
+              """
+          )
+        );
+    }
 }
 

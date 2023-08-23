@@ -23,6 +23,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.kotlin.internal.KotlinPrinter;
 import org.openrewrite.kotlin.marker.OmitBraces;
+import org.openrewrite.kotlin.marker.PrimaryConstructor;
 import org.openrewrite.kotlin.marker.TypeReferencePrefix;
 import org.openrewrite.kotlin.style.SpacesStyle;
 import org.openrewrite.java.tree.*;
@@ -251,6 +252,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
+        boolean isConstructor = m.getMarkers().findFirst(PrimaryConstructor.class).isPresent();
 
         // beforeParenthesesOfMethodDeclaration is defaulted to `false` in IntelliJ's Kotlin formatting.
         m = m.getPadding().withParameters(
@@ -275,7 +277,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         m = m.withMarkers(spaceBeforeColonAfterDeclarationName(m.getMarkers()));
 
         // handle space after colon before declaration type
-        if (m.getReturnTypeExpression() != null) {
+        if (m.getReturnTypeExpression() != null && !isConstructor) {
             m = m.withReturnTypeExpression(spaceBefore(m.getReturnTypeExpression(), style.getOther().getAfterColonBeforeDeclarationType()));
         }
 

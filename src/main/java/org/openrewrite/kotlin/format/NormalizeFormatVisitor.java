@@ -24,6 +24,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
+import org.openrewrite.kotlin.marker.PrimaryConstructor;
 
 import java.util.List;
 
@@ -80,6 +81,10 @@ public class NormalizeFormatVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
+
+        if (m.getMarkers().findFirst(PrimaryConstructor.class).isPresent()) {
+            return m;
+        }
 
         if (!m.getLeadingAnnotations().isEmpty()) {
             m = concatenatePrefix(m, Space.firstPrefix(m.getLeadingAnnotations()));
