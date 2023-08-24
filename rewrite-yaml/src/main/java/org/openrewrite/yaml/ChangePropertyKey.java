@@ -287,9 +287,11 @@ public class ChangePropertyKey extends Recipe {
         public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
             Yaml.Mapping m = super.visitMapping(mapping, p);
             if (m.getEntries().contains(scope)) {
-                String newEntryPrefix = scope.getPrefix();
-                Yaml.Mapping.Entry newEntry = buildEntry(newEntryPrefix, scope.getBeforeMappingValueIndicator(),
-                        subproperty, removeExclusions(entryToReplace.getValue().copyPaste()));
+                Yaml.Mapping.Entry newEntry = buildEntry(
+                        scope.getPrefix(),
+                        scope.getBeforeMappingValueIndicator(),
+                        subproperty,
+                        removeExclusions(entryToReplace.getValue().copyPaste()));
                 if (hasExcludedValues(entryToReplace)) {
                     m = m.withEntries(ListUtils.concat(m.getEntries(), newEntry));
                 } else {
