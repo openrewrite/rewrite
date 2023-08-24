@@ -302,7 +302,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
                 }
                 return version;
             }
-            
+
             @Nullable
             public TreeVisitor<Xml, ExecutionContext> upgradeVersion(ExecutionContext ctx, Xml.Tag tag, @Nullable String requestedVersion, String groupId, String artifactId, String version2) throws MavenDownloadingException {
                 String newerVersion = findNewerVersion(groupId, artifactId, version2, ctx);
