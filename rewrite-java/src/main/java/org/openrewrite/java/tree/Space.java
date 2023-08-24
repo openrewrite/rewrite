@@ -20,10 +20,7 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.WeakHashMap;
+import java.util.*;
 
 import static java.util.Collections.emptyList;
 
@@ -46,7 +43,7 @@ public class Space {
      * e.g.: a single space between keywords, or the common indentation of every line in a block.
      * So use flyweights to avoid storing many instances of functionally identical spaces
      */
-    private static final Map<String, Space> flyweights = new WeakHashMap<>();
+    private static final Map<String, Space> flyweights = Collections.synchronizedMap(new WeakHashMap<>());
 
     static {
         flyweights.put(" ", SINGLE_SPACE);
