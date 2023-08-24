@@ -195,6 +195,19 @@ class AutoFormatVisitorTest implements RewriteTest {
     }
 
     @Test
+    void extensionMethod() {
+        rewriteRun(
+          kotlin(
+            """
+              fun String.extension(): Any {
+                  return ""
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void composite2() {
         rewriteRun(
           kotlin(

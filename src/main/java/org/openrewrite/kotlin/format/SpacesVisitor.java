@@ -22,6 +22,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.kotlin.internal.KotlinPrinter;
+import org.openrewrite.kotlin.marker.Extension;
 import org.openrewrite.kotlin.marker.OmitBraces;
 import org.openrewrite.kotlin.marker.PrimaryConstructor;
 import org.openrewrite.kotlin.marker.TypeReferencePrefix;
@@ -253,6 +254,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
         boolean isConstructor = m.getMarkers().findFirst(PrimaryConstructor.class).isPresent();
+        boolean hasReceiverType = method.getMarkers().findFirst(Extension.class).isPresent();
 
         // beforeParenthesesOfMethodDeclaration is defaulted to `false` in IntelliJ's Kotlin formatting.
         m = m.getPadding().withParameters(
@@ -270,7 +272,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         // handle space after comma
         m = m.withParameters(ListUtils.map(
                 m.getParameters(), (index, param) ->
-                        index == 0 ? param : spaceBefore(param, style.getOther().getAfterComma())
+                        index == 0 || index == 1 && hasReceiverType ? param : spaceBefore(param, style.getOther().getAfterComma())
         ));
 
         // handle space before colon after declaration name
@@ -299,7 +301,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                     m.getPadding().getParameters().getPadding().withElements(
                             ListUtils.map(m.getPadding().getParameters().getPadding().getElements(),
                                     (index, param) -> {
-                                        if (index == 0) {
+                                        if (index == 0 || index == 1 && hasReceiverType) {
                                             param = param.withElement(spaceBefore(param.getElement(), false));
                                         } else {
                                             param = param.withElement(
@@ -708,7 +710,9 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
         J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, p);
-        if (v.getPadding().getInitializer() != null) {
+        boolean hasReceiverType = v.getMarkers().findFirst(Extension.class).isPresent();
+
+        if (v.getPadding().getInitializer() != null && !hasReceiverType) {
             v = v.getPadding().withInitializer(spaceBefore(v.getPadding().getInitializer(), style.getAroundOperators().getAssignment()));
         }
         if (v.getPadding().getInitializer() != null) {
