@@ -122,7 +122,7 @@ public class UpgradePluginVersion extends Recipe {
                                 assert tagGroupId != null;
                                 assert tagArtifactId != null;
                                 findNewerDependencyVersion(tagGroupId, tagArtifactId, versionLookup, ctx).ifPresent(newer -> {
-                                    ChangePluginVersionVisitor changeDependencyVersion = new ChangePluginVersionVisitor(groupId, artifactId, newer);
+                                    ChangePluginVersionVisitor changeDependencyVersion = new ChangePluginVersionVisitor(tagGroupId, tagArtifactId, newer);
                                     doAfterVisit(changeDependencyVersion);
                                 });
                             } catch (MavenDownloadingException e) {

@@ -468,4 +468,68 @@ class UpgradePluginVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void upgradeMultiplePluginsWithDifferentVersions() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion(
+            "*",
+            "*",
+            "2.4.x",
+            null,
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>io.quarkus</groupId>
+                      <artifactId>quarkus-maven-plugin</artifactId>
+                      <version>1.13.3.Final</version>
+                    </plugin>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>1.0.0</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>io.quarkus</groupId>
+                      <artifactId>quarkus-maven-plugin</artifactId>
+                      <version>2.4.2.Final</version>
+                    </plugin>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>2.4.13</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
+
 }
