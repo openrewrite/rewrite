@@ -1113,13 +1113,15 @@ class KotlinParserVisitor(
                 }
                 if (receiver != null) {
                     val selectExpr =
-                        convertToExpression<Expression>(receiver, data)!!
-                    val after = whitespace()
-                    if (skip("?")) {
-                        markers = markers.addIfAbsent(IsNullSafe(randomId(), Space.EMPTY))
+                        convertToExpression<Expression>(receiver, data)
+                    if (selectExpr != null) {
+                        val after = whitespace()
+                        if (skip("?")) {
+                            markers = markers.addIfAbsent(IsNullSafe(randomId(), Space.EMPTY))
+                        }
+                        skip(".")
+                        select = JRightPadded.build(selectExpr).withAfter(after)
                     }
-                    skip(".")
-                    select = JRightPadded.build(selectExpr).withAfter(after)
                 }
             }
             val name = visitElement(namedReference, data) as J.Identifier
@@ -2335,7 +2337,7 @@ class KotlinParserVisitor(
         )
     }
 
-    override fun visitResolvedQualifier(resolvedQualifier: FirResolvedQualifier, data: ExecutionContext): J {
+    override fun visitResolvedQualifier(resolvedQualifier: FirResolvedQualifier, data: ExecutionContext): J? {
         val fieldAccess = resolvedQualifier.packageFqName.asString()
         val resolvedName =
             if (resolvedQualifier.relativeClassFqName == null) "" else "." + resolvedQualifier.relativeClassFqName!!.asString()
@@ -2355,6 +2357,8 @@ class KotlinParserVisitor(
                 }
             }
         }
+        if (name.isEmpty())
+            return null
         var typeTree: TypeTree = build(name.toString())
         if (resolvedQualifier.relativeClassFqName != null) {
             typeTree = typeTree.withType(typeMapping.type(resolvedQualifier))

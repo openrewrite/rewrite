@@ -44,6 +44,30 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void unqualifiedImportedCall() {
+        rewriteRun(
+          kotlin(
+            """
+              package pkg
+              
+              import pkg.Callee.calleeMethod
+              import pkg.Callee.CALLEE_FIELD
+              
+              class Caller {
+                  fun method(): Any = calleeMethod()
+                  fun method2(): Any = CALLEE_FIELD
+              }
+              
+              object Callee {
+                  const val CALLEE_FIELD = ""
+                  fun calleeMethod(): Unit = Unit
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void buildGradle() {
         rewriteRun(
           kotlin(
