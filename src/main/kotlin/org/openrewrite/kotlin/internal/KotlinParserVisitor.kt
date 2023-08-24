@@ -437,9 +437,9 @@ class KotlinParserVisitor(
             // skip destructured property declarations.
             for (statement in anonymousFunction.body!!.statements) {
                 if (statement is FirProperty && statement.initializer is FirComponentCall &&
-                    (statement.initializer as FirComponentCall).dispatchReceiver is FirPropertyAccessExpression &&
-                    ((statement.initializer as FirComponentCall).dispatchReceiver as FirPropertyAccessExpression).calleeReference is FirResolvedNamedReference &&
-                    "<destruct>" == (((statement.initializer as FirComponentCall).dispatchReceiver as FirPropertyAccessExpression).calleeReference as FirResolvedNamedReference).name.asString()
+                    (statement.initializer as FirComponentCall).explicitReceiver is FirPropertyAccessExpression &&
+                    ((statement.initializer as FirComponentCall).explicitReceiver as FirPropertyAccessExpression).calleeReference is FirResolvedNamedReference &&
+                    "<destruct>" == (((statement.initializer as FirComponentCall).explicitReceiver as FirPropertyAccessExpression).calleeReference as FirResolvedNamedReference).name.asString()
                 ) {
                     skip.add(statement)
                 }

@@ -70,6 +70,19 @@ class LambdaTest implements RewriteTest {
         );
     }
 
+    @Test
+    void multipleDestructuredLambdaParams() {
+        rewriteRun(
+          kotlin(
+            """
+              val m = mapOf(Pair("", "")).forEach { (key, value) ->
+                       println(key + value)
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/60")
     @Test
     void suspendLambda() {
