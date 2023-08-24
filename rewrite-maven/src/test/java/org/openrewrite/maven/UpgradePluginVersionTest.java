@@ -532,4 +532,77 @@ class UpgradePluginVersionTest implements RewriteTest {
         );
     }
 
+    @Test
+    void upgradePluginsVersionOnProperties() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradePluginVersion(
+            "*",
+            "*",
+            "2.4.x",
+            null,
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <properties>
+                  <quarkus-maven-plugin.version>1.13.3.Final</quarkus-maven-plugin.version>
+                  <rewrite-maven-plugin.version>1.0.0</rewrite-maven-plugin.version>
+                </properties>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>io.quarkus</groupId>
+                      <artifactId>quarkus-maven-plugin</artifactId>
+                      <version>${quarkus-maven-plugin.version}</version>
+                    </plugin>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>${rewrite-maven-plugin.version}</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <properties>
+                  <quarkus-maven-plugin.version>2.4.2.Final</quarkus-maven-plugin.version>
+                  <rewrite-maven-plugin.version>2.4.13</rewrite-maven-plugin.version>
+                </properties>
+
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>io.quarkus</groupId>
+                      <artifactId>quarkus-maven-plugin</artifactId>
+                      <version>${quarkus-maven-plugin.version}</version>
+                    </plugin>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>${rewrite-maven-plugin.version}</version>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
+
 }
