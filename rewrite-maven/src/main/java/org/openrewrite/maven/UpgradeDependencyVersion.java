@@ -161,7 +161,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
                             }
                         }
                     } else if (isPluginDependencyTag(groupId, artifactId)) {
-                        // TODO handle plugin dependencies
+                        t = upgradePluginDependency(ctx, t);
                     }
                 } catch (MavenDownloadingException e) {
                     return e.warn(t);
@@ -275,6 +275,34 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
                 return null;
             }
 
+            private Xml.Tag upgradePluginDependency(ExecutionContext ctx, Xml.Tag t) throws MavenDownloadingException {
+                String groupId = t.getChildValue("groupId").orElse(null);
+                String artifactId = t.getChildValue("artifactId").orElse(null);
+                String version = t.getChildValue("version").orElse(null);
+                if (groupId != null && artifactId != null && version != null) {
+                    String newerVersion = findNewerVersion(groupId, artifactId, resolveVersion(version), ctx);
+                    if (newerVersion != null) {
+                        if (version.startsWith("${") && !implicitlyDefinedVersionProperties.contains(version)) {
+                            doAfterVisit(new ChangePropertyValue(version.substring(2, version.length() - 1), newerVersion, overrideManagedVersion, false).getVisitor());
+                        } else {
+                            Optional<Xml.Tag> versionTag = t.getChild("version");
+                            assert versionTag.isPresent();
+                            t = (Xml.Tag) new ChangeTagValueVisitor<>(versionTag.get(), newerVersion).visitNonNull(t, 0, getCursor().getParentOrThrow());
+                        }
+                    }
+                }
+                return t;
+            }
+
+            private String resolveVersion(String version) {
+                if (version.startsWith("${") && !implicitlyDefinedVersionProperties.contains(version)) {
+                    Map<String, String> properties = getResolutionResult().getPom().getProperties();
+                    String property = version.substring(2, version.length() - 1);
+                    return properties.getOrDefault(property, version);
+                }
+                return version;
+            }
+            
             @Nullable
             public TreeVisitor<Xml, ExecutionContext> upgradeVersion(ExecutionContext ctx, Xml.Tag tag, @Nullable String requestedVersion, String groupId, String artifactId, String version2) throws MavenDownloadingException {
                 String newerVersion = findNewerVersion(groupId, artifactId, version2, ctx);
