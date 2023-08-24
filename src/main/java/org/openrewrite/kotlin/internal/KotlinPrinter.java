@@ -751,8 +751,15 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             if (element.getElement().getMarkers().findFirst(Implicit.class).isPresent()) {
                 return;
             }
+
+            // inlined modified logic `JavaPrinter#visitRightPadded(JRightPadded, JRightPadded.Location, String, PrintOutputCapture)`
+            // as that method would end up printing markers before the element and there is currently no way to differentiate
+            // before and after markers
             String suffix = i == elements.size() - 1 ? "" : ",";
-            visitRightPadded(element, JContainer.Location.METHOD_DECLARATION_PARAMETERS.getElementLocation(), suffix, p);
+            visit(((JRightPadded<? extends J>) element).getElement(), p);
+            visitSpace(element.getAfter(), JContainer.Location.METHOD_DECLARATION_PARAMETERS.getElementLocation().getAfterLocation(), p);
+            visitMarkers(element.getMarkers(), p);
+            p.append(suffix);
         }
 
         @Override

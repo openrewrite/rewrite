@@ -452,6 +452,17 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void trailingComma() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test(val attr: String,)
+              """
+          )
+        );
+    }
+
+    @Test
     void hasFinalModifier() {
         rewriteRun(
           kotlin("class A",
