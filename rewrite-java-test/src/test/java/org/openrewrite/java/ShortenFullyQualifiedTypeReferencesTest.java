@@ -421,4 +421,47 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void subtree() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  if (method.getSimpleName().equals("m1")) {
+                      doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(method));
+                  }
+                  return super.visitMethodDeclaration(method, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.Collection;
+              import java.util.function.Function;
+
+              class T {
+                  Function<Collection<?>, Integer> m() {
+                      return java.util.Collection::size;
+                  }
+                  Function<Collection<?>, Integer> m1() {
+                      return java.util.Collection::size;
+                  }
+              }
+              """,
+            """
+              import java.util.Collection;
+              import java.util.function.Function;
+
+              class T {
+                  Function<Collection<?>, Integer> m() {
+                      return java.util.Collection::size;
+                  }
+                  Function<Collection<?>, Integer> m1() {
+                      return Collection::size;
+                  }
+              }
+              """
+          )
+        );
+    }
 }
