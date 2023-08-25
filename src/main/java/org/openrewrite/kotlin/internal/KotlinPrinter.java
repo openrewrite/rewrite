@@ -585,9 +585,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 return ident;
             }
 
-            beforeSyntax(Space.EMPTY, ident.getMarkers(), Space.Location.IDENTIFIER_PREFIX, p);
             visit(ident.getAnnotations(), p);
-            visitSpace(ident.getPrefix(), Space.Location.IDENTIFIER_PREFIX, p);
+            beforeSyntax(ident, Space.Location.IDENTIFIER_PREFIX, p);
+            visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
             p.append(ident.getSimpleName());
             kotlinPrinter.trailingMarkers(ident.getMarkers(), p);
             afterSyntax(ident, p);
