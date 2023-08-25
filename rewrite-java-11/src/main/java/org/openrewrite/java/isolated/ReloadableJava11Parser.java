@@ -152,7 +152,6 @@ public class ReloadableJava11Parser implements JavaParser {
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
-        parsingListener.intermediateMessage("Compiling Java source files");
         return cus.entrySet().stream().map(cuByPath -> {
             Input input = cuByPath.getKey();
             parsingListener.startedParsing(input);
