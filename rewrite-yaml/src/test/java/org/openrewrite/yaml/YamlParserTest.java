@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.SourceFile;
+import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -26,8 +27,9 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.yaml.Assertions.yaml;
 
-class YamlParserTest {
+class YamlParserTest implements RewriteTest {
 
     @Test
     void ascii() {
