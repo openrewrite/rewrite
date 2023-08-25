@@ -37,6 +37,7 @@ public class FindMethodsTest implements RewriteTest {
               val i3 = decode("1")
               val i4 = listOf("1").map {Integer::decode}
               val i5 = listOf("1").map {::decode}
+              val i6 = listOf("1").map {::`decode`}
               """,
             """
               import java.lang.Integer
@@ -47,6 +48,7 @@ public class FindMethodsTest implements RewriteTest {
               val i3 = /*~~>*/decode("1")
               val i4 = listOf("1").map {Integer::/*~~>*/decode}
               val i5 = listOf("1").map {::/*~~>*/decode}
+              val i6 = listOf("1").map {::/*~~>*/`decode`}
               """
           )
         );
