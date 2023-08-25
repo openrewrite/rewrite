@@ -16,8 +16,6 @@
 package org.openrewrite.kotlin;
 
 import lombok.EqualsAndHashCode;
-import org.openrewrite.Cursor;
-import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -180,16 +178,18 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
 
             List<JRightPadded<J.Import>> newImports = layoutStyle.addImport(cu.getPadding().getImports(), importToAdd, cu.getPackageDeclaration(), classpath);
 
-            // ImportLayoutStile::addImport adds always `\n` as newlines. Checking if we need to fix them
-            newImports = checkCRLF(cu, newImports);
+            // ImportLayoutStyle::addImport adds always `\n` as newlines. Checking if we need to fix them
+            GeneralFormatStyle generalFormatStyle = Optional.ofNullable(cu.getStyle(GeneralFormatStyle.class))
+              .orElse(autodetectGeneralFormatStyle(cu));
+            newImports = checkCRLF(cu, newImports, generalFormatStyle);
 
             cu = cu.getPadding().withImports(newImports);
 
-            JavaSourceFile c = cu;
-            cu = cu.withClasses(ListUtils.mapFirst(cu.getClasses(), clazz -> {
-                J.ClassDeclaration cl = autoFormat(clazz, clazz.getName(), p, new Cursor(null, c));
-                return clazz.withPrefix(clazz.getPrefix().withWhitespace(cl.getPrefix().getWhitespace()));
-            }));
+            // make sure first statement has a prefix if necessary
+            if (((K.CompilationUnit) tree).getImports().isEmpty() || ((K.CompilationUnit) tree).getPackageDeclaration() == null) {
+                cu = cu.withStatements(ListUtils.mapFirst(cu.getStatements(), stmt ->
+                  stmt.getPrefix().isEmpty() ? stmt.withPrefix(stmt.getPrefix().withWhitespace(generalFormatStyle.isUseCRLFNewLines() ? "\r\n\r\n" : "\n\n")) : stmt));
+            }
 
             j = cu;
         }
@@ -197,9 +197,7 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
     }
 
     // TODO refactor ImportLayoutStyle so that this method can be removed
-    private List<JRightPadded<J.Import>> checkCRLF(JavaSourceFile cu, List<JRightPadded<J.Import>> newImports) {
-        GeneralFormatStyle generalFormatStyle = Optional.ofNullable(((SourceFile) cu).getStyle(GeneralFormatStyle.class))
-                .orElse(autodetectGeneralFormatStyle(cu));
+    private List<JRightPadded<J.Import>> checkCRLF(JavaSourceFile cu, List<JRightPadded<J.Import>> newImports, GeneralFormatStyle generalFormatStyle) {
         if (generalFormatStyle.isUseCRLFNewLines()) {
             return ListUtils.map(newImports, rp -> rp.map(
                     i -> i.withPrefix(i.getPrefix().withWhitespace(i.getPrefix().getWhitespace()

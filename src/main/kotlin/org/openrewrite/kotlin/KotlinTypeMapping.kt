@@ -730,7 +730,19 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
                     parameterTypes.add(javaType)
                 }
             }
+        } else if (simpleFunction != null && simpleFunction.valueParameters.isNotEmpty()) {
+            parameterTypes = ArrayList(simpleFunction.valueParameters.size)
+            for (parameter in simpleFunction.valueParameters) {
+                val parameterSymbol = parameter.symbol
+                val javaType: JavaType = if (parameterSymbol.fir is FirJavaValueParameter) {
+                    type(parameterSymbol.fir.returnTypeRef)
+                } else {
+                    type(parameterSymbol.resolvedReturnTypeRef)
+                }
+                parameterTypes.add(javaType)
+            }
         }
+
         var resolvedDeclaringType: JavaType.FullyQualified? = null
         if (functionCall.calleeReference is FirResolvedNamedReference) {
             if ((functionCall.calleeReference as FirResolvedNamedReference).resolvedSymbol is FirNamedFunctionSymbol) {
