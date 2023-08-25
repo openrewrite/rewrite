@@ -420,9 +420,10 @@ public class MavenPomDownloader {
 
     @Nullable
     private MavenMetadata.Snapshot maxSnapshot(@Nullable MavenMetadata.Snapshot s1, @Nullable MavenMetadata.Snapshot s2) {
-        if (s1 == null) {
+        // apparently the snapshot timestamp is not always present in the metadata
+        if (s1 == null || s1.getTimestamp() == null) {
             return s2;
-        } else if (s2 == null) {
+        } else if (s2 == null || s2.getTimestamp() == null) {
             return s1;
         } else {
             return (s1.getTimestamp().compareTo(s2.getTimestamp())) >= 0 ? s1 : s2;
