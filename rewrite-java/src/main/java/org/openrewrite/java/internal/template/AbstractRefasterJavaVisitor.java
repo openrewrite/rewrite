@@ -69,8 +69,8 @@ public abstract class AbstractRefasterJavaVisitor extends JavaVisitor<ExecutionC
         if (optionsSet.contains(EmbeddingOption.REMOVE_PARENS) && !getAfterVisit().contains(visitor = new UnnecessaryParenthesesVisitor())) {
             doAfterVisit(visitor);
         }
-        if (optionsSet.contains(EmbeddingOption.SHORTEN_NAMES) && !getAfterVisit().contains(visitor = new ShortenFullyQualifiedTypeReferences().getVisitor())) {
-            doAfterVisit(visitor);
+        if (optionsSet.contains(EmbeddingOption.SHORTEN_NAMES)) {
+            doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(j));
         }
         if (optionsSet.contains(EmbeddingOption.SIMPLIFY_BOOLEANS)) {
             j = new SimplifyBooleanExpressionVisitor().visitNonNull(j, ctx, cursor.getParent());

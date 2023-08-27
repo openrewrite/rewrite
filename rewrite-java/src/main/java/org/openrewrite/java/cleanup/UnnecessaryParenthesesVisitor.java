@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
+import lombok.EqualsAndHashCode;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.UnwrapParentheses;
@@ -22,6 +23,7 @@ import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
 import org.openrewrite.java.tree.*;
 
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class UnnecessaryParenthesesVisitor extends JavaVisitor<ExecutionContext> {
     @Override
     public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
