@@ -26,6 +26,7 @@ import org.openrewrite.java.cleanup.UnnecessaryParenthesesVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaCoordinates;
 
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
@@ -53,28 +54,31 @@ public abstract class AbstractRefasterJavaVisitor extends JavaVisitor<ExecutionC
         return template.get().apply(cursor, coordinates, parameters);
     }
 
+    @Deprecated
+    // to be removed as soon as annotation processor generates required options
     protected J embed(J j, Cursor cursor, ExecutionContext ctx) {
-        return embed(j, cursor, ctx, EmbeddingOptions.ALL_OPTIONS);
+        return embed(j, cursor, ctx, EmbeddingOption.values());
     }
 
     @SuppressWarnings({"DataFlowIssue", "SameParameterValue"})
-    protected J embed(J j, Cursor cursor, ExecutionContext ctx, EnumSet<EmbeddingOptions> options) {
+    protected J embed(J j, Cursor cursor, ExecutionContext ctx, EmbeddingOption... options) {
+        EnumSet<EmbeddingOption> optionsSet = options.length > 0 ? EnumSet.copyOf(Arrays.asList(options)) :
+                EnumSet.noneOf(EmbeddingOption.class);
+
         TreeVisitor<?, ExecutionContext> visitor;
-        if (options.contains(EmbeddingOptions.REMOVE_PARENS) && !getAfterVisit().contains(visitor = new UnnecessaryParenthesesVisitor())) {
+        if (optionsSet.contains(EmbeddingOption.REMOVE_PARENS) && !getAfterVisit().contains(visitor = new UnnecessaryParenthesesVisitor())) {
             doAfterVisit(visitor);
         }
-        if (options.contains(EmbeddingOptions.SHORTEN_NAMES) && !getAfterVisit().contains(visitor = new ShortenFullyQualifiedTypeReferences().getVisitor())) {
+        if (optionsSet.contains(EmbeddingOption.SHORTEN_NAMES) && !getAfterVisit().contains(visitor = new ShortenFullyQualifiedTypeReferences().getVisitor())) {
             doAfterVisit(visitor);
         }
-        if (options.contains(EmbeddingOptions.SIMPLIFY_BOOLEANS)) {
+        if (optionsSet.contains(EmbeddingOption.SIMPLIFY_BOOLEANS)) {
             j = new SimplifyBooleanExpressionVisitor().visitNonNull(j, ctx, cursor.getParent());
         }
         return j;
     }
 
-    protected enum EmbeddingOptions {
+    protected enum EmbeddingOption {
         SHORTEN_NAMES, SIMPLIFY_BOOLEANS, REMOVE_PARENS;
-
-        public static final EnumSet<EmbeddingOptions> ALL_OPTIONS = EnumSet.allOf(EmbeddingOptions.class);
     }
 }
