@@ -28,7 +28,7 @@ class FormatPreservingReaderTest {
     @Test
     void allInCurrentBuffer() throws IOException {
         var text = "0123456789";
-        var formatPreservingReader = new FormatPreservingReader(new StringReader(text));
+        var formatPreservingReader = new FormatPreservingReader(text);
 
         char[] charArray = new char[10];
         formatPreservingReader.read(charArray, 0, 10);
@@ -38,7 +38,7 @@ class FormatPreservingReaderTest {
     @Test
     void allInPreviousBuffer() throws IOException {
         var text = "0123456789";
-        var formatPreservingReader = new FormatPreservingReader(new StringReader(text));
+        var formatPreservingReader = new FormatPreservingReader(text);
 
         char[] charArray = new char[10];
 
@@ -51,7 +51,7 @@ class FormatPreservingReaderTest {
     @Test
     void splitBetweenPrevAndCurrentBuffer() throws IOException {
         var text = "0123456789";
-        var formatPreservingReader = new FormatPreservingReader(new StringReader(text));
+        var formatPreservingReader = new FormatPreservingReader(text);
 
         char[] charArray = new char[10];
 

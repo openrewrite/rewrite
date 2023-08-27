@@ -107,8 +107,7 @@ public class YamlParser implements org.openrewrite.Parser {
             yamlSourceWithVariablePlaceholders.append(yamlSource, pos, yamlSource.length());
         }
 
-        try (StringReader stringReader = new StringReader(yamlSourceWithVariablePlaceholders.toString());
-             FormatPreservingReader reader = new FormatPreservingReader(stringReader)) {
+        try (FormatPreservingReader reader = new FormatPreservingReader(yamlSourceWithVariablePlaceholders.toString())) {
             StreamReader streamReader = new StreamReader(reader);
             Scanner scanner = new ScannerImpl(streamReader, new LoaderOptions());
             Parser parser = new ParserImpl(scanner);
