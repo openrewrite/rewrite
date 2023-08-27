@@ -331,7 +331,7 @@ public class ReloadableJava11Parser implements JavaParser {
     public static class Builder extends JavaParser.Builder<ReloadableJava11Parser, Builder> {
         @Override
         public ReloadableJava11Parser build() {
-            return new ReloadableJava11Parser(logCompilationWarningsAndErrors, classpath, classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
+            return new ReloadableJava11Parser(logCompilationWarningsAndErrors, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
         }
     }
 
