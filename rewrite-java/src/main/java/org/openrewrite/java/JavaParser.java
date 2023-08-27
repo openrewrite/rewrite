@@ -300,6 +300,7 @@ public interface JavaParser extends Parser {
     @SuppressWarnings("unchecked")
     abstract class Builder<P extends JavaParser, B extends Builder<P, B>> extends Parser.Builder {
         protected Collection<Path> classpath = Collections.emptyList();
+        protected Collection<String> artifactNames = Collections.emptyList();
         protected Collection<byte[]> classBytesClasspath = Collections.emptyList();
         protected JavaTypeCache javaTypeCache = new JavaTypeCache();
 
@@ -343,17 +344,20 @@ public interface JavaParser extends Parser {
         }
 
         public B classpath(Collection<Path> classpath) {
+            this.artifactNames = Collections.emptyList();
             this.classpath = classpath;
             return (B) this;
         }
 
-        public B classpath(String... classpath) {
-            this.classpath = dependenciesFromClasspath(classpath);
+        public B classpath(String... artifactNames) {
+            this.artifactNames = Arrays.asList(artifactNames);
+            this.classpath = Collections.emptyList();
             return (B) this;
         }
 
         @SuppressWarnings("UnusedReturnValue")
         public B classpathFromResources(ExecutionContext ctx, String... classpath) {
+            this.artifactNames = Collections.emptyList();
             this.classpath = dependenciesFromResources(ctx, classpath);
             return (B) this;
         }
@@ -368,6 +372,14 @@ public interface JavaParser extends Parser {
                 this.styles.add(style);
             }
             return (B) this;
+        }
+
+        protected Collection<Path> resolvedClasspath() {
+            if (!artifactNames.isEmpty()) {
+                classpath = JavaParser.dependenciesFromClasspath(artifactNames.toArray(new String[0]));
+                artifactNames = Collections.emptyList();
+            }
+            return classpath;
         }
 
         public abstract P build();
