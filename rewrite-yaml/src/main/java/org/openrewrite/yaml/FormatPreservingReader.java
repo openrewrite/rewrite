@@ -33,7 +33,12 @@ import java.util.Map;
  */
 class FormatPreservingReader extends Reader {
     private final Reader delegate;
-    private final Map<Integer, Range> indexMapping = new HashMap<>();
+
+    // whether the source has multi bytes (> 2 bytes) unicode characters
+    private final boolean hasMultiBytesUnicode;
+    // Characters index to source index mapping, valid only when `hasMultiBytesUnicode` is true.
+    // Snake yaml parser is based on characters index and reader is based on source index.
+    private final Map<Integer, Range> indexMapping;
     private final int characterCount;
 
     @Data
@@ -50,6 +55,8 @@ class FormatPreservingReader extends Reader {
     FormatPreservingReader(String source) {
         this.delegate = new StringReader(source);
 
+        boolean hasUnicodes = false;
+        Map<Integer, Range> map = new HashMap<>();
         int index = 0;
         int cursor = 0;
         while (cursor < source.length()) {
@@ -58,26 +65,37 @@ class FormatPreservingReader extends Reader {
             int offset = 0;
 
             if (newCursor > cursor + 1) {
+                hasUnicodes = true;
                 offset = newCursor - cursor - 1;
             }
 
             int end = start + offset;
-            indexMapping.put(index, new Range(start, end));
+            map.put(index, new Range(start, end));
             index++;
             cursor = newCursor;
         }
 
-        indexMapping.put(index, new Range(cursor, cursor));
-        characterCount = index;
+        map.put(index, new Range(cursor, cursor));
+
+        hasMultiBytesUnicode = hasUnicodes;
+        if (hasMultiBytesUnicode) {
+            indexMapping = map;
+            characterCount = index;
+        } else {
+            indexMapping = new HashMap<>();
+            characterCount = source.length();
+        }
     }
 
     String prefix(int lastEnd, int startIndex) {
-        if (lastEnd >= characterCount) {
-            return "";
-        }
+        if (hasMultiBytesUnicode) {
+            if (lastEnd >= characterCount) {
+                return "";
+            }
 
-        lastEnd = indexMapping.get(lastEnd).getStart();
-        startIndex = indexMapping.get(startIndex).getStart();
+            lastEnd = indexMapping.get(lastEnd).getStart();
+            startIndex = indexMapping.get(startIndex).getStart();
+        }
 
         assert lastEnd <= startIndex;
 
@@ -107,8 +125,10 @@ class FormatPreservingReader extends Reader {
             return "";
         }
 
-        start = indexMapping.get(start).getStart();
-        end = indexMapping.get(end).getEnd();
+        if (hasMultiBytesUnicode) {
+            start = indexMapping.get(start).getStart();
+            end = indexMapping.get(end).getEnd();
+        }
 
         int length = end - start + 1;
         char[] readBuff = new char[length];
