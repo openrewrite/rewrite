@@ -54,7 +54,7 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
         return getVisitor(null);
     }
 
-    public static TreeVisitor<?, ExecutionContext> modifyOnly(J subtree) {
+    public static <J2 extends J> TreeVisitor<J, ExecutionContext> modifyOnly(J2 subtree) {
         return getVisitor(subtree);
     }
 
