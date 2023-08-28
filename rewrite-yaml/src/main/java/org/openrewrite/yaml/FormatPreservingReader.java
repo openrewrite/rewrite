@@ -37,7 +37,8 @@ class FormatPreservingReader extends Reader {
     // whether the source has multi bytes (> 2 bytes) unicode characters
     private final boolean hasMultiBytesUnicode;
     // Characters index to source index mapping, valid only when `hasMultiBytesUnicode` is true.
-    // Snake yaml parser is based on characters index and reader is based on source index.
+    // Snake yaml parser is based on characters index and reader is based on source index. If there are any >2 bytes
+    // unicode characters in source code, it will make the index unmatch.
     private final Map<Integer, Range> indexMapping;
     private final int characterCount;
 
