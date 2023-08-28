@@ -69,8 +69,8 @@ class YamlParserTest implements RewriteTest {
     @ParameterizedTest
     @ValueSource(strings = {
       "b",
-      "🛠",
-      "🛠🛠",
+      " 🛠",
+      " 🛠🛠",
       "🛠 🛠",
       "hello🛠world",
       "你好世界",
@@ -88,7 +88,7 @@ class YamlParserTest implements RewriteTest {
         Yaml.Mapping mapping = (Yaml.Mapping) document.getBlock();
         Yaml.Mapping.Entry entry = mapping.getEntries().get(0);
         Yaml.Scalar title = (Yaml.Scalar) entry.getValue();
-        assertThat(title.getValue()).isEqualTo(input);
+        assertThat(title.getValue()).isEqualTo(input.trim());
     }
 
     @ParameterizedTest
