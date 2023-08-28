@@ -1175,7 +1175,11 @@ public interface J extends Tree {
         }
 
         public ClassDeclaration withImplements(@Nullable List<TypeTree> implementings) {
-            return getPadding().withImplements(JContainer.withElementsNullable(this.implementings, implementings));
+            JContainer<TypeTree> newImplementings = JContainer.withElementsNullable(this.implementings, implementings);
+            if (newImplementings != null && !newImplementings.getElements().isEmpty()) {
+                newImplementings = newImplementings.withBefore(Space.SINGLE_SPACE);
+            }
+            return getPadding().withImplements(newImplementings);
         }
 
         @Nullable
