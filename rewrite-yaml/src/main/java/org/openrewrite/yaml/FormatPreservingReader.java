@@ -55,16 +55,10 @@ class FormatPreservingReader extends Reader {
 
         while (cursor < source.length()) {
             int newCursor = source.offsetByCodePoints(cursor, 1);
-            int start = cursor;
-            int offset = 0;
-
             if (newCursor > cursor + 1) {
                 hasUnicodes = true;
-                offset = newCursor - cursor - 1;
             }
-
-            int end = start + 1 + offset;
-            pos[i++] = end;
+            pos[i++] = newCursor;
             cursor = newCursor;
         }
 
