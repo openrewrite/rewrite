@@ -24,8 +24,6 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 /**
  * Maintains a sliding buffer of characters used to determine format prefixes of
@@ -39,7 +37,7 @@ class FormatPreservingReader extends Reader {
     // Characters index to source index mapping, valid only when `hasMultiBytesUnicode` is true.
     // Snake yaml parser is based on characters index and reader is based on source index. If there are any >2 bytes
     // unicode characters in source code, it will make the index mismatch.
-    private final List<Range> indexRanges;
+    private final int[] indexes;
 
     @Data
     public static class Range {
@@ -56,8 +54,12 @@ class FormatPreservingReader extends Reader {
         this.delegate = new StringReader(source);
 
         boolean hasUnicodes = false;
-        List<Range> ranges = new ArrayList<>(source.length());
+        int[] pos = new int[source.length() + 1];
+
         int cursor = 0;
+        int i = 1;
+        pos[0] = 0;
+
         while (cursor < source.length()) {
             int newCursor = source.offsetByCodePoints(cursor, 1);
             int start = cursor;
@@ -68,21 +70,19 @@ class FormatPreservingReader extends Reader {
                 offset = newCursor - cursor - 1;
             }
 
-            int end = start + offset;
-            ranges.add(new Range(start, end));
+            int end = start + 1 + offset;
+            pos[i++] = end;
             cursor = newCursor;
         }
 
-        ranges.add( new Range(cursor, cursor));
-
         hasMultiBytesUnicode = hasUnicodes;
-        indexRanges = hasMultiBytesUnicode ? ranges : Collections.emptyList();
+        indexes = hasMultiBytesUnicode ? pos : new int[]{};
     }
 
     String prefix(int lastEnd, int startIndex) {
         if (hasMultiBytesUnicode) {
-            lastEnd = indexRanges.get(lastEnd).getStart();
-            startIndex = indexRanges.get(startIndex).getStart();
+            lastEnd = indexes[lastEnd];
+            startIndex = indexes[startIndex];
         }
 
         assert lastEnd <= startIndex;
@@ -114,8 +114,8 @@ class FormatPreservingReader extends Reader {
         }
 
         if (hasMultiBytesUnicode) {
-            start = indexRanges.get(start).getStart();
-            end = indexRanges.get(end).getEnd();
+            start = indexes[start];
+            end = indexes[end + 1] - 1;
         }
 
         int length = end - start + 1;
