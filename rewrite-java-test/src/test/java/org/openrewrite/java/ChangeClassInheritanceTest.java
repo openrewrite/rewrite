@@ -41,17 +41,17 @@ class ChangeClassInheritanceTest implements RewriteTest {
         void addExtends() {
             java(
               """
-              package de.example;
-              
-              class CustomList {
-              }
-              """,
+                package de.example;
+                              
+                class CustomList {
+                }
+                """,
               """
-              package de.example;
-              
-              class CustomList extends java.util.ArrayList {
-              }
-              """
+                package de.example;
+                              
+                class CustomList extends java.util.ArrayList {
+                }
+                """
             );
         }
 
@@ -60,17 +60,17 @@ class ChangeClassInheritanceTest implements RewriteTest {
             rewriteRun(
               java(
                 """
-                package de.example;
-                
-                class CustomList extends java.util.HashMap {
-                }
-                """,
+                  package de.example;
+                                  
+                  class CustomList extends java.util.HashMap {
+                  }
+                  """,
                 """
-                package de.example;
-                
-                class CustomList extends java.util.ArrayList {
-                }
-                """
+                  package de.example;
+                                  
+                  class CustomList extends java.util.ArrayList {
+                  }
+                  """
               )
             );
         }
@@ -79,17 +79,17 @@ class ChangeClassInheritanceTest implements RewriteTest {
         void addExtendsOnExistingImplements() {
             java(
               """
-              package de.example;
-              
-              class CustomList implements java.lang.Cloneable {
-              }
-              """,
+                package de.example;
+                              
+                class CustomList implements java.lang.Cloneable {
+                }
+                """,
               """
-              package de.example;
-              
-              class CustomList extends java.util.ArrayList implements java.lang.Cloneable {
-              }
-              """
+                package de.example;
+                              
+                class CustomList extends java.util.ArrayList implements java.lang.Cloneable {
+                }
+                """
             );
         }
     }
