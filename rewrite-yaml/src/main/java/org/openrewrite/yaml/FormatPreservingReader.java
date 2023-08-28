@@ -21,6 +21,7 @@ import org.yaml.snakeyaml.events.Event;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.io.StringReader;
 import java.util.ArrayList;
 
 /**
@@ -28,19 +29,49 @@ import java.util.ArrayList;
  * YAML AST elements.
  */
 class FormatPreservingReader extends Reader {
-
     private final Reader delegate;
+
+    // whether the source has multi bytes (> 2 bytes) unicode characters
+    private final boolean hasMultiBytesUnicode;
+    // Characters index to source index mapping, valid only when `hasMultiBytesUnicode` is true.
+    // Snake yaml parser is based on characters index and reader is based on source index. If there are any >2 bytes
+    // unicode characters in source code, it will make the index mismatch.
+    private final int[] indexes;
 
     private ArrayList<Character> buffer = new ArrayList<>();
 
     @Getter
     private int bufferIndex = 0;
 
-    FormatPreservingReader(Reader delegate) {
-        this.delegate = delegate;
+    FormatPreservingReader(String source) {
+        this.delegate = new StringReader(source);
+
+        boolean hasUnicodes = false;
+        int[] pos = new int[source.length() + 1];
+
+        int cursor = 0;
+        int i = 1;
+        pos[0] = 0;
+
+        while (cursor < source.length()) {
+            int newCursor = source.offsetByCodePoints(cursor, 1);
+            if (newCursor > cursor + 1) {
+                hasUnicodes = true;
+            }
+            pos[i++] = newCursor;
+            cursor = newCursor;
+        }
+
+        hasMultiBytesUnicode = hasUnicodes;
+        indexes = hasMultiBytesUnicode ? pos : new int[]{};
     }
 
     String prefix(int lastEnd, int startIndex) {
+        if (hasMultiBytesUnicode) {
+            lastEnd = indexes[lastEnd];
+            startIndex = indexes[startIndex];
+        }
+
         assert lastEnd <= startIndex;
 
         int prefixLen = startIndex - lastEnd;
@@ -65,6 +96,15 @@ class FormatPreservingReader extends Reader {
     }
 
     public String readStringFromBuffer(int start, int end) {
+        if (end < start) {
+            return "";
+        }
+
+        if (hasMultiBytesUnicode) {
+            start = indexes[start];
+            end = indexes[end + 1] - 1;
+        }
+
         int length = end - start + 1;
         char[] readBuff = new char[length];
         for (int i = 0; i < length; i++) {
