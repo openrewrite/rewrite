@@ -40,14 +40,14 @@ class ChangeClassInheritanceTest implements RewriteTest {
         @Override
         public void defaults(RecipeSpec spec) {
             spec.recipe(RewriteTest.toRecipe(() -> new JavaVisitor<>() {
-                private final J.Identifier arrayList = new J.Identifier(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY, ArrayList.class.getName(), JavaType.buildType(ArrayList.class.getName()), null);
+                private final J.Identifier arrayList = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, ArrayList.class.getName(), JavaType.buildType(ArrayList.class.getName()), null);
 
                 @Override
                 public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
                     if (classDecl.getExtends() != null && Objects.equals(arrayList.getType(), classDecl.getExtends().getType())) {
                         return classDecl;
                     }
-                    return classDecl.withExtends(arrayList);
+                    return classDecl.withExtends(arrayList.withPrefix(Space.SINGLE_SPACE));
                 }
             }));
         }
@@ -114,14 +114,14 @@ class ChangeClassInheritanceTest implements RewriteTest {
         @Override
         public void defaults(RecipeSpec spec) {
             spec.recipe(RewriteTest.toRecipe(() -> new JavaVisitor<>() {
-                private final J.Identifier serializable = new J.Identifier(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY, Serializable.class.getName(), JavaType.buildType(Serializable.class.getName()), null);
+                private final J.Identifier serializable = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, Serializable.class.getName(), JavaType.buildType(Serializable.class.getName()), null);
 
                 @Override
                 public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
                     if (classDecl.getImplements() != null && classDecl.getImplements().stream().anyMatch(e -> Objects.equals(e.getType(), serializable.getType()))) {
                         return classDecl;
                     }
-                    return classDecl.withImplements(List.of(serializable));
+                    return classDecl.withImplements(List.of(serializable.withPrefix(Space.SINGLE_SPACE)));
                 }
             }));
         }
