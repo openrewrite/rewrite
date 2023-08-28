@@ -15,7 +15,6 @@
  */
 package org.openrewrite.yaml;
 
-import lombok.Data;
 import lombok.Getter;
 import org.openrewrite.internal.lang.NonNull;
 import org.yaml.snakeyaml.events.Event;
@@ -38,12 +37,6 @@ class FormatPreservingReader extends Reader {
     // Snake yaml parser is based on characters index and reader is based on source index. If there are any >2 bytes
     // unicode characters in source code, it will make the index mismatch.
     private final int[] indexes;
-
-    @Data
-    public static class Range {
-        private final int start;
-        private final int end;
-    }
 
     private ArrayList<Character> buffer = new ArrayList<>();
 
