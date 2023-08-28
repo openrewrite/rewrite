@@ -29,7 +29,7 @@ public class NormalizeLineBreaks extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Normalize the line breaks";
+        return "Normalize line breaks";
     }
 
     @Override
