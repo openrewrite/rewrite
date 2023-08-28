@@ -24,8 +24,8 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Maintains a sliding buffer of characters used to determine format prefixes of
@@ -38,9 +38,8 @@ class FormatPreservingReader extends Reader {
     private final boolean hasMultiBytesUnicode;
     // Characters index to source index mapping, valid only when `hasMultiBytesUnicode` is true.
     // Snake yaml parser is based on characters index and reader is based on source index. If there are any >2 bytes
-    // unicode characters in source code, it will make the index unmatch.
-    private final Map<Integer, Range> indexMapping;
-    private final int characterCount;
+    // unicode characters in source code, it will make the index mismatch.
+    private final List<Range> indexRanges;
 
     @Data
     public static class Range {
@@ -57,8 +56,7 @@ class FormatPreservingReader extends Reader {
         this.delegate = new StringReader(source);
 
         boolean hasUnicodes = false;
-        Map<Integer, Range> map = new HashMap<>();
-        int index = 0;
+        List<Range> ranges = new ArrayList<>(source.length());
         int cursor = 0;
         while (cursor < source.length()) {
             int newCursor = source.offsetByCodePoints(cursor, 1);
@@ -71,31 +69,20 @@ class FormatPreservingReader extends Reader {
             }
 
             int end = start + offset;
-            map.put(index, new Range(start, end));
-            index++;
+            ranges.add(new Range(start, end));
             cursor = newCursor;
         }
 
-        map.put(index, new Range(cursor, cursor));
+        ranges.add( new Range(cursor, cursor));
 
         hasMultiBytesUnicode = hasUnicodes;
-        if (hasMultiBytesUnicode) {
-            indexMapping = map;
-            characterCount = index;
-        } else {
-            indexMapping = new HashMap<>();
-            characterCount = source.length();
-        }
+        indexRanges = hasMultiBytesUnicode ? ranges : Collections.emptyList();
     }
 
     String prefix(int lastEnd, int startIndex) {
         if (hasMultiBytesUnicode) {
-            if (lastEnd >= characterCount) {
-                return "";
-            }
-
-            lastEnd = indexMapping.get(lastEnd).getStart();
-            startIndex = indexMapping.get(startIndex).getStart();
+            lastEnd = indexRanges.get(lastEnd).getStart();
+            startIndex = indexRanges.get(startIndex).getStart();
         }
 
         assert lastEnd <= startIndex;
@@ -127,8 +114,8 @@ class FormatPreservingReader extends Reader {
         }
 
         if (hasMultiBytesUnicode) {
-            start = indexMapping.get(start).getStart();
-            end = indexMapping.get(end).getEnd();
+            start = indexRanges.get(start).getStart();
+            end = indexRanges.get(end).getEnd();
         }
 
         int length = end - start + 1;
