@@ -392,7 +392,8 @@ public interface K extends J {
             Get,
             IdentityEquals,
             IdentityNotEquals,
-            RangeTo
+            RangeTo,
+            RangeUntil
         }
 
         public K.Binary.Padding getPadding() {

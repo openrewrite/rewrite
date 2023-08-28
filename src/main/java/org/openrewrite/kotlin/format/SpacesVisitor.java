@@ -784,6 +784,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                 b = applyBinarySpaceAround(b, style.getAroundOperators().getEquality());
                 break;
             case RangeTo:
+            case RangeUntil:
                 b = applyBinarySpaceAround(b, style.getAroundOperators().getRange());
                 break;
         }

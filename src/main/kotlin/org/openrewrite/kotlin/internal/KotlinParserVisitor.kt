@@ -1017,7 +1017,7 @@ class KotlinParserVisitor(
             val operatorName = functionCall.calleeReference.name.asString()
             if (isUnaryOperation(operatorName)) {
                 mapUnaryOperation(functionCall)
-            } else if ("contains" == operatorName || "rangeTo" == operatorName || "get" == operatorName || "set" == operatorName) {
+            } else if ("contains" == operatorName || "rangeTo" == operatorName || "get" == operatorName || "set" == operatorName || "rangeUntil" == operatorName) {
                 mapKotlinBinaryOperation(functionCall)
             } else {
                 mapBinaryOperation(functionCall)
@@ -1554,6 +1554,15 @@ class KotlinParserVisitor(
                     ),
                     typeMapping.type(functionCall.argumentList.arguments[1])
                 )
+            }
+
+            "rangeUntil" -> {
+                val lhs =
+                    if (functionCall.explicitReceiver != null) functionCall.explicitReceiver else functionCall.dispatchReceiver
+                left = convertToExpression(lhs as FirElement, data)!!
+                opPrefix = sourceBefore("..<")
+                kotlinBinaryType = Binary.Type.RangeUntil
+                right = convertToExpression(functionCall.argumentList.arguments[0], data)!!
             }
 
             else -> {

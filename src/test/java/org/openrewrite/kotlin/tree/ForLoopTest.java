@@ -73,6 +73,21 @@ class ForLoopTest implements RewriteTest {
     }
 
     @Test
+    void rangeUntil() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method ( ) {
+                  for ( i in 1 ..< 42 ) {
+                      println ( i )
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void arrayWithIndex() {
         rewriteRun(
           kotlin(

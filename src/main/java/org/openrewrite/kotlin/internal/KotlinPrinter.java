@@ -103,6 +103,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             case RangeTo:
                 keyword = "..";
                 break;
+            case RangeUntil:
+                keyword = "..<";
+                break;
         }
         visit(binary.getLeft(), p);
         visitSpace(binary.getPadding().getOperator().getBefore(), KSpace.Location.BINARY_OPERATOR, p);
