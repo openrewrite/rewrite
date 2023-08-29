@@ -21,14 +21,12 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.OmitParentheses;
-import org.openrewrite.kotlin.internal.KotlinPrinter;
-import org.openrewrite.kotlin.marker.Extension;
-import org.openrewrite.kotlin.marker.OmitBraces;
-import org.openrewrite.kotlin.marker.PrimaryConstructor;
-import org.openrewrite.kotlin.marker.TypeReferencePrefix;
-import org.openrewrite.kotlin.style.SpacesStyle;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
+import org.openrewrite.kotlin.internal.KotlinPrinter;
+import org.openrewrite.kotlin.marker.*;
+import org.openrewrite.kotlin.style.SpacesStyle;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 
@@ -287,7 +285,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
             m = m.withBody(spaceBefore(m.getBody(), beforeLeftBrace));
         }
 
-        if (m.getParameters().isEmpty() || m.getParameters().iterator().next() instanceof J.Empty) {
+        if (m.getParameters().isEmpty() || m.getParameters().get(0) instanceof J.Empty) {
             m = m.getPadding().withParameters(
                     m.getPadding().getParameters().getPadding().withElements(
                             ListUtils.map(m.getPadding().getParameters().getPadding().getElements(),
@@ -353,14 +351,16 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         J.MethodInvocation m = super.visitMethodInvocation(method, p);
 
         boolean noParens = m.getMarkers().findFirst(OmitParentheses.class).isPresent();
-        if (noParens && m.getPadding().getSelect() != null) {
+        boolean infix = m.getMarkers().findFirst(Infix.class).isPresent();
+
+        if (infix && m.getPadding().getSelect() != null) {
             m = m.getPadding().withSelect(
                     spaceAfter(m.getPadding().getSelect(), true)
             );
         }
         // Defaulted to `false` if parens exist and to `true` if parens are omitted in Kotlin's formatting.
-        m = m.getPadding().withArguments(spaceBefore(m.getPadding().getArguments(), noParens, false));
-        if (m.getArguments().isEmpty() || m.getArguments().iterator().next() instanceof J.Empty) {
+        m = m.getPadding().withArguments(spaceBefore(m.getPadding().getArguments(), false, false));
+        if (m.getArguments().isEmpty() || m.getArguments().get(0) instanceof J.Empty) {
             // withInEmptyMethodCallParentheses is defaulted to `false` in IntelliJ's Kotlin formatting.
             m = m.getPadding().withArguments(
                     m.getPadding().getArguments().getPadding().withElements(
@@ -378,7 +378,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                             ListUtils.map(m.getPadding().getArguments().getPadding().getElements(),
                                     (index, arg) -> {
                                         if (index == 0) {
-                                            arg = arg.withElement(spaceBefore(arg.getElement(), false));
+                                            arg = arg.withElement(spaceBefore(arg.getElement(), noParens));
                                         } else {
                                             arg = arg.withElement(
                                                     spaceBefore(arg.getElement(), style.getOther().getAfterComma())
@@ -948,25 +948,31 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         // handle space before Lambda arrow
         boolean useSpaceBeforeLambdaArrow = style.getOther().getBeforeLambdaArrow();
         boolean lastParamHasSpace = false;
+        boolean trailingComma = false;
         List<JRightPadded<J>> parameters = l.getParameters().getPadding().getParams();
         if (!parameters.isEmpty()) {
-            Space after = parameters.get(parameters.size() - 1).getAfter();
-            lastParamHasSpace = after.getComments().isEmpty() && onlySpacesAndNotEmpty(after.getWhitespace());
+            JRightPadded<J> lastParam = parameters.get(parameters.size() - 1);
+            Space after = lastParam.getAfter();
+            trailingComma = lastParam.getMarkers().findFirst(TrailingComma.class).isPresent();
+            lastParamHasSpace = after.getComments().isEmpty() && onlySpacesAndNotEmpty(after.getWhitespace())
+            || lastParam.getMarkers().findFirst(TrailingComma.class).map(t -> onlySpacesAndNotEmpty(t.getSuffix().getWhitespace())).orElse(false);
+            useSpaceBeforeLambdaArrow &= !trailingComma;
         }
 
         if (lastParamHasSpace) {
-            parameters = ListUtils.mapLast(parameters, rp  -> spaceAfter(rp, useSpaceBeforeLambdaArrow));
+            boolean useSpace = useSpaceBeforeLambdaArrow;
+            parameters = ListUtils.mapLast(parameters, rp  -> spaceAfter(rp, useSpace));
             l = l.withParameters(l.getParameters().getPadding().withParams(parameters));
-        } else {
+        } else if (!parameters.isEmpty()) {
             l = l.withArrow(updateSpace(l.getArrow(), useSpaceBeforeLambdaArrow));
         }
 
         // handle space after Lambda arrow
-        // Intellij has a specific setting for Space before Lambda arrow, but no setting for space after Lambda arrow, default to true.
-        boolean useSpaceAfterLambdaArrow = true;
-        l = l.withBody(spaceBefore(l.getBody(), useSpaceAfterLambdaArrow));
+        // Intellij has a specific setting for Space before Lambda arrow, but no setting for space after Lambda arrow
+        // presumably handled as prefix space for body
+        l = l.withBody(spaceBefore(l.getBody(), false));
 
-        if (!(l.getParameters().getParameters().isEmpty() || l.getParameters().getParameters().iterator().next() instanceof J.Empty)) {
+        if (!(l.getParameters().getParameters().isEmpty() || l.getParameters().getParameters().get(0) instanceof J.Empty)) {
             int parametersSize = l.getParameters().getParameters().size();
             l = l.withParameters(
                     l.getParameters().getPadding().withParams(

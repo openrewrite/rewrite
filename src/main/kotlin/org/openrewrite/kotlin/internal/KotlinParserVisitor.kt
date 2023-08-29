@@ -1104,6 +1104,7 @@ class KotlinParserVisitor(
             var markers = Markers.EMPTY
             var select: JRightPadded<Expression>? = null
             if (isInfix) {
+                markers = markers.addIfAbsent(Infix(randomId()))
                 markers = markers.addIfAbsent(Extension(randomId()))
             }
             if (functionCall !is FirImplicitInvokeCall) {

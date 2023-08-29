@@ -208,6 +208,52 @@ class AutoFormatVisitorTest implements RewriteTest {
     }
 
     @Test
+    void trailingLambda() {
+        rewriteRun(
+          kotlin(
+            """
+              val x = "foo".let {
+                  it.length
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingLambdaWithParam() {
+        rewriteRun(
+          kotlin(
+            """
+              val x = listOf(1).forEach { e -> println(e) }
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingLambdaWithParamTrailingComment() {
+        rewriteRun(
+          kotlin(
+            """
+              val x = listOf(1).forEach { e, -> println(e) }
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingLambdaWithMethodRefParam() {
+        rewriteRun(
+          kotlin(
+            """
+              val x = listOf(1).forEach(::println)
+              """
+          )
+        );
+    }
+
+    @Test
     void composite2() {
         rewriteRun(
           kotlin(
