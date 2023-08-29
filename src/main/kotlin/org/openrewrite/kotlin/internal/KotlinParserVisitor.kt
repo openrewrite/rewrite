@@ -1378,7 +1378,7 @@ class KotlinParserVisitor(
                 )
             }
         } else {
-            var isTrailingLambda = argumentCount == 1 && isCloseParen
+            var isTrailingLambda = argumentCount == 1 && isCloseParen && isLastArgumentLambda
             for (i in flattenedExpressions.indices) {
                 val expression = flattenedExpressions[i]
                 var expr = convertToExpression<Expression>(expression, data)!!
@@ -1405,7 +1405,9 @@ class KotlinParserVisitor(
                     if (trailingComma != null) padded.withMarkers(padded.markers.addIfAbsent(trailingComma)) else padded
                 expressions.add(padded)
             }
-            skip(")")
+            if (!isTrailingLambda) {
+                skip(")")
+            }
             args = JContainer.build(containerPrefix, expressions, markers)
         }
         return args

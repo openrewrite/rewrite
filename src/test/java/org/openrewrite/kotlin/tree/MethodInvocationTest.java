@@ -567,6 +567,21 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void parameterAndTrailingLambda() {
+        rewriteRun(
+          kotlin(
+            """
+              fun f(x: Int, y: (Int) -> Int)  = y(x)
+
+              fun test() {
+                  print(f(1) { 2 })
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/100")
     @Test
     void anonymousLambdaInSuperConstructorCall() {
