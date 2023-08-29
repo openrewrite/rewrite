@@ -20,6 +20,7 @@ import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.kotlin.internal.KotlinParsingException;
 import org.openrewrite.kotlin.tree.K;
@@ -96,6 +97,11 @@ public final class Assertions {
     public static Consumer<SourceSpec<K.CompilationUnit>> isFullyParsed() {
         return spec -> spec.afterRecipe(cu -> {
             new KotlinIsoVisitor<Integer>() {
+                @Override
+                public J visitUnknown(J.Unknown unknown, Integer integer) {
+                    throw new KotlinParsingException("Parsing error, J.Unknown detected", new RuntimeException());
+                }
+
                 @Override
                 public Space visitSpace(Space space, Space.Location loc, Integer integer) {
                     if (!space.getWhitespace().trim().isEmpty()) {
