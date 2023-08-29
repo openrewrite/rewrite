@@ -145,7 +145,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         beforeSyntax(value, p);
         p.append("{@value");
         visit(value.getSpaceBeforeTree(), p);
-        javaVisitor.visit(value.getTree(), p);
+        javaVisitorVisit(value.getTree(), p);
         visit(value.getEndBrace(), p);
         afterSyntax(value, p);
         return value;
@@ -197,7 +197,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         beforeSyntax(provides, p);
         p.append("@provides");
         visit(provides.getSpaceBeforeServiceType(), p);
-        javaVisitor.visit(provides.getServiceType(), p);
+        javaVisitorVisit(provides.getServiceType(), p);
         visit(provides.getDescription(), p);
         afterSyntax(provides, p);
         return provides;
@@ -245,8 +245,8 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     public Javadoc visitSerialField(Javadoc.SerialField serialField, PrintOutputCapture<P> p) {
         beforeSyntax(serialField, p);
         p.append("@serialField");
-        javaVisitor.visit(serialField.getName(), p);
-        javaVisitor.visit(serialField.getType(), p);
+        javaVisitorVisit(serialField.getName(), p);
+        javaVisitorVisit(serialField.getType(), p);
         visit(serialField.getDescription(), p);
         afterSyntax(serialField, p);
         return serialField;
@@ -298,7 +298,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         beforeSyntax(aThrows, p);
         p.append(aThrows.isThrowsKeyword() ? "@throws" : "@exception");
         visit(aThrows.getSpaceBeforeExceptionName(), p);
-        javaVisitor.visit(aThrows.getExceptionName(), p);
+        javaVisitorVisit(aThrows.getExceptionName(), p);
         visit(aThrows.getDescription(), p);
         afterSyntax(aThrows, p);
         return aThrows;
@@ -328,7 +328,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         beforeSyntax(uses, p);
         p.append("@uses");
         visit(uses.getBeforeServiceType(), p);
-        javaVisitor.visit(uses.getServiceType(), p);
+        javaVisitorVisit(uses.getServiceType(), p);
         visit(uses.getDescription(), p);
         afterSyntax(uses, p);
         return uses;
@@ -355,7 +355,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     public Javadoc visitReference(Javadoc.Reference reference, PrintOutputCapture<P> p) {
         getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "JAVADOC_LINE_BREAKS", reference.getLineBreaks());
         getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "JAVADOC_LINE_BREAK_INDEX", 0);
-        javaVisitor.visit(reference.getTree(), p, getCursor());
+        javaVisitorVisit(reference.getTree(), p);
         afterSyntax(reference, p);
         return reference;
     }

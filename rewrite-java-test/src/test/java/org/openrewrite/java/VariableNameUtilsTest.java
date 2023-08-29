@@ -486,6 +486,8 @@ class VariableNameUtilsTest implements RewriteTest {
           })),
           java(
             """
+              import java.util.function.Consumer;
+              
               @SuppressWarnings("all")
               class Test {
                   void m() {
@@ -499,6 +501,8 @@ class VariableNameUtilsTest implements RewriteTest {
               }
               """,
             """
+              import java.util.function.Consumer;
+              
               @SuppressWarnings("all")
               class Test {
                   void m() {
