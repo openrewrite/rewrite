@@ -162,13 +162,14 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @SuppressWarnings("unused")
     public Space visitSpace(Space space, Space.Location loc, P p) {
+        //noinspection ConstantValue
         return space == Space.EMPTY || space == Space.SINGLE_SPACE || space == null ? space :
                 space.withComments(ListUtils.map(space.getComments(), comment -> {
                     if (comment instanceof Javadoc) {
                         if (javadocVisitor == null) {
                             javadocVisitor = getJavadocVisitor();
                         }
-                        return (Comment) javadocVisitor.visit((Javadoc) comment, p);
+                        return (Comment) javadocVisitor.visit((Javadoc) comment, p, getCursor());
                     }
                     return comment;
                 }));
