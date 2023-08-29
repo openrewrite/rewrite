@@ -1163,11 +1163,7 @@ public interface J extends Tree {
         }
 
         public ClassDeclaration withExtends(@Nullable TypeTree extendings) {
-            JLeftPadded newExtendings = JLeftPadded.withElement(this.extendings, extendings);
-            if (newExtendings != null) {
-                newExtendings = newExtendings.withBefore(Space.SINGLE_SPACE);
-            }
-            return getPadding().withExtends(newExtendings);
+            return getPadding().withExtends(JLeftPadded.withElement(this.extendings, extendings));
         }
 
         @Nullable
@@ -1179,11 +1175,7 @@ public interface J extends Tree {
         }
 
         public ClassDeclaration withImplements(@Nullable List<TypeTree> implementings) {
-            JContainer<TypeTree> newImplementings = JContainer.withElementsNullable(this.implementings, implementings);
-            if (newImplementings != null) {
-                newImplementings = newImplementings.withBefore(Space.SINGLE_SPACE);
-            }
-            return getPadding().withImplements(newImplementings);
+            return getPadding().withImplements(JContainer.withElementsNullable(this.implementings, implementings));
         }
 
         @Nullable
