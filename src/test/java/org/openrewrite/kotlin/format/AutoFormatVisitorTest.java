@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -174,6 +175,7 @@ class AutoFormatVisitorTest implements RewriteTest {
     @Test
     void composite() {
         rewriteRun(
+          spec -> spec.parser(KotlinParser.builder().classpath("junit-jupiter-api")),
           kotlin(
             """
               package com.netflix.graphql.dgs.client.codegen

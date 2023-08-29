@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
@@ -306,9 +307,10 @@ class MinimumViableSpacingTest implements RewriteTest {
     @Test
     void noSpaceAferAnnotation() {
         rewriteRun(
-          spec -> spec.recipes(
-            toRecipe(() -> new MinimumViableSpacingVisitor<>())
-          ),
+          spec -> spec.parser(KotlinParser.builder().classpath("junit-jupiter-api"))
+            .recipes(
+              toRecipe(() -> new MinimumViableSpacingVisitor<>())
+            ),
           kotlin(
             """
               import org.junit.jupiter.api.Test

@@ -16,40 +16,58 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.RecipeRunException;
+import org.openrewrite.kotlin.internal.KotlinParsingException;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
+@SuppressWarnings("EmptyTryBlock")
 class JUnknownTest implements RewriteTest {
 
     @Test
     void fileDeclaration() {
-        rewriteRun(
-          kotlin(
-            """
-              val s = ""
-              // comment
-              
-              // comment
-              val n: WrongType = WrongType()
-              """
-          )
-        );
+        try {
+            rewriteRun(
+              kotlin(
+                """
+                  val s = ""
+                  // comment
+                  
+                  // comment
+                  val n: WrongType = WrongType()
+                  """
+              )
+            );
+        }
+        catch (Exception e) {
+            assertThat(e instanceof RecipeRunException).isTrue();
+            assertThat(e.getCause() instanceof KotlinParsingException).isTrue();
+            assertThat(e.getCause().getMessage()).isEqualTo("Parsing error, J.Unknown detected");
+        }
     }
 
     @Test
     void expression() {
-        rewriteRun(
-          kotlin(
-            """
-              fun method(s: String,
-                         // comment
-                         
-                         // comment
-                         n: WrongType) {
-              }
-              """
-          )
-        );
+        try {
+            rewriteRun(
+              kotlin(
+                """
+                  fun method(s: String,
+                             // comment
+                             
+                             // comment
+                             n: WrongType) {
+                  }
+                  """
+              )
+            );
+        }
+        catch (Exception e) {
+            assertThat(e instanceof RecipeRunException).isTrue();
+            assertThat(e.getCause() instanceof KotlinParsingException).isTrue();
+            assertThat(e.getCause().getMessage()).isEqualTo("Parsing error, J.Unknown detected");
+        }
     }
 }
