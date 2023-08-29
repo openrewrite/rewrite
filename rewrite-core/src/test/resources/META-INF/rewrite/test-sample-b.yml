@@ -1,0 +1,7 @@
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: test.declarative.sample.b
+displayName: Test Recipe
+recipeList:
+  - org.openrewrite.text.ChangeText:
+      toText: after

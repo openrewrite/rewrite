@@ -1,0 +1,6 @@
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: test.declarative.sample.a
+displayName: Test Recipe
+recipeList:
+  - test.declarative.sample.b

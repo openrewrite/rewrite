@@ -363,6 +363,31 @@ class RecipeLifecycleTest implements RewriteTest {
             .activateRecipes("test.recipe.a")),
           text("Hi", "NoArgRecipeHi"));
     }
+
+    @Test
+    void declarativeRecipeChainFromResources() {
+        rewriteRun(spec -> spec.recipeFromResources("test.declarative.sample.a"),
+          text("Hi", "after"));
+    }
+
+    @Test
+    void declarativeRecipeChainFromResourcesIncludesImperativeRecipesInDescriptors() {
+        rewriteRun(spec -> spec.recipeFromResources("test.declarative.sample.a")
+            .afterRecipe(recipeRun -> assertThat(recipeRun.getChangeset().getAllResults().get(0)
+              .getRecipeDescriptorsThatMadeChanges().get(0).getRecipeList().get(0).getRecipeList().get(0)
+              .getDisplayName()).isEqualTo("Change text")),
+          text("Hi", "after"));
+    }
+
+    @Test
+    void declarativeRecipeChainFromResourcesLongList() {
+        rewriteRun(spec -> spec.recipe(Environment.builder()
+            .load(new YamlResourceLoader(RecipeLifecycleTest.class.getResourceAsStream("/META-INF/rewrite/test-sample-a.yml"), URI.create("rewrite.yml"), new Properties()))
+            .load(new YamlResourceLoader(RecipeLifecycleTest.class.getResourceAsStream("/META-INF/rewrite/test-sample-b.yml"), URI.create("rewrite.yml"), new Properties()))
+            .build()
+            .activateRecipes("test.declarative.sample.a")),
+          text("Hi", "after"));
+    }
 }
 
 class DefaultConstructorRecipe extends Recipe {

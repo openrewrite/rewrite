@@ -127,6 +127,13 @@ public class RecipeSpec {
         return recipe(Objects.requireNonNull(RecipeSpec.class.getResourceAsStream(yamlResource)), activeRecipes);
     }
 
+    public RecipeSpec recipeFromResources(String... activeRecipes) {
+        return recipe(Environment.builder()
+                .scanYamlResources()
+                .build()
+                .activateRecipes(activeRecipes));
+    }
+
     /**
      * @param parser The parser supplier to use when a matching source file is found.
      * @return The current recipe spec.
