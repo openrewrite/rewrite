@@ -39,7 +39,7 @@ public class SourcesFileResults extends DataTable<SourcesFileResults.Row> {
         String afterSourcePath;
 
         @Column(displayName = "Parent of the recipe that made changes",
-                description = "In a hierarchical recipe, the parent of the recipe that made a change. Empty if" +
+                description = "In a hierarchical recipe, the parent of the recipe that made a change. Empty if " +
                               "this is the root of a hierarchy or if the recipe is not hierarchical at all.")
         String parentRecipe;
 
