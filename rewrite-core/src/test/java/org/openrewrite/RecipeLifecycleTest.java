@@ -15,19 +15,25 @@
  */
 package org.openrewrite;
 
+import lombok.NoArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.config.Environment;
 import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
+import java.io.ByteArrayInputStream;
+import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Properties;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -248,5 +254,164 @@ class RecipeLifecycleTest implements RewriteTest {
                 return super.visitText(text, executionContext);
             }
         }).withName(name);
+    }
+
+    @Test
+    void canCallImperativeRecipeWithoutArgsFromDeclarative() {
+        rewriteRun(spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: test.recipe
+            displayName: Test Recipe
+            recipeList:
+              - org.openrewrite.NoArgRecipe
+            """,
+          "test.recipe"
+          ),
+          text("Hi", "NoArgRecipeHi"));
+    }
+
+    @Test
+    void canCallImperativeRecipeWithUnnecessaryArgsFromDeclarative() {
+        rewriteRun(spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: test.recipe
+            displayName: Test Recipe
+            recipeList:
+              - org.openrewrite.NoArgRecipe:
+                  foo: bar
+            """,
+            "test.recipe"
+          ),
+          text("Hi", "NoArgRecipeHi"));
+    }
+
+    @Test
+    void canCallRecipeWithNoExplicitConstructor() {
+        rewriteRun(spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: test.recipe
+            displayName: Test Recipe
+            recipeList:
+              - org.openrewrite.DefaultConstructorRecipe
+            """,
+            "test.recipe"
+          ),
+          text("Hi", "DefaultConstructorRecipeHi"));
+    }
+
+    @Test
+    void declarativeRecipeChain() {
+        rewriteRun(spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: test.recipe.a
+            displayName: Test Recipe
+            recipeList:
+              - test.recipe.b
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: test.recipe.b
+            displayName: Test Recipe
+            recipeList:
+              - test.recipe.c
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: test.recipe.c
+            displayName: Test Recipe
+            recipeList:
+              - org.openrewrite.NoArgRecipe
+            """,
+            "test.recipe.a"
+          ),
+          text("Hi", "NoArgRecipeHi"));
+    }
+
+    @Test
+    void declarativeRecipeChainAcrossFiles() {
+        rewriteRun(spec -> spec.recipe(Environment.builder()
+            .load(new YamlResourceLoader(new ByteArrayInputStream("""
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.recipe.c
+                displayName: Test Recipe
+                recipeList:
+                  - org.openrewrite.NoArgRecipe
+                """.getBytes()),
+              URI.create("rewrite.yml"), new Properties()))
+            .load(new YamlResourceLoader(new ByteArrayInputStream("""
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.recipe.b
+                displayName: Test Recipe
+                recipeList:
+                  - test.recipe.c
+                """.getBytes()),
+              URI.create("rewrite.yml"), new Properties()))
+            .load(new YamlResourceLoader(new ByteArrayInputStream("""
+                ---
+                type: specs.openrewrite.org/v1beta/recipe
+                name: test.recipe.a
+                displayName: Test Recipe
+                recipeList:
+                  - test.recipe.b
+                """.getBytes()),
+              URI.create("rewrite.yml"), new Properties()))
+            .build()
+            .activateRecipes("test.recipe.a")),
+          text("Hi", "NoArgRecipeHi"));
+    }
+}
+
+class DefaultConstructorRecipe extends Recipe {
+    @Override
+    public String getDisplayName() {
+        return "DefaultConstructorRecipe";
+    }
+
+    @Override
+    public String getDescription() {
+        return "DefaultConstructorRecipe.";
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+                if (!text.getText().contains(getDisplayName())) {
+                    return text.withText(getDisplayName() + text.getText());
+                }
+                return super.visitText(text, executionContext);
+            }
+        };
+    }
+}
+
+@NoArgsConstructor
+class NoArgRecipe extends Recipe {
+    @Override
+    public String getDisplayName() {
+        return "NoArgRecipe";
+    }
+
+    @Override
+    public String getDescription() {
+        return "NoArgRecipe.";
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+                if (!text.getText().contains(getDisplayName())) {
+                    return text.withText(getDisplayName() + text.getText());
+                }
+                return super.visitText(text, executionContext);
+            }
+        };
     }
 }
