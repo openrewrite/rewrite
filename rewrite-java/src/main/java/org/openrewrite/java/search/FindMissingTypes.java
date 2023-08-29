@@ -62,7 +62,10 @@ public class FindMissingTypes extends Recipe {
                 public <M extends Marker> M visitMarker(Marker marker, List<MissingTypeResult> missingTypeResults) {
                     if (marker instanceof SearchResult) {
                         String message = ((SearchResult) marker).getDescription();
-                        String path = getCursor().getPathAsStream().filter(J.class::isInstance).map(t -> t.getClass().getSimpleName()).collect(Collectors.joining("->"));
+                        String path = getCursor()
+                                .getPathAsStream(j -> j instanceof J || j instanceof Javadoc)
+                                .map(t -> t.getClass().getSimpleName())
+                                .collect(Collectors.joining("->"));
                         J j = getCursor().firstEnclosing(J.class);
                         String printedTree;
                         if (getCursor().firstEnclosing(JavaSourceFile.class) != null) {
@@ -91,16 +94,6 @@ public class FindMissingTypes extends Recipe {
     static class FindMissingTypesVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         private final Set<JavaType> seenTypes = new HashSet<>();
-
-        @Override
-        protected JavadocVisitor<ExecutionContext> getJavadocVisitor() {
-            return new JavadocVisitor<ExecutionContext>(new JavaVisitor<>()) {
-                @Override
-                public @Nullable Javadoc visit(@Nullable Tree tree, ExecutionContext executionContext) {
-                    return (Javadoc) tree;
-                }
-            };
-        }
 
         @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
@@ -209,7 +202,8 @@ public class FindMissingTypes extends Recipe {
         private boolean isAllowedToHaveNullType(J.Identifier ident) {
             return inPackageDeclaration() || inImport() || isClassName()
                     || isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident)
-                    || isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident);
+                    || isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident)
+                    || isInJavaDoc(ident);
         }
 
         private boolean inPackageDeclaration() {
@@ -266,6 +260,12 @@ public class FindMissingTypes extends Recipe {
             Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.MemberReference &&
                    ident == ((J.MemberReference) value).getReference();
+        }
+
+        private boolean isInJavaDoc(J.Identifier ident) {
+            Tree value = getCursor().getParentTreeCursor().getValue();
+            return value instanceof Javadoc.Reference &&
+                    ident == ((Javadoc.Reference) value).getTree();
         }
 
         private boolean isCaseLabel() {

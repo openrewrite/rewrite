@@ -169,7 +169,10 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                         if (javadocVisitor == null) {
                             javadocVisitor = getJavadocVisitor();
                         }
-                        return (Comment) javadocVisitor.visit((Javadoc) comment, p, getCursor());
+                        Cursor previous = javadocVisitor.getCursor();
+                        Comment c = (Comment) javadocVisitor.visit((Javadoc) comment, p, getCursor());
+                        javadocVisitor.setCursor(previous);
+                        return c;
                     }
                     return comment;
                 }));

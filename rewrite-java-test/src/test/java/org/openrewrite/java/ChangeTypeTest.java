@@ -613,12 +613,16 @@ class ChangeTypeTest implements RewriteTest {
             """
               import a.A1;
               
+              import java.util.Map;
+              
               public class B {
                  Map<A1, A1> m;
               }
               """,
             """
               import a.A2;
+              
+              import java.util.Map;
               
               public class B {
                  Map<A2, A2> m;
