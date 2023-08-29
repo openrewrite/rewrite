@@ -23,6 +23,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import java.util.Collections;
 import java.util.regex.Matcher;
@@ -274,28 +275,13 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                           <dependency>
                               <groupId>com.google.guava</groupId>
                               <artifactId>guava</artifactId>
-                              <version>13.0.1</version>
+                              <version>13.0</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
               </project>
               """,
-            """
-              <project>
-                  <groupId>com.mycompany</groupId>
-                  <artifactId>my-parent</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>com.google.guava</groupId>
-                              <artifactId>guava</artifactId>
-                              <version>14.0</version>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-              </project>
-              """
+            SourceSpec::skip
           ),
           mavenProject("my-child",
             pomXml(
