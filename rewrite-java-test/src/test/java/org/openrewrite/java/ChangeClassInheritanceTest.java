@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
-import org.openrewrite.java.tree.CoordinateBuilder;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
@@ -29,6 +28,7 @@ import org.openrewrite.test.RewriteTest;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -41,7 +41,7 @@ class ChangeClassInheritanceTest implements RewriteTest {
         @Override
         public void defaults(RecipeSpec spec) {
             spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
-                private final J.Identifier arrayList = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, ArrayList.class.getName(), JavaType.buildType(ArrayList.class.getName()), null);
+                private final J.Identifier arrayList = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, Collections.emptyList(), ArrayList.class.getName(), JavaType.buildType(ArrayList.class.getName()), null);
 
                 @Override
                 public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration c, ExecutionContext executionContext) {
@@ -56,19 +56,21 @@ class ChangeClassInheritanceTest implements RewriteTest {
 
         @Test
         void addExtends() {
-            java(
-              """
-                package de.example;
-                              
-                class CustomList {
-                }
-                """,
-              """
-                package de.example;
-                              
-                class CustomList extends java.util.ArrayList {
-                }
+            rewriteRun(
+              java(
                 """
+                  package de.example;
+                                
+                  class CustomList {
+                  }
+                  """,
+                """
+                  package de.example;
+                                
+                  class CustomList extends java.util.ArrayList {
+                  }
+                  """
+              )
             );
         }
 
@@ -94,19 +96,21 @@ class ChangeClassInheritanceTest implements RewriteTest {
 
         @Test
         void addExtendsOnExistingImplements() {
-            java(
-              """
-                package de.example;
-                              
-                class CustomList implements java.lang.Cloneable {
-                }
-                """,
-              """
-                package de.example;
-                              
-                class CustomList extends java.util.ArrayList implements java.lang.Cloneable {
-                }
+            rewriteRun(
+              java(
                 """
+                  package de.example;
+                                
+                  class CustomList implements java.lang.Cloneable {
+                  }
+                  """,
+                """
+                  package de.example;
+                                
+                  class CustomList extends java.util.ArrayList implements java.lang.Cloneable {
+                  }
+                  """
+              )
             );
         }
     }
@@ -116,7 +120,7 @@ class ChangeClassInheritanceTest implements RewriteTest {
         @Override
         public void defaults(RecipeSpec spec) {
             spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
-                private final J.Identifier serializable = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, Serializable.class.getName(), JavaType.buildType(Serializable.class.getName()), null);
+                private final J.Identifier serializable = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, Collections.emptyList(), Serializable.class.getName(), JavaType.buildType(Serializable.class.getName()), null);
 
                 @Override
                 public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration c, ExecutionContext executionContext) {

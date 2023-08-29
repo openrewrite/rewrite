@@ -1163,7 +1163,11 @@ public interface J extends Tree {
         }
 
         public ClassDeclaration withExtends(@Nullable TypeTree extendings) {
-            return getPadding().withExtends(JLeftPadded.withElement(this.extendings, extendings));
+            JLeftPadded newExtendings = JLeftPadded.withElement(this.extendings, extendings);
+            if (newExtendings != null) {
+                newExtendings = newExtendings.withBefore(Space.SINGLE_SPACE);
+            }
+            return getPadding().withExtends(newExtendings);
         }
 
         @Nullable
