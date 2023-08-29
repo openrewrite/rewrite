@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-@SuppressWarnings({"JavadocDeclaration", "TrailingWhitespacesInTextBlock", "TextBlockMigration"})
+@SuppressWarnings({"JavadocDeclaration", "TrailingWhitespacesInTextBlock", "TextBlockMigration", "RedundantThrows", "ConcatenationWithEmptyString"})
 class JavadocTest implements RewriteTest {
 
     @SuppressWarnings("JavadocReference")
@@ -1472,7 +1472,6 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("JavadocBlankLines")
     @Issue("https://github.com/openrewrite/rewrite/issues/2046")
     @Test
     void trailingWhitespaceAndMultilineMargin() {

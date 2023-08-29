@@ -18,10 +18,14 @@ package org.openrewrite.java.search;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Javadoc;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.SearchResult;
 
@@ -89,6 +93,16 @@ public class FindMissingTypes extends Recipe {
         private final Set<JavaType> seenTypes = new HashSet<>();
 
         @Override
+        protected JavadocVisitor<ExecutionContext> getJavadocVisitor() {
+            return new JavadocVisitor<ExecutionContext>(new JavaVisitor<>()) {
+                @Override
+                public @Nullable Javadoc visit(@Nullable Tree tree, ExecutionContext executionContext) {
+                    return (Javadoc) tree;
+                }
+            };
+        }
+
+        @Override
         public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
             // The non-nullability of J.Identifier.getType() in our AST is a white lie
             // J.Identifier.getType() is allowed to be null in places where the containing AST element fully specifies the type
@@ -103,7 +117,7 @@ public class FindMissingTypes extends Recipe {
             J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
             if (v == variable) {
                 JavaType.Variable variableType = v.getVariableType();
-                if (!isWellFormedType(variableType, seenTypes) && !isAllowedToHaveUnknownType(variable)) {
+                if (!isWellFormedType(variableType, seenTypes) && !isAllowedToHaveUnknownType()) {
                     v = SearchResult.found(v, "Variable type is missing or malformed");
                 } else if (variableType != null && !variableType.getName().equals(v.getSimpleName())) {
                     v = SearchResult.found(v, "type information has a different variable name '" + variableType.getName() + "'");
@@ -112,7 +126,7 @@ public class FindMissingTypes extends Recipe {
             return v;
         }
 
-        private boolean isAllowedToHaveUnknownType(J.VariableDeclarations.NamedVariable variable) {
+        private boolean isAllowedToHaveUnknownType() {
             Cursor parent = getCursor().getParent();
             while (parent != null && parent.getParent() != null && !(parent.getParentTreeCursor().getValue() instanceof J.ClassDeclaration)) {
                 parent = parent.getParentTreeCursor();
@@ -222,24 +236,24 @@ public class FindMissingTypes extends Recipe {
         }
 
         private boolean isFieldAccess(J.Identifier ident) {
-            J value = getCursor().getParentTreeCursor().getValue();
+            Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.FieldAccess
                     && (ident == ((J.FieldAccess) value).getName() ||
                         ident == ((J.FieldAccess) value).getTarget() && !((J.FieldAccess) value).getSimpleName().equals("class"));
         }
 
         private boolean isBeingDeclared(J.Identifier ident) {
-            J value = getCursor().getParentTreeCursor().getValue();
+            Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.VariableDeclarations.NamedVariable && ident == ((J.VariableDeclarations.NamedVariable) value).getName();
         }
 
         private boolean isParameterizedType(J.Identifier ident) {
-            J value = getCursor().getParentTreeCursor().getValue();
+            Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.ParameterizedType && ident == ((J.ParameterizedType) value).getClazz();
         }
 
         private boolean isNewClass(J.Identifier ident) {
-            J value = getCursor().getParentTreeCursor().getValue();
+            Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.NewClass && ident == ((J.NewClass) value).getClazz();
         }
 
@@ -249,7 +263,7 @@ public class FindMissingTypes extends Recipe {
         }
 
         private boolean isMemberReference(J.Identifier ident) {
-            J value = getCursor().getParentTreeCursor().getValue();
+            Tree value = getCursor().getParentTreeCursor().getValue();
             return value instanceof J.MemberReference &&
                    ident == ((J.MemberReference) value).getReference();
         }
