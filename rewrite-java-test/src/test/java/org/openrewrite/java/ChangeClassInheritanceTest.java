@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
+import org.openrewrite.java.tree.CoordinateBuilder;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
@@ -39,11 +40,12 @@ class ChangeClassInheritanceTest implements RewriteTest {
     class WithExtendsTest implements RewriteTest {
         @Override
         public void defaults(RecipeSpec spec) {
-            spec.recipe(RewriteTest.toRecipe(() -> new JavaVisitor<>() {
+            spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
                 private final J.Identifier arrayList = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, ArrayList.class.getName(), JavaType.buildType(ArrayList.class.getName()), null);
 
                 @Override
-                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration c, ExecutionContext executionContext) {
+                    J.ClassDeclaration classDecl = super.visitClassDeclaration(c, executionContext);
                     if (classDecl.getExtends() != null && Objects.equals(arrayList.getType(), classDecl.getExtends().getType())) {
                         return classDecl;
                     }
@@ -113,11 +115,12 @@ class ChangeClassInheritanceTest implements RewriteTest {
     class WithImplementsTest implements RewriteTest {
         @Override
         public void defaults(RecipeSpec spec) {
-            spec.recipe(RewriteTest.toRecipe(() -> new JavaVisitor<>() {
+            spec.recipe(RewriteTest.toRecipe(() -> new JavaIsoVisitor<>() {
                 private final J.Identifier serializable = new J.Identifier(Tree.randomId(), Space.EMPTY, Markers.EMPTY, Serializable.class.getName(), JavaType.buildType(Serializable.class.getName()), null);
 
                 @Override
-                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
+                public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration c, ExecutionContext executionContext) {
+                    J.ClassDeclaration classDecl = super.visitClassDeclaration(c, executionContext);
                     if (classDecl.getImplements() != null && classDecl.getImplements().stream().anyMatch(e -> Objects.equals(e.getType(), serializable.getType()))) {
                         return classDecl;
                     }
