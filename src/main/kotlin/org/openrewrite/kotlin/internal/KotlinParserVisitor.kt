@@ -4669,7 +4669,7 @@ class KotlinParserVisitor(
         )
         val body: JRightPadded<Statement> = if (forLoop.block.statements.isNotEmpty()) {
             // actual loop body is contained as a nested block of the second statement
-            val block = visitBlock(forLoop.block.statements[1] as FirBlock, emptySet(), data) as Statement
+            val block = visitBlock(forLoop.block.statements[forLoop.block.statements.size - 1] as FirBlock, emptySet(), data) as Statement
             padRight(block, Space.EMPTY)
         } else {
             padRight(J.Empty(randomId(), Space.EMPTY, Markers.EMPTY), Space.EMPTY)
