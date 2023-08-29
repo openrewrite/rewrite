@@ -87,10 +87,9 @@ import static java.util.stream.Collectors.toList;
 import static org.jetbrains.kotlin.cli.common.CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY;
 import static org.jetbrains.kotlin.cli.common.messages.MessageRenderer.PLAIN_FULL_PATHS;
 import static org.jetbrains.kotlin.cli.jvm.JvmArgumentsKt.*;
-import static org.jetbrains.kotlin.cli.jvm.compiler.pipeline.CompilerPipelineKt.*;
+import static org.jetbrains.kotlin.cli.jvm.compiler.pipeline.CompilerPipelineKt.createProjectEnvironment;
 import static org.jetbrains.kotlin.cli.jvm.config.JvmContentRootsKt.*;
 import static org.jetbrains.kotlin.config.CommonConfigurationKeys.*;
-import static org.jetbrains.kotlin.config.CommonConfigurationKeys.INCREMENTAL_COMPILATION;
 import static org.jetbrains.kotlin.config.JVMConfigurationKeys.DO_NOT_CLEAR_BINDING_CONTEXT;
 import static org.jetbrains.kotlin.incremental.IncrementalFirJvmCompilerRunnerKt.configureBaseRoots;
 
@@ -233,7 +232,9 @@ public class KotlinParser implements Parser {
     @SuppressWarnings("unused")
     public static class Builder extends Parser.Builder {
         @Nullable
-        private Collection<Path> classpath = JavaParser.runtimeClasspath();
+        private Collection<String> artifactNames = emptyList();
+        @Nullable
+        private Collection<Path> classpath = emptyList();
 
         private JavaTypeCache typeCache = new JavaTypeCache();
         private boolean logCompilationWarningsAndErrors;
@@ -251,12 +252,20 @@ public class KotlinParser implements Parser {
         }
 
         public Builder classpath(Collection<Path> classpath) {
+            this.artifactNames = null;
             this.classpath = classpath;
             return this;
         }
 
-        public Builder classpath(String... classpath) {
-            this.classpath = JavaParser.dependenciesFromClasspath(classpath);
+        public Builder classpath(String... artifactNames) {
+            this.artifactNames = Arrays.asList(artifactNames);
+            this.classpath = null;
+            return this;
+        }
+
+        public Builder classpathFromResources(ExecutionContext ctx, String... classpath) {
+            this.artifactNames = null;
+            this.classpath = JavaParser.dependenciesFromResources(ctx, classpath);
             return this;
         }
 
@@ -282,8 +291,17 @@ public class KotlinParser implements Parser {
             return this;
         }
 
+        @Nullable
+        private Collection<Path> resolvedClasspath() {
+            if (artifactNames != null && !artifactNames.isEmpty()) {
+                classpath = JavaParser.dependenciesFromClasspath(artifactNames.toArray(new String[0]));
+                artifactNames = null;
+            }
+            return classpath;
+        }
+
         public KotlinParser build() {
-            return new KotlinParser(classpath, styles, logCompilationWarningsAndErrors, typeCache, moduleName, languageLevel);
+            return new KotlinParser(resolvedClasspath(), styles, logCompilationWarningsAndErrors, typeCache, moduleName, languageLevel);
         }
 
         @Override
