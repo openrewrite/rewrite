@@ -59,7 +59,7 @@ public class ChangePropertyKey extends Recipe {
 
     @Option(displayName = "Use relaxed binding",
             description = "Whether to match the `oldPropertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
-                    "rules. Defaults to `true`. If you want to use exact matching in your search, set this to `false`.",
+                          "rules. Defaults to `true`. If you want to use exact matching in your search, set this to `false`.",
             required = false)
     @Nullable
     Boolean relaxedBinding;
@@ -72,7 +72,7 @@ public class ChangePropertyKey extends Recipe {
 
     @Option(displayName = "Key Separator",
             description = "The separator used in `oldPropertyKey` and `newPropertyKey` to split the elements of the yaml path. " +
-                    "By default, this is `.`, but if any of your keys have this character, you might want to change it to not split the key.",
+                          "By default, this is `.`, but if any of your keys have this character, you might want to change it to not split the key.",
             required = false)
     @Nullable
     String keySeparator;
@@ -129,7 +129,7 @@ public class ChangePropertyKey extends Recipe {
                     .collect(Collectors.joining(getKeySeparator()));
 
             if (newPropertyKey.startsWith(oldPropertyKey)
-                    && (matches(prop, newPropertyKey) || matches(prop, newPropertyKey + ".*") || childMatchesNewPropertyKey(entry, prop))) {
+                && (matches(prop, newPropertyKey) || matches(prop, newPropertyKey + ".*") || childMatchesNewPropertyKey(entry, prop))) {
                 return e;
             }
 
@@ -140,7 +140,7 @@ public class ChangePropertyKey extends Recipe {
                     Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();
                     String value = propertyEntry.getKey().getValue() + getKeySeparator();
 
-                    if ((!propertyToTest.startsWith(value ) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext()))
+                    if ((!propertyToTest.startsWith(value) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext()))
                         && hasNonExcludedValues(propertyEntry)) {
                         doAfterVisit(new InsertSubpropertyVisitor<>(
                                 propertyEntry,
@@ -154,14 +154,14 @@ public class ChangePropertyKey extends Recipe {
             } else {
                 String parentProp = prop.substring(0, prop.length() - e.getKey().getValue().length()).replaceAll(".$", "");
                 if (matches(prop, oldPropertyKey + ".*") &&
-                        !(matches(parentProp, oldPropertyKey + ".*") || matches(parentProp, oldPropertyKey)) &&
-                        noneMatch(prop, oldPropertyKey, excludedSubKeys())) {
+                    !(matches(parentProp, oldPropertyKey + ".*") || matches(parentProp, oldPropertyKey)) &&
+                    noneMatch(prop, oldPropertyKey, excludedSubKeys())) {
                     Iterator<Yaml.Mapping.Entry> propertyEntriesLeftToRight = propertyEntries.descendingIterator();
                     while (propertyEntriesLeftToRight.hasNext()) {
                         Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();
                         String value = propertyEntry.getKey().getValue() + getKeySeparator();
 
-                        if (!propertyToTest.startsWith(value ) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext())) {
+                        if (!propertyToTest.startsWith(value) || (propertyToTest.startsWith(value) && !propertyEntriesLeftToRight.hasNext())) {
                             doAfterVisit(new InsertSubpropertyVisitor<>(
                                     propertyEntry,
                                     propertyToTest + prop.substring(oldPropertyKey.length()),
@@ -212,7 +212,7 @@ public class ChangePropertyKey extends Recipe {
     private boolean anyMatch(Yaml.Mapping.Entry entry, List<String> subKeys) {
         for (String subKey : subKeys) {
             if (entry.getKey().getValue().equals(subKey)
-                    || entry.getKey().getValue().startsWith(subKey + getKeySeparator())) {
+                || entry.getKey().getValue().startsWith(subKey + getKeySeparator())) {
                 return true;
             }
         }
@@ -222,7 +222,7 @@ public class ChangePropertyKey extends Recipe {
     private boolean noneMatch(Yaml.Mapping.Entry entry, List<String> subKeys) {
         for (String subKey : subKeys) {
             if (entry.getKey().getValue().equals(subKey)
-                    || entry.getKey().getValue().startsWith(subKey + getKeySeparator())) {
+                || entry.getKey().getValue().startsWith(subKey + getKeySeparator())) {
                 return false;
             }
         }
@@ -263,12 +263,13 @@ public class ChangePropertyKey extends Recipe {
         private Yaml.Mapping.Entry buildEntry(String prefix, String beforeMappingValueIndicator, String key, Yaml.Block value) {
             int idx = key.indexOf(getKeySeparator());
             if (idx > 0) {
+                String nestedPrefix = prefix.isEmpty() ? "\n  " : prefix + "  ";
                 value = new Yaml.Mapping(
                         randomId(),
                         Markers.EMPTY,
                         null,
                         Collections.singletonList(
-                                buildEntry(prefix+"  ", beforeMappingValueIndicator, key.substring(idx + 1), value)),
+                                buildEntry(nestedPrefix, beforeMappingValueIndicator, key.substring(idx + 1), value)),
                         null,
                         null);
                 key = key.substring(0, idx);
@@ -287,7 +288,7 @@ public class ChangePropertyKey extends Recipe {
         public Yaml.Mapping visitMapping(Yaml.Mapping mapping, P p) {
             Yaml.Mapping m = super.visitMapping(mapping, p);
             if (m.getEntries().contains(scope)) {
-                String newEntryPrefix = scope.getPrefix();
+                String newEntryPrefix = scope.getPrefix();//.isEmpty() ? "\n" : scope.getPrefix();
                 Yaml.Mapping.Entry newEntry = buildEntry(newEntryPrefix, scope.getBeforeMappingValueIndicator(),
                         subproperty, removeExclusions(entryToReplace.getValue().copyPaste()));
                 if (hasExcludedValues(entryToReplace)) {

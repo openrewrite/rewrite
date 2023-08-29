@@ -807,6 +807,24 @@ class ChangePropertyKeyTest implements RewriteTest {
               """
           )
         );
-
     }
+
+    @Test
+    void rootSingleKeyPrefixNewline() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePropertyKey("spring.profiles", "spring.config.activate.on-profile", null, null)),
+          yaml(
+            """
+              spring.profiles: prod
+              """,
+            """
+              spring:
+                config:
+                  activate:
+                    on-profile: prod
+              """
+          )
+        );
+    }
+
 }
