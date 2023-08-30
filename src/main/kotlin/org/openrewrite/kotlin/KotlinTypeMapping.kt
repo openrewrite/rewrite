@@ -119,6 +119,10 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
                 return mapJavaElementType(type, signature)
             }
 
+            is FirResolvedQualifier -> {
+                return classType(type, signature, ownerFallBack)
+            }
+
             else -> return resolveType(type, signature, ownerFallBack)
         }
     }
@@ -221,6 +225,24 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
                 return JavaType.Unknown.getInstance()
             }
             firClass = symbol.fir
+        } else if (classType is FirResolvedQualifier) {
+            when (classType.symbol) {
+                is FirTypeAliasSymbol -> {
+                    return classType(
+                        (classType.symbol as FirTypeAliasSymbol).resolvedExpandedTypeRef,
+                        signature,
+                        ownerFallBack
+                    )
+                }
+
+                is FirRegularClassSymbol -> {
+                    firClass = classType.symbol!!.fir as FirClass
+                }
+
+                else -> {
+                    return JavaType.Unknown.getInstance()
+                }
+            }
         } else {
             firClass = classType as FirClass
         }
