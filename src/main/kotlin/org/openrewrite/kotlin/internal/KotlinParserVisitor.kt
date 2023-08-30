@@ -1344,7 +1344,7 @@ class KotlinParserVisitor(
         val expressions: MutableList<JRightPadded<Expression>> = ArrayList(flattenedExpressions.size)
         val isLastArgumentLambda = flattenedExpressions.isNotEmpty() && flattenedExpressions[argumentCount - 1] is FirLambdaArgumentExpression
 
-        var markers = Markers.EMPTY
+        val markers = Markers.EMPTY
         val args: JContainer<Expression>
         var saveCursor = cursor
         val containerPrefix = whitespace()
@@ -2631,7 +2631,7 @@ class KotlinParserVisitor(
         val arguments = stringConcatenationCall.argumentList.arguments
         var i = 0
         while (i < arguments.size) {
-            var e = arguments[i]
+            val e = arguments[i]
             val savedCursor = cursor
             val before = whitespace()
             if (cursor < e.source!!.endOffset && skip("$")) {
