@@ -76,8 +76,11 @@ public class NullUtils {
 
     /**
      * The method uses reflection to find all declared fields of a class that have been marked (via commonly used
-     * annotations) as being Non-Null. This method will also look at the class's package level to see if the API
-     * for that package is defaulted as Non-Null. ANY annotation that has runtime retention and matches on of the simple
+     * annotations) as being Non-Null, or a required {@link Option}.
+     * This method will also look at the class's package level to see if the API
+     * for that package is defaulted as Non-Null.
+     * Fields with explicit Nullable annotations will be excluded.
+     * Any other annotation that has runtime retention and matches one of the simple
      * annotation names (minus any package) will be considered a match.
      *
      * @param _class The class to reflect over
@@ -97,9 +100,10 @@ public class NullUtils {
         List<Field> nonNullFields = new ArrayList<>(fields.length);
         for (Field field : fields) {
             field.setAccessible(true);
-            if(fieldHasNonNullableAnnotation(field) ||
-                    (defaultNonNull && !fieldHasNullableAnnotation(field)) ||
-                    fieldIsRequiredOption(field)) {
+            if (fieldHasNullableAnnotation(field)) {
+                continue;
+            }
+            if (defaultNonNull || fieldHasNonNullableAnnotation(field) || fieldIsRequiredOption(field)) {
                 nonNullFields.add(field);
             }
         }
