@@ -282,6 +282,35 @@ class VariableDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void delegatedProperty() {
+        rewriteRun(
+          kotlin(
+            """
+              import kotlin.reflect.KProperty
+
+              class IntDelegate {
+                  private var storedValue: Int = 0
+
+                  operator fun getValue(thisRef: Any?, property: KProperty<*>): Int {
+                      println("Getting value of property ${property.name}")
+                      return storedValue
+                  }
+
+                  operator fun setValue(thisRef: Any?, property: KProperty<*>, value: Int) {
+                      println("Setting value of property ${property.name}")
+                      storedValue = value
+                  }
+              }
+
+              class Example {
+                  var value: Int by IntDelegate()
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/82")
     @Test
     void genericIntersectionType() {
