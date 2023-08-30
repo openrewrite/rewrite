@@ -16,7 +16,7 @@
 package org.openrewrite.kotlin.internal;
 
 import lombok.Data;
-import lombok.EqualsAndHashCode;
+import lombok.val;
 import org.jetbrains.kotlin.com.intellij.lang.impl.TokenSequence;
 import org.jetbrains.kotlin.com.intellij.openapi.util.TextRange;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
@@ -43,6 +43,7 @@ public class PsiTree {
     private List<PsiToken> tokens;
     private Map<Integer, PsiToken> tokenOffSetMap;
 
+    @SuppressWarnings("DataFlowIssue")
     PsiTree(PsiFile psiFile, String source) {
         this.psiFile = psiFile;
         this.source = source;
@@ -87,27 +88,6 @@ public class PsiTree {
 
             Node other = (Node) obj;
             return range.equals(other.range) && type.equals(other.getType());
-        }
-    }
-
-    public List<Node> findByCursor(int cursor) {
-        List<Node> nodes = new ArrayList<>();
-        findByCursor(root, nodes, cursor);
-        return nodes;
-    }
-
-    @Nullable
-    private void findByCursor(Node node, List<Node> result, int cursor) {
-        if (node.getRange().getStartOffset() == cursor) {
-            result.add(node);
-        }
-
-        if (!node.getRange().contains(cursor)) {
-            return;
-        }
-
-        for (Node childNode : node.getChildNodes()) {
-            findByCursor(childNode, result, cursor);
         }
     }
 
@@ -165,11 +145,12 @@ public class PsiTree {
         }
     }
 
+    @SuppressWarnings({"UnstableApiUsage", "DataFlowIssue"})
     private void tokenize(String sourceCode) {
         tokens = new ArrayList<>();
         tokenOffSetMap = new HashMap<>();
 
-        KotlinLexer kotlinLexer = new KotlinLexer();
+        val kotlinLexer = new KotlinLexer();
         TokenSequence tokenSequence = TokenSequence.performLexing(sourceCode, kotlinLexer);
         int tokenCount = tokenSequence.getTokenCount();
 

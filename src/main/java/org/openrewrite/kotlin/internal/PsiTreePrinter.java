@@ -23,6 +23,7 @@ import org.openrewrite.Parser;
 
 import java.util.*;
 
+@SuppressWarnings("unused")
 public class PsiTreePrinter {
     private static final String TAB = "    ";
     private static final String ELEMENT_PREFIX = "\\---";
@@ -128,16 +129,14 @@ public class PsiTreePrinter {
     }
 
     private String toString(PsiElement psiElement) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(psiElement.getTextRange())
-            .append(" | ")
-            .append(psiElement.getNode().getElementType())
-            .append(" | ")
-            .append(psiElement.getClass().getSimpleName())
-            .append(" | Text: \"")
-            .append(truncate(psiElement.getText()).replace("\n", "\\n").replace("\r", "\\r"))
-            .append("\"");
-        return sb.toString();
+        return psiElement.getTextRange() +
+                " | " +
+                psiElement.getNode().getElementType() +
+                " | " +
+                psiElement.getClass().getSimpleName() +
+                " | Text: \"" +
+                truncate(psiElement.getText()).replace("\n", "\\n").replace("\r", "\\r") +
+                "\"";
     }
 
     private void printSkeletonNode(PsiElement psiElement, int depth) {

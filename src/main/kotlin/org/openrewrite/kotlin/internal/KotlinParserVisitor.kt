@@ -1350,7 +1350,6 @@ class KotlinParserVisitor(
         val containerPrefix = whitespace()
         var parenOrBrace = source[cursor++]
         val saveCursor2 = cursor
-        val before = whitespace()
         val isCloseParen = parenOrBrace == '(' && source[cursor] == ')'
         if (isCloseParen && isLastArgumentLambda) {
             cursor++
@@ -4821,6 +4820,7 @@ class KotlinParserVisitor(
         return rightPadded
     }
 
+    @Suppress("SameParameterValue")
     private fun <J2 : J> convertAllToExpressions(
         elements: List<FirElement>,
         innerDelim: String,
