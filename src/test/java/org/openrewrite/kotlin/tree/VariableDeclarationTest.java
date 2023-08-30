@@ -268,6 +268,20 @@ class VariableDeclarationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/264")
+    @Test
+    void delegationByLazyWithType() {
+        rewriteRun(
+          kotlin(
+            """
+              class User {
+                  val value: Int by lazy { 10 }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/82")
     @Test
     void genericIntersectionType() {

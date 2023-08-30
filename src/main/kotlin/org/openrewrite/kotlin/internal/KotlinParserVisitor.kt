@@ -1921,6 +1921,12 @@ class KotlinParserVisitor(
             if (property.delegate != null) {
                 if (property.delegate is FirFunctionCall && "lazy" == (property.delegate as FirFunctionCall?)!!.calleeReference.name.asString()) {
                     val prev = PsiTreeUtil.skipWhitespacesAndCommentsBackward(getRealPsiElement(property.delegate))
+                    val typeMarkersPair = mapTypeExpression(property, markers)
+                    if (typeMarkersPair.first != null) {
+                        typeExpression = typeMarkersPair.first
+                        markers = typeMarkersPair.second
+                    }
+
                     val before = sourceBefore(prev!!.text)
                     initMarkers = initMarkers.addIfAbsent(By(randomId()))
                     initializer = padLeft(before, convertToExpression(property.delegate!!, data)!!)
@@ -1932,31 +1938,11 @@ class KotlinParserVisitor(
                         )
                     )
                 }
-            } else if (property.returnTypeRef is FirResolvedTypeRef &&
-                (property.returnTypeRef.source == null || property.returnTypeRef.source?.kind !is KtFakeSourceElementKind)
-            ) {
-                val typeRef = property.returnTypeRef as FirResolvedTypeRef
-                if (typeRef.delegatedTypeRef != null) {
-                    val prev =
-                        PsiTreeUtil.skipWhitespacesAndCommentsBackward(getRealPsiElement(typeRef.delegatedTypeRef))
-                    val addTypeReferencePrefix = prev is LeafPsiElement && prev.elementType === KtTokens.COLON
-                    if (addTypeReferencePrefix) {
-                        markers = markers.addIfAbsent(TypeReferencePrefix(randomId(), sourceBefore(":")))
-                    }
-                    val j: J = visitElement(typeRef, data)!!
-                    typeExpression = if (j is TypeTree) {
-                        j
-                    } else {
-                        FunctionType(
-                            randomId(),
-                            Space.EMPTY,
-                            Markers.EMPTY,
-                            j as TypedTree,
-                            emptyList(),
-                            emptyList(),
-                            null
-                        )
-                    }
+            } else {
+                val typeMarkersPair = mapTypeExpression(property, markers)
+                if (typeMarkersPair.first != null) {
+                    typeExpression = typeMarkersPair.first
+                    markers = typeMarkersPair.second
                 }
             }
             var equals: PsiElement? = null
@@ -2037,6 +2023,40 @@ class KotlinParserVisitor(
             setter,
             isSetterFirst
         )
+    }
+
+    private fun mapTypeExpression(property: FirProperty, markers: Markers) : Pair<TypeTree?, Markers> {
+        var typeExpression : TypeTree? = null
+        var updatedMarkers = markers
+        if (property.returnTypeRef is FirResolvedTypeRef &&
+                (property.returnTypeRef.source == null || property.returnTypeRef.source?.kind !is KtFakeSourceElementKind)
+        ) {
+            val typeRef = property.returnTypeRef as FirResolvedTypeRef
+            if (typeRef.delegatedTypeRef != null) {
+                val prev =
+                        PsiTreeUtil.skipWhitespacesAndCommentsBackward(getRealPsiElement(typeRef.delegatedTypeRef))
+                val addTypeReferencePrefix = prev is LeafPsiElement && prev.elementType === KtTokens.COLON
+                if (addTypeReferencePrefix) {
+                    updatedMarkers = markers.addIfAbsent(TypeReferencePrefix(randomId(), sourceBefore(":")))
+                }
+                val j: J = visitElement(typeRef, data)!!
+                typeExpression = if (j is TypeTree) {
+                    j
+                } else {
+                    FunctionType(
+                            randomId(),
+                            Space.EMPTY,
+                            Markers.EMPTY,
+                            j as TypedTree,
+                            emptyList(),
+                            emptyList(),
+                            null
+                    )
+                }
+            }
+        }
+
+        return Pair(typeExpression, updatedMarkers)
     }
 
     private fun isValidGetter(getter: FirPropertyAccessor?): Boolean {
