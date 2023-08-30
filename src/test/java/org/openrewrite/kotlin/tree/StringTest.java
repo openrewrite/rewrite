@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -33,6 +34,26 @@ class StringTest implements RewriteTest {
                   ""\"
                               ${n_functions}
               ""\".trimIndent()
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/260")
+    @Test
+    void stringTemplate() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.lang.annotation.RetentionPolicy
+
+              fun addMember(format: String?, vararg args: Any?): String? {
+                  return ""
+              }
+
+              fun method(i : Int) {
+                  addMember("${'$'}T.${'$'}N", RetentionPolicy::class.java, "CLASS")
+              }
               """
           )
         );

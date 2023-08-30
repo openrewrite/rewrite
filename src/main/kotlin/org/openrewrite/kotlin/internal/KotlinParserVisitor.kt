@@ -2636,11 +2636,6 @@ class KotlinParserVisitor(
             val before = whitespace()
             if (cursor < e.source!!.endOffset && skip("$")) {
                 val inBraces = skip("{")
-                if (e is FirConstExpression<*>) {
-                    // Skip generated whitespace expression so that it's added to the prefix of the reference.
-                    i += 1
-                    e = arguments[i]
-                }
                 values.add(
                     KString.Value(
                         randomId(),
@@ -4678,7 +4673,7 @@ class KotlinParserVisitor(
             padRight(expression, afterExpression)
         )
         val body: JRightPadded<Statement> = if (forLoop.block.statements.isNotEmpty()) {
-            // actual loop body is contained as a nested block of the second statement
+            // actual loop body is contained as a nested block of the last statement
             val block = visitBlock(forLoop.block.statements[forLoop.block.statements.size - 1] as FirBlock, emptySet(), data) as Statement
             padRight(block, Space.EMPTY)
         } else {
