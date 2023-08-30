@@ -95,12 +95,20 @@ public class NullUtils {
         for (Field field : fields) {
             field.setAccessible(true);
             if(fieldHasNonNullableAnnotation(field) ||
-                    (defaultNonNull && !fieldHasNullableAnnotation(field))) {
+                    (defaultNonNull && !fieldHasNullableAnnotation(field)) ||
+                    fieldIsRequiredOption(field)) {
                 nonNullFields.add(field);
             }
         }
         nonNullFields.sort(Comparator.comparing(Field::getName));
         return nonNullFields;
+    }
+
+    private static boolean fieldIsRequiredOption(Field field) {
+        Option annotation = field.getAnnotation(Option.class);
+        if (annotation != null)
+            return annotation.required();
+        return false;
     }
 
     private static boolean fieldHasNonNullableAnnotation(Field field) {
