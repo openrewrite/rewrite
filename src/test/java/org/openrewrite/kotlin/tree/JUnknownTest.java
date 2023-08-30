@@ -21,9 +21,9 @@ import org.openrewrite.kotlin.internal.KotlinParsingException;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-@SuppressWarnings("EmptyTryBlock")
 class JUnknownTest implements RewriteTest {
 
     @Test
@@ -40,11 +40,11 @@ class JUnknownTest implements RewriteTest {
                   """
               )
             );
-        }
-        catch (Exception e) {
-            assertThat(e instanceof RecipeRunException).isTrue();
-            assertThat(e.getCause() instanceof KotlinParsingException).isTrue();
-            assertThat(e.getCause().getMessage()).isEqualTo("Parsing error, J.Unknown detected");
+            fail("Should have thrown an exception");
+        } catch (Exception e) {
+            assertThat(e).isInstanceOf(RecipeRunException.class);
+            assertThat(e).cause().isInstanceOf(KotlinParsingException.class);
+            assertThat(e).cause().hasMessage("Parsing error, J.Unknown detected");
         }
     }
 
@@ -63,11 +63,11 @@ class JUnknownTest implements RewriteTest {
                   """
               )
             );
-        }
-        catch (Exception e) {
-            assertThat(e instanceof RecipeRunException).isTrue();
-            assertThat(e.getCause() instanceof KotlinParsingException).isTrue();
-            assertThat(e.getCause().getMessage()).isEqualTo("Parsing error, J.Unknown detected");
+            fail("Should have thrown an exception");
+        } catch (Exception e) {
+            assertThat(e).isInstanceOf(RecipeRunException.class);
+            assertThat(e).cause().isInstanceOf(KotlinParsingException.class);
+            assertThat(e).cause().hasMessage("Parsing error, J.Unknown detected");
         }
     }
 }

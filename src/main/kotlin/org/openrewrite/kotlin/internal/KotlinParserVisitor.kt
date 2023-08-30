@@ -4850,6 +4850,7 @@ class KotlinParserVisitor(
                             text
                         )
                     ) as J2
+                    skip(text)
                 }
             } else {
                 j = convertToExpression(element, data)
