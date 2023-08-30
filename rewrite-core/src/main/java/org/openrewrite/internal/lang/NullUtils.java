@@ -15,6 +15,9 @@
  */
 package org.openrewrite.internal.lang;
 
+import org.openrewrite.Option;
+
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.util.*;
 
@@ -48,7 +51,7 @@ public class NullUtils {
      * <li>org.checkerframework.checker.nullness.qual.NonNull</li>
      * <li>javax.validation.constraints.NotNull</li>
      */
-    private static List<String> FIELD_LEVEL_NON_NULL_ANNOTATIONS = Arrays.asList(
+    private static final List<String> FIELD_LEVEL_NON_NULL_ANNOTATIONS = Arrays.asList(
             "NonNull",
             "Nonnull",
             "NotNull"
@@ -67,7 +70,7 @@ public class NullUtils {
      * <li>org.checkerframework.checker.nullness.qual.Nullable</li>
      * <li>javax.validation.constraints.NotNull</li>
      */
-    private static List<String> FIELD_LEVEL_NULLABLE_ANNOTATIONS = Collections.singletonList(
+    private static final List<String> FIELD_LEVEL_NULLABLE_ANNOTATIONS = Collections.singletonList(
             "Nullable"
     );
 
@@ -112,13 +115,21 @@ public class NullUtils {
     }
 
     private static boolean fieldHasNonNullableAnnotation(Field field) {
-        return Arrays.stream(field.getDeclaredAnnotations())
-                .map(a -> a.annotationType().getSimpleName())
-                .anyMatch(FIELD_LEVEL_NON_NULL_ANNOTATIONS::contains);
+        for (Annotation a : field.getDeclaredAnnotations()) {
+            String simpleName = a.annotationType().getSimpleName();
+            if (FIELD_LEVEL_NON_NULL_ANNOTATIONS.contains(simpleName)) {
+                return true;
+            }
+        }
+        return false;
     }
     private static boolean fieldHasNullableAnnotation(Field field) {
-        return Arrays.stream(field.getDeclaredAnnotations())
-                .map(a -> a.annotationType().getSimpleName())
-                .anyMatch(FIELD_LEVEL_NULLABLE_ANNOTATIONS::contains);
+        for (Annotation a : field.getDeclaredAnnotations()) {
+            String simpleName = a.annotationType().getSimpleName();
+            if (FIELD_LEVEL_NULLABLE_ANNOTATIONS.contains(simpleName)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
