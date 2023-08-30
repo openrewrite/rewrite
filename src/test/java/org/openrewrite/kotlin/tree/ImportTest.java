@@ -88,4 +88,16 @@ class ImportTest implements RewriteTest {
               """)
         );
     }
+
+    @Test
+    void aliasFieldAccess() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.lang.Integer as Number
+              var max = Number.MAX_VALUE
+              """
+          )
+        );
+    }
 }

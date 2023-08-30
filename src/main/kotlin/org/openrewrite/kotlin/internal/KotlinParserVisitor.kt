@@ -84,6 +84,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.Consumer
 import java.util.function.Function
 import java.util.stream.Collectors
+import kotlin.collections.HashMap
 import kotlin.math.max
 import kotlin.math.min
 
@@ -112,7 +113,7 @@ class KotlinParserVisitor(
 
     // Associate top-level function and property declarations to the file.
     private var currentFile: FirFile? = null
-
+    private var aliasImportMap: MutableMap<String, String>
 
     init {
         sourcePath = kotlinSource.input.getRelativePath(relativeTo)
@@ -127,6 +128,7 @@ class KotlinParserVisitor(
         this.firSession = firSession
         this.nodes = kotlinSource.nodes
         generatedFirProperties = HashMap()
+        aliasImportMap = HashMap()
     }
 
     override fun visitFile(file: FirFile, data: ExecutionContext): J {
@@ -1108,10 +1110,7 @@ class KotlinParserVisitor(
                 markers = markers.addIfAbsent(Extension(randomId()))
             }
             if (functionCall !is FirImplicitInvokeCall) {
-                var receiver = getReceiver(functionCall.explicitReceiver)
-                if (receiver == null) {
-                    receiver = getReceiver(functionCall.dispatchReceiver)
-                }
+                val receiver = getReceiver(functionCall.explicitReceiver)
                 if (receiver != null) {
                     val selectExpr =
                         convertToExpression<Expression>(receiver, data)
@@ -1766,7 +1765,9 @@ class KotlinParserVisitor(
             // FirImport does not contain type attribution information, so we cannot use the type mapping here.
             val aliasId = createIdentifier(aliasText)
             alias = padLeft(asPrefix, aliasId)
+            aliasImportMap[importName] = aliasText
         }
+
         return J.Import(
             randomId(),
             prefix,
@@ -2353,24 +2354,33 @@ class KotlinParserVisitor(
         val fieldAccess = resolvedQualifier.packageFqName.asString()
         val resolvedName =
             if (resolvedQualifier.relativeClassFqName == null) "" else "." + resolvedQualifier.relativeClassFqName!!.asString()
-        val split = (fieldAccess + resolvedName).split("\\.".toRegex()).dropLastWhile { it.isEmpty() }
-            .toTypedArray()
+        val fullName = fieldAccess + resolvedName
+        val alias = aliasImportMap[fullName]
+
         val name = StringBuilder()
-        for (i in split.indices) {
-            val part = split[i]
-            name.append(whitespace().whitespace)
-            if (skip(part)) {
-                name.append(part)
-            }
-            if (i < split.size - 1) {
+        if (alias != null && skip(alias)) {
+            name.append(alias)
+        } else {
+            val split = fullName.split("\\.".toRegex()).dropLastWhile { it.isEmpty() }
+                .toTypedArray()
+            for (i in split.indices) {
+                val part = split[i]
                 name.append(whitespace().whitespace)
-                if (skip(".")) {
-                    name.append(".")
+                if (skip(part)) {
+                    name.append(part)
+                }
+                if (i < split.size - 1) {
+                    name.append(whitespace().whitespace)
+                    if (skip(".")) {
+                        name.append(".")
+                    }
                 }
             }
         }
+
         if (name.isEmpty())
             return null
+
         var typeTree: TypeTree = build(name.toString())
         if (resolvedQualifier.relativeClassFqName != null) {
             typeTree = typeTree.withType(typeMapping.type(resolvedQualifier))
