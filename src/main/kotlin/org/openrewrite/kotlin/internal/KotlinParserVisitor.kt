@@ -1926,7 +1926,7 @@ class KotlinParserVisitor(
                         markers = typeMarkersPair.second
                     }
 
-                    val before = sourceBefore(prev!!.text)
+                    val before = if (prev != null) sourceBefore(prev.text) else Space.EMPTY
                     initMarkers = initMarkers.addIfAbsent(By(randomId()))
                     initializer = padLeft(before, convertToExpression(property.delegate!!, data)!!)
                 } else {
