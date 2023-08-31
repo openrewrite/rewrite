@@ -211,7 +211,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
             source.append(text);
             if (text.startsWith("0x")) {
                 value = Long.decode(text) * sign.get();
-            } else if (text.contains(".") || text.contains("e")) {
+            } else if (text.contains(".") || text.contains("e") || text.contains("E")) {
                 value = Double.parseDouble(text) * sign.get();
             } else {
                 try {

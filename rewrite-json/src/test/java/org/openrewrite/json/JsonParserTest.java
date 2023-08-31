@@ -69,7 +69,14 @@ public class JsonParserTest implements RewriteTest {
     @Test
     void doubleLiteralExpSigned() {
         rewriteRun(
-          json("-1.e3")
+          json("-1e3")
+        );
+    }
+
+    @Test
+    void doubleLiteralExpSignedUpperCase() {
+        rewriteRun(
+          json("1E-3")
         );
     }
 
