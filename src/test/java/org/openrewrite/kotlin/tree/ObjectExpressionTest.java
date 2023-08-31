@@ -31,11 +31,11 @@ class ObjectExpressionTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-  val x = object : Iterator<Any> {
-      var elementsLeft = 1
-      override fun hasNext(): Boolean = elementsLeft > 0
-      override fun next(): String = "x"
-  }
+              val x = object : Iterator<Any> {
+                  var elementsLeft = 1
+                  override fun hasNext(): Boolean = elementsLeft > 0
+                  override fun next(): String = "x"
+              }
               """
           )
         );
