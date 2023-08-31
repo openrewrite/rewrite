@@ -17,14 +17,15 @@ package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class FunctionTypeTest implements RewriteTest {
 
-    @ExpectedToFail
     @Test
+    @ExpectedToFail
     void namedParameter() {
         rewriteRun(
           kotlin(
@@ -35,4 +36,16 @@ class FunctionTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/275")
+    @ExpectedToFail
+    void parenthesizedNullableType() {
+        rewriteRun(
+          kotlin(
+            """
+              val v: ((Any) -> Any)? = null
+              """
+          )
+        );
+    }
 }
