@@ -47,6 +47,7 @@ public class AddSettingsPluginRepository extends Recipe {
 
     @Option(displayName = "URL",
             description = "The url of the artifact repository",
+            required = false,
             example = "https://repo.spring.io")
     String url;
 
