@@ -308,7 +308,7 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun size(): Int = 1
+              fun size(): Int = -1
               """
           )
         );
