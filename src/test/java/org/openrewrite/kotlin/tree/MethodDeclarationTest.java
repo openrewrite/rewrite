@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -297,6 +298,19 @@ class MethodDeclarationTest implements RewriteTest {
                     }
                 }
             }))
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/271")
+    @ExpectedToFail
+    void negativeSingleExpression() {
+        rewriteRun(
+          kotlin(
+            """
+              fun size(): Int = 1
+              """
+          )
         );
     }
 }
