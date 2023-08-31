@@ -21,7 +21,9 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.ResolvedPom;
+import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
@@ -66,6 +68,13 @@ public class ChangeProjectVersion extends Recipe {
             example = "8.4.2")
     String newVersion;
 
+    @Option(displayName = "Override Parent Version",
+            description = "This flag can be set to explicitly override the inherited parent version. The default for this flag is `false`.",
+            required = false
+    )
+    @Nullable
+    Boolean overrideParentVersion;
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
 
@@ -82,17 +91,24 @@ public class ChangeProjectVersion extends Recipe {
                     if (matchesGlob(resolvedPom.getValue(t.getChildValue("groupId").orElse(null)), groupId) &&
                         matchesGlob(resolvedPom.getValue(t.getChildValue("artifactId").orElse(null)), artifactId)) {
                         Optional<Xml.Tag> versionTag = t.getChild("version");
-                        assert versionTag.isPresent() && versionTag.get().getValue().isPresent();
-                        String versionTagValue = versionTag.get().getValue().get();
-                        String oldVersion = resolvedPom.getValue(versionTagValue);
-                        assert oldVersion != null;
+                        if (versionTag.isPresent() && versionTag.get().getValue().isPresent()) {
+                            String versionTagValue = versionTag.get().getValue().get();
+                            String oldVersion = resolvedPom.getValue(versionTagValue);
+                            assert oldVersion != null;
 
-                        if (!oldVersion.equals(newVersion)) {
-                            if (versionTagValue.startsWith("${") && !implicitlyDefinedVersionProperties.contains(versionTagValue)) {
-                                doAfterVisit(new ChangePropertyValue(versionTagValue.substring(2, versionTagValue.length() - 1), newVersion, false, false).getVisitor());
-                            } else {
-                                doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
+                            if (!oldVersion.equals(newVersion)) {
+                                if (versionTagValue.startsWith("${") && !implicitlyDefinedVersionProperties.contains(versionTagValue)) {
+                                    doAfterVisit(new ChangePropertyValue(versionTagValue.substring(2, versionTagValue.length() - 1), newVersion, false, false).getVisitor());
+                                } else {
+                                    doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
+                                }
+                                maybeUpdateModel();
                             }
+                        } else if (Boolean.TRUE.equals(overrideParentVersion)) {
+                            // if the version is not present and the override parent version is set,
+                            // add a new explicit version tag
+                            Xml.Tag newVersionTag = Xml.Tag.build("<version>" + newVersion + "</version>");
+                            doAfterVisit(new AddToTagVisitor<>(t, newVersionTag, new MavenTagInsertionComparator(t.getChildren())));
                             maybeUpdateModel();
                         }
                     }

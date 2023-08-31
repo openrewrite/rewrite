@@ -26,7 +26,7 @@ public class ChangeProjectVersionTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new ChangeProjectVersion("org.openrewrite", "rewrite-maven", "8.4.2"));
+        spec.recipe(new ChangeProjectVersion("org.openrewrite", "rewrite-maven", "8.4.2", null));
     }
 
     @Test
@@ -124,6 +124,8 @@ public class ChangeProjectVersionTest implements RewriteTest {
                         <rewrite.groupId>org.openrewrite</rewrite.groupId>
                         <rewrite-maven.artifactId>rewrite-maven</rewrite-maven.artifactId>
                     </properties>
+                    
+                    <packaging>pom</packaging>
                 </project>
               """
           ),
@@ -136,6 +138,7 @@ public class ChangeProjectVersionTest implements RewriteTest {
                       <artifactId>rewrite-core</artifactId>
                       <version>8.4.1</version>
                   </parent>
+                  
                   <groupId>${rewrite.groupId}</groupId>
                   <artifactId>${rewrite-maven.artifactId}</artifactId>
                   <version>8.4.1</version>
@@ -147,6 +150,7 @@ public class ChangeProjectVersionTest implements RewriteTest {
                       <artifactId>rewrite-core</artifactId>
                       <version>8.4.1</version>
                   </parent>
+                  
                   <groupId>${rewrite.groupId}</groupId>
                   <artifactId>${rewrite-maven.artifactId}</artifactId>
                   <version>8.4.2</version>
@@ -175,7 +179,7 @@ public class ChangeProjectVersionTest implements RewriteTest {
     @Test
     void changesMultipleMatchingProjects() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeProjectVersion("org.openrewrite", "rewrite-*", "8.4.2")),
+          spec -> spec.recipe(new ChangeProjectVersion("org.openrewrite", "rewrite-*", "8.4.2", null)),
           pomXml(
             """
               <project>
@@ -205,6 +209,85 @@ public class ChangeProjectVersionTest implements RewriteTest {
                   <version>8.4.2</version>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void doNotChangeProjectVersionInheritedFromParent() {
+        rewriteRun(
+          pomXml(
+            """
+                <project>
+                    <groupId>org.openrewrite</groupId>
+                    <artifactId>rewrite-core</artifactId>
+                    <version>8.4.1</version>
+                    
+                    <packaging>pom</packaging>
+                </project>
+              """
+          ),
+          mavenProject("rewrite-maven",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>org.openrewrite</groupId>
+                        <artifactId>rewrite-core</artifactId>
+                        <version>8.4.1</version>
+                    </parent>
+                    
+                    <groupId>org.openrewrite</groupId>
+                    <artifactId>rewrite-maven</artifactId>
+                </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void changeProjectVersionInheritedFromParentIfOverrideParentVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeProjectVersion("org.openrewrite", "rewrite-maven", "8.4.2", true)),
+          pomXml(
+            """
+                <project>
+                    <groupId>org.openrewrite</groupId>
+                    <artifactId>rewrite-core</artifactId>
+                    <version>8.4.1</version>
+                    
+                    <packaging>pom</packaging>
+                </project>
+              """
+          ),
+          mavenProject("rewrite-maven",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>org.openrewrite</groupId>
+                        <artifactId>rewrite-core</artifactId>
+                        <version>8.4.1</version>
+                    </parent>
+                    
+                    <groupId>org.openrewrite</groupId>
+                    <artifactId>rewrite-maven</artifactId>
+                </project>
+                """, """
+                <project>
+                    <parent>
+                        <groupId>org.openrewrite</groupId>
+                        <artifactId>rewrite-core</artifactId>
+                        <version>8.4.1</version>
+                    </parent>
+                    
+                    <groupId>org.openrewrite</groupId>
+                    <artifactId>rewrite-maven</artifactId>
+                    <version>8.4.2</version>
+                </project>
+                """
+            )
           )
         );
     }
