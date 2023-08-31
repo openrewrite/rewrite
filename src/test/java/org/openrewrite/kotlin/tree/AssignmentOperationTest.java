@@ -16,6 +16,8 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -87,6 +89,23 @@ class AssignmentOperationTest implements RewriteTest {
               fun method ( ) {
                 var n = 84
                 n /= if (true) 42 else 21
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/268")
+    @ExpectedToFail
+    void augmentedPlusAssign() {
+        rewriteRun(
+          kotlin(
+            """
+              fun names(): Set<String> {
+                  val result = HashSet<String>()
+                  result += "x"
+                  return result
               }
               """
           )
