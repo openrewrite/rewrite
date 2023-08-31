@@ -17,6 +17,7 @@ package org.openrewrite.kotlin.tree;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.KotlinParser;
@@ -370,6 +371,22 @@ class AnnotationTest implements RewriteTest {
               }
               """
             )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/267")
+    @ExpectedToFail
+    void expressionAnnotationInsideLambda() {
+        rewriteRun(
+          kotlin(
+            """
+              val s = java.util.function.Supplier<String> {
+                  @Suppress("UNCHECKED_CAST")
+                  requireNotNull("x")
+              }
+              """
+          )
         );
     }
 }
