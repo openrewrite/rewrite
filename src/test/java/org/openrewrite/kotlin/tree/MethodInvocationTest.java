@@ -601,4 +601,17 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/270")
+    @ExpectedToFail
+    void extensionFunctionCall() {
+        rewriteRun(
+          kotlin(
+            """
+              val block: Collection<Any>.() -> Unit = {}
+              val r = listOf("descriptor").block()
+              """
+          )
+        );
+    }
 }
