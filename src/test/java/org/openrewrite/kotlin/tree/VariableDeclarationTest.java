@@ -18,9 +18,11 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
+import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -305,6 +307,29 @@ class VariableDeclarationTest implements RewriteTest {
 
               class Example {
                   var value: Int by IntDelegate()
+              }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/277")
+    @Test
+    void provideDelegateBinaryType() {
+        rewriteRun(
+          spec -> spec.parser(KotlinParser.builder().classpath("clikt")),
+          kotlin(
+            """
+              import com.github.ajalt.clikt.core.CliktCommand
+              import com.github.ajalt.clikt.parameters.arguments.argument
+              import com.github.ajalt.clikt.parameters.arguments.multiple
+              import com.github.ajalt.clikt.parameters.types.file
+
+              class CodeGenCli : CliktCommand("Generate Java sources for SCHEMA file(s)") {
+                  private val schemas by argument().file(mustExist = true).multiple()
+                  override fun run() {
+                  }
               }
               """
           )

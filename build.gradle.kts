@@ -39,6 +39,8 @@ dependencies {
     testImplementation("org.openrewrite:rewrite-test")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
     testRuntimeOnly("org.openrewrite:rewrite-java-17")
+
+    testImplementation("com.github.ajalt.clikt:clikt:3.5.0")
 }
 
 val compileKotlin: KotlinCompile by tasks
