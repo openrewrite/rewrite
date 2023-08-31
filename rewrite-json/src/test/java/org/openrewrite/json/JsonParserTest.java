@@ -81,6 +81,13 @@ public class JsonParserTest implements RewriteTest {
     }
 
     @Test
+    void bigInteger() {
+        rewriteRun(
+          json("-10000000000000000999")
+        );
+    }
+
+    @Test
     void array() {
         rewriteRun(
           json("[ 1 , 2 , 3 , ]")

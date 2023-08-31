@@ -26,6 +26,7 @@ import org.openrewrite.json.internal.grammar.JSON5Parser;
 import org.openrewrite.json.tree.*;
 import org.openrewrite.marker.Markers;
 
+import java.math.BigInteger;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -217,7 +218,11 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
                 try {
                     value = Integer.parseInt(text) * sign.get();
                 } catch (NumberFormatException e) {
-                    value = Long.parseLong(text) * sign.get();
+                    try {
+                        value = Long.parseLong(text) * sign.get();
+                    } catch (NumberFormatException e1) {
+                        value = sign.get() == 1 ? new BigInteger(text, 10) : new BigInteger("-" + text, 10);
+                    }
                 }
             }
         }
