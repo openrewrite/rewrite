@@ -218,8 +218,9 @@ class WhenTest implements RewriteTest {
               fun method() {
                   val condition: Int = 11
                   when {
-                      condition < 10   ->    1
-                      condition > 10   ->    true
+                      condition < 20   ->    'c'
+                      condition < 10   ->    -1
+                      condition > 10   ->    (true)
                       else             ->    0.9
                   }
               }
@@ -228,6 +229,7 @@ class WhenTest implements RewriteTest {
                 K.When when = (K.When)((J.MethodDeclaration)(cu.getStatements().get(0))).getBody().getStatements().get(1);
                 boolean allBranchesHasLiteralBody = when.getBranches().getStatements().stream().map(K.WhenBranch.class::cast).allMatch(
                   branch -> branch.getBody() instanceof J.Literal
+                            || branch.getBody() instanceof J.Parentheses<?> && ((J.Parentheses<?>) branch.getBody()).getTree() instanceof J.Literal
                 );
                 assertThat(allBranchesHasLiteralBody).isTrue();
             })

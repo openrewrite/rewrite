@@ -74,7 +74,7 @@ import org.openrewrite.java.tree.TypeTree.build
 import org.openrewrite.kotlin.KotlinParser
 import org.openrewrite.kotlin.KotlinTypeMapping
 import org.openrewrite.kotlin.marker.*
-import org.openrewrite.kotlin.tree.K.*
+import org.openrewrite.kotlin.tree.K
 import org.openrewrite.marker.Markers
 import org.openrewrite.style.NamedStyles
 import java.nio.charset.Charset
@@ -200,7 +200,7 @@ class KotlinParserVisitor(
             }
             statements.add(maybeSemicolon(statement!!))
         }
-        return CompilationUnit(
+        return K.CompilationUnit(
             randomId(),
             Space.EMPTY,
             Markers.build(styles),
@@ -640,7 +640,7 @@ class KotlinParserVisitor(
     }
 
     override fun visitArrayOfCall(arrayOfCall: FirArrayOfCall, data: ExecutionContext): J {
-        return ListLiteral(
+        return K.ListLiteral(
             randomId(),
             sourceBefore("["),
             Markers.EMPTY,
@@ -704,7 +704,11 @@ class KotlinParserVisitor(
     }
 
     override fun visitBlock(block: FirBlock, data: ExecutionContext): J {
-        return visitBlock(block, emptySet(), data)
+        return if (block is FirSingleExpressionBlock) visitSingleExpressionBlock(block, data) else visitBlock(block, emptySet(), data)
+    }
+
+    private fun visitSingleExpressionBlock(block: FirSingleExpressionBlock, data: ExecutionContext): J {
+        return visitElement(block.statement, data)!!
     }
 
     /**
@@ -724,15 +728,12 @@ class KotlinParserVisitor(
     private fun visitBlock(block: FirBlock, skipStatements: Set<FirElement>, data: ExecutionContext): J {
         var saveCursor = cursor
         var prefix: Space = whitespace()
-        var omitBraces: OmitBraces? = null
-        val isEmptyBody = !source.startsWith("{", cursor)
-        if (isEmptyBody) {
+        val hasBraces = skip("{")
+        if (!hasBraces) {
             cursor(saveCursor)
             prefix = Space.EMPTY
-            omitBraces = OmitBraces(randomId())
-        } else {
-            skip("{")
         }
+
         val firStatements: MutableList<FirStatement> = ArrayList(block.statements.size)
         for (s in block.statements) {
             // Skip FirElements that should not be processed.
@@ -767,7 +768,7 @@ class KotlinParserVisitor(
             if (j == null) {
                 j = visitElement(firElement, data)
                 if (j !is Statement && j is Expression) {
-                    j = ExpressionStatement(randomId(), j)
+                    j = K.ExpressionStatement(randomId(), j)
                 }
             }
             i += skipImplicitDestructs
@@ -786,10 +787,10 @@ class KotlinParserVisitor(
         return J.Block(
             randomId(),
             prefix,
-            if (omitBraces == null) Markers.EMPTY else Markers.EMPTY.addIfAbsent(omitBraces),
+            if (hasBraces) Markers.EMPTY else Markers.EMPTY.addIfAbsent(OmitBraces(randomId())),
             JRightPadded.build(false),
             statements,
-            if (isEmptyBody) Space.EMPTY else sourceBefore("}")
+            if (hasBraces) sourceBefore("}") else Space.EMPTY
         )
     }
 
@@ -907,14 +908,14 @@ class KotlinParserVisitor(
         val rightExpr =
             convertToExpression<Expression>(right, data)!!
         return if (op == FirOperation.IDENTITY || op == FirOperation.NOT_IDENTITY) {
-            Binary(
+            K.Binary(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
                 leftExpr,
                 padLeft(
                     opPrefix,
-                    if (op == FirOperation.IDENTITY) Binary.Type.IdentityEquals else Binary.Type.IdentityNotEquals
+                    if (op == FirOperation.IDENTITY) K.Binary.Type.IdentityEquals else K.Binary.Type.IdentityNotEquals
                 ),
                 rightExpr,
                 Space.EMPTY,
@@ -1199,7 +1200,7 @@ class KotlinParserVisitor(
         return receiver
     }
 
-    private fun mapDestructProperty(properties: List<FirStatement>): DestructuringDeclaration {
+    private fun mapDestructProperty(properties: List<FirStatement>): K.DestructuringDeclaration {
         val prefix = whitespace()
         val initializer = properties[0] as FirProperty
         val destructuringDeclaration = getRealPsiElement(initializer) as KtDestructuringDeclaration?
@@ -1255,7 +1256,7 @@ class KotlinParserVisitor(
             trailingAnnotations = null
             var j = visitComponentCall(property.initializer as FirComponentCall, data, true)
             if (j !is Expression && j is Statement) {
-                j = StatementExpression(randomId(), j)
+                j = K.StatementExpression(randomId(), j)
             }
             namedVariable =
                 namedVariable.padding.withInitializer(padLeft(Space.build(" ", emptyList()), j as Expression))
@@ -1300,7 +1301,7 @@ class KotlinParserVisitor(
                 )
             )
         )
-        return DestructuringDeclaration(
+        return K.DestructuringDeclaration(
             randomId(),
             prefix,
             Markers.EMPTY,
@@ -1487,7 +1488,7 @@ class KotlinParserVisitor(
         val prefix = whitespace()
         var left: Expression
         val opPrefix: Space
-        val kotlinBinaryType: Binary.Type
+        val kotlinBinaryType: K.Binary.Type
         val right: Expression
         var after = Space.EMPTY
         when (functionCall.calleeReference.name.asString()) {
@@ -1501,7 +1502,7 @@ class KotlinParserVisitor(
 
                 // The `in` keyword is a function call to `contains` applied to a primitive range. I.E., `IntRange`, `LongRange`.
                 opPrefix = whitespace()
-                kotlinBinaryType = if (skip("!")) Binary.Type.NotContains else Binary.Type.Contains
+                kotlinBinaryType = if (skip("!")) K.Binary.Type.NotContains else K.Binary.Type.Contains
                 skip("in")
                 val rhs: FirExpression =
                     if (functionCall.explicitReceiver != null) functionCall.explicitReceiver!! else functionCall.dispatchReceiver
@@ -1511,7 +1512,7 @@ class KotlinParserVisitor(
             "get" -> {
                 left = convertToExpression(functionCall.explicitReceiver!!, data)!!
                 opPrefix = sourceBefore("[")
-                kotlinBinaryType = Binary.Type.Get
+                kotlinBinaryType = K.Binary.Type.Get
                 right = convertToExpression(functionCall.argumentList.arguments[0], data)!!
                 after = sourceBefore("]")
             }
@@ -1562,7 +1563,7 @@ class KotlinParserVisitor(
                     if (functionCall.explicitReceiver != null) functionCall.explicitReceiver else functionCall.dispatchReceiver
                 left = convertToExpression(lhs as FirElement, data)!!
                 opPrefix = sourceBefore("..<")
-                kotlinBinaryType = Binary.Type.RangeUntil
+                kotlinBinaryType = K.Binary.Type.RangeUntil
                 right = convertToExpression(functionCall.argumentList.arguments[0], data)!!
             }
 
@@ -1571,11 +1572,11 @@ class KotlinParserVisitor(
                     if (functionCall.explicitReceiver != null) functionCall.explicitReceiver else functionCall.dispatchReceiver
                 left = convertToExpression(lhs as FirElement, data)!!
                 opPrefix = sourceBefore("..")
-                kotlinBinaryType = Binary.Type.RangeTo
+                kotlinBinaryType = K.Binary.Type.RangeTo
                 right = convertToExpression(functionCall.argumentList.arguments[0], data)!!
             }
         }
-        return Binary(
+        return K.Binary(
             randomId(),
             prefix,
             Markers.EMPTY,
@@ -1715,7 +1716,7 @@ class KotlinParserVisitor(
             body,
             closureType
         )
-        return FunctionType(
+        return K.FunctionType(
             randomId(),
             prefix,
             Markers.EMPTY,
@@ -2013,7 +2014,7 @@ class KotlinParserVisitor(
             emptyList(),
             variables
         )
-        return if (getter == null && setter == null) variableDeclarations else Property(
+        return if (getter == null && setter == null) variableDeclarations else K.Property(
             randomId(),
             variableDeclarations.prefix,
             Markers.EMPTY,
@@ -2042,7 +2043,7 @@ class KotlinParserVisitor(
                 typeExpression = if (j is TypeTree) {
                     j
                 } else {
-                    FunctionType(
+                    K.FunctionType(
                             randomId(),
                             Space.EMPTY,
                             Markers.EMPTY,
@@ -2180,7 +2181,7 @@ class KotlinParserVisitor(
                 for (i in valueParameters.indices) {
                     var j: J = visitElement(valueParameters[i], data)!!
                     if (j is Expression && j !is Statement) {
-                        j = ExpressionStatement(randomId(), j)
+                        j = K.ExpressionStatement(randomId(), j)
                     }
                     if (i == valueParameters.size - 1) {
                         parameters.add(padRight(j as Statement, sourceBefore(")")))
@@ -2205,10 +2206,7 @@ class KotlinParserVisitor(
             val blockPrefix = whitespace()
             if (propertyAccessor.body is FirSingleExpressionBlock) {
                 if (skip("=")) {
-                    val singleExpressionBlock = SingleExpressionBlock(randomId())
-                    body = visitElement(propertyAccessor.body!!, data) as J.Block?
-                    body = body!!.withPrefix(blockPrefix)
-                    body = body.withMarkers(body.markers.addIfAbsent(singleExpressionBlock))
+                    body = convertToBlock(propertyAccessor.body as FirSingleExpressionBlock, data).withPrefix(blockPrefix)
                 }
             } else {
                 cursor(saveCursor)
@@ -2290,7 +2288,7 @@ class KotlinParserVisitor(
             returnExpr = convertToExpression(returnExpression.result, data)
         }
         val k =
-            KReturn(randomId(), annotations, J.Return(randomId(), prefix, Markers.EMPTY, returnExpr), label)
+            K.KReturn(randomId(), annotations, J.Return(randomId(), prefix, Markers.EMPTY, returnExpr), label)
         return if (explicitReturn) k else k.withMarkers(k.markers.addIfAbsent(ImplicitReturn(randomId())))
     }
 
@@ -2589,10 +2587,7 @@ class KotlinParserVisitor(
         before = whitespace()
         if (simpleFunction.body is FirSingleExpressionBlock) {
             if (skip("=")) {
-                val singleExpressionBlock = SingleExpressionBlock(randomId())
-                body = visitElement(simpleFunction.body!!, data) as J.Block?
-                body = body!!.withPrefix(before)
-                body = body.withMarkers(body.markers.addIfAbsent(singleExpressionBlock))
+                body = convertToBlock(simpleFunction.body as FirSingleExpressionBlock, data).withPrefix(before)
             } else {
                 throw IllegalStateException("Unexpected single block expression, cursor is likely at the wrong position.")
             }
@@ -2656,7 +2651,7 @@ class KotlinParserVisitor(
             if (cursor < e.source!!.endOffset && skip("$")) {
                 val inBraces = skip("{")
                 values.add(
-                    KString.Value(
+                    K.KString.Value(
                         randomId(),
                         before,
                         Markers.EMPTY,
@@ -2672,7 +2667,7 @@ class KotlinParserVisitor(
             i++
         }
         cursor += delimiter.length
-        return KString(
+        return K.KString(
             randomId(),
             prefix,
             Markers.EMPTY,
@@ -2699,7 +2694,7 @@ class KotlinParserVisitor(
                 thisReceiverExpression.calleeReference.boundSymbol!!.fir
             )
         }
-        return KThis(
+        return K.KThis(
             randomId(),
             prefix,
             Markers.EMPTY,
@@ -2979,7 +2974,7 @@ class KotlinParserVisitor(
         }
 
         return name
-            ?: TypeParameterExpression(randomId(), J.TypeParameter(
+            ?: K.TypeParameterExpression(randomId(), J.TypeParameter(
                 randomId(),
                 Space.EMPTY,
                 markers,
@@ -3096,7 +3091,7 @@ class KotlinParserVisitor(
                 typeExpression = if (j is TypeTree) {
                     j
                 } else {
-                    FunctionType(
+                    K.FunctionType(
                         randomId(),
                         Space.EMPTY,
                         Markers.EMPTY,
@@ -3115,7 +3110,7 @@ class KotlinParserVisitor(
                     typeExpression = if (j is TypeTree) {
                         j
                     } else {
-                        FunctionType(
+                        K.FunctionType(
                             randomId(),
                             Space.EMPTY,
                             Markers.EMPTY,
@@ -3253,7 +3248,7 @@ class KotlinParserVisitor(
                 if (singleExpression) (whenBranch.result as FirSingleExpressionBlock).statement else whenBranch.result
             var j: J = visitElement(result, data)!!
             if (j !is Statement && j is Expression) {
-                j = ExpressionStatement(randomId(), j)
+                j = K.ExpressionStatement(randomId(), j)
             }
             J.If(
                 randomId(),
@@ -3329,7 +3324,7 @@ class KotlinParserVisitor(
                 }
                 val expressionContainer = JContainer.build(Space.EMPTY, expressions, Markers.EMPTY)
                 val body: J = visitElement(whenBranch.result, data)!!
-                val branch = WhenBranch(
+                val branch = K.WhenBranch(
                     randomId(),
                     branchPrefix,
                     Markers.EMPTY,
@@ -3347,7 +3342,7 @@ class KotlinParserVisitor(
                 statements,
                 bodySuffix
             )
-            return When(
+            return K.When(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
@@ -3370,7 +3365,7 @@ class KotlinParserVisitor(
             val elsePrefix = sourceBefore("else")
             var j = visitWhenBranch(branch, data)
             if (j !is Statement && j is Expression) {
-                j = ExpressionStatement(randomId(), j)
+                j = K.ExpressionStatement(randomId(), j)
             }
             val ifElse = J.If.Else(
                 randomId(),
@@ -3577,7 +3572,7 @@ class KotlinParserVisitor(
                     null,
                     if (type is JavaType.Method) type else null
                 )
-                FunctionType(randomId(), Space.EMPTY, Markers.EMPTY, newClass, emptyList(), emptyList(), null)
+                K.FunctionType(randomId(), Space.EMPTY, Markers.EMPTY, newClass, emptyList(), emptyList(), null)
             } else {
                 visitElement(constructor.returnTypeRef, data) as TypeTree?
             }
@@ -3598,10 +3593,7 @@ class KotlinParserVisitor(
         before = whitespace()
         if (constructor.body is FirSingleExpressionBlock) {
             if (skip("=")) {
-                val singleExpressionBlock = SingleExpressionBlock(randomId())
-                body = visitElement(constructor.body!!, data) as J.Block?
-                body = body!!.withPrefix(before)
-                body = body.withMarkers(body.markers.addIfAbsent(singleExpressionBlock))
+                body = convertToBlock(constructor.body as FirSingleExpressionBlock, data).withPrefix(before)
             } else {
                 throw IllegalStateException("Unexpected single block expression.")
             }
@@ -3959,7 +3951,7 @@ class KotlinParserVisitor(
                         null,
                         null
                     )
-                    element = FunctionType(
+                    element = K.FunctionType(
                         randomId(),
                         Space.EMPTY,
                         Markers.EMPTY,
@@ -4382,10 +4374,6 @@ class KotlinParserVisitor(
 
                 KtNodeTypes.OPERATION_REFERENCE -> if (KtNodeTypes.PREFIX_EXPRESSION == node.treeParent.elementType && firElement is FirBlock)
                     firElement = firElement.statements[0]
-
-                KtNodeTypes.INTEGER_CONSTANT, KtNodeTypes.FLOAT_CONSTANT, KtNodeTypes.BOOLEAN_CONSTANT -> if (firElement is FirSingleExpressionBlock)
-                    if (firElement.statement is FirConstExpression<*>)
-                        firElement = firElement.statement
             }
         }
 
@@ -4793,11 +4781,26 @@ class KotlinParserVisitor(
         }
     }
 
+    private fun convertToBlock(t: FirSingleExpressionBlock, data: ExecutionContext): J.Block {
+        var j: J = visitElement(t, data)!!
+        if (j !is Statement && j is Expression) {
+            j = K.ExpressionStatement(randomId(), j)
+        }
+        return J.Block(
+            randomId(),
+            Space.EMPTY,
+            Markers.EMPTY.addIfAbsent(OmitBraces(randomId())).addIfAbsent(SingleExpressionBlock(randomId())),
+            JRightPadded.build(false),
+            listOf(JRightPadded.build(j as Statement)),
+            Space.EMPTY
+        )
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun <J2 : J> convertToExpression(t: FirElement, data: ExecutionContext): J2? {
         var j: J? = visitElement(t, data)
         if (j is Statement && j !is Expression) {
-            j = StatementExpression(randomId(), j)
+            j = K.StatementExpression(randomId(), j)
         }
         return j as J2?
     }
@@ -4811,7 +4814,7 @@ class KotlinParserVisitor(
         val j: J? = visitElement(t, data)
         var j2: J2? = null
         if (j is Statement && j !is Expression) {
-            j2 = StatementExpression(randomId(), j) as J2
+            j2 = K.StatementExpression(randomId(), j) as J2
         } else if (j != null) {
             j2 = j as J2
         }

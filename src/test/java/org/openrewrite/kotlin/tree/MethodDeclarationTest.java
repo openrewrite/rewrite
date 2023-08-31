@@ -303,12 +303,22 @@ class MethodDeclarationTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/271")
-    @ExpectedToFail
     void negativeSingleExpression() {
         rewriteRun(
           kotlin(
             """
               fun size(): Int = -1
+              """
+          )
+        );
+    }
+
+    @Test
+    void parenthesizedSingleExpression() {
+        rewriteRun(
+          kotlin(
+            """
+              fun size(): Int = (-1)
               """
           )
         );
