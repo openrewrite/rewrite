@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.format;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
@@ -312,7 +311,6 @@ class BlankLinesTest implements RewriteTest {
                 );
             }
 
-            @Disabled("Parsing error to be fixed")
             @Issue("https://github.com/openrewrite/rewrite/issues/1171")
             @Test
             void minimumAfterClassHeaderNestedEnum() {

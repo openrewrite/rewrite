@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -270,7 +269,7 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
-    @Disabled
+    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/205")
     @Test
     void genericTypeConstraint() {

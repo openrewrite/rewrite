@@ -33,7 +33,6 @@ public class ChangeTypeTest implements RewriteTest {
         spec.recipe(new ChangeType("a.b.Original", "x.y.Target", true));
     }
 
-    @Disabled("Will be fixed by autoformatting")
     @Test
     void changeImport() {
         rewriteRun(
@@ -94,7 +93,6 @@ public class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    @Disabled("Requires fix in rewrite: https://github.com/openrewrite/rewrite/issues/2995")
     @Test
     void changeTypeWithGenericArgumentFullyQualified() {
         rewriteRun(
@@ -117,6 +115,8 @@ public class ChangeTypeTest implements RewriteTest {
             """
               package example
               
+              import x.y.Target
+
               fun test(original: x.y.Target<String>) { }
               """
           )
