@@ -291,7 +291,7 @@ public abstract class Recipe implements Cloneable {
     /**
      * The default implementation of validate on the recipe will look for package and field level annotations that
      * indicate a field is not-null. The annotations must have run-time retention and the simple name of the annotation
-     * must match one of the common names defined in {@link NullUtils}. Non-null Strings must also not be blank.
+     * must match one of the common names defined in {@link NullUtils}
      *
      * @return A validated instance based using non-null/nullable annotations to determine which fields of the recipe are required.
      */
@@ -300,10 +300,7 @@ public abstract class Recipe implements Cloneable {
         List<Field> requiredFields = NullUtils.findNonNullFields(this.getClass());
         for (Field field : requiredFields) {
             try {
-                validated = validated.and(
-                        field.getType().equals(String.class)
-                                ? Validated.notBlank(field.getName(), (String) field.get(this))
-                                : Validated.required(field.getName(), field.get(this)));
+                validated = validated.and(Validated.required(field.getName(), field.get(this)));
             } catch (IllegalAccessException e) {
                 logger.warn("Unable to validate the field [{}] on the class [{}]", field.getName(), this.getClass().getName());
             }
