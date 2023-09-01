@@ -617,11 +617,6 @@ class KotlinParserVisitor(
             convertToExpression<Expression>(callableReferenceAccess.explicitReceiver!!, data)!!
         }
 
-        var typeArgs: JContainer<Expression>? = null
-        if (callableReferenceAccess.typeArguments.isNotEmpty()) {
-            typeArgs = mapTypeArguments(callableReferenceAccess.typeArguments, data)
-        }
-
         val paddedExpr: JRightPadded<Expression> = if (receiverExpr == null) {
             padRight(J.Empty(randomId(), Space.EMPTY, Markers.EMPTY), sourceBefore("::"))
         } else {
@@ -633,7 +628,7 @@ class KotlinParserVisitor(
             prefix,
             Markers.EMPTY,
             paddedExpr,
-            typeArgs,
+            null,
             padLeft(whitespace(), visitElement(callableReferenceAccess.calleeReference, data) as J.Identifier),
             typeMapping.type(callableReferenceAccess.calleeReference),
             methodReferenceType,

@@ -95,4 +95,21 @@ class MethodReferenceTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void anonymousClassArgument() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.util.function.Supplier
+              
+              val s1: Supplier<List<String>> = Supplier(::emptyList)
+              val s2: Supplier<List<String>> = Supplier { emptyList() }
+              
+              val s3 = Supplier<List<String>>(::emptyList)
+              val s4 = Supplier<List<String>> { emptyList() }
+              """
+          )
+        );
+    }
 }
