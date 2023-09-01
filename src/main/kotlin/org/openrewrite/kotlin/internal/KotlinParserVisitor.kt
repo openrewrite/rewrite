@@ -2889,15 +2889,22 @@ class KotlinParserVisitor(
         } else {
             name = createIdentifier(typeParameter.name.asString(), typeParameter)
             if (nonImplicitParams.size == 1) {
-                bounds = JContainer.build(
-                    sourceBefore(":"), listOf(
-                        padRight(
-                            visitElement(
-                                nonImplicitParams[0], data
-                            ) as TypeTree, Space.EMPTY
-                        )
-                    ), Markers.EMPTY
-                )
+                val saveCursor = cursor
+                whitespace()
+                if (source[cursor] == ':') {
+                    cursor(saveCursor)
+                    bounds = JContainer.build(
+                        sourceBefore(":"), listOf(
+                            padRight(
+                                visitElement(
+                                    nonImplicitParams[0], data
+                                ) as TypeTree, Space.EMPTY
+                            )
+                        ), Markers.EMPTY
+                    )
+                } else {
+                    cursor(saveCursor)
+                }
             }
         }
         return J.TypeParameter(
