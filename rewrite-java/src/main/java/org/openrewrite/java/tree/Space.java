@@ -115,6 +115,8 @@ public class Space {
     public Space withWhitespace(String whitespace) {
         if (comments.isEmpty() && whitespace.isEmpty()) {
             return Space.EMPTY;
+        } else if (comments.isEmpty() && " ".equals(whitespace)) {
+            return SINGLE_SPACE;
         }
         if ((whitespace.isEmpty() && this.whitespace == null) || whitespace.equals(this.whitespace)) {
             return this;
