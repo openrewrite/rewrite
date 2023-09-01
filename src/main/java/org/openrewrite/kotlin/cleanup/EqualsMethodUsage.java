@@ -82,6 +82,16 @@ public class EqualsMethodUsage extends Recipe {
             }
 
             @Override
+            public <T extends J> J visitParentheses(J.Parentheses<T> parens, ExecutionContext ctx) {
+                J pa = super.visitParentheses(parens, ctx);
+                if (pa instanceof J.Parentheses && getCursor().pollMessage("replaced") != null) {
+                    getCursor().getParentTreeCursor().putMessage("replaced", true);
+                    return ((J.Parentheses<?>) pa).getTree();
+                }
+                return pa;
+            }
+
+            @Override
             public J visitMethodInvocation(J.MethodInvocation method,
                                            ExecutionContext ctx) {
                 method = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);

@@ -103,7 +103,6 @@ class EqualsMethodUsageTest implements RewriteTest {
         );
     }
 
-    @Disabled("Parentheses parsing error to be fixed")
     @Test
     void replaceWithNotEqualInParentheses() {
         rewriteRun(
