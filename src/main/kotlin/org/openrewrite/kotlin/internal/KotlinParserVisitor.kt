@@ -40,13 +40,11 @@ import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.impl.*
 import org.jetbrains.kotlin.fir.references.*
 import org.jetbrains.kotlin.fir.resolve.toFirRegularClassSymbol
+import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
-import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirVariableSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitUnitTypeRef
@@ -4493,7 +4491,8 @@ class KotlinParserVisitor(
         if (resolvedSymbol is FirVariableSymbol<*>) {
             var owner: JavaType.FullyQualified? = null
             val lookupTag: ConeClassLikeLookupTag? = resolvedSymbol.containingClassLookupTag()
-            if (lookupTag != null) {
+            if (lookupTag != null && lookupTag.toSymbol(firSession) !is FirAnonymousObjectSymbol) {
+                // TODO check type attribution for `FirAnonymousObjectSymbol` case
                 owner =
                     typeMapping.type(lookupTag.toFirRegularClassSymbol(firSession)!!.fir) as JavaType.FullyQualified?
             }
