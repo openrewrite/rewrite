@@ -35,4 +35,17 @@ class ExtensionFunctionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void extensionFunctionCall() {
+        rewriteRun(
+          kotlin(
+            """
+              fun String.foo(f: String, b: (String) -> Unit) = b(this.replace("a", f))
+
+              val x = "a".foo("b") { s -> println(s) }
+              """
+          )
+        );
+    }
 }

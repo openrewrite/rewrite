@@ -1087,11 +1087,15 @@ class KotlinParserVisitor(
                 markers = markers.addIfAbsent(Infix(randomId()))
                 markers = markers.addIfAbsent(Extension(randomId()))
             }
-            if (functionCall !is FirImplicitInvokeCall) {
-                val receiver = getReceiver(functionCall.explicitReceiver)
+
+            val implicitExtensionFunction = functionCall is FirImplicitInvokeCall
+                    && functionCall.arguments.isNotEmpty()
+                    && functionCall.source != null
+                    && functionCall.source!!.startOffset < functionCall.calleeReference.source!!.startOffset
+            if (functionCall !is FirImplicitInvokeCall || implicitExtensionFunction) {
+                val receiver = if (implicitExtensionFunction) functionCall.arguments[0] else getReceiver(functionCall.explicitReceiver)
                 if (receiver != null) {
-                    val selectExpr =
-                        convertToExpression<Expression>(receiver, data)
+                    val selectExpr = convertToExpression<Expression>(receiver, data)
                     if (selectExpr != null) {
                         val after = whitespace()
                         if (skip("?")) {
@@ -1102,6 +1106,7 @@ class KotlinParserVisitor(
                     }
                 }
             }
+
             val name = visitElement(namedReference, data) as J.Identifier
             var typeParams: JContainer<Expression>? = null
             if (functionCall.typeArguments.isNotEmpty()) {
@@ -1114,7 +1119,7 @@ class KotlinParserVisitor(
                 }
             }
 
-            val args = mapFunctionalCallArguments(functionCall)
+            val args = mapFunctionalCallArguments(functionCall, implicitExtensionFunction)
 
             var owner = getCurrentFile()
             if (namedReference is FirResolvedNamedReference) {
@@ -1295,10 +1300,10 @@ class KotlinParserVisitor(
         return annotations
     }
 
-    private fun mapFunctionalCallArguments(firCall: FirCall): JContainer<Expression> {
+    private fun mapFunctionalCallArguments(firCall: FirCall, skipFirstArgument: Boolean = false): JContainer<Expression> {
         var callPsi = getPsiElement(firCall)!!
         callPsi = if (callPsi is KtDotQualifiedExpression) callPsi.lastChild else callPsi
-        val firArguments = firCall.argumentList.arguments
+        val firArguments = if (skipFirstArgument) firCall.argumentList.arguments.subList(1, firCall.argumentList.arguments.size) else firCall.argumentList.arguments
         val flattenedExpressions = firArguments.stream()
             .map { e -> if (e is FirVarargArgumentsExpression) e.arguments else listOf(e) }
             .flatMap { it.stream() }
