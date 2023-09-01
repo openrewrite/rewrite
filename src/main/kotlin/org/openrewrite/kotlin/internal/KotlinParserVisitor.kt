@@ -347,7 +347,7 @@ class KotlinParserVisitor(
             label = visitElement(anonymousFunction.label!!, data) as J.Label?
         }
         val prefix = whitespace()
-        val omitBraces = !source.startsWith("{", cursor)
+        val omitBraces = source[cursor] != '{'
         if (omitBraces) {
             markers = markers.addIfAbsent(OmitBraces(randomId()))
         } else {
@@ -515,7 +515,7 @@ class KotlinParserVisitor(
         val args: JContainer<Expression>
         saveCursor = cursor
         val before = whitespace()
-        args = if (source.startsWith("(", cursor)) {
+        args = if (source[cursor] == '(') {
             if (anonymousObject.declarations.isNotEmpty() &&
                 anonymousObject.declarations[0] is FirPrimaryConstructor &&
                 (anonymousObject.declarations[0] as FirPrimaryConstructor).delegatedConstructor != null &&
@@ -1053,7 +1053,7 @@ class KotlinParserVisitor(
             }
             val saveCursor = cursor
             whitespace()
-            if (source.startsWith("<", cursor) && functionCall.typeArguments.isNotEmpty()) {
+            if (source[cursor] == '<' && functionCall.typeArguments.isNotEmpty()) {
                 cursor(saveCursor)
                 name = J.ParameterizedType(
                     randomId(),
@@ -1130,7 +1130,7 @@ class KotlinParserVisitor(
             if (functionCall.typeArguments.isNotEmpty()) {
                 val saveCursor = cursor
                 whitespace()
-                val parseTypeArguments = source.startsWith("<", cursor)
+                val parseTypeArguments = source[cursor] == '<'
                 cursor(saveCursor)
                 if (parseTypeArguments) {
                     typeParams = mapTypeArguments(functionCall.typeArguments, data)
@@ -1139,7 +1139,7 @@ class KotlinParserVisitor(
             val saveCursor = cursor
             whitespace()
             val args: JContainer<Expression>
-            if (source.startsWith("(", cursor)) {
+            if (source[cursor] == '(') {
                 cursor(saveCursor)
                 args = mapFunctionalCallArguments(functionCall.argumentList.arguments)
             } else {
@@ -1698,7 +1698,7 @@ class KotlinParserVisitor(
         val arrow = sourceBefore("->")
         val saveCursor = cursor
         whitespace()
-        val omitBraces = !source.startsWith("{")
+        val omitBraces = source[cursor] != '{'
         cursor(saveCursor)
         var body: J = visitElement(functionTypeRef.returnTypeRef, data)!!
         if (body is J.Block) {
@@ -2572,7 +2572,7 @@ class KotlinParserVisitor(
             returnTypeExpression = visitElement(simpleFunction.returnTypeRef, data) as TypeTree?
             saveCursor = cursor
             before = whitespace()
-            if (source.startsWith("?", cursor)) {
+            if (source[cursor] == '?') {
                 returnTypeExpression = returnTypeExpression!!.withMarkers(
                     returnTypeExpression.markers.addIfAbsent(IsNullable(randomId(), before))
                 )
@@ -2635,7 +2635,7 @@ class KotlinParserVisitor(
         val prefix = whitespace()
         val delimiter: String = if (source.startsWith("\"\"\"", cursor)) {
             "\"\"\""
-        } else if (source.startsWith("$", cursor)) {
+        } else if (source[cursor] == '$') {
             "$"
         } else {
             "\""
@@ -3578,7 +3578,7 @@ class KotlinParserVisitor(
             }
             saveCursor = cursor
             before = whitespace()
-            if (source.startsWith("?", cursor)) {
+            if (source[cursor] == '?') {
                 returnTypeExpression = returnTypeExpression!!.withMarkers(
                     returnTypeExpression.markers.addIfAbsent(IsNullable(randomId(), before))
                 )
@@ -3976,7 +3976,7 @@ class KotlinParserVisitor(
         val bodyPrefix = whitespace()
         val omitBraces: OmitBraces
         var body: J.Block
-        if (cursor == source.length || !source.startsWith("{", cursor)) {
+        if (cursor == source.length || source[cursor] != '{') {
             cursor(saveCursor)
             omitBraces = OmitBraces(randomId())
             body = J.Block(
@@ -4544,7 +4544,7 @@ class KotlinParserVisitor(
         fieldType: JavaType.Variable?
     ): J.Identifier {
         val prefix = whitespace()
-        val isQuotedSymbol = source.startsWith("`", cursor)
+        val isQuotedSymbol = source[cursor] == '`'
         val value: String
         if (isQuotedSymbol) {
             val closingQuoteIdx = source.indexOf('`', cursor + 1)
