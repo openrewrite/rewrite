@@ -350,7 +350,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
         J.MethodInvocation m = super.visitMethodInvocation(method, p);
 
-        boolean noParens = m.getMarkers().findFirst(OmitParentheses.class).isPresent();
+        boolean noParens = m.getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class).isPresent();
         boolean infix = m.getMarkers().findFirst(Infix.class).isPresent();
 
         if (infix && m.getPadding().getSelect() != null) {

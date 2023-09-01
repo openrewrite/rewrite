@@ -188,9 +188,7 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun method ( arg : Any ) {
-                  val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
-              }
+              val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
               """
           )
         );
@@ -316,7 +314,7 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              class FreeSpec ( private val init : FreeSpec . ( ) -> Unit ) {
+              class FreeSpec ( private val initializer : FreeSpec . ( ) -> Unit ) {
                 infix fun String . modify ( block : ( ) -> Unit ) : Nothing = TODO ( )
               }
               

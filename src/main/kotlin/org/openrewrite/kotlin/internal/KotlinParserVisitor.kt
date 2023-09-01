@@ -522,7 +522,9 @@ class KotlinParserVisitor(
                 (anonymousObject.declarations[0] as FirPrimaryConstructor).delegatedConstructor!!.argumentList.arguments.isNotEmpty()
             ) {
                 cursor(saveCursor)
-                mapFunctionalCallArguments((anonymousObject.declarations[0] as FirPrimaryConstructor).delegatedConstructor!!.argumentList.arguments)
+                val delegatedConstructor =
+                    (anonymousObject.declarations[0] as FirPrimaryConstructor).delegatedConstructor!!
+                mapFunctionalCallArguments(delegatedConstructor)
             } else {
                 skip("(")
                 JContainer.build(
@@ -1066,32 +1068,7 @@ class KotlinParserVisitor(
             } else {
                 cursor(saveCursor)
             }
-            val args: JContainer<Expression>
-            var arrExpressions: MutableList<FirExpression> = mutableListOf()
-            var init: FirLambdaArgumentExpression? = null
-            if (functionCall.argumentList is FirResolvedArgumentList) {
-                for ((key, value) in (functionCall.argumentList as FirResolvedArgumentList).mapping) {
-                    if (key is FirLambdaArgumentExpression && "init" == value.name.asString()) {
-                        init = key
-                    } else {
-                        arrExpressions.add(key)
-                    }
-                }
-            } else {
-                arrExpressions = functionCall.argumentList.arguments.toMutableList()
-            }
-            args = mapFunctionalCallArguments(arrExpressions)
-            var body: J.Block? = null
-            if (init != null) {
-                body = J.Block(
-                    randomId(),
-                    sourceBefore("{"),
-                    Markers.EMPTY,
-                    JRightPadded(false, Space.EMPTY, Markers.EMPTY),
-                    listOf(padRight(visitElement(init, data) as Statement, Space.EMPTY)),
-                    sourceBefore("}")
-                )
-            }
+            val args = mapFunctionalCallArguments(functionCall)
             J.NewClass(
                 randomId(),
                 prefix,
@@ -1100,7 +1077,7 @@ class KotlinParserVisitor(
                 Space.EMPTY,
                 name,
                 args,
-                body,
+                null,
                 typeMapping.methodInvocationType(functionCall, getCurrentFile())
             )
         } else {
@@ -1136,25 +1113,9 @@ class KotlinParserVisitor(
                     typeParams = mapTypeArguments(functionCall.typeArguments, data)
                 }
             }
-            val saveCursor = cursor
-            whitespace()
-            val args: JContainer<Expression>
-            if (source[cursor] == '(') {
-                cursor(saveCursor)
-                args = mapFunctionalCallArguments(functionCall.argumentList.arguments)
-            } else {
-                cursor(saveCursor)
-                markers = markers.addIfAbsent(OmitParentheses(randomId()))
-                val arguments: MutableList<JRightPadded<Expression>> =
-                    ArrayList(functionCall.argumentList.arguments.size)
-                for (argument in functionCall.argumentList.arguments) {
-                    val expr =
-                        convertToExpression<Expression>(argument, data)!!
-                    val padded = JRightPadded.build(expr)
-                    arguments.add(padded)
-                }
-                args = JContainer.build(arguments)
-            }
+
+            val args = mapFunctionalCallArguments(functionCall)
+
             var owner = getCurrentFile()
             if (namedReference is FirResolvedNamedReference) {
                 val symbol = namedReference.resolvedSymbol
@@ -1334,18 +1295,22 @@ class KotlinParserVisitor(
         return annotations
     }
 
-    private fun mapFunctionalCallArguments(firExpressions: List<FirExpression>): JContainer<Expression> {
-        val flattenedExpressions = firExpressions.stream()
-            .map { e: FirExpression ->
-                if (e is FirVarargArgumentsExpression) e.arguments else listOf(e)
-            }
+    private fun mapFunctionalCallArguments(firCall: FirCall): JContainer<Expression> {
+        var callPsi = getPsiElement(firCall)!!
+        callPsi = if (callPsi is KtDotQualifiedExpression) callPsi.lastChild else callPsi
+        val firArguments = firCall.argumentList.arguments
+        val flattenedExpressions = firArguments.stream()
+            .map { e -> if (e is FirVarargArgumentsExpression) e.arguments else listOf(e) }
             .flatMap { it.stream() }
             .collect(Collectors.toList())
         val argumentCount = flattenedExpressions.size
+        // Trailing lambda: https://kotlinlang.org/docs/lambdas.html#passing-trailing-lambdas
+        val hasTrailingLambda = argumentCount > 0 && callPsi.lastChild is KtLambdaArgument
         val expressions: MutableList<JRightPadded<Expression>> = ArrayList(flattenedExpressions.size)
         val isLastArgumentLambda = flattenedExpressions.isNotEmpty() && flattenedExpressions[argumentCount - 1] is FirLambdaArgumentExpression
+        val isInfix = firCall is FirFunctionCall && firCall.origin == FirFunctionCallOrigin.Infix
 
-        val markers = Markers.EMPTY
+        var markers = Markers.EMPTY
         val args: JContainer<Expression>
         var saveCursor = cursor
         val containerPrefix = whitespace()
@@ -1356,17 +1321,20 @@ class KotlinParserVisitor(
             cursor++
             saveCursor = cursor
             parenOrBrace = source[cursor]
+        } else if (parenOrBrace != '(') {
+            cursor(saveCursor2 - 1)
+            markers = markers.addIfAbsent(OmitParentheses(randomId()))
         } else {
             cursor(saveCursor2)
         }
-        if (firExpressions.isEmpty()) {
+        if (firArguments.isEmpty()) {
             args = if (parenOrBrace == '{') {
                 // function call arguments with no parens.
                 cursor(saveCursor)
                 JContainer.build(
                     containerPrefix,
                     listOf(padRight(J.Empty(randomId(), Space.EMPTY, Markers.EMPTY), Space.EMPTY)),
-                    markers.addIfAbsent(OmitParentheses(randomId()))
+                    markers
                 )
             } else {
                 JContainer.build(
@@ -1377,8 +1345,9 @@ class KotlinParserVisitor(
                 )
             }
         } else {
-            var isTrailingLambda = argumentCount == 1 && isCloseParen && isLastArgumentLambda
+            var isTrailingLambda = false
             for (i in flattenedExpressions.indices) {
+                isTrailingLambda = hasTrailingLambda && i == argumentCount - 1
                 val expression = flattenedExpressions[i]
                 var expr = convertToExpression<Expression>(expression, data)!!
                 if (isTrailingLambda && expr !is J.Empty) {
@@ -1388,23 +1357,22 @@ class KotlinParserVisitor(
                 }
                 val padding = whitespace()
                 var trailingComma: TrailingComma? = null
-                if (isLastArgumentLambda && i == argumentCount - 2) {
-                    trailingComma = if (skip(",")) TrailingComma(randomId(), whitespace()) else null
-                    if (skip(")")) {
-                        // Trailing lambda: https://kotlinlang.org/docs/lambdas.html#passing-trailing-lambdas
-                        isTrailingLambda = true
+                if (!isInfix) {
+                    if (isLastArgumentLambda && i == argumentCount - 2) {
+                        trailingComma = if (skip(",")) TrailingComma(randomId(), whitespace()) else null
+                        skip(")")
+                    } else if (i == argumentCount - 1) {
+                        trailingComma = if (skip(",")) TrailingComma(randomId(), whitespace()) else null
+                    } else {
+                        skip(",")
                     }
-                } else if (i == argumentCount - 1) {
-                    trailingComma = if (skip(",")) TrailingComma(randomId(), whitespace()) else null
-                } else {
-                    skip(",")
                 }
                 var padded = padRight(expr, padding)
                 padded =
                     if (trailingComma != null) padded.withMarkers(padded.markers.addIfAbsent(trailingComma)) else padded
                 expressions.add(padded)
             }
-            if (!isTrailingLambda) {
+            if (!isTrailingLambda && !isInfix) {
                 skip(")")
             }
             args = JContainer.build(containerPrefix, expressions, markers)
@@ -2582,7 +2550,7 @@ class KotlinParserVisitor(
         } else {
             cursor(saveCursor)
         }
-        var body: J.Block?
+        val body: J.Block?
         saveCursor = cursor
         before = whitespace()
         if (simpleFunction.body is FirSingleExpressionBlock) {
@@ -3557,9 +3525,7 @@ class KotlinParserVisitor(
                 val delegateName: TypeTree =
                     createIdentifier(if (constructor.delegatedConstructor!!.isThis) "this" else "super")
                 val argsPrefix = whitespace()
-                val args = mapFunctionalCallArguments(
-                    constructor.delegatedConstructor!!.argumentList.arguments
-                ).withBefore(argsPrefix)
+                val args = mapFunctionalCallArguments(constructor.delegatedConstructor!!).withBefore(argsPrefix)
                 val type = typeMapping.type(constructor)
                 val newClass = J.NewClass(
                     randomId(),
@@ -3588,7 +3554,7 @@ class KotlinParserVisitor(
         } else {
             cursor(saveCursor)
         }
-        var body: J.Block?
+        val body: J.Block?
         saveCursor = cursor
         before = whitespace()
         if (constructor.body is FirSingleExpressionBlock) {
@@ -3939,7 +3905,7 @@ class KotlinParserVisitor(
                 var element = visitElement(typeRef, data) as TypeTree
                 if (symbol != null && ClassKind.CLASS == symbol.fir.classKind) {
                     // Wrap the element in a J.NewClass to preserve the whitespace and container of `( )`
-                    val args = mapFunctionalCallArguments(firPrimaryConstructor!!.delegatedConstructor!!.argumentList.arguments)
+                    val args = mapFunctionalCallArguments(firPrimaryConstructor!!.delegatedConstructor!!)
                     val newClass = J.NewClass(
                         randomId(),
                         element.prefix,
@@ -4776,6 +4742,16 @@ class KotlinParserVisitor(
     private fun getRealPsiElement(element: FirElement?): PsiElement? {
         return if ((element?.source == null) || (element.source is KtFakeSourceElement)) {
             null
+        } else {
+            (element.source as KtRealPsiSourceElement?)?.psi
+        }
+    }
+
+    private fun getPsiElement(element: FirElement?): PsiElement? {
+        return if (element?.source == null) {
+            null
+        } else if (element.source is KtFakeSourceElement) {
+            (element.source as KtFakeSourceElement).psi
         } else {
             (element.source as KtRealPsiSourceElement?)?.psi
         }

@@ -779,11 +779,18 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
             visit(method.getName(), p);
             visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
-            JContainer<Expression> argContainer = method.getPadding().getArguments();
 
-            visitSpace(argContainer.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
+            visitArgumentsContainer(method.getPadding().getArguments(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
+
+            kotlinPrinter.trailingMarkers(method.getMarkers(), p);
+            afterSyntax(method, p);
+            return method;
+        }
+
+        private void visitArgumentsContainer(JContainer<Expression> argContainer, Space.Location argsLocation, PrintOutputCapture<P> p) {
+            visitSpace(argContainer.getBefore(), argsLocation, p);
             List<JRightPadded<Expression>> args = argContainer.getPadding().getElements();
-            boolean omitParensOnMethod = method.getMarkers().findFirst(OmitParentheses.class).isPresent();
+            boolean omitParensOnMethod = argContainer.getMarkers().findFirst(OmitParentheses.class).isPresent();
 
             int argCount = args.size();
             boolean isTrailingLambda = !args.isEmpty() && args.get(argCount - 1).getElement().getMarkers().findFirst(TrailingLambdaArgument.class).isPresent();
@@ -798,14 +805,16 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 // Print trailing lambda.
                 if (i == argCount - 1 && isTrailingLambda) {
                     visitSpace(arg.getAfter(), JRightPadded.Location.METHOD_INVOCATION_ARGUMENT.getAfterLocation(), p);
-                    p.append(")");
+                    if (!omitParensOnMethod) {
+                        p.append(")");
+                    }
                     visit(arg.getElement(), p);
                     break;
                 }
 
                 if (i > 0 && omitParensOnMethod && (
                         !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() &&
-                                !args.get(0).getElement().getMarkers().findFirst(org.openrewrite.java.marker.OmitParentheses.class).isPresent())) {
+                                !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent())) {
                     p.append(')');
                 } else if (i > 0) {
                     p.append(',');
@@ -822,10 +831,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             if (!omitParensOnMethod && !isTrailingLambda) {
                 p.append(')');
             }
-
-            kotlinPrinter.trailingMarkers(method.getMarkers(), p);
-            afterSyntax(method, p);
-            return method;
         }
 
         @Override
@@ -845,9 +850,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visitRightPadded(newClass.getPadding().getEnclosing(), JRightPadded.Location.NEW_CLASS_ENCLOSING, ".", p);
             visitSpace(newClass.getNew(), Space.Location.NEW_PREFIX, p);
             visit(newClass.getClazz(), p);
-            if (!newClass.getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class).isPresent()) {
-                visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
-            }
+
+            visitArgumentsContainer(newClass.getPadding().getArguments(), Space.Location.NEW_CLASS_ARGUMENTS, p);
+
             visit(newClass.getBody(), p);
             afterSyntax(newClass, p);
             return newClass;
