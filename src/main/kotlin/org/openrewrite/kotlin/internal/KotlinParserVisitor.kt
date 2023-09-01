@@ -1318,7 +1318,7 @@ class KotlinParserVisitor(
         var markers = Markers.EMPTY
         val args: JContainer<Expression>
         var saveCursor = cursor
-        val containerPrefix = whitespace()
+        var containerPrefix = whitespace()
         var parenOrBrace = source[cursor++]
         val saveCursor2 = cursor
         val isCloseParen = parenOrBrace == '(' && source[cursor] == ')'
@@ -1327,7 +1327,8 @@ class KotlinParserVisitor(
             saveCursor = cursor
             parenOrBrace = source[cursor]
         } else if (parenOrBrace != '(') {
-            cursor(saveCursor2 - 1)
+            cursor(saveCursor)
+            containerPrefix = Space.EMPTY
             markers = markers.addIfAbsent(OmitParentheses(randomId()))
         } else {
             cursor(saveCursor2)
