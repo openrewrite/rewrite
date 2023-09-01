@@ -945,13 +945,26 @@ public interface K extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
     @Data
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class Property implements K, Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Property.Padding> padding;
 
         @EqualsAndHashCode.Include
         UUID id;
 
         Space prefix;
         Markers markers;
+
+        @Nullable
+        JContainer<TypeParameter> typeParameters;
+
+        @Nullable
+        public List<TypeParameter> getTypeParameters() {
+            return typeParameters == null ? null : typeParameters.getElements();
+        }
+
         J.VariableDeclarations variableDeclarations;
 
         @Nullable
@@ -962,10 +975,11 @@ public interface K extends J {
 
         boolean isSetterFirst;
 
-        public Property(UUID id, Space prefix, Markers markers, VariableDeclarations variableDeclarations, @Nullable J.MethodDeclaration getter, @Nullable J.MethodDeclaration setter, boolean isSetterFirst) {
+        public Property(UUID id, Space prefix, Markers markers, @Nullable JContainer<TypeParameter> typeParameters, VariableDeclarations variableDeclarations, @Nullable J.MethodDeclaration getter, @Nullable J.MethodDeclaration setter, boolean isSetterFirst) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;
+            this.typeParameters = typeParameters;
             this.variableDeclarations = variableDeclarations;
             this.getter = getter;
             this.setter = setter;
@@ -983,9 +997,38 @@ public interface K extends J {
             return new CoordinateBuilder.Statement(this);
         }
 
+        public Property.Padding getPadding() {
+            Property.Padding p;
+            if (this.padding == null) {
+                p = new Property.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Property.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
         @Override
         public String toString() {
             return withPrefix(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Property t;
+
+            @Nullable
+            public JContainer<TypeParameter> getTypeParameters() {
+                return t.typeParameters;
+            }
+
+            public Property withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
+                return t.typeParameters == typeParameters ? t : new Property(t.id, t.prefix, t.markers, typeParameters, t.variableDeclarations, t.getter, t.setter, t.isSetterFirst);
+            }
         }
     }
 

@@ -1856,6 +1856,29 @@ class KotlinParserVisitor(
                 )
             }
         }
+
+        var typeParameters: JContainer<J.TypeParameter>? = null
+        if (property.typeParameters.isNotEmpty()) {
+            val before = sourceBefore("<")
+            val params: MutableList<JRightPadded<J.TypeParameter>> = ArrayList(property.typeParameters.size)
+            val parameters = property.typeParameters
+            for (i in parameters.indices) {
+                val typeParameter = parameters[i]
+                val j: J = visitElement(typeParameter, data)!!
+                params.add(
+                    padRight(
+                        j as J.TypeParameter,
+                        if (i == parameters.size - 1) sourceBefore(">") else sourceBefore(",")
+                    )
+                )
+            }
+            typeParameters = JContainer.build(
+                before,
+                params,
+                Markers.EMPTY
+            )
+        }
+
         var receiver: JRightPadded<Statement>? = null
         if (property.receiverParameter != null) {
             // Generates a VariableDeclaration to represent the receiver similar to how it is done in the Kotlin compiler.
@@ -1985,6 +2008,7 @@ class KotlinParserVisitor(
             randomId(),
             variableDeclarations.prefix,
             Markers.EMPTY,
+            typeParameters,
             variableDeclarations.withPrefix(Space.EMPTY),
             getter,
             setter,

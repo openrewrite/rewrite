@@ -258,6 +258,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
         }
 
+        delegate.visitContainer("<", property.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
+
         Extension extension = vd.getMarkers().findFirst(Extension.class).orElse(null);
         if (extension != null) {
             if (property.getSetter() != null &&
@@ -473,6 +475,16 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visit(breakStatement.getLabel(), p);
             afterSyntax(breakStatement, p);
             return breakStatement;
+        }
+
+        @Override
+        public void visitContainer(String before, @Nullable JContainer<? extends J> container, JContainer.Location location, String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
+            super.visitContainer(before, container, location, suffixBetween, after, p);
+        }
+
+        @Override
+        public <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container, JContainer.Location loc, PrintOutputCapture<P> pPrintOutputCapture) {
+            return super.visitContainer(container, loc, pPrintOutputCapture);
         }
 
         @Override
