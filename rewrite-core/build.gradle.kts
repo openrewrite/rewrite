@@ -8,6 +8,7 @@ plugins {
 dependencies {
     compileOnly("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
     compileOnly("org.eclipse.jgit:org.eclipse.jgit.ssh.jsch:5.13.+")
+    compileOnly("org.eclipse.jgit:org.eclipse.jgit.ssh.apache.agent:latest.release")
 
     implementation("org.openrewrite.tools:java-object-diff:latest.release")
 
