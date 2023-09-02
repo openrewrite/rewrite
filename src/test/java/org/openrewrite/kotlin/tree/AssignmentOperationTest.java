@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -97,14 +96,19 @@ class AssignmentOperationTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/268")
-    @ExpectedToFail
-    void augmentedPlusAssign() {
+    void augmentedAssign() {
         rewriteRun(
           kotlin(
             """
+              operator fun <T> MutableCollection<T>.divAssign(elements: Collection<T>) {
+                  this.retainAll(elements)
+              }
+
               fun names(): Set<String> {
                   val result = HashSet<String>()
                   result += "x"
+                  result -= "x"
+                  result /= setOf("x")
                   return result
               }
               """

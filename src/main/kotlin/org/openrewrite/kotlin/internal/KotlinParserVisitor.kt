@@ -1017,6 +1017,8 @@ class KotlinParserVisitor(
                 mapUnaryOperation(functionCall)
             } else if ("contains" == operatorName || "rangeTo" == operatorName || "get" == operatorName || "set" == operatorName || "rangeUntil" == operatorName) {
                 mapKotlinBinaryOperation(functionCall)
+            } else if (operatorName in augmentedAssignOperators) {
+                mapAugmentedAssign(functionCall)
             } else if ("provideDelegate" == operatorName) {
                 // TODO should we really just entirely skip the `provideDelegate` call in the LST?
                 visitElement(functionCall.explicitReceiver!!, data)!!
@@ -1597,6 +1599,54 @@ class KotlinParserVisitor(
         val right =
             convertToExpression<Expression>(functionCall.argumentList.arguments[0], data)!!
         return J.Binary(
+            randomId(),
+            prefix,
+            Markers.EMPTY,
+            left,
+            padLeft(opPrefix, javaBinaryType),
+            right,
+            typeMapping.type(functionCall)
+        )
+    }
+    private fun mapAugmentedAssign(functionCall: FirFunctionCall): J {
+        val prefix = whitespace()
+        val receiver: FirElement =
+            if (functionCall.explicitReceiver != null) functionCall.explicitReceiver!! else functionCall.dispatchReceiver
+        val left =
+            convertToExpression<Expression>(receiver, data)!!
+        val opPrefix: Space
+        val javaBinaryType: J.AssignmentOperation.Type
+        when (functionCall.calleeReference.name.asString()) {
+            "divAssign" -> {
+                javaBinaryType = J.AssignmentOperation.Type.Division
+                opPrefix = sourceBefore("/=")
+            }
+
+            "minusAssign" -> {
+                javaBinaryType = J.AssignmentOperation.Type.Subtraction
+                opPrefix = sourceBefore("-=")
+            }
+
+            "plusAssign" -> {
+                javaBinaryType = J.AssignmentOperation.Type.Addition
+                opPrefix = sourceBefore("+=")
+            }
+
+            "remAssign" -> {
+                javaBinaryType = J.AssignmentOperation.Type.Modulo
+                opPrefix = sourceBefore("%=")
+            }
+
+            "timesAssign" -> {
+                javaBinaryType = J.AssignmentOperation.Type.Multiplication
+                opPrefix = sourceBefore("*=")
+            }
+
+            else -> throw UnsupportedOperationException("Unsupported assignment operator type.")
+        }
+        val right =
+            convertToExpression<Expression>(functionCall.argumentList.arguments[0], data)!!
+        return J.AssignmentOperation(
             randomId(),
             prefix,
             Markers.EMPTY,
@@ -5015,5 +5065,9 @@ class KotlinParserVisitor(
         val space = Space.format(source, cursor, nextNonWhitespace)
         cursor = nextNonWhitespace
         return space
+    }
+
+    companion object {
+        private val augmentedAssignOperators = setOf("plusAssign", "minusAssign", "timesAssign", "divAssign", "remAssign")
     }
 }
