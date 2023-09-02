@@ -3559,7 +3559,7 @@ class KotlinParserVisitor(
             delegationCall = J.MethodInvocation(
                 randomId(),
                 thisPrefix,
-                Markers.EMPTY.addIfAbsent(ConstructorDelegation(randomId(), before)),
+                Markers.EMPTY.addIfAbsent(ConstructorDelegation(randomId(), before)).addIfAbsent(Implicit(randomId())),
                 null,
                 null,
                 delegateName,

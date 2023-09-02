@@ -1055,10 +1055,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
         protected void visitStatement(@Nullable JRightPadded<Statement> paddedStat, JRightPadded.Location location, PrintOutputCapture<P> p) {
             if (paddedStat != null) {
-                if (paddedStat.getElement().getMarkers().findFirst(ConstructorDelegation.class).isPresent()) {
+                Statement element = paddedStat.getElement();
+                if (element.getMarkers().findFirst(Implicit.class).isPresent()) {
                     return;
                 }
-                visit(paddedStat.getElement(), p);
+                visit(element, p);
                 visitSpace(paddedStat.getAfter(), location.getAfterLocation(), p);
                 visitMarkers(paddedStat.getMarkers(), p);
             }
