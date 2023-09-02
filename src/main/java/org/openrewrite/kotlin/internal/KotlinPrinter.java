@@ -755,7 +755,15 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                         kotlinPrinter.visitSpace(typeReferencePrefix.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p));
                 p.append(":");
                 visit(method.getReturnTypeExpression(), p);
+            } else if (method.getBody() != null && !method.getBody().getStatements().isEmpty()) {
+                Statement firstStatement = method.getBody().getStatements().get(0);
+                firstStatement.getMarkers().findFirst(ConstructorDelegation.class).ifPresent(delegation -> {
+                    kotlinPrinter.visitSpace(delegation.getPrefix(), KSpace.Location.CONSTRUCTOR_DELEGATION_PREFIX, p);
+                    p.append(":");
+                    visit(firstStatement, p);
+                });
             }
+
             visit(method.getBody(), p);
             afterSyntax(method, p);
             return method;
@@ -1061,6 +1069,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
         protected void visitStatement(@Nullable JRightPadded<Statement> paddedStat, JRightPadded.Location location, PrintOutputCapture<P> p) {
             if (paddedStat != null) {
+                if (paddedStat.getElement().getMarkers().findFirst(ConstructorDelegation.class).isPresent()) {
+                    return;
+                }
                 visit(paddedStat.getElement(), p);
                 visitSpace(paddedStat.getAfter(), location.getAfterLocation(), p);
                 visitMarkers(paddedStat.getMarkers(), p);

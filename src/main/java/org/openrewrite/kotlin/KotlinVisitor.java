@@ -20,11 +20,11 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.marker.*;
 import org.openrewrite.kotlin.service.KotlinAutoFormatService;
-import org.openrewrite.kotlin.tree.*;
+import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.kotlin.tree.KSpace;
 import org.openrewrite.marker.Marker;
 
 /**
@@ -294,6 +294,9 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         } else if (marker instanceof CheckNotNull) {
             CheckNotNull cnn = (CheckNotNull) marker;
             m = cnn.withPrefix(visitSpace(cnn.getPrefix(), KSpace.Location.CHECK_NOT_NULL_PREFIX, p));
+        } else if (marker instanceof ConstructorDelegation) {
+            ConstructorDelegation cd = (ConstructorDelegation) marker;
+            m = cd.withPrefix(visitSpace(cd.getPrefix(), KSpace.Location.CONSTRUCTOR_DELEGATION_PREFIX, p));
         } else if (marker instanceof IsNullable) {
             IsNullable isn = (IsNullable) marker;
             m = isn.withPrefix(visitSpace(isn.getPrefix(), KSpace.Location.IS_NULLABLE_PREFIX, p));
