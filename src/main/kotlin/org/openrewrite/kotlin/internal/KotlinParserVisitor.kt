@@ -1017,6 +1017,9 @@ class KotlinParserVisitor(
                 mapUnaryOperation(functionCall)
             } else if ("contains" == operatorName || "rangeTo" == operatorName || "get" == operatorName || "set" == operatorName || "rangeUntil" == operatorName) {
                 mapKotlinBinaryOperation(functionCall)
+            } else if ("provideDelegate" == operatorName) {
+                // TODO should we really just entirely skip the `provideDelegate` call in the LST?
+                visitElement(functionCall.explicitReceiver!!, data)!!
             } else {
                 mapBinaryOperation(functionCall)
             }
@@ -1910,7 +1913,7 @@ class KotlinParserVisitor(
             var initMarkers = Markers.EMPTY
             if (property.delegate != null) {
                 if (property.delegate is FirFunctionCall) {
-                    val prev = PsiTreeUtil.skipWhitespacesAndCommentsBackward(getRealPsiElement(property.delegate))
+                    val prev = PsiTreeUtil.skipWhitespacesAndCommentsBackward(getPsiElement(property.delegate))
                     val typeMarkersPair = mapTypeExpression(property, markers)
                     if (typeMarkersPair.first != null) {
                         typeExpression = typeMarkersPair.first

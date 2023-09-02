@@ -313,7 +313,6 @@ class VariableDeclarationTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/277")
     @Test
     void provideDelegateBinaryType() {
@@ -328,8 +327,23 @@ class VariableDeclarationTest implements RewriteTest {
 
               class CodeGenCli : CliktCommand("Generate Java sources for SCHEMA file(s)") {
                   private val schemas by argument().file(mustExist = true).multiple()
-                  override fun run() {
-                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/277")
+    @Test
+    void provideDelegateExtension() {
+        rewriteRun(
+          kotlin(
+            """
+              operator fun String.provideDelegate(thisRef: T, prop: kotlin.reflect.KProperty<*>): kotlin.properties.ReadOnlyProperty<T, Any> {
+                  return null!!
+              }
+              class T {
+                  val s by ""
               }
               """
           )
