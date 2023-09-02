@@ -2787,7 +2787,7 @@ class KotlinParserVisitor(
             FirOperation.AS -> after = sourceBefore("as")
             FirOperation.SAFE_AS -> {
                 after = sourceBefore("as?")
-                markers = markers.addIfAbsent(IsNullable(randomId(), Space.EMPTY))
+                markers = markers.addIfAbsent(IsNullSafe(randomId(), Space.EMPTY))
             }
 
             else -> throw UnsupportedOperationException("Unsupported type operator " + typeOperatorCall.operation.name)

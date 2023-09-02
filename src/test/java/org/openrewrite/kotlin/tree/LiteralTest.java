@@ -64,6 +64,18 @@ class LiteralTest implements RewriteTest {
     }
 
     @Test
+    void nullLiteral() {
+        rewriteRun(
+          kotlin(
+            """
+              val n1 = null
+              val n2: Any = null!!
+              """
+          )
+        );
+    }
+
+    @Test
     void literalBinary() {
         rewriteRun(
           kotlin(

@@ -120,7 +120,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         if (binary.getOperator() == K.Binary.Type.Get) {
             p.append("]");
         }
-        trailingMarkers(binary.getMarkers(), p);
         afterSyntax(binary, p);
         return binary;
     }
@@ -574,7 +573,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visit(fieldAccess.getTarget(), p);
             String prefix = fieldAccess.getMarkers().findFirst(IsNullSafe.class).isPresent() ? "?." : ".";
             visitLeftPadded(prefix, fieldAccess.getPadding().getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, p);
-            kotlinPrinter.trailingMarkers(fieldAccess.getMarkers(), p);
             afterSyntax(fieldAccess, p);
             return fieldAccess;
         }
@@ -604,7 +602,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             beforeSyntax(ident, Space.Location.IDENTIFIER_PREFIX, p);
             visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
             p.append(ident.getSimpleName());
-            kotlinPrinter.trailingMarkers(ident.getMarkers(), p);
             afterSyntax(ident, p);
             return ident;
         }
@@ -802,7 +799,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
             visitArgumentsContainer(method.getPadding().getArguments(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
 
-            kotlinPrinter.trailingMarkers(method.getMarkers(), p);
             afterSyntax(method, p);
             return method;
         }
@@ -879,16 +875,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
-        public J visitParameterizedType(J.ParameterizedType type, PrintOutputCapture<P> p) {
-            beforeSyntax(type, Space.Location.PARAMETERIZED_TYPE_PREFIX, p);
-            visit(type.getClazz(), p);
-            visitContainer("<", type.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
-            kotlinPrinter.trailingMarkers(type.getMarkers(), p);
-            afterSyntax(type, p);
-            return type;
-        }
-
-        @Override
         public J visitReturn(J.Return return_, PrintOutputCapture<P> p) {
             if (return_.getMarkers().findFirst(ImplicitReturn.class).isPresent()) {
                 visitSpace(return_.getPrefix(), Space.Location.RETURN_PREFIX, p);
@@ -917,7 +903,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             J.ControlParentheses<TypeTree> controlParens = typeCast.getClazz();
             beforeSyntax(controlParens, Space.Location.CONTROL_PARENTHESES_PREFIX, p);
 
-            String as = typeCast.getMarkers().findFirst(IsNullable.class).isPresent() ? "as?" : "as";
+            String as = typeCast.getMarkers().findFirst(IsNullSafe.class).isPresent() ? "as?" : "as";
             p.append(as);
 
             visit(controlParens.getTree(), p);
@@ -1150,6 +1136,12 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             p.append(keyword);
             afterSyntax(mod, p);
         }
+
+        @Override
+        protected void afterSyntax(J j, PrintOutputCapture<P> p) {
+            kotlinPrinter.trailingMarkers(j.getMarkers(), p);
+            super.afterSyntax(j, p);
+        }
     }
 
     private void trailingMarkers(Markers markers, PrintOutputCapture<P> p) {
@@ -1245,6 +1237,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     private void afterSyntax(J j, PrintOutputCapture<P> p) {
+        trailingMarkers(j.getMarkers(), p);
         afterSyntax(j.getMarkers(), p);
     }
 
