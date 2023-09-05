@@ -15,10 +15,14 @@
  */
 package org.openrewrite.java;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
@@ -39,7 +43,16 @@ import static org.openrewrite.java.tree.TypeUtils.getFullyQualifiedClassPath;
  * is aware of the import layout style and will correctly handle unfolding of wildcard imports if the import counts
  * drop below the configured values.
  */
+@Value
+@EqualsAndHashCode(callSuper = true)
 public class RemoveUnusedImports extends Recipe {
+
+    @Option(displayName = "Unfold wildcard imports",
+            description = "Expand wildcard imports into individual imports",
+            required = false)
+    @Nullable
+    Boolean unfoldWildcard;
+
     @Override
     public String getDisplayName() {
         return "Remove unused imports";
@@ -64,10 +77,16 @@ public class RemoveUnusedImports extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new NoMissingTypes(), new RemoveUnusedImportsVisitor());
+        return Preconditions.check(new NoMissingTypes(), new RemoveUnusedImportsVisitor(Boolean.TRUE.equals(unfoldWildcard)));
     }
 
     private static class RemoveUnusedImportsVisitor extends JavaIsoVisitor<ExecutionContext> {
+
+        private boolean unfoldWildcard;
+
+        public RemoveUnusedImportsVisitor(final boolean unfoldWildcard) {
+            this.unfoldWildcard = unfoldWildcard;
+        }
 
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
