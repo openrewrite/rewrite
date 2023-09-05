@@ -1962,7 +1962,7 @@ class KotlinParserVisitor(
         if (node != null) {
             var initMarkers = Markers.EMPTY
             if (property.delegate != null) {
-                if (property.delegate is FirFunctionCall) {
+                if (property.delegate is FirFunctionCall || property.delegate is FirPropertyAccessExpression || property.delegate is FirCallableReferenceAccess) {
                     val prev = PsiTreeUtil.skipWhitespacesAndCommentsBackward(getPsiElement(property.delegate))
                     val typeMarkersPair = mapTypeExpression(property, markers)
                     if (typeMarkersPair.first != null) {

@@ -26,7 +26,6 @@ class DelegationTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/145")
-    @ExpectedToFail
     void delegationByMap() {
         rewriteRun(
           kotlin(
@@ -42,7 +41,6 @@ class DelegationTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/269")
-    @ExpectedToFail
     void delegationToProperty() {
         rewriteRun(
           kotlin(
