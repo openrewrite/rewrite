@@ -3946,13 +3946,13 @@ class KotlinParserVisitor(
                 membersMultiVariablesSeparated.add(declaration)
             }
         }
-        var primaryConstructor: Statement? = null
+        var primaryConstructor: J.MethodDeclaration? = null
         if ((node as KtClassOrObject?)!!.primaryConstructor != null) {
             markers = markers.addIfAbsent(PrimaryConstructor(randomId()))
             primaryConstructor = mapPrimaryConstructor(firPrimaryConstructor)
         }
         var implementings: JContainer<TypeTree>? = null
-        var superTypes: MutableList<JRightPadded<TypeTree>>? = null
+        val superTypes: MutableList<JRightPadded<TypeTree>> = ArrayList(regularClass.superTypeRefs.size)
         var saveCursor = cursor
         val before = whitespace()
         skip(":")
@@ -3965,33 +3965,71 @@ class KotlinParserVisitor(
             val symbol = typeRef.coneType.toRegularClassSymbol(firSession)
             // Filter out generated types.
             if (typeRef.source != null && typeRef.source!!.kind !is KtFakeSourceElementKind) {
-                if (superTypes == null) {
-                    superTypes = ArrayList(regularClass.superTypeRefs.size)
-                }
                 var element = visitElement(typeRef, data) as TypeTree
                 if (firPrimaryConstructor != null && symbol != null && ClassKind.CLASS == symbol.fir.classKind) {
                     // Wrap the element in a J.NewClass to preserve the whitespace and container of `( )`
                     val args = mapFunctionalCallArguments(firPrimaryConstructor.delegatedConstructor!!)
-                    val newClass = J.NewClass(
+                    val delegationCall = J.MethodInvocation(
                         randomId(),
                         element.prefix,
-                        Markers.EMPTY,
+                        Markers.EMPTY.addIfAbsent(ConstructorDelegation(randomId(), before)).addIfAbsent(Implicit(randomId())),
                         null,
-                        Space.EMPTY,
-                        element.withPrefix(Space.EMPTY),
+                        null,
+                        J.Identifier(
+                            randomId(),
+                            prefix,
+                            Markers.EMPTY,
+                            emptyList(),
+                            if (firPrimaryConstructor.delegatedConstructor!!.isThis) "this" else "super",
+                            typeMapping.type(typeRef),
+                            null
+                        ),
                         args,
-                        null,
-                        null
+                        typeMapping.type(firPrimaryConstructor.delegatedConstructor!!.calleeReference.resolved!!.resolvedSymbol) as JavaType.Method?
                     )
-                    element = K.FunctionType(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        newClass,
-                        emptyList(),
-                        emptyList(),
-                        null
-                    )
+                    if (primaryConstructor == null) {
+                        primaryConstructor = J.MethodDeclaration(
+                            randomId(),
+                            Space.EMPTY,
+                            Markers.build(
+                                listOf(
+                                    PrimaryConstructor(randomId()),
+                                    Implicit(randomId())
+                                )
+                            ),
+                            emptyList(), // TODO annotations
+                            emptyList(), // TODO modifiers
+                            null,
+                            null,
+                            J.MethodDeclaration.IdentifierWithAnnotations(
+                                name.withMarkers(name.markers.addIfAbsent(Implicit(randomId()))),
+                                emptyList()
+                            ),
+                            JContainer.empty(),
+                            null,
+                            J.Block(
+                                randomId(),
+                                Space.EMPTY,
+                                Markers.EMPTY.addIfAbsent(OmitBraces(randomId())),
+                                JRightPadded(false, Space.EMPTY, Markers.EMPTY),
+                                listOf(JRightPadded.build(delegationCall)),
+                                Space.EMPTY
+                            ),
+                            null,
+                            null // TODO type
+                        )
+                    } else {
+                        primaryConstructor = primaryConstructor.withBody(J.Block(
+                            randomId(),
+                            Space.EMPTY,
+                            Markers.EMPTY.addIfAbsent(OmitBraces(randomId())),
+                            JRightPadded(false, Space.EMPTY, Markers.EMPTY),
+                            listOf(JRightPadded.build(delegationCall)),
+                            Space.EMPTY
+                        ))
+                    }
+                    markers = markers.addIfAbsent(PrimaryConstructor(randomId()))
+                    element = element.withMarkers(element.markers.addIfAbsent(ConstructorDelegation(randomId(), Space.EMPTY)))
                 }
                 superTypes.add(
                     JRightPadded.build(element)
@@ -3999,7 +4037,7 @@ class KotlinParserVisitor(
                 )
             }
         }
-        if (superTypes == null) {
+        if (superTypes.isEmpty()) {
             cursor(saveCursor)
         } else {
             implementings = JContainer.build(before, superTypes, Markers.EMPTY)
@@ -4122,7 +4160,7 @@ class KotlinParserVisitor(
         )
     }
 
-    private fun mapPrimaryConstructor(primaryConstructor: FirPrimaryConstructor?): Statement {
+    private fun mapPrimaryConstructor(primaryConstructor: FirPrimaryConstructor?): J.MethodDeclaration {
         val prefix = whitespace()
         var modifiers: MutableList<J.Modifier> = ArrayList()
         var leadingAnnotations: MutableList<J.Annotation> = mutableListOf()
@@ -4170,7 +4208,7 @@ class KotlinParserVisitor(
             leadingAnnotations,
             if (modifiers.isEmpty()) emptyList() else modifiers,
             null,
-            name,
+            null,
             J.MethodDeclaration.IdentifierWithAnnotations(
                 name.withMarkers(name.markers.addIfAbsent(Implicit(randomId()))),
                 emptyList()

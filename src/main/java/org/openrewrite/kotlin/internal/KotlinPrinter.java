@@ -531,7 +531,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             if (classDecl.getMarkers().findFirst(PrimaryConstructor.class).isPresent()) {
                 for (Statement statement : classDecl.getBody().getStatements()) {
                     if (statement instanceof J.MethodDeclaration &&
-                            statement.getMarkers().findFirst(PrimaryConstructor.class).isPresent()) {
+                        statement.getMarkers().findFirst(PrimaryConstructor.class).isPresent() &&
+                        !statement.getMarkers().findFirst(Implicit.class).isPresent()) {
                         J.MethodDeclaration method = (J.MethodDeclaration) statement;
                         beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
                         visit(method.getLeadingAnnotations(), p);
@@ -554,7 +555,25 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
 
             if (classDecl.getImplements() != null) {
-                visitContainer(":", classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, ",", null, p);
+                JContainer<TypeTree> container = classDecl.getPadding().getImplements();
+                beforeSyntax(container.getBefore(), container.getMarkers(), JContainer.Location.IMPLEMENTS.getBeforeLocation(), p);
+                p.append(":");
+                List<? extends JRightPadded<? extends J>> nodes = container.getPadding().getElements();
+                for (int i = 0; i < nodes.size(); i++) {
+                    JRightPadded<? extends J> node = nodes.get(i);
+                    J element = node.getElement();
+                    visit(element.getMarkers().findFirst(ConstructorDelegation.class)
+                                    .flatMap(m -> getConstructorDelegationCall(classDecl)
+                                            .map(c -> (J) c.withName((J.Identifier) element).withPrefix(Space.EMPTY)))
+                                    .orElse(element),
+                            p);
+                    visitSpace(node.getAfter(), JContainer.Location.IMPLEMENTS.getElementLocation().getAfterLocation(), p);
+                    visitMarkers(node.getMarkers(), p);
+                    if (i < nodes.size() - 1) {
+                        p.append(",");
+                    }
+                }
+                afterSyntax(container.getMarkers(), p);
             }
 
             if (!classDecl.getBody().getMarkers().findFirst(OmitBraces.class).isPresent()) {
@@ -562,6 +581,21 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
             afterSyntax(classDecl, p);
             return classDecl;
+        }
+
+        private Optional<J.MethodInvocation> getConstructorDelegationCall(J.ClassDeclaration classDecl) {
+            for (Statement statement : classDecl.getBody().getStatements()) {
+                if (statement instanceof J.MethodDeclaration && statement.getMarkers().findFirst(PrimaryConstructor.class).isPresent()) {
+                    J.MethodDeclaration constructor = (J.MethodDeclaration) statement;
+                    if (constructor.isConstructor() && constructor.getBody() != null && !constructor.getBody().getStatements().isEmpty()) {
+                        Statement delegationCall = constructor.getBody().getStatements().get(0);
+                        if (delegationCall instanceof J.MethodInvocation && delegationCall.getMarkers().findFirst(ConstructorDelegation.class).isPresent()) {
+                            return Optional.of((J.MethodInvocation) delegationCall);
+                        }
+                    }
+                }
+            }
+            return Optional.empty();
         }
 
         @Override

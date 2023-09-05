@@ -23,6 +23,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
+import org.openrewrite.kotlin.marker.Implicit;
 import org.openrewrite.kotlin.style.TabsAndIndentsStyle;
 import org.openrewrite.kotlin.tree.K;
 
@@ -652,7 +653,9 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
     @Nullable
     @Override
     public J visit(@Nullable Tree tree, P p) {
-        if (getCursor().getNearestMessage("stop") != null) {
+        if (tree instanceof J && tree.getMarkers().findFirst(Implicit.class).isPresent()) {
+            return (J) tree;
+        } else if (getCursor().getNearestMessage("stop") != null) {
             return (J) tree;
         }
         return super.visit(tree, p);
