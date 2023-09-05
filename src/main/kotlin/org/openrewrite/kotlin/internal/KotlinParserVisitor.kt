@@ -2559,7 +2559,7 @@ class KotlinParserVisitor(
         var before = sourceBefore("(")
         var params = if (simpleFunction.valueParameters.isNotEmpty()) JContainer.build(
             before,
-            convertAllToExpressions<Statement>(simpleFunction.valueParameters, ",", ")", data),
+            convertAll<Statement>(simpleFunction.valueParameters, ",", ")", data),
             Markers.EMPTY
         ) else JContainer.build(
             before, listOf(
@@ -3544,7 +3544,7 @@ class KotlinParserVisitor(
         var before = sourceBefore("(")
         params = if (constructor.valueParameters.isNotEmpty()) JContainer.build(
             before,
-            convertAllToExpressions(
+            convertAll(
                 constructor.valueParameters, ",", ")", data
             ),
             Markers.EMPTY
@@ -4152,7 +4152,7 @@ class KotlinParserVisitor(
         val before = sourceBefore("(")
         val params = if (primaryConstructor!!.valueParameters.isNotEmpty()) JContainer.build(
             before,
-            convertAllToExpressions<Statement>(
+            convertAll<Statement>(
                 primaryConstructor.valueParameters, ",", ")", data
             ),
             Markers.EMPTY
@@ -4883,11 +4883,40 @@ class KotlinParserVisitor(
     }
 
     @Suppress("SameParameterValue")
+    private fun <J2 : J> convertAll(
+        elements: List<FirElement>,
+        innerDelim: String,
+        delim: String,
+        data: ExecutionContext
+    ): MutableList<JRightPadded<J2>> {
+        return convertAll0(elements, data, innerDelim, delim) {
+            @Suppress("UNCHECKED_CAST")
+            it as J2
+        }
+    }
+
+    @Suppress("SameParameterValue")
     private fun <J2 : J> convertAllToExpressions(
         elements: List<FirElement>,
         innerDelim: String,
         delim: String,
         data: ExecutionContext
+    ): MutableList<JRightPadded<J2>> {
+        return convertAll0(elements, data, innerDelim, delim) {
+            if (it is Statement && it !is Expression) {
+                K.StatementExpression(randomId(), it)
+            }
+            @Suppress("UNCHECKED_CAST")
+            it as J2?
+        }
+    }
+
+    private fun <J2 : J> KotlinParserVisitor.convertAll0(
+        elements: List<FirElement>,
+        data: ExecutionContext,
+        innerDelim: String,
+        delim: String,
+        map: (J?) -> J2?
     ): MutableList<JRightPadded<J2>> {
         if (elements.isEmpty()) {
             return mutableListOf()
@@ -4900,7 +4929,7 @@ class KotlinParserVisitor(
             if (element.source != null) {
                 val saveCursor = cursor
                 try {
-                    j = convertToExpression(element, data)
+                    j = map(visitElement(element, data))
                 } catch (e: Exception) {
                     if (element.source == null || getRealPsiElement(element) == null) {
                         throw KotlinParsingException("Failed to parse declaration", e)
@@ -4935,7 +4964,7 @@ class KotlinParserVisitor(
                     skip(text)
                 }
             } else {
-                j = convertToExpression(element, data)
+                j = map(visitElement(element, data))
             }
             var rightPadded: JRightPadded<J2>
             if (i < elementCount - 1) {

@@ -17,7 +17,6 @@ package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -487,7 +486,26 @@ class ClassDeclarationTest implements RewriteTest {
               class SerializationException : IllegalArgumentException {
                   constructor(message: String?, cause: Throwable?) : super(message, cause)
               }
-              """
+              """,
+              spec -> spec.afterRecipe(cu -> {
+                  assertThat(cu.getStatements()).satisfiesExactly(stmt -> {
+                      J.ClassDeclaration clazz = (J.ClassDeclaration) stmt;
+                      assertThat(clazz.getBody().getStatements()).satisfiesExactly(decl -> {
+                          J.MethodDeclaration constructor = (J.MethodDeclaration) decl;
+                          assertThat(constructor.getParameters()).satisfiesExactly(
+                              message -> assertThat(message).isInstanceOf(J.VariableDeclarations.class),
+                              cause -> assertThat(cause).isInstanceOf(J.VariableDeclarations.class)
+                          );
+                          assertThat(constructor.getBody().getStatements()).satisfiesExactly(stmt1 -> {
+                              J.MethodInvocation superCall = (J.MethodInvocation) stmt1;
+                              assertThat(superCall.getArguments()).satisfiesExactly(
+                                  message -> assertThat(message).isInstanceOf(J.Identifier.class),
+                                  cause -> assertThat(cause).isInstanceOf(J.Identifier.class)
+                              );
+                          });
+                      });
+                  });
+              })
           )
         );
     }
