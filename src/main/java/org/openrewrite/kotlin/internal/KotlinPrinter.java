@@ -84,6 +84,14 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitAnnotatedExpression(K.AnnotatedExpression annotatedExpression, PrintOutputCapture<P> p) {
+        visit(annotatedExpression.getAnnotations(), p);
+        visit(annotatedExpression.getExpression(), p);
+        afterSyntax(annotatedExpression, p);
+        return annotatedExpression;
+    }
+
+    @Override
     public J visitBinary(K.Binary binary, PrintOutputCapture<P> p) {
         beforeSyntax(binary, Space.Location.BINARY_PREFIX, p);
         String keyword = "";
@@ -173,6 +181,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitKReturn(K.KReturn kReturn, PrintOutputCapture<P> p) {
+        // backwards compatibility: leave this in until `K.KReturn#annotations` has been deleted
         visit(kReturn.getAnnotations(), p);
         J.Return return_ = kReturn.getExpression();
         if (kReturn.getLabel() != null) {

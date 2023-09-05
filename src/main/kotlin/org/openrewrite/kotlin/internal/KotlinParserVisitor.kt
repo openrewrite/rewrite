@@ -2161,12 +2161,7 @@ class KotlinParserVisitor(
                 type
             )
         } else {
-            val annotations = mapAnnotations(propertyAccessExpression.annotations)
-            var j = visitElement(propertyAccessExpression.calleeReference, data)!!
-            if (j is J.Identifier && annotations != null) {
-                j = j.withAnnotations(annotations)
-            }
-            j
+            visitElement(propertyAccessExpression.calleeReference, data)!!
         }
     }
 
@@ -2307,15 +2302,6 @@ class KotlinParserVisitor(
     }
 
     override fun visitReturnExpression(returnExpression: FirReturnExpression, data: ExecutionContext): J {
-        val annotations: List<J.Annotation?>
-        if (returnExpression.annotations.isEmpty()) {
-            annotations = emptyList<J.Annotation>()
-        } else {
-            annotations = ArrayList(returnExpression.annotations.size)
-            for (annotation in returnExpression.annotations) {
-                annotations.add(visitElement(annotation, data) as J.Annotation?)
-            }
-        }
         var label: J.Identifier? = null
         val node = getRealPsiElement(returnExpression) as KtReturnExpression?
         val explicitReturn = node != null
@@ -2331,9 +2317,9 @@ class KotlinParserVisitor(
         if (returnExpression.result !is FirUnitExpression) {
             returnExpr = convertToExpression(returnExpression.result, data)
         }
-        val k =
-            K.KReturn(randomId(), annotations, J.Return(randomId(), prefix, Markers.EMPTY, returnExpr), label)
-        return if (explicitReturn) k else k.withMarkers(k.markers.addIfAbsent(ImplicitReturn(randomId())))
+
+        val markers = if (explicitReturn) Markers.EMPTY else Markers.EMPTY.addIfAbsent(ImplicitReturn(randomId()))
+        return K.KReturn(randomId(), J.Return(randomId(), prefix, markers, returnExpr), label)
     }
 
     override fun visitResolvedTypeRef(resolvedTypeRef: FirResolvedTypeRef, data: ExecutionContext): J {
@@ -4423,6 +4409,22 @@ class KotlinParserVisitor(
             }
         }
 
+        if (firElement is FirExpression && firElement.annotations.isNotEmpty()) {
+            val annotations = ArrayList<J.Annotation>(firElement.annotations.size)
+            for (annotation in firElement.annotations) {
+                annotations.add(visitElement(annotation, data) as J.Annotation)
+            }
+            return K.AnnotatedExpression(
+                randomId(),
+                Markers.EMPTY,
+                annotations,
+                visitElement0(firElement, data) as Expression
+            )
+        }
+        return visitElement0(firElement, data)
+    }
+
+    private fun visitElement0(firElement: FirElement, data: ExecutionContext): J? {
         return when (firElement) {
             // FIR error elements
             is FirErrorNamedReference -> visitErrorNamedReference(firElement, data)

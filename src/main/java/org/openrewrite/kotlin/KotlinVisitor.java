@@ -96,6 +96,19 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return after;
     }
 
+    public J visitAnnotatedExpression(K.AnnotatedExpression annotatedExpression, P p) {
+        K.AnnotatedExpression ae = annotatedExpression;
+        ae = ae.withMarkers(visitMarkers(ae.getMarkers(), p));
+        ae = ae.withAnnotations(ListUtils.map(ae.getAnnotations(), a -> visitAndCast(a, p)));
+        Expression temp = (Expression) visitExpression(ae, p);
+        if (!(temp instanceof K.AnnotatedExpression)) {
+            return temp;
+        } else {
+            ae = (K.AnnotatedExpression) temp;
+        }
+        return ae;
+    }
+
     public J visitBinary(K.Binary binary, P p) {
         K.Binary b = binary;
         b = b.withPrefix(visitSpace(b.getPrefix(), KSpace.Location.BINARY_PREFIX, p));
@@ -155,7 +168,12 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         } else {
             r = (K.KReturn) temp;
         }
-        r = r.withAnnotations(ListUtils.map(r.getAnnotations(), a -> visitAndCast(a, p)));
+        Expression temp2 = (Expression) visitExpression(r, p);
+        if (!(temp2 instanceof K.KReturn)) {
+            return temp2;
+        } else {
+            r = (K.KReturn) temp2;
+        }
         r = r.withExpression(visitAndCast(r.getExpression(), p));
         r = r.withLabel(visitAndCast(r.getLabel(), p));
         return r;
