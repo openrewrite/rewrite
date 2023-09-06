@@ -1963,7 +1963,15 @@ class KotlinParserVisitor(
         var isSetterFirst = false
         var typeExpression: TypeTree? = null
         val namePrefix = whitespace()
-        val name = createIdentifier(property.name.asString(), property)
+
+        val propertyName = property.name.asString()
+        val variableName = when (propertyName) {
+            "<unused var>" -> "_"
+            "<no name provided>" -> ""
+            else -> propertyName
+        }
+
+        val name = createIdentifier(variableName, property)
         var initializer: JLeftPadded<Expression>? = null
         if (node != null) {
             var initMarkers = Markers.EMPTY
