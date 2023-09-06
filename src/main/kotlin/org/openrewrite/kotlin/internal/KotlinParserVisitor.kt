@@ -246,6 +246,12 @@ class KotlinParserVisitor(
     }
 
     override fun visitAnnotationCall(annotationCall: FirAnnotationCall, data: ExecutionContext): J {
+        val psiAnnotation = getRealPsiElement(annotationCall)
+        val psiAnnotationChildren = psiAnnotation?.children
+        val hasValueArgumentList = if (psiAnnotationChildren != null) {
+            psiAnnotationChildren.any { it is KtValueArgumentList}
+        } else false
+
         val prefix = whitespace()
         var markers = Markers.EMPTY
         skip("@")
@@ -300,7 +306,7 @@ class KotlinParserVisitor(
         }
         val name = visitElement(annotationCall.annotationTypeRef, data) as NameTree
         var args: JContainer<Expression>? = null
-        if (annotationCall.argumentList.arguments.isNotEmpty()) {
+        if (hasValueArgumentList || annotationCall.argumentList.arguments.isNotEmpty()) {
             val argsPrefix = sourceBefore("(")
             val expressions: List<JRightPadded<Expression>> = if (annotationCall.argumentList.arguments.size == 1) {
                 if (annotationCall.argumentList.arguments[0] is FirVarargArgumentsExpression) {
@@ -4956,14 +4962,15 @@ class KotlinParserVisitor(
         delim: String,
         map: (J?) -> J2?
     ): MutableList<JRightPadded<J2>> {
-        if (elements.isEmpty()) {
-            return mutableListOf()
-        }
         val elementCount = elements.size
         val converted: MutableList<JRightPadded<J2>> = ArrayList(elementCount)
+
+        var j: J2? = null
+        var rightPadded: JRightPadded<J2>
+
         for (i in elements.indices) {
             val element = elements[i]
-            var j: J2?
+
             if (element.source != null) {
                 val saveCursor = cursor
                 try {
@@ -5004,34 +5011,38 @@ class KotlinParserVisitor(
             } else {
                 j = map(visitElement(element, data))
             }
-            var rightPadded: JRightPadded<J2>
+
             if (i < elementCount - 1) {
                 rightPadded = if (j != null) {
                     padRight(j, sourceBefore(innerDelim))
                 } else {
                     continue
                 }
-            } else {
-                val space = whitespace()
-                if (j != null) {
-                    rightPadded = if (skip(",")) padRight(j, space).withMarkers(
-                        Markers.build(
-                            listOf(
-                                TrailingComma(
-                                    randomId(), whitespace()
-                                )
-                            )
-                        )
-                    ) else padRight(j, space)
-                } else {
-                    @Suppress("UNCHECKED_CAST")
-                    j = J.Empty(randomId(), Space.EMPTY, Markers.EMPTY) as J2
-                    rightPadded = padRight(j, space)
-                }
-                skip(delim)
+
+                converted.add(rightPadded)
             }
-            converted.add(rightPadded)
         }
+
+        // handle last element
+        val space = whitespace()
+        if (j != null) {
+            rightPadded = if (skip(",")) padRight(j, space).withMarkers(
+                    Markers.build(
+                            listOf(
+                                    TrailingComma(
+                                            randomId(), whitespace()
+                                    )
+                            )
+                    )
+            ) else padRight(j, space)
+        } else {
+            @Suppress("UNCHECKED_CAST")
+            j = J.Empty(randomId(), Space.EMPTY, Markers.EMPTY) as J2
+            rightPadded = padRight(j, space)
+        }
+        skip(delim)
+        converted.add(rightPadded)
+
         return if (converted.isEmpty()) mutableListOf() else converted
     }
 

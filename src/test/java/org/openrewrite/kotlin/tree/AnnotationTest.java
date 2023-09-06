@@ -387,4 +387,21 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/284")
+    @Test
+    void annotationWithEmptyArguments() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Ann
+
+              @Suppress()
+              @Ann
+              class A {
+              }
+              """
+          )
+        );
+    }
 }
