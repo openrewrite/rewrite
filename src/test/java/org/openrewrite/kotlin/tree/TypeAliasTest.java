@@ -28,10 +28,6 @@ class TypeAliasTest implements RewriteTest {
           kotlin(
             """
               class Test
-              """
-          ),
-          kotlin(
-            """
               typealias TestAlias = Test
               val a : TestAlias = Test ( )
               """
@@ -45,10 +41,7 @@ class TypeAliasTest implements RewriteTest {
           kotlin(
             """
               class Test < T >
-              """
-          ),
-          kotlin(
-            """
+
               typealias OldAlias < T > = Test < T >
               val a : OldAlias < String > = Test < String> ( )
               """

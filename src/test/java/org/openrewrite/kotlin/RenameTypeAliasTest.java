@@ -33,8 +33,12 @@ public class RenameTypeAliasTest implements RewriteTest {
     @Test
     void doesNotMatchType() {
         rewriteRun(
-          kotlin("class Other"),
-          kotlin("typealias OldAlias = Other")
+          kotlin(
+            """
+              class Other
+              typealias OldAlias = Other
+              """
+          )
         );
     }
 
@@ -42,18 +46,27 @@ public class RenameTypeAliasTest implements RewriteTest {
     @Test
     void differentAliasName() {
         rewriteRun(
-          kotlin("class Test"),
-          kotlin("typealias OtherAlias = Test")
+          kotlin(
+            """
+              class Test
+              typealias OtherAlias = Test
+              """
+          )
         );
     }
 
     @Test
     void declaration() {
         rewriteRun(
-          kotlin("class Test"),
           kotlin(
-            "typealias OldAlias = Test",
-            "typealias NewAlias = Test"
+            """
+              class Test
+              typealias OldAlias = Test
+              """,
+            """
+              class Test
+              typealias NewAlias = Test
+              """
           )
         );
     }
@@ -86,13 +99,14 @@ public class RenameTypeAliasTest implements RewriteTest {
     @Test
     void variableTypeExpression() {
         rewriteRun(
-          kotlin("class Test"),
           kotlin(
             """
+              class Test
               typealias OldAlias = Test
               val a : OldAlias = Test()
               """,
             """
+              class Test
               typealias NewAlias = Test
               val a : NewAlias = Test()
               """
@@ -103,14 +117,15 @@ public class RenameTypeAliasTest implements RewriteTest {
     @Test
     void functionParameter() {
         rewriteRun(
-          kotlin("class Test"),
           kotlin(
             """
+              class Test
               typealias OldAlias = Test
               fun method(a: OldAlias) {
               }
               """,
             """
+              class Test
               typealias NewAlias = Test
               fun method(a: NewAlias) {
               }
@@ -122,15 +137,16 @@ public class RenameTypeAliasTest implements RewriteTest {
     @Test
     void parameterizedType() {
         rewriteRun(
-          kotlin("class Test<T>"),
           kotlin(
             """
+              class Test<T>
               typealias OldAlias<T> = Test<T>
-              val a: OldAlias<String> = Test<String>()
+              val a: OldAlias<String> = Test()
               """,
             """
+              class Test<T>
               typealias NewAlias<T> = Test<T>
-              val a: NewAlias<String> = Test<String>()
+              val a: NewAlias<String> = Test()
               """
           )
         );
