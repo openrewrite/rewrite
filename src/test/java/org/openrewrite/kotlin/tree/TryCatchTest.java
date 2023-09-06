@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -62,6 +63,22 @@ class TryCatchTest implements RewriteTest {
               } catch ( caught : Throwable ) {
                  caught
               } as? Throwable
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/286")
+    @Test
+    void catchUnderscore() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method() {
+                  try {
+                  } catch (_: InterruptedException) {
+                  }
+              }
               """
           )
         );

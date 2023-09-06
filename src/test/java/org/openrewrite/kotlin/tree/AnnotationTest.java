@@ -404,20 +404,4 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
-
-    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/286")
-    @Test
-    void catchUnderscore() {
-        rewriteRun(
-          kotlin(
-            """
-              fun method() {
-                  try {
-                  } catch (_: InterruptedException) {
-                  }
-              }
-              """
-          )
-        );
-    }
 }

@@ -205,4 +205,17 @@ class LambdaTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void underScoreAsLamdbaParameters() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method(map : HashMap<String, String>) {
+                  map.forEach { (_, value) -> println("$value!") }
+              }
+              """
+          )
+        );
+    }
 }
