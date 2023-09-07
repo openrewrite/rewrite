@@ -551,4 +551,22 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/286")
+    @Test
+    void unusedUnderScoreVariableInDestructuringDeclaration() {
+        rewriteRun(
+          kotlin(
+            """
+              fun getUserInfo(): Pair<String, String> {
+                  return Pair("Leo", "Messi")
+              }
+
+              fun main() {
+                  val (_, lastName) = getUserInfo()
+              }
+              """
+          )
+        );
+    }
 }

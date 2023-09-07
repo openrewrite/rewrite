@@ -15,12 +15,8 @@
  */
 package org.openrewrite.kotlin.internal
 
-import org.jetbrains.kotlin.KtFakeSourceElement
-import org.jetbrains.kotlin.KtFakeSourceElementKind
+import org.jetbrains.kotlin.*
 import org.jetbrains.kotlin.KtFakeSourceElementKind.GeneratedLambdaLabel
-import org.jetbrains.kotlin.KtLightSourceElement
-import org.jetbrains.kotlin.KtNodeTypes
-import org.jetbrains.kotlin.KtRealPsiSourceElement
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode
 import org.jetbrains.kotlin.com.intellij.lang.LighterASTNode
 import org.jetbrains.kotlin.com.intellij.openapi.util.TextRange
@@ -53,6 +49,8 @@ import org.jetbrains.kotlin.lexer.KtModifierKeywordToken
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.allChildren
+import org.jetbrains.kotlin.psi.psiUtil.endOffset
+import org.jetbrains.kotlin.psi.psiUtil.startOffset
 import org.jetbrains.kotlin.types.ConstantValueKind
 import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.util.getChildren
@@ -82,7 +80,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.Consumer
 import java.util.function.Function
 import java.util.stream.Collectors
-import kotlin.collections.HashMap
 import kotlin.math.max
 import kotlin.math.min
 
@@ -763,7 +760,25 @@ class KotlinParserVisitor(
             }
             var skipImplicitDestructs = 0
             if (element is KtDestructuringDeclaration) {
-                j = mapDestructProperty(firStatements.subList(i, i + element.entries.size + 1))
+                val destructEntries = element.children.filterIsInstance<KtDestructuringDeclarationEntry>()
+                val psiFirPairs : MutableList<Pair<PsiElement, FirStatement?>> = mutableListOf()
+
+                psiFirPairs.add(Pair(element, firElement as FirStatement))
+                for (destructEntry in destructEntries) {
+                    destructEntry.endOffset
+                    var fe : FirStatement? = null
+                    for (fs in firStatements) {
+                        if (fs.source != null &&
+                            fs.source!!.startOffset == destructEntry.startOffset &&
+                            fs.source!!.endOffset == destructEntry.endOffset) {
+                            fe = fs
+                            break
+                        }
+                    }
+                    psiFirPairs.add(Pair(destructEntry, fe))
+                }
+
+                j = mapDestructProperty(psiFirPairs)
                 skipImplicitDestructs = element.entries.size
             }
             if (j == null) {
@@ -1170,9 +1185,9 @@ class KotlinParserVisitor(
         return receiver
     }
 
-    private fun mapDestructProperty(properties: List<FirStatement>): K.DestructuringDeclaration {
+    private fun mapDestructProperty(propertiesPairs: List<Pair<PsiElement, FirStatement?>>): K.DestructuringDeclaration {
         val prefix = whitespace()
-        val initializer = properties[0] as FirProperty
+        val initializer = propertiesPairs[0].second as FirProperty
         val destructuringDeclaration = getRealPsiElement(initializer) as KtDestructuringDeclaration?
         var modifiers: MutableList<J.Modifier> = ArrayList()
         val leadingAnnotations: MutableList<J.Annotation> = mutableListOf()
@@ -1200,10 +1215,32 @@ class KotlinParserVisitor(
             trailingAnnotations = null
         }
         val before = sourceBefore("(")
-        val vars: MutableList<JRightPadded<J.VariableDeclarations.NamedVariable>> = ArrayList(properties.size - 1)
+        val vars: MutableList<JRightPadded<J.VariableDeclarations.NamedVariable>> = ArrayList(propertiesPairs.size - 1)
         var paddedInitializer: JLeftPadded<Expression>? = null
-        for (i in 1 until properties.size) {
-            val property = properties[i] as FirProperty
+        for (i in 1 until propertiesPairs.size) {
+            val property = propertiesPairs[i].second as FirProperty?
+
+            if (property == null) {
+                val maybeBeforeUnderscore = whitespace()
+                if (skip("_")) {
+                    val nameVar = createIdentifier("_", null, null).withPrefix(maybeBeforeUnderscore)
+                    val namedVariable = J.VariableDeclarations.NamedVariable(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        nameVar,
+                        emptyList(),
+                        null,
+                        null
+                    )
+
+                    val paddedVariable = padRight(namedVariable, sourceBefore(","))
+                    vars.add(paddedVariable)
+                }
+
+                continue
+            }
+
             val entry = getRealPsiElement(property) as KtDestructuringDeclarationEntry
             val annotations: MutableList<J.Annotation> = mutableListOf()
             val propNode = getRealPsiElement(property)
@@ -1231,7 +1268,7 @@ class KotlinParserVisitor(
             namedVariable =
                 namedVariable.padding.withInitializer(padLeft(Space.build(" ", emptyList()), j as Expression))
             var paddedVariable: JRightPadded<J.VariableDeclarations.NamedVariable>
-            if (i == properties.size - 1 && initializer.initializer != null) {
+            if (i == propertiesPairs.size - 1 && initializer.initializer != null) {
                 val after = sourceBefore(")")
                 paddedInitializer = padLeft(sourceBefore("="), convertToExpression(initializer.initializer!!, data)!!)
                 paddedVariable = padRight(namedVariable, after)
