@@ -1222,7 +1222,7 @@ class KotlinParserVisitor(
 
             if (property == null) {
                 val maybeBeforeUnderscore = whitespace()
-                if (skip("_")) {
+                if (source[cursor] == '_') {
                     val nameVar = createIdentifier("_", null, null).withPrefix(maybeBeforeUnderscore)
                     val namedVariable = J.VariableDeclarations.NamedVariable(
                         randomId(),
@@ -2148,6 +2148,16 @@ class KotlinParserVisitor(
                             null
                     )
                 }
+            } else {
+                typeExpression = J.Identifier(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY.addIfAbsent(Implicit(randomId())),
+                        emptyList(),
+                        if (property.isVal) "val" else "var",
+                        typeMapping.type(typeRef),
+                        null
+                )
             }
         }
 
@@ -4465,7 +4475,8 @@ class KotlinParserVisitor(
     }
 
     override fun visitErrorTypeRef(errorTypeRef: FirErrorTypeRef, data: ExecutionContext): J {
-        throw UnsupportedOperationException(generateUnsupportedMessage("FirErrorTypeRef"))
+        return createIdentifier(getRealPsiElement(errorTypeRef)!!.text)
+            .withType(JavaType.Unknown.getInstance())
     }
 
     private fun generateUnsupportedMessage(typeName: String): String {
