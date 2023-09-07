@@ -286,7 +286,7 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
                 if (ownerSymbol != null) {
                     owner = TypeUtils.asFullyQualified(type(ownerSymbol.fir))
                 }
-            } else if (ownerFallBack != null) {
+            } else if (firClass.symbol.classId.isNestedClass && ownerFallBack != null) {
                 owner = TypeUtils.asFullyQualified(type(ownerFallBack.fir))
             }
             val properties: MutableList<FirProperty> = ArrayList(firClass.declarations.size)
