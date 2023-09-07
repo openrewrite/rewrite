@@ -18,11 +18,12 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.kotlin.KotlinParser;
+import org.openrewrite.kotlin.marker.Implicit;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -59,8 +60,12 @@ class VariableDeclarationTest implements RewriteTest {
     @Test
     void anonymousObject() {
         rewriteRun(
-          kotlin("open class Test"),
-          kotlin("val o : Test = object : Test ( ) { }")
+          kotlin(
+            """
+              open class Test
+              val o: Test = object : Test ( ) { }
+              """
+          )
         );
     }
 
@@ -82,8 +87,12 @@ class VariableDeclarationTest implements RewriteTest {
     @Test
     void inline() {
         rewriteRun(
-          kotlin("class Spec"),
-          kotlin("inline val Spec . `java-base` : String get ( ) = \"  \"")
+          kotlin(
+            """
+              class Spec
+              inline val Spec . `java-base` : String get ( ) = "  "
+              """
+          )
         );
     }
 
@@ -386,10 +395,6 @@ class VariableDeclarationTest implements RewriteTest {
               class StringValue {
                   val value : String = ""
               }
-              """
-          ),
-          kotlin(
-            """
               fun method ( input : Any ) {
                   val split = ( input as StringValue ) . value . split ( "-" ) . toTypedArray ( )
               }
@@ -402,9 +407,9 @@ class VariableDeclarationTest implements RewriteTest {
     @Test
     void parameterizedReceiver() {
         rewriteRun(
-          kotlin("class SomeParameterized<T>"),
           kotlin(
             """
+              class SomeParameterized<T>
               val SomeParameterized < Int > . receivedMember : Int
                   get ( ) = 42
               """
@@ -416,9 +421,9 @@ class VariableDeclarationTest implements RewriteTest {
     @Test
     void abstractReceiver() {
         rewriteRun(
-          kotlin("class SomeParameterized<T>"),
           kotlin(
             """
+              class SomeParameterized<T>
               abstract class Test {
                   abstract val SomeParameterized < Int > . receivedMember : Int
               }
@@ -566,6 +571,42 @@ class VariableDeclarationTest implements RewriteTest {
                   val (_, lastName) = getUserInfo()
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void typeExpressionPresent() {
+        rewriteRun(
+          kotlin(
+            """
+              val i1 = 1
+              var i2 = 3
+              val i3: Int = 2
+              """,
+            spec -> spec.afterRecipe(cu ->
+                assertThat(cu.getStatements()).satisfiesExactly(
+                    i1 -> assertThat(((J.VariableDeclarations) i1).getTypeExpression()).satisfies(
+                        type -> {
+                            assertThat(type).isNull();
+                        }
+                    ),
+                    i2 -> assertThat(((J.VariableDeclarations) i2).getTypeExpression()).satisfies(
+                        type -> {
+                            assertThat(type).isNull();
+                        }
+                    ),
+                    i3 -> assertThat(((J.VariableDeclarations) i3).getTypeExpression()).satisfies(
+                        type -> {
+                            assertThat(type).isInstanceOf(J.Identifier.class);
+                            assertThat(((J.Identifier) type).getSimpleName()).isEqualTo("Int");
+                            assertThat(type.getMarkers().findFirst(Implicit.class)).isEmpty();
+                            assertThat(type.getType()).isInstanceOf(JavaType.Class.class);
+                            assertThat(((JavaType.Class) type.getType()).getFullyQualifiedName()).isEqualTo("kotlin.Int");
+                        }
+                    )
+                )
+            )
           )
         );
     }
