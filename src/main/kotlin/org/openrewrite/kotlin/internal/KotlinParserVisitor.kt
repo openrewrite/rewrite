@@ -2148,16 +2148,6 @@ class KotlinParserVisitor(
                             null
                     )
                 }
-            } else {
-                typeExpression = J.Identifier(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY.addIfAbsent(Implicit(randomId())),
-                        emptyList(),
-                        if (property.isVal) "val" else "var",
-                        typeMapping.type(typeRef),
-                        null
-                )
             }
         }
 
@@ -4475,8 +4465,7 @@ class KotlinParserVisitor(
     }
 
     override fun visitErrorTypeRef(errorTypeRef: FirErrorTypeRef, data: ExecutionContext): J {
-        return createIdentifier(getRealPsiElement(errorTypeRef)!!.text)
-            .withType(JavaType.Unknown.getInstance())
+        throw UnsupportedOperationException(generateUnsupportedMessage("FirErrorTypeRef"))
     }
 
     private fun generateUnsupportedMessage(typeName: String): String {
