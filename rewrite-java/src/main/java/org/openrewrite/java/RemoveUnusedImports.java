@@ -30,13 +30,14 @@ import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptySet;
 import static org.openrewrite.java.style.ImportLayoutStyle.isPackageAlwaysFolded;
-import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqualAsPredicate;
-import static org.openrewrite.java.tree.TypeUtils.getFullyQualifiedClassPath;
+import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
+import static org.openrewrite.java.tree.TypeUtils.toFullyQualifiedName;
 
 /**
  * This recipe will remove any imports for types that are not referenced within the compilation unit. This recipe
@@ -160,7 +161,7 @@ public class RemoveUnusedImports extends Recipe {
                     // see https://github.com/openrewrite/rewrite/issues/1698 for more detail
                     String target = qualid.getTarget().toString();
                     String modifiedTarget = methodsAndFieldsByTypeName.keySet().stream()
-                            .filter(fullyQualifiedNamesAreEqualAsPredicate(target))
+                            .filter((fqn) -> fullyQualifiedNamesAreEqual(target, fqn))
                             .findFirst()
                             .orElse(target);
                     SortedSet<String> targetMethodsAndFields = methodsAndFieldsByTypeName.get(modifiedTarget);
@@ -222,7 +223,7 @@ public class RemoveUnusedImports extends Recipe {
                     }
                 } else {
                     Set<JavaType.FullyQualified> types = typesByPackage.getOrDefault(elem.getPackageName(), new HashSet<>());
-                    Set<JavaType.FullyQualified> typesByFullyQualifiedClassPath = typesByPackage.getOrDefault(getFullyQualifiedClassPath(elem.getPackageName()), new HashSet<>());
+                    Set<JavaType.FullyQualified> typesByFullyQualifiedClassPath = typesByPackage.getOrDefault(toFullyQualifiedName(elem.getPackageName()), new HashSet<>());
                     Set<JavaType.FullyQualified> combinedTypes = Stream.concat(types.stream(), typesByFullyQualifiedClassPath.stream())
                             .collect(Collectors.toSet());
                     JavaType.FullyQualified qualidType = TypeUtils.asFullyQualified(elem.getQualid().getType());
@@ -256,7 +257,8 @@ public class RemoveUnusedImports extends Recipe {
                         if ("*".equals(elem.getQualid().getSimpleName())) {
                             return elem.getPackageName().equals(c.getPackageName());
                         }
-                        return fullyQualifiedNamesAreEqualAsPredicate(c.getFullyQualifiedName()).test(elem.getTypeName());
+                        @Nullable String fqn1 = c.getFullyQualifiedName();
+                        return ((Predicate<String>) (fqn2) -> fullyQualifiedNamesAreEqual(fqn1, fqn2)).test(elem.getTypeName());
                     })) {
                         anImport.used = false;
                         changed = true;
