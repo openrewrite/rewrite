@@ -39,6 +39,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
 
+import static org.openrewrite.Tree.randomId;
+
 public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     private final KotlinJavaPrinter<P> delegate;
 
@@ -566,7 +568,14 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     J element = node.getElement();
                     visit(element.getMarkers().findFirst(ConstructorDelegation.class)
                                     .flatMap(m -> getConstructorDelegationCall(classDecl)
-                                            .map(c -> (J) c.withName((J.Identifier) element).withPrefix(Space.EMPTY)))
+                                            .map(c -> {
+                                                if (element instanceof J.Identifier) {
+                                                    return c.withName((J.Identifier) element).withPrefix(Space.EMPTY);
+                                                } else if (element instanceof J.ParameterizedType) {
+                                                    return new J.NewClass(randomId(), Space.EMPTY, Markers.EMPTY, null, Space.EMPTY, ((J.ParameterizedType) element), c.getPadding().getArguments(), null, null);
+                                                }
+                                                return element;
+                                            }))
                                     .orElse(element),
                             p);
                     visitSpace(node.getAfter(), JContainer.Location.IMPLEMENTS.getElementLocation().getAfterLocation(), p);

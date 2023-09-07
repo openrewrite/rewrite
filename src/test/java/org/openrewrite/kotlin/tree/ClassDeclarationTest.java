@@ -215,6 +215,20 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void primaryConstructorWithAnySupertype() {
+        rewriteRun(
+          kotlin("class Test : Any()")
+        );
+    }
+
+    @Test
+    void primaryConstructorWithParameterizedSupertype() {
+        rewriteRun(
+          kotlin("class Test : java.util.ArrayList<String>()")
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/74")
     @Test
     void secondaryConstructor() {
