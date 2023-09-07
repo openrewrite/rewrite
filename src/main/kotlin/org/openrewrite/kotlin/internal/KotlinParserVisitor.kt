@@ -4050,7 +4050,7 @@ class KotlinParserVisitor(
                             null
                         ),
                         args,
-                        typeMapping.type(firPrimaryConstructor.delegatedConstructor!!.calleeReference.resolved!!.resolvedSymbol) as JavaType.Method?
+                        typeMapping.type(firPrimaryConstructor.delegatedConstructor!!.calleeReference.resolved!!.resolvedSymbol) as? JavaType.Method
                     )
                     if (primaryConstructor == null) {
                         primaryConstructor = J.MethodDeclaration(
@@ -4282,7 +4282,7 @@ class KotlinParserVisitor(
             null,
             null,
             null,
-            if (type is JavaType.Method) type else null
+            type as? JavaType.Method
         )
     }
 
