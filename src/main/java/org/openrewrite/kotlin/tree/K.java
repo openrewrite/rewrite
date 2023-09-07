@@ -1307,7 +1307,7 @@ public interface K extends J {
 
         @Nullable
         @With
-        ControlParentheses<Expression> selector;
+        ControlParentheses<J> selector;
 
         @With
         Block branches;
@@ -1315,7 +1315,7 @@ public interface K extends J {
         @Nullable
         JavaType type;
 
-        public When(UUID id, Space prefix, Markers markers, @Nullable ControlParentheses<Expression> selector, Block branches, @Nullable JavaType type) {
+        public When(UUID id, Space prefix, Markers markers, @Nullable ControlParentheses<J> selector, Block branches, @Nullable JavaType type) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;

@@ -3364,13 +3364,13 @@ class KotlinParserVisitor(
         val prefix = whitespace()
         if (skip("when")) {
             // Create the entire when expression here to simplify visiting `WhenBranch`, since `if` and `when` share the same data structure.
-            var controlParentheses: J.ControlParentheses<Expression>? = null
+            var controlParentheses: J.ControlParentheses<J>? = null
             if (whenExpression.subjectVariable != null) {
                 controlParentheses = J.ControlParentheses(
                     randomId(),
                     sourceBefore("("),
                     Markers.EMPTY,
-                    padRight(convertToExpression(whenExpression.subjectVariable!!, data)!!, sourceBefore(")"))
+                    padRight(visitElement(whenExpression.subjectVariable!!, data)!!, sourceBefore(")"))
                 )
             } else if (whenExpression.subject != null) {
                 controlParentheses = J.ControlParentheses(
