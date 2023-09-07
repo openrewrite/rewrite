@@ -15,10 +15,14 @@
  */
 package org.openrewrite.java;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
@@ -26,17 +30,29 @@ import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptySet;
 import static org.openrewrite.java.style.ImportLayoutStyle.isPackageAlwaysFolded;
 import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqualAsPredicate;
+import static org.openrewrite.java.tree.TypeUtils.getFullyQualifiedClassPath;
 
 /**
  * This recipe will remove any imports for types that are not referenced within the compilation unit. This recipe
  * is aware of the import layout style and will correctly handle unfolding of wildcard imports if the import counts
  * drop below the configured values.
  */
+@Value
+@EqualsAndHashCode(callSuper = true)
 public class RemoveUnusedImports extends Recipe {
+
+    @Option(displayName = "Unfold wildcard imports",
+            description = "Expand wildcard imports into individual imports",
+            required = false)
+    @Nullable
+    Boolean unfoldWildcard;
+
     @Override
     public String getDisplayName() {
         return "Remove unused imports";
@@ -61,10 +77,16 @@ public class RemoveUnusedImports extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new NoMissingTypes(), new RemoveUnusedImportsVisitor());
+        return Preconditions.check(new NoMissingTypes(), new RemoveUnusedImportsVisitor(Boolean.TRUE.equals(unfoldWildcard)));
     }
 
     private static class RemoveUnusedImportsVisitor extends JavaIsoVisitor<ExecutionContext> {
+
+        private boolean unfoldWildcard;
+
+        public RemoveUnusedImportsVisitor(final boolean unfoldWildcard) {
+            this.unfoldWildcard = unfoldWildcard;
+        }
 
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
@@ -199,21 +221,24 @@ public class RemoveUnusedImports extends Recipe {
                         changed = true;
                     }
                 } else {
-                    Set<JavaType.FullyQualified> types = typesByPackage.get(elem.getPackageName());
+                    Set<JavaType.FullyQualified> types = typesByPackage.getOrDefault(elem.getPackageName(), new HashSet<>());
+                    Set<JavaType.FullyQualified> typesByFullyQualifiedClassPath = typesByPackage.getOrDefault(getFullyQualifiedClassPath(elem.getPackageName()), new HashSet<>());
+                    Set<JavaType.FullyQualified> combinedTypes = Stream.concat(types.stream(), typesByFullyQualifiedClassPath.stream())
+                            .collect(Collectors.toSet());
                     JavaType.FullyQualified qualidType = TypeUtils.asFullyQualified(elem.getQualid().getType());
-                    if (types == null || sourcePackage.equals(elem.getPackageName()) && qualidType != null && !qualidType.getFullyQualifiedName().contains("$")) {
+                    if (combinedTypes.isEmpty() || sourcePackage.equals(elem.getPackageName()) && qualidType != null && !qualidType.getFullyQualifiedName().contains("$")) {
                         anImport.used = false;
                         changed = true;
                     } else if ("*".equals(elem.getQualid().getSimpleName())) {
                         if (isPackageAlwaysFolded(layoutStyle.getPackagesToFold(), elem)) {
                             anImport.used = true;
                             usedWildcardImports.add(elem.getPackageName());
-                        } else if (types.size() < layoutStyle.getClassCountToUseStarImport()) {
+                        } else if (combinedTypes.size() < layoutStyle.getClassCountToUseStarImport()) {
                             // replacing the star with a series of unfolded imports
                             anImport.imports.clear();
 
                             // add each unfolded import
-                            types.stream().map(JavaType.FullyQualified::getClassName).sorted().distinct().forEach(type ->
+                            combinedTypes.stream().map(JavaType.FullyQualified::getClassName).sorted().distinct().forEach(type ->
                                     anImport.imports.add(new JRightPadded<>(elem
                                             .withQualid(qualid.withName(name.withSimpleName(type)))
                                             .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY))
@@ -227,7 +252,7 @@ public class RemoveUnusedImports extends Recipe {
                         } else {
                             usedWildcardImports.add(elem.getPackageName());
                         }
-                    } else if (types.stream().noneMatch(c -> {
+                    } else if (combinedTypes.stream().noneMatch(c -> {
                         if ("*".equals(elem.getQualid().getSimpleName())) {
                             return elem.getPackageName().equals(c.getPackageName());
                         }

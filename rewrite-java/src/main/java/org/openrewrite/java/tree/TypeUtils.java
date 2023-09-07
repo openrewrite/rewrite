@@ -38,10 +38,14 @@ public class TypeUtils {
                );
     }
 
+    public static String getFullyQualifiedClassPath(String fqn) {
+        return fqn.replace('$', '.');
+    }
+
     public static boolean fullyQualifiedNamesAreEqual(@Nullable String fqn1, @Nullable String fqn2) {
         if (fqn1 != null && fqn2 != null) {
             return fqn1.equals(fqn2) || fqn1.length() == fqn2.length()
-                                        && fqn1.replace('$', '.').equals(fqn2.replace('$', '.'));
+                                        && getFullyQualifiedClassPath(fqn1).equals(getFullyQualifiedClassPath(fqn2));
         }
         return fqn1 == null && fqn2 == null;
     }
