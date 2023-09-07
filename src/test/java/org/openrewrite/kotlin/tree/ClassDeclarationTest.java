@@ -552,4 +552,16 @@ class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void coneProjection() {
+        rewriteRun(
+          kotlin(
+            """
+              val map = mapOf(Pair("one", 1)) as? Map<*, *>
+              val s = map.orEmpty().entries.joinToString { (key, value) -> "$key: $value" }
+              """
+          )
+        );
+    }
 }

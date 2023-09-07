@@ -376,6 +376,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
             }
             s.append(boundSigs)
             s.append("}")
+        } else if (type is ConeCapturedType && type.lowerType == null) {
+            s.append("*")
         } else {
             throw IllegalArgumentException("Unsupported ConeTypeProjection " + type.javaClass.getName())
         }
