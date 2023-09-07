@@ -36,6 +36,14 @@ import static org.openrewrite.groovy.Assertions.groovy;
 class VariableDeclarationsTest implements RewriteTest {
 
     @Test
+    void varKeyword() {
+        rewriteRun(
+          groovy("var a = 1")
+        );
+    }
+
+
+    @Test
     void singleVariableDeclaration() {
         rewriteRun(
           groovy("Integer a = 1")
