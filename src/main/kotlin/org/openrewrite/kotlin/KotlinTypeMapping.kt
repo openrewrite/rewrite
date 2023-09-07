@@ -23,13 +23,14 @@ import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.containingClassLookupTag
 import org.jetbrains.kotlin.fir.declarations.*
+import org.jetbrains.kotlin.fir.declarations.utils.isLocal
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaField
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaMethod
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaValueParameter
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
-import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
+import org.jetbrains.kotlin.fir.resolve.providers.toSymbol
 import org.jetbrains.kotlin.fir.resolve.toFirRegularClassSymbol
 import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag
@@ -280,12 +281,13 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
                     type(superTypeRef)
                 )
             var owner: JavaType.FullyQualified? = null
-            if (firClass.symbol.classId.getOuterClassId() != null) {
-                val ownerSymbol = firSession.symbolProvider
-                    .getClassLikeSymbolByClassId(firClass.symbol.classId.getOuterClassId()!!)
+            if (!firClass.isLocal && firClass.symbol.classId.isNestedClass) {
+                val ownerSymbol = firClass.symbol.classId.outerClassId!!.toSymbol(firSession)
                 if (ownerSymbol != null) {
                     owner = TypeUtils.asFullyQualified(type(ownerSymbol.fir))
                 }
+            } else if (ownerFallBack != null) {
+                owner = TypeUtils.asFullyQualified(type(ownerFallBack.fir))
             }
             val properties: MutableList<FirProperty> = ArrayList(firClass.declarations.size)
             val javaFields: MutableList<FirJavaField> = ArrayList(firClass.declarations.size)

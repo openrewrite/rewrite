@@ -539,4 +539,17 @@ class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void localClass() {
+        rewriteRun(
+          kotlin(
+            """
+              fun foo() {
+                  class Inner
+              }
+              """
+          )
+        );
+    }
 }
