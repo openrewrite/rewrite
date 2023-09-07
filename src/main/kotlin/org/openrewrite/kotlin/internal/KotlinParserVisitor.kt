@@ -452,9 +452,6 @@ class KotlinParserVisitor(
         if (body is J.Block && !omitBraces) {
             body = body.withEnd(sourceBefore("}"))
         }
-        if (body != null && anonymousFunction.valueParameters.isEmpty()) {
-            body = body.withMarkers(body.markers.removeByType(OmitBraces::class.java))
-        }
         if (body == null) {
             body = J.Block(
                 randomId(),
@@ -481,10 +478,54 @@ class KotlinParserVisitor(
         anonymousFunctionExpression: FirAnonymousFunctionExpression,
         data: ExecutionContext
     ): J {
-        if (!anonymousFunctionExpression.anonymousFunction.isLambda) {
-            throw UnsupportedOperationException("Unsupported anonymous function expression.")
+        val anonymousFunction = anonymousFunctionExpression.anonymousFunction
+        if (anonymousFunction.isLambda) {
+            return visitAnonymousFunction(anonymousFunction, data)
+        } else {
+            val prefix = sourceBefore("fun")
+            val before = sourceBefore("(")
+            val params: List<JRightPadded<J>> = if (anonymousFunction.valueParameters.isNotEmpty())
+                convertAll(
+                    anonymousFunction.valueParameters, ",", ")", data
+                )
+            else
+                listOf(
+                    padRight(
+                        J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), Space.EMPTY
+                    )
+                )
+
+            val body = mapFunctionBody(anonymousFunction, data)!!
+            return J.Lambda(
+                randomId(),
+                prefix,
+                Markers.EMPTY.addIfAbsent(AnonymousFunction(randomId())),
+                J.Lambda.Parameters(randomId(), before, Markers.EMPTY, true, params),
+                Space.EMPTY,
+                body,
+                null
+            )
         }
-        return visitAnonymousFunction(anonymousFunctionExpression.anonymousFunction, data)
+    }
+
+    private fun mapFunctionBody(function: FirFunction, data: ExecutionContext): J.Block? {
+        val saveCursor = cursor
+        val before = whitespace()
+        return if (function.body is FirSingleExpressionBlock) {
+            if (skip("=")) {
+                convertToBlock(function.body as FirSingleExpressionBlock, data).withPrefix(before)
+            } else {
+                throw IllegalStateException("Unexpected single block expression, cursor is likely at the wrong position.")
+            }
+        } else if (function.body is FirBlock) {
+            cursor(saveCursor)
+            visitElement(function.body!!, data) as J.Block?
+        } else if (function.body == null) {
+            cursor(saveCursor)
+            null
+        } else {
+            throw IllegalStateException("Unexpected function body.")
+        }
     }
 
     override fun visitAnonymousInitializer(anonymousInitializer: FirAnonymousInitializer, data: ExecutionContext): J {
@@ -2291,17 +2332,7 @@ class KotlinParserVisitor(
             } else {
                 cursor(saveCursor)
             }
-            var body: J.Block? = null
-            saveCursor = cursor
-            val blockPrefix = whitespace()
-            if (propertyAccessor.body is FirSingleExpressionBlock) {
-                if (skip("=")) {
-                    body = convertToBlock(propertyAccessor.body as FirSingleExpressionBlock, data).withPrefix(blockPrefix)
-                }
-            } else {
-                cursor(saveCursor)
-                body = visitElement(propertyAccessor.body!!, data) as J.Block?
-            }
+            val body = mapFunctionBody(propertyAccessor, data)
             return J.MethodDeclaration(
                 randomId(),
                 prefix,
@@ -2663,24 +2694,7 @@ class KotlinParserVisitor(
         } else {
             cursor(saveCursor)
         }
-        val body: J.Block?
-        saveCursor = cursor
-        before = whitespace()
-        if (simpleFunction.body is FirSingleExpressionBlock) {
-            if (skip("=")) {
-                body = convertToBlock(simpleFunction.body as FirSingleExpressionBlock, data).withPrefix(before)
-            } else {
-                throw IllegalStateException("Unexpected single block expression, cursor is likely at the wrong position.")
-            }
-        } else if (simpleFunction.body is FirBlock) {
-            cursor(saveCursor)
-            body = visitElement(simpleFunction.body!!, data) as J.Block?
-        } else if (simpleFunction.body == null) {
-            cursor(saveCursor)
-            body = null
-        } else {
-            throw IllegalStateException("Unexpected function body.")
-        }
+        val body = mapFunctionBody(simpleFunction, data)
 
         return J.MethodDeclaration(
             randomId(),

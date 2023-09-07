@@ -41,6 +41,7 @@ import java.util.function.UnaryOperator;
 
 public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     private final KotlinJavaPrinter<P> delegate;
+
     public KotlinPrinter() {
         delegate = delegate();
     }
@@ -153,7 +154,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
 
         if (!destructuringDeclaration.getInitializer().getVariables().isEmpty() &&
-                destructuringDeclaration.getInitializer().getVariables().get(0).getPadding().getInitializer() != null) {
+            destructuringDeclaration.getInitializer().getVariables().get(0).getPadding().getInitializer() != null) {
             visitSpace(Objects.requireNonNull(destructuringDeclaration.getInitializer().getVariables().get(0).getPadding()
                     .getInitializer()).getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
             p.append("=");
@@ -272,14 +273,14 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         Extension extension = vd.getMarkers().findFirst(Extension.class).orElse(null);
         if (extension != null) {
             if (property.getSetter() != null &&
-                    !property.getSetter().getParameters().isEmpty() &&
-                    property.getSetter().getParameters().get(0) instanceof J.VariableDeclarations) {
+                !property.getSetter().getParameters().isEmpty() &&
+                property.getSetter().getParameters().get(0) instanceof J.VariableDeclarations) {
                 visit(((J.VariableDeclarations) property.getSetter().getParameters().get(0)).getTypeExpression(), p);
                 delegate.visitSpace(property.getSetter().getPadding().getParameters().getPadding().getElements().get(0).getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
                 p.append(".");
             } else if (property.getGetter() != null &&
-                    !property.getGetter().getParameters().isEmpty() &&
-                    property.getGetter().getParameters().get(0) instanceof J.VariableDeclarations) {
+                       !property.getGetter().getParameters().isEmpty() &&
+                       property.getGetter().getParameters().get(0) instanceof J.VariableDeclarations) {
                 visit(((J.VariableDeclarations) property.getGetter().getParameters().get(0)).getTypeExpression(), p);
                 delegate.visitSpace(property.getGetter().getPadding().getParameters().getPadding().getElements().get(0).getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
                 p.append(".");
@@ -461,13 +462,13 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 p.append("=");
             }
 
-            boolean omitParens = block.getMarkers().findFirst(OmitBraces.class).isPresent();
-            if (!omitParens) {
+            boolean omitBraces = block.getMarkers().findFirst(OmitBraces.class).isPresent();
+            if (!omitBraces) {
                 p.append("{");
             }
             visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
             visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
-            if (!omitParens) {
+            if (!omitBraces) {
                 p.append("}");
             }
             afterSyntax(block, p);
@@ -693,26 +694,28 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitLambda(J.Lambda lambda, PrintOutputCapture<P> p) {
             beforeSyntax(lambda, Space.Location.LAMBDA_PREFIX, p);
-            boolean omitBraces = lambda.getMarkers().findFirst(OmitBraces.class).isPresent();
-            if (!omitBraces) {
-                p.append('{');
+
+            if (lambda.getMarkers().findFirst(AnonymousFunction.class).isPresent()) {
+                p.append("fun");
+                visitLambdaParameters(lambda.getParameters(), p);
+                visitBlock((J.Block) lambda.getBody(), p);
+            } else {
+                boolean omitBraces = lambda.getMarkers().findFirst(OmitBraces.class).isPresent();
+                if (!omitBraces) {
+                    p.append('{');
+                }
+
+                visitLambdaParameters(lambda.getParameters(), p);
+                if (!lambda.getParameters().getParameters().isEmpty()) {
+                    visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
+                    p.append("->");
+                }
+                visit(lambda.getBody(), p);
+                if (!omitBraces) {
+                    p.append('}');
+                }
             }
 
-            visitLambdaParameters(lambda.getParameters(), p);
-            if (!lambda.getParameters().getParameters().isEmpty()) {
-                visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
-                p.append("->");
-            }
-            if (lambda.getBody() instanceof J.Block) {
-                J.Block block = (J.Block) lambda.getBody();
-                visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
-                visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
-            } else {
-                visit(lambda.getBody(), p);
-            }
-            if (!omitBraces) {
-                p.append('}');
-            }
             afterSyntax(lambda, p);
             return lambda;
         }
@@ -874,7 +877,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
                 if (i > 0 && omitParensOnMethod && (
                         !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() &&
-                                !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent())) {
+                        !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent())) {
                     p.append(')');
                 } else if (i > 0) {
                     p.append(',');

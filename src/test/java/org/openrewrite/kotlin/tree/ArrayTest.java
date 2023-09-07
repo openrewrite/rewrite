@@ -74,7 +74,7 @@ class ArrayTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              val arr = IntArray ( if (true) else 1 )
+              val arr = IntArray ( if (true) 0 else 1 )
               """
           )
         );
