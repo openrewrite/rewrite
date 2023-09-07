@@ -154,7 +154,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
         if (!destructuringDeclaration.getInitializer().getVariables().isEmpty() &&
                 destructuringDeclaration.getInitializer().getVariables().get(0).getPadding().getInitializer() != null) {
-            visitSpace(Objects.requireNonNull(destructuringDeclaration.getPadding().getAssignments().getPadding().getElements().get(0).getElement().getPadding().getInitializer()).getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+            visitSpace(Objects.requireNonNull(destructuringDeclaration.getInitializer().getVariables().get(0).getPadding()
+                    .getInitializer()).getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
             p.append("=");
             visit(Objects.requireNonNull(destructuringDeclaration.getInitializer().getVariables().get(0).getPadding().getInitializer()).getElement(), p);
         }

@@ -534,4 +534,21 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void spaceBetweenEqualsInDestructuringDeclaration() {
+        rewriteRun(
+          kotlin(
+            """
+              fun getUserInfo(): Pair<String, String> {
+                  return Pair("Leo", "Messi")
+              }
+
+              fun main() {
+                  val (firstName, lastName)   =     getUserInfo()
+              }
+              """
+          )
+        );
+    }
 }
