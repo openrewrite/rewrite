@@ -774,11 +774,6 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
             case NotContains:
             case Contains:
                 break;
-            case Get:
-                // withinBrackets defaults to False
-                b = b.withAfter(updateSpace(b.getAfter(), false));
-                b = b.withRight(spaceBefore(b.getRight(), false));
-                break;
             case IdentityEquals:
             case IdentityNotEquals:
                 b = applyBinarySpaceAround(b, style.getAroundOperators().getEquality());

@@ -457,6 +457,7 @@ public interface K extends J {
         public enum Type {
             Contains,
             NotContains,
+            @Deprecated // kept for backwards compatibility
             Get,
             IdentityEquals,
             IdentityNotEquals,
