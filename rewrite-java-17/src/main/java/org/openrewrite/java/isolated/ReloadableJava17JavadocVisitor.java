@@ -17,6 +17,7 @@ package org.openrewrite.java.isolated;
 
 import com.sun.source.doctree.*;
 import com.sun.source.tree.IdentifierTree;
+import com.sun.source.tree.ArrayTypeTree;
 import com.sun.source.tree.MemberSelectTree;
 import com.sun.source.tree.ParameterizedTypeTree;
 import com.sun.source.tree.PrimitiveTypeTree;
@@ -1130,6 +1131,39 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             String name = primitiveType.toString();
             cursor += name.length();
             return new J.Identifier(randomId(), fmt, Markers.EMPTY, emptyList(), name, typeMapping.primitive(primitiveType.typetag), null);
+        }
+
+        @Override
+        public J visitArrayType(ArrayTypeTree node, Space fmt) {
+            com.sun.source.tree.Tree typeIdent = node.getType();
+            int dimCount = 1;
+
+            while (typeIdent instanceof ArrayTypeTree) {
+                dimCount++;
+                typeIdent = ((ArrayTypeTree) typeIdent).getType();
+            }
+
+            TypeTree elemType = (TypeTree) scan(typeIdent, fmt);
+
+            List<JRightPadded<Space>> dimensions = emptyList();
+            if (dimCount > 0) {
+                dimensions = new ArrayList<>(dimCount);
+                for (int n = 0; n < dimCount; n++) {
+                    dimensions.add(padRight(Space.build(sourceBeforeAsString("["), emptyList()), Space.build(sourceBeforeAsString("]"), emptyList())));
+                }
+            }
+
+            return new J.ArrayType(
+                    randomId(),
+                    fmt,
+                    Markers.EMPTY,
+                    elemType,
+                    dimensions
+            );
+        }
+
+        private <T> JRightPadded<T> padRight(T tree, Space right) {
+            return new JRightPadded<>(tree, right, Markers.EMPTY);
         }
 
         @Override

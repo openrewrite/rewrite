@@ -1634,4 +1634,17 @@ class JavadocTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3530")
+    void arrayTypeLiterals() {
+        rewriteRun(
+          java("" +
+            "    /**\n" +
+            "     * Create an instance of {@link byte[]} and {@link byte[][]}\n" +
+            "     */\n" +
+            "class A {}"
+          )
+        );
+    }
 }
