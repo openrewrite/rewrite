@@ -24,8 +24,13 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.marker.*;
 import org.openrewrite.kotlin.service.KotlinAutoFormatService;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.kotlin.tree.KContainer;
+import org.openrewrite.kotlin.tree.KRightPadded;
 import org.openrewrite.kotlin.tree.KSpace;
 import org.openrewrite.marker.Marker;
+import org.openrewrite.marker.Markers;
+
+import java.util.List;
 
 /**
  * Visit K types.
@@ -145,17 +150,24 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         K.FunctionType f = functionType;
         f = f.withPrefix(visitSpace(f.getPrefix(), KSpace.Location.FUNCTION_TYPE_PREFIX, p));
         f = f.withMarkers(visitMarkers(f.getMarkers(), p));
-        Expression temp = (Expression) visitExpression(f, p);
-        if (!(temp instanceof K.FunctionType)) {
-            return temp;
-        } else {
-            f = (K.FunctionType) temp;
-        }
         f = f.withLeadingAnnotations(ListUtils.map(f.getLeadingAnnotations(), a -> visitAndCast(a, p)));
         f = f.withModifiers(ListUtils.map(f.getModifiers(), e -> visitAndCast(e, p)));
         f = f.withReceiver(visitRightPadded(f.getReceiver(), p));
-        f = f.withTypedTree(visitAndCast(f.getTypedTree(), p));
+        if (f.getPadding().getParameters() != null) {
+            f = f.getPadding().withParameters(this.visitContainer(f.getPadding().getParameters(), KContainer.Location.FUNCTION_TYPE_PARAMETERS, p));
+        }
+        f = f.withReturnType(visitAndCast(f.getReturnType(), p));
         return f;
+    }
+
+    public J visitFunctionTypeParameter(K.FunctionType.Parameter parameter, P p) {
+        K.FunctionType.Parameter pa = parameter;
+        pa = pa.withMarkers(visitMarkers(pa.getMarkers(), p));
+        if (pa.getName() != null) {
+            pa = pa.withName(visitAndCast(pa.getName(), p));
+        }
+        pa = pa.withParameterType(visitAndCast(pa.getParameterType(), p));
+        return pa;
     }
 
     public J visitKReturn(K.KReturn kReturn, P p) {
@@ -301,6 +313,50 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
 
     public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, P p) {
         return super.visitContainer(container, JContainer.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    public <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
+                                                        KContainer.Location loc, P p) {
+        if (container == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+        setCursor(new Cursor(getCursor(), container));
+
+        Space before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
+        List<JRightPadded<J2>> js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
+
+        setCursor(getCursor().getParent());
+
+        return js == container.getPadding().getElements() && before == container.getBefore() ?
+                container :
+                JContainer.build(before, js, container.getMarkers());
+    }
+
+    public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, KRightPadded.Location loc, P p) {
+        if (right == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+
+        setCursor(new Cursor(getCursor(), right));
+
+        T t = right.getElement();
+        if (t instanceof J) {
+            //noinspection unchecked
+            t = visitAndCast((J) right.getElement(), p);
+        }
+
+        setCursor(getCursor().getParent());
+        if (t == null) {
+            //noinspection ConstantConditions
+            return null;
+        }
+
+        Space after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+        Markers markers = visitMarkers(right.getMarkers(), p);
+        return (after == right.getAfter() && t == right.getElement() && markers == right.getMarkers()) ?
+                right : new JRightPadded<>(t, after, markers);
     }
 
     @Override

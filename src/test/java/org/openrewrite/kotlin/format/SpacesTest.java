@@ -1228,6 +1228,36 @@ class SpacesTest implements RewriteTest {
             }
 
             @Test
+            void otherBeforeColonAfterDeclarationNameFalseFunctionTypeParameter() {
+                rewriteRun(
+                  spaces(style -> style.withOther(style.getOther().withBeforeColonAfterDeclarationName(false))),
+                  kotlin(
+                    """
+                      val ft : (a  :  Int) -> Int = { 2 }
+                      """,
+                    """
+                      val ft: (a: Int) -> Int = { 2 }
+                      """
+                  )
+                );
+            }
+
+            @Test
+            void otherBeforeColonAfterDeclarationNameTrueFunctionTypeParameter() {
+                rewriteRun(
+                  spaces(style -> style.withOther(style.getOther().withBeforeColonAfterDeclarationName(true))),
+                  kotlin(
+                    """
+                      val ft : (a  :  Int) -> Int = { 2 }
+                      """,
+                    """
+                      val ft : (a : Int) -> Int = { 2 }
+                      """
+                  )
+                );
+            }
+
+            @Test
             void otherBeforeColonAfterDeclarationNameFalseMethodDeclaration() {
                 rewriteRun(
                   spaces(style -> style.withOther(style.getOther().withBeforeColonAfterDeclarationName(false))),

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.tree;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -647,7 +648,8 @@ public interface K extends J {
 
         @Override
         public <T extends J> T withType(@Nullable JavaType type) {
-            return (T) withExpression(expression.withType(type));
+            ExpressionStatement newExpression = withExpression(expression.withType(type));
+            return (T) (newExpression == expression ? this : newExpression);
         }
 
         @Transient
@@ -657,41 +659,54 @@ public interface K extends J {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    @Value
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @With
-    class FunctionType implements K, Expression, Statement, TypeTree {
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    class FunctionType implements K, TypeTree {
+
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        @With
+        @Getter
 
         UUID id;
+        @With
         Space prefix;
 
-        public FunctionType(UUID id, Space prefix, Markers markers, TypedTree typedTree, List<Annotation> leadingAnnotations, List<Modifier> modifiers, @Nullable JRightPadded<NameTree> receiver) {
+        public FunctionType(UUID id, Space prefix, Markers markers, List<Annotation> leadingAnnotations,
+                            List<Modifier> modifiers, @Nullable JRightPadded<NameTree> receiver,
+                            JContainer<TypeTree> parameters, Space arrow, TypedTree returnType) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;
-            this.typedTree = typedTree;
             this.leadingAnnotations = leadingAnnotations;
             this.modifiers = modifiers;
             this.receiver = receiver;
+            this.parameters = parameters;
+            this.arrow = arrow;
+            this.returnType = returnType;
         }
 
         public Space getPrefix() {
             // For backwards compatibility with older LST before there was a prefix field
             //noinspection ConstantConditions
-            return prefix == null ? typedTree.getPrefix() : prefix;
+            return prefix == null ? returnType.getPrefix() : prefix;
         }
 
+        @With
         Markers markers;
 
         public Markers getMarkers() {
             // For backwards compatibility with older LST before there was a prefix field
             //noinspection ConstantConditions
-            return markers == null ? typedTree.getMarkers() : markers;
+            return markers == null ? returnType.getMarkers() : markers;
         }
 
-        TypedTree typedTree;
-
+        @With
         List<J.Annotation> leadingAnnotations;
 
         public List<Annotation> getLeadingAnnotations() {
@@ -700,6 +715,7 @@ public interface K extends J {
             return leadingAnnotations == null ? Collections.emptyList() : leadingAnnotations;
         }
 
+        @With
         List<J.Modifier> modifiers;
 
         public List<Modifier> getModifiers() {
@@ -709,29 +725,135 @@ public interface K extends J {
         }
 
         @Nullable
+        @With
+        @Getter
         JRightPadded<NameTree> receiver;
+
+        JContainer<TypeTree> parameters;
+
+        public List<TypeTree> getParameters() {
+            return parameters.getElements();
+        }
+
+        public FunctionType withParameters(List<TypeTree> parameters) {
+            return getPadding().withParameters(JContainer.withElementsNullable(this.parameters, parameters));
+        }
+
+        @With
+        @Getter
+        Space arrow;
+
+        // backwards compatibility
+        @JsonAlias("typedTree")
+        @With
+        @Getter
+        TypedTree returnType;
 
         @Override
         public @Nullable JavaType getType() {
-            return typedTree.getType();
+            return returnType.getType();
         }
 
-        @Override
-        public <J2 extends J> J2 withType(@Nullable JavaType type) {
-            if (typedTree instanceof FunctionType) {
-                return (J2) withTypedTree(typedTree.withType(type));
-            }
-            return (J2) this;
-        }
-
-        @Override
-        public CoordinateBuilder.Statement getCoordinates() {
-            return new CoordinateBuilder.Statement(this);
+        public <T extends J> T withType(@Nullable JavaType type) {
+            TypeTree newType = returnType.withType(type);
+            //noinspection unchecked
+            return (T) (newType == type ? this : withReturnType(newType));
         }
 
         @Override
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
             return v.visitFunctionType(this, p);
+        }
+
+        @ToString
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        public static final class Parameter implements K, TypeTree {
+            @With
+            @EqualsAndHashCode.Include
+            @Getter
+            UUID id;
+
+            @With
+            @Getter
+            Markers markers;
+
+            @With
+            @Getter
+            @Nullable
+            Identifier name;
+
+            @With
+            @Getter
+            @Nullable
+            Space colon;
+
+            @With
+            @Getter
+            TypeTree parameterType;
+
+            public Parameter(UUID id, Markers markers, @Nullable Identifier name, @Nullable Space colon, TypeTree parameterType) {
+                this.id = id;
+                this.markers = markers;
+                this.name = name;
+                this.colon = colon;
+                this.parameterType = parameterType;
+            }
+
+            @Override
+            public Space getPrefix() {
+                return name != null ? name.getPrefix() : parameterType.getPrefix();
+            }
+
+            @Override
+            public <J2 extends J> J2 withPrefix(Space space) {
+                //noinspection unchecked
+                return (J2) (name != null ? withName(name.withPrefix(space)) : withType(parameterType.withPrefix(space)));
+            }
+
+            @Override
+            public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+                return v.visitFunctionTypeParameter(this, p);
+            }
+
+            @Override
+            public JavaType getType() {
+                return parameterType.getType();
+            }
+
+            @Override
+            public <T extends J> T withType(@Nullable JavaType type) {
+                return (T) new Parameter(id, markers, name, colon, this.parameterType.withType(type));
+            }
+        }
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final FunctionType t;
+
+            @Nullable
+            public JContainer<TypeTree> getParameters() {
+                return t.parameters;
+            }
+
+            public FunctionType withParameters(@Nullable JContainer<TypeTree> parameters) {
+                return t.parameters == parameters ? t
+                        : new FunctionType(t.id, t.prefix, t.markers, t.leadingAnnotations, t.modifiers, t.receiver, parameters, t.arrow, t.returnType);
+            }
         }
     }
 

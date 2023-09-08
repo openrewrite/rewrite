@@ -43,6 +43,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
+    public K.FunctionType.Parameter visitFunctionTypeParameter(K.FunctionType.Parameter parameter, P p) {
+        return (K.FunctionType.Parameter) super.visitFunctionTypeParameter(parameter, p);
+    }
+
+    @Override
     public K.KReturn visitKReturn(K.KReturn kReturn, P p) {
         return (K.KReturn) super.visitKReturn(kReturn, p);
     }

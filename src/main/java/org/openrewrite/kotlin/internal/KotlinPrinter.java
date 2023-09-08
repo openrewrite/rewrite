@@ -162,19 +162,42 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitFunctionType(K.FunctionType functionType, PrintOutputCapture<P> p) {
+        boolean nullable = functionType.getMarkers().findFirst(IsNullable.class).isPresent();
+
         beforeSyntax(functionType, KSpace.Location.FUNCTION_TYPE_PREFIX, p);
         visit(functionType.getLeadingAnnotations(), p);
         for (J.Modifier modifier : functionType.getModifiers()) {
             delegate.visitModifier(modifier, p);
         }
 
+        if (nullable) {
+            p.append("(");
+        }
         if (functionType.getReceiver() != null) {
             visitRightPadded(functionType.getReceiver(), p);
             p.append(".");
         }
-        visit(functionType.getTypedTree(), p);
+        delegate.visitContainer("(", functionType.getPadding().getParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ")", p);
+        visitSpace(functionType.getArrow(), KSpace.Location.FUNCTION_TYPE_ARROW_PREFIX, p);
+        p.append("->");
+        visit(functionType.getReturnType(), p);
+        if (nullable) {
+            p.append(")");
+        }
         afterSyntax(functionType, p);
         return functionType;
+    }
+
+    @Override
+    public J visitFunctionTypeParameter(K.FunctionType.Parameter parameter, PrintOutputCapture<P> p) {
+        if (parameter.getName() != null) {
+            visit(parameter.getName(), p);
+            //noinspection DataFlowIssue
+            visitSpace(parameter.getColon(), KSpace.Location.FUNCTION_TYPE_PARAMETER_COLON, p);
+            p.append(":");
+        }
+        visit(parameter.getParameterType(), p);
+        return parameter;
     }
 
     @Override

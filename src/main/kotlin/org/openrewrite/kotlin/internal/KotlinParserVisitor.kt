@@ -1743,6 +1743,10 @@ class KotlinParserVisitor(
 
     override fun visitFunctionTypeRef(functionTypeRef: FirFunctionTypeRef, data: ExecutionContext): J {
         val prefix = whitespace()
+        if (functionTypeRef.isMarkedNullable) {
+            skip("(")
+            whitespace() // FIXME add to LST
+        }
         var modifiers: List<J.Modifier> = ArrayList()
         val leadingAnnotations: MutableList<J.Annotation> = mutableListOf()
         val node = getRealPsiElement(functionTypeRef)
@@ -1762,25 +1766,22 @@ class KotlinParserVisitor(
                 .withAfter(whitespace())
             skip(".")
         }
-        val list = PsiTreeUtil.findChildOfType(node, KtParameterList::class.java)
-        val parenthesized = list != null && list.text.startsWith("(")
         val before = sourceBefore("(")
-        val refParams: MutableList<JRightPadded<J?>> = ArrayList(functionTypeRef.parameters.size)
-        val closureType = typeMapping.type(functionTypeRef)
+        val refParams: MutableList<JRightPadded<out TypeTree>> = ArrayList(functionTypeRef.parameters.size)
         if (functionTypeRef.parameters.isNotEmpty()) {
             val parameters = functionTypeRef.parameters
             for (i in parameters.indices) {
                 val p = parameters[i]
-                val expr: J? = visitElement(p, data)
-                var param: JRightPadded<J?>
+                val expr = visitElement(p, data) as K.FunctionType.Parameter?
                 if (expr != null) {
+                    var param: JRightPadded<out TypeTree>
                     if (i < parameters.size - 1) {
                         param = JRightPadded.build(expr).withAfter(whitespace())
                         skip(",")
                     } else {
-                        val after = if (parenthesized) whitespace() else Space.EMPTY
+                        val after = whitespace()
                         param = JRightPadded.build(expr).withAfter(after)
-                        if (parenthesized && skip(",")) {
+                        if (skip(",")) {
                             param = param.withMarkers(Markers.build(listOf(TrailingComma(randomId(), whitespace()))))
                         }
                     }
@@ -1788,46 +1789,36 @@ class KotlinParserVisitor(
                 }
             }
             skip(")")
-        }
-        var params = J.Lambda.Parameters(randomId(), Space.EMPTY, Markers.EMPTY, parenthesized, refParams)
-        if (parenthesized && functionTypeRef.parameters.isEmpty()) {
-            params = params.padding.withParams(
-                listOf(
+        } else {
+            refParams +=
                     JRightPadded
-                        .build(J.Empty(randomId(), Space.EMPTY, Markers.EMPTY) as J)
+                        .build(J.Empty(randomId(), Space.EMPTY, Markers.EMPTY))
                         .withAfter(sourceBefore(")"))
-                )
-            )
         }
+
         val arrow = sourceBefore("->")
-        val saveCursor = cursor
-        whitespace()
-        val omitBraces = source[cursor] != '{'
-        cursor(saveCursor)
-        var body: J = visitElement(functionTypeRef.returnTypeRef, data)!!
-        if (body is J.Block) {
-            body = body.withEnd(sourceBefore("}"))
+        val returnType: TypeTree = visitElement(functionTypeRef.returnTypeRef, data) as TypeTree
+
+        val nullablePrefix: Space?
+        if (functionTypeRef.isMarkedNullable) {
+            whitespace() // FIXME add to LST
+            skip(")")
+            nullablePrefix = whitespace()
+            skip("?")
+        } else {
+            nullablePrefix = null
         }
-        if (functionTypeRef.parameters.isEmpty()) {
-            body = body.withMarkers(body.markers.removeByType(OmitBraces::class.java))
-        }
-        val lambda = J.Lambda(
-            randomId(),
-            before,
-            if (omitBraces) Markers.EMPTY.addIfAbsent(OmitBraces(randomId())) else Markers.EMPTY,
-            params,
-            arrow,
-            body,
-            closureType
-        )
+
         return K.FunctionType(
             randomId(),
             prefix,
-            Markers.EMPTY,
-            lambda,
+            if (functionTypeRef.isMarkedNullable) Markers.EMPTY.addIfAbsent(IsNullable(randomId(), nullablePrefix!!)) else Markers.EMPTY,
             leadingAnnotations,
             modifiers,
-            receiver
+            receiver,
+            JContainer.build(before, refParams as List<JRightPadded<TypeTree>>, Markers.EMPTY),
+            arrow,
+            returnType
         )
     }
 
@@ -2179,15 +2170,7 @@ class KotlinParserVisitor(
                 typeExpression = if (j is TypeTree) {
                     j
                 } else {
-                    K.FunctionType(
-                            randomId(),
-                            Space.EMPTY,
-                            Markers.EMPTY,
-                            j as TypedTree,
-                            emptyList(),
-                            emptyList(),
-                            null
-                    )
+                    throw IllegalStateException("Unexpected type expression: " + j.javaClass.name)
                 }
             }
         }
@@ -3193,15 +3176,7 @@ class KotlinParserVisitor(
                 typeExpression = if (j is TypeTree) {
                     j
                 } else {
-                    K.FunctionType(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        j as TypedTree,
-                        emptyList(),
-                        emptyList(),
-                        null
-                    )
+                    throw IllegalStateException("Unexpected type expression: " + j.javaClass.name)
                 }
             } else if ("_" == valueName) {
                 val savedCursor = cursor
@@ -3212,15 +3187,7 @@ class KotlinParserVisitor(
                     typeExpression = if (j is TypeTree) {
                         j
                     } else {
-                        K.FunctionType(
-                            randomId(),
-                            Space.EMPTY,
-                            Markers.EMPTY,
-                            j as TypedTree,
-                            emptyList(),
-                            emptyList(),
-                            null
-                        )
+                        throw IllegalStateException("Unexpected type expression: " + j.javaClass.name)
                     }
                 } else {
                     cursor = savedCursor
@@ -3838,7 +3805,20 @@ class KotlinParserVisitor(
         functionTypeParameter: FirFunctionTypeParameter,
         data: ExecutionContext
     ): J {
-        return visitElement(functionTypeParameter.returnTypeRef, data)!!
+        val name: J.Identifier?
+        var colon: Space? = null
+        if (functionTypeParameter.name != null) {
+            name = createIdentifier(functionTypeParameter.name!!.asString())
+            colon = whitespace()
+            skip(":")
+        } else name = null
+        return K.FunctionType.Parameter(
+            randomId(),
+            Markers.EMPTY,
+            name,
+            colon,
+            visitElement(functionTypeParameter.returnTypeRef, data) as TypeTree
+        )
     }
 
     override fun visitImplicitInvokeCall(implicitInvokeCall: FirImplicitInvokeCall, data: ExecutionContext): J {

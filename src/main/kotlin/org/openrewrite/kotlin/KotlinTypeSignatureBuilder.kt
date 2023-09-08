@@ -336,6 +336,11 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
             s.append("Generic{in ")
             s.append(signature(type1))
             s.append("}")
+        } else if (type is ConeCapturedType) {
+            val (type1) = type
+            s.append("Generic{in ")
+            s.append(signature(type1))
+            s.append("}")
         } else if (type is ConeKotlinTypeProjectionOut) {
             val (type1) = type
             s.append("Generic{out ")

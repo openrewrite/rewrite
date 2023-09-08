@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -25,12 +24,22 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 class FunctionTypeTest implements RewriteTest {
 
     @Test
-    @ExpectedToFail
+    void nested() {
+        rewriteRun(
+          kotlin(
+            """
+              val f: ((Int) -> Boolean) -> Boolean = { true }
+              """
+          )
+        );
+    }
+
+    @Test
     void namedParameter() {
         rewriteRun(
           kotlin(
             """
-              val f: (p: Any) -> Boolean = { p -> true }
+              val f: (p  : Any) -> Boolean = { true }
               """
           )
         );
@@ -38,7 +47,6 @@ class FunctionTypeTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/275")
-    @ExpectedToFail
     void parenthesizedNullableType() {
         rewriteRun(
           kotlin(
