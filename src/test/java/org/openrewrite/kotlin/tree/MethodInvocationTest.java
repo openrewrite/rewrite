@@ -16,10 +16,12 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.marker.IndexedAccess;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings({"RedundantVisibilityModifier", "PropertyName", "RedundantNullableReturnType", "UnusedReceiverParameter", "ConstantConditionIf", "MoveLambdaOutsideParentheses"})
@@ -611,6 +613,48 @@ class MethodInvocationTest implements RewriteTest {
               val block2: Collection<Any>.(String, () -> Unit) -> Unit = {_, _ -> }
               val r2 = listOf("descriptor").block2("x") {}
               """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/233")
+    void indexedAccess() {
+        rewriteRun(
+          kotlin(
+            """
+              val arr = IntArray(1)
+              val a0 = arr[0]
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/233")
+    void customIndexedAccess() {
+        rewriteRun(
+          kotlin(
+            """
+              class Surface {
+                  operator fun get(x: Int, y: Int) = 2 * x + 4 * y - 10
+              }
+              val surface = Surface()
+              val z = surface[4, 2]
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(((J.VariableDeclarations) cu.getStatements().get(cu.getStatements().size() - 1))).satisfies(
+                    z ->
+                        assertThat(((J.MethodInvocation) z.getVariables().get(0).getInitializer())).satisfies(
+                            get -> {
+                                assertThat(get.getMarkers().findFirst(IndexedAccess.class)).isPresent();
+                                assertThat(((J.Identifier) get.getSelect()).getSimpleName()).isEqualTo("surface");
+                                assertThat(get.getName().getSimpleName()).isEqualTo("get");
+                                assertThat(get.getArguments()).hasSize(2);
+                            }
+                        )
+                );
+            })
           )
         );
     }

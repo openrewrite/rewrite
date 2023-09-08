@@ -33,7 +33,10 @@ import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertyGetter
 import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertySetter
 import org.jetbrains.kotlin.fir.declarations.impl.FirPrimaryConstructor
 import org.jetbrains.kotlin.fir.expressions.*
-import org.jetbrains.kotlin.fir.expressions.impl.*
+import org.jetbrains.kotlin.fir.expressions.impl.FirElseIfTrueCondition
+import org.jetbrains.kotlin.fir.expressions.impl.FirNoReceiverExpression
+import org.jetbrains.kotlin.fir.expressions.impl.FirSingleExpressionBlock
+import org.jetbrains.kotlin.fir.expressions.impl.FirUnitExpression
 import org.jetbrains.kotlin.fir.references.*
 import org.jetbrains.kotlin.fir.resolve.toFirRegularClassSymbol
 import org.jetbrains.kotlin.fir.resolve.toSymbol
@@ -1077,7 +1080,10 @@ class KotlinParserVisitor(
             val operatorName = functionCall.calleeReference.name.asString()
             if (isUnaryOperation(operatorName)) {
                 mapUnaryOperation(functionCall)
-            } else if ("contains" == operatorName || "rangeTo" == operatorName || "get" == operatorName || "set" == operatorName || "rangeUntil" == operatorName) {
+            } else if ("get" == operatorName) {
+                val indexedAccess = mapFunctionCall(functionCall, false, data)
+                indexedAccess.withMarkers(indexedAccess.markers.addIfAbsent(IndexedAccess(randomId())))
+            } else if ("contains" == operatorName || "rangeTo" == operatorName || "set" == operatorName || "rangeUntil" == operatorName) {
                 mapKotlinBinaryOperation(functionCall)
             } else if (operatorName in augmentedAssignOperators) {
                 mapAugmentedAssign(functionCall)
@@ -1402,19 +1408,21 @@ class KotlinParserVisitor(
         var saveCursor = cursor
         var containerPrefix = whitespace()
         var parenOrBrace = source[cursor++]
-        val saveCursor2 = cursor
+        val closing = when (parenOrBrace) { '[' -> "]" else -> ")" }
+        if (parenOrBrace == '[') {
+            markers = markers.addIfAbsent(IndexedAccess(randomId()))
+        }
         val isCloseParen = parenOrBrace == '(' && source[cursor] == ')'
         if (isCloseParen && isLastArgumentLambda) {
             cursor++
             saveCursor = cursor
             parenOrBrace = source[cursor]
-        } else if (parenOrBrace != '(') {
+        } else if ((parenOrBrace != '(' && parenOrBrace != '[') || isInfix) {
             cursor(saveCursor)
             containerPrefix = Space.EMPTY
             markers = markers.addIfAbsent(OmitParentheses(randomId()))
-        } else {
-            cursor(saveCursor2)
         }
+
         if (firArguments.isEmpty()) {
             args = if (parenOrBrace == '{') {
                 // function call arguments with no parens.
@@ -1427,7 +1435,7 @@ class KotlinParserVisitor(
             } else {
                 JContainer.build(
                     containerPrefix,
-                    listOf(padRight(J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), Space.EMPTY)
+                    listOf(padRight(J.Empty(randomId(), sourceBefore(closing), Markers.EMPTY), Space.EMPTY)
                     ),
                     markers
                 )
@@ -1448,7 +1456,7 @@ class KotlinParserVisitor(
                 if (!isInfix) {
                     if (isLastArgumentLambda && i == argumentCount - 2) {
                         trailingComma = if (skip(",")) TrailingComma(randomId(), whitespace()) else null
-                        skip(")")
+                        skip(closing)
                     } else if (i == argumentCount - 1) {
                         trailingComma = if (skip(",")) TrailingComma(randomId(), whitespace()) else null
                     } else {
@@ -1461,7 +1469,7 @@ class KotlinParserVisitor(
                 expressions.add(padded)
             }
             if (!isTrailingLambda && !isInfix) {
-                skip(")")
+                skip(closing)
             }
             args = JContainer.build(containerPrefix, expressions, markers)
         }
@@ -1563,14 +1571,6 @@ class KotlinParserVisitor(
                 val rhs: FirExpression =
                     if (functionCall.explicitReceiver != null) functionCall.explicitReceiver!! else functionCall.dispatchReceiver
                 right = convertToExpression(rhs, data)!!
-            }
-
-            "get" -> {
-                left = convertToExpression(functionCall.explicitReceiver!!, data)!!
-                opPrefix = sourceBefore("[")
-                kotlinBinaryType = K.Binary.Type.Get
-                right = convertToExpression(functionCall.argumentList.arguments[0], data)!!
-                after = sourceBefore("]")
             }
 
             "set" -> {

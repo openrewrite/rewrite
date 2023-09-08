@@ -840,18 +840,22 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<P> p) {
+            boolean indexedAccess = method.getMarkers().findFirst(IndexedAccess.class).isPresent();
+
             beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
 
             visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, p);
-            if (method.getSelect() != null && !method.getMarkers().findFirst(Extension.class).isPresent()) {
+            if (method.getSelect() != null && !method.getMarkers().findFirst(Extension.class).isPresent() && !indexedAccess) {
                 if (method.getMarkers().findFirst(IsNullSafe.class).isPresent()) {
                     p.append("?");
                 }
                 p.append(".");
             }
 
-            visit(method.getName(), p);
-            visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
+            if (!indexedAccess) {
+                visit(method.getName(), p);
+                visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
+            }
 
             visitArgumentsContainer(method.getPadding().getArguments(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
 
@@ -863,12 +867,13 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visitSpace(argContainer.getBefore(), argsLocation, p);
             List<JRightPadded<Expression>> args = argContainer.getPadding().getElements();
             boolean omitParensOnMethod = argContainer.getMarkers().findFirst(OmitParentheses.class).isPresent();
+            boolean indexedAccess = argContainer.getMarkers().findFirst(IndexedAccess.class).isPresent();
 
             int argCount = args.size();
             boolean isTrailingLambda = !args.isEmpty() && args.get(argCount - 1).getElement().getMarkers().findFirst(TrailingLambdaArgument.class).isPresent();
 
             if (!omitParensOnMethod) {
-                p.append('(');
+                p.append(indexedAccess ? '[' : '(');
             }
 
             for (int i = 0; i < argCount; i++) {
@@ -878,7 +883,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 if (i == argCount - 1 && isTrailingLambda) {
                     visitSpace(arg.getAfter(), JRightPadded.Location.METHOD_INVOCATION_ARGUMENT.getAfterLocation(), p);
                     if (!omitParensOnMethod) {
-                        p.append(")");
+                        p.append(indexedAccess ? ']' : ')');
                     }
                     visit(arg.getElement(), p);
                     break;
@@ -887,7 +892,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 if (i > 0 && omitParensOnMethod && (
                         !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() &&
                         !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent())) {
-                    p.append(')');
+                    p.append(indexedAccess ? ']' : ')');
                 } else if (i > 0) {
                     p.append(',');
                 }
@@ -895,13 +900,13 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 SpreadArgument spread = arg.getElement().getMarkers().findFirst(SpreadArgument.class).orElse(null);
                 if (spread != null) {
                     kotlinPrinter.visitSpace(spread.getPrefix(), KSpace.Location.SPREAD_ARGUMENT_PREFIX, p);
-                    p.append("*");
+                    p.append('*');
                 }
                 visitRightPadded(arg, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT, p);
             }
 
             if (!omitParensOnMethod && !isTrailingLambda) {
-                p.append(')');
+                p.append(indexedAccess ? ']' : ')');
             }
         }
 
