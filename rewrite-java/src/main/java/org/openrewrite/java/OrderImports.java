@@ -96,7 +96,7 @@ public class OrderImports extends Recipe {
                 }
 
                 if (Boolean.TRUE.equals(removeUnused)) {
-                    doAfterVisit(new RemoveUnusedImports(true).getVisitor());
+                    doAfterVisit(new RemoveUnusedImports().getVisitor());
                 } else if (changed) {
                     doAfterVisit(new FormatFirstClassPrefix<>());
                 }

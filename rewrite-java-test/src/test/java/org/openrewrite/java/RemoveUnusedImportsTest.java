@@ -31,7 +31,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new RemoveUnusedImports(true));
+        spec.recipe(new RemoveUnusedImports());
     }
 
     @Test
@@ -1219,7 +1219,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
     @Test
     void doesNotUnfoldWildCardImport() {
         rewriteRun(
-          spec -> spec.recipe(new RemoveUnusedImports(false)),
+          spec -> spec.recipe(new RemoveUnusedImports()),
           java(
             """
               package com.Source.mine;

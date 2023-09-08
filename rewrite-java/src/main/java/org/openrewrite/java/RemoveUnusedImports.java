@@ -18,11 +18,9 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
@@ -30,7 +28,6 @@ import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
 import java.util.*;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -47,12 +44,6 @@ import static org.openrewrite.java.tree.TypeUtils.toFullyQualifiedName;
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class RemoveUnusedImports extends Recipe {
-
-    @Option(displayName = "Unfold wildcard imports",
-            description = "Expand wildcard imports into individual imports",
-            required = false)
-    @Nullable
-    Boolean unfoldWildcard;
 
     @Override
     public String getDisplayName() {
@@ -78,16 +69,10 @@ public class RemoveUnusedImports extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new NoMissingTypes(), new RemoveUnusedImportsVisitor(Boolean.TRUE.equals(unfoldWildcard)));
+        return Preconditions.check(new NoMissingTypes(), new RemoveUnusedImportsVisitor());
     }
 
     private static class RemoveUnusedImportsVisitor extends JavaIsoVisitor<ExecutionContext> {
-
-        private boolean unfoldWildcard;
-
-        public RemoveUnusedImportsVisitor(final boolean unfoldWildcard) {
-            this.unfoldWildcard = unfoldWildcard;
-        }
 
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
@@ -257,8 +242,7 @@ public class RemoveUnusedImports extends Recipe {
                         if ("*".equals(elem.getQualid().getSimpleName())) {
                             return elem.getPackageName().equals(c.getPackageName());
                         }
-                        @Nullable String fqn1 = c.getFullyQualifiedName();
-                        return ((Predicate<String>) (fqn2) -> fullyQualifiedNamesAreEqual(fqn1, fqn2)).test(elem.getTypeName());
+                        return fullyQualifiedNamesAreEqual(c.getFullyQualifiedName(), elem.getTypeName());
                     })) {
                         anImport.used = false;
                         changed = true;
