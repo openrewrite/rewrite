@@ -831,7 +831,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import static java.util.Collections.*;
               
               class Test {
-                  ConcurrentHashMap<String, String> m = new ConcurrentHashMap(emptyMap());
+                  ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>(emptyMap());
               }
               """
           )
@@ -973,7 +973,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 }
 
                 public static void helloWorld() {
-                    System.out.println("hello world!");              
+                    System.out.println("hello world!");
                 }
               }
               """
@@ -1003,7 +1003,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   public static void main(String[] args) {
                     var uniqueCount = B1;
                     helloWorld();
-                  }              
+                  }
               }
               """
           )
@@ -1030,7 +1030,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 }
 
                 public static void helloWorld() {
-                    System.out.println("hello world!");              
+                    System.out.println("hello world!");
                 }
               }
               """
@@ -1065,7 +1065,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                     var uniqueCount = B1;
                     var uniqueCountNested = C1;
                     helloWorld();
-                  }              
+                  }
               }
               """
           )
@@ -1085,7 +1085,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   
                   public short getShort1() {
                     return SHORT1;
-                  } 
+                  }
               }
               """
           ),
