@@ -606,6 +606,7 @@ public interface K extends J {
             this.expression = expression;
         }
 
+        @JsonCreator
         public ExpressionStatement(UUID id, Expression expression) {
             this.id = id;
             this.expression = expression;
