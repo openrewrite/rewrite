@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -884,6 +885,7 @@ public interface K extends J {
             this(id, Collections.emptyList(), expression, label);
         }
 
+        @JsonCreator
         public KReturn(UUID id, List<Annotation> annotations, Return expression, @Nullable J.Identifier label) {
             this.id = id;
             this.annotations = annotations;
