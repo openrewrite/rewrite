@@ -993,9 +993,17 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitClosureExpression(ClosureExpression expression) {
-            Space prefix = sourceBefore("{");
+            Space prefix = whitespace();
+            LambdaStyle ls = new LambdaStyle(randomId(), expression instanceof LambdaExpression, true);
+            boolean parenthesized = false;
+            if(source.charAt(cursor) == '(') {
+                parenthesized = true;
+                cursor += 1; // skip '('
+            } else if (source.charAt(cursor) == '{') {
+                cursor += 1; // skip '{'
+            }
             JavaType closureType = typeMapping.type(staticType(expression));
-            List<JRightPadded<J>> paramExprs = emptyList();
+            List<JRightPadded<J>> paramExprs;
             if (expression.getParameters() != null && expression.getParameters().length > 0) {
                 paramExprs = new ArrayList<>(expression.getParameters().length);
                 Parameter[] parameters = expression.getParameters();
@@ -1016,36 +1024,39 @@ public class GroovyParserVisitor {
                     JRightPadded<J> param = JRightPadded.build(expr);
                     if (i != parameters.length - 1) {
                         param = param.withAfter(sourceBefore(","));
+                    } else {
+                        param = param.withAfter(whitespace());
                     }
                     paramExprs.add(param);
                 }
+            } else {
+                Space argPrefix = EMPTY;
+                if(parenthesized) {
+                    argPrefix = whitespace();
+                }
+                paramExprs = singletonList(JRightPadded.build(new J.Empty(randomId(), argPrefix, Markers.EMPTY)));
             }
-
-            J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, false, paramExprs);
+            if(parenthesized) {
+                cursor += 1;
+            }
+            J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, parenthesized, paramExprs);
             int saveCursor = cursor;
             Space arrowPrefix = whitespace();
             if (source.startsWith("->", cursor)) {
                 cursor += "->".length();
-                if (params.getParameters().isEmpty()) {
-                    params = params.getPadding().withParams(singletonList(JRightPadded
-                            .build((J) new J.Empty(randomId(), EMPTY, Markers.EMPTY))
-                            .withAfter(arrowPrefix)));
-                } else {
-                    params = params.getPadding().withParams(
-                            ListUtils.mapLast(params.getPadding().getParams(), param -> param.withAfter(arrowPrefix))
-                    );
-                }
             } else {
+                ls = ls.withArrow(false);
                 cursor = saveCursor;
+                arrowPrefix = EMPTY;
             }
-
             J body = visit(expression.getCode());
-            queue.add(new J.Lambda(randomId(), prefix, Markers.EMPTY, params,
-                    EMPTY,
+            queue.add(new J.Lambda(randomId(), prefix, Markers.build(singletonList(ls)), params,
+                    arrowPrefix,
                     body,
                     closureType));
-
-            cursor += 1; // skip '}'
+            if(cursor < source.length() && source.charAt(cursor) == '}') {
+                cursor++;
+            }
         }
 
         @Override
