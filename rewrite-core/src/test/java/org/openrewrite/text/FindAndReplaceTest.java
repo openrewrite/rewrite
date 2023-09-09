@@ -92,4 +92,52 @@ class FindAndReplaceTest implements RewriteTest {
           text("test", "tested")
         );
     }
+
+    @Test
+    void multilineReplace() {
+        rewriteRun(
+          spec -> spec.recipe(
+            new FindAndReplace("""
+              final MongoClientURI uri = new MongoClientURI(clientUri, buildMongoClientOptionsBuilder());
+                    return new MongoClient(uri);""",
+              """
+              final MongoClientSettings.Builder settingsBuilder = MongoClientSettings.builder().applyConnectionString(new ConnectionString(clientUri));
+                    if (appMongoProperties.isUseClientCert()) {
+                        settingsBuilder.applyToSslSettings(sslBuilder -> {
+                            sslBuilder.enabled(true);
+                            sslBuilder.context(buildSslContext());
+                        });
+                    }
+                    return MongoClients.create(settingsBuilder.build());""",
+              null,
+              null,
+              null,
+              null,
+              null)),
+          text(
+            """
+              class test {
+                  void test() {
+                    final MongoClientURI uri = new MongoClientURI(clientUri, buildMongoClientOptionsBuilder());
+                    return new MongoClient(uri);
+                  }
+              }""",
+            """
+              class test {
+                  void test() {
+                    final MongoClientSettings.Builder settingsBuilder = MongoClientSettings.builder().applyConnectionString(new ConnectionString(clientUri));
+                    if (appMongoProperties.isUseClientCert()) {
+                        settingsBuilder.applyToSslSettings(sslBuilder -> {
+                            sslBuilder.enabled(true);
+                            sslBuilder.context(buildSslContext());
+                        });
+                    }
+                    return MongoClients.create(settingsBuilder.build());
+                  }
+              }
+              """,
+            spec -> spec.path("test.yml")
+          )
+        );
+    }
 }
