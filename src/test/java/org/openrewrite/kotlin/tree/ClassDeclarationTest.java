@@ -254,8 +254,12 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void implicitConstructorWithSuperType() {
         rewriteRun(
-          kotlin("class Other"),
-          kotlin("class Test ( val answer : Int ) : Other ( ) { }")
+          kotlin(
+            """
+              open class Other
+              class Test constructor ( val answer : Int ) : Other ( ) { }
+              """
+          )
         );
     }
 
@@ -416,7 +420,7 @@ class ClassDeclarationTest implements RewriteTest {
                   val root : R
               ) {
                   
-                  constructor ( parent : T , root : R ) : this ( parent , root )
+                  constructor ( parent : T , root : R , id : Int ) : this ( parent , root )
                   
                   fun parent ( ) : T {
                       return parent
@@ -454,10 +458,7 @@ class ClassDeclarationTest implements RewriteTest {
             """
               @Repeatable
               annotation class A ( val s : String )
-              """
-          ),
-          kotlin(
-            """
+              
               open @A ( "1" ) public @A ( "2" ) class TestA
               @A ( "1" ) open @A ( "2" ) public class TestB
               """
@@ -560,6 +561,21 @@ class ClassDeclarationTest implements RewriteTest {
             """
               val map = mapOf(Pair("one", 1)) as? Map<*, *>
               val s = map.orEmpty().entries.joinToString { (key, value) -> "$key: $value" }
+              """
+          )
+        );
+    }
+
+    @Test
+    void outerClassTypeParameters() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test<K, V> {
+                  abstract inner class LinkedTreeMapIterator<T> : MutableIterator<T> {
+                      var lastReturned: Map.Entry<K, V>? = null
+                  }
+              }
               """
           )
         );

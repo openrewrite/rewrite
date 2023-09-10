@@ -3965,7 +3965,7 @@ class KotlinParserVisitor(
             val before = sourceBefore("<")
             val typeParameters: MutableList<JRightPadded<J.TypeParameter?>> =
                 ArrayList(regularClass.typeParameters.size)
-            val parameters = regularClass.typeParameters
+            val parameters = regularClass.typeParameters.filter { it.source != null }
             for (i in parameters.indices) {
                 val j: J = visitElement(parameters[i], data)!!
                 typeParameters.add(
