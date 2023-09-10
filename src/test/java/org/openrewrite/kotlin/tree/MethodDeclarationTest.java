@@ -322,4 +322,15 @@ class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void multiplatformExpectDeclaration() {
+        rewriteRun(
+          kotlin(
+            """
+              expect suspend fun Any.executeAsync(): Any
+              """
+          )
+        );
+    }
 }

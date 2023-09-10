@@ -2671,7 +2671,7 @@ class KotlinParserVisitor(
             returnTypeExpression = visitElement(simpleFunction.returnTypeRef, data) as TypeTree?
             saveCursor = cursor
             before = whitespace()
-            if (source[cursor] == '?') {
+            if (at('?')) {
                 returnTypeExpression = returnTypeExpression!!.withMarkers(
                     returnTypeExpression.markers.addIfAbsent(IsNullable(randomId(), before))
                 )
@@ -4877,6 +4877,8 @@ class KotlinParserVisitor(
     private fun getCurrentFile(): FirBasedSymbol<*>? {
         return if (currentFile == null) null else currentFile!!.symbol
     }
+
+    private fun at(c: Char) = cursor < source.length && source[cursor] == c
 
     private fun skip(token: String?): Boolean {
         if (token != null && source.startsWith(token, cursor)) {
