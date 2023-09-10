@@ -351,11 +351,11 @@ class KotlinParserVisitor(
             label = visitElement(anonymousFunction.label!!, data) as J.Label?
         }
         val prefix = whitespace()
-        val omitBraces = source[cursor] != '{'
-        if (omitBraces) {
-            markers = markers.addIfAbsent(OmitBraces(randomId()))
-        } else {
+        val hasBraces = source[cursor] == '{'
+        if (hasBraces) {
             skip("{")
+        } else {
+            markers = markers.addIfAbsent(OmitBraces(randomId()))
         }
         var omitDestruct = false
         val valueParams: MutableList<JRightPadded<J>> = ArrayList(anonymousFunction.valueParameters.size)
@@ -451,8 +451,8 @@ class KotlinParserVisitor(
                 }
             }
         }
-        var body = if (anonymousFunction.body == null) null else visitBlock(anonymousFunction.body!!, skip, data)
-        if (body is J.Block && !omitBraces) {
+        var body = if (anonymousFunction.body == null) null else visitBlock0(anonymousFunction.body!!, skip, false, data)
+        if (hasBraces && body is J.Block) {
             body = body.withEnd(sourceBefore("}"))
         }
         if (body == null) {
@@ -768,9 +768,13 @@ class KotlinParserVisitor(
      * but should not be added as statements to the J.ForLoop#body.
      */
     private fun visitBlock(block: FirBlock, skipStatements: Set<FirElement>, data: ExecutionContext): J {
+        return visitBlock0(block, skipStatements, true, data)
+    }
+
+    private fun visitBlock0(block: FirBlock, skipStatements: Set<FirElement>, consumeBraces: Boolean, data: ExecutionContext): J.Block {
         var saveCursor = cursor
         var prefix: Space = whitespace()
-        val hasBraces = skip("{")
+        val hasBraces = consumeBraces && skip("{")
         if (!hasBraces) {
             cursor(saveCursor)
             prefix = Space.EMPTY
@@ -780,7 +784,7 @@ class KotlinParserVisitor(
         for (s in block.statements) {
             // Skip FirElements that should not be processed.
             if (!skipStatements.contains(s) &&
-                (s.source == null || s.source!!.kind !is KtFakeSourceElementKind.ImplicitConstructor)
+                    (s.source == null || s.source!!.kind !is KtFakeSourceElementKind.ImplicitConstructor)
             ) {
                 firStatements.add(s)
             }
@@ -797,7 +801,7 @@ class KotlinParserVisitor(
                 // The FirWhileLoop at position 1 is the for loop, which is transformed to use an iterator.
                 // So, the FirBlock is transformed to construct a J.ForEach that preserves source code.
                 if (firElement.statements[0] is FirProperty && "<iterator>" == (firElement.statements[0] as FirProperty).name.asString() &&
-                    firElement.statements[1] is FirWhileLoop
+                        firElement.statements[1] is FirWhileLoop
                 ) {
                     j = mapForLoop(firElement)
                 }
@@ -805,16 +809,16 @@ class KotlinParserVisitor(
             var skipImplicitDestructs = 0
             if (element is KtDestructuringDeclaration) {
                 val destructEntries = element.children.filterIsInstance<KtDestructuringDeclarationEntry>()
-                val psiFirPairs : MutableList<Pair<PsiElement, FirStatement?>> = mutableListOf()
+                val psiFirPairs: MutableList<Pair<PsiElement, FirStatement?>> = mutableListOf()
 
                 psiFirPairs.add(Pair(element, firElement as FirStatement))
                 for (destructEntry in destructEntries) {
                     destructEntry.endOffset
-                    var fe : FirStatement? = null
+                    var fe: FirStatement? = null
                     for (fs in firStatements) {
                         if (fs.source != null &&
-                            fs.source!!.startOffset == destructEntry.startOffset &&
-                            fs.source!!.endOffset == destructEntry.endOffset) {
+                                fs.source!!.startOffset == destructEntry.startOffset &&
+                                fs.source!!.endOffset == destructEntry.endOffset) {
                             fe = fs
                             break
                         }
@@ -837,7 +841,7 @@ class KotlinParserVisitor(
             val beforeSemicolon = whitespace()
             if (cursor < source.length && skip(";")) {
                 stat = stat.withMarkers(stat.markers.add(Semicolon(randomId())))
-                    .withAfter(beforeSemicolon)
+                        .withAfter(beforeSemicolon)
             } else {
                 cursor(saveCursor)
             }
@@ -845,12 +849,12 @@ class KotlinParserVisitor(
             i++
         }
         return J.Block(
-            randomId(),
-            prefix,
-            if (hasBraces) Markers.EMPTY else Markers.EMPTY.addIfAbsent(OmitBraces(randomId())),
-            JRightPadded.build(false),
-            statements,
-            if (hasBraces) sourceBefore("}") else Space.EMPTY
+                randomId(),
+                prefix,
+                if (hasBraces) Markers.EMPTY else Markers.EMPTY.addIfAbsent(OmitBraces(randomId())),
+                JRightPadded.build(false),
+                statements,
+                if (hasBraces) sourceBefore("}") else Space.EMPTY
         )
     }
 

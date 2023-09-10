@@ -63,4 +63,19 @@ class AnonymousFunctionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void nestedWithWhitespace() {
+        rewriteRun(
+          kotlin(
+            """
+              val filter = null?.let { _ ->
+                  { false
+                  }
+              }
+              """
+          )
+        );
+    }
+
 }
