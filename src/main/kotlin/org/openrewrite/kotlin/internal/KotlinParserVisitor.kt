@@ -4502,11 +4502,15 @@ class KotlinParserVisitor(
             for (annotation in firElement.annotations) {
                 annotations.add(visitElement(annotation, data) as J.Annotation)
             }
+            var j = visitElement0(firElement, data)
+            if (j is Statement && j !is Expression) {
+                j = K.StatementExpression(randomId(), j)
+            }
             return K.AnnotatedExpression(
                 randomId(),
                 Markers.EMPTY,
                 annotations,
-                visitElement0(firElement, data) as Expression
+                j as Expression
             )
         }
         return visitElement0(firElement, data)

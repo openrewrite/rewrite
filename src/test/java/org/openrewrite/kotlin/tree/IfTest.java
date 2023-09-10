@@ -138,4 +138,19 @@ class IfTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void annotatedIf() {
+        rewriteRun(
+          kotlin(
+            """
+              fun foo(t: Boolean) {
+                  @Suppress
+                  if (t)
+                      print("t")
+              }
+              """
+          )
+        );
+    }
 }
