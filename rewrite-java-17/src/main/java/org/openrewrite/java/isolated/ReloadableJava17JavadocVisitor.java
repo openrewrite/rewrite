@@ -1155,7 +1155,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
             return new J.ArrayType(
                     randomId(),
-                    fmt,
+                    Space.EMPTY,
                     Markers.EMPTY,
                     elemType,
                     dimensions

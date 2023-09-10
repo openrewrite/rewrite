@@ -1640,9 +1640,22 @@ class JavadocTest implements RewriteTest {
     void arrayTypeLiterals() {
         rewriteRun(
           java("" +
-            "    /**\n" +
-            "     * Create an instance of {@link byte[]} and {@link byte[][]}\n" +
-            "     */\n" +
+            "/**\n" +
+            "  * Create an instance of {@link byte[]} and {@link byte[][]}\n" +
+            "  */\n" +
+            "class A {}"
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3530")
+    void arrayTypeLiterals2() {
+        rewriteRun(
+          java("" +
+            "/**\n" +
+            " * <p>Values are converted to strings using {@link java.util.Arrays#compare(Comparable[], Comparable[])}}.\n" +
+            " */\n" +
             "class A {}"
           )
         );
