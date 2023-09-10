@@ -2730,7 +2730,8 @@ class KotlinParserVisitor(
             val e = arguments[i]
             val savedCursor = cursor
             val before = whitespace()
-            if (cursor < e.source!!.endOffset && skip("$")) {
+            val isDollar = e is FirConstExpression<*> && e.value == "$"
+            if (cursor < e.source!!.endOffset && !isDollar && skip("$")) {
                 val inBraces = skip("{")
                 values.add(
                     K.KString.Value(

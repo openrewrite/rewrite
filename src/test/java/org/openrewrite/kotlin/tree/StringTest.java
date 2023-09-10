@@ -59,4 +59,16 @@ class StringTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/293")
+    void templateWithConstDollarBeforeSubstitution() {
+        rewriteRun(
+          kotlin(
+            """
+              val s = "$<init>${null}"
+              """
+          )
+        );
+    }
+
 }
