@@ -135,8 +135,7 @@ class FindAndReplaceTest implements RewriteTest {
                     return MongoClients.create(settingsBuilder.build());
                   }
               }
-              """,
-            spec -> spec.path("test.yml")
+              """
           )
         );
     }
