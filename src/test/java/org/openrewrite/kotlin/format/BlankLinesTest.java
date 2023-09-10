@@ -329,7 +329,6 @@ class BlankLinesTest implements RewriteTest {
                       class OuterClass {
                       
                           enum class InnerEnum0 {
-                      
                               FIRST,
                               SECOND
                           }

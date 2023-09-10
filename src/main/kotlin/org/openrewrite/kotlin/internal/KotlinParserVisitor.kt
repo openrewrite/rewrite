@@ -3939,7 +3939,7 @@ class KotlinParserVisitor(
                 sourceBefore("class"),
                 Markers.EMPTY,
                 kindAnnotations,
-                J.ClassDeclaration.Kind.Type.Class
+                if (ClassKind.ENUM_CLASS == classKind) J.ClassDeclaration.Kind.Type.Enum else J.ClassDeclaration.Kind.Type.Class
             )
         }
         var name: J.Identifier
@@ -4009,82 +4009,82 @@ class KotlinParserVisitor(
         // Kotlin declared super class and interfaces differently than java. All types declared after the `:` are added into implementings.
         // This should probably exist on a K.ClassDeclaration view where the getters return the appropriate types.
         // The J.ClassDeclaration should have the super type set in extending and the J.NewClass should be unwrapped.
-        for (i in regularClass.superTypeRefs.indices) {
-            val typeRef = regularClass.superTypeRefs[i]
+
+        // Filter out generated types.
+        val realSuperTypes = regularClass.superTypeRefs.filter { it.source != null && it.source!!.kind !is KtFakeSourceElementKind }.toList()
+        for (i in realSuperTypes.indices) {
+            val typeRef = realSuperTypes[i]
             val symbol = typeRef.coneType.toRegularClassSymbol(firSession)
-            // Filter out generated types.
-            if (typeRef.source != null && typeRef.source!!.kind !is KtFakeSourceElementKind) {
-                var element = visitElement(typeRef, data) as TypeTree
-                if (firPrimaryConstructor != null && symbol != null && ClassKind.CLASS == symbol.fir.classKind) {
-                    // Wrap the element in a J.NewClass to preserve the whitespace and container of `( )`
-                    val args = mapFunctionalCallArguments(firPrimaryConstructor.delegatedConstructor!!)
-                    val delegationCall = J.MethodInvocation(
+            var element = visitElement(typeRef, data) as TypeTree
+            if (firPrimaryConstructor != null && symbol != null && ClassKind.CLASS == symbol.fir.classKind) {
+                // Wrap the element in a J.NewClass to preserve the whitespace and container of `( )`
+                val args = mapFunctionalCallArguments(firPrimaryConstructor.delegatedConstructor!!)
+                val delegationCall = J.MethodInvocation(
+                    randomId(),
+                    element.prefix,
+                    Markers.EMPTY.addIfAbsent(ConstructorDelegation(randomId(), before)).addIfAbsent(Implicit(randomId())),
+                    null,
+                    null,
+                    J.Identifier(
                         randomId(),
-                        element.prefix,
-                        Markers.EMPTY.addIfAbsent(ConstructorDelegation(randomId(), before)).addIfAbsent(Implicit(randomId())),
-                        null,
-                        null,
-                        J.Identifier(
-                            randomId(),
-                            prefix,
-                            Markers.EMPTY,
-                            emptyList(),
-                            if (firPrimaryConstructor.delegatedConstructor!!.isThis) "this" else "super",
-                            typeMapping.type(typeRef),
-                            null
+                        prefix,
+                        Markers.EMPTY,
+                        emptyList(),
+                        if (firPrimaryConstructor.delegatedConstructor!!.isThis) "this" else "super",
+                        typeMapping.type(typeRef),
+                        null
+                    ),
+                    args,
+                    typeMapping.type(firPrimaryConstructor.delegatedConstructor!!.calleeReference.resolved!!.resolvedSymbol) as? JavaType.Method
+                )
+                if (primaryConstructor == null) {
+                    primaryConstructor = J.MethodDeclaration(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.build(
+                            listOf(
+                                PrimaryConstructor(randomId()),
+                                Implicit(randomId())
+                            )
                         ),
-                        args,
-                        typeMapping.type(firPrimaryConstructor.delegatedConstructor!!.calleeReference.resolved!!.resolvedSymbol) as? JavaType.Method
-                    )
-                    if (primaryConstructor == null) {
-                        primaryConstructor = J.MethodDeclaration(
-                            randomId(),
-                            Space.EMPTY,
-                            Markers.build(
-                                listOf(
-                                    PrimaryConstructor(randomId()),
-                                    Implicit(randomId())
-                                )
-                            ),
-                            emptyList(), // TODO annotations
-                            emptyList(), // TODO modifiers
-                            null,
-                            null,
-                            J.MethodDeclaration.IdentifierWithAnnotations(
-                                name.withMarkers(name.markers.addIfAbsent(Implicit(randomId()))),
-                                emptyList()
-                            ),
-                            JContainer.empty(),
-                            null,
-                            J.Block(
-                                randomId(),
-                                Space.EMPTY,
-                                Markers.EMPTY.addIfAbsent(OmitBraces(randomId())),
-                                JRightPadded(false, Space.EMPTY, Markers.EMPTY),
-                                listOf(JRightPadded.build(delegationCall)),
-                                Space.EMPTY
-                            ),
-                            null,
-                            null // TODO type
-                        )
-                    } else {
-                        primaryConstructor = primaryConstructor.withBody(J.Block(
+                        emptyList(), // TODO annotations
+                        emptyList(), // TODO modifiers
+                        null,
+                        null,
+                        J.MethodDeclaration.IdentifierWithAnnotations(
+                            name.withMarkers(name.markers.addIfAbsent(Implicit(randomId()))),
+                            emptyList()
+                        ),
+                        JContainer.empty(),
+                        null,
+                        J.Block(
                             randomId(),
                             Space.EMPTY,
                             Markers.EMPTY.addIfAbsent(OmitBraces(randomId())),
                             JRightPadded(false, Space.EMPTY, Markers.EMPTY),
                             listOf(JRightPadded.build(delegationCall)),
                             Space.EMPTY
-                        ))
-                    }
-                    markers = markers.addIfAbsent(PrimaryConstructor(randomId()))
-                    element = element.withMarkers(element.markers.addIfAbsent(ConstructorDelegation(randomId(), Space.EMPTY)))
+                        ),
+                        null,
+                        null // TODO type
+                    )
+                } else {
+                    primaryConstructor = primaryConstructor.withBody(J.Block(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY.addIfAbsent(OmitBraces(randomId())),
+                        JRightPadded(false, Space.EMPTY, Markers.EMPTY),
+                        listOf(JRightPadded.build(delegationCall)),
+                        Space.EMPTY
+                    ))
                 }
-                superTypes.add(
-                    JRightPadded.build(element)
-                        .withAfter(if (i == regularClass.superTypeRefs.size - 1) Space.EMPTY else sourceBefore(","))
-                )
+                markers = markers.addIfAbsent(PrimaryConstructor(randomId()))
+                element = element.withMarkers(element.markers.addIfAbsent(ConstructorDelegation(randomId(), Space.EMPTY)))
             }
+            superTypes.add(
+                JRightPadded.build(element)
+                    .withAfter(if (i == realSuperTypes.size - 1) Space.EMPTY else sourceBefore(","))
+            )
         }
         if (superTypes.isEmpty()) {
             cursor(saveCursor)
