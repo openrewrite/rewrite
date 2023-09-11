@@ -20,7 +20,9 @@ import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
+import org.openrewrite.PathUtils;
 import org.openrewrite.Recipe;
+import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.AddToTagVisitor;
@@ -75,6 +77,16 @@ public class AddPlugin extends Recipe {
     @Nullable
     String executions;
 
+    @Option(displayName = "File pattern",
+            description = "A glob expression that can be used to constrain which directories or source files should be searched. " +
+                    "Multiple patterns may be specified, separated by a semicolon `;`. " +
+                    "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. " +
+                    "When not set, all source files are searched. ",
+            required = false,
+            example = "**/*.java")
+    @Nullable
+    String filePattern;
+
     @Override
     public String getDisplayName() {
         return "Add Maven plugin";
@@ -91,6 +103,15 @@ public class AddPlugin extends Recipe {
     }
 
     private class AddPluginVisitor extends MavenIsoVisitor<ExecutionContext> {
+
+        @Override
+        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
+            if (filePattern != null) {
+                return PathUtils.matchesGlob(sourceFile.getSourcePath(), filePattern);
+            } else {
+                return sourceFile instanceof Xml.Document;
+            }
+        }
 
         @Override
         public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
