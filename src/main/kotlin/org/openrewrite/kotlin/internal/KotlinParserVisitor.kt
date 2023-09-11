@@ -3989,10 +3989,6 @@ class KotlinParserVisitor(
                 val range = TextRange(declaration.source!!.startOffset, declaration.source!!.endOffset)
                 generatedFirProperties[range] = declaration
             } else {
-                // We aren't interested in the generated values.
-                if (ClassKind.ENUM_CLASS == classKind && declaration.source != null) {
-                    continue
-                }
                 membersMultiVariablesSeparated.add(declaration)
             }
         }
