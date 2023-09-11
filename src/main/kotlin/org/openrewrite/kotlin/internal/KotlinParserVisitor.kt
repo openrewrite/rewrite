@@ -4492,7 +4492,7 @@ class KotlinParserVisitor(
             }
         }
 
-        if (firElement is FirExpression && firElement.annotations.isNotEmpty()) {
+        if ((firElement is FirExpression || firElement is FirVariableAssignment) && (firElement as FirStatement).annotations.isNotEmpty()) {
             val annotations = ArrayList<J.Annotation>(firElement.annotations.size)
             for (annotation in firElement.annotations) {
                 annotations.add(visitElement(annotation, data) as J.Annotation)

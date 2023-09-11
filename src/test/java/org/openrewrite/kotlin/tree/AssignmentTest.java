@@ -135,4 +135,19 @@ class AssignmentTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void annotation() {
+        rewriteRun(
+          kotlin(
+            """
+              fun test() {
+                  var a: Boolean
+                  @Suppress
+                  a = true
+              }
+              """
+          )
+        );
+    }
 }
