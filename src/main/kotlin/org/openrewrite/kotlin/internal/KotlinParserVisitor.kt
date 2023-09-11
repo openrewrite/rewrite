@@ -1394,7 +1394,7 @@ class KotlinParserVisitor(
 
     private fun mapFunctionalCallArguments(firCall: FirCall, skipFirstArgument: Boolean = false): JContainer<Expression> {
         var callPsi = getPsiElement(firCall)!!
-        callPsi = if (callPsi is KtDotQualifiedExpression) callPsi.lastChild else callPsi
+        callPsi = if (callPsi is KtDotQualifiedExpression || callPsi is KtSafeQualifiedExpression) callPsi.lastChild else callPsi
         val firArguments = if (skipFirstArgument) firCall.argumentList.arguments.subList(1, firCall.argumentList.arguments.size) else firCall.argumentList.arguments
         val flattenedExpressions = firArguments.stream()
             .map { e -> if (e is FirVarargArgumentsExpression) e.arguments else listOf(e) }

@@ -676,4 +676,19 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/308")
+    void trailingLambdaAfterNullSafe() {
+        rewriteRun(
+          kotlin(
+            """
+              val x = "x"
+                   ?.associateTo(mutableMapOf()) { p ->
+                       p to listOfNotNull(p.uppercase())
+                   }
+              """
+          )
+        );
+    }
 }
