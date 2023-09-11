@@ -16,14 +16,18 @@
 package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
 
@@ -31,6 +35,7 @@ import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings("ConstantConditions")
 public class KotlinTypeMappingTest {
@@ -43,35 +48,35 @@ public class KotlinTypeMappingTest {
         ctx.putMessage(REQUIRE_PRINT_EQUALS_INPUT, false);
         //noinspection OptionalGetWithoutIsPresent
         goatClassDeclaration = requireNonNull(((K.CompilationUnit) KotlinParser.builder()
-                .logCompilationWarningsAndErrors(true)
-                .build()
-                .parse(ctx, goat)
-                .findFirst()
-                .get())
-                .getClasses()
-                .get(0)
+          .logCompilationWarningsAndErrors(true)
+          .build()
+          .parse(ctx, goat)
+          .findFirst()
+          .get())
+          .getClasses()
+          .get(0)
         );
     }
 
     private static final JavaType.Parameterized goatType =
-            requireNonNull(TypeUtils.asParameterized(goatClassDeclaration.getType()));
+      requireNonNull(TypeUtils.asParameterized(goatClassDeclaration.getType()));
 
     public JavaType.Method methodType(String methodName) {
         JavaType.Method type = goatType.getMethods().stream()
-                .filter(m -> m.getName().equals(methodName))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Expected to find matching method named " + methodName));
+          .filter(m -> m.getName().equals(methodName))
+          .findFirst()
+          .orElseThrow(() -> new IllegalStateException("Expected to find matching method named " + methodName));
         assertThat(type.getDeclaringType().toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
         return type;
     }
 
     public J.VariableDeclarations getField(String fieldName) {
         return goatClassDeclaration.getBody().getStatements().stream()
-                .filter(org.openrewrite.java.tree.J.VariableDeclarations.class::isInstance)
-                .map(J.VariableDeclarations.class::cast)
-                .filter(mv -> mv.getVariables().stream().anyMatch(v -> v.getSimpleName().equals(fieldName)))
-                .findFirst()
-                .orElse(null);
+          .filter(org.openrewrite.java.tree.J.VariableDeclarations.class::isInstance)
+          .map(J.VariableDeclarations.class::cast)
+          .filter(mv -> mv.getVariables().stream().anyMatch(v -> v.getSimpleName().equals(fieldName)))
+          .findFirst()
+          .orElse(null);
     }
 
     public JavaType firstMethodParameter(String methodName) {
@@ -146,7 +151,7 @@ public class KotlinTypeMappingTest {
         assertThat(generic.getName()).isEqualTo("");
         assertThat(generic.getVariance()).isEqualTo(CONTRAVARIANT);
         assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0)).getFullyQualifiedName()).
-                isEqualTo("org.openrewrite.kotlin.C");
+          isEqualTo("org.openrewrite.kotlin.C");
     }
 
     @Disabled("Requires parsing intersection types")
@@ -158,7 +163,7 @@ public class KotlinTypeMappingTest {
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
         assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.PT");
         assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(1)).getFullyQualifiedName()).
-                isEqualTo("org.openrewrite.kotlin.C");
+          isEqualTo("org.openrewrite.kotlin.C");
     }
 
     @Test
@@ -214,9 +219,9 @@ public class KotlinTypeMappingTest {
     void enumTypeA() {
         JavaType.Class clazz = (JavaType.Class) firstMethodParameter("enumTypeA");
         JavaType.Method type = clazz.getMethods().stream()
-                .filter(m -> "<constructor>".equals(m.getName()))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("No constructor found"));
+          .filter(m -> "<constructor>".equals(m.getName()))
+          .findFirst()
+          .orElseThrow(() -> new IllegalStateException("No constructor found"));
         assertThat(type.toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeA{name=<constructor>,return=org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeA,parameters=[]}");
 
         JavaType.FullyQualified supertype = clazz.getSupertype();
@@ -228,9 +233,9 @@ public class KotlinTypeMappingTest {
     void enumTypeB() {
         JavaType.Class clazz = (JavaType.Class) firstMethodParameter("enumTypeB");
         JavaType.Method type = clazz.getMethods().stream()
-                .filter(m -> "<constructor>".equals(m.getName()))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("No constructor found"));
+          .filter(m -> "<constructor>".equals(m.getName()))
+          .findFirst()
+          .orElseThrow(() -> new IllegalStateException("No constructor found"));
         assertThat(type.toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeB{name=<constructor>,return=org.openrewrite.kotlin.KotlinTypeGoat$EnumTypeB,parameters=[org.openrewrite.kotlin.KotlinTypeGoat$TypeA]}");
 
         JavaType.FullyQualified supertype = clazz.getSupertype();
@@ -272,5 +277,26 @@ public class KotlinTypeMappingTest {
         JavaType.Parameterized returnType = (JavaType.Parameterized) method.getReturnType();
         // Assert the type of the parameterized type contains the type parameter from the source.
         assertThat(returnType.getType().getTypeParameters().get(0).toString()).isEqualTo("Generic{T}");
+    }
+
+    @Nested
+    class ParsingTest implements RewriteTest {
+        @Test
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/303")
+        @ExpectedToFail
+        void coneTypeProjection() {
+            rewriteRun(
+              kotlin(
+                """
+                  val labels: List<String> = listOf("")
+                  val label: String = ""
+                  val newLabels = buildList {
+                      addAll(labels)
+                      add(label)
+                  }
+                  """
+              )
+            );
+        }
     }
 }
