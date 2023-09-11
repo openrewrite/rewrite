@@ -17,6 +17,7 @@ package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -575,6 +576,21 @@ class ClassDeclarationTest implements RewriteTest {
                   abstract inner class LinkedTreeMapIterator<T> : MutableIterator<T> {
                       var lastReturned: Map.Entry<K, V>? = null
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/301")
+    @ExpectedToFail
+    void qualifiedSuperType() {
+        rewriteRun(
+          kotlin(
+            """
+              abstract class LinkedHashTreeMap<K, V> : AbstractMutableMap<K, V>() {
+                  abstract inner class EntrySet : AbstractMutableSet<MutableMap.MutableEntry<K, V>>()
               }
               """
           )
