@@ -16,6 +16,8 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -131,6 +133,24 @@ class EnumTest implements RewriteTest {
                   FOO {
                       fun foo() = print("foo",)
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/307")
+    @ExpectedToFail
+    void enumWithFunction() {
+        rewriteRun(
+          kotlin(
+            """
+              private enum class TargetLanguage {
+                  JAVA,
+                  KOTLIN;
+              
+                  fun expectedFile(): String = "foo"
               }
               """
           )
