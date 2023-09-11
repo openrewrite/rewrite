@@ -260,15 +260,29 @@ public class YamlResourceLoader implements ResourceLoader {
                             int i,
                             Object recipeData) {
         if (recipeData instanceof String) {
-            recipe.addUninitialized((String) recipeData, classLoader);
+            String recipeName = (String) recipeData;
+            try {
+                // first try an explicitly-declared zero-arg constructor
+                recipe.addUninitialized((Recipe) Class.forName(recipeName, true,
+                                classLoader == null ? this.getClass().getClassLoader() : classLoader)
+                        .getDeclaredConstructor()
+                        .newInstance());
+            } catch (ReflectiveOperationException reflectiveOperationException) {
+                try {
+                    // then try jackson
+                    recipe.addUninitialized(instantiateRecipe(recipeName, new HashMap<>()));
+                } catch (IllegalArgumentException illegalArgumentException) {
+                    // else, it's probably declarative
+                    recipe.addUninitialized(recipeName);
+                }
+            }
         } else if (recipeData instanceof Map) {
             Map.Entry<String, Object> nameAndConfig = ((Map<String, Object>) recipeData).entrySet().iterator().next();
             try {
                 if (nameAndConfig.getValue() instanceof Map) {
-                    Map<Object, Object> withJsonType = new HashMap<>((Map<String, Object>) nameAndConfig.getValue());
-                    withJsonType.put("@c", nameAndConfig.getKey());
                     try {
-                        recipe.addUninitialized(mapper.convertValue(withJsonType, Recipe.class));
+                        recipe.addUninitialized(instantiateRecipe(nameAndConfig.getKey(),
+                                (Map<String, Object>) nameAndConfig.getValue()));
                     } catch (IllegalArgumentException e) {
                         if (e.getCause() instanceof InvalidTypeIdException) {
                             recipe.addValidation(Validated.invalid(nameAndConfig.getKey(),
@@ -297,6 +311,12 @@ public class YamlResourceLoader implements ResourceLoader {
                     "is an object type that isn't recognized as a recipe.",
                     null));
         }
+    }
+
+    private Recipe instantiateRecipe(String recipeName, Map<String, Object> args) throws IllegalArgumentException {
+        Map<Object, Object> withJsonType = new HashMap<>(args);
+        withJsonType.put("@c", recipeName);
+        return mapper.convertValue(withJsonType, Recipe.class);
     }
 
     @Override

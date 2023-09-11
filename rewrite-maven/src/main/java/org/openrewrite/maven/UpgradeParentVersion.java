@@ -91,7 +91,7 @@ public class UpgradeParentVersion extends Recipe {
     }
 
     private ChangeParentPom changeParentPom() {
-        return new ChangeParentPom(groupId, null, artifactId, null, newVersion,
+        return new ChangeParentPom(groupId, null, artifactId, null, newVersion, null, null,
                 versionPattern, false, retainVersions);
     }
 }

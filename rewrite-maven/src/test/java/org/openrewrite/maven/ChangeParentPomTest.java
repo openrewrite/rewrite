@@ -42,6 +42,8 @@ class ChangeParentPomTest implements RewriteTest {
             "jackson-parent",
             "2.12",
             null,
+            null,
+            null,
             false,
             null
           )),
@@ -81,6 +83,160 @@ class ChangeParentPomTest implements RewriteTest {
     }
 
     @Test
+    void changeParentWithRelativePath() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeParentPom(
+            "org.springframework.boot",
+            "com.fasterxml.jackson",
+            "spring-boot-starter-parent",
+            "jackson-parent",
+            "2.12",
+            "",
+            "../../pom.xml",
+            null,
+            false,
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>1.5.12.RELEASE</version>
+                  <relativePath/>
+                </parent>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <parent>
+                  <groupId>com.fasterxml.jackson</groupId>
+                  <artifactId>jackson-parent</artifactId>
+                  <version>2.12</version>
+                  <relativePath>../../pom.xml</relativePath>
+                </parent>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeParentAddRelativePathEmptyValue() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeParentPom(
+            "org.springframework.boot",
+            "com.fasterxml.jackson",
+            "spring-boot-starter-parent",
+            "jackson-parent",
+            "2.12",
+            null,
+            "",
+            null,
+            false,
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>1.5.12.RELEASE</version>
+                </parent>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <parent>
+                  <groupId>com.fasterxml.jackson</groupId>
+                  <artifactId>jackson-parent</artifactId>
+                  <version>2.12</version>
+                  <relativePath />
+                </parent>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeParentAddRelativePathNonEmptyValue() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeParentPom(
+            "org.springframework.boot",
+            "com.fasterxml.jackson",
+            "spring-boot-starter-parent",
+            "jackson-parent",
+            "2.12",
+            null,
+            "../pom.xml",
+            null,
+            false,
+            null
+          )),
+          pomXml(
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <parent>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-parent</artifactId>
+                  <version>1.5.12.RELEASE</version>
+                </parent>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """,
+            """
+              <project>
+                <modelVersion>4.0.0</modelVersion>
+                
+                <parent>
+                  <groupId>com.fasterxml.jackson</groupId>
+                  <artifactId>jackson-parent</artifactId>
+                  <version>2.12</version>
+                  <relativePath>../pom.xml</relativePath>
+                </parent>
+                
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
     void upgradeVersion() {
         rewriteRun(
           spec -> spec.recipe(new ChangeParentPom(
@@ -89,6 +245,8 @@ class ChangeParentPomTest implements RewriteTest {
             "spring-boot-starter-parent",
             null,
             "~1.5",
+            null,
+            null,
             null,
             false,
             null
@@ -140,6 +298,8 @@ class ChangeParentPomTest implements RewriteTest {
             null,
             "1.5.22.RELEASE",
             null,
+            null,
+            null,
             false,
             null
           )),
@@ -190,6 +350,8 @@ class ChangeParentPomTest implements RewriteTest {
             null,
             "1.5.12.RELEASE",
             null,
+            null,
+            null,
             false,
             null
           )),
@@ -223,6 +385,8 @@ class ChangeParentPomTest implements RewriteTest {
             "spring-boot-starter-parent",
             null,
             "1.5.12.RELEASE",
+            null,
+            null,
             null,
             true,
             null
@@ -274,6 +438,8 @@ class ChangeParentPomTest implements RewriteTest {
             null,
             "~1.5",
             null,
+            null,
+            null,
             false,
             null
           )),
@@ -323,6 +489,8 @@ class ChangeParentPomTest implements RewriteTest {
             "junit-bom",
             null,
             "5.9.1",
+            null,
+            null,
             null,
             false,
             null
@@ -389,6 +557,8 @@ class ChangeParentPomTest implements RewriteTest {
             null,
             "5.9.1",
             null,
+            null,
+            null,
             false,
             null
           )),
@@ -454,6 +624,8 @@ class ChangeParentPomTest implements RewriteTest {
             null,
             "5.9.1",
             null,
+            null,
+            null,
             false,
             null
           )),
@@ -513,7 +685,7 @@ class ChangeParentPomTest implements RewriteTest {
     @Test
     void upgradeNonSemverVersion() {
         rewriteRun(
-          spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-starter-parent", null, "2021.0.5", null, false, null)),
+          spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-starter-parent", null, "2021.0.5", null, null, null, false, null)),
           pomXml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
@@ -556,7 +728,7 @@ class ChangeParentPomTest implements RewriteTest {
         @Test
         void dependencyWithExplicitVersionRemovedFromDepMgmt() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-config-dependencies", null, "3.1.4", null, null,
+              spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-config-dependencies", null, "3.1.4", null, null, null, null,
                 List.of("com.jcraft:jsch"))),
               pomXml(
                 """
@@ -612,7 +784,7 @@ class ChangeParentPomTest implements RewriteTest {
         @Test
         void dependencyWithoutExplicitVersionRemovedFromDepMgmt() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-config-dependencies", null, "3.1.4", null, null,
+              spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-config-dependencies", null, "3.1.4", null, null, null, null,
                 Collections.singletonList("com.jcraft:jsch"))),
               pomXml(
                 """
@@ -667,7 +839,7 @@ class ChangeParentPomTest implements RewriteTest {
         @Test
         void dependencyWithoutExplicitVersionRemovedFromDepMgmtRetainSpecificVersion() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-config-dependencies", null, "3.1.4", null, null,
+              spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-config-dependencies", null, "3.1.4", null, null, null, null,
                 Collections.singletonList("com.jcraft:jsch:0.1.50"))),
               pomXml(
                 """
@@ -722,7 +894,7 @@ class ChangeParentPomTest implements RewriteTest {
         @Test
         void multipleRetainVersions() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-dependencies", null, "2021.0.5", null, true,
+              spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-dependencies", null, "2021.0.5", null, null, null, true,
                 Lists.newArrayList("com.jcraft:jsch", "org.springframework.cloud:spring-cloud-schema-registry-*:1.1.1"))),
               pomXml(
                 """
@@ -786,7 +958,7 @@ class ChangeParentPomTest implements RewriteTest {
         @Test
         void globGavWithNoVersion() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-dependencies", null, "2021.0.5", null, true,
+              spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-dependencies", null, "2021.0.5", null, null, null, true,
                 Lists.newArrayList("org.springframework.cloud:spring-cloud-schema-registry-*"))),
               pomXml(
                 """
@@ -841,7 +1013,7 @@ class ChangeParentPomTest implements RewriteTest {
         @Test
         void preservesExplicitVersionIfNotRequested() {
             rewriteRun(
-              spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-dependencies", null, "2021.0.5", null, true,
+              spec -> spec.recipe(new ChangeParentPom("org.springframework.cloud", null, "spring-cloud-dependencies", null, "2021.0.5", null, null, null, true,
                 Lists.newArrayList("org.springframework.cloud:spring-cloud-schema-registry-*"))),
               pomXml(
                 """
@@ -898,7 +1070,7 @@ class ChangeParentPomTest implements RewriteTest {
     @RepeatedTest(10)
     @Issue("https://github.com/openrewrite/rewrite/issues/1753")
     void multiModule() {
-        ChangeParentPom recipe = new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.6.7", null, true, null);
+        ChangeParentPom recipe = new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.6.7", null, null, null, true, null);
         rewriteRun(
           spec -> spec.recipe(recipe),
           mavenProject("parent",

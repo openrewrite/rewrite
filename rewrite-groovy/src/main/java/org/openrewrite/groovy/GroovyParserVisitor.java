@@ -257,7 +257,7 @@ public class GroovyParserVisitor {
                             .withAfter(i == interfaces.length - 1 ? EMPTY : sourceBefore(",")));
                 }
                 // Can be empty for an annotation @interface which only implements Annotation
-                if (implTypes.size() > 0) {
+                if (!implTypes.isEmpty()) {
                     implementings = JContainer.build(implPrefix, implTypes, Markers.EMPTY);
                 }
             }
@@ -621,7 +621,7 @@ public class GroovyParserVisitor {
                                 .sorted(Comparator.comparing(ASTNode::getLastLineNumber)
                                         .thenComparing(ASTNode::getLastColumnNumber))
                                 .collect(Collectors.toList());
-            } else if (unparsedArgs.size() > 0 && unparsedArgs.get(0) instanceof MapExpression) {
+            } else if (!unparsedArgs.isEmpty() && unparsedArgs.get(0) instanceof MapExpression) {
                 // The map literal may or may not be wrapped in "[]"
                 // If it is wrapped in "[]" then this isn't a named arguments situation and we should not lift the parameters out of the enclosing MapExpression
                 saveCursor = cursor;
@@ -1249,7 +1249,7 @@ public class GroovyParserVisitor {
         }
 
         Statement condenseLabels(List<J.Label> labels, Statement s) {
-            if (labels.size() == 0) {
+            if (labels.isEmpty()) {
                 return s;
             }
             return labels.get(0).withStatement(condenseLabels(labels.subList(1, labels.size()), s));
@@ -1859,11 +1859,14 @@ public class GroovyParserVisitor {
             JavaType type = typeMapping.type(staticType(((org.codehaus.groovy.ast.expr.Expression) expression)));
 
             if (expression.isDynamicTyped()) {
+                Space prefix = whitespace();
+                String defOrVar = source.substring(cursor, cursor + 3);
+                cursor += 3;
                 return new J.Identifier(randomId(),
-                        sourceBefore("def"),
+                        prefix,
                         Markers.EMPTY,
                         emptyList(),
-                        "def",
+                        defOrVar,
                         type, null);
             }
             Space prefix = sourceBefore(expression.getOriginType().getUnresolvedName());

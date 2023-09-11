@@ -277,7 +277,7 @@ public interface JavaType {
         public String getClassName() {
             String fqn = getFullyQualifiedName();
             String className = fqn.substring(fqn.lastIndexOf('.') + 1);
-            return className.replace('$', '.');
+            return TypeUtils.toFullyQualifiedName(className);
         }
 
         public String getPackageName() {

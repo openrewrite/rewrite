@@ -99,6 +99,16 @@ public class ClasspathScanningLoader implements ResourceLoader {
                 .acceptPaths("META-INF/rewrite"), properties, dependencyResourceLoaders, classLoader);
     }
 
+    public static ClasspathScanningLoader onlyYaml(Properties properties) {
+        ClasspathScanningLoader classpathScanningLoader = new ClasspathScanningLoader();
+        classpathScanningLoader.scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"),
+                properties, emptyList(), null);
+        return classpathScanningLoader;
+    }
+
+    private ClasspathScanningLoader() {
+    }
+
     /**
      * This must be called _after_ scanClasses or the descriptors of declarative recipes will be missing any
      * non-declarative recipes they depend on that would be discovered by scanClasses

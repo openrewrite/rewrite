@@ -401,6 +401,20 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitArrayType(J.ArrayType arrayType, PrintOutputCapture<P> p) {
+            beforeSyntax(arrayType, Space.Location.ARRAY_TYPE_PREFIX, p);
+            visit(arrayType.getElementType(), p);
+            for (JRightPadded<Space> d : arrayType.getDimensions()) {
+                visitSpace(d.getElement(), Space.Location.DIMENSION, p);
+                p.append('[');
+                visitSpace(d.getAfter(), Space.Location.DIMENSION_SUFFIX, p);
+                p.append(']');
+            }
+            afterSyntax(arrayType, p);
+            return arrayType;
+        }
+
+        @Override
         public J visitParameterizedType(J.ParameterizedType type, PrintOutputCapture<P> p) {
             beforeSyntax(type, Space.Location.IDENTIFIER_PREFIX, p);
             visit(type.getClazz(), p);

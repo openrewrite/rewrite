@@ -112,6 +112,11 @@ public class RecipeIntrospectionUtils {
             java.lang.reflect.Parameter param = primaryConstructor.getParameters()[i];
             if (param.getType().isPrimitive()) {
                 constructorArgs[i] = getPrimitiveDefault(param.getType());
+            } else if (param.getType().equals(String.class) && isKotlin(clazz)) {
+                // Default Recipe::validate is more valuable if we pass null for unconfigured Strings.
+                // But, that's not safe for Kotlin non-null types, so use an empty String for those
+                // (though it will sneak through default recipe validation)
+                constructorArgs[i] = "";
             } else if (Enum.class.isAssignableFrom(param.getType())) {
                 try {
                     Object[] values = (Object[]) param.getType().getMethod("values").invoke(null);
@@ -133,6 +138,15 @@ public class RecipeIntrospectionUtils {
             // Should never happen
             throw getRecipeIntrospectionException(clazz, e);
         }
+    }
+
+    private static boolean isKotlin(Class<?> clazz) {
+        for (Annotation a : clazz.getAnnotations()) {
+            if (a.annotationType().getName().equals("kotlin.Metadata")) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @NonNull
