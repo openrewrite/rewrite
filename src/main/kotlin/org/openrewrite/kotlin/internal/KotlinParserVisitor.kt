@@ -3961,11 +3961,10 @@ class KotlinParserVisitor(
         // The order the bounds exist in T and S will be based on the declaration order.
         // However, each bound may be declared in any order T -> S -> T -> S.
         var typeParams: JContainer<J.TypeParameter?>? = null
-        if (regularClass.typeParameters.isNotEmpty()) {
+        val parameters = regularClass.typeParameters.filter { it.source != null }
+        if (parameters.isNotEmpty()) {
             val before = sourceBefore("<")
-            val typeParameters: MutableList<JRightPadded<J.TypeParameter?>> =
-                ArrayList(regularClass.typeParameters.size)
-            val parameters = regularClass.typeParameters.filter { it.source != null }
+            val typeParameters: MutableList<JRightPadded<J.TypeParameter?>> = ArrayList(parameters.size)
             for (i in parameters.indices) {
                 val j: J = visitElement(parameters[i], data)!!
                 typeParameters.add(

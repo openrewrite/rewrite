@@ -584,7 +584,6 @@ class ClassDeclarationTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/301")
-    @ExpectedToFail
     void qualifiedSuperType() {
         rewriteRun(
           kotlin(
