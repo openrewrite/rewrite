@@ -36,8 +36,12 @@ public interface SourceFile extends Tree {
      * @return <code>true</code> if the parse-to-print loop is idempotent, <code>false</code> otherwise.
      */
     default boolean printEqualsInput(Parser.Input input, ExecutionContext ctx) {
-        Charset charset = (getCharset() == null) ? StandardCharsets.UTF_8 : getCharset();
-        return printAll().equals(StringUtils.readFully(input.getSource(ctx), charset));
+        String printed = printAll();
+        Charset charset = getCharset();
+        if (charset != null) {
+            return printed.equals(StringUtils.readFully(input.getSource(ctx), charset));
+        }
+        return printed.equals(StringUtils.readFully(input.getSource(ctx)));
     }
 
     /**
