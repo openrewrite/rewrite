@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.marker.IndexedAccess;
@@ -655,6 +656,23 @@ class MethodInvocationTest implements RewriteTest {
                         )
                 );
             })
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/297")
+    @ExpectedToFail
+    void spaceAfterLambdaParameter() {
+        rewriteRun(
+          kotlin(
+            """
+                val l = listOf("")
+                val v = Pair(
+                    l?.map { true },
+                    "foo"
+                  )
+              """
           )
         );
     }
