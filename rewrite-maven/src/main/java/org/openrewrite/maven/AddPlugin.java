@@ -48,7 +48,9 @@ public class AddPlugin extends Recipe {
 
     @Option(displayName = "Version",
             description = "A fixed version of the plugin to add.",
-            example = "1.0.0")
+            example = "1.0.0",
+            required = false)
+    @Nullable
     String version;
 
     @Language("xml")
@@ -125,7 +127,7 @@ public class AddPlugin extends Recipe {
 
                 if (maybePlugin.isPresent()) {
                     Xml.Tag plugin = maybePlugin.get();
-                    if (!version.equals(plugin.getChildValue("version").orElse(null))) {
+                    if (version != null && !version.equals(plugin.getChildValue("version").orElse(null))) {
                         //noinspection OptionalGetWithoutIsPresent
                         t = (Xml.Tag) new ChangeTagValueVisitor<>(plugin.getChild("version").get(), version).visitNonNull(t, ctx, getCursor().getParentOrThrow());
                     }
@@ -133,7 +135,7 @@ public class AddPlugin extends Recipe {
                     Xml.Tag pluginTag = Xml.Tag.build("<plugin>\n" +
                             "<groupId>" + groupId + "</groupId>\n" +
                             "<artifactId>" + artifactId + "</artifactId>\n" +
-                            "<version>" + version + "</version>\n" +
+                            (version != null ? "<version>" + version + "</version>\n" : "") +
                             (executions != null ? executions.trim() + "\n" : "") +
                             (configuration != null ? configuration.trim() + "\n" : "") +
                             (dependencies != null ? dependencies.trim() + "\n" : "") +

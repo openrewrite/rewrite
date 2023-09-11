@@ -251,4 +251,35 @@ public class AddPluginTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addPluginWithoutVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", null, null, null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
 }
