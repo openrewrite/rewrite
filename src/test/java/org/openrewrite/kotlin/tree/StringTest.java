@@ -71,4 +71,16 @@ class StringTest implements RewriteTest {
         );
     }
 
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/306")
+    void dollarTemplateString() {
+        rewriteRun(
+          kotlin(
+            """
+              val customHandler = "${"$"}Handler"
+              """
+          )
+        );
+    }
 }
