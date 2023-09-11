@@ -16,6 +16,8 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -87,6 +89,23 @@ class ArrayTest implements RewriteTest {
             """
               val arr = IntArray ( 1 )
               val a = arr [ if (true) 0 else 1 ]
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/291")
+    @ExpectedToFail
+    void incrementArrayElement() {
+        rewriteRun(
+          kotlin(
+            """
+              val array = IntArray(1)
+              array.let {
+                  it[0]++
+              }
+              val x = array[0]++
               """
           )
         );
