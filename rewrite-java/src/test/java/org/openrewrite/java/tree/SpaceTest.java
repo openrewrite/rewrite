@@ -170,7 +170,7 @@ class SpaceTest {
     }
 
     @Test
-    void MultiCommentsSuffix() {
+    void multiCommentsSuffix() {
         String input = """
 
                 //c1
@@ -183,5 +183,13 @@ class SpaceTest {
         TextComment c2 = (TextComment) space.getComments().get(1);
         assertThat(c2.getText()).isEqualTo("c2");
         assertThat(c2.getSuffix()).isEqualTo("");
+    }
+
+    @Test
+    void slashInNonComment() {
+        String input = "foo/bar";
+        var space = Space.format(input);
+        assertThat(space.getComments()).isEmpty();
+        assertThat(space.getWhitespace()).isEqualTo(input);
     }
 }

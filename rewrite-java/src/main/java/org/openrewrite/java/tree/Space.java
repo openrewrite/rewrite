@@ -163,15 +163,18 @@ public class Space {
                     } else if (last == '/' && !inMultiLineComment) {
                         inSingleLineComment = true;
                         comment.setLength(0);
+                        prefix.setLength(prefix.length() - 1);
                     } else if (last == '*' && inMultiLineComment && comment.length() > 0) {
                         inMultiLineComment = false;
                         comment.setLength(comment.length() - 1); // trim the last '*'
-                        comments.add(new TextComment(true, comment.toString(), prefix.toString(), Markers.EMPTY));
+                        comments.add(new TextComment(true, comment.toString(), prefix.substring(0, prefix.length() - 1), Markers.EMPTY));
                         prefix.setLength(0);
                         comment.setLength(0);
                         continue;
-                    } else {
+                    } else if (inMultiLineComment) {
                         comment.append(c);
+                    } else {
+                        prefix.append(c);
                     }
                     break;
                 case '\r':
