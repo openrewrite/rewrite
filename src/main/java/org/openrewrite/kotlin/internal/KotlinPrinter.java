@@ -906,9 +906,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     break;
                 }
 
-                if (i > 0 && omitParensOnMethod && (
-                        !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() &&
-                        !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent())) {
+                if (i > 0 && omitParensOnMethod && !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent()) {
                     p.append(indexedAccess ? ']' : ')');
                 } else if (i > 0) {
                     p.append(',');
