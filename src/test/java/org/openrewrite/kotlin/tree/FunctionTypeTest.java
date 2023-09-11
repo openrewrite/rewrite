@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -52,6 +53,21 @@ class FunctionTypeTest implements RewriteTest {
           kotlin(
             """
               val v: ((Any) -> Any)? = null
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/292")
+    @ExpectedToFail
+    void functionTypeParentheses() {
+        rewriteRun(
+          kotlin(
+            """
+              fun readMetadata(lookup: ((Class<Metadata>) -> Metadata?)): Metadata {
+                  return null!!
+              }
               """
           )
         );
