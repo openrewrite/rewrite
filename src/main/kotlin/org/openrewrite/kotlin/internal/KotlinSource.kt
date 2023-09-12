@@ -19,19 +19,19 @@ import lombok.Getter
 import lombok.Setter
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
-import org.jetbrains.kotlin.com.intellij.psi.PsiElementVisitor
 import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
 import org.openrewrite.Parser
 import java.util.*
+import kotlin.collections.ArrayDeque
 
 @Getter
 class KotlinSource(
     var input: Parser.Input,
     ktFile: KtFile
 ) {
-    var nodes: Map<Int, ASTNode>
+    val nodes: Map<Int, ASTNode>
 
     @Setter
     var firFile: FirFile? = null
@@ -41,23 +41,18 @@ class KotlinSource(
     }
 
     private fun map(ktFile: KtFile): Map<Int, ASTNode> {
-        val result: MutableMap<Int, ASTNode> = LinkedHashMap()
-        val visited = Collections.newSetFromMap(IdentityHashMap<PsiElement, Boolean>())
-        val v: PsiElementVisitor = object : PsiElementVisitor() {
-            override fun visitElement(element: PsiElement) {
-                if (!visited.add(element)) {
-                    return
-                }
-                result[element.textRange.startOffset] = element.node
-                for (child in element.children) {
-                    (child as? KtElement)?.let { visitElement(it) }
-                }
-                if (element.nextSibling is KtElement) {
-                    visitElement(element.nextSibling)
-                }
-            }
+        val result: MutableMap<Int, ASTNode> = HashMap()
+        val stack = ArrayDeque<PsiElement>()
+        stack.addFirst(ktFile)
+        while (stack.isNotEmpty()) {
+            val curr = stack.removeFirst()
+            if (curr is KtElement)
+                result[curr.textRange.startOffset] = curr.node
+            if (curr.firstChild != null)
+                stack.addFirst(curr.firstChild)
+            if (curr.nextSibling != null)
+                stack.addFirst(curr.nextSibling)
         }
-        v.visitElement(ktFile)
         return result
     }
 }
