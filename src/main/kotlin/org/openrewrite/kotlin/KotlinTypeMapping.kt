@@ -722,14 +722,18 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
             simpleFunction = symbol.fir as FirSimpleFunction
         }
         var paramNames: MutableList<String>? = null
+        if (simpleFunction?.receiverParameter != null) {
+            paramNames = ArrayList(simpleFunction.valueParameters.size + 1)
+            paramNames.add('$'+ "this" + '$')
+        }
         if (simpleFunction != null && simpleFunction.valueParameters.isNotEmpty()) {
-            paramNames = ArrayList(simpleFunction.valueParameters.size)
+            paramNames = paramNames ?: ArrayList(simpleFunction.valueParameters.size)
             for (p: FirValueParameter in simpleFunction.valueParameters) {
                 val s = p.name.asString()
                 paramNames.add(s)
             }
         } else if (constructor != null && constructor.valueParameters.isNotEmpty()) {
-            paramNames = ArrayList(constructor.valueParameters.size)
+            paramNames = paramNames ?: ArrayList(constructor.valueParameters.size)
             for (p: FirValueParameter in constructor.valueParameters) {
                 val s = p.name.asString()
                 paramNames.add(s)
@@ -746,6 +750,10 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
         )
         typeCache.put(signature, method)
         var parameterTypes: MutableList<JavaType>? = null
+        if (simpleFunction?.receiverParameter != null) {
+            parameterTypes = ArrayList(simpleFunction.valueParameters.size + 1)
+            parameterTypes.add(type(simpleFunction.receiverParameter!!.typeRef))
+        }
         if (constructor != null && constructor.valueParameters.isNotEmpty()) {
             parameterTypes = ArrayList(constructor.valueParameters.size)
             for (argtype: FirValueParameter? in constructor.valueParameters) {
@@ -755,7 +763,7 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
                 }
             }
         } else if (simpleFunction != null && simpleFunction.valueParameters.isNotEmpty()) {
-            parameterTypes = ArrayList(simpleFunction.valueParameters.size)
+            parameterTypes = parameterTypes ?: ArrayList(simpleFunction.valueParameters.size)
             for (parameter in simpleFunction.valueParameters) {
                 val parameterSymbol = parameter.symbol
                 val javaType: JavaType = if (parameterSymbol.fir is FirJavaValueParameter) {

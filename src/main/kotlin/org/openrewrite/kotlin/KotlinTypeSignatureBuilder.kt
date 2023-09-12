@@ -633,7 +633,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
             "{name=" + functionCall.calleeReference.name.asString() +
                     ",return=" + signature(functionCall.typeRef)
         }
-        return s + ",parameters=" + methodArgumentSignature(functionCall.argumentList.arguments) + '}'
+        return s + ",parameters=" + methodArgumentSignature((functionCall.calleeReference as FirResolvedNamedReference).resolvedSymbol as FirFunctionSymbol<out FirFunction>) + '}'
     }
 
     /**
@@ -687,27 +687,12 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
     /**
      * Generate the method argument signature.
      */
-    private fun methodArgumentSignature(argumentsList: List<FirExpression>): String {
-        val genericArgumentTypes = StringJoiner(",", "[", "]")
-        if (argumentsList.size == 1 && argumentsList[0] is FirVarargArgumentsExpression) {
-            val varargArgumentsExpression = argumentsList[0] as FirVarargArgumentsExpression
-            for (argument in varargArgumentsExpression.arguments) {
-                genericArgumentTypes.add(signature(argument))
-            }
-        } else {
-            for (firExpression in argumentsList) {
-                genericArgumentTypes.add(signature(firExpression))
-            }
-        }
-        return genericArgumentTypes.toString()
-    }
-
-    /**
-     * Generate the method argument signature.
-     */
     @OptIn(SymbolInternals::class)
     private fun methodArgumentSignature(sym: FirFunctionSymbol<out FirFunction>): String {
         val genericArgumentTypes = StringJoiner(",", "[", "]")
+        if (sym.receiverParameter != null) {
+            genericArgumentTypes.add(signature(sym.receiverParameter!!.typeRef))
+        }
         for (parameterSymbol in sym.valueParameterSymbols) {
             val paramSignature: String = if (parameterSymbol.fir is FirJavaValueParameter) {
                 signature(parameterSymbol.fir.returnTypeRef, sym)

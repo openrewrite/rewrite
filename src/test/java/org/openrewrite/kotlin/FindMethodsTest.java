@@ -53,4 +53,23 @@ public class FindMethodsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void extensionMethod() {
+        rewriteRun(
+          spec -> spec.recipe(new FindMethods("kotlin.collections.CollectionsKt last(kotlin.collections.List)", false)),
+          kotlin(
+            """
+              val l = listOf("one")
+              val r1 = l.last()
+              val r2 = (l as Iterable<String>).last()
+              """,
+            """
+              val l = listOf("one")
+              val r1 = /*~~>*/l.last()
+              val r2 = (l as Iterable<String>).last()
+              """
+          )
+        );
+    }
 }
