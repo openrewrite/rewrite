@@ -36,6 +36,18 @@ class FunctionTypeTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/310")
+    void generic() {
+        rewriteRun(
+          kotlin(
+            """
+              val f: Function<() -> Boolean> = { { true } }
+              """
+          )
+        );
+    }
+
+    @Test
     void namedParameter() {
         rewriteRun(
           kotlin(

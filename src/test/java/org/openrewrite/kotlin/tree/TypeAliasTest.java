@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -53,7 +52,6 @@ class TypeAliasTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/300")
-    @ExpectedToFail
     void typeAliasForFunctionType() {
         rewriteRun(
           kotlin(

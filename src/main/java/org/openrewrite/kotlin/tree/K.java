@@ -665,7 +665,7 @@ public interface K extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class FunctionType implements K, TypeTree {
+    class FunctionType implements K, TypeTree, Expression {
 
         @Nullable
         @NonFinal
@@ -760,6 +760,11 @@ public interface K extends J {
             TypeTree newType = returnType.withType(type);
             //noinspection unchecked
             return (T) (newType == type ? this : withReturnType(newType));
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
 
         @Override
