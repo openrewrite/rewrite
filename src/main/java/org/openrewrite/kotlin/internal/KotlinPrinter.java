@@ -39,8 +39,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
 
-import static org.openrewrite.Tree.randomId;
-
 public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     private final KotlinJavaPrinter<P> delegate;
 
@@ -127,6 +125,41 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         visitSpace(binary.getAfter(), KSpace.Location.BINARY_SUFFIX, p);
         afterSyntax(binary, p);
         return binary;
+    }
+
+    @Override
+    public J visitConstructor(K.Constructor constructor, PrintOutputCapture<P> p) {
+        J.MethodDeclaration method = constructor.getMethodDeclaration();
+
+        beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
+        p.append("constructor");
+        JContainer<Statement> params = method.getPadding().getParameters();
+        beforeSyntax(params.getBefore(), params.getMarkers(), JContainer.Location.METHOD_DECLARATION_PARAMETERS.getBeforeLocation(), p);
+        p.append("(");
+        List<JRightPadded<Statement>> elements = params.getPadding().getElements();
+        for (int i = 0; i < elements.size(); i++) {
+            delegate.printMethodParameters(p, i, elements);
+        }
+        afterSyntax(params.getMarkers(), p);
+        p.append(")");
+
+        visitSpace(constructor.getColon(), KSpace.Location.CONSTRUCTOR_COLON, p);
+        p.append(':');
+        visit(constructor.getConstructorInvocation(), p);
+        afterSyntax(constructor, p);
+
+        visit(method.getBody(), p);
+
+        return constructor;
+    }
+
+    @Override
+    public J visitConstructorInvocation(K.ConstructorInvocation constructorInvocation, PrintOutputCapture<P> p) {
+        beforeSyntax(constructorInvocation, KSpace.Location.CONSTRUCTOR_INVOCATION_PREFIX, p);
+        visit(constructorInvocation.getTypeTree(), p);
+        delegate.visitArgumentsContainer(constructorInvocation.getPadding().getArguments(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
+        afterSyntax(constructorInvocation, p);
+        return constructorInvocation;
     }
 
     @Override
@@ -583,18 +616,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 for (int i = 0; i < nodes.size(); i++) {
                     JRightPadded<? extends J> node = nodes.get(i);
                     J element = node.getElement();
-                    visit(element.getMarkers().findFirst(ConstructorDelegation.class)
-                                    .flatMap(m -> getConstructorDelegationCall(classDecl)
-                                            .map(c -> {
-                                                if (element instanceof J.Identifier) {
-                                                    return c.withName((J.Identifier) element).withPrefix(Space.EMPTY);
-                                                } else if (element instanceof J.ParameterizedType) {
-                                                    return new J.NewClass(randomId(), Space.EMPTY, Markers.EMPTY, null, Space.EMPTY, ((J.ParameterizedType) element), c.getPadding().getArguments(), null, null);
-                                                }
-                                                return element;
-                                            }))
-                                    .orElse(element),
-                            p);
+                    visit(element, p);
                     visitSpace(node.getAfter(), JContainer.Location.IMPLEMENTS.getElementLocation().getAfterLocation(), p);
                     visitMarkers(node.getMarkers(), p);
                     if (i < nodes.size() - 1) {
@@ -609,21 +631,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
             afterSyntax(classDecl, p);
             return classDecl;
-        }
-
-        private Optional<J.MethodInvocation> getConstructorDelegationCall(J.ClassDeclaration classDecl) {
-            for (Statement statement : classDecl.getBody().getStatements()) {
-                if (statement instanceof J.MethodDeclaration && statement.getMarkers().findFirst(PrimaryConstructor.class).isPresent()) {
-                    J.MethodDeclaration constructor = (J.MethodDeclaration) statement;
-                    if (constructor.isConstructor() && constructor.getBody() != null && !constructor.getBody().getStatements().isEmpty()) {
-                        Statement delegationCall = constructor.getBody().getStatements().get(0);
-                        if (delegationCall instanceof J.MethodInvocation && delegationCall.getMarkers().findFirst(ConstructorDelegation.class).isPresent()) {
-                            return Optional.of((J.MethodInvocation) delegationCall);
-                        }
-                    }
-                }
-            }
-            return Optional.empty();
         }
 
         @Override
@@ -829,13 +836,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                         kotlinPrinter.visitSpace(typeReferencePrefix.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p));
                 p.append(":");
                 visit(method.getReturnTypeExpression(), p);
-            } else if (method.getBody() != null && !method.getBody().getStatements().isEmpty()) {
-                Statement firstStatement = method.getBody().getStatements().get(0);
-                firstStatement.getMarkers().findFirst(ConstructorDelegation.class).ifPresent(delegation -> {
-                    kotlinPrinter.visitSpace(delegation.getPrefix(), KSpace.Location.CONSTRUCTOR_DELEGATION_PREFIX, p);
-                    p.append(":");
-                    visit(firstStatement, p);
-                });
             }
 
             visit(method.getBody(), p);

@@ -21,8 +21,6 @@ import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
-import org.openrewrite.kotlin.marker.ConstructorDelegation;
-import org.openrewrite.kotlin.marker.Implicit;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -91,27 +89,23 @@ class FieldAccessTest implements RewriteTest {
               """,
             spec -> spec.afterRecipe(cu -> {
                 J.ClassDeclaration test = (J.ClassDeclaration) cu.getStatements().get(1);
+                assertThat(test.getImplements()).satisfiesExactly(
+                  superType -> {
+                      K.ConstructorInvocation call = (K.ConstructorInvocation) superType;
+                      assertThat(((JavaType.FullyQualified) call.getType()).getFullyQualifiedName()).isEqualTo("Super");
+                      assertThat(((J.Identifier) call.getTypeTree()).getSimpleName()).isEqualTo("Super");
+                      assertThat(call.getArguments()).satisfiesExactly(
+                        id -> assertThat(id).isInstanceOf(J.Binary.class)
+                      );
+                  }
+                );
                 assertThat(test.getBody().getStatements()).satisfiesExactly(
                   stmt -> {
                       J.MethodDeclaration constr = (J.MethodDeclaration) stmt;
                       assertThat(constr.getParameters()).satisfiesExactly(
                         id2 -> assertThat(id2).isInstanceOf(J.VariableDeclarations.class)
                       );
-                      assertThat(constr.getBody()).isNotNull();
-                      assertThat(constr.getBody().getStatements()).satisfiesExactly(
-                        stmt1 -> {
-                            J.MethodInvocation call = (J.MethodInvocation) stmt1;
-                            assertThat(call.getMarkers().getMarkers()).satisfiesExactlyInAnyOrder(
-                              implicit -> assertThat(implicit).isInstanceOf(Implicit.class),
-                              delegation -> assertThat(delegation).isInstanceOf(ConstructorDelegation.class)
-                            );
-                            assertThat(call.getArguments()).satisfiesExactly(
-                              expr -> {
-                                  assertThat(expr).isInstanceOf(J.Binary.class);
-                              }
-                            );
-                        }
-                      );
+                      assertThat(constr.getBody()).isNull();
                   }
                 );
             })

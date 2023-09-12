@@ -3622,24 +3622,23 @@ class KotlinParserVisitor(
         }
 
         saveCursor = cursor
-        var delegationCall: J.MethodInvocation? = null
+        var delegationCall: K.ConstructorInvocation? = null
         before = whitespace()
+        var colon: Space? = null
         if (skip(":") && constructor.delegatedConstructor != null) {
+            colon = before
             val thisPrefix = whitespace()
             // The delegate constructor call is de-sugared during the backend phase of the compiler.
             val delegateName =
                 createIdentifier(if (constructor.delegatedConstructor!!.isThis) "this" else "super")
             val argsPrefix = whitespace()
             val args = mapFunctionalCallArguments(constructor.delegatedConstructor!!).withBefore(argsPrefix)
-            delegationCall = J.MethodInvocation(
+            delegationCall = K.ConstructorInvocation(
                 randomId(),
                 thisPrefix,
-                Markers.EMPTY.addIfAbsent(ConstructorDelegation(randomId(), before)).addIfAbsent(Implicit(randomId())),
-                null,
-                null,
+                Markers.EMPTY,
                 delegateName,
                 args,
-                type(constructor) as JavaType.Method
             )
         } else {
             cursor(saveCursor)
@@ -3663,22 +3662,7 @@ class KotlinParserVisitor(
             throw IllegalStateException("Unexpected constructor body.")
         }
 
-        if (delegationCall != null) {
-            body = if (body == null) {
-                J.Block(
-                    randomId(),
-                    Space.EMPTY,
-                    Markers.EMPTY.addIfAbsent(OmitBraces(randomId())),
-                    JRightPadded(false, Space.EMPTY, Markers.EMPTY),
-                    listOf(JRightPadded.build(delegationCall)),
-                    Space.EMPTY
-                )
-            } else {
-                body.withStatements(ListUtils.insert(body.statements, delegationCall, 0))
-            }
-        }
-
-        return J.MethodDeclaration(
+        val methodDeclaration = J.MethodDeclaration(
             randomId(),
             prefix,
             markers,
@@ -3693,6 +3677,11 @@ class KotlinParserVisitor(
             null,
             typeMapping.methodDeclarationType(constructor, null, getCurrentFile())
         )
+
+        if (delegationCall != null) {
+            return K.Constructor(randomId(), Markers.EMPTY, methodDeclaration, colon!!, delegationCall)
+        }
+        return methodDeclaration
     }
 
     override fun visitComponentCall(componentCall: FirComponentCall, data: ExecutionContext): J {
@@ -4013,76 +4002,27 @@ class KotlinParserVisitor(
         for (i in realSuperTypes.indices) {
             val typeRef = realSuperTypes[i]
             val symbol = typeRef.coneType.toRegularClassSymbol(firSession)
-            var element = visitElement(typeRef, data) as TypeTree
-            if (firPrimaryConstructor != null && symbol != null && ClassKind.CLASS == symbol.fir.classKind) {
-                // Wrap the element in a J.NewClass to preserve the whitespace and container of `( )`
-                val args = mapFunctionalCallArguments(firPrimaryConstructor.delegatedConstructor!!)
-                val delegationCall = J.MethodInvocation(
-                    randomId(),
-                    element.prefix,
-                    Markers.EMPTY.addIfAbsent(ConstructorDelegation(randomId(), before)).addIfAbsent(Implicit(randomId())),
-                    null,
-                    null,
-                    J.Identifier(
+            // Filter out generated types.
+            if (typeRef.source != null && typeRef.source!!.kind !is KtFakeSourceElementKind) {
+                val element: TypeTree
+                if (firPrimaryConstructor != null && symbol != null && ClassKind.CLASS == symbol.fir.classKind) {
+                    val delegationCall = K.ConstructorInvocation(
                         randomId(),
-                        prefix,
+                        whitespace(),
                         Markers.EMPTY,
-                        emptyList(),
-                        if (firPrimaryConstructor.delegatedConstructor!!.isThis) "this" else "super",
-                        type(typeRef),
-                        null
-                    ),
-                    args,
-                    type(firPrimaryConstructor.delegatedConstructor!!.calleeReference.resolved!!.resolvedSymbol) as? JavaType.Method
-                )
-                if (primaryConstructor == null) {
-                    primaryConstructor = J.MethodDeclaration(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.build(
-                            listOf(
-                                PrimaryConstructor(randomId()),
-                                Implicit(randomId())
-                            )
-                        ),
-                        emptyList(), // TODO annotations
-                        emptyList(), // TODO modifiers
-                        null,
-                        null,
-                        J.MethodDeclaration.IdentifierWithAnnotations(
-                            name.withMarkers(name.markers.addIfAbsent(Implicit(randomId()))),
-                            emptyList()
-                        ),
-                        JContainer.empty(),
-                        null,
-                        J.Block(
-                            randomId(),
-                            Space.EMPTY,
-                            Markers.EMPTY.addIfAbsent(OmitBraces(randomId())),
-                            JRightPadded(false, Space.EMPTY, Markers.EMPTY),
-                            listOf(JRightPadded.build(delegationCall)),
-                            Space.EMPTY
-                        ),
-                        null,
-                        null // TODO type
+                        visitElement(typeRef, data) as TypeTree,
+                        mapFunctionalCallArguments(firPrimaryConstructor.delegatedConstructor!!)
                     )
+                    markers = markers.addIfAbsent(PrimaryConstructor(randomId()))
+                    element = delegationCall
                 } else {
-                    primaryConstructor = primaryConstructor.withBody(J.Block(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY.addIfAbsent(OmitBraces(randomId())),
-                        JRightPadded(false, Space.EMPTY, Markers.EMPTY),
-                        listOf(JRightPadded.build(delegationCall)),
-                        Space.EMPTY
-                    ))
+                    element = visitElement(typeRef, data) as TypeTree
                 }
-                markers = markers.addIfAbsent(PrimaryConstructor(randomId()))
-                element = element.withMarkers(element.markers.addIfAbsent(ConstructorDelegation(randomId(), Space.EMPTY)))
+                superTypes.add(
+                    JRightPadded.build(element)
+                        .withAfter(if (i == realSuperTypes.size - 1) Space.EMPTY else sourceBefore(","))
+                )
             }
-            superTypes.add(
-                JRightPadded.build(element)
-                    .withAfter(if (i == realSuperTypes.size - 1) Space.EMPTY else sourceBefore(","))
-            )
         }
         if (superTypes.isEmpty()) {
             cursor(saveCursor)
@@ -4596,6 +4536,7 @@ class KotlinParserVisitor(
             is FirContextReceiver -> visitContextReceiver(firElement, data)
             is FirContractDescriptionOwner -> visitContractDescriptionOwner(firElement, data)
             is FirQualifiedAccessExpression -> visitQualifiedAccessExpression(firElement, data)
+            is FirDelegatedConstructorCall -> visitDelegatedConstructorCall(firElement, data)
             is FirContextReceiverArgumentListOwner -> visitContextReceiverArgumentListOwner(firElement, data)
             is FirClassReferenceExpression -> visitClassReferenceExpression(firElement, data)
             is FirClassLikeDeclaration -> visitClassLikeDeclaration(firElement, data)
