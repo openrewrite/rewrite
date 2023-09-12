@@ -16,10 +16,15 @@
 package org.openrewrite.kotlin.format;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.KotlinParser;
+import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class AutoFormatVisitorTest implements RewriteTest {
@@ -290,5 +295,33 @@ class AutoFormatVisitorTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings({"OptionalGetWithoutIsPresent", "DataFlowIssue"})
+    @Test
+    void visitorAutoFormatTest() {
+        K.CompilationUnit unFormatted = KotlinParser.builder().build()
+          .parse("""
+            class Test {
+            fun method():String{return ""}
+            }
+            """)
+          .map(K.CompilationUnit.class::cast)
+          .findFirst()
+          .get();
+
+        K.CompilationUnit autoFormatted = (K.CompilationUnit) new KotlinIsoVisitor<>() {
+            @Override
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Object p) {
+                return autoFormat(method, p);
+            }
+        }.visit(unFormatted, new InMemoryExecutionContext());
+
+        assertThat(autoFormatted.printAll()).isEqualTo("""
+          class Test {
+              fun method(): String {
+                  return ""
+              }
+          }
+          """);
+    }
 }
 
