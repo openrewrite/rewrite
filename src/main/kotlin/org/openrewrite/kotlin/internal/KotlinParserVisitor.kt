@@ -2183,13 +2183,11 @@ class KotlinParserVisitor(
     }
 
     private fun isValidGetter(getter: FirPropertyAccessor?): Boolean {
-        return getter != null && getter !is FirDefaultPropertyGetter &&
-                (getter.source == null || getter.source!!.kind !is KtFakeSourceElementKind)
+        return getter != null && (getter.source == null || getter.source!!.kind !is KtFakeSourceElementKind)
     }
 
     private fun isValidSetter(setter: FirPropertyAccessor?): Boolean {
-        return setter != null && setter !is FirDefaultPropertySetter &&
-                (setter.source == null || setter.source!!.kind !is KtFakeSourceElementKind)
+        return setter != null && (setter.source == null || setter.source!!.kind !is KtFakeSourceElementKind)
     }
 
     private fun collectFirAnnotations(property: FirProperty): List<FirAnnotation> {
@@ -2287,13 +2285,13 @@ class KotlinParserVisitor(
             val name = createIdentifier(methodName, propertyAccessor)
             val params: JContainer<Statement?>
             val before = sourceBefore("(")
-            if (propertyAccessor.isGetter) {
+            if (propertyAccessor.isGetter && propertyAccessor.body != null) {
                 params = JContainer.build(
                     before,
                     listOf(padRight(J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), Space.EMPTY)),
                     Markers.EMPTY
                 )
-            } else {
+            } else if (propertyAccessor.body != null) {
                 val parameters: MutableList<JRightPadded<Statement?>> = ArrayList(propertyAccessor.valueParameters.size)
                 val valueParameters = propertyAccessor.valueParameters
                 for (i in valueParameters.indices) {
@@ -2308,6 +2306,10 @@ class KotlinParserVisitor(
                     }
                 }
                 params = JContainer.build(before, parameters, Markers.EMPTY)
+            } else {
+                params = JContainer.empty<Statement?>()
+                    .withBefore(before)
+                    .withMarkers(Markers.EMPTY.addIfAbsent(OmitParentheses(randomId())))
             }
             var saveCursor = cursor
             val nextPrefix = whitespace()

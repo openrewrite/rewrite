@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -39,17 +38,19 @@ class PropertyTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/299")
-    @ExpectedToFail
-    void uninitializedWithPrivateSetter() {
+    void propertyAccessorsWithoutBody() {
         rewriteRun(
           kotlin(
             """
               class Test {
                   var foo: Long
                       private set
+                  var bar: Long
+                      @Suppress get
               
                   init {
                       foo = 1
+                      bar = 2
                   }
               }
               """

@@ -811,14 +811,18 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
             JContainer<Statement> params = method.getPadding().getParameters();
             beforeSyntax(params.getBefore(), params.getMarkers(), JContainer.Location.METHOD_DECLARATION_PARAMETERS.getBeforeLocation(), p);
-            p.append("(");
+            if (!params.getMarkers().findFirst(OmitParentheses.class).isPresent()) {
+                p.append("(");
+            }
             int i = hasReceiverType ? 1 : 0;
             List<JRightPadded<Statement>> elements = params.getPadding().getElements();
             for (; i < elements.size(); i++) {
                 printMethodParameters(p, i, elements);
             }
             afterSyntax(params.getMarkers(), p);
-            p.append(")");
+            if (!params.getMarkers().findFirst(OmitParentheses.class).isPresent()) {
+                p.append(")");
+            }
 
             if (method.getReturnTypeExpression() != null) {
                 method.getMarkers().findFirst(TypeReferencePrefix.class).ifPresent(typeReferencePrefix ->
