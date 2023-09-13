@@ -20,7 +20,7 @@ dependencies {
     testRuntimeOnly("org.apache.commons:commons-lang3:latest.release")
     testRuntimeOnly(project(":rewrite-yaml"))
     testImplementation(project(":rewrite-maven"))
-    testRuntimeOnly("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
+    testRuntimeOnly("org.eclipse.jgit:org.eclipse.jgit:6.7.+")
 }
 
 tasks.withType<Javadoc> {
