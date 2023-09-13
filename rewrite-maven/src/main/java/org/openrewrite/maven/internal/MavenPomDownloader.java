@@ -89,7 +89,7 @@ public class MavenPomDownloader {
 
     /**
      * @param projectPoms    Other POMs in this project.
-     * @param ctx            The execution context, which potentially contain Maven settings customization and
+     * @param ctx            The execution context, which potentially contain Maven settings customization
      *                       and {@link HttpSender} customization.
      * @param mavenSettings  The Maven settings to use, if any. This argument overrides any Maven settings
      *                       set on the execution context.
@@ -486,6 +486,7 @@ public class MavenPomDownloader {
         gav = handleSnapshotTimestampVersion(gav);
 
         for (MavenRepository repo : normalizedRepos) {
+            //noinspection DataFlowIssue
             if (!repositoryAcceptsVersion(repo, gav.getVersion(), containingPom)) {
                 continue;
             }
@@ -495,7 +496,7 @@ public class MavenPomDownloader {
             Optional<Pom> result = mavenCache.getPom(resolvedGav);
             if (result == null) {
                 URI uri = URI.create(repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
-                                     gav.getGroupId().replace('.', '/') + '/' +
+                                     requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
                                      gav.getArtifactId() + '/' +
                                      gav.getVersion() + '/' +
                                      gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".pom");
@@ -576,7 +577,7 @@ public class MavenPomDownloader {
      * Gets the base version from snapshot timestamp version.
      */
     private GroupArtifactVersion handleSnapshotTimestampVersion(GroupArtifactVersion gav) {
-        Matcher m = SNAPSHOT_TIMESTAMP.matcher(gav.getVersion());
+        Matcher m = SNAPSHOT_TIMESTAMP.matcher(requireNonNull(gav.getVersion()));
         if (m.matches()) {
             final String baseVersion;
             if (m.group(1) != null) {
@@ -816,8 +817,17 @@ public class MavenPomDownloader {
             this.responseCode = responseCode;
         }
 
+        /**
+         * All 400s are considered client-side exceptions, but we only want to cache ones that are unlikely to change
+         * if requested again in order to save on time spent making HTTP calls.
+         * <br/>
+         * For 408 TIMEOUT, 425 TOO_EARLY, and 429 TOO_MANY_REQUESTS, these are likely to change if not cached.
+         */
         public boolean isClientSideException() {
-            return checkStatusCodesInRange(400, 499) && !checkStatusCodeIn(408, 425, 429); // 408 = Request Timeout, 425 = Too Early, 429 = Too Many Requests
+            if (responseCode == null || responseCode < 400 || responseCode > 499) {
+                return false;
+            }
+            return responseCode != 408 && responseCode != 425 && responseCode != 429;
         }
 
         public String getMessage() {
@@ -827,18 +837,7 @@ public class MavenPomDownloader {
         }
 
         public boolean isAccessDenied() {
-            return checkStatusCodesInRange(400, 403); // todo why also 400?
-        }
-
-        private boolean checkStatusCodesInRange(int start, int endInclusive) {
-            return responseCode != null && responseCode >= start && responseCode <= endInclusive;
-        }
-
-        private boolean checkStatusCodeIn(int... codes) {
-            if (responseCode == null) {
-                return false;
-            }
-            return Arrays.stream(codes).anyMatch(code -> responseCode == code);
+            return responseCode != null && responseCode > 400 && responseCode <= 403;
         }
     }
 
