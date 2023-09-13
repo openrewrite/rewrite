@@ -6,7 +6,7 @@ plugins {
 }
 
 dependencies {
-    compileOnly("org.eclipse.jgit:org.eclipse.jgit:6.7.+")
+    compileOnly("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 
     implementation("org.openrewrite.tools:java-object-diff:latest.release")
 
@@ -28,7 +28,7 @@ dependencies {
     implementation("org.yaml:snakeyaml:latest.release")
 
     testImplementation(project(":rewrite-test"))
-    testImplementation("org.eclipse.jgit:org.eclipse.jgit:6.7.+")
+    testImplementation("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 }
 
 val shadowJar = tasks.named<ShadowJar>("shadowJar") {

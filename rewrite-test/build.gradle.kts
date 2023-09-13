@@ -11,5 +11,5 @@ dependencies {
     implementation("org.assertj:assertj-core:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-csv")
     implementation("org.slf4j:slf4j-api:1.7.36")
-    implementation("org.eclipse.jgit:org.eclipse.jgit:6.7.+")
+    implementation("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 }
