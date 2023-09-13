@@ -163,6 +163,16 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitDelegatedSuperType(K.DelegatedSuperType delegatedSuperType, PrintOutputCapture<P> p) {
+        visit(delegatedSuperType.getTypeTree(), p);
+        visitSpace(delegatedSuperType.getBy(), KSpace.Location.DELEGATED_SUPER_TYPE_BY, p);
+        p.append("by");
+        visit(delegatedSuperType.getDelegate(), p);
+        afterSyntax(delegatedSuperType, p);
+        return delegatedSuperType;
+    }
+
+    @Override
     public J visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, PrintOutputCapture<P> p) {
         beforeSyntax(destructuringDeclaration, KSpace.Location.DESTRUCTURING_DECLARATION_PREFIX, p);
         visit(destructuringDeclaration.getInitializer().getLeadingAnnotations(), p);

@@ -52,6 +52,7 @@ import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.allChildren
 import org.jetbrains.kotlin.psi.psiUtil.endOffset
 import org.jetbrains.kotlin.psi.psiUtil.startOffset
+import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes
 import org.jetbrains.kotlin.types.ConstantValueKind
 import org.jetbrains.kotlin.types.Variance
 import org.jetbrains.kotlin.util.getChildren
@@ -4004,7 +4005,7 @@ class KotlinParserVisitor(
             val symbol = typeRef.coneType.toRegularClassSymbol(firSession)
             // Filter out generated types.
             if (typeRef.source != null && typeRef.source!!.kind !is KtFakeSourceElementKind) {
-                val element: TypeTree
+                var element: TypeTree
                 if (firPrimaryConstructor != null && symbol != null && ClassKind.CLASS == symbol.fir.classKind) {
                     val delegationCall = K.ConstructorInvocation(
                         randomId(),
@@ -4017,6 +4018,16 @@ class KotlinParserVisitor(
                     element = delegationCall
                 } else {
                     element = visitElement(typeRef, data) as TypeTree
+                }
+
+                // interface delegation (see https://kotlinlang.org/docs/delegation.html)
+                if (typeRef.psi!!.parent.node.elementType == KtStubElementTypes.DELEGATED_SUPER_TYPE_ENTRY) {
+                    val exprNode = typeRef.psi!!.parent.node.lastChildNode
+                    val field = regularClass.declarations.first { exprNode == it.psi?.node }
+                    val by = whitespace()
+                    skip("by")
+                    val expr = convertToExpression<Expression>((field as FirField).initializer!!, data)!!
+                    element = K.DelegatedSuperType(randomId(), Markers.EMPTY, element, by, expr)
                 }
                 superTypes.add(
                     JRightPadded.build(element)

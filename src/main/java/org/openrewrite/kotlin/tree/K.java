@@ -663,6 +663,71 @@ public interface K extends J {
     @SuppressWarnings("unused")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    final class DelegatedSuperType implements K, TypeTree {
+
+        @Getter
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        TypeTree typeTree;
+
+        @Getter
+        @With
+        Space by;
+
+        @Getter
+        @With
+        Expression delegate;
+
+        public DelegatedSuperType(UUID id, Markers markers, TypeTree typeTree, Space by, Expression delegate) {
+            this.id = id;
+            this.markers = markers;
+            this.typeTree = typeTree;
+            this.by = by;
+            this.delegate = delegate;
+        }
+
+        @Override
+        public DelegatedSuperType withType(@Nullable JavaType type) {
+            return withTypeTree(typeTree.withType(type));
+        }
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitDelegatedSuperType(this, p);
+        }
+
+        @Override
+        public <J2 extends J> J2 withPrefix(Space space) {
+            return (J2) withTypeTree(typeTree.withPrefix(space));
+        }
+
+        @Override
+        public Space getPrefix() {
+            return typeTree.getPrefix();
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return typeTree.getType();
+        }
+
+        @Override
+        public String toString() {
+            return withBy(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
+        }
+    }
+
+    @SuppressWarnings("unused")
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class DestructuringDeclaration implements K, Statement {
 

@@ -149,6 +149,15 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return d;
     }
 
+    public J visitDelegatedSuperType(K.DelegatedSuperType delegatedSuperType, P p) {
+        K.DelegatedSuperType d = delegatedSuperType;
+        d = d.withBy(visitSpace(d.getBy(), KSpace.Location.DELEGATED_SUPER_TYPE_BY, p));
+        d = d.withMarkers(visitMarkers(d.getMarkers(), p));
+        d = d.withTypeTree(visitAndCast(d.getTypeTree(), p));
+        d = d.withDelegate(visitAndCast(d.getDelegate(), p));
+        return d;
+    }
+
     public J visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, P p) {
         K.DestructuringDeclaration d = destructuringDeclaration;
         d = d.withPrefix(visitSpace(d.getPrefix(), KSpace.Location.DESTRUCTURING_DECLARATION_PREFIX, p));
