@@ -141,7 +141,7 @@ public class RecipeScheduler {
         public LargeSourceSet scanSources(LargeSourceSet sourceSet, int cycle) {
             return mapForRecipeRecursively(sourceSet, (recipeStack, sourceFile) -> {
                 Recipe recipe = recipeStack.peek();
-                if (recipe.maxCycles() < cycle) {
+                if (sourceFile == null || recipe.maxCycles() < cycle) {
                     return sourceFile;
                 }
 
@@ -200,7 +200,7 @@ public class RecipeScheduler {
         public LargeSourceSet editSources(LargeSourceSet sourceSet, int cycle) {
             return mapForRecipeRecursively(sourceSet, (recipeStack, sourceFile) -> {
                 Recipe recipe = recipeStack.peek();
-                if (recipe.maxCycles() < cycle) {
+                if (sourceFile == null || recipe.maxCycles() < cycle) {
                     return sourceFile;
                 }
 
@@ -320,7 +320,7 @@ public class RecipeScheduler {
             return after;
         }
 
-        private LargeSourceSet mapForRecipeRecursively(LargeSourceSet sourceSet, BiFunction<Stack<Recipe>, SourceFile, SourceFile> mapFn) {
+        private LargeSourceSet mapForRecipeRecursively(LargeSourceSet sourceSet, BiFunction<Stack<Recipe>, @Nullable SourceFile, @Nullable SourceFile> mapFn) {
             return sourceSet.edit(sourceFile -> {
                 Stack<Stack<Recipe>> allRecipesStack = initRecipeStack();
 

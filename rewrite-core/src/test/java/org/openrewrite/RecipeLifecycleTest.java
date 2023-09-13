@@ -15,7 +15,8 @@
  */
 package org.openrewrite;
 
-import lombok.NoArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.config.Environment;
@@ -24,6 +25,7 @@ import org.openrewrite.config.YamlResourceLoader;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.text.FindAndReplace;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
@@ -32,10 +34,9 @@ import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.List;
-import java.util.Properties;
-import java.util.UUID;
+import java.util.*;
 
+import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
 import static org.openrewrite.Recipe.noop;
@@ -78,20 +79,33 @@ class RecipeLifecycleTest implements RewriteTest {
         );
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = true)
+    static class DeleteFirst extends Recipe {
+
+        @Override
+        public String getDisplayName() {
+            return "Delete a file";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Deletes a file early on in the recipe pipeline. " +
+                   "Subsequent recipes should not be passed a null source file.";
+        }
+
+        @Override
+        public List<Recipe> getRecipeList() {
+            return Arrays.asList(
+              new DeleteSourceFiles("test.txt"),
+              new FindAndReplace("test", "", null, null, null, null, null));
+        }
+    }
+
     @Test
-    void deleteFile() {
+    void deletionWithSubsequentRecipes() {
         rewriteRun(
-          spec -> spec
-            .recipe(toRecipe(() -> new TreeVisitor<>() {
-                  @Override
-                  public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                      return null;
-                  }
-              }).withName("test.DeletingRecipe")
-            )
-            .afterRecipe(run -> assertThat(run.getChangeset().getAllResults().stream()
-              .map(r -> r.getRecipeDescriptorsThatMadeChanges().get(0).getName()))
-              .containsOnly("test.DeletingRecipe")),
+          spec -> spec.recipe(new DeleteFirst()),
           text("test", null, spec -> spec.path("test.txt"))
         );
     }
@@ -382,61 +396,10 @@ class RecipeLifecycleTest implements RewriteTest {
     @Test
     void declarativeRecipeChainFromResourcesLongList() {
         rewriteRun(spec -> spec.recipe(Environment.builder()
-            .load(new YamlResourceLoader(RecipeLifecycleTest.class.getResourceAsStream("/META-INF/rewrite/test-sample-a.yml"), URI.create("rewrite.yml"), new Properties()))
-            .load(new YamlResourceLoader(RecipeLifecycleTest.class.getResourceAsStream("/META-INF/rewrite/test-sample-b.yml"), URI.create("rewrite.yml"), new Properties()))
+            .load(new YamlResourceLoader(requireNonNull(RecipeLifecycleTest.class.getResourceAsStream("/META-INF/rewrite/test-sample-a.yml")), URI.create("rewrite.yml"), new Properties()))
+            .load(new YamlResourceLoader(requireNonNull(RecipeLifecycleTest.class.getResourceAsStream("/META-INF/rewrite/test-sample-b.yml")), URI.create("rewrite.yml"), new Properties()))
             .build()
             .activateRecipes("test.declarative.sample.a")),
           text("Hi", "after"));
-    }
-}
-
-class DefaultConstructorRecipe extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "DefaultConstructorRecipe";
-    }
-
-    @Override
-    public String getDescription() {
-        return "DefaultConstructorRecipe.";
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new PlainTextVisitor<>() {
-            @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
-                if (!text.getText().contains(getDisplayName())) {
-                    return text.withText(getDisplayName() + text.getText());
-                }
-                return super.visitText(text, executionContext);
-            }
-        };
-    }
-}
-
-@NoArgsConstructor
-class NoArgRecipe extends Recipe {
-    @Override
-    public String getDisplayName() {
-        return "NoArgRecipe";
-    }
-
-    @Override
-    public String getDescription() {
-        return "NoArgRecipe.";
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new PlainTextVisitor<>() {
-            @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
-                if (!text.getText().contains(getDisplayName())) {
-                    return text.withText(getDisplayName() + text.getText());
-                }
-                return super.visitText(text, executionContext);
-            }
-        };
     }
 }
