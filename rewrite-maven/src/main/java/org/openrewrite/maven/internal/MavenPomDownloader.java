@@ -817,7 +817,7 @@ public class MavenPomDownloader {
         }
 
         public boolean isClientSideException() {
-            return responseCode != null && responseCode >= 400 && responseCode <= 404;
+            return checkStatusCodesInRange(400, 499) && !checkStatusCodeIn(408, 425, 429); // 408 = Request Timeout, 425 = Too Early, 429 = Too Many Requests
         }
 
         public String getMessage() {
@@ -827,7 +827,18 @@ public class MavenPomDownloader {
         }
 
         public boolean isAccessDenied() {
-            return isClientSideException() && responseCode != 404;
+            return checkStatusCodesInRange(400, 403); // todo why also 400?
+        }
+
+        private boolean checkStatusCodesInRange(int start, int endInclusive) {
+            return responseCode != null && responseCode >= start && responseCode <= endInclusive;
+        }
+
+        private boolean checkStatusCodeIn(int... codes) {
+            if (responseCode == null) {
+                return false;
+            }
+            return Arrays.stream(codes).anyMatch(code -> responseCode == code);
         }
     }
 
