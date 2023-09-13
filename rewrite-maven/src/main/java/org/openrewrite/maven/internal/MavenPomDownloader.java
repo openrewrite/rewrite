@@ -837,7 +837,7 @@ public class MavenPomDownloader {
         }
 
         public boolean isAccessDenied() {
-            return responseCode != null && responseCode > 400 && responseCode <= 403;
+            return responseCode != null && 400 < responseCode && responseCode <= 403;
         }
     }
 
