@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
@@ -401,5 +402,58 @@ class RecipeLifecycleTest implements RewriteTest {
             .build()
             .activateRecipes("test.declarative.sample.a")),
           text("Hi", "after"));
+    }
+}
+
+@SuppressWarnings("unused") // referenced in yaml
+class DefaultConstructorRecipe extends Recipe {
+    @Override
+    public String getDisplayName() {
+        return "DefaultConstructorRecipe";
+    }
+
+    @Override
+    public String getDescription() {
+        return "DefaultConstructorRecipe.";
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+                if (!text.getText().contains(getDisplayName())) {
+                    return text.withText(getDisplayName() + text.getText());
+                }
+                return super.visitText(text, executionContext);
+            }
+        };
+    }
+}
+
+@SuppressWarnings("unused") // referenced in yaml
+@NoArgsConstructor
+class NoArgRecipe extends Recipe {
+    @Override
+    public String getDisplayName() {
+        return "NoArgRecipe";
+    }
+
+    @Override
+    public String getDescription() {
+        return "NoArgRecipe.";
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new PlainTextVisitor<>() {
+            @Override
+            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+                if (!text.getText().contains(getDisplayName())) {
+                    return text.withText(getDisplayName() + text.getText());
+                }
+                return super.visitText(text, executionContext);
+            }
+        };
     }
 }
