@@ -1184,7 +1184,7 @@ public interface K extends J {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     @With
-    final class KString implements K, Expression {
+    final class KString implements K, Statement, Expression {
         UUID id;
         Space prefix;
         Markers markers;
@@ -1210,8 +1210,8 @@ public interface K extends J {
 
         @Transient
         @Override
-        public CoordinateBuilder.Expression getCoordinates() {
-            return new CoordinateBuilder.Expression(this);
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
