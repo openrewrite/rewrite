@@ -17,9 +17,11 @@ package org.openrewrite.text;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.SourceSpecs.text;
 
 class FindAndReplaceJavaTest implements RewriteTest {
 
@@ -32,6 +34,29 @@ class FindAndReplaceJavaTest implements RewriteTest {
             "class Test {}",
             "class Replaced {}"
           )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3532")
+    void filePatternShouldLimitApplication() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+              type: specs.openrewrite.org/v1beta/recipe
+              name: com.yourorg.FindAndReplaceExample
+              displayName: Find and replace example
+              recipeList:
+                - org.openrewrite.text.FindAndReplace:
+                    find: blacklist
+                    replace: denylist
+                    filePattern: '**/*.java'
+              """,
+            "com.yourorg.FindAndReplaceExample"),
+          java(
+            "class blacklist {}",
+            "class denylist {}"
+          ),
+          text("See `class blacklist {}`")
         );
     }
 }
