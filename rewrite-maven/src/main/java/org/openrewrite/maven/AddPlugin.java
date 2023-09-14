@@ -83,7 +83,7 @@ public class AddPlugin extends Recipe {
                     "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. " +
                     "When not set, all source files are searched. ",
             required = false,
-            example = "**/*.java")
+            example = "**/*-parent/grpc-*/pom.xml")
     @Nullable
     String filePattern;
 
