@@ -205,12 +205,15 @@ public class ChangeParentPom extends Recipe {
                                     changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("relativePath").get(), targetRelativePath));
                                 }
                                 else if (tag.getChildValue("relativePath").orElse(null) == null && targetRelativePath != null) {
+                                    final Xml.Tag relativePathTag;
                                     if (StringUtils.isBlank(targetRelativePath)) {
-                                        changeParentTagVisitors.add(new AddToTagVisitor<>(t, Xml.Tag.build("<relativePath />")));
+                                        relativePathTag = Xml.Tag.build("<relativePath />");
                                     }
                                     else {
-                                        changeParentTagVisitors.add(new AddToTagVisitor<>(t, Xml.Tag.build("<relativePath>" + targetRelativePath + "</relativePath>")));
+                                        relativePathTag = Xml.Tag.build("<relativePath>" + targetRelativePath + "</relativePath>");
                                     }
+                                    doAfterVisit(new AddToTagVisitor<>(t, relativePathTag, new MavenTagInsertionComparator(t.getChildren())));
+                                    maybeUpdateModel();
                                 }
 
                                 if (changeParentTagVisitors.size() > 0) {
