@@ -236,7 +236,6 @@ class ChangeParentPomTest implements RewriteTest {
         );
     }
 
-    @Test
     @RepeatedTest(10)
     void multiModuleRelativePath() {
       ChangeParentPom recipe = new ChangeParentPom("org.springframework.boot", null, "spring-boot-starter-parent", null, "2.6.7", null, "", null, false, null);
@@ -321,7 +320,6 @@ class ChangeParentPomTest implements RewriteTest {
       );
   }
 
-  @Test
   @RepeatedTest(10)
   void multiModuleRelativePathChangeChildrens() {
     ChangeParentPom recipe = new ChangeParentPom("org.sample", "org.springframework.boot", "sample", "spring-boot-starter-parent", "2.5.0", null, "", null, true, null);

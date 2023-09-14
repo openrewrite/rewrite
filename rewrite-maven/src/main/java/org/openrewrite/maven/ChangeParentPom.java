@@ -205,7 +205,7 @@ public class ChangeParentPom extends Recipe {
                                     changeParentTagVisitors.add(new ChangeTagValueVisitor<>(t.getChild("relativePath").get(), targetRelativePath));
                                 }
                                 else if (tag.getChildValue("relativePath").orElse(null) == null && targetRelativePath != null) {
-                                    Xml.Tag relativePathTag = null;
+                                    final Xml.Tag relativePathTag;
                                     if (StringUtils.isBlank(targetRelativePath)) {
                                         relativePathTag = Xml.Tag.build("<relativePath />");
                                     }
