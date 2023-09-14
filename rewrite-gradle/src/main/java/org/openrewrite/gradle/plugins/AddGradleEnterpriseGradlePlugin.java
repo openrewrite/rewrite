@@ -97,8 +97,8 @@ public class AddGradleEnterpriseGradlePlugin extends Recipe {
     Boolean uploadInBackground;
 
     @Option(displayName = "Publish Criteria",
-            description = "When set to `always` the plugin will publish build scans of every single build. " +
-                    "When set to `failure` the plugin will only publish build scans when the build fails. " +
+            description = "When set to `Always` the plugin will publish build scans of every single build. " +
+                    "When set to `Failure` the plugin will only publish build scans when the build fails. " +
                     "When omitted scans will be published only when the `--scan` option is passed to the build.",
             required = false,
             valid = {"Always", "Failure"},

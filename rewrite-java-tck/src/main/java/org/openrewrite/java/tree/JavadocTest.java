@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-@SuppressWarnings({"JavadocDeclaration", "TrailingWhitespacesInTextBlock", "TextBlockMigration"})
+@SuppressWarnings({"JavadocDeclaration", "TrailingWhitespacesInTextBlock", "TextBlockMigration", "RedundantThrows", "ConcatenationWithEmptyString"})
 class JavadocTest implements RewriteTest {
 
     @SuppressWarnings("JavadocReference")
@@ -1472,7 +1472,6 @@ class JavadocTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("JavadocBlankLines")
     @Issue("https://github.com/openrewrite/rewrite/issues/2046")
     @Test
     void trailingWhitespaceAndMultilineMargin() {
@@ -1632,6 +1631,32 @@ class JavadocTest implements RewriteTest {
                           " * \n" +
                           " */\n" +
                           "class A {}"
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3530")
+    void arrayTypeLiterals() {
+        rewriteRun(
+          java("" +
+            "/**\n" +
+            "  * Create an instance of {@link byte[]} and {@link byte[][]}\n" +
+            "  */\n" +
+            "class A {}"
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3530")
+    void arrayTypeLiterals2() {
+        rewriteRun(
+          java("" +
+            "/**\n" +
+            " * <p>Values are converted to strings using {@link java.util.Arrays#compare(Comparable[], Comparable[])}}.\n" +
+            " */\n" +
+            "class A {}"
           )
         );
     }

@@ -30,7 +30,7 @@ import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
 
 /**
- * A collection of styles by name, e.g. IntelliJ or Google Java Format.
+ * A collection of styles by name, e.g., IntelliJ IDEA or Google Java Format.
  */
 @Data
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -56,13 +56,16 @@ public class NamedStyles implements Marker {
                                             Iterable<? extends NamedStyles> namedStyles) {
         S merged = null;
         for (NamedStyles namedStyle : namedStyles) {
-            for (Style style : namedStyle.styles) {
-                if (styleClass.isInstance(style)) {
-                    style = style.applyDefaults();
-                    if (merged == null) {
-                        merged = (S) style;
-                    } else {
-                        merged = (S) merged.merge(style);
+            Collection<Style> styles = namedStyle.styles;
+            if (styles != null) {
+                for (Style style : styles) {
+                    if (styleClass.isInstance(style)) {
+                        style = style.applyDefaults();
+                        if (merged == null) {
+                            merged = (S) style;
+                        } else {
+                            merged = (S) merged.merge(style);
+                        }
                     }
                 }
             }
@@ -78,20 +81,20 @@ public class NamedStyles implements Marker {
      */
     @Nullable
     public static NamedStyles merge(List<NamedStyles> styles) {
-        if(styles.isEmpty()) {
+        if (styles.isEmpty()) {
             return null;
-        } else if(styles.size() == 1) {
+        } else if (styles.size() == 1) {
             return styles.get(0);
         }
         Set<Class<? extends Style>> styleClasses = new HashSet<>();
-        for(NamedStyles namedStyles : styles) {
-            for(Style style : namedStyles.getStyles()) {
+        for (NamedStyles namedStyles : styles) {
+            for (Style style : namedStyles.getStyles()) {
                 styleClasses.add(style.getClass());
             }
         }
 
         List<Style> mergedStyles = new ArrayList<>(styleClasses.size());
-        for(Class<? extends Style> styleClass : styleClasses) {
+        for (Class<? extends Style> styleClass : styleClasses) {
             mergedStyles.add(NamedStyles.merge(styleClass, styles));
         }
 

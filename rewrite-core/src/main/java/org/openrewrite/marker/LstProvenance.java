@@ -18,7 +18,9 @@ package org.openrewrite.marker;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
+import org.openrewrite.internal.lang.Nullable;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Value
@@ -31,10 +33,17 @@ public class LstProvenance implements Marker {
     String buildToolVersion;
     String lstSerializerVersion;
 
+    /**
+     * Nullable for backwards compatibility with older LSTs.
+     */
+    @Nullable
+    Instant timestampUtc;
+
     public enum Type {
         Gradle,
         Maven,
         Bazel,
-        Cli
+        Cli,
+        CobolCli
     }
 }

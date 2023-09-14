@@ -41,16 +41,17 @@ public class PropertiesParser implements Parser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        return acceptedInputs(sourceFiles).map(sourceFile -> {
-            Path path = sourceFile.getRelativePath(relativeTo);
-            try (EncodingDetectingInputStream is = sourceFile.getSource(ctx)) {
+        return acceptedInputs(sourceFiles).map(input -> {
+            parsingListener.startedParsing(input);
+            Path path = input.getRelativePath(relativeTo);
+            try (EncodingDetectingInputStream is = input.getSource(ctx)) {
                 Properties.File file = parseFromInput(path, is)
-                        .withFileAttributes(sourceFile.getFileAttributes());
-                parsingListener.parsed(sourceFile, file);
-                return file;
+                        .withFileAttributes(input.getFileAttributes());
+                parsingListener.parsed(input, file);
+                return requirePrintEqualsInput(file, input, relativeTo, ctx);
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
-                return ParseError.build(this, sourceFile, relativeTo, ctx, t);
+                return ParseError.build(this, input, relativeTo, ctx, t);
             }
         });
     }

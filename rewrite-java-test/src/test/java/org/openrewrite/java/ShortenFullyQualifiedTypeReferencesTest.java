@@ -228,7 +228,7 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
               @SuppressWarnings("DataFlowIssue")
               public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                   if (method.getSimpleName().equals("m1")) {
-                      return (J.MethodDeclaration) new ShortenFullyQualifiedTypeReferences().getVisitor().visit(method, ctx);
+                      return (J.MethodDeclaration) new ShortenFullyQualifiedTypeReferences().getVisitor().visit(method, ctx, getCursor().getParent());
                   }
                   return super.visitMethodDeclaration(method, ctx);
               }
@@ -414,6 +414,49 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
 
               class T {
                   Function<Collection<?>, Integer> m() {
+                      return Collection::size;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void subtree() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              @Override
+              public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                  if (method.getSimpleName().equals("m1")) {
+                      doAfterVisit(ShortenFullyQualifiedTypeReferences.modifyOnly(method));
+                  }
+                  return super.visitMethodDeclaration(method, ctx);
+              }
+          })),
+          java(
+            """
+              import java.util.Collection;
+              import java.util.function.Function;
+
+              class T {
+                  Function<Collection<?>, Integer> m() {
+                      return java.util.Collection::size;
+                  }
+                  Function<Collection<?>, Integer> m1() {
+                      return java.util.Collection::size;
+                  }
+              }
+              """,
+            """
+              import java.util.Collection;
+              import java.util.function.Function;
+
+              class T {
+                  Function<Collection<?>, Integer> m() {
+                      return java.util.Collection::size;
+                  }
+                  Function<Collection<?>, Integer> m1() {
                       return Collection::size;
                   }
               }

@@ -151,6 +151,7 @@ public class ReloadableJava17Parser implements JavaParser {
         LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = parseInputsToCompilerAst(sourceFiles, ctx);
         return cus.entrySet().stream().map(cuByPath -> {
             Input input = cuByPath.getKey();
+            parsingListener.startedParsing(input);
             try {
                 ReloadableJava17ParserVisitor parser = new ReloadableJava17ParserVisitor(
                         input.getRelativePath(relativeTo),
@@ -165,7 +166,7 @@ public class ReloadableJava17Parser implements JavaParser {
                 J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
                 cuByPath.setValue(null); // allow memory used by this JCCompilationUnit to be released
                 parsingListener.parsed(input, cu);
-                return cu;
+                return requirePrintEqualsInput(cu, input, relativeTo, ctx);
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
                 return ParseError.build(this, input, relativeTo, ctx, t);
@@ -300,7 +301,7 @@ public class ReloadableJava17Parser implements JavaParser {
     public static class Builder extends JavaParser.Builder<ReloadableJava17Parser, Builder> {
         @Override
         public ReloadableJava17Parser build() {
-            return new ReloadableJava17Parser(logCompilationWarningsAndErrors, classpath, classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
+            return new ReloadableJava17Parser(logCompilationWarningsAndErrors, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
         }
     }
 

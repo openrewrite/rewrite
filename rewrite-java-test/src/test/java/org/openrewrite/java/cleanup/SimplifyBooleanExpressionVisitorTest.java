@@ -16,6 +16,8 @@
 package org.openrewrite.java.cleanup;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
@@ -25,7 +27,7 @@ import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings("ALL")
-class SimplifyBooleanExpressionTest implements RewriteTest {
+class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
@@ -345,5 +347,75 @@ class SimplifyBooleanExpressionTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @ParameterizedTest
+    @Issue("https://github.com/openrewrite/rewrite-templating/issues/28")
+    // Mimic what would be inserted by a Refaster template using two nullable parameters, with the second one a literal
+    @CsvSource(delimiterString = "//", textBlock = """
+      a == null || a.isEmpty()                                 // a == null || a.isEmpty()
+      a == null || !a.isEmpty()                                // a == null || !a.isEmpty()
+      a != null && a.isEmpty()                                 // a != null && a.isEmpty()
+      a != null && !a.isEmpty()                                // a != null && !a.isEmpty()
+
+      "" == null || "".isEmpty()                               // true
+      "" == null || !"".isEmpty()                              // false
+      "" != null && "".isEmpty()                               // true
+      "" != null && !"".isEmpty()                              // false
+      
+      "b" == null || "b".isEmpty()                             // false
+      "b" == null || !"b".isEmpty()                            // true
+      "b" != null && "b".isEmpty()                             // false
+      "b" != null && !"b".isEmpty()                            // true
+
+      a == null || a.isEmpty() || "" == null || "".isEmpty()   // true
+      a == null || a.isEmpty() || "" == null || !"".isEmpty()  // a == null || a.isEmpty()
+      a == null || a.isEmpty() || "" != null && "".isEmpty()   // true
+      a == null || a.isEmpty() || "" != null && !"".isEmpty()  // a == null || a.isEmpty()
+      a == null || a.isEmpty() && "" == null || "".isEmpty()   // true
+      a == null || a.isEmpty() && "" == null || !"".isEmpty()  // a == null
+      a == null || a.isEmpty() && "" != null && "".isEmpty()   // a == null || a.isEmpty()
+      a == null || a.isEmpty() && "" != null && !"".isEmpty()  // a == null
+      a == null || !a.isEmpty() || "" == null || "".isEmpty()  // true
+      a == null || !a.isEmpty() || "" == null || !"".isEmpty() // a == null || !a.isEmpty()
+      a == null || !a.isEmpty() || "" != null && "".isEmpty()  // true
+      a == null || !a.isEmpty() || "" != null && !"".isEmpty() // a == null || !a.isEmpty()
+      a == null || !a.isEmpty() && "" == null || "".isEmpty()  // true 
+      a == null || !a.isEmpty() && "" == null || !"".isEmpty() // a == null
+      a == null || !a.isEmpty() && "" != null && "".isEmpty()  // a == null || !a.isEmpty() 
+      a == null || !a.isEmpty() && "" != null && !"".isEmpty() // a == null
+
+      a == null || a.isEmpty() || "b" == null || "b".isEmpty()   // a == null || a.isEmpty()
+      a == null || a.isEmpty() || "b" == null || !"b".isEmpty()  // true
+      a == null || a.isEmpty() || "b" != null && "b".isEmpty()   // a == null || a.isEmpty()
+      a == null || a.isEmpty() || "b" != null && !"b".isEmpty()  // true
+      a == null || a.isEmpty() && "b" == null || "b".isEmpty()   // a == null
+      a == null || a.isEmpty() && "b" == null || !"b".isEmpty()  // true
+      a == null || a.isEmpty() && "b" != null && "b".isEmpty()   // a == null
+      a == null || a.isEmpty() && "b" != null && !"b".isEmpty()  // a == null || a.isEmpty()
+      a == null || !a.isEmpty() || "b" == null || "b".isEmpty()  // a == null || !a.isEmpty()
+      a == null || !a.isEmpty() || "b" == null || !"b".isEmpty() // true
+      a == null || !a.isEmpty() || "b" != null && "b".isEmpty()  // a == null || !a.isEmpty()
+      a == null || !a.isEmpty() || "b" != null && !"b".isEmpty() // true
+      a == null || !a.isEmpty() && "b" == null || "b".isEmpty()  // a == null 
+      a == null || !a.isEmpty() && "b" == null || !"b".isEmpty() // true
+      a == null || !a.isEmpty() && "b" != null && "b".isEmpty()  // a == null 
+      a == null || !a.isEmpty() && "b" != null && !"b".isEmpty() // a == null || !a.isEmpty()
+      """)
+    void simplifyLiteralNull(String before, String after) {
+        //language=java
+        String template = """
+          class A {
+              void foo(String a) {
+                  boolean c = %s;
+              }
+          }
+          """;
+        String beforeJava = template.formatted(before);
+        if (before.equals(after)) {
+            rewriteRun(java(beforeJava));
+        } else {
+            rewriteRun(java(beforeJava, template.formatted(after)));
+        }
     }
 }

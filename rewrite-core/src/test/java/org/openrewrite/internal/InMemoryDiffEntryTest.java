@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite;
+package org.openrewrite.internal;
 
 import org.eclipse.jgit.lib.FileMode;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.internal.InMemoryDiffEntry;
 import org.openrewrite.internal.StringUtils;
 
 import java.nio.file.Path;
@@ -29,7 +30,7 @@ import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-class ResultTest {
+class InMemoryDiffEntryTest {
     private final Path filePath = Paths.get("com/netflix/MyJavaClass.java");
 
     private String ab(String which) {
@@ -38,7 +39,7 @@ class ResultTest {
 
     @Test
     void idempotent() {
-        try (var diff = new Result.InMemoryDiffEntry(
+        try (var diff = new InMemoryDiffEntry(
           Paths.get("com/netflix/MyJavaClass.java"),
           Paths.get("com/netflix/MyJavaClass.java"),
           null,
@@ -52,7 +53,7 @@ class ResultTest {
 
     @Test
     void ignoreWhitespace() {
-        try (var diff = new Result.InMemoryDiffEntry(
+        try (var diff = new InMemoryDiffEntry(
           Paths.get("com/netflix/MyJavaClass.java"),
           Paths.get("com/netflix/MyJavaClass.java"),
           null,
@@ -74,7 +75,7 @@ class ResultTest {
 
     @Test
     void singleLineChange() {
-        try (var result = new Result.InMemoryDiffEntry(
+        try (var result = new InMemoryDiffEntry(
           filePath, filePath, null,
           """
             public void test() {
@@ -105,7 +106,7 @@ class ResultTest {
 
     @Test
     void multipleChangesMoreThanThreeLinesApart() {
-        try (var result = new Result.InMemoryDiffEntry(
+        try (var result = new InMemoryDiffEntry(
           filePath, filePath, null,
           """
             public void test() {
@@ -167,7 +168,7 @@ class ResultTest {
 
     @Test
     void addFile() {
-        try (var result = new Result.InMemoryDiffEntry(
+        try (var result = new InMemoryDiffEntry(
           null, filePath, null,
           "",
           """
@@ -194,7 +195,7 @@ class ResultTest {
 
     @Test
     void deleteFile() {
-        try (var result = new Result.InMemoryDiffEntry(
+        try (var result = new InMemoryDiffEntry(
           filePath, null, null,
           """
             public void test() {
@@ -221,7 +222,7 @@ class ResultTest {
     @Disabled("Does not work with CI due to jgit shadowJar")
     @Test
     void executableFile() {
-        try (var result = new Result.InMemoryDiffEntry(
+        try (var result = new InMemoryDiffEntry(
           filePath, null, null,
           """
             public void test() {

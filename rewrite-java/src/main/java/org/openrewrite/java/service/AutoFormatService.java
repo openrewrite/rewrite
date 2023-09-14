@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,35 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.marker;
+package org.openrewrite.java.service;
 
-import lombok.EqualsAndHashCode;
-import lombok.Value;
-import lombok.With;
+import org.openrewrite.Incubating;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.format.AutoFormatVisitor;
 
-import java.util.UUID;
+@Incubating(since = "8.2.0")
+public class AutoFormatService {
 
-@Value
-@EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@With
-public class BuildToolFailure implements Marker {
-    @EqualsAndHashCode.Include
-    UUID id;
-
-    /**
-     * The name of the build tool that failed, possibly a wrapper.
-     */
-    String type;
-    @Nullable
-    String version;
-
-    /**
-     * The command that was executed.
-     */
-    @Nullable
-    String command;
-
-    @Nullable
-    Integer exitCode;
+    public <P> JavaVisitor<P> autoFormatVisitor(@Nullable Tree stopAfter) {
+        return new AutoFormatVisitor<>(stopAfter);
+    }
 }

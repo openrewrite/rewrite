@@ -36,6 +36,7 @@ public class MavenTagInsertionComparator implements Comparator<Content> {
             "groupId",
             "artifactId",
             "version",
+            "relativePath",
             "packaging",
             "name",
             "description",

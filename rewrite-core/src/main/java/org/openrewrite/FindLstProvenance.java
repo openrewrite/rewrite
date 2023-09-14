@@ -23,6 +23,8 @@ import org.openrewrite.table.LstProvenanceTable;
 import java.util.HashSet;
 import java.util.Set;
 
+import static java.time.ZoneOffset.UTC;
+
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindLstProvenance extends ScanningRecipe<FindLstProvenance.Accumulator> {
@@ -58,9 +60,11 @@ public class FindLstProvenance extends ScanningRecipe<FindLstProvenance.Accumula
                 if (lstProvenance == null) {
                     return tree;
                 }
-                if(acc.seenProvenance.add(lstProvenance)) {
+                if (acc.seenProvenance.add(lstProvenance)) {
                     provenanceTable.insertRow(ctx, new LstProvenanceTable.Row(lstProvenance.getBuildToolType(),
-                            lstProvenance.getBuildToolVersion(), lstProvenance.getLstSerializerVersion()));
+                            lstProvenance.getBuildToolVersion(), lstProvenance.getLstSerializerVersion(),
+                            lstProvenance.getTimestampUtc() == null ? null : lstProvenance.getTimestampUtc().toEpochMilli(),
+                            lstProvenance.getTimestampUtc() == null ? null : lstProvenance.getTimestampUtc().atZone(UTC).toString()));
                 }
                 return tree;
             }

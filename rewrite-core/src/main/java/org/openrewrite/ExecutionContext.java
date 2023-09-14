@@ -34,6 +34,7 @@ public interface ExecutionContext {
     String CURRENT_RECIPE = "org.openrewrite.currentRecipe";
     String DATA_TABLES = "org.openrewrite.dataTables";
     String RUN_TIMEOUT = "org.openrewrite.runTimeout";
+    String REQUIRE_PRINT_EQUALS_INPUT = "org.openrewrite.requirePrintEqualsInput";
 
     @Incubating(since = "7.20.0")
     default ExecutionContext addObserver(TreeObserver.Subscription observer) {

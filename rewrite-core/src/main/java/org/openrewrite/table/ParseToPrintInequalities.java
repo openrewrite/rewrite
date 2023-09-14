@@ -13,29 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.table;
+package org.openrewrite.table;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreType;
 import lombok.Value;
 import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.lang.Nullable;
 
-public class MethodCallGraph extends DataTable<MethodCallGraph.Row> {
-
-    public MethodCallGraph(Recipe recipe) {
+@JsonIgnoreType
+public class ParseToPrintInequalities extends DataTable<ParseToPrintInequalities.Row> {
+    public ParseToPrintInequalities(Recipe recipe) {
         super(recipe,
-                "Method call graph",
-                "The call relationships between methods.");
+                "Parser to print inequalities",
+                "A list of files that parsers produced `SourceFile` which, when printed, " +
+                "didn't match the original source code.");
     }
 
     @Value
     public static class Row {
-        @Column(displayName = "From",
-                description = "The containing method that is making the call.")
-        String from;
+        @Column(displayName = "Source path", description = "The file that failed to parse.")
+        String sourcePath;
 
-        @Column(displayName = "To",
-                description = "The method that is being called.")
-        String to;
+        @Column(displayName = "Diff",
+                description = "The diff between the original source code and the printed `SourceFile`.")
+        @Nullable
+        String diff;
     }
 }

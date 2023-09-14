@@ -263,7 +263,7 @@ public class StringUtils {
             }
 
             byte[] bytes = bos.toByteArray();
-            return new String(bytes, 0, bytes.length, charset);
+            return new String(bytes, charset);
         } catch (IOException e) {
             throw new UnsupportedOperationException(e);
         }
@@ -713,36 +713,32 @@ public class StringUtils {
         boolean inMultiLineComment = false;
         boolean inSingleLineComment = false;
 
-        int delimIndex = cursor;
-        for (; delimIndex < source.length(); delimIndex++) {
+        int length = source.length();
+        for (; cursor < length; cursor++) {
+            char current = source.charAt(cursor);
             if (inSingleLineComment) {
-                if (source.charAt(delimIndex) == '\n') {
-                    inSingleLineComment = false;
-                }
-            } else {
-                if (source.length() > delimIndex + 1) {
-                    switch (source.substring(delimIndex, delimIndex + 2)) {
-                        case "//":
-                            inSingleLineComment = true;
-                            delimIndex++;
-                            continue;
-                        case "/*":
-                            inMultiLineComment = true;
-                            delimIndex++;
-                            continue;
-                        case "*/":
-                            inMultiLineComment = false;
-                            delimIndex++;
-                            continue;
-                    }
+                inSingleLineComment = current != '\n';
+                continue;
+            } else if (length > cursor + 1) {
+                char next = source.charAt(cursor + 1);
+                if (current == '/' && next == '/') {
+                    inSingleLineComment = true;
+                    cursor++;
+                    continue;
+                } else if (current == '/' && next == '*') {
+                    inMultiLineComment = true;
+                    cursor++;
+                    continue;
+                } else if (current == '*' && next == '/') {
+                    inMultiLineComment = false;
+                    cursor++;
+                    continue;
                 }
             }
-            if (!inMultiLineComment && !inSingleLineComment) {
-                if (!Character.isWhitespace(source.substring(delimIndex, delimIndex + 1).charAt(0))) {
-                    break; // found it!
-                }
+            if (!inMultiLineComment && !Character.isWhitespace(current)) {
+                break; // found it!
             }
         }
-        return delimIndex;
+        return cursor;
     }
 }

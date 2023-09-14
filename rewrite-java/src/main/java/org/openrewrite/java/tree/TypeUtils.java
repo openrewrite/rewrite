@@ -38,16 +38,16 @@ public class TypeUtils {
                );
     }
 
+    public static String toFullyQualifiedName(String fqn) {
+        return fqn.replace('$', '.');
+    }
+
     public static boolean fullyQualifiedNamesAreEqual(@Nullable String fqn1, @Nullable String fqn2) {
         if (fqn1 != null && fqn2 != null) {
             return fqn1.equals(fqn2) || fqn1.length() == fqn2.length()
-                                        && fqn1.replace('$', '.').equals(fqn2.replace('$', '.'));
+                                        && toFullyQualifiedName(fqn1).equals(toFullyQualifiedName(fqn2));
         }
         return fqn1 == null && fqn2 == null;
-    }
-
-    public static Predicate<String> fullyQualifiedNamesAreEqualAsPredicate (@Nullable String fqn1) {
-        return (fqn2) -> fullyQualifiedNamesAreEqual(fqn1, fqn2);
     }
 
     /**
@@ -130,7 +130,7 @@ public class TypeUtils {
      */
     public static boolean isOfClassType(@Nullable JavaType type, String fqn) {
         if (type instanceof JavaType.FullyQualified) {
-            return TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) type).getFullyQualifiedName(), (fqn));
+            return TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) type).getFullyQualifiedName(), fqn);
         } else if (type instanceof JavaType.Variable) {
             return isOfClassType(((JavaType.Variable) type).getType(), fqn);
         } else if (type instanceof JavaType.Method) {
@@ -144,7 +144,7 @@ public class TypeUtils {
     }
 
     /**
-     * @param type The declaring type of the method invocation or constructor.
+     * @param type          The declaring type of the method invocation or constructor.
      * @param matchOverride Whether to match the {@code Object} type.
      * @return True if the declaring type matches the criteria of this matcher.
      */
@@ -154,29 +154,29 @@ public class TypeUtils {
             boolean matchOverride,
             Predicate<String> matcher
     ) {
-       if (type == null || type instanceof JavaType.Unknown) {
-           return false;
-       }
-       if (matcher.test(type.getFullyQualifiedName())) {
-           return true;
-       }
-       if (matchOverride) {
-           if (!"java.lang.Object".equals(type.getFullyQualifiedName()) &&
-               isOfTypeWithName(TYPE_OBJECT, true, matcher)) {
-               return true;
-           }
+        if (type == null || type instanceof JavaType.Unknown) {
+            return false;
+        }
+        if (matcher.test(type.getFullyQualifiedName())) {
+            return true;
+        }
+        if (matchOverride) {
+            if (!"java.lang.Object".equals(type.getFullyQualifiedName()) &&
+                isOfTypeWithName(TYPE_OBJECT, true, matcher)) {
+                return true;
+            }
 
-           if (isOfTypeWithName(type.getSupertype(), true, matcher)) {
-               return true;
-           }
+            if (isOfTypeWithName(type.getSupertype(), true, matcher)) {
+                return true;
+            }
 
-           for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
-               if (isOfTypeWithName(anInterface, true, matcher)) {
-                   return true;
-               }
-           }
-       }
-       return false;
+            for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
+                if (isOfTypeWithName(anInterface, true, matcher)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {

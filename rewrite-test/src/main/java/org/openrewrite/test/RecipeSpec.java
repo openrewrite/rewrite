@@ -19,13 +19,11 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
-import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.ByteArrayInputStream;
@@ -116,7 +114,6 @@ public class RecipeSpec {
 
     public RecipeSpec recipe(InputStream yaml, String... activeRecipes) {
         return recipe(Environment.builder()
-                .scanRuntimeClasspath() // Slow but required to find recipe classes the yaml recipe may depend on
                 .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties()))
                 .build()
                 .activateRecipes(activeRecipes));
@@ -128,6 +125,13 @@ public class RecipeSpec {
 
     public RecipeSpec recipeFromResource(String yamlResource, String... activeRecipes) {
         return recipe(Objects.requireNonNull(RecipeSpec.class.getResourceAsStream(yamlResource)), activeRecipes);
+    }
+
+    public RecipeSpec recipeFromResources(String... activeRecipes) {
+        return recipe(Environment.builder()
+                .scanYamlResources()
+                .build()
+                .activateRecipes(activeRecipes));
     }
 
     /**

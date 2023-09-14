@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
 import org.openrewrite.java.tree.J;
 
 public class UnwrapParentheses<P> extends JavaVisitor<P> {
@@ -41,7 +42,7 @@ public class UnwrapParentheses<P> extends JavaVisitor<P> {
         if (!(parensScope.getValue() instanceof J.Parentheses)) {
             return false;
         }
-        J parent = parensScope.getParentTreeCursor().getValue();
+        Tree parent = parensScope.getParentTreeCursor().getValue();
         if (parent instanceof J.If ||
                 parent instanceof J.Switch ||
                 parent instanceof J.Synchronized ||

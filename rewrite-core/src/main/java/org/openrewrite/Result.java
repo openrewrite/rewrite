@@ -23,6 +23,7 @@ import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
 import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
 import org.eclipse.jgit.lib.*;
 import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.internal.InMemoryDiffEntry;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 
@@ -184,119 +185,5 @@ public class Result {
     @Override
     public String toString() {
         return diff();
-    }
-
-    static class InMemoryDiffEntry extends DiffEntry implements AutoCloseable {
-
-        static final AbbreviatedObjectId A_ZERO = AbbreviatedObjectId
-                .fromObjectId(ObjectId.zeroId());
-
-        private final InMemoryRepository repo;
-        private final Set<Recipe> recipesThatMadeChanges;
-
-        InMemoryDiffEntry(@Nullable Path originalFilePath, @Nullable Path filePath, @Nullable Path relativeTo, String oldSource,
-                          String newSource, Set<Recipe> recipesThatMadeChanges) {
-            this(originalFilePath, filePath, relativeTo, oldSource, newSource, recipesThatMadeChanges, FileMode.REGULAR_FILE, FileMode.REGULAR_FILE);
-        }
-
-        InMemoryDiffEntry(@Nullable Path originalFilePath, @Nullable Path filePath, @Nullable Path relativeTo, String oldSource,
-                          String newSource, Set<Recipe> recipesThatMadeChanges, FileMode oldMode, FileMode newMode) {
-
-            this.recipesThatMadeChanges = recipesThatMadeChanges;
-
-            try {
-                this.repo = new InMemoryRepository.Builder()
-                        .setRepositoryDescription(new DfsRepositoryDescription())
-                        .build();
-
-                try (ObjectInserter inserter = repo.getObjectDatabase().newInserter()) {
-
-                    if (originalFilePath != null) {
-                        this.oldId = inserter.insert(Constants.OBJ_BLOB, oldSource.getBytes(StandardCharsets.UTF_8)).abbreviate(40);
-                        this.oldMode = oldMode;
-                        this.oldPath = (relativeTo == null ? originalFilePath : relativeTo.relativize(originalFilePath)).toString().replace("\\", "/");
-                    } else {
-                        this.oldId = A_ZERO;
-                        this.oldMode = FileMode.MISSING;
-                        this.oldPath = DEV_NULL;
-                    }
-
-                    if (filePath != null) {
-                        this.newId = inserter.insert(Constants.OBJ_BLOB, newSource.getBytes(StandardCharsets.UTF_8)).abbreviate(40);
-                        this.newMode = newMode;
-                        this.newPath = (relativeTo == null ? filePath : relativeTo.relativize(filePath)).toString().replace("\\", "/");
-                    } else {
-                        this.newId = A_ZERO;
-                        this.newMode = FileMode.MISSING;
-                        this.newPath = DEV_NULL;
-                    }
-                    inserter.flush();
-                }
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-
-            if (this.oldMode == FileMode.MISSING && this.newMode != FileMode.MISSING) {
-                this.changeType = ChangeType.ADD;
-            } else if (this.oldMode != FileMode.MISSING && this.newMode == FileMode.MISSING) {
-                this.changeType = ChangeType.DELETE;
-            } else if (!oldPath.equals(newPath)) {
-                this.changeType = ChangeType.RENAME;
-            } else {
-                this.changeType = ChangeType.MODIFY;
-            }
-        }
-
-        String getDiff() {
-            return getDiff(false);
-        }
-
-        String getDiff(@Nullable Boolean ignoreAllWhitespace) {
-            if (ignoreAllWhitespace == null) {
-                ignoreAllWhitespace = false;
-            }
-
-            if (oldId.equals(newId) && oldPath.equals(newPath)) {
-                return "";
-            }
-
-            ByteArrayOutputStream patch = new ByteArrayOutputStream();
-            try (DiffFormatter formatter = new DiffFormatter(patch)) {
-                formatter.setDiffComparator(ignoreAllWhitespace ? RawTextComparator.WS_IGNORE_ALL : RawTextComparator.DEFAULT);
-                formatter.setRepository(repo);
-                formatter.format(this);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-
-            String diff = patch.toString();
-
-            AtomicBoolean addedComment = new AtomicBoolean(false);
-            // NOTE: String.lines() would remove empty lines which we don't want
-            return Arrays.stream(diff.split("\n"))
-                           .map(l -> {
-                               if (!addedComment.get() && l.startsWith("@@") && l.endsWith("@@")) {
-                                   addedComment.set(true);
-
-                                   Set<String> sortedRecipeNames = new LinkedHashSet<>();
-                                   for (Recipe recipesThatMadeChange : recipesThatMadeChanges) {
-                                       sortedRecipeNames.add(recipesThatMadeChange.getName());
-                                   }
-                                   StringJoiner joinedRecipeNames = new StringJoiner(", ", " ", "");
-                                   for (String name : sortedRecipeNames) {
-                                       joinedRecipeNames.add(name);
-                                   }
-
-                                   return l + joinedRecipeNames;
-                               }
-                               return l;
-                           })
-                           .collect(Collectors.joining("\n")) + "\n";
-        }
-
-        @Override
-        public void close() {
-            this.repo.close();
-        }
     }
 }

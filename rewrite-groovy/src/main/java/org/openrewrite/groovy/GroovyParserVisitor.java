@@ -257,7 +257,7 @@ public class GroovyParserVisitor {
                             .withAfter(i == interfaces.length - 1 ? EMPTY : sourceBefore(",")));
                 }
                 // Can be empty for an annotation @interface which only implements Annotation
-                if (implTypes.size() > 0) {
+                if (!implTypes.isEmpty()) {
                     implementings = JContainer.build(implPrefix, implTypes, Markers.EMPTY);
                 }
             }
@@ -621,7 +621,7 @@ public class GroovyParserVisitor {
                                 .sorted(Comparator.comparing(ASTNode::getLastLineNumber)
                                         .thenComparing(ASTNode::getLastColumnNumber))
                                 .collect(Collectors.toList());
-            } else if (unparsedArgs.size() > 0 && unparsedArgs.get(0) instanceof MapExpression) {
+            } else if (!unparsedArgs.isEmpty() && unparsedArgs.get(0) instanceof MapExpression) {
                 // The map literal may or may not be wrapped in "[]"
                 // If it is wrapped in "[]" then this isn't a named arguments situation and we should not lift the parameters out of the enclosing MapExpression
                 saveCursor = cursor;
@@ -993,9 +993,17 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitClosureExpression(ClosureExpression expression) {
-            Space prefix = sourceBefore("{");
+            Space prefix = whitespace();
+            LambdaStyle ls = new LambdaStyle(randomId(), expression instanceof LambdaExpression, true);
+            boolean parenthesized = false;
+            if(source.charAt(cursor) == '(') {
+                parenthesized = true;
+                cursor += 1; // skip '('
+            } else if (source.charAt(cursor) == '{') {
+                cursor += 1; // skip '{'
+            }
             JavaType closureType = typeMapping.type(staticType(expression));
-            List<JRightPadded<J>> paramExprs = emptyList();
+            List<JRightPadded<J>> paramExprs;
             if (expression.getParameters() != null && expression.getParameters().length > 0) {
                 paramExprs = new ArrayList<>(expression.getParameters().length);
                 Parameter[] parameters = expression.getParameters();
@@ -1016,36 +1024,39 @@ public class GroovyParserVisitor {
                     JRightPadded<J> param = JRightPadded.build(expr);
                     if (i != parameters.length - 1) {
                         param = param.withAfter(sourceBefore(","));
+                    } else {
+                        param = param.withAfter(whitespace());
                     }
                     paramExprs.add(param);
                 }
+            } else {
+                Space argPrefix = EMPTY;
+                if(parenthesized) {
+                    argPrefix = whitespace();
+                }
+                paramExprs = singletonList(JRightPadded.build(new J.Empty(randomId(), argPrefix, Markers.EMPTY)));
             }
-
-            J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, false, paramExprs);
+            if(parenthesized) {
+                cursor += 1;
+            }
+            J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, parenthesized, paramExprs);
             int saveCursor = cursor;
             Space arrowPrefix = whitespace();
             if (source.startsWith("->", cursor)) {
                 cursor += "->".length();
-                if (params.getParameters().isEmpty()) {
-                    params = params.getPadding().withParams(singletonList(JRightPadded
-                            .build((J) new J.Empty(randomId(), EMPTY, Markers.EMPTY))
-                            .withAfter(arrowPrefix)));
-                } else {
-                    params = params.getPadding().withParams(
-                            ListUtils.mapLast(params.getPadding().getParams(), param -> param.withAfter(arrowPrefix))
-                    );
-                }
             } else {
+                ls = ls.withArrow(false);
                 cursor = saveCursor;
+                arrowPrefix = EMPTY;
             }
-
             J body = visit(expression.getCode());
-            queue.add(new J.Lambda(randomId(), prefix, Markers.EMPTY, params,
-                    EMPTY,
+            queue.add(new J.Lambda(randomId(), prefix, Markers.build(singletonList(ls)), params,
+                    arrowPrefix,
                     body,
                     closureType));
-
-            cursor += 1; // skip '}'
+            if(cursor < source.length() && source.charAt(cursor) == '}') {
+                cursor++;
+            }
         }
 
         @Override
@@ -1157,6 +1168,19 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitContinueStatement(ContinueStatement statement) {
+            queue.add(new J.Continue(randomId(),
+                    sourceBefore("continue"),
+                    Markers.EMPTY,
+                    (statement.getLabel() == null) ?
+                            null :
+                            new J.Identifier(randomId(),
+                                    sourceBefore(statement.getLabel()),
+                                    Markers.EMPTY, emptyList(), statement.getLabel(), null, null))
+            );
+        }
+
+        @Override
         public void visitNotExpression(NotExpression expression) {
             Space fmt = sourceBefore("!");
             JLeftPadded<J.Unary.Type> op = padLeft(EMPTY, J.Unary.Type.Not);
@@ -1236,7 +1260,7 @@ public class GroovyParserVisitor {
         }
 
         Statement condenseLabels(List<J.Label> labels, Statement s) {
-            if (labels.size() == 0) {
+            if (labels.isEmpty()) {
                 return s;
             }
             return labels.get(0).withStatement(condenseLabels(labels.subList(1, labels.size()), s));
@@ -1846,11 +1870,14 @@ public class GroovyParserVisitor {
             JavaType type = typeMapping.type(staticType(((org.codehaus.groovy.ast.expr.Expression) expression)));
 
             if (expression.isDynamicTyped()) {
+                Space prefix = whitespace();
+                String defOrVar = source.substring(cursor, cursor + 3);
+                cursor += 3;
                 return new J.Identifier(randomId(),
-                        sourceBefore("def"),
+                        prefix,
                         Markers.EMPTY,
                         emptyList(),
-                        "def",
+                        defOrVar,
                         type, null);
             }
             Space prefix = sourceBefore(expression.getOriginType().getUnresolvedName());

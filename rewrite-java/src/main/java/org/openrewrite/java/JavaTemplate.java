@@ -137,6 +137,20 @@ public class JavaTemplate implements SourceTemplate<J, JavaCoordinates> {
             this.code = code.trim();
         }
 
+        /**
+         * A template snippet is context-sensitive when it refers to the class, variables, methods, or other symbols
+         * visible from its insertion scope. When a template is completely self-contained, it is not context-sensitive.
+         * Context-free template snippets can be cached, since it does not matter where the resulting LST elements will
+         * be inserted. Since the LST elements in a context-sensitive snippet vary depending on where they are inserted
+         * the resulting LST elements cannot be reused between different insertion points and are not cached.
+         * <p>
+         * An example of a context-free snippet might be something like this, to be used as a local variable declaration:
+         * <code>int i = 1</code>;
+         * <p>
+         * An example of a context-sensitive snippet is:
+         * <code>int i = a</code>;
+         * This cannot be made sense of without the surrounding scope which includes the declaration of "a".
+         */
         public Builder contextSensitive() {
             this.contextSensitive = true;
             return this;

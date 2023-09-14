@@ -26,9 +26,21 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.PathUtils;
+import org.openrewrite.ScanningRecipe;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.internal.MavenXmlMapper;
+import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.maven.tree.MavenMetadata;
+import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.semver.LatestRelease;
+import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.XPathMatcher;
@@ -38,7 +50,11 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 
@@ -61,14 +77,9 @@ public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleE
                                                         "  <version>%s</version>\n" +
                                                         "</extension>";
 
-    @Language("xml")
-    private static final String ENTERPRISE_TAG_FORMAT_WITHOUT_VERSION = "<extension>\n" +
-                                                                        "  <groupId>com.gradle</groupId>\n" +
-                                                                        "  <artifactId>gradle-enterprise-maven-extension</artifactId>\n" +
-                                                                        "</extension>";
-
     @Option(displayName = "Extension version",
             description = "A maven-compatible version number to select the gradle-enterprise-maven-extension version.",
+            required = false,
             example = "1.17.4")
     @Nullable
     String version;
@@ -103,13 +114,13 @@ public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleE
     Boolean uploadInBackground;
 
     @Option(displayName = "Publish Criteria",
-            description = "When set to `always` the extension will publish build scans of every single build. " +
+            description = "When set to `Always` the extension will publish build scans of every single build. " +
                           "This is the default behavior when omitted." +
-                          "When set to `failure` the extension will only publish build scans when the build fails. " +
-                          "When set to `demand` the extension will only publish build scans when explicitly requested.",
+                          "When set to `Failure` the extension will only publish build scans when the build fails. " +
+                          "When set to `Demand` the extension will only publish build scans when explicitly requested.",
             required = false,
-            valid = {"always", "failure", "demand"},
-            example = "true")
+            valid = {"Always", "Failure", "Demand"},
+            example = "Always")
     @Nullable
     PublishCriteria publishCriteria;
 
@@ -127,7 +138,7 @@ public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleE
 
     @Override
     public String getDisplayName() {
-        return "Add Gradle Enterprise Maven extension to maven projects";
+        return "Add Gradle Enterprise Maven extension";
     }
 
     @Override
@@ -325,10 +336,27 @@ public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleE
      */
     private Xml.Document addEnterpriseExtension(Xml.Document extensionsXml, ExecutionContext ctx) {
         @Language("xml")
-        String tagSource = version != null ? String.format(ENTERPRISE_TAG_FORMAT, version) : ENTERPRISE_TAG_FORMAT_WITHOUT_VERSION;
+        String tagSource = version != null ? String.format(ENTERPRISE_TAG_FORMAT, version) : String.format(ENTERPRISE_TAG_FORMAT, getLatestVersion(ctx));
         AddToTagVisitor<ExecutionContext> addToTagVisitor = new AddToTagVisitor<>(
                 extensionsXml.getRoot(),
                 Xml.Tag.build(tagSource));
         return (Xml.Document) addToTagVisitor.visitNonNull(extensionsXml, ctx);
+    }
+
+    private String getLatestVersion(ExecutionContext ctx) {
+        MavenPomDownloader pomDownloader = new MavenPomDownloader(Collections.emptyMap(), ctx, null, null);
+        VersionComparator versionComparator = new LatestRelease(null);
+        GroupArtifact gradleEnterpriseExtension = new GroupArtifact("com.gradle", "gradle-enterprise-maven-extension");
+        try {
+            MavenMetadata extensionMetadata = pomDownloader.downloadMetadata(gradleEnterpriseExtension, null, Collections.singletonList(MavenRepository.MAVEN_CENTRAL));
+        return extensionMetadata.getVersioning()
+            .getVersions()
+            .stream()
+            .filter(v -> versionComparator.isValid(null, v))
+            .max((v1, v2) -> versionComparator.compare(null, v1, v2))
+            .orElseThrow(() -> new IllegalStateException("Expected to find at least one Gradle Enterprise Maven extension version to select from."));
+        } catch (MavenDownloadingException e) {
+            throw new IllegalStateException("Could not download Maven metadata", e);
+        }
     }
 }

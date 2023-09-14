@@ -64,7 +64,7 @@ public class Find extends Recipe {
     @Nullable
     Boolean caseSensitive;
 
-    @Option(displayName = "Regex Multiline Mode",
+    @Option(displayName = "Regex multiline mode",
             description = "When performing a regex search setting this to `true` allows \"^\" and \"$\" to match the beginning and end of lines, respectively. " +
                           "When performing a regex search when this is `false` \"^\" and \"$\" will match only the beginning and ending of the entire source file, respectively." +
                           "Has no effect when not performing a regex search. Default `false`.",
@@ -72,7 +72,7 @@ public class Find extends Recipe {
     @Nullable
     Boolean multiline;
 
-    @Option(displayName = "Regex Dot All",
+    @Option(displayName = "Regex dot all",
             description = "When performing a regex search setting this to `true` allows \".\" to match line terminators." +
                           "Has no effect when not performing a regex search. Default `false`.",
             required = false)
@@ -84,6 +84,7 @@ public class Find extends Recipe {
                           "Multiple patterns may be specified, separated by a semicolon `;`. " +
                           "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. " +
                           "When not set, all source files are searched. ",
+            required = false,
             example = "**/*.java")
     @Nullable
     String filePattern;

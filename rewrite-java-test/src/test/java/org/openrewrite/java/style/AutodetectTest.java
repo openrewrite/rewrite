@@ -32,6 +32,31 @@ class AutodetectTest implements RewriteTest {
         return JavaParser.fromJavaVersion().build();
     }
 
+    @Test
+    void continuationIndent() {
+        var cus = jp().parse(
+          """
+            class Test {
+            	boolean eq(){
+            		return (1 == 1 &&
+            				2 == 2 &&
+            				3 == 3);
+            	}
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+
+        assertThat(tabsAndIndents.getUseTabCharacter()).isTrue();
+        assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+        assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(8);
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1221")
     @Test
     void springDemoApp() {
@@ -926,7 +951,7 @@ class AutodetectTest implements RewriteTest {
           .as("While there are outlier 3 and 9 space indents, the most prevalent indentation is 6")
           .isEqualTo(6);
         assertThat(tabsAndIndents.getContinuationIndent())
-          .as("With no actual continuation indents to go off of, assume IntelliJ default of 2x the normal indent")
+          .as("With no actual continuation indents to go off of, assume IntelliJ IDEA default of 2x the normal indent")
           .isEqualTo(12);
     }
 

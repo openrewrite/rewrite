@@ -26,6 +26,7 @@ import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -59,7 +60,7 @@ public class FindAndReplace extends Recipe {
     @Nullable
     Boolean caseSensitive;
 
-    @Option(displayName = "Regex Multiline Mode",
+    @Option(displayName = "Regex multiline mode",
             description = "When performing a regex search setting this to `true` allows \"^\" and \"$\" to match the beginning and end of lines, respectively. " +
                           "When performing a regex search when this is `false` \"^\" and \"$\" will match only the beginning and ending of the entire source file, respectively." +
                           "Has no effect when not performing a regex search. Default `false`.",
@@ -67,7 +68,7 @@ public class FindAndReplace extends Recipe {
     @Nullable
     Boolean multiline;
 
-    @Option(displayName = "Regex Dot All",
+    @Option(displayName = "Regex dot all",
             description = "When performing a regex search setting this to `true` allows \".\" to match line terminators." +
                           "Has no effect when not performing a regex search. Default `false`.",
             required = false)
@@ -79,6 +80,7 @@ public class FindAndReplace extends Recipe {
                           "Multiple patterns may be specified, separated by a semicolon `;`. " +
                           "If multiple patterns are supplied any of the patterns matching will be interpreted as a match. " +
                           "When not set, all source files are searched. ",
+            required = false,
             example = "**/*.java")
     @Nullable
     String filePattern;
@@ -97,13 +99,15 @@ public class FindAndReplace extends Recipe {
 
 
     /**
-     * Ensure that a file is not find-and-replaced twice in the same recipe run.
+     * Ensure that the same replacement is not applied to the same file more than once per recipe run.
      * Used to avoid the situation where replacing "a" with "ab" results in something like "abb".
      */
     @Value
     @With
     static class AlreadyReplaced implements Marker {
         UUID id;
+        String find;
+        String replace;
     }
 
     @Override
@@ -115,8 +119,13 @@ public class FindAndReplace extends Recipe {
                 if (sourceFile instanceof Quark || sourceFile instanceof Remote || sourceFile instanceof Binary) {
                     return sourceFile;
                 }
-                if(sourceFile.getMarkers().findFirst(AlreadyReplaced.class).isPresent()) {
-                    return sourceFile;
+                for (Marker marker : sourceFile.getMarkers().getMarkers()) {
+                    if(marker instanceof AlreadyReplaced) {
+                        AlreadyReplaced alreadyReplaced = (AlreadyReplaced) marker;
+                        if(Objects.equals(find, alreadyReplaced.getFind()) && Objects.equals(replace, alreadyReplaced.getReplace())) {
+                            return sourceFile;
+                        }
+                    }
                 }
                 String searchStr = find;
                 if (!Boolean.TRUE.equals(regex)) {
@@ -141,7 +150,7 @@ public class FindAndReplace extends Recipe {
                 }
                 String newText = matcher.replaceAll(replace);
                 return plainText.withText(newText)
-                        .withMarkers(sourceFile.getMarkers().add(new AlreadyReplaced(randomId())));
+                        .withMarkers(sourceFile.getMarkers().add(new AlreadyReplaced(randomId(), find, replace)));
             }
         };
         //noinspection DuplicatedCode

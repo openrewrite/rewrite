@@ -60,18 +60,20 @@ public class YamlParser implements org.openrewrite.Parser {
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
         return acceptedInputs(sourceFiles)
-                .map(sourceFile -> {
-                    Path path = sourceFile.getRelativePath(relativeTo);
-                    try (EncodingDetectingInputStream is = sourceFile.getSource(ctx)) {
+                .map(input -> {
+                    parsingListener.startedParsing(input);
+                    Path path = input.getRelativePath(relativeTo);
+                    try (EncodingDetectingInputStream is = input.getSource(ctx)) {
                         Yaml.Documents yaml = parseFromInput(path, is);
-                        parsingListener.parsed(sourceFile, yaml);
-                        return yaml.withFileAttributes(sourceFile.getFileAttributes());
+                        parsingListener.parsed(input, yaml);
+                        yaml = yaml.withFileAttributes(input.getFileAttributes());
+                        yaml = unwrapPrefixedMappings(yaml);
+                        return requirePrintEqualsInput(yaml, input, relativeTo, ctx);
                     } catch (Throwable t) {
                         ctx.getOnError().accept(t);
-                        return ParseError.build(this, sourceFile, relativeTo, ctx, t);
+                        return ParseError.build(this, input, relativeTo, ctx, t);
                     }
                 })
-                .map(this::unwrapPrefixedMappings)
                 .map(sourceFile -> {
                     if (sourceFile instanceof Yaml.Documents) {
                         Yaml.Documents docs = (Yaml.Documents) sourceFile;
@@ -105,8 +107,7 @@ public class YamlParser implements org.openrewrite.Parser {
             yamlSourceWithVariablePlaceholders.append(yamlSource, pos, yamlSource.length());
         }
 
-        try (StringReader stringReader = new StringReader(yamlSourceWithVariablePlaceholders.toString());
-             FormatPreservingReader reader = new FormatPreservingReader(stringReader)) {
+        try (FormatPreservingReader reader = new FormatPreservingReader(yamlSourceWithVariablePlaceholders.toString())) {
             StreamReader streamReader = new StreamReader(reader);
             Scanner scanner = new ScannerImpl(streamReader, new LoaderOptions());
             Parser parser = new ParserImpl(scanner);
@@ -219,6 +220,9 @@ public class YamlParser implements org.openrewrite.Parser {
                             case PLAIN:
                             default:
                                 style = Yaml.Scalar.Style.PLAIN;
+                                if (!scalarValue.startsWith("@") && event.getStartMark().getIndex() >= reader.getBufferIndex()) {
+                                    scalarValue = reader.readStringFromBuffer(event.getStartMark().getIndex(), event.getEndMark().getIndex() - 1);
+                                }
                                 break;
                         }
                         BlockBuilder builder = blockStack.isEmpty() ? null : blockStack.peek();
@@ -526,10 +530,7 @@ public class YamlParser implements org.openrewrite.Parser {
         }
     }
 
-    private SourceFile unwrapPrefixedMappings(SourceFile y) {
-        if (!(y instanceof Yaml.Documents)) {
-            return y;
-        }
+    private Yaml.Documents unwrapPrefixedMappings(Yaml.Documents y) {
         //noinspection ConstantConditions
         return (Yaml.Documents) new YamlIsoVisitor<Integer>() {
             @Override

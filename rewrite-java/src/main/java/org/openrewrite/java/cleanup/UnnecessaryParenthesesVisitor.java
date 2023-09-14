@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
+import lombok.EqualsAndHashCode;
 import org.openrewrite.*;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.UnwrapParentheses;
@@ -22,6 +23,7 @@ import org.openrewrite.java.style.Checkstyle;
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
 import org.openrewrite.java.tree.*;
 
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class UnnecessaryParenthesesVisitor extends JavaVisitor<ExecutionContext> {
     @Override
     public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
@@ -195,5 +197,14 @@ public class UnnecessaryParenthesesVisitor extends JavaVisitor<ExecutionContext>
                 getCursor().getParentOrThrow());
         }
         return fc;
+    }
+
+    @Override
+    public J visitTernary(J.Ternary ternary, ExecutionContext ctx) {
+        J.Ternary te = (J.Ternary) super.visitTernary(ternary, ctx);
+        if (te.getCondition() instanceof J.Parentheses) {
+            te = (J.Ternary) new UnwrapParentheses<>((J.Parentheses<?>) te.getCondition()).visitNonNull(te, ctx, getCursor().getParentOrThrow());
+        }
+        return te;
     }
 }

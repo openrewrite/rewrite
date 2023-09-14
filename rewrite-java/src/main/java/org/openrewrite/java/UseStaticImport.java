@@ -63,14 +63,10 @@ public class UseStaticImport extends Recipe {
                     JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
                     maybeRemoveImport(receiverType);
 
-                    AddImport<ExecutionContext> addStatic = new AddImport<>(
+                    maybeAddImport(
                             receiverType.getFullyQualifiedName(),
                             m.getSimpleName(),
                             false);
-
-                    if (!getAfterVisit().contains(addStatic)) {
-                        doAfterVisit(addStatic);
-                    }
                 }
 
                 if (m.getSelect() != null) {
