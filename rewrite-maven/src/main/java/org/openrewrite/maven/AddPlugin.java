@@ -107,10 +107,9 @@ public class AddPlugin extends Recipe {
         @Override
         public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
             if (filePattern != null) {
-                return PathUtils.matchesGlob(sourceFile.getSourcePath(), filePattern);
-            } else {
-                return sourceFile instanceof Xml.Document;
+                return PathUtils.matchesGlob(sourceFile.getSourcePath(), filePattern) && super.isAcceptable(sourceFile, executionContext);
             }
+            return super.isAcceptable(sourceFile, executionContext);
         }
 
         @Override
