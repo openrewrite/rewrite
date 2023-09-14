@@ -72,9 +72,9 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
         if (tree instanceof K.CompilationUnit) {
             K.CompilationUnit cu = (K.CompilationUnit) requireNonNull(tree);
             if (cu.getPackageDeclaration() != null) {
-                J.Package pa =  cu.getPackageDeclaration();
+                J.Package pa = cu.getPackageDeclaration();
                 if (!pa.getPrefix().getComments().isEmpty()) {
-                    List<Comment> updatedComments =  ListUtils.mapLast(pa.getPrefix().getComments(), c -> {
+                    List<Comment> updatedComments = ListUtils.mapLast(pa.getPrefix().getComments(), c -> {
                         String suffix = keepMaximumLines(c.getSuffix(), keepMaximumBlankLines_BetweenHeaderAndPackage);
                         suffix = minimumLines(suffix, minimumBlankLines_BeforePackageStatement);
                         return c.withSuffix(suffix);
@@ -103,7 +103,7 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
             } else {
 
                 cu = cu.getPadding().withImports(ListUtils.mapFirst(cu.getPadding().getImports(), i ->
-                        minimumLines(i,  minimumBlankLines_AfterPackageStatement)));
+                        minimumLines(i, minimumBlankLines_AfterPackageStatement)));
             }
             return super.visit(cu, p);
         }
@@ -252,6 +252,29 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
             } else {
                 return keepMaximumLines(j, style.getKeepMaximum().getInCode());
             }
+        } else if (parentTree instanceof K.CompilationUnit) {
+            K.CompilationUnit cu = (K.CompilationUnit) parentTree;
+
+            int declMax = style.getKeepMaximum().getInDeclarations();
+
+            // don't adjust the first statement
+            if (!cu.getStatements().isEmpty() && !cu.getStatements().iterator().next().isScope(j)) {
+                if (j instanceof J.VariableDeclarations) {
+                    declMax = Math.max(declMax, minimumBlankLines_AroundField);
+                    j = minimumLines(j, minimumBlankLines_AroundField);
+                } else if (j instanceof J.MethodDeclaration) {
+                    declMax = Math.max(declMax, minimumBlankLines_AroundMethod);
+                    j = minimumLines(j, minimumBlankLines_AroundMethod);
+                } else if (j instanceof J.Block) {
+                    declMax = Math.max(declMax, minimumBlankLines_AroundInitializer);
+                    j = minimumLines(j, minimumBlankLines_AroundInitializer);
+                } else if (j instanceof J.ClassDeclaration) {
+                    declMax = Math.max(declMax, minimumBlankLines_AroundClass);
+                    j = minimumLines(j, minimumBlankLines_AroundClass);
+                }
+            }
+
+            j = keepMaximumLines(j, declMax);
         }
         return j;
     }

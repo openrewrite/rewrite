@@ -535,6 +535,32 @@ class BlankLinesTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/314")
+    void blankLinesBetweenTopLevelStatements() {
+        rewriteRun(
+          blankLines(),
+          kotlin(
+            """
+              class T
+              fun a(): Unit {
+              }
+              fun b(): Unit {
+              }
+              """,
+            """
+              class T
+
+              fun a(): Unit {
+              }
+
+              fun b(): Unit {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void minimumBeforePackage() {
         rewriteRun(
           blankLines(),
