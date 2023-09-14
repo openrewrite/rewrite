@@ -94,15 +94,13 @@ public class MavenRepositoryMirror {
     }
 
     public static MavenRepository apply(Collection<MavenRepositoryMirror> mirrors, MavenRepository repo) {
-        MavenRepository mapped = repo;
-        MavenRepository next = null;
-        while (next != mapped) {
-            next = mapped;
-            for (MavenRepositoryMirror mirror : mirrors) {
-                mapped = mirror.apply(mapped);
+        for (MavenRepositoryMirror mirror : mirrors) {
+            MavenRepository mapped = mirror.apply(repo);
+            if (mapped != repo) {
+                return  mapped;
             }
         }
-        return mapped;
+        return repo;
     }
 
     public MavenRepository apply(MavenRepository repo) {
