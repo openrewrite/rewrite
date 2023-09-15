@@ -343,7 +343,7 @@ public class Autodetect extends NamedStyles {
                 List<Statement> parameters = method.getParameters();
                 for (int i = 1; i < parameters.size(); i++) {
                     if (parameters.get(i).getPrefix().getLastWhitespace().contains("\n")) {
-                        if (alignTo == parameters.get(i).getPrefix().getLastWhitespace().length()) {
+                        if (alignTo == parameters.get(i).getPrefix().getLastWhitespace().length() - 1) {
                             stats.multilineAlignedToFirstArgument++;
                         } else {
                             stats.multilineNotAlignedToFirstArgument++;
