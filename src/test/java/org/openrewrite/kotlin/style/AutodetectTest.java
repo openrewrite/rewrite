@@ -57,6 +57,28 @@ class AutodetectTest implements RewriteTest {
         assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(8);
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3550")
+    void alignParametersWhenMultiple() {
+        var cus = kp().parse(
+          """
+            class Test {
+            	fun foo(s1: String,
+            	        s2: String,
+            	        s3: String) {
+            	}
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+
+        assertThat(tabsAndIndents.getFunctionDeclarationParameters().getAlignWhenMultiple()).isTrue();
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/1221")
     @Test
     void springDemoApp() {
