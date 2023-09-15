@@ -347,6 +347,7 @@ public class Autodetect extends NamedStyles {
                             stats.multilineAlignedToFirstArgument++;
                         } else {
                             stats.multilineNotAlignedToFirstArgument++;
+                            countIndents(parameters.get(i).getPrefix().getWhitespace(), true, stats);
                         }
                     }
                 }

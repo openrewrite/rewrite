@@ -58,6 +58,28 @@ class AutodetectTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3552")
+    void continuationIndentFromParameters() {
+        var cus = jp().parse(
+          """
+            class Test {
+               void foo(String s1,
+                    String s2,
+                    String s3) {
+               }
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+
+        assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(5);
+    }
+
+    @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3550")
     void alignParametersWhenMultiple() {
         var cus = jp().parse(
