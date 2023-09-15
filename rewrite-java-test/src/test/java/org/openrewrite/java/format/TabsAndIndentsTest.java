@@ -109,7 +109,8 @@ class TabsAndIndentsTest implements RewriteTest {
                   private void firstArgOnNewLine(
                           String first,
                           int times,
-                       String third) {
+                       String third
+                       ) {
                   }
               }
               """,
@@ -122,7 +123,8 @@ class TabsAndIndentsTest implements RewriteTest {
                   private void firstArgOnNewLine(
                           String first,
                           int times,
-                          String third) {
+                          String third
+                  ) {
                   }
               }
               """
