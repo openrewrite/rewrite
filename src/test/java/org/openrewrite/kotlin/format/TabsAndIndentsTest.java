@@ -55,6 +55,26 @@ class TabsAndIndentsTest implements RewriteTest {
           )));
     }
 
+    @Test
+    void resetIndentationAfterParametersList() {
+        rewriteRun(
+          tabsAndIndents(style -> style.withFunctionDeclarationParameters(new TabsAndIndentsStyle.FunctionDeclarationParameters(false))),
+          kotlin(
+            """
+              data class A(
+                      val a: Boolean,
+                      val b: Boolean,
+                      val c: Boolean,
+                      val d: Boolean
+              ) {
+                  fun foo(
+                  ) = ""
+              }
+              """
+          )
+        );
+    }
+
     @SuppressWarnings("SuspiciousIndentAfterControlStatement")
     @Issue("https://github.com/openrewrite/rewrite/issues/2251")
     @Test
@@ -697,7 +717,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   fun multilineMethod(
                           foo: String,
                           bar: String
-                          ) {
+                  ) {
                       foo
                               .length
                   }

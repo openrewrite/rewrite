@@ -67,6 +67,24 @@ class AutoFormatVisitorTest implements RewriteTest {
     }
 
     @Test
+    void primaryConstructor() {
+        rewriteRun(
+          kotlin(
+            """
+              package t
+              
+              class A(
+                  val a: Boolean,
+                  val b: Boolean,
+                  val c: Boolean,
+                  val d: Boolean
+              )
+              """
+          )
+        );
+    }
+
+    @Test
     void tabsAndIndents() {
         rewriteRun(
           kotlin(
@@ -146,7 +164,7 @@ class AutoFormatVisitorTest implements RewriteTest {
                   fun multilineMethod(
                           foo: String,
                           bar: String
-                          ) {
+                  ) {
                       foo
                               .length
                   }
@@ -170,7 +188,7 @@ class AutoFormatVisitorTest implements RewriteTest {
 
               class BaseProjectionNode (
                       val type: Int = 1
-                      ) {
+              ) {
               }
               """
           )

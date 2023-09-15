@@ -193,7 +193,8 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
-        c = c.withBody(spaceBefore(c.getBody(), beforeLeftBrace));
+        boolean omitBraces = c.getBody().getMarkers().findFirst(OmitBraces.class).isPresent();
+        c = c.withBody(spaceBefore(c.getBody(), beforeLeftBrace && !omitBraces));
         if (c.getBody().getStatements().isEmpty()) {
             if (c.getKind() != J.ClassDeclaration.Kind.Type.Enum) {
                 // withinCodeBraces is defaulted to `false` in IntelliJ's Kotlin formatting.

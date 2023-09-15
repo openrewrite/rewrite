@@ -244,7 +244,14 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                     case METHOD_DECLARATION_PARAMETER:
                     case RECORD_STATE_VECTOR: {
                         JContainer<J> container = getCursor().getParentOrThrow().getValue();
-                        J firstArg = container.getElements().iterator().next();
+                        if (elem instanceof J.Empty) {
+                            elem = elem.withPrefix(indentTo(elem.getPrefix(), indent, loc.getAfterLocation()));
+                            after = right.getAfter();
+                            break;
+                        }
+                        List<J> elements = container.getElements();
+                        J firstArg = elements.iterator().next();
+                        J lastArg = elements.get(elements.size() - 1);
                         if (style.getFunctionDeclarationParameters().getAlignWhenMultiple()) {
                             J.MethodDeclaration method = getCursor().firstEnclosing(J.MethodDeclaration.class);
                             if (method != null) {
@@ -257,13 +264,13 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                                 }
                                 getCursor().getParentOrThrow().putMessage("lastIndent", alignTo - style.getContinuationIndent());
                                 elem = visitAndCast(elem, p);
-                                after = indentTo(right.getAfter(), alignTo, loc.getAfterLocation());
+                                after = indentTo(right.getAfter(), t == lastArg ? indent : alignTo, loc.getAfterLocation());
                             } else {
                                 after = right.getAfter();
                             }
                         } else {
                             elem = visitAndCast(elem, p);
-                            after = indentTo(right.getAfter(), style.getContinuationIndent(), loc.getAfterLocation());
+                            after = indentTo(right.getAfter(), t == lastArg ? indent : style.getContinuationIndent(), loc.getAfterLocation());
                         }
                         break;
                     }
