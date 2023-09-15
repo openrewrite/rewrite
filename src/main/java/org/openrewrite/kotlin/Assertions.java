@@ -48,6 +48,11 @@ public final class Assertions {
         });
     }
 
+    public static SourceSpecs kotlinScript(@Language("kts") @Nullable String before) {
+        return kotlinScript(before, s -> {
+        });
+    }
+
     public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before, Consumer<SourceSpec<K.CompilationUnit>> spec) {
         SourceSpec<K.CompilationUnit> kotlin = new SourceSpec<>(
                 K.CompilationUnit.class, null, KotlinParser.builder(), before,
@@ -56,6 +61,16 @@ public final class Assertions {
         );
         acceptSpec(spec, kotlin);
         return kotlin;
+    }
+
+    public static SourceSpecs kotlinScript(@Language("kts") @Nullable String before, Consumer<SourceSpec<K.CompilationUnit>> spec) {
+        SourceSpec<K.CompilationUnit> kotlinScript = new SourceSpec<>(
+                K.CompilationUnit.class, null, KotlinParser.builder().isKotlinScript(true), before,
+                SourceSpec.EachResult.noop,
+                Assertions::customizeExecutionContext
+        );
+        acceptSpec(spec, kotlinScript);
+        return kotlinScript;
     }
 
     public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before, @Language("kotlin") String after) {
