@@ -434,6 +434,7 @@ public class Autodetect extends NamedStyles {
             }
             if (m.getPadding().getSelect() != null) {
                 countIndents(m.getPadding().getSelect().getAfter().getWhitespace(), true, stats);
+                visit(m.getSelect(), stats);
             }
             visitContainer(m.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, stats);
 
