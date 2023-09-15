@@ -293,12 +293,11 @@ public class Autodetect extends NamedStyles {
         @Override
         public Space visitSpace(Space space, Space.Location loc, GeneralFormatStatistics stats) {
             String prefix = space.getWhitespace();
-            char[] chars = prefix.toCharArray();
 
-            for (int i = 0; i < chars.length; i++) {
-                char c = chars[i];
+            for (int i = 0; i < prefix.length(); i++) {
+                char c = prefix.charAt(i);
                 if (c == '\n') {
-                    if (i == 0 || chars[i - 1] != '\r') {
+                    if (i == 0 || prefix.charAt(i - 1) != '\r') {
                         stats.linesWithLFNewLines++;
                     } else {
                         stats.linesWithCRLFNewLines++;
@@ -347,6 +346,7 @@ public class Autodetect extends NamedStyles {
                             stats.multilineAlignedToFirstArgument++;
                         } else {
                             stats.multilineNotAlignedToFirstArgument++;
+                            countIndents(parameters.get(i).getPrefix().getWhitespace(), true, stats);
                         }
                     }
                 }
@@ -460,14 +460,14 @@ public class Autodetect extends NamedStyles {
                 int spaceIndent = 0;
                 int tabIndent = 0;
                 boolean mixed = false;
-                char[] chars = space.substring(ni).toCharArray();
-                for (char c : chars) {
-                    if (c == ' ') {
+                String chars = space.substring(ni);
+                for (int i = 0; i < chars.length(); i++) {
+                    if (chars.charAt(i) == ' ') {
                         if (tabIndent > 0) {
                             mixed = true;
                         }
                         spaceIndent++;
-                    } else if (c == '\t') {
+                    } else if (chars.charAt(i) == '\t') {
                         if (spaceIndent > 0) {
                             mixed = true;
                         }
@@ -750,11 +750,9 @@ public class Autodetect extends NamedStyles {
                 return pkg;
             }
 
-            char[] p1 = pkg.toCharArray();
-            char[] p2 = lcp.toCharArray();
             int i = 0;
-            for (; i < p1.length && i < p2.length; i++) {
-                if (p1[i] != p2[i]) {
+            for (; i < pkg.length() && i < lcp.length(); i++) {
+                if (pkg.charAt(i) != lcp.charAt(i)) {
                     break;
                 }
             }
