@@ -233,6 +233,18 @@ class AutoFormatVisitorTest implements RewriteTest {
     }
 
     @Test
+    void extensionProperty() {
+        rewriteRun(
+          kotlin(
+            """
+              val String.extension: Any
+                      get() = ""
+              """
+          )
+        );
+    }
+
+    @Test
     void trailingLambda() {
         rewriteRun(
           kotlin(

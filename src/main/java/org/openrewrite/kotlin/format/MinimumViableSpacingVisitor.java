@@ -305,7 +305,8 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
 
         J firstEnclosing = getCursor().getParentOrThrow().firstEnclosing(J.class);
         if (!v.getVariables().isEmpty() && !(firstEnclosing instanceof J.Lambda)) {
-            if (v.getVariables().get(0).getPrefix().getWhitespace().isEmpty() && !v.getModifiers().isEmpty()) {
+            boolean extension = v.getMarkers().findFirst(Extension.class).isPresent();
+            if (v.getVariables().get(0).getPrefix().getWhitespace().isEmpty() && !v.getModifiers().isEmpty() && !extension) {
                 v = v.withVariables(ListUtils.mapFirst(v.getVariables(), v0 -> v0.withName(v0.getName().withPrefix(v0.getName().getPrefix().withWhitespace(" ")))));
             }
         }
