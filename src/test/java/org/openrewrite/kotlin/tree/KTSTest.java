@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,18 +16,17 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlinScript;
 
 class KTSTest implements RewriteTest {
 
-    @ExpectedToFail("KTS parser is not implemented yet")
     @Test
     void helloWorld() {
         rewriteRun(
           kotlinScript("""
+            import java.util.List
             println("Hello, World!")
             """)
         );

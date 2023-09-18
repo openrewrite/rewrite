@@ -160,7 +160,21 @@ class KotlinParserVisitor(
             imports.add(maybeSemicolon(importStatement))
         }
         val statements: MutableList<JRightPadded<Statement>> = ArrayList(file.declarations.size)
-        for (declaration in file.declarations) {
+        val firStatements = if (sourcePath.fileName.toString().endsWith(".kts")) {
+            // We do not know if a K.Script is necessary if any of these assertions are true, we will.
+            if (file.declarations.size > 1) {
+                throw UnsupportedOperationException("Unexpected script declaration count.")
+            } else if (file.declarations.isNotEmpty() && (file.declarations[0] as FirScript).parameters.isNotEmpty()) {
+                throw UnsupportedOperationException("Unexpected script parameters.")
+            } else if (file.declarations.isNotEmpty() && (file.declarations[0] as FirScript).contextReceivers.isNotEmpty()) {
+                throw UnsupportedOperationException("Unexpected script context receivers.")
+            }
+
+            (file.declarations[0] as FirScript).statements
+        } else {
+            file.declarations
+        }
+        for (declaration in firStatements) {
             var statement: Statement?
             val savedCursor = cursor
             try {
