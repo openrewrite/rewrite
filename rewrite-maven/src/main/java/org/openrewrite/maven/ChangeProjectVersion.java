@@ -54,13 +54,13 @@ public class ChangeProjectVersion extends Recipe {
     }
 
     @Option(displayName = "GroupId",
-            description = "The groupId of the maven project to change it's version. This can be a glob expression.",
+            description = "The groupId of the maven project to change its version. This can be a glob expression.",
             example = "org.openrewrite")
     String groupId;
 
     @Option(displayName = "ArtifactId",
-            description = "The artifactId of the maven project to change it's version. This can be a glob expression.",
-            example = "rewrite-maven")
+            description = "The artifactId of the maven project to change its version. This can be a glob expression.",
+            example = "*")
     String artifactId;
 
     @Option(displayName = "New version",
@@ -69,7 +69,7 @@ public class ChangeProjectVersion extends Recipe {
     String newVersion;
 
     @Option(displayName = "Override Parent Version",
-            description = "This flag can be set to explicitly override the inherited parent version. The default for this flag is `false`.",
+            description = "This flag can be set to explicitly override the inherited parent version. Default `false`.",
             required = false
     )
     @Nullable
