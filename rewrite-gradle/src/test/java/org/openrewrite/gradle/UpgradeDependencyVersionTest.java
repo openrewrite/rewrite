@@ -144,6 +144,43 @@ class UpgradeDependencyVersionTest implements RewriteTest {
     }
 
     @Test
+    void varargsDependency() {
+        rewriteRun(
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              repositories {
+                mavenCentral()
+              }
+              
+              dependencies {
+                implementation(
+                  'com.google.guava:guava-gwt:29.0-jre',
+                  'com.google.guava:guava:29.0-jre')
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+              
+              repositories {
+                mavenCentral()
+              }
+              
+              dependencies {
+                implementation(
+                  'com.google.guava:guava-gwt:29.0-jre',
+                  'com.google.guava:guava:30.1.1-jre')
+              }
+              """)
+        );
+    }
+
+    @Test
     void mapNotationVariable() {
         rewriteRun(
           buildGradle(
@@ -327,15 +364,15 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                   id "java"
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               ext {
                   guavaVersion = "29.0-jre"
               }
-
+              
               def guavaVersion2 = "29.0-jre"
               dependencies {
                   implementation("com.google.guava:guava:29.0-jre")
@@ -348,15 +385,15 @@ class UpgradeDependencyVersionTest implements RewriteTest {
               plugins {
                   id "java"
               }
-
+              
               repositories {
                   mavenCentral()
               }
-
+              
               ext {
                   guavaVersion = "30.1.1-jre"
               }
-
+              
               def guavaVersion2 = "30.1.1-jre"
               dependencies {
                   implementation("com.google.guava:guava:30.1.1-jre")
