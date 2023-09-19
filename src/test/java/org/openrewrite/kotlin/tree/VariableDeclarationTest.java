@@ -63,7 +63,7 @@ class VariableDeclarationTest implements RewriteTest {
           kotlin(
             """
               open class Test
-              val o: Test = object : Test ( ) { }
+              val o  : Test   =  object   :     Test  (   )     {    }
               """
           )
         );
