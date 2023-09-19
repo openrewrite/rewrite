@@ -43,6 +43,47 @@ public final class Assertions {
         }
     }
 
+    // A helper method to adjust white spaces in the input kotlin source to help us detect parse-to-print idempotent issues
+    // Just change from `before` to `adjustSpaces(before)` below to test locally
+    @Nullable
+    private static String adjustSpaces(@Nullable String input) {
+        if (input == null) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder();
+        int count = 0;
+        int limit = 1;
+        char pre = 0;
+        for (char c : input.toCharArray()) {
+            if (c == ' ') {
+                if (pre == ' ') {
+                    count++;
+                    if (count <= limit) {
+                        out.append(c);
+                    }
+                } else {
+                    count++;
+                    out.append(c);
+                }
+            } else {
+                if (pre == ' ') {
+                    for (int i = count; i < limit; i++) {
+                        out.append(' ');
+                    }
+                    count = 0;
+                    limit++;
+                    if (limit > 5) {
+                        limit = 1;
+                    }
+                }
+                out.append(c);
+            }
+            pre = c;
+        }
+
+        return out.toString();
+    }
+
     public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before) {
         return kotlin(before, s -> {
         });
