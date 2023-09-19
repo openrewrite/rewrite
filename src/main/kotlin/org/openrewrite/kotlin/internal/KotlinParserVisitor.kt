@@ -3824,11 +3824,10 @@ class KotlinParserVisitor(
             skip(":")
         } else name = null
         return K.FunctionType.Parameter(
-            randomId(),
-            Markers.EMPTY,
-            name,
-            colon,
-            visitElement(functionTypeParameter.returnTypeRef, data) as TypeTree
+                randomId(),
+                if (colon != null) Markers.EMPTY.addIfAbsent(TypeReferencePrefix(randomId(), colon)) else Markers.EMPTY,
+                name,
+                visitElement(functionTypeParameter.returnTypeRef, data) as TypeTree
         )
     }
 

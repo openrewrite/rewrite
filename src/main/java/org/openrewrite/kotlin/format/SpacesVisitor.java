@@ -931,8 +931,9 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public K.FunctionType.Parameter visitFunctionTypeParameter(K.FunctionType.Parameter parameter, P p) {
         K.FunctionType.Parameter pa = super.visitFunctionTypeParameter(parameter, p);
-        if (pa.getColon() != null) {
-            pa = pa.withColon(updateSpace(pa.getColon(), style.getOther().getBeforeColonAfterDeclarationName()));
+        // handle space around colon
+        if (pa.getMarkers().findFirst(TypeReferencePrefix.class).orElse(null) != null) {
+            pa = pa.withMarkers(spaceBeforeColonAfterDeclarationName(pa.getMarkers()));
             pa = pa.withParameterType(spaceBefore(pa.getParameterType(), style.getOther().getAfterColonBeforeDeclarationType()));
         }
         return pa;

@@ -78,7 +78,7 @@ class AutoFormatVisitorTest implements RewriteTest {
                   val b: Boolean,
                   val c: Boolean,
                   val d: Boolean
-              )
+              ): Any()
               """
           )
         );

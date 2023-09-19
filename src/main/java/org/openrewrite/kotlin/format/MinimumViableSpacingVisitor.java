@@ -106,19 +106,6 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
             }
         }
 
-        if (c.getPadding().getImplements() != null) {
-            Space before = c.getPadding().getImplements().getBefore();
-            if (before.getWhitespace().isEmpty()) {
-                c = c.getPadding().withImplements(c.getPadding().getImplements().withBefore(before.withWhitespace(" ")));
-                c = c.withImplements(ListUtils.mapFirst(c.getImplements(), anImplements -> {
-                    if (anImplements.getPrefix().getWhitespace().isEmpty()) {
-                        return anImplements.withPrefix(anImplements.getPrefix().withWhitespace(" "));
-                    }
-                    return anImplements;
-                }));
-            }
-        }
-
         c = c.withBody(c.getBody().withStatements(ListUtils.map(c.getBody().getStatements(),
                 (i, st) -> (i != 0) ? st.withPrefix(addNewline(st.getPrefix())) : st)));
 
