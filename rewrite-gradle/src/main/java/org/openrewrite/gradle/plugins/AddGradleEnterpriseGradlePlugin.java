@@ -68,7 +68,7 @@ public class AddGradleEnterpriseGradlePlugin extends Recipe {
     @Option(displayName = "Server URL",
             description = "The URL of the Gradle Enterprise server. If omitted the recipe will set no URL and Gradle will direct scans to https://scans.gradle.com/",
             required = false,
-            example = "https://ge.openrewrite.org/")
+            example = "https://scans.gradle.com/")
     @Nullable
     String server;
 
