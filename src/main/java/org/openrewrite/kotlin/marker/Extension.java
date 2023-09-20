@@ -26,6 +26,7 @@ import java.util.UUID;
 public class Extension implements Marker {
     UUID id;
 
+
     public Extension(UUID id) {
         this.id = id;
     }

@@ -1532,7 +1532,18 @@ public interface K extends J {
 
         boolean isSetterFirst;
 
-        public Property(UUID id, Space prefix, Markers markers, @Nullable JContainer<TypeParameter> typeParameters, VariableDeclarations variableDeclarations, @Nullable K.TypeConstraints typeConstraints, @Nullable J.MethodDeclaration getter, @Nullable J.MethodDeclaration setter, boolean isSetterFirst) {
+        @Nullable
+        JRightPadded<Expression> receiver;
+
+        @Nullable
+        public Expression getReceiver() {
+            return receiver == null ? null : receiver.getElement();
+        }
+
+        public Property(UUID id, Space prefix, Markers markers, @Nullable JContainer<TypeParameter> typeParameters, VariableDeclarations variableDeclarations,
+                        @Nullable K.TypeConstraints typeConstraints,
+                        @Nullable J.MethodDeclaration getter, @Nullable J.MethodDeclaration setter, boolean isSetterFirst,
+                        @Nullable JRightPadded<Expression> receiver) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;
@@ -1542,6 +1553,7 @@ public interface K extends J {
             this.getter = getter;
             this.setter = setter;
             this.isSetterFirst = isSetterFirst;
+            this.receiver = receiver;
         }
 
         @Override
@@ -1585,7 +1597,19 @@ public interface K extends J {
             }
 
             public Property withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
-                return t.typeParameters == typeParameters ? t : new Property(t.id, t.prefix, t.markers, typeParameters, t.variableDeclarations, t.typeConstraints, t.getter, t.setter, t.isSetterFirst);
+                return t.typeParameters == typeParameters ? t : new Property(t.id, t.prefix, t.markers, typeParameters,
+                        t.variableDeclarations, t.typeConstraints, t.getter, t.setter, t.isSetterFirst, t.receiver);
+            }
+
+            @Nullable
+            public JRightPadded<Expression> getReceiver() {
+                return t.receiver;
+            }
+
+            @Nullable
+            public Property withReceiver(@Nullable JRightPadded<Expression> receiver) {
+                return t.receiver == receiver ? t : new Property(t.id, t.prefix, t.markers, t.typeParameters,
+                        t.variableDeclarations,t.typeConstraints, t.getter, t.setter, t.isSetterFirst, receiver);
             }
         }
     }

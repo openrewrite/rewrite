@@ -90,7 +90,7 @@ class VariableDeclarationTest implements RewriteTest {
           kotlin(
             """
               class Spec
-              inline val Spec . `java-base` : String get ( ) = "  "
+              inline val  Spec   .    `java-base`     : String  get   (    )   =  "  "
               """
           )
         );
@@ -99,7 +99,6 @@ class VariableDeclarationTest implements RewriteTest {
     @Test
     void getter() {
         rewriteRun(
-          kotlin("class Spec"),
           kotlin(
             """
               val isEmpty : Boolean
