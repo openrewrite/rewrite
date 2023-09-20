@@ -1258,6 +1258,21 @@ class SpacesTest implements RewriteTest {
             }
 
             @Test
+            void whereClause() {
+                rewriteRun(
+                  spaces(style -> style.withOther(style.getOther().withBeforeColonAfterDeclarationName(true))),
+                  kotlin(
+                    """
+                      class Test<T> where T: Comparable<T>, T: CharSequence
+                      """,
+                    """
+                      class Test <T> where T : Comparable<T>, T : CharSequence
+                      """
+                  )
+                );
+            }
+
+            @Test
             void otherBeforeColonAfterDeclarationNameFalseMethodDeclaration() {
                 rewriteRun(
                   spaces(style -> style.withOther(style.getOther().withBeforeColonAfterDeclarationName(false))),

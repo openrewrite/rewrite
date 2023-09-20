@@ -57,4 +57,17 @@ class PropertyTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/160")
+    void multipleTypeConstraints() {
+        rewriteRun(
+          kotlin(
+            """
+              val <T> T.plus2: Int where T: CharSequence, T: Comparable<T>
+                  get() = length + 2
+              """
+          )
+        );
+    }
 }

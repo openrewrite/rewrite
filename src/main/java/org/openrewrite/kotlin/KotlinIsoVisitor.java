@@ -33,6 +33,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
+    public K.ClassDeclaration visitClassDeclaration(K.ClassDeclaration classDeclaration, P p) {
+        return (K.ClassDeclaration) super.visitClassDeclaration(classDeclaration, p);
+    }
+
+    @Override
     public K.Constructor visitConstructor(K.Constructor constructor, P p) {
         return (K.Constructor) super.visitConstructor(constructor, p);
     }
@@ -83,6 +88,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
+    public K.MethodDeclaration visitMethodDeclaration(K.MethodDeclaration methodDeclaration, P p) {
+        return (K.MethodDeclaration) super.visitMethodDeclaration(methodDeclaration, p);
+    }
+
+    @Override
     public K.ListLiteral visitListLiteral(K.ListLiteral listLiteral, P p) {
         return (K.ListLiteral) super.visitListLiteral(listLiteral, p);
     }
@@ -90,6 +100,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     @Override
     public K.Property visitProperty(K.Property property, P p) {
         return (K.Property) super.visitProperty(property, p);
+    }
+
+    @Override
+    public K.TypeConstraints visitTypeConstraints(K.TypeConstraints typeConstraints, P p) {
+        return (K.TypeConstraints) super.visitTypeConstraints(typeConstraints, p);
     }
 
     @Override

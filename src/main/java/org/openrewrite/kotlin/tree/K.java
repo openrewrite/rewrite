@@ -23,7 +23,6 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
@@ -198,7 +197,7 @@ public interface K extends J {
         Space eof;
 
         @Transient
-        public List<ClassDeclaration> getClasses() {
+        public List<J.ClassDeclaration> getClasses() {
             return statements.stream()
                     .map(JRightPadded::getElement)
                     .filter(J.ClassDeclaration.class::isInstance)
@@ -207,7 +206,7 @@ public interface K extends J {
         }
 
         @Override
-        public K.CompilationUnit withClasses(List<ClassDeclaration> classes) {
+        public K.CompilationUnit withClasses(List<J.ClassDeclaration> classes) {
             return getPadding().withClasses(JRightPadded.withElements(this.getPadding().getClasses(), classes));
         }
 
@@ -274,7 +273,7 @@ public interface K extends J {
                         .collect(Collectors.toList());
             }
 
-            public K.CompilationUnit withClasses(List<JRightPadded<ClassDeclaration>> classes) {
+            public K.CompilationUnit withClasses(List<JRightPadded<J.ClassDeclaration>> classes) {
                 List<JRightPadded<Statement>> statements = t.statements.stream()
                         .filter(s -> !(s.getElement() instanceof J.ClassDeclaration))
                         .collect(Collectors.toList());
@@ -499,6 +498,64 @@ public interface K extends J {
     @SuppressWarnings("unused")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    final class ClassDeclaration implements K, Statement, TypedTree {
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Markers markers;
+
+        @With
+        J.ClassDeclaration classDeclaration;
+
+        @With
+        TypeConstraints typeConstraints;
+
+        public ClassDeclaration(UUID id, Markers markers, J.ClassDeclaration classDeclaration, TypeConstraints typeConstraints) {
+            this.id = id;
+            this.markers = markers;
+            this.classDeclaration = classDeclaration;
+            this.typeConstraints = typeConstraints;
+        }
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitClassDeclaration(this, p);
+        }
+
+        @Override
+        public <J2 extends J> J2 withPrefix(Space space) {
+            return (J2) withClassDeclaration(classDeclaration.withPrefix(space));
+        }
+
+        @Override
+        public Space getPrefix() {
+            return classDeclaration.getPrefix();
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return classDeclaration.getType();
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            return (T) withClassDeclaration(classDeclaration.withType(type));
+        }
+    }
+
+    @SuppressWarnings("unused")
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     final class Constructor implements K, Statement, TypedTree {
 
         @Getter
@@ -522,7 +579,7 @@ public interface K extends J {
         @With
         ConstructorInvocation constructorInvocation;
 
-        public Constructor(UUID id, Markers markers, MethodDeclaration methodDeclaration, Space colon, ConstructorInvocation constructorInvocation) {
+        public Constructor(UUID id, Markers markers, J.MethodDeclaration methodDeclaration, Space colon, ConstructorInvocation constructorInvocation) {
             this.id = id;
             this.markers = markers;
             this.methodDeclaration = methodDeclaration;
@@ -661,28 +718,24 @@ public interface K extends J {
     }
 
     @SuppressWarnings("unused")
+    @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     final class DelegatedSuperType implements K, TypeTree {
 
-        @Getter
         @With
         @EqualsAndHashCode.Include
         UUID id;
 
-        @Getter
         @With
         Markers markers;
 
-        @Getter
         @With
         TypeTree typeTree;
 
-        @Getter
         @With
         Space by;
 
-        @Getter
         @With
         Expression delegate;
 
@@ -1384,6 +1437,64 @@ public interface K extends J {
         }
     }
 
+    @SuppressWarnings("unused")
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    final class MethodDeclaration implements K, Statement, TypedTree {
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Markers markers;
+
+        @With
+        J.MethodDeclaration methodDeclaration;
+
+        @With
+        TypeConstraints typeConstraints;
+
+        public MethodDeclaration(UUID id, Markers markers, J.MethodDeclaration methodDeclaration, TypeConstraints typeConstraints) {
+            this.id = id;
+            this.markers = markers;
+            this.methodDeclaration = methodDeclaration;
+            this.typeConstraints = typeConstraints;
+        }
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitMethodDeclaration(this, p);
+        }
+
+        @Override
+        public <J2 extends J> J2 withPrefix(Space space) {
+            return (J2) withMethodDeclaration(methodDeclaration.withPrefix(space));
+        }
+
+        @Override
+        public Space getPrefix() {
+            return methodDeclaration.getPrefix();
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return methodDeclaration.getType();
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            return (T) withMethodDeclaration(methodDeclaration.withType(type));
+        }
+    }
+
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @With
@@ -1411,6 +1522,9 @@ public interface K extends J {
         J.VariableDeclarations variableDeclarations;
 
         @Nullable
+        TypeConstraints typeConstraints;
+
+        @Nullable
         J.MethodDeclaration getter;
 
         @Nullable
@@ -1418,12 +1532,13 @@ public interface K extends J {
 
         boolean isSetterFirst;
 
-        public Property(UUID id, Space prefix, Markers markers, @Nullable JContainer<TypeParameter> typeParameters, VariableDeclarations variableDeclarations, @Nullable J.MethodDeclaration getter, @Nullable J.MethodDeclaration setter, boolean isSetterFirst) {
+        public Property(UUID id, Space prefix, Markers markers, @Nullable JContainer<TypeParameter> typeParameters, VariableDeclarations variableDeclarations, @Nullable K.TypeConstraints typeConstraints, @Nullable J.MethodDeclaration getter, @Nullable J.MethodDeclaration setter, boolean isSetterFirst) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;
             this.typeParameters = typeParameters;
             this.variableDeclarations = variableDeclarations;
+            this.typeConstraints = typeConstraints;
             this.getter = getter;
             this.setter = setter;
             this.isSetterFirst = isSetterFirst;
@@ -1470,7 +1585,7 @@ public interface K extends J {
             }
 
             public Property withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
-                return t.typeParameters == typeParameters ? t : new Property(t.id, t.prefix, t.markers, typeParameters, t.variableDeclarations, t.getter, t.setter, t.isSetterFirst);
+                return t.typeParameters == typeParameters ? t : new Property(t.id, t.prefix, t.markers, typeParameters, t.variableDeclarations, t.typeConstraints, t.getter, t.setter, t.isSetterFirst);
             }
         }
     }
@@ -1576,6 +1691,87 @@ public interface K extends J {
         @Override
         public CoordinateBuilder.Statement getCoordinates() {
             return new CoordinateBuilder.Statement(this);
+        }
+    }
+
+    @Getter
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class TypeConstraints implements K {
+        @Nullable
+        @NonFinal
+        transient WeakReference<TypeConstraints.Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Markers markers;
+
+        JContainer<J.TypeParameter> constraints;
+
+        public TypeConstraints(UUID id, Markers markers, JContainer<J.TypeParameter> constraints) {
+            this.id = id;
+            this.markers = markers;
+            this.constraints = constraints;
+        }
+
+        public List<J.TypeParameter> getConstraints() {
+            return constraints.getElements();
+        }
+
+        public TypeConstraints withConstraints(List<J.TypeParameter> constraints) {
+            return getPadding().withConstraints(requireNonNull(JContainer.withElementsNullable(this.constraints, constraints)));
+        }
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitTypeConstraints(this, p);
+        }
+
+        @Override
+        public <J2 extends J> J2 withPrefix(Space space) {
+            return (J2) getPadding().withConstraints(constraints.withBefore(space));
+        }
+
+        @Override
+        public Space getPrefix() {
+            return constraints.getBefore();
+        }
+
+        public TypeConstraints.Padding getPadding() {
+            TypeConstraints.Padding p;
+            if (this.padding == null) {
+                p = new TypeConstraints.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new TypeConstraints.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final TypeConstraints t;
+
+            public JContainer<J.TypeParameter> getConstraints() {
+                return t.constraints;
+            }
+
+            public TypeConstraints withConstraints(JContainer<J.TypeParameter> constraints) {
+                return t.constraints == constraints ? t : new TypeConstraints(t.id, t.markers, constraints);
+            }
         }
     }
 
@@ -1783,7 +1979,7 @@ public interface K extends J {
 
         @Override
         public String toString() {
-            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+            return withPrefix(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
         }
 
         @RequiredArgsConstructor

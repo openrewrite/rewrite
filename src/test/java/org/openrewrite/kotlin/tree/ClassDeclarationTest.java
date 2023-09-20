@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
@@ -276,9 +275,8 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    // TODO: check why this test now succeeds
-    @Disabled
     @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/160")
     void multipleBounds() {
         rewriteRun(
           kotlin(
@@ -288,7 +286,7 @@ class ClassDeclarationTest implements RewriteTest {
               interface C
               interface D
               
-              class KotlinTypeGoat < T , S > where S : A , T : D , S : B , T : C
+              class KotlinTypeGoat<T, S> where S : A, T : D, S : B, T : C
               """
           )
         );
@@ -298,6 +296,28 @@ class ClassDeclarationTest implements RewriteTest {
     void object() {
         rewriteRun(
           kotlin(" object Test")
+        );
+    }
+
+    @Test
+    void suspendFunctionTypeAsSuperType() {
+        rewriteRun(
+          kotlin(
+            """
+              abstract class Test: suspend () -> String
+              """
+          )
+        );
+    }
+
+    @Test
+    void explicitDelegation() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test(c : Collection<String>): Collection<String> by c
+              """
+          )
         );
     }
 

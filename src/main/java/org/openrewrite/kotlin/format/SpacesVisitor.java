@@ -348,6 +348,21 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     }
 
     @Override
+    public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam, P p) {
+        J.TypeParameter pa = super.visitTypeParameter(typeParam, p);
+
+        // handle space before colon after declaration name
+        pa = pa.withMarkers(spaceBeforeColonAfterDeclarationName(pa.getMarkers()));
+        if (pa.getMarkers().findFirst(TypeReferencePrefix.class).isPresent()) {
+            pa = pa.withBounds(
+                    ListUtils.map(pa.getBounds(), b ->
+                            spaceBefore(b, style.getOther().getAfterColonBeforeDeclarationType()))
+            );
+        }
+        return pa;
+    }
+
+    @Override
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
         J.MethodInvocation m = super.visitMethodInvocation(method, p);
 
@@ -703,7 +718,6 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         if (multiVariable.getMarkers().findFirst(TypeReferencePrefix.class).orElse(null) != null &&
                 mv.getTypeExpression() != null) {
             mv = mv.withTypeExpression(spaceBefore(mv.getTypeExpression(), style.getOther().getAfterColonBeforeDeclarationType()));
-
         }
         return mv;
     }

@@ -158,13 +158,13 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
                 if (cu.getPackageDeclaration() == null) {
                     // leave javadocs on the class and move other comments up to the import
                     // (which could include license headers and the like)
-                    Space firstClassPrefix = cu.getClasses().get(0).getPrefix();
-                    importToAdd = importToAdd.withPrefix(firstClassPrefix
-                            .withComments(ListUtils.map(firstClassPrefix.getComments(), comment -> comment instanceof Javadoc ? null : comment))
+                    Space firstStatementPrefix = cu.getStatements().get(0).getPrefix();
+                    importToAdd = importToAdd.withPrefix(firstStatementPrefix
+                            .withComments(ListUtils.map(firstStatementPrefix.getComments(), comment -> comment instanceof Javadoc ? null : comment))
                             .withWhitespace(""));
 
-                    cu = cu.withClasses(ListUtils.mapFirst(cu.getClasses(), clazz ->
-                            clazz.withComments(ListUtils.map(clazz.getComments(), comment -> comment instanceof Javadoc ? comment : null))
+                    cu = cu.withStatements(ListUtils.mapFirst(cu.getStatements(), stmt ->
+                            stmt.withComments(ListUtils.map(stmt.getComments(), comment -> comment instanceof Javadoc ? comment : null))
                     ));
                 }
             }

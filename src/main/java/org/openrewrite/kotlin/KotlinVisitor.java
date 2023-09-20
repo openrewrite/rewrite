@@ -131,6 +131,14 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return b;
     }
 
+    public J visitClassDeclaration(K.ClassDeclaration classDeclaration, P p) {
+        K.ClassDeclaration c = classDeclaration;
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.withClassDeclaration(visitAndCast(c.getClassDeclaration(), p));
+        c = c.withTypeConstraints(visitAndCast(c.getTypeConstraints(), p));
+        return c;
+    }
+
     public J visitConstructor(K.Constructor constructor, P p) {
         K.Constructor c = constructor;
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
@@ -271,6 +279,14 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return l;
     }
 
+    public J visitMethodDeclaration(K.MethodDeclaration methodDeclaration, P p) {
+        K.MethodDeclaration m = methodDeclaration;
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        m = m.withMethodDeclaration(visitAndCast(m.getMethodDeclaration(), p));
+        m = m.withTypeConstraints(visitAndCast(m.getTypeConstraints(), p));
+        return m;
+    }
+
     public J visitNamedVariableInitializer(K.NamedVariableInitializer namedVariableInitializer, P p) {
         K.NamedVariableInitializer n = namedVariableInitializer;
         n = n.withPrefix(visitSpace(n.getPrefix(), KSpace.Location.NAMED_VARIABLE_INITIALIZER_PREFIX, p));
@@ -293,6 +309,13 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         pr = pr.withGetter(visitAndCast(pr.getGetter(), p));
         pr = pr.withSetter(visitAndCast(pr.getSetter(), p));
         return pr;
+    }
+
+    public J visitTypeConstraints(K.TypeConstraints typeConstraints, P p) {
+        K.TypeConstraints t = typeConstraints;
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        t = t.getPadding().withConstraints(visitContainer(t.getPadding().getConstraints(), p));
+        return t;
     }
 
     public J visitWhen(K.When when, P p) {

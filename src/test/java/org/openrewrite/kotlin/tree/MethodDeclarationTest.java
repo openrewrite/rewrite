@@ -269,8 +269,7 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
-    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/205")
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/160")
     @Test
     void genericTypeConstraint() {
         rewriteRun(
@@ -329,6 +328,17 @@ class MethodDeclarationTest implements RewriteTest {
           kotlin(
             """
               expect suspend fun Any.executeAsync(): Any
+              """
+          )
+        );
+    }
+
+    @Test
+    void multipleTypeConstraints() {
+        rewriteRun(
+          kotlin(
+            """
+              fun <T> foo(t: T): T where T: CharSequence, T: Comparable<T> = t
               """
           )
         );
