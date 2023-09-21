@@ -175,6 +175,7 @@ public class MavenParser implements Parser {
             return this;
         }
 
+        @SuppressWarnings("unused") // Used in `MavenMojoProjectParser.parseMaven(..)`
         public Builder mavenConfig(@Nullable Path mavenConfig) {
             if (mavenConfig != null && mavenConfig.toFile().exists()) {
                 try {
