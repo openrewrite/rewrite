@@ -107,14 +107,13 @@ public class MavenParser implements Parser {
                         .resolveDependencies(downloader, ctx);
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
             } catch (MavenDownloadingExceptions e) {
-                Xml.Document withWarnings = e.warn(docToPom.getKey());
                 ParseExceptionResult parseExceptionResult = new ParseExceptionResult(
                         randomId(),
                         MavenParser.class.getSimpleName(),
                         e.getClass().getSimpleName(),
-                        withWarnings.printAll(),
+                        e.warn(docToPom.getKey()).printAll(), // Shows any underlying MavenDownloadingException
                         null);
-                parsed.add(docToPom.getKey().withMarkers(withWarnings.getMarkers().add(parseExceptionResult)));
+                parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(parseExceptionResult)));
                 ctx.getOnError().accept(e);
             } catch (MavenDownloadingException e) {
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e))));
