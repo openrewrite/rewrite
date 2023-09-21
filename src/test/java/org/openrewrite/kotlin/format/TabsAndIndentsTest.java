@@ -2115,4 +2115,21 @@ class TabsAndIndentsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/323")
+    void resetIndentationAfterClosingParameterListParenthesis() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  fun foo(
+                      bar: String,
+                      baz: String
+                  ): String = null!!
+              }
+              """
+          )
+        );
+    }
 }
