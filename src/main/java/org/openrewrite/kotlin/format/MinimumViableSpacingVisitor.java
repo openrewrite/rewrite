@@ -48,8 +48,7 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, P p) {
         K.CompilationUnit kcu = super.visitCompilationUnit(cu, p);
-        kcu = kcu.withStatements(ListUtils.map(kcu.getStatements(),
-                (i, st) -> (i != 0) ? st.withPrefix(st.getPrefix().withWhitespace("\n")) : st));
+        kcu = kcu.getPadding().withStatements(visitStatementList(kcu.getPadding().getStatements()));
         return kcu;
     }
 
@@ -225,8 +224,12 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public J.Block visitBlock(J.Block block, P p) {
         J.Block b = super.visitBlock(block, p);
-        List<JRightPadded<Statement>> statements = b.getPadding().getStatements();
-        b = b.getPadding().withStatements(ListUtils.map(statements,
+        b = b.getPadding().withStatements(visitStatementList(b.getPadding().getStatements()));
+        return b;
+    }
+
+    private List<JRightPadded<Statement>> visitStatementList(List<JRightPadded<Statement>> statements) {
+        return ListUtils.map(statements,
                 (i, st) -> {
                     Statement element = st.getElement();
                     if (i == 0
@@ -235,9 +238,8 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
                             || statements.get(i - 1).getMarkers().findFirst(Semicolon.class).isPresent()) {
                         return st;
                     }
-                    return st.withElement(element.withPrefix(element.getPrefix().withWhitespace("\n")));
-                }));
-        return b;
+                    return st.withElement(element.withPrefix(addNewline(element.getPrefix())));
+                });
     }
 
     @Override
@@ -253,7 +255,7 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public K.Binary visitBinary(K.Binary binary, P p) {
         K.Binary kb = super.visitBinary(binary, p);
-        if (kb.getOperator() ==  K.Binary.Type.Contains || kb.getOperator() ==  K.Binary.Type.NotContains) {
+        if (kb.getOperator() == K.Binary.Type.Contains || kb.getOperator() == K.Binary.Type.NotContains) {
             kb = kb.getPadding().withOperator(kb.getPadding().getOperator().withBefore(updateSpace(kb.getPadding().getOperator().getBefore(), true)));
             kb = kb.withRight(spaceBefore(kb.getRight(), true));
         }

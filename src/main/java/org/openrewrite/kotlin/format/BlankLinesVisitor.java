@@ -134,22 +134,22 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
         j = j.withBody(j.getBody().withEnd(minimumLines(j.getBody().getEnd(),
                 minimumBlankLines_BeforeClassEnd)));
 
-        JavaSourceFile cu = getCursor().firstEnclosingOrThrow(JavaSourceFile.class);
+        K.CompilationUnit cu = getCursor().firstEnclosingOrThrow(K.CompilationUnit.class);
         boolean hasImports = !cu.getImports().isEmpty();
-        boolean firstClass = j.equals(cu.getClasses().get(0));
-        Set<J.ClassDeclaration> classes = new HashSet<>(cu.getClasses());
+        boolean firstStatement = j.equals(cu.getStatements().get(0));
+        Set<Statement> topLevelStatements = new HashSet<>(cu.getStatements());
 
-        j = firstClass ?
+        j = firstStatement ?
                 (hasImports ? minimumLines(j, minimumBlankLines_AfterImports) : j) :
                 // Apply `style.getMinimum().getAroundClass()` to classes declared in the SourceFile.
-                (classes.contains(j)) ? minimumLines(j, minimumBlankLines_AroundClass) : j;
+                (topLevelStatements.contains(j)) ? minimumLines(j, minimumBlankLines_AroundClass) : j;
 
         // style.getKeepMaximum().getInDeclarations() also sets the maximum new lines of class declaration prefixes.
-        j = firstClass ?
+        j = firstStatement ?
                 (hasImports ? keepMaximumLines(j, Math.max(style.getKeepMaximum().getInDeclarations(), minimumBlankLines_AfterImports)) : j) :
-                (classes.contains(j)) ? keepMaximumLines(j, style.getKeepMaximum().getInDeclarations()) : j;
+                (topLevelStatements.contains(j)) ? keepMaximumLines(j, style.getKeepMaximum().getInDeclarations()) : j;
 
-        if (!hasImports && firstClass) {
+        if (!hasImports && firstStatement) {
             if (cu.getPackageDeclaration() == null) {
                 if (!j.getPrefix().getWhitespace().isEmpty()) {
                     j = j.withPrefix(j.getPrefix().withWhitespace(""));
@@ -262,13 +262,13 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
                 if (j instanceof J.VariableDeclarations) {
                     declMax = Math.max(declMax, minimumBlankLines_AroundField);
                     j = minimumLines(j, minimumBlankLines_AroundField);
-                } else if (j instanceof J.MethodDeclaration) {
+                } else if (j instanceof J.MethodDeclaration || j instanceof K.MethodDeclaration) {
                     declMax = Math.max(declMax, minimumBlankLines_AroundMethod);
                     j = minimumLines(j, minimumBlankLines_AroundMethod);
                 } else if (j instanceof J.Block) {
                     declMax = Math.max(declMax, minimumBlankLines_AroundInitializer);
                     j = minimumLines(j, minimumBlankLines_AroundInitializer);
-                } else if (j instanceof J.ClassDeclaration) {
+                } else if (j instanceof J.ClassDeclaration || j instanceof K.ClassDeclaration) {
                     declMax = Math.max(declMax, minimumBlankLines_AroundClass);
                     j = minimumLines(j, minimumBlankLines_AroundClass);
                 }

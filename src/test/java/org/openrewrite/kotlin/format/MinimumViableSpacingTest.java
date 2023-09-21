@@ -380,4 +380,21 @@ class MinimumViableSpacingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void compilationUnitDeclarations() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new MinimumViableSpacingVisitor<>())
+          ),
+          kotlin(
+            """
+              val one = 1
+              val two = 2
+              
+              class Test
+              """
+          )
+        );
+    }
 }
