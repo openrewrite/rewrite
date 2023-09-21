@@ -475,7 +475,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     private Comment indentComment(Comment comment, String priorSuffix, int column) {
         if (comment instanceof TextComment) {
             TextComment textComment = (TextComment) comment;
-            if (!textComment.getText().contains("\n")) {
+            String text = textComment.getText();
+            if (!text.contains("\n")) {
                 return comment;
             }
 
@@ -489,9 +490,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 String newMargin = indent(margin, shift);
                 if (textComment.isMultiline()) {
                     StringBuilder multiline = new StringBuilder();
-                    char[] chars = textComment.getText().toCharArray();
-                    for (int i = 0; i < chars.length; i++) {
-                        char c = chars[i];
+                    for (int i = 0; i < text.length(); i++) {
+                        char c = text.charAt(i);
                         if (c == '\n') {
                             multiline.append(c).append(newMargin);
                             i += margin.length();
@@ -504,12 +504,11 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             } else if (shift < 0) {
                 if (textComment.isMultiline()) {
                     StringBuilder multiline = new StringBuilder();
-                    char[] chars = textComment.getText().toCharArray();
-                    for (int i = 0; i < chars.length; i++) {
-                        char c = chars[i];
+                    for (int i = 0; i < text.length(); i++) {
+                        char c = text.charAt(i);
                         if (c == '\n') {
                             multiline.append(c);
-                            for (int j = 0; j < Math.abs(shift) && i+j+1 < chars.length && (chars[j + i + 1] == ' ' || chars[j + i + 1] == '\t'); j++) {
+                            for (int j = 0; j < Math.abs(shift) && i+j+1 < text.length() && (text.charAt(j + i + 1) == ' ' || text.charAt(j + i + 1) == '\t'); j++) {
                                 i++;
                             }
                         } else {
@@ -585,7 +584,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         int size = 0;
-        for (char c : whitespace.toCharArray()) {
+        for (int i = 0; i < whitespace.length(); i++) {
+            char c = whitespace.charAt(i);
             size += c == '\t' ? style.getTabSize() : 1;
             if (c == '\n' || c == '\r') {
                 size = 0;
@@ -604,7 +604,9 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
         int column = 0;
         boolean afterInitStart = false;
-        for (char c : alignTo.print(getCursor()).toCharArray()) {
+        String print = alignTo.print(getCursor());
+        for (int i = 0; i < print.length(); i++) {
+            char c = print.charAt(i);
             if (c == '(') {
                 afterInitStart = true;
             } else if (afterInitStart && !Character.isWhitespace(c)) {

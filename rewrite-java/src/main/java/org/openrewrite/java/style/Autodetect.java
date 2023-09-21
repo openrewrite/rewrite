@@ -293,12 +293,11 @@ public class Autodetect extends NamedStyles {
         @Override
         public Space visitSpace(Space space, Space.Location loc, GeneralFormatStatistics stats) {
             String prefix = space.getWhitespace();
-            char[] chars = prefix.toCharArray();
 
-            for (int i = 0; i < chars.length; i++) {
-                char c = chars[i];
+            for (int i = 0; i < prefix.length(); i++) {
+                char c = prefix.charAt(i);
                 if (c == '\n') {
-                    if (i == 0 || chars[i - 1] != '\r') {
+                    if (i == 0 || prefix.charAt(i - 1) != '\r') {
                         stats.linesWithLFNewLines++;
                     } else {
                         stats.linesWithCRLFNewLines++;
@@ -435,6 +434,7 @@ public class Autodetect extends NamedStyles {
             }
             if (m.getPadding().getSelect() != null) {
                 countIndents(m.getPadding().getSelect().getAfter().getWhitespace(), true, stats);
+                visit(m.getSelect(), stats);
             }
             visitContainer(m.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, stats);
 
@@ -461,8 +461,8 @@ public class Autodetect extends NamedStyles {
                 int spaceIndent = 0;
                 int tabIndent = 0;
                 boolean mixed = false;
-                char[] chars = space.substring(ni).toCharArray();
-                for (char c : chars) {
+                for (int i = ni; i < space.length(); i++) {
+                    char c = space.charAt(i);
                     if (c == ' ') {
                         if (tabIndent > 0) {
                             mixed = true;
@@ -843,11 +843,9 @@ public class Autodetect extends NamedStyles {
                 return pkg;
             }
 
-            char[] p1 = pkg.toCharArray();
-            char[] p2 = lcp.toCharArray();
             int i = 0;
-            for (; i < p1.length && i < p2.length; i++) {
-                if (p1[i] != p2[i]) {
+            for (; i < pkg.length() && i < lcp.length(); i++) {
+                if (pkg.charAt(i) != lcp.charAt(i)) {
                     break;
                 }
             }

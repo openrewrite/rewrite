@@ -88,8 +88,6 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     }
 
     private void init() {
-        char[] sourceArr = source.toCharArray();
-
         StringBuilder firstPrefixBuilder = new StringBuilder();
         StringBuilder javadocContent = new StringBuilder();
         StringBuilder marginBuilder = null;
@@ -98,12 +96,12 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
         // skip past the opening '/**'
         int i = 3;
-        for (; i < sourceArr.length; i++) {
-            char c = sourceArr[i];
+        for (; i < source.length(); i++) {
+            char c = source.charAt(i);
             if (inFirstPrefix) {
                 // '*' characters are considered a part of the margin until a non '*' is parsed.
                 if (Character.isWhitespace(c) || c == '*' && isPrefixAsterisk) {
-                    if (isPrefixAsterisk && i + 1 <= sourceArr.length - 1 && sourceArr[i + 1] != '*') {
+                    if (isPrefixAsterisk && i + 1 <= source.length() - 1 && source.charAt(i + 1) != '*') {
                         isPrefixAsterisk = false;
                     }
                     firstPrefixBuilder.append(c);
@@ -118,30 +116,31 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             }
 
             if (c == '\n') {
+                char prev = source.charAt(i - 1);
                 if (inFirstPrefix) {
                     firstPrefix = firstPrefixBuilder.toString();
                     inFirstPrefix = false;
                 } else {
                     // Handle consecutive new lines.
-                    if ((sourceArr[i - 1] == '\n' ||
-                            sourceArr[i - 1] == '\r' && sourceArr[i - 2] == '\n')) {
-                        String prevLineLine = sourceArr[i - 1] == '\n' ? "\n" : "\r\n";
+                    if ((prev == '\n' ||
+                            prev == '\r' && source.charAt(i - 2) == '\n')) {
+                        String prevLineLine = prev == '\n' ? "\n" : "\r\n";
                         lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), prevLineLine, Markers.EMPTY));
                     } else if (marginBuilder != null) { // A new line with no '*' that only contains whitespace.
-                        String newLine = sourceArr[i - 1] == '\r' ? "\r\n" : "\n";
+                        String newLine = prev == '\r' ? "\r\n" : "\n";
                         lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), newLine, Markers.EMPTY));
                         javadocContent.append(marginBuilder.substring(marginBuilder.indexOf("\n") + 1));
                     }
                     javadocContent.append(c);
                 }
-                String newLine = sourceArr[i - 1] == '\r' ? "\r\n" : "\n";
+                String newLine = prev == '\r' ? "\r\n" : "\n";
                 marginBuilder = new StringBuilder(newLine);
             } else if (marginBuilder != null) {
                 if (!Character.isWhitespace(c)) {
                     if (c == '*') {
                         // '*' characters are considered a part of the margin until a non '*' is parsed.
                         marginBuilder.append(c);
-                        if (i + 1 <= sourceArr.length - 1 && sourceArr[i + 1] != '*') {
+                        if (i + 1 <= source.length() - 1 && source.charAt(i + 1) != '*') {
                             lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
                                     marginBuilder.toString(), Markers.EMPTY));
                             marginBuilder = null;
@@ -152,7 +151,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                                     marginBuilder.toString(), Markers.EMPTY));
                             javadocContent.append(c);
                         } else {
-                            String newLine = marginBuilder.toString().startsWith("\r") ? "\r\n" : "\n";
+                            String newLine = marginBuilder.charAt(0) == '\r' ? "\r\n" : "\n";
                             lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
                                     newLine, Markers.EMPTY));
                             String margin = marginBuilder.toString();
@@ -864,9 +863,9 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             node = node.stripLeading();
         }
 
-        char[] textArr = node.toCharArray();
         StringBuilder text = new StringBuilder();
-        for (char c : textArr) {
+        for (int i = 0; i < node.length(); i++) {
+            char c = node.charAt(i);
             cursor++;
             if (c == '\n') {
                 if (text.length() > 0) {
