@@ -17,6 +17,7 @@ package org.openrewrite.kotlin.format;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.kotlin.KotlinParser;
@@ -361,4 +362,22 @@ class MinimumViableSpacingTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/322")
+    void statementWithCommentInPrefix() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new MinimumViableSpacingVisitor<>())
+          ),
+          kotlin(
+            """
+              fun x() {
+                  "s".length; "s".length
+                  // c1
+                  "s".length
+              }
+              """
+          )
+        );
+    }
 }

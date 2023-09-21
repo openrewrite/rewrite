@@ -26,6 +26,7 @@ import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.marker.Extension;
 import org.openrewrite.kotlin.marker.Implicit;
 import org.openrewrite.kotlin.marker.PrimaryConstructor;
+import org.openrewrite.kotlin.marker.Semicolon;
 import org.openrewrite.kotlin.tree.K;
 
 import java.util.List;
@@ -218,12 +219,25 @@ public class MinimumViableSpacingVisitor<P> extends KotlinIsoVisitor<P> {
             }
         }
 
-        if (m.getBody() != null) {
-            m = m.withBody(m.getBody().withStatements(ListUtils.map(m.getBody().getStatements(),
-                    (i, st) -> (i != 0) ? st.withPrefix(st.getPrefix().withWhitespace("\n")) : st)));
-        }
-
         return m;
+    }
+
+    @Override
+    public J.Block visitBlock(J.Block block, P p) {
+        J.Block b = super.visitBlock(block, p);
+        List<JRightPadded<Statement>> statements = b.getPadding().getStatements();
+        b = b.getPadding().withStatements(ListUtils.map(statements,
+                (i, st) -> {
+                    Statement element = st.getElement();
+                    if (i == 0
+                            || element.getPrefix().getWhitespace().contains("\n")
+                            || element.getPrefix().getLastWhitespace().contains("\n")
+                            || statements.get(i - 1).getMarkers().findFirst(Semicolon.class).isPresent()) {
+                        return st;
+                    }
+                    return st.withElement(element.withPrefix(element.getPrefix().withWhitespace("\n")));
+                }));
+        return b;
     }
 
     @Override
