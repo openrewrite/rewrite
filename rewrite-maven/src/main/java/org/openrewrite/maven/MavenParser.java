@@ -106,7 +106,11 @@ public class MavenParser implements Parser {
                 MavenResolutionResult model = new MavenResolutionResult(randomId(), null, resolvedPom, emptyList(), null, emptyMap(), sanitizedSettings, mavenCtx.getActiveProfiles())
                         .resolveDependencies(downloader, ctx);
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
-            } catch (MavenDownloadingExceptions | MavenDownloadingException e) {
+            } catch (MavenDownloadingExceptions e) {
+                Xml.Document withWarnings = e.warn(docToPom.getKey());
+                parsed.add(withWarnings.withMarkers(withWarnings.getMarkers().add(ParseExceptionResult.build(MavenParser.class, e))));
+                ctx.getOnError().accept(e);
+            } catch (MavenDownloadingException e) {
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e))));
                 ctx.getOnError().accept(e);
             }
