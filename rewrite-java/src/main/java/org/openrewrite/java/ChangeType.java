@@ -193,13 +193,7 @@ public class ChangeType extends Recipe {
                         if (!"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
                             maybeAddImport(fullyQualifiedTarget.getPackageName(), fullyQualifiedTarget.getClassName(), null, true);
                         }
-
-                        if (importAlias != null) {
-                            JavaVisitor visitor = new UpdateImportAlias(targetType, importAlias);
-                            if (!getAfterVisit().contains(visitor)) {
-                                doAfterVisit(visitor);
-                            }
-                        }
+                        maybeUpdateAlias();
                     }
                 }
 
@@ -299,13 +293,7 @@ public class ChangeType extends Recipe {
                             if (fqn != null && TypeUtils.isOfClassType(fqn, originalType.getFullyQualifiedName()) &&
                                 method.getSimpleName().equals(anImport.getQualid().getSimpleName())) {
                                 maybeAddImport(((JavaType.FullyQualified) targetType).getFullyQualifiedName(), method.getName().getSimpleName());
-
-                                if (importAlias != null) {
-                                    JavaVisitor visitor = new UpdateImportAlias(targetType, importAlias);
-                                    if (!getAfterVisit().contains(visitor)) {
-                                        doAfterVisit(visitor);
-                                    }
-                                }
+                                maybeUpdateAlias();
                                 break;
                             }
                         }
@@ -313,6 +301,15 @@ public class ChangeType extends Recipe {
                 }
             }
             return super.visitMethodInvocation(method, ctx);
+        }
+
+        private void maybeUpdateAlias() {
+            if (importAlias != null) {
+                UpdateImportAlias visitor = new UpdateImportAlias(targetType, importAlias);
+                if (!getAfterVisit().contains(visitor)) {
+                    doAfterVisit(visitor);
+                }
+            }
         }
 
         private Expression updateOuterClassTypes(Expression typeTree) {
