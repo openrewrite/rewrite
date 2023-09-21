@@ -104,7 +104,8 @@ class TabsAndIndentsTest implements RewriteTest {
               class Test {
                   private void firstArgNoPrefix(String first,
                                                 int times,
-                       String third) {
+                                                String third
+                       ) {
                   }
                   private void firstArgOnNewLine(
                           String first,
@@ -118,7 +119,8 @@ class TabsAndIndentsTest implements RewriteTest {
               class Test {
                   private void firstArgNoPrefix(String first,
                                                 int times,
-                                                String third) {
+                                                String third
+                  ) {
                   }
                   private void firstArgOnNewLine(
                           String first,

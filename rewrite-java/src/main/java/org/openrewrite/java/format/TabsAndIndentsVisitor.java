@@ -231,6 +231,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                                 }
                                 getCursor().getParentOrThrow().putMessage("lastIndent", alignTo - style.getContinuationIndent());
                                 elem = visitAndCast(elem, p);
+                                getCursor().getParentOrThrow().putMessage("lastIndent", indent);
                                 after = indentTo(right.getAfter(), t == lastArg ? indent : alignTo, loc.getAfterLocation());
                             } else {
                                 after = right.getAfter();
