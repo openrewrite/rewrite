@@ -25,6 +25,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings({"All", "RedundantVisibilityModifier"})
 class AutodetectTest implements RewriteTest {
@@ -988,5 +989,29 @@ class AutodetectTest implements RewriteTest {
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(12);
+    }
+
+    @Test
+    void continuationIndentFromFieldAccess() {
+        var cus = kp().parse(
+          """
+            class Node(val next: Node?, val name: String)
+            class Test {
+                val node = Node(null, "foo")
+                val res = node
+                     .next
+                     ?.next
+                     ?.next
+                     ?.name
+            }
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+
+        assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(5);
     }
 }

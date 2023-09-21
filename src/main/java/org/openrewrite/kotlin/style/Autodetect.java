@@ -423,6 +423,13 @@ public class Autodetect extends NamedStyles {
             return expression;
         }
 
+        @Override
+        public J.FieldAccess visitFieldAccess(J.FieldAccess fa, IndentStatistics stats) {
+            visit(fa.getTarget(), stats);
+            countIndents(fa.getPadding().getName().getBefore().getWhitespace(), true, stats);
+            return fa;
+        }
+
         @SuppressWarnings("CommentedOutCode")
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation m, IndentStatistics stats) {
@@ -461,14 +468,13 @@ public class Autodetect extends NamedStyles {
                 int spaceIndent = 0;
                 int tabIndent = 0;
                 boolean mixed = false;
-                String chars = space.substring(ni);
-                for (int i = 0; i < chars.length(); i++) {
-                    if (chars.charAt(i) == ' ') {
+                for (int i = ni; i < space.length(); i++) {
+                    if (space.charAt(i) == ' ') {
                         if (tabIndent > 0) {
                             mixed = true;
                         }
                         spaceIndent++;
-                    } else if (chars.charAt(i) == '\t') {
+                    } else if (space.charAt(i) == '\t') {
                         if (spaceIndent > 0) {
                             mixed = true;
                         }
