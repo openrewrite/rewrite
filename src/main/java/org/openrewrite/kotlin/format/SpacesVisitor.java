@@ -393,11 +393,19 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                     m.getPadding().getArguments().getPadding().withElements(
                             ListUtils.map(m.getPadding().getArguments().getPadding().getElements(),
                                     (index, arg) -> {
-                                        if (index == 0) {
-                                            arg = arg.withElement(spaceBefore(arg.getElement(), noParens));
+                                        boolean before = index == 0 ? noParens : style.getOther().getAfterComma();
+                                        if (arg.getElement().getMarkers().findFirst(SpreadArgument.class).isPresent()) {
+                                            SpreadArgument spreadArgument = arg.getElement().getMarkers().findFirst(SpreadArgument.class).get();
+                                            arg = arg.withElement(
+                                                    arg.getElement().withMarkers(arg.getMarkers().setByType(spreadArgument
+                                                            .withPrefix(updateSpace(spreadArgument.getPrefix(), before))))
+                                            );
+                                            arg = arg.withElement(
+                                                    spaceBefore(arg.getElement(), style.getAroundOperators().getUnary())
+                                            );
                                         } else {
                                             arg = arg.withElement(
-                                                    spaceBefore(arg.getElement(), style.getOther().getAfterComma())
+                                                    spaceBefore(arg.getElement(), before)
                                             );
                                         }
                                         if (index == argsSize - 1) {

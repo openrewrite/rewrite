@@ -415,12 +415,14 @@ class SpacesTest implements RewriteTest {
                   fun method() {
                       var x = 0
                       x += 1
+                      x++
                   }
                   """,
                 """
                   fun method() {
                       var x=0
                       x+=1
+                      x++
                   }
                   """
               )
@@ -701,6 +703,30 @@ class SpacesTest implements RewriteTest {
                       val a = 1 * 2
                       val b = 1 / 2
                       val c = 1 % 2
+                  }
+                  """
+              )
+            );
+        }
+
+        @Test
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/321")
+        void afterSpreadOperator() {
+            rewriteRun(
+              spaces(style -> style.withAroundOperators(style.getAroundOperators().withUnary(false))
+                .withOther(style.getOther().withAfterComma(true))
+              ),
+              kotlin(
+                """
+                  fun format(format: String, vararg params: String) { }
+                  fun test() {
+                    format("f",* arrayOf("foo", "bar"))
+                  }
+                  """,
+                """
+                  fun format(format: String, vararg params: String) { }
+                  fun test() {
+                    format("f", *arrayOf("foo", "bar"))
                   }
                   """
               )
