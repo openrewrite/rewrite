@@ -15,10 +15,12 @@
  */
 package org.openrewrite.java;
 
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
@@ -85,6 +87,8 @@ public class ChangeType extends Recipe {
     private static class ChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
         private final JavaType.Class originalType;
         private final JavaType targetType;
+        @Nullable
+        private J.Identifier importAlias;
 
         @Nullable
         private final Boolean ignoreDefinition;
@@ -96,6 +100,7 @@ public class ChangeType extends Recipe {
             this.originalType = JavaType.ShallowClass.build(oldFullyQualifiedTypeName);
             this.targetType = JavaType.buildType(newFullyQualifiedTypeName);
             this.ignoreDefinition = ignoreDefinition;
+            importAlias = null;
         }
 
         @Override
@@ -125,6 +130,14 @@ public class ChangeType extends Recipe {
 
         @Override
         public J visitImport(J.Import import_, ExecutionContext ctx) {
+            // Just Collect kotlin alias for original type here
+            if (import_.getAlias() != null) {
+                if (hasSameFQN(import_, originalType)) {
+                    // collect Kotlin alias
+                    importAlias = import_.getAlias();
+                }
+            }
+
             // visitCompilationUnit() handles changing the imports.
             // If we call super.visitImport() then visitFieldAccess() will change the imports before AddImport/RemoveImport see them.
             // visitFieldAccess() doesn't have the import-specific formatting logic that AddImport/RemoveImport do.
@@ -180,6 +193,7 @@ public class ChangeType extends Recipe {
                         if (!"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
                             maybeAddImport(fullyQualifiedTarget.getPackageName(), fullyQualifiedTarget.getClassName(), null, true);
                         }
+                        maybeUpdateAlias();
                     }
                 }
 
@@ -279,6 +293,7 @@ public class ChangeType extends Recipe {
                             if (fqn != null && TypeUtils.isOfClassType(fqn, originalType.getFullyQualifiedName()) &&
                                 method.getSimpleName().equals(anImport.getQualid().getSimpleName())) {
                                 maybeAddImport(((JavaType.FullyQualified) targetType).getFullyQualifiedName(), method.getName().getSimpleName());
+                                maybeUpdateAlias();
                                 break;
                             }
                         }
@@ -286,6 +301,15 @@ public class ChangeType extends Recipe {
                 }
             }
             return super.visitMethodInvocation(method, ctx);
+        }
+
+        private void maybeUpdateAlias() {
+            if (importAlias != null) {
+                UpdateImportAlias visitor = new UpdateImportAlias(targetType, importAlias);
+                if (!getAfterVisit().contains(visitor)) {
+                    doAfterVisit(visitor);
+                }
+            }
         }
 
         private Expression updateOuterClassTypes(Expression typeTree) {
@@ -434,6 +458,25 @@ public class ChangeType extends Recipe {
 
         private boolean isTargetFullyQualifiedType(@Nullable JavaType.FullyQualified fq) {
             return fq != null && TypeUtils.isOfClassType(fq, originalType.getFullyQualifiedName()) && targetType instanceof JavaType.FullyQualified;
+        }
+    }
+
+
+
+    // Visitor to backfill the missing kotlin alias import
+    @AllArgsConstructor
+    private static class UpdateImportAlias extends JavaIsoVisitor<ExecutionContext> {
+        @NonNull
+        private final JavaType targetType;
+        @NonNull
+        private J.Identifier importAlias;
+
+        @Override
+        public J.Import visitImport(J.Import _import, ExecutionContext executionContext) {
+            if (hasSameFQN(_import, targetType)) {
+                return _import.withAlias(importAlias);
+            }
+            return _import;
         }
     }
 
@@ -589,5 +632,15 @@ public class ChangeType extends Recipe {
             return classType;
         }
         return getTopLevelClassName(classType.getOwningClass());
+    }
+
+    public static boolean hasSameFQN(J.Import import_, JavaType targetType) {
+        JavaType.FullyQualified type = TypeUtils.asFullyQualified(targetType);
+        String fqn = type != null ? type.getFullyQualifiedName() : null;
+
+        JavaType.FullyQualified curType = TypeUtils.asFullyQualified(Optional.ofNullable(import_.getQualid()).map(J.FieldAccess::getType).orElse(null));
+        String curFqn = curType != null ? curType.getFullyQualifiedName() : null;
+
+        return fqn != null && fqn.equals(curFqn);
     }
 }
