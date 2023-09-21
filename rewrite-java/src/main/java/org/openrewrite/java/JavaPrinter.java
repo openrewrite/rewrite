@@ -707,8 +707,9 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                 }
             }
 
-            char[] valueSourceArr = literal.getValueSource().toCharArray();
-            for (char c : valueSourceArr) {
+            String valueSource = literal.getValueSource();
+            for (int j = 0; j < valueSource.length(); j++) {
+                char c = valueSource.charAt(j);
                 p.append(c);
                 if (surrogate != null && surrogate.getValueSourceIndex() == ++i) {
                     while (surrogate != null && surrogate.getValueSourceIndex() == i) {

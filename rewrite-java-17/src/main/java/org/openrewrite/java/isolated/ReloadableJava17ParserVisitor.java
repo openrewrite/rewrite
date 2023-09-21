@@ -835,11 +835,10 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
             List<J.Literal.UnicodeEscape> unicodeEscapes = null;
 
             int i = 0;
-            char[] valueSourceArr = valueSource.toCharArray();
-            for (int j = 0; j < valueSourceArr.length; j++) {
-                char c = valueSourceArr[j];
-                if (c == '\\' && j < valueSourceArr.length - 1 && (j == 0 || valueSourceArr[j - 1] != '\\')) {
-                    if (valueSourceArr[j + 1] == 'u' && j < valueSource.length() - 5) {
+            for (int j = 0; j < valueSource.length(); j++) {
+                char c = valueSource.charAt(j);
+                if (c == '\\' && j < valueSource.length() - 1 && (j == 0 || valueSource.charAt(j - 1) != '\\')) {
+                    if (valueSource.charAt(j + 1) == 'u' && j < valueSource.length() - 5) {
                         String codePoint = valueSource.substring(j + 2, j + 6);
                         int codePointNumeric = Integer.parseInt(codePoint, 16);
                         if (codePointNumeric >= SURR_FIRST && codePointNumeric <= SURR_LAST) {
