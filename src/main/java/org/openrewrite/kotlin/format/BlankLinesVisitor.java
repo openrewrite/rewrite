@@ -73,7 +73,7 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
             K.CompilationUnit cu = (K.CompilationUnit) requireNonNull(tree);
             if (cu.getPackageDeclaration() != null) {
                 J.Package pa = cu.getPackageDeclaration();
-                if (!pa.getPrefix().getComments().isEmpty()) {
+                if (!pa.getPrefix().getComments().isEmpty() || !cu.getAnnotations().isEmpty()) {
                     List<Comment> updatedComments = ListUtils.mapLast(pa.getPrefix().getComments(), c -> {
                         String suffix = keepMaximumLines(c.getSuffix(), keepMaximumBlankLines_BetweenHeaderAndPackage);
                         suffix = minimumLines(suffix, minimumBlankLines_BeforePackageStatement);
