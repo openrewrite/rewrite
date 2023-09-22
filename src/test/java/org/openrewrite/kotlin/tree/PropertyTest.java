@@ -37,6 +37,22 @@ class PropertyTest implements RewriteTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/325")
+    void interfaceWithEmptyGetter() {
+        rewriteRun(
+          kotlin(
+            """
+              interface Test {
+                  val foo: String
+                      get
+                  fun bar() = 2
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/299")
     void propertyAccessorsWithoutBody() {
         rewriteRun(

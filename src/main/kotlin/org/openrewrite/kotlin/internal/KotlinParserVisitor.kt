@@ -2291,14 +2291,14 @@ class KotlinParserVisitor(
             val methodName = if (propertyAccessor.isGetter) "get" else "set"
             val name = createIdentifier(methodName, propertyAccessor)
             val params: JContainer<Statement?>
-            val before = sourceBefore("(")
             if (propertyAccessor.isGetter && propertyAccessor.body != null) {
                 params = JContainer.build(
-                        before,
+                        sourceBefore("("),
                         listOf(padRight(J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), Space.EMPTY)),
                         Markers.EMPTY
                 )
             } else if (propertyAccessor.body != null) {
+                val before = sourceBefore("(")
                 val parameters: MutableList<JRightPadded<Statement?>> = ArrayList(propertyAccessor.valueParameters.size)
                 val valueParameters = propertyAccessor.valueParameters
                 for (i in valueParameters.indices) {
@@ -2315,7 +2315,7 @@ class KotlinParserVisitor(
                 params = JContainer.build(before, parameters, Markers.EMPTY)
             } else {
                 params = JContainer.empty<Statement?>()
-                        .withBefore(before)
+                        .withBefore(whitespace())
                         .withMarkers(Markers.EMPTY.addIfAbsent(OmitParentheses(randomId())))
             }
             val saveCursor = cursor
