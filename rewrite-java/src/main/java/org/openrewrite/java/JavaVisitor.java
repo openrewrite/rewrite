@@ -124,11 +124,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         int lastDotIdx = fullyQualifiedName.lastIndexOf('.');
         String packageName = lastDotIdx != -1 ? fullyQualifiedName.substring(0, lastDotIdx) : null;
         String typeName = lastDotIdx != -1 ? fullyQualifiedName.substring(lastDotIdx + 1) : fullyQualifiedName;
-        maybeAddImport(packageName, typeName, member, onlyIfReferenced);
+        maybeAddImport(packageName, typeName, member, null, onlyIfReferenced);
     }
 
-    public void maybeAddImport(@Nullable String packageName, String typeName, @Nullable String member, boolean onlyIfReferenced) {
-        JavaVisitor<P> visitor = service(ImportService.class).addImportVisitor(packageName, typeName, member, onlyIfReferenced);
+    public void maybeAddImport(@Nullable String packageName, String typeName, @Nullable String member, @Nullable String alias, boolean onlyIfReferenced) {
+        JavaVisitor<P> visitor = service(ImportService.class).addImportVisitor(packageName, typeName, member, alias, onlyIfReferenced);
         if (!getAfterVisit().contains(visitor)) {
             doAfterVisit(visitor);
         }

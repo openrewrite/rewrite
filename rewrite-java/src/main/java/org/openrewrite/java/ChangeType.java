@@ -20,7 +20,6 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.UsesType;
 import org.openrewrite.java.tree.*;
@@ -89,6 +88,8 @@ public class ChangeType extends Recipe {
         private final JavaType targetType;
         @Nullable
         private J.Identifier importAlias;
+        private boolean hasImportWithoutAlias;
+        private boolean isKotlinSource;
 
         @Nullable
         private final Boolean ignoreDefinition;
@@ -101,11 +102,16 @@ public class ChangeType extends Recipe {
             this.targetType = JavaType.buildType(newFullyQualifiedTypeName);
             this.ignoreDefinition = ignoreDefinition;
             importAlias = null;
+            hasImportWithoutAlias = false;
+            isKotlinSource = false;
         }
 
         @Override
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
+                if (tree.getClass().getName().equals("org.openrewrite.kotlin.tree.K$CompilationUnit")) {
+                    isKotlinSource = true;
+                }
                 JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
                 if (!Boolean.TRUE.equals(ignoreDefinition)) {
                     JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);
@@ -130,11 +136,16 @@ public class ChangeType extends Recipe {
 
         @Override
         public J visitImport(J.Import import_, ExecutionContext ctx) {
-            // Just Collect kotlin alias for original type here
-            if (import_.getAlias() != null) {
+            if (isKotlinSource) {
+                // Collect kotlin alias information here
+                // If there is an existing import with an alias, we need to add a target import with an alias accordingly.
+                // If there is an existing import without an alias, we need to add a target import with an alias accordingly.
                 if (hasSameFQN(import_, originalType)) {
-                    // collect Kotlin alias
-                    importAlias = import_.getAlias();
+                    if (import_.getAlias() != null) {
+                        importAlias = import_.getAlias();
+                    } else {
+                        hasImportWithoutAlias = true;
+                    }
                 }
             }
 
@@ -147,6 +158,16 @@ public class ChangeType extends Recipe {
         @Override
         public @Nullable JavaType visitType(@Nullable JavaType javaType, ExecutionContext ctx) {
             return updateType(javaType);
+        }
+
+        private void maybeAddKotlinImport(JavaType.FullyQualified owningClass) {
+            if (importAlias != null) {
+                maybeAddImport(owningClass.getPackageName(), owningClass.getClassName(), null, importAlias.getSimpleName(), true);
+            }
+
+            if (hasImportWithoutAlias) {
+                maybeAddImport(owningClass.getPackageName(), owningClass.getClassName(), null, null, true);
+            }
         }
 
         @Override
@@ -188,12 +209,19 @@ public class ChangeType extends Recipe {
                     JavaType.FullyQualified owningClass = fullyQualifiedTarget.getOwningClass();
                     if (!(owningClass != null && topLevelClassnames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName()))) {
                         if (owningClass != null && !"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
-                            maybeAddImport(owningClass.getPackageName(), owningClass.getClassName(), null, true);
+                            if (isKotlinSource) {
+                                maybeAddKotlinImport(owningClass);
+                            } else {
+                                maybeAddImport(owningClass.getPackageName(), owningClass.getClassName(), null, null, true);
+                            }
                         }
                         if (!"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
-                            maybeAddImport(fullyQualifiedTarget.getPackageName(), fullyQualifiedTarget.getClassName(), null, true);
+                            if (isKotlinSource) {
+                                maybeAddKotlinImport(fullyQualifiedTarget);
+                            } else {
+                                maybeAddImport(fullyQualifiedTarget.getPackageName(), fullyQualifiedTarget.getClassName(), null, null, true);
+                            }
                         }
-                        maybeUpdateAlias();
                     }
                 }
 
@@ -292,8 +320,13 @@ public class ChangeType extends Recipe {
                             JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType());
                             if (fqn != null && TypeUtils.isOfClassType(fqn, originalType.getFullyQualifiedName()) &&
                                 method.getSimpleName().equals(anImport.getQualid().getSimpleName())) {
-                                maybeAddImport(((JavaType.FullyQualified) targetType).getFullyQualifiedName(), method.getName().getSimpleName());
-                                maybeUpdateAlias();
+                                JavaType.FullyQualified targetFqn = (JavaType.FullyQualified) targetType;
+
+                                if (isKotlinSource) {
+                                    maybeAddKotlinImport(targetFqn);
+                                } else {
+                                    maybeAddImport((targetFqn).getFullyQualifiedName(), method.getName().getSimpleName());
+                                }
                                 break;
                             }
                         }
@@ -301,15 +334,6 @@ public class ChangeType extends Recipe {
                 }
             }
             return super.visitMethodInvocation(method, ctx);
-        }
-
-        private void maybeUpdateAlias() {
-            if (importAlias != null) {
-                UpdateImportAlias visitor = new UpdateImportAlias(targetType, importAlias);
-                if (!getAfterVisit().contains(visitor)) {
-                    doAfterVisit(visitor);
-                }
-            }
         }
 
         private Expression updateOuterClassTypes(Expression typeTree) {
@@ -458,25 +482,6 @@ public class ChangeType extends Recipe {
 
         private boolean isTargetFullyQualifiedType(@Nullable JavaType.FullyQualified fq) {
             return fq != null && TypeUtils.isOfClassType(fq, originalType.getFullyQualifiedName()) && targetType instanceof JavaType.FullyQualified;
-        }
-    }
-
-
-
-    // Visitor to backfill the missing kotlin alias import
-    @AllArgsConstructor
-    private static class UpdateImportAlias extends JavaIsoVisitor<ExecutionContext> {
-        @NonNull
-        private final JavaType targetType;
-        @NonNull
-        private J.Identifier importAlias;
-
-        @Override
-        public J.Import visitImport(J.Import _import, ExecutionContext executionContext) {
-            if (hasSameFQN(_import, targetType)) {
-                return _import.withAlias(importAlias);
-            }
-            return _import;
         }
     }
 

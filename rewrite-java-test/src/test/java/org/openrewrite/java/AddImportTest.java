@@ -536,7 +536,7 @@ class AddImportTest implements RewriteTest {
             );
 
             rewriteRun(
-              spec -> spec.recipe(toRecipe(() -> new AddImport<>(pkg, "B", null, false))),
+              spec -> spec.recipe(toRecipe(() -> new AddImport<>(pkg, "B", null, null, false))),
               sources.toArray(new SourceSpecs[0])
             );
         }
