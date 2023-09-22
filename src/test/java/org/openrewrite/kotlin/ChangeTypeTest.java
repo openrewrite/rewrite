@@ -165,4 +165,55 @@ public class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void addImportAlias() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
+          kotlin(
+            """
+              import java.util.ArrayList as MyList
+
+              fun main() {
+                  val list = ArrayList<String>()
+                  val list2 = MyList<String>()
+              }
+              """,
+            """
+              import java.util.LinkedList as MyList
+
+              fun main() {
+                  val list = LinkedList<String>()
+                  val list2 = MyList<String>()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void updateImportAlias() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
+          kotlin(
+            """
+              import java.util.ArrayList as MyList
+              import java.util.LinkedList
+
+              fun main() {
+                  val list = ArrayList<String>()
+                  val list2 = MyList<String>()
+              }
+              """,
+            """
+              import java.util.LinkedList as MyList
+
+              fun main() {
+                  val list = LinkedList<String>()
+                  val list2 = MyList<String>()
+              }
+              """
+          )
+        );
+    }
 }
