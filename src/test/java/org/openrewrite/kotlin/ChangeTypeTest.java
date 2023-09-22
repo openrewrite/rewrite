@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -114,8 +113,6 @@ public class ChangeTypeTest implements RewriteTest {
               """,
             """
               package example
-              
-              import x.y.Target
 
               fun test(original: x.y.Target<String>) { }
               """
@@ -172,6 +169,8 @@ public class ChangeTypeTest implements RewriteTest {
           spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
           kotlin(
             """
+              import java.util.ArrayList
+
               import java.util.ArrayList as MyList
 
               fun main() {
@@ -180,6 +179,8 @@ public class ChangeTypeTest implements RewriteTest {
               }
               """,
             """
+              import java.util.LinkedList
+              
               import java.util.LinkedList as MyList
 
               fun main() {
@@ -198,7 +199,7 @@ public class ChangeTypeTest implements RewriteTest {
           kotlin(
             """
               import java.util.ArrayList as MyList
-              import java.util.LinkedList
+              import java.util.ArrayList
 
               fun main() {
                   val list = ArrayList<String>()
@@ -206,11 +207,59 @@ public class ChangeTypeTest implements RewriteTest {
               }
               """,
             """
+              import java.util.LinkedList
+              
               import java.util.LinkedList as MyList
 
               fun main() {
                   val list = LinkedList<String>()
                   val list2 = MyList<String>()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void usingAliasOnly() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
+          kotlin(
+            """
+              import java.util.ArrayList as MyList
+
+              fun main() {
+                  val list2 = MyList<String>()
+              }
+              """,
+            """
+              import java.util.LinkedList as MyList
+
+              fun main() {
+                  val list2 = MyList<String>()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void qualifiedReference() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
+          kotlin(
+            """
+              import java.util.ArrayList as MyList
+
+              fun main() {
+                  val list2 = java.util.ArrayList<String>()
+              }
+              """,
+            """
+              import java.util.LinkedList as MyList
+
+              fun main() {
+                  val list2 = java.util.LinkedList<String>()
               }
               """
           )

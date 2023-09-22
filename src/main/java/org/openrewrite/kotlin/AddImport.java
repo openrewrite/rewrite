@@ -121,6 +121,13 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
 
             if (cu.getImports().stream().anyMatch(i -> {
                 String ending = i.getQualid().getSimpleName();
+
+                String alias1 = Optional.ofNullable(i.getAlias()).map(J.Identifier::getSimpleName).orElse("");
+                String alias2 = alias != null ? alias : "";
+                if (!alias1.equals(alias2)) {
+                    return false;
+                }
+
                 if (member == null) {
                     return i.getPackageName().equals(packageName) &&
                            (ending.equals(typeName) || "*".equals(ending));
