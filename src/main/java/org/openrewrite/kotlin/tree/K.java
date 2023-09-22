@@ -23,6 +23,7 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaTypeVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
@@ -42,6 +43,8 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
@@ -143,6 +146,47 @@ public interface K extends J {
             this.imports = imports;
             this.statements = statements;
             this.eof = eof;
+        }
+
+        @Transient
+        @Override
+        public long getWeight(Predicate<Object> uniqueIdentity) {
+            AtomicInteger n = new AtomicInteger();
+            new KotlinVisitor<AtomicInteger>() {
+                final JavaTypeVisitor<AtomicInteger> typeVisitor = new JavaTypeVisitor<AtomicInteger>() {
+                    @Override
+                    public JavaType visit(@Nullable JavaType javaType, AtomicInteger n) {
+                        if (javaType != null && uniqueIdentity.test(javaType)) {
+                            n.incrementAndGet();
+                            return super.visit(javaType, n);
+                        }
+                        //noinspection ConstantConditions
+                        return javaType;
+                    }
+                };
+
+                @Override
+                public @Nullable J visit(@Nullable Tree tree, AtomicInteger n) {
+                    if (tree != null) {
+                        n.incrementAndGet();
+                    }
+                    return super.visit(tree, n);
+                }
+
+                @Override
+                public JavaType visitType(@Nullable JavaType javaType, AtomicInteger n) {
+                    return typeVisitor.visit(javaType, n);
+                }
+
+                @Override
+                public Markers visitMarkers(@Nullable Markers markers, AtomicInteger n) {
+                    if (markers != null) {
+                        n.addAndGet(markers.getMarkers().size());
+                    }
+                    return markers;
+                }
+            }.visit(this, n);
+            return n.get();
         }
 
         @Override
