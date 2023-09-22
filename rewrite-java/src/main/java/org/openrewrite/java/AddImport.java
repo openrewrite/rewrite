@@ -72,6 +72,10 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     @EqualsAndHashCode.Include
     private final boolean onlyIfReferenced;
 
+    @EqualsAndHashCode.Include
+    @Nullable
+    private final String alias;
+
     public AddImport(String type, @Nullable String member, boolean onlyIfReferenced) {
         int lastDotIdx = type.lastIndexOf('.');
         this.packageName = lastDotIdx != -1 ? type.substring(0, lastDotIdx) : null;
@@ -79,14 +83,16 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         this.fullyQualifiedName = type;
         this.member = member;
         this.onlyIfReferenced = onlyIfReferenced;
+        alias = null;
     }
 
-    public AddImport(@Nullable String packageName, String typeName, @Nullable String member, boolean onlyIfReferenced) {
+    public AddImport(@Nullable String packageName, String typeName, @Nullable String member, @Nullable String alias, boolean onlyIfReferenced) {
         this.packageName = packageName;
         this.typeName = typeName.replace('.', '$');
         this.fullyQualifiedName = packageName == null ? typeName : packageName + "." + typeName;
         this.member = member;
         this.onlyIfReferenced = onlyIfReferenced;
+        this.alias = alias;
     }
 
     @Override

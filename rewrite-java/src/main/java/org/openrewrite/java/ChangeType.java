@@ -188,12 +188,17 @@ public class ChangeType extends Recipe {
                     JavaType.FullyQualified owningClass = fullyQualifiedTarget.getOwningClass();
                     if (!(owningClass != null && topLevelClassnames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName()))) {
                         if (owningClass != null && !"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
-                            maybeAddImport(owningClass.getPackageName(), owningClass.getClassName(), null, true);
+                            if (importAlias != null) {
+                                maybeAddImport(owningClass.getPackageName(), owningClass.getClassName(), null, importAlias.getSimpleName(), true);
+                            }
+                            maybeAddImport(owningClass.getPackageName(), owningClass.getClassName(), null, null, true);
                         }
                         if (!"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
-                            maybeAddImport(fullyQualifiedTarget.getPackageName(), fullyQualifiedTarget.getClassName(), null, true);
+                            if (importAlias != null) {
+                                maybeAddImport(fullyQualifiedTarget.getPackageName(), fullyQualifiedTarget.getClassName(), null, importAlias.getSimpleName(), true);
+                            }
+                            maybeAddImport(fullyQualifiedTarget.getPackageName(), fullyQualifiedTarget.getClassName(), null, null, true);
                         }
-                        maybeUpdateAlias();
                     }
                 }
 
@@ -292,8 +297,12 @@ public class ChangeType extends Recipe {
                             JavaType.FullyQualified fqn = TypeUtils.asFullyQualified(anImport.getQualid().getTarget().getType());
                             if (fqn != null && TypeUtils.isOfClassType(fqn, originalType.getFullyQualifiedName()) &&
                                 method.getSimpleName().equals(anImport.getQualid().getSimpleName())) {
-                                maybeAddImport(((JavaType.FullyQualified) targetType).getFullyQualifiedName(), method.getName().getSimpleName());
-                                maybeUpdateAlias();
+                                JavaType.FullyQualified targetFqn = (JavaType.FullyQualified) targetType;
+                                maybeAddImport((targetFqn).getFullyQualifiedName(), method.getName().getSimpleName());
+
+                                if (importAlias != null) {
+                                    maybeAddImport(targetFqn.getPackageName(), targetFqn.getClassName(), null, importAlias.getSimpleName(), true);
+                                }
                                 break;
                             }
                         }
@@ -301,15 +310,6 @@ public class ChangeType extends Recipe {
                 }
             }
             return super.visitMethodInvocation(method, ctx);
-        }
-
-        private void maybeUpdateAlias() {
-            if (importAlias != null) {
-                UpdateImportAlias visitor = new UpdateImportAlias(targetType, importAlias);
-                if (!getAfterVisit().contains(visitor)) {
-                    doAfterVisit(visitor);
-                }
-            }
         }
 
         private Expression updateOuterClassTypes(Expression typeTree) {
@@ -458,25 +458,6 @@ public class ChangeType extends Recipe {
 
         private boolean isTargetFullyQualifiedType(@Nullable JavaType.FullyQualified fq) {
             return fq != null && TypeUtils.isOfClassType(fq, originalType.getFullyQualifiedName()) && targetType instanceof JavaType.FullyQualified;
-        }
-    }
-
-
-
-    // Visitor to backfill the missing kotlin alias import
-    @AllArgsConstructor
-    private static class UpdateImportAlias extends JavaIsoVisitor<ExecutionContext> {
-        @NonNull
-        private final JavaType targetType;
-        @NonNull
-        private J.Identifier importAlias;
-
-        @Override
-        public J.Import visitImport(J.Import _import, ExecutionContext executionContext) {
-            if (hasSameFQN(_import, targetType)) {
-                return _import.withAlias(importAlias);
-            }
-            return _import;
         }
     }
 
