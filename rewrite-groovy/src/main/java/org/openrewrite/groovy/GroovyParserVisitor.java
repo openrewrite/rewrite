@@ -35,16 +35,17 @@ import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.ImplicitReturn;
+import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.java.marker.Semicolon;
 import org.openrewrite.marker.Markers;
 
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -69,7 +70,6 @@ public class GroovyParserVisitor {
     private final Charset charset;
     private final boolean charsetBomMarked;
     private final GroovyTypeMapping typeMapping;
-    private final ExecutionContext ctx;
 
     private int cursor = 0;
 
@@ -83,6 +83,7 @@ public class GroovyParserVisitor {
      */
     private int columnOffset;
 
+    @SuppressWarnings("unused")
     public GroovyParserVisitor(Path sourcePath, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source, JavaTypeCache typeCache, ExecutionContext ctx) {
         this.sourcePath = sourcePath;
         this.fileAttributes = fileAttributes;
@@ -90,7 +91,6 @@ public class GroovyParserVisitor {
         this.charset = source.getCharset();
         this.charsetBomMarked = source.isCharsetBomMarked();
         this.typeMapping = new GroovyTypeMapping(typeCache);
-        this.ctx = ctx;
     }
 
     public G.CompilationUnit visit(SourceUnit unit, ModuleNode ast) throws GroovyParsingException {
@@ -581,10 +581,21 @@ public class GroovyParserVisitor {
             return ts;
         }
 
-        private void visitParenthesized(ASTNode node, Space fmt) {
-            skip("(");
-            queue.add(new J.Parentheses<Expression>(randomId(), fmt, Markers.EMPTY,
-                    convert(node, t -> sourceBefore(")"))));
+        private Expression insideParentheses(ASTNode node, Function<Space, Expression> parenthesizedTree) {
+            AtomicInteger insideParenthesesLevel = node.getNodeMetaData("_INSIDE_PARENTHESES_LEVEL");
+            if (insideParenthesesLevel != null) {
+                Stack<Space> openingParens = new Stack<>();
+                for (int i = 0; i < insideParenthesesLevel.get(); i++) {
+                    openingParens.push(sourceBefore("("));
+                }
+                Expression parenthesized = parenthesizedTree.apply(whitespace());
+                for (int i = 0; i < insideParenthesesLevel.get(); i++) {
+                    parenthesized = new J.Parentheses<>(randomId(), openingParens.pop(), Markers.EMPTY,
+                            padRight(parenthesized, sourceBefore(")")));
+                }
+                return parenthesized;
+            }
+            return parenthesizedTree.apply(whitespace());
         }
 
         @Override
@@ -690,19 +701,15 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitBinaryExpression(BinaryExpression binary) {
-            Space fmt = whitespace();
-
-            if (source.charAt(cursor) == '(') {
-                visitParenthesized(binary, fmt);
-            } else {
+            queue.add(insideParentheses(binary, fmt -> {
                 Expression left = visit(binary.getLeftExpression());
-
                 Space opPrefix = whitespace();
                 boolean assignment = false;
                 boolean instanceOf = false;
                 J.AssignmentOperation.Type assignOp = null;
                 J.Binary.Type binaryOp = null;
                 G.Binary.Type gBinaryOp = null;
+
                 switch (binary.getOperation().getText()) {
                     case "+":
                         binaryOp = J.Binary.Type.Addition;
@@ -818,31 +825,32 @@ public class GroovyParserVisitor {
                 Expression right = visit(binary.getRightExpression());
 
                 if (assignment) {
-                    queue.add(new J.Assignment(randomId(), fmt, Markers.EMPTY,
+                    return new J.Assignment(randomId(), fmt, Markers.EMPTY,
                             left, JLeftPadded.build(right).withBefore(opPrefix),
-                            typeMapping.type(binary.getType())));
+                            typeMapping.type(binary.getType()));
                 } else if (instanceOf) {
-                    queue.add(new J.InstanceOf(randomId(), fmt, Markers.EMPTY,
+                    return new J.InstanceOf(randomId(), fmt, Markers.EMPTY,
                             JRightPadded.build(left).withAfter(opPrefix), right, null,
-                            typeMapping.type(binary.getType())));
+                            typeMapping.type(binary.getType()));
                 } else if (assignOp != null) {
-                    queue.add(new J.AssignmentOperation(randomId(), fmt, Markers.EMPTY,
+                    return new J.AssignmentOperation(randomId(), fmt, Markers.EMPTY,
                             left, JLeftPadded.build(assignOp).withBefore(opPrefix),
-                            right, typeMapping.type(binary.getType())));
+                            right, typeMapping.type(binary.getType()));
                 } else if (binaryOp != null) {
-                    queue.add(new J.Binary(randomId(), fmt, Markers.EMPTY,
+                    return new J.Binary(randomId(), fmt, Markers.EMPTY,
                             left, JLeftPadded.build(binaryOp).withBefore(opPrefix),
-                            right, typeMapping.type(binary.getType())));
+                            right, typeMapping.type(binary.getType()));
                 } else if (gBinaryOp != null) {
                     Space after = EMPTY;
                     if (gBinaryOp == G.Binary.Type.Access) {
                         after = sourceBefore("]");
                     }
-                    queue.add(new G.Binary(randomId(), fmt, Markers.EMPTY,
+                    return new G.Binary(randomId(), fmt, Markers.EMPTY,
                             left, JLeftPadded.build(gBinaryOp).withBefore(opPrefix),
-                            right, after, typeMapping.type(binary.getType())));
+                            right, after, typeMapping.type(binary.getType()));
                 }
-            }
+                throw new IllegalStateException("Unknown binary expression " + binary.getClass().getSimpleName());
+            }));
         }
 
         @Override
@@ -950,7 +958,7 @@ public class GroovyParserVisitor {
                             null,
                             JContainer.build(singletonList(JRightPadded.build(visit(statement.getExpression())))),
                             JContainer.build(sourceBefore(":"),
-                                    convertStatements(((BlockStatement) statement.getCode()).getStatements(),  t -> Space.EMPTY), Markers.EMPTY),
+                                    convertStatements(((BlockStatement) statement.getCode()).getStatements(), t -> Space.EMPTY), Markers.EMPTY),
                             null
                     )
             );
@@ -996,7 +1004,7 @@ public class GroovyParserVisitor {
             Space prefix = whitespace();
             LambdaStyle ls = new LambdaStyle(randomId(), expression instanceof LambdaExpression, true);
             boolean parenthesized = false;
-            if(source.charAt(cursor) == '(') {
+            if (source.charAt(cursor) == '(') {
                 parenthesized = true;
                 cursor += 1; // skip '('
             } else if (source.charAt(cursor) == '{') {
@@ -1031,12 +1039,12 @@ public class GroovyParserVisitor {
                 }
             } else {
                 Space argPrefix = EMPTY;
-                if(parenthesized) {
+                if (parenthesized) {
                     argPrefix = whitespace();
                 }
                 paramExprs = singletonList(JRightPadded.build(new J.Empty(randomId(), argPrefix, Markers.EMPTY)));
             }
-            if(parenthesized) {
+            if (parenthesized) {
                 cursor += 1;
             }
             J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), EMPTY, Markers.EMPTY, parenthesized, paramExprs);
@@ -1054,7 +1062,7 @@ public class GroovyParserVisitor {
                     arrowPrefix,
                     body,
                     closureType));
-            if(cursor < source.length() && source.charAt(cursor) == '}') {
+            if (cursor < source.length() && source.charAt(cursor) == '}') {
                 cursor++;
             }
         }
@@ -1074,83 +1082,78 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitConstantExpression(ConstantExpression expression) {
-            Space prefix = whitespace();
-
-            JavaType.Primitive jType;
-            // The unaryPlus is not included in the expression and must be handled through the source.
-            String text = expression.getText();
-            Object value = expression.getValue();
-            ClassNode type = expression.getType();
-            if (type == ClassHelper.BigDecimal_TYPE) {
-                // TODO: Proper support for BigDecimal literals
-                jType = JavaType.Primitive.Double;
-                value = ((BigDecimal) value).doubleValue();
-            } else if (type == ClassHelper.boolean_TYPE) {
-                jType = JavaType.Primitive.Boolean;
-            } else if (type == ClassHelper.byte_TYPE) {
-                jType = JavaType.Primitive.Byte;
-            } else if (type == ClassHelper.char_TYPE) {
-                jType = JavaType.Primitive.Char;
-            } else if (type == ClassHelper.double_TYPE || "java.lang.Double".equals(type.getName())) {
-                jType = JavaType.Primitive.Double;
-                if (expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT") instanceof String) {
-                    text = (String) expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT");
-                }
-            } else if (type == ClassHelper.float_TYPE || "java.lang.Float".equals(type.getName())) {
-                jType = JavaType.Primitive.Float;
-                if (expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT") instanceof String) {
-                    text = (String) expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT");
-                }
-            } else if (type == ClassHelper.int_TYPE || "java.lang.Integer".equals(type.getName())) {
-                jType = JavaType.Primitive.Int;
-                if (expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT") instanceof String) {
-                    text = (String) expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT");
-                }
-            } else if (type == ClassHelper.long_TYPE || "java.lang.Long".equals(type.getName())) {
-                if (expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT") instanceof String) {
-                    text = (String) expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT");
-                }
-                jType = JavaType.Primitive.Long;
-            } else if (type == ClassHelper.short_TYPE || "java.lang.Short".equals(type.getName())) {
-                jType = JavaType.Primitive.Short;
-            } else if (type == ClassHelper.STRING_TYPE) {
-                jType = JavaType.Primitive.String;
-                // String literals value returned by getValue()/getText() has already processed sequences like "\\" -> "\"
-                int length = sourceLengthOfNext(expression);
-                text = source.substring(cursor, cursor + length);
-                int delimiterLength = 0;
-                if (text.startsWith("$/")) {
-                    delimiterLength = 2;
-                } else if (text.startsWith("\"\"\"") || text.startsWith("'''")) {
-                    delimiterLength = 3;
-                } else if (text.startsWith("/") || text.startsWith("\"") || text.startsWith("'")) {
-                    delimiterLength = 1;
-                }
-                value = text.substring(delimiterLength, text.length() - delimiterLength);
-            } else if (expression.isNullExpression()) {
-                if(source.startsWith("null", cursor)) {
-                    text = "null";
+            queue.add(insideParentheses(expression, fmt -> {
+                JavaType.Primitive jType;
+                // The unaryPlus is not included in the expression and must be handled through the source.
+                String text = expression.getText();
+                Object value = expression.getValue();
+                ClassNode type = expression.getType();
+                if (type == ClassHelper.BigDecimal_TYPE) {
+                    // TODO: Proper support for BigDecimal literals
+                    jType = JavaType.Primitive.Double;
+                    value = ((BigDecimal) value).doubleValue();
+                } else if (type == ClassHelper.boolean_TYPE) {
+                    jType = JavaType.Primitive.Boolean;
+                } else if (type == ClassHelper.byte_TYPE) {
+                    jType = JavaType.Primitive.Byte;
+                } else if (type == ClassHelper.char_TYPE) {
+                    jType = JavaType.Primitive.Char;
+                } else if (type == ClassHelper.double_TYPE || "java.lang.Double".equals(type.getName())) {
+                    jType = JavaType.Primitive.Double;
+                    if (expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT") instanceof String) {
+                        text = (String) expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT");
+                    }
+                } else if (type == ClassHelper.float_TYPE || "java.lang.Float".equals(type.getName())) {
+                    jType = JavaType.Primitive.Float;
+                    if (expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT") instanceof String) {
+                        text = (String) expression.getNodeMetaData().get("_FLOATING_POINT_LITERAL_TEXT");
+                    }
+                } else if (type == ClassHelper.int_TYPE || "java.lang.Integer".equals(type.getName())) {
+                    jType = JavaType.Primitive.Int;
+                    if (expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT") instanceof String) {
+                        text = (String) expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT");
+                    }
+                } else if (type == ClassHelper.long_TYPE || "java.lang.Long".equals(type.getName())) {
+                    if (expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT") instanceof String) {
+                        text = (String) expression.getNodeMetaData().get("_INTEGER_LITERAL_TEXT");
+                    }
+                    jType = JavaType.Primitive.Long;
+                } else if (type == ClassHelper.short_TYPE || "java.lang.Short".equals(type.getName())) {
+                    jType = JavaType.Primitive.Short;
+                } else if (type == ClassHelper.STRING_TYPE) {
+                    jType = JavaType.Primitive.String;
+                    // String literals value returned by getValue()/getText() has already processed sequences like "\\" -> "\"
+                    int length = sourceLengthOfNext(expression);
+                    text = source.substring(cursor, cursor + length);
+                    int delimiterLength = 0;
+                    if (text.startsWith("$/")) {
+                        delimiterLength = 2;
+                    } else if (text.startsWith("\"\"\"") || text.startsWith("'''")) {
+                        delimiterLength = 3;
+                    } else if (text.startsWith("/") || text.startsWith("\"") || text.startsWith("'")) {
+                        delimiterLength = 1;
+                    }
+                    value = text.substring(delimiterLength, text.length() - delimiterLength);
+                } else if (expression.isNullExpression()) {
+                    if (source.startsWith("null", cursor)) {
+                        text = "null";
+                    } else {
+                        text = "";
+                    }
+                    jType = JavaType.Primitive.Null;
                 } else {
-                    text = "";
+                    throw new IllegalStateException("Unexpected constant type " + type);
                 }
-                jType = JavaType.Primitive.Null;
-            } else {
-                ctx.getOnError().accept(new IllegalStateException("Unexpected constant type " + type));
-                return;
-            }
 
-            if (source.charAt(cursor) == '(') {
-                visitParenthesized(expression, prefix);
-            } else {
                 if (source.charAt(cursor) == '+' && !text.startsWith("+")) {
                     // A unaryPlus operator is implied on numerics and needs to be manually detected / added via the source.
                     text = "+" + text;
                 }
                 cursor += text.length();
 
-                queue.add(new J.Literal(randomId(), prefix, Markers.EMPTY, value, text,
-                        null, jType));
-            }
+                return new J.Literal(randomId(), fmt, Markers.EMPTY, value, text,
+                        null, jType);
+            }));
         }
 
         @Override
@@ -1374,8 +1377,8 @@ public class GroovyParserVisitor {
                     } else {
                         columnOffset--;
                     }
-                    strings.add(new G.GString.Value(randomId(), Markers.EMPTY, visit(e),  inCurlies ? sourceBefore("}") : Space.EMPTY, inCurlies));
-                    if(!inCurlies) {
+                    strings.add(new G.GString.Value(randomId(), Markers.EMPTY, visit(e), inCurlies ? sourceBefore("}") : Space.EMPTY, inCurlies));
+                    if (!inCurlies) {
                         columnOffset++;
                     }
                 } else if (e instanceof ConstantExpression) {
@@ -1704,7 +1707,7 @@ public class GroovyParserVisitor {
                             randomId(), sourceBefore("{"), Markers.EMPTY,
                             JRightPadded.build(false),
                             ListUtils.concat(
-                                    convertAll(statement.getCaseStatements(),  t -> Space.EMPTY, t -> Space.EMPTY),
+                                    convertAll(statement.getCaseStatements(), t -> Space.EMPTY, t -> Space.EMPTY),
                                     statement.getDefaultStatement().isEmpty() ? null : JRightPadded.build(visitDefaultCaseStatement((BlockStatement) statement.getDefaultStatement()))
                             ),
                             sourceBefore("}"))));
@@ -1721,17 +1724,11 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitTernaryExpression(TernaryExpression ternary) {
-            Space prefix = whitespace();
-
-            if (source.charAt(cursor) == '(') {
-                visitParenthesized(ternary, prefix);
-            } else {
-                queue.add(new J.Ternary(randomId(), prefix, Markers.EMPTY,
-                        visit(ternary.getBooleanExpression()),
-                        padLeft(sourceBefore("?"), visit(ternary.getTrueExpression())),
-                        padLeft(sourceBefore(":"), visit(ternary.getFalseExpression())),
-                        typeMapping.type(ternary.getType())));
-            }
+            queue.add(insideParentheses(ternary, fmt -> new J.Ternary(randomId(), fmt, Markers.EMPTY,
+                    visit(ternary.getBooleanExpression()),
+                    padLeft(sourceBefore("?"), visit(ternary.getTrueExpression())),
+                    padLeft(sourceBefore(":"), visit(ternary.getFalseExpression())),
+                    typeMapping.type(ternary.getType()))));
         }
 
         @Override
@@ -2136,9 +2133,9 @@ public class GroovyParserVisitor {
 
         assert expr != null;
         if (classNode != null) {
-            if(classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder()) {
+            if (classNode.isUsingGenerics() && !classNode.isGenericsPlaceHolder()) {
                 expr = new J.ParameterizedType(randomId(), EMPTY, Markers.EMPTY, (NameTree) expr, visitTypeParameterizations(classNode.getGenericsTypes()), typeMapping.type(classNode));
-            } else if(classNode.isArray()) {
+            } else if (classNode.isArray()) {
                 expr = new J.ArrayType(randomId(), EMPTY, Markers.EMPTY, (TypeTree) expr, arrayDimensionsFrom(classNode));
             }
         }
@@ -2147,7 +2144,7 @@ public class GroovyParserVisitor {
 
     private List<JRightPadded<Space>> arrayDimensionsFrom(ClassNode classNode) {
         List<JRightPadded<Space>> result = new ArrayList<>();
-        while(classNode != null && classNode.isArray()) {
+        while (classNode != null && classNode.isArray()) {
             classNode = classNode.getComponentType();
             result.add(JRightPadded.build(sourceBefore("[")).withAfter(sourceBefore("]")));
         }
