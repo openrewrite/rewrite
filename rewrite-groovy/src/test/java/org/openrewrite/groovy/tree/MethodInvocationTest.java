@@ -22,7 +22,6 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.groovy.Assertions.groovy;
 
 class MethodInvocationTest implements RewriteTest {
-
     @Test
     void gradle() {
         rewriteRun(
@@ -259,6 +258,31 @@ class MethodInvocationTest implements RewriteTest {
                   isEmpty("")
                 }
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3559")
+    void escapedMethodNameTest() {
+        rewriteRun(
+          groovy(
+            """
+              def 'default'() {}
+              'default'()
+              """
+          )
+        );
+    }
+
+    @Test
+    void escapedMethodNameWithSpacesTest() {
+        rewriteRun(
+          groovy(
+            """
+              def 'some test scenario description'() {}
+              'some test scenario description'()
               """
           )
         );

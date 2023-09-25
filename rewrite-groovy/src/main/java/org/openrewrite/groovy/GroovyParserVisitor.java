@@ -1466,9 +1466,18 @@ public class GroovyParserVisitor {
             // closure() has implicitThis set to false
             // So the "select" that was just parsed _may_ have actually been the method name
             J.Identifier name;
-            if (call.getMethodAsString().equals(source.substring(cursor, cursor + call.getMethodAsString().length()))) {
-                name = new J.Identifier(randomId(), sourceBefore(call.getMethodAsString()), Markers.EMPTY,
-                        emptyList(), call.getMethodAsString(), null, null);
+
+            String methodNameExpression = call.getMethodAsString();
+            if (source.charAt(cursor) == '"' || source.charAt(cursor) == '\'') {
+                // we have an escaped groovy method name, commonly used for test `def 'some scenario description'() {}`
+                // or to workaround names that are also keywords in groovy
+                methodNameExpression = source.charAt(cursor) + methodNameExpression + source.charAt(cursor);
+            }
+
+
+            if (methodNameExpression.equals(source.substring(cursor, cursor + methodNameExpression.length()))) {
+                name = new J.Identifier(randomId(), sourceBefore(methodNameExpression), Markers.EMPTY,
+                        emptyList(), methodNameExpression, null, null);
 
             } else if (select != null && select.getElement() instanceof J.Identifier) {
                 name = (J.Identifier) select.getElement();
