@@ -1210,6 +1210,44 @@ class AddDependencyTest implements RewriteTest {
         );
     }
 
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3559")
+    void defaultConfigurationEscaped() {
+        String onlyIfUsing = "com.google.common.math.IntMath";
+        rewriteRun(
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing, "default")),
+          mavenProject("project",
+            srcTestJava(
+              java(usingGuavaIntMath)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                """,
+              """
+                plugins {
+                    id 'java'
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
+                dependencies {
+                    'default' "com.google.guava:guava:29.0-jre"
+                }
+                """
+            )
+          )
+        );
+    }
+
     private AddDependency addDependency(String gav, String onlyIfUsing) {
         return addDependency(gav, onlyIfUsing, null);
     }

@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import lombok.RequiredArgsConstructor;
+
 import org.openrewrite.*;
 import org.openrewrite.gradle.internal.InsertDependencyComparator;
 import org.openrewrite.gradle.marker.GradleDependencyConfiguration;
@@ -37,7 +38,6 @@ import org.openrewrite.maven.tree.*;
 import org.openrewrite.semver.*;
 import org.openrewrite.tree.ParseError;
 
-import java.text.ParseException;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -239,11 +239,11 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
             DependencyStyle style = autodetectDependencyStyle(body.getStatements());
             if (style == DependencyStyle.String) {
                 codeTemplate = "dependencies {\n" +
-                               configuration + " \"" + groupId + ":" + artifactId + (resolvedVersion == null ? "" : ":" + resolvedVersion) + (resolvedVersion == null || classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\"" +
+                               escapeIfNecessary(configuration) + " \"" + groupId + ":" + artifactId + (resolvedVersion == null ? "" : ":" + resolvedVersion) + (resolvedVersion == null || classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\"" +
                                "\n}";
             } else {
                 codeTemplate = "dependencies {\n" +
-                               configuration + " group: \"" + groupId + "\", name: \"" + artifactId + "\"" + (resolvedVersion == null ? "" : ", version: \"" + resolvedVersion + "\"") + (classifier == null ? "" : ", classifier: \"" + classifier + "\"") + (extension == null ? "" : ", ext: \"" + extension + "\"") +
+                               escapeIfNecessary(configuration) + " group: \"" + groupId + "\", name: \"" + artifactId + "\"" + (resolvedVersion == null ? "" : ", version: \"" + resolvedVersion + "\"") + (classifier == null ? "" : ", classifier: \"" + classifier + "\"") + (extension == null ? "" : ", ext: \"" + extension + "\"") +
                                "\n}";
             }
 
@@ -331,6 +331,12 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
 
             return m;
         }
+    }
+
+    private String escapeIfNecessary(String configurationName) {
+        // default is a gradle configuration created by the base plugin and a groovy keyword if
+        // it is used it needs to be escaped
+        return configurationName.equals("default") ? "'" + configurationName + "'" : configurationName;
     }
 
     enum DependencyStyle {
