@@ -55,6 +55,35 @@ class UnnecessaryParenthesesTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings({"EmptyTryBlock", "CaughtExceptionImmediatelyRethrown"})
+    @Test
+    void minimumSpaceThrow() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  int test() {
+                      try {
+                      } catch(Exception e) {
+                          throw(e);
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  int test() {
+                      try {
+                      } catch(Exception e) {
+                          throw e;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2170")
     @Test
     void minimumSpace() {
