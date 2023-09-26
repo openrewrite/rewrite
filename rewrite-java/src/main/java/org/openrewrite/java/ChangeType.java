@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java;
 
-import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
@@ -88,8 +87,6 @@ public class ChangeType extends Recipe {
         private final JavaType targetType;
         @Nullable
         private J.Identifier importAlias;
-        private boolean hasImportWithoutAlias;
-
         @Nullable
         private final Boolean ignoreDefinition;
 
@@ -101,7 +98,6 @@ public class ChangeType extends Recipe {
             this.targetType = JavaType.buildType(newFullyQualifiedTypeName);
             this.ignoreDefinition = ignoreDefinition;
             importAlias = null;
-            hasImportWithoutAlias = false;
         }
 
         @Override
@@ -137,8 +133,6 @@ public class ChangeType extends Recipe {
             if (hasSameFQN(import_, originalType)) {
                 if (import_.getAlias() != null) {
                     importAlias = import_.getAlias();
-                } else {
-                    hasImportWithoutAlias = true;
                 }
             }
 
@@ -158,9 +152,7 @@ public class ChangeType extends Recipe {
                 maybeAddImport(owningClass.getPackageName(), owningClass.getClassName(), null, importAlias.getSimpleName(), true);
             }
 
-            if (hasImportWithoutAlias) {
-                maybeAddImport(owningClass.getPackageName(), owningClass.getClassName(), null, null, true);
-            }
+            maybeAddImport(owningClass.getPackageName(), owningClass.getClassName(), null, null, true);
         }
 
         @Override

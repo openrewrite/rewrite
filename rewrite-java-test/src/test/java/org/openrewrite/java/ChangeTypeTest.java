@@ -69,6 +69,35 @@ class ChangeTypeTest implements RewriteTest {
 
     @SuppressWarnings({"deprecation", "KotlinRedundantDiagnosticSuppress"})
     @Test
+    void starImport() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.logging.LoggingMXBean", "java.lang.management.PlatformLoggingMXBean", true)),
+          java(
+            """
+              import java.util.logging.*;
+
+              class Test {
+                  static void method() {
+                      LoggingMXBean loggingBean = null;
+                  }
+              }
+              """,
+            """
+              import java.lang.management.PlatformLoggingMXBean;
+              import java.util.logging.*;
+
+              class Test {
+                  static void method() {
+                      PlatformLoggingMXBean loggingBean = null;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings({"deprecation", "KotlinRedundantDiagnosticSuppress"})
+    @Test
     void allowJavaLangSubpackages() {
         rewriteRun(
           spec -> spec.recipe(new ChangeType("java.util.logging.LoggingMXBean", "java.lang.management.PlatformLoggingMXBean", true)),
