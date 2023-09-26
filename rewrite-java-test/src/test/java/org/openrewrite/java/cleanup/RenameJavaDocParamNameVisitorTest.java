@@ -49,6 +49,8 @@ class RenameJavaDocParamNameVisitorTest implements RewriteTest {
                 J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, executionContext);
                 if (variable.getSimpleName().equals("oldName")) {
                     v = v.withName(v.getName().withSimpleName("newName"));
+                    v = v.withName(v.getName().withFieldType(v.getName().getFieldType().withName("newName")));
+                    v = v.withVariableType(v.getVariableType().withName("newName"));
                 }
                 return v;
             }

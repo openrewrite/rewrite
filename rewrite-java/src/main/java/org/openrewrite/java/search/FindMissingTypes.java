@@ -18,10 +18,7 @@ package org.openrewrite.java.search;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.JavadocVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
@@ -101,6 +98,9 @@ public class FindMissingTypes extends Recipe {
             // J.Identifier.getType() is allowed to be null in places where the containing AST element fully specifies the type
             if (!isWellFormedType(identifier.getType(), seenTypes) && !isAllowedToHaveNullType(identifier)) {
                 identifier = SearchResult.found(identifier, "Identifier type is missing or malformed");
+            }
+            if (identifier.getFieldType() != null && !identifier.getSimpleName().equals(identifier.getFieldType().getName())) {
+                identifier = SearchResult.found(identifier, "type information has a different variable name '" + identifier.getFieldType().getName() + "'");
             }
             return identifier;
         }
