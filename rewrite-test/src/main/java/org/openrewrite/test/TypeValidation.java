@@ -46,7 +46,10 @@ public class TypeValidation {
     @Builder.Default
     private boolean constructorInvocations = true;
 
+    @Builder.Default
+    private boolean before = true;
+
     public static TypeValidation none() {
-        return new TypeValidation(false,false,false,false,false,false);
+        return new TypeValidation(false,false,false,false,false,false,false);
     }
 }

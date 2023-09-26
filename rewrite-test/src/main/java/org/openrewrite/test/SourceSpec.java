@@ -55,13 +55,13 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     UnaryOperator<String> after;
 
     /**
-     * Apply a function to each SourceFile after recipe execution.
+     * Apply a function to each SourceFile (before and after) recipe execution.
      * Useful for validating the AST or its metadata.
      */
-    final EachResult eachResult;
+    final ValidateSource validateSource;
 
-    public interface EachResult {
-        EachResult noop = (sourceFile, testMethodSpec, testClassSpec) -> sourceFile;
+    public interface ValidateSource {
+        ValidateSource noop = (sourceFile, testMethodSpec, testClassSpec) -> sourceFile;
 
         SourceFile accept(SourceFile sourceFile, RecipeSpec testMethodSpec, RecipeSpec testClassSpec);
     }
@@ -75,7 +75,7 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
         this.parser = parser;
         this.before = before;
         this.after = after;
-        this.eachResult = EachResult.noop;
+        this.validateSource = ValidateSource.noop;
         this.customizeExecutionContext = (ctx) -> {
         };
     }

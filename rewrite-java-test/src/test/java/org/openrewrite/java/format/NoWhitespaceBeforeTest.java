@@ -30,6 +30,7 @@ import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.SourceSpec;
+import org.openrewrite.test.TypeValidation;
 
 import java.util.Collections;
 import java.util.List;
@@ -735,7 +736,8 @@ class NoWhitespaceBeforeTest implements RewriteTest {
     @Test
     void doNotStripAnnotationArguments() {
         rewriteRun(
-          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle())),
+          spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle()))
+            .typeValidationOptions(TypeValidation.none()),
           java(
             """
               import org.graalvm.compiler.core.common.SuppressFBWarnings;
