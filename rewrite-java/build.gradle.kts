@@ -33,7 +33,7 @@ dependencies {
     implementation("org.apache.commons:commons-text:latest.release")
     implementation("io.github.classgraph:classgraph:latest.release")
 
-    implementation("org.xerial.snappy:snappy-java:1.1.10.1")
+    implementation("org.xerial.snappy:snappy-java:1.1.10.+")
 
     api("com.fasterxml.jackson.core:jackson-annotations")
 
