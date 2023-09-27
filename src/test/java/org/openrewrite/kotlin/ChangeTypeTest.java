@@ -26,7 +26,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-public class ChangeTypeTest implements RewriteTest {
+class ChangeTypeTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new ChangeType("a.b.Original", "x.y.Target", true));
@@ -113,6 +113,8 @@ public class ChangeTypeTest implements RewriteTest {
               """,
             """
               package example
+              
+              import x.y.Target
 
               fun test(original: x.y.Target<String>) { }
               """
@@ -233,6 +235,8 @@ public class ChangeTypeTest implements RewriteTest {
               }
               """,
             """
+              import java.util.LinkedList
+
               import java.util.LinkedList as MyList
 
               fun main() {
@@ -256,6 +260,8 @@ public class ChangeTypeTest implements RewriteTest {
               }
               """,
             """
+              import java.util.LinkedList
+
               import java.util.LinkedList as MyList
 
               fun main() {
