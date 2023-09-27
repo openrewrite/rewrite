@@ -1046,5 +1046,31 @@ class AutodetectTest implements RewriteTest {
               .as("With no actual continuation indents to go off of, assume IntelliJ IDEA default of 2x the normal indent")
               .isEqualTo(8);
         }
+
+        @Test
+        void includeAnnotationAsAnnotationArg() {
+            var cus = kp().parse(
+              """
+                annotation class Foo
+                annotation class Foos(val value: Array<Foo>)
+                
+                class Test {
+                    @Foos(
+                       value = [Foo()])
+                    fun count(vararg strings: String) {
+                        return strings.length
+                    }
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var styles = detector.build();
+            var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+
+            assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+            assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(3);
+        }
     }
 }
