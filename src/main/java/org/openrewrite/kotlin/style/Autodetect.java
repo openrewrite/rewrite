@@ -418,7 +418,9 @@ public class Autodetect extends NamedStyles {
             if (statementExpressions.contains(expression)) {
                 return expression;
             }
-            countIndents(expression.getPrefix().getWhitespace(), true, stats);
+            // (newline-separated) annotations on some common target are not continuations
+            boolean isContinuation = !(expression instanceof J.Annotation);
+            countIndents(expression.getPrefix().getWhitespace(), isContinuation, stats);
 
             return expression;
         }
