@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java.style;
 
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.style.GeneralFormatStyle;
@@ -25,7 +27,7 @@ import org.openrewrite.test.RewriteTest;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SuppressWarnings({"ConstantConditions", "ResultOfMethodCallIgnored"})
+@SuppressWarnings({"ConstantConditions", "ResultOfMethodCallIgnored", "PointlessBooleanExpression"})
 class AutodetectTest implements RewriteTest {
 
     private static JavaParser jp() {
@@ -1044,5 +1046,123 @@ class AutodetectTest implements RewriteTest {
         assertThat(tabsAndIndents.getTabSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
         assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(12);
+    }
+
+    @Nested
+    class ContinuationIndentForAnnotations {
+        @Test
+        @Issue("https://github.com/openrewrite/rewrite/issues/3568")
+        void ignoreSpaceBetweenAnnotations() {
+            var cus = jp().parse(
+              """
+                class Test {
+                    @SafeVarargs
+                    @Deprecated
+                    @SuppressWarnings({"mistakes"})
+                    boolean count(String... strings) {
+                        return strings.length;
+                    }
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var styles = detector.build();
+            var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+
+            assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+            assertThat(tabsAndIndents.getContinuationIndent())
+              .as("With no actual continuation indents to go off of, assume IntelliJ IDEA default of 2x the normal indent")
+              .isEqualTo(8);
+        }
+
+        @Test
+        void includeAnnotationAsAnnotationArg() {
+            var cus = jp().parse(
+              """
+                @interface Foo{}
+                @interface Foos{
+                    Foo[] value();
+                }
+                
+                class Test {
+                    @Foos(
+                       @Foo)
+                    boolean count(String... strings) {
+                        return strings.length;
+                    }
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var styles = detector.build();
+            var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+
+            assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+            assertThat(tabsAndIndents.getContinuationIndent())
+              .isEqualTo(3);
+        }
+
+        @Test
+        void includeAnnotationArgArray() {
+            var cus = jp().parse(
+              """
+                @interface Foo{}
+                @interface Foos{
+                    Foo[] value();
+                }
+                
+                class Test {
+                    @Foos(
+                       {@Foo})
+                    boolean count(String... strings) {
+                        return strings.length;
+                    }
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var styles = detector.build();
+            var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+
+            assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+            assertThat(tabsAndIndents.getContinuationIndent())
+              .isEqualTo(3);
+        }
+
+        @Test
+        @ExpectedToFail("existing visitor does not super-visit newArray trees")
+        void includeAnnotationArgArrayElements() {
+            var cus = jp().parse(
+              """
+                @interface Foo{}
+                @interface Foos{
+                    Foo[] value();
+                }
+                
+                class Test {
+                    @Foos({
+                       @Foo})
+                    boolean count(String... strings) {
+                        return strings.length;
+                    }
+                }
+                """
+            );
+
+            var detector = Autodetect.detector();
+            cus.forEach(detector::sample);
+            var styles = detector.build();
+            var tabsAndIndents = NamedStyles.merge(TabsAndIndentsStyle.class, singletonList(styles));
+
+            assertThat(tabsAndIndents.getIndentSize()).isEqualTo(4);
+            assertThat(tabsAndIndents.getContinuationIndent())
+              .isEqualTo(3);
+        }
     }
 }
