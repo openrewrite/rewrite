@@ -24,6 +24,30 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class FunctionTypeTest implements RewriteTest {
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/326")
+    @Test
+    void functionWithFunctionTypeParameter() {
+        rewriteRun(
+          kotlin(
+            """
+              class GradleSpigotDependencyLoaderTestBuilder(
+                  var init: TestInitializer.() -> Unit = {}
+              ) {
+              }
+              
+              class TestInitializer(
+                  val resourcesDir: String
+              )
+              
+              fun runTest() {
+                  val builder = GradleSpigotDependencyLoaderTestBuilder()
+                  builder.init(TestInitializer("null"))
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void nested() {
         rewriteRun(

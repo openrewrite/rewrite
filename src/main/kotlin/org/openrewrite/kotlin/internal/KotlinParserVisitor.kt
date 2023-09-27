@@ -1175,10 +1175,22 @@ class KotlinParserVisitor(
                 markers = markers.addIfAbsent(Extension(randomId()))
             }
 
-            val implicitExtensionFunction = functionCall is FirImplicitInvokeCall
+            var hasExplicitReceiver = false
+            if (functionCall is FirImplicitInvokeCall) {
+                val explicitReceiver = functionCall.explicitReceiver
+                if (explicitReceiver is FirPropertyAccessExpression) {
+                    if (explicitReceiver.explicitReceiver != null) {
+                        hasExplicitReceiver = true
+                    }
+                }
+            }
+
+            var implicitExtensionFunction = functionCall is FirImplicitInvokeCall
                     && functionCall.arguments.isNotEmpty()
                     && functionCall.source != null
                     && functionCall.source!!.startOffset < functionCall.calleeReference.source!!.startOffset
+                    && !hasExplicitReceiver
+
             if (functionCall !is FirImplicitInvokeCall || implicitExtensionFunction) {
                 val receiver = if (implicitExtensionFunction) functionCall.arguments[0] else getReceiver(functionCall.explicitReceiver)
                 if (receiver != null) {
@@ -1191,6 +1203,13 @@ class KotlinParserVisitor(
                         skip(".")
                         select = JRightPadded.build(selectExpr).withAfter(after)
                     }
+                }
+            }
+
+            if (functionCall is FirImplicitInvokeCall) {
+                val receiver = functionCall.explicitReceiver
+                if (receiver is FirPropertyAccessExpression && receiver.explicitReceiver != null) {
+                    select = padRight(convertToExpression(receiver.explicitReceiver as FirElement, data)!!, whitespace())
                 }
             }
 
@@ -1413,6 +1432,18 @@ class KotlinParserVisitor(
         var callPsi = getPsiElement(firCall)!!
         callPsi = if (callPsi is KtDotQualifiedExpression || callPsi is KtSafeQualifiedExpression) callPsi.lastChild else callPsi
         val firArguments = if (skipFirstArgument) firCall.argumentList.arguments.subList(1, firCall.argumentList.arguments.size) else firCall.argumentList.arguments
+
+        var hasParentheses = false
+        var lPAROffset = 0
+        if (firCall.argumentList.source is KtRealPsiSourceElement) {
+            val firArgumentsSource = firCall.argumentList.source.psi
+            val firstChild = firArgumentsSource?.firstChild
+            if (firstChild != null && firstChild.node.elementType == KtTokens.LPAR) {
+                hasParentheses = true
+                lPAROffset = firstChild.node.startOffset
+            }
+        }
+
         val flattenedExpressions = firArguments.stream()
                 .map { e -> if (e is FirVarargArgumentsExpression) e.arguments else listOf(e) }
                 .flatMap { it.stream() }
@@ -1441,7 +1472,7 @@ class KotlinParserVisitor(
             cursor++
             saveCursor = cursor
             parenOrBrace = source[cursor]
-        } else if ((parenOrBrace != '(' && parenOrBrace != '[') || isInfix) {
+        } else if (!hasParentheses && ((parenOrBrace != '(' && parenOrBrace != '[') || isInfix)) {
             cursor(saveCursor)
             containerPrefix = Space.EMPTY
             markers = markers.addIfAbsent(OmitParentheses(randomId()))
@@ -1469,6 +1500,12 @@ class KotlinParserVisitor(
             for (i in flattenedExpressions.indices) {
                 isTrailingLambda = hasTrailingLambda && i == argumentCount - 1
                 val expression = flattenedExpressions[i]
+
+                // Didn't find a way to proper reset the cursor, so have to do a hard reset here
+                if (firCall is FirImplicitInvokeCall && hasParentheses && i == 0) {
+                    cursor = lPAROffset + 1
+                }
+
                 var expr = convertToExpression<Expression>(expression, data)!!
                 if (isTrailingLambda && expr !is J.Empty) {
                     expr = expr.withMarkers(expr.markers.addIfAbsent(TrailingLambdaArgument(randomId())))
