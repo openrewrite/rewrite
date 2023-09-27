@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -75,7 +76,8 @@ class FindRepeatableAnnotationsTest implements RewriteTest {
 
                   String target();
               }
-              """
+              """,
+            SourceSpec::skip
           ),
           java(
             """
@@ -91,7 +93,18 @@ class FindRepeatableAnnotationsTest implements RewriteTest {
               public @interface ValueMappings {
                   ValueMapping[] value();
               }
-              """
+              """,
+            SourceSpec::skip
+          ),
+          java(
+            """
+              package org.mapstruct;
+                          
+              public class MappingConstants {
+                  public static final String NULL = "null";
+              }
+              """,
+            SourceSpec::skip
           )
         );
     }
