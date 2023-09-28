@@ -39,6 +39,8 @@ dependencies {
     testImplementation("org.openrewrite:rewrite-test")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
     testRuntimeOnly("org.openrewrite:rewrite-java-17")
+    testRuntimeOnly("com.squareup.misk:misk-prometheus:latest.release")
+    testRuntimeOnly("com.squareup.misk:misk-metrics:latest.release")
 
     testImplementation("com.github.ajalt.clikt:clikt:3.5.0")
 }

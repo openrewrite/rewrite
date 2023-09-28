@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
@@ -267,6 +268,31 @@ class ChangeTypeTest implements RewriteTest {
               fun main() {
                   val list2 = java.util.LinkedList<String>()
               }
+              """
+          )
+        );
+    }
+
+    @Disabled
+    @Test
+    void fromLibrary() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType(
+            "misk.metrics.backends.prometheus.v2.PrometheusMetrics",
+              "misk.metrics.v2.Metrics", true))
+            .parser(KotlinParser.builder()
+              .classpath("misk-prometheus", "misk-metrics"))
+          ,
+          kotlin(
+            """
+              import misk.metrics.backends.prometheus.v2.PrometheusMetrics
+              
+              class A(val a: PrometheusMetrics)
+              """,
+            """
+              import java.util.LinkedList as MyList
+              
+              class A(val a: Metrics)
               """
           )
         );
