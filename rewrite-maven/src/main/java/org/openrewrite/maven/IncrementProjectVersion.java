@@ -17,16 +17,14 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import lombok.With;
 import org.openrewrite.*;
-import org.openrewrite.marker.Marker;
+import org.openrewrite.maven.marker.AlreadyIncremented;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.ChangeTagValue;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -68,12 +66,6 @@ public class IncrementProjectVersion extends Recipe {
         MAJOR,
         MINOR,
         PATCH
-    }
-
-    @Value
-    @With
-    private static class AlreadyIncremented implements Marker {
-        UUID id;
     }
 
     private static final Pattern SEMVER_PATTERN = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)\\.?(\\d+)?(-.+)?$");
