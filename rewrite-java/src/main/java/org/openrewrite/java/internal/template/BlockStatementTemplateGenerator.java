@@ -461,7 +461,13 @@ public class BlockStatementTemplateGenerator {
                 after.append(";");
             }
         } else if (j instanceof J.VariableDeclarations) {
-            before.insert(0, variable((J.VariableDeclarations) j, false, cursor) + '=');
+            if (prior instanceof J.Annotation) {
+                after.append(variable((J.VariableDeclarations) j, false, cursor))
+                        .append('=')
+                        .append(valueOfType(((J.VariableDeclarations) j).getType()));
+            } else {
+                before.insert(0, variable((J.VariableDeclarations) j, false, cursor) + '=');
+            }
             after.append(";");
         } else if (j instanceof J.MethodInvocation) {
             // If prior is an argument, wrap in __M__.any(prior)

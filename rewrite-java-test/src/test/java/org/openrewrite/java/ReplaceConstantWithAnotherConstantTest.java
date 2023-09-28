@@ -16,8 +16,10 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -131,6 +133,43 @@ public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               class Test {
                   static final String FOO = "foo";
                   Object o = Test.FOO;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3555")
+    void replaceConstantForAnnotatedParameter() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("com.google.common.base.Charsets.UTF_8", "com.constant.B.UTF_8"))
+            .typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
+          java(
+            """
+              package com.constant;
+              public class B {
+                  public static final String UTF_8 = "UTF_8";
+              }
+              """
+          ),
+          java(
+            """
+              import com.google.common.base.Charsets;
+              
+              class Test {
+                  void foo(@SuppressWarnings(value = Charsets.UTF_8) String param) {
+                      System.out.println(param);
+                  }
+              }
+              """,
+            """
+              import com.constant.B;
+              
+              class Test {
+                  void foo(@SuppressWarnings(value = B.UTF_8) String param) {
+                      System.out.println(param);
+                  }
               }
               """
           )
