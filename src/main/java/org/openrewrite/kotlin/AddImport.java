@@ -237,7 +237,39 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
         if (member == null) {
             //Non-static imports, we just look for field accesses.
             for (NameTree t : FindTypes.find(compilationUnit, fullyQualifiedName)) {
-                if ((!(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(fullyQualifiedName)) &&
+                JavaType.Class classType = JavaType.ShallowClass.build(fullyQualifiedName);
+                boolean foundReference = false;
+                boolean usingAlias = false;
+                if (t instanceof J.ParameterizedType) {
+                    J.ParameterizedType pt = (J.ParameterizedType) t;
+                    if (pt.getClazz() instanceof J.Identifier) {
+                        String nameInSource = ((J.Identifier) pt.getClazz()).getSimpleName();
+                        if (alias != null) {
+                            if ( nameInSource.equals(alias)) {
+                                usingAlias = true;
+                            }
+                        } else if (nameInSource.equals(classType.getClassName())) {
+                            foundReference = true;
+                        }
+                    }
+                } else if (t instanceof J.Identifier) {
+                    String nameInSource = ((J.Identifier) t).getSimpleName();
+                    if (alias != null) {
+                        if ( nameInSource.equals(alias)) {
+                            usingAlias = true;
+                        }
+                    } else if (nameInSource.equals(classType.getClassName())) {
+                        foundReference = true;
+                    }
+                } else {
+                    foundReference = true;
+                }
+
+                if (usingAlias) {
+                    return true;
+                }
+
+                if (foundReference && (!(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(fullyQualifiedName)) &&
                     isTypeReference(t)) {
                     return true;
                 }

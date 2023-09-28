@@ -23,6 +23,7 @@ import org.openrewrite.java.ChangeType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -54,6 +55,34 @@ class ChangeTypeTest implements RewriteTest {
               
               class A {
                   val type : Target = Target()
+              }
+              """
+          )
+        );
+    }
+
+
+    @Test
+    void changeImportAlias() {
+        rewriteRun(
+          kotlin(
+            """
+              package a.b
+              class Original
+              """),
+          kotlin(
+            """
+              import a.b.Original as MyAlias
+              
+              class A {
+                  val type : MyAlias = MyAlias()
+              }
+              """,
+            """
+              import x.y.Target as MyAlias
+              
+              class A {
+                  val type : MyAlias = MyAlias()
               }
               """
           )
@@ -93,6 +122,40 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/42")
+    @Test
+    void changeTypeWithGenericArgumentAlias() {
+        rewriteRun(
+          kotlin(
+            """
+              package a.b
+              class Original<A>
+              """),
+          kotlin(
+            """
+              package x.y
+              class Target<A>
+              """),
+          kotlin(
+            """
+              package example
+              
+              import a.b.Original as MyAlias
+              
+              fun test(original: MyAlias<String>) { }
+              """,
+            """
+              package example
+              
+              import x.y.Target as MyAlias
+              
+              fun test(original: MyAlias<String>) { }
+              """
+          )
+        );
+    }
+
     @Test
     void changeTypeWithGenericArgumentFullyQualified() {
         rewriteRun(
@@ -114,8 +177,6 @@ class ChangeTypeTest implements RewriteTest {
               """,
             """
               package example
-              
-              import x.y.Target
 
               fun test(original: x.y.Target<String>) { }
               """
@@ -236,12 +297,31 @@ class ChangeTypeTest implements RewriteTest {
               }
               """,
             """
-              import java.util.LinkedList
-
               import java.util.LinkedList as MyList
 
               fun main() {
                   val list2 = MyList<String>()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void implicitImport() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
+          kotlin(
+            """
+              fun main() {
+                  val list = ArrayList<String>()
+              }
+              """,
+            """
+              import java.util.LinkedList
+
+              fun main() {
+                  val list = LinkedList<String>()
               }
               """
           )
@@ -261,14 +341,13 @@ class ChangeTypeTest implements RewriteTest {
               }
               """,
             """
-              import java.util.LinkedList
 
-              import java.util.LinkedList as MyList
 
               fun main() {
                   val list2 = java.util.LinkedList<String>()
               }
               """
+            , SourceSpec::noTrim
           )
         );
     }
