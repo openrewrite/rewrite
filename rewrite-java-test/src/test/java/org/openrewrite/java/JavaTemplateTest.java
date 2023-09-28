@@ -15,11 +15,10 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Cursor;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Issue;
+import org.openrewrite.*;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RewriteTest;
 
@@ -1041,4 +1040,44 @@ class JavaTemplateTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3571")
+    @DisplayName("JavaTemplate should create a new instance with new id")
+    void javaTemplateShouldCreateANewInstanceWithNewId() {
+
+        RecipeRun run = new Recipe() {
+
+            @Override
+            public String getDisplayName() {
+                return null;
+            }
+
+            @Override
+            public String getDescription() {
+                return null;
+            }
+
+            @Override
+            public TreeVisitor<?, ExecutionContext> getVisitor() {
+                return new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
+                        JavaTemplate javaTemplate = JavaTemplate.builder("@Deprecated").javaParser(JavaParser.fromJavaVersion()).build();
+                        return javaTemplate.apply(getCursor(), classDecl.getCoordinates().addAnnotation((o1, o2) -> o1.getSimpleName().compareTo(o1.getSimpleName())));
+                    }
+                };
+            }
+        }.run(new InMemoryLargeSourceSet(JavaParser.fromJavaVersion().build().parse("public class AClass {}").toList()), new InMemoryExecutionContext(t -> {
+            throw new RuntimeException(t);
+        }));
+
+        Result result = run.getChangeset().getAllResults().get(0);
+        J.ClassDeclaration classBefore = ((J.CompilationUnit) result.getBefore()).getClasses().get(0);
+        J.ClassDeclaration classAfter = ((J.CompilationUnit) result.getAfter()).getClasses().get(0);
+
+        assertThat(classBefore).isNotSameAs( classAfter);
+        assertThat(classBefore.getId()).isNotEqualTo( classAfter.getId());
+    }
+
 }
