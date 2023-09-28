@@ -945,7 +945,9 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         K.FunctionType kf = super.visitFunctionType(functionType, p);
 
         // handle space around arrow in function type
-        kf = kf.withArrow(updateSpace(kf.getArrow(), style.getOther().getAroundArrowInFunctionTypes()));
+        if (kf.getArrow() != null) {
+            kf = kf.withArrow(updateSpace(kf.getArrow(), style.getOther().getAroundArrowInFunctionTypes()));
+        }
         kf = kf.withReturnType(spaceBefore(kf.getReturnType(), style.getOther().getAroundArrowInFunctionTypes()));
         return kf;
     }
