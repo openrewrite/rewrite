@@ -204,6 +204,62 @@ public class AddImportTest implements RewriteTest {
     }
 
     @Test
+    void importOrdering() {
+        rewriteRun(
+          spec -> spec.recipe(
+            importTypeRecipe("java.util.LinkedList")
+          ),
+          kotlin(
+            """
+              import java.util.HashMap
+              import java.util.StringJoiner
+
+              class A {
+              }
+              """,
+            """
+              import java.util.HashMap
+              import java.util.LinkedList
+              import java.util.StringJoiner
+
+              class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void importOrderingWithAlias() {
+        rewriteRun(
+          spec -> spec.recipe(
+            importTypeRecipe("java.util", "LinkedList", "MyList")
+          ),
+          kotlin(
+            """
+              import java.util.Calendar
+              
+              import java.util.HashMap as MyHashMap
+              import java.util.StringJoiner as MyStringJoiner
+
+              class A {
+              }
+              """,
+            """
+              import java.util.Calendar
+              
+              import java.util.HashMap as MyHashMap
+              import java.util.LinkedList as MyList
+              import java.util.StringJoiner as MyStringJoiner
+
+              class A {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void noImportOfImplicitTypes() {
         rewriteRun(
           spec -> spec.recipe(importTypeRecipe("kotlin.Pair")),
@@ -244,7 +300,18 @@ public class AddImportTest implements RewriteTest {
         return toRecipe(() -> new KotlinIsoVisitor<>() {
             @Override
             public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+
                 maybeAddImport(type, null, false);
+                return cu;
+            }
+        });
+    }
+
+    static Recipe importTypeRecipe(String packageName, String typeName, String alias) {
+        return toRecipe(() -> new KotlinIsoVisitor<>() {
+            @Override
+            public K.CompilationUnit visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
+                maybeAddImport(packageName, typeName, null, alias, false);
                 return cu;
             }
         });
