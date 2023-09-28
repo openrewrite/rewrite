@@ -15,11 +15,10 @@
  */
 package org.openrewrite.java;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Cursor;
-import org.openrewrite.DocumentExample;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Issue;
+import org.openrewrite.*;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RewriteTest;
 
@@ -1040,5 +1039,91 @@ class JavaTemplateTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3573")
+    @DisplayName("JavaTemplate should add a method with the declaring type == the type of declaring class type")
+    void javaTemplateShouldAssignDeclaringTypesProperly_1() {
+
+        RecipeRun run = new Recipe() {
+
+            @Override
+            public String getDisplayName() {
+                return null;
+            }
+
+            @Override
+            public String getDescription() {
+                return null;
+            }
+
+            @Override
+            public TreeVisitor<?, ExecutionContext> getVisitor() {
+                return new JavaIsoVisitor<>() {
+                    @Override
+                    public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
+                        JavaTemplate javaTemplate = JavaTemplate.builder("""
+                          public int getNumber() {
+                            return 0;
+                          }
+                          """).javaParser(JavaParser.fromJavaVersion()).build();
+                        return javaTemplate.apply(getCursor(), classDecl.getBody().getCoordinates().addMethodDeclaration((o1, o2) -> o1.getSimpleName().compareTo(o1.getSimpleName())));
+                    }
+                };
+            }
+        }.run(new InMemoryLargeSourceSet(JavaParser.fromJavaVersion().build().parse("public class AClass {}").toList()), new InMemoryExecutionContext(t -> {
+            throw new RuntimeException(t);
+        }));
+
+        Result result = run.getChangeset().getAllResults().get(0);
+        J.ClassDeclaration classBefore = ((J.CompilationUnit) result.getBefore()).getClasses().get(0);
+        J.ClassDeclaration classAfter = ((J.CompilationUnit) result.getAfter()).getClasses().get(0);
+        J.MethodDeclaration method = (J.MethodDeclaration) classAfter.getBody().getStatements().get(0);
+        assertThat(classAfter.getType()).isEqualTo(classBefore.getType());
+        assertThat(method.getMethodType().getDeclaringType()).isEqualTo(classAfter.getType());
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3573")
+    @DisplayName("JavaTemplate should add a method with the declaring type == the type of declaring class type")
+    void javaTemplateShouldAssignDeclaringTypesProperly_2() {
+
+        RecipeRun run = new Recipe() {
+
+            @Override
+            public String getDisplayName() {
+                return null;
+            }
+
+            @Override
+            public String getDescription() {
+                return null;
+            }
+
+            @Override
+            public TreeVisitor<?, ExecutionContext> getVisitor() {
+                return new JavaIsoVisitor<>() {
+                    @Override
+                    public J.Block visitBlock(J.Block block, ExecutionContext executionContext) {
+                        JavaTemplate javaTemplate = JavaTemplate.builder("""
+                          public int getNumber() {
+                            return 0;
+                          }
+                          """).javaParser(JavaParser.fromJavaVersion()).build();
+                        return javaTemplate.apply(getCursor(), block.getCoordinates().addMethodDeclaration((o1, o2) -> o1.getSimpleName().compareTo(o1.getSimpleName())));
+                    }
+                };
+            }
+        }.run(new InMemoryLargeSourceSet(JavaParser.fromJavaVersion().build().parse("public class AClass {}").toList()), new InMemoryExecutionContext(t -> {
+            throw new RuntimeException(t);
+        }));
+
+        Result result = run.getChangeset().getAllResults().get(0);
+        J.ClassDeclaration classBefore = ((J.CompilationUnit) result.getBefore()).getClasses().get(0);
+        J.ClassDeclaration classAfter = ((J.CompilationUnit) result.getAfter()).getClasses().get(0);
+        J.MethodDeclaration method = (J.MethodDeclaration) classAfter.getBody().getStatements().get(0);
+        assertThat(classAfter.getType()).isEqualTo(classBefore.getType());
+        assertThat(method.getMethodType().getDeclaringType()).isEqualTo(classAfter.getType());
     }
 }
