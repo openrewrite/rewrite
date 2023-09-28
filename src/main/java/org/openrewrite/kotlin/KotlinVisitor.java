@@ -22,7 +22,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.marker.*;
-import org.openrewrite.kotlin.service.KotlinAutoFormatService;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.kotlin.tree.KContainer;
 import org.openrewrite.kotlin.tree.KRightPadded;
@@ -64,41 +63,6 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, P p) {
         throw new UnsupportedOperationException("Kotlin has a different structure for its compilation unit. See K.CompilationUnit.");
-    }
-
-    @Override
-    public <J2 extends J> J2 autoFormat(J2 j, P p) {
-        return autoFormat(j, p, getCursor().getParentTreeCursor());
-    }
-
-    @SuppressWarnings({"ConstantConditions", "unchecked"})
-    @Override
-    public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, P p, Cursor cursor) {
-        KotlinAutoFormatService service = getCursor().firstEnclosingOrThrow(JavaSourceFile.class).service(KotlinAutoFormatService.class);
-        return (J2) service.autoFormatVisitor(stopAfter).visit(j, p, cursor);
-    }
-
-    @Override
-    public <J2 extends J> J2 autoFormat(J2 j, P p, Cursor cursor) {
-        return autoFormat(j, null, p, cursor);
-    }
-
-    @Override
-    public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p) {
-        return maybeAutoFormat(before, after, p, getCursor().getParentTreeCursor());
-    }
-
-    @Override
-    public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p, Cursor cursor) {
-        return maybeAutoFormat(before, after, null, p, cursor);
-    }
-
-    @Override
-    public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, @Nullable J stopAfter, P p, Cursor cursor) {
-        if (before != after) {
-            return autoFormat(after, stopAfter, p, cursor);
-        }
-        return after;
     }
 
     public J visitAnnotatedExpression(K.AnnotatedExpression annotatedExpression, P p) {

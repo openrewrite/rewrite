@@ -24,7 +24,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.style.*;
-import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.style.GeneralFormatStyle;
 
 import java.util.Optional;
@@ -42,11 +41,6 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
 
     public AutoFormatVisitor(@Nullable Tree stopAfter) {
         this.stopAfter = stopAfter;
-    }
-
-    @Override
-    public boolean isAcceptable(SourceFile sourceFile, P p) {
-        return sourceFile instanceof K.CompilationUnit;
     }
 
     @Override
