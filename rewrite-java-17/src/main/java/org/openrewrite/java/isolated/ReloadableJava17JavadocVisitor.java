@@ -1148,7 +1148,11 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             if (dimCount > 0) {
                 dimensions = new ArrayList<>(dimCount);
                 for (int n = 0; n < dimCount; n++) {
-                    dimensions.add(padRight(Space.build(sourceBeforeAsString("["), emptyList()), Space.build(sourceBeforeAsString("]"), emptyList())));
+                    if (!source.substring(cursor).startsWith("...")) {
+                        dimensions.add(padRight(
+                                Space.build(sourceBeforeAsString("["), emptyList()),
+                                Space.build(sourceBeforeAsString("]"), emptyList())));
+                    }
                 }
             }
 
