@@ -42,6 +42,12 @@ public class FindDeprecatedFields extends Recipe {
     @Nullable
     String typePattern;
 
+    @Option(displayName = "Match inherited",
+            description = "When enabled, find types that inherit from a deprecated type.",
+            required = false)
+    @Nullable
+    Boolean matchInherited;
+
     @Option(displayName = "Ignore deprecated scopes",
             description = "When a deprecated method is used in a deprecated method or class, ignore it.",
             required = false)
@@ -60,7 +66,8 @@ public class FindDeprecatedFields extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        TypeMatcher typeMatcher = typePattern == null ? null : new TypeMatcher(typePattern);
+        TypeMatcher typeMatcher = typePattern == null ? null : new TypeMatcher(typePattern,
+                Boolean.TRUE.equals(matchInherited));
 
         return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {
             @Override

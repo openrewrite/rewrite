@@ -20,9 +20,9 @@ import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.FieldMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.marker.SearchResult;
@@ -38,11 +38,11 @@ public class FindFields extends Recipe {
             example = "com.fasterxml.jackson.core.json.JsonWriteFeature")
     String fullyQualifiedTypeName;
 
-    @Option(displayName = "Match on overrides",
-            description = "When enabled, find methods that are overrides of the method pattern.",
+    @Option(displayName = "Match inherited",
+            description = "When enabled, find types that inherit from a deprecated type.",
             required = false)
     @Nullable
-    Boolean matchOverrides;
+    Boolean matchInherited;
 
     @Option(displayName = "Field name",
             description = "The name of a field on the type.",
@@ -65,7 +65,7 @@ public class FindFields extends Recipe {
             @Override
             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext executionContext) {
                 JavaType.Variable varType = fieldAccess.getName().getFieldType();
-                if (varType != null && new FieldMatcher(fullyQualifiedTypeName, Boolean.TRUE.equals(matchOverrides)).matches(varType.getOwner()) &&
+                if (varType != null && new TypeMatcher(fullyQualifiedTypeName, Boolean.TRUE.equals(matchInherited)).matches(varType.getOwner()) &&
                     StringUtils.matchesGlob(varType.getName(), fieldName)) {
                     return SearchResult.found(fieldAccess);
                 }
@@ -76,7 +76,7 @@ public class FindFields extends Recipe {
             public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
                 J.Identifier i = super.visitIdentifier(identifier, executionContext);
                 JavaType.Variable varType = identifier.getFieldType();
-                if (varType != null && new FieldMatcher(fullyQualifiedTypeName, Boolean.TRUE.equals(matchOverrides)).matches(varType.getOwner()) &&
+                if (varType != null && new TypeMatcher(fullyQualifiedTypeName, Boolean.TRUE.equals(matchInherited)).matches(varType.getOwner()) &&
                     StringUtils.matchesGlob(varType.getName(), fieldName)) {
                     i = SearchResult.found(i);
                 }
@@ -87,7 +87,7 @@ public class FindFields extends Recipe {
             public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
                 J.MemberReference m = super.visitMemberReference(memberRef, ctx);
                 JavaType.Variable varType = memberRef.getVariableType();
-                if (varType != null && new FieldMatcher(fullyQualifiedTypeName, Boolean.TRUE.equals(matchOverrides)).matches(varType.getOwner()) &&
+                if (varType != null && new TypeMatcher(fullyQualifiedTypeName, Boolean.TRUE.equals(matchInherited)).matches(varType.getOwner()) &&
                     StringUtils.matchesGlob(varType.getName(), fieldName)) {
                     m = m.withReference(SearchResult.found(m.getReference()));
                 }
@@ -102,7 +102,7 @@ public class FindFields extends Recipe {
             public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Set<J> vs) {
                 J.FieldAccess f = super.visitFieldAccess(fieldAccess, vs);
                 JavaType.Variable varType = fieldAccess.getName().getFieldType();
-                if (varType != null && new FieldMatcher(fullyQualifiedTypeName, true).matches(varType.getOwner()) &&
+                if (varType != null && new TypeMatcher(fullyQualifiedTypeName, true).matches(varType.getOwner()) &&
                     StringUtils.matchesGlob(varType.getName(), fieldName)) {
                     vs.add(f);
                 }
@@ -113,7 +113,7 @@ public class FindFields extends Recipe {
             public J.Identifier visitIdentifier(J.Identifier identifier, Set<J> vs) {
                 J.Identifier i = super.visitIdentifier(identifier, vs);
                 JavaType.Variable varType = identifier.getFieldType();
-                if (varType != null && new FieldMatcher(fullyQualifiedTypeName, true).matches(varType.getOwner()) &&
+                if (varType != null && new TypeMatcher(fullyQualifiedTypeName, true).matches(varType.getOwner()) &&
                     StringUtils.matchesGlob(varType.getName(), fieldName)) {
                     vs.add(i);
                 }
@@ -124,7 +124,7 @@ public class FindFields extends Recipe {
             public J.MemberReference visitMemberReference(J.MemberReference memberRef, Set<J> vs) {
                 J.MemberReference m = super.visitMemberReference(memberRef, vs);
                 JavaType.Variable varType = memberRef.getVariableType();
-                if (varType != null && new FieldMatcher(fullyQualifiedTypeName, true).matches(varType.getOwner()) &&
+                if (varType != null && new TypeMatcher(fullyQualifiedTypeName, true).matches(varType.getOwner()) &&
                     StringUtils.matchesGlob(varType.getName(), fieldName)) {
                     vs.add(m);
                 }

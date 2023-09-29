@@ -19,12 +19,11 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.FieldMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
 import static java.util.Objects.requireNonNull;
@@ -40,7 +39,7 @@ public class UsesField<P> extends JavaIsoVisitor<P> {
             JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
             for (JavaType.Variable variable : cu.getTypesInUse().getVariables()) {
                 if (StringUtils.matchesGlob(variable.getName(), field) &&
-                    new FieldMatcher(owner, true).matches(variable.getOwner())) {
+                    new TypeMatcher(owner, true).matches(variable.getOwner())) {
                     return SearchResult.found(cu);
                 }
             }

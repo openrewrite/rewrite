@@ -15,24 +15,31 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
+@Value
+@EqualsAndHashCode(callSuper = false)
 public class FindImplementations extends Recipe {
     @Option(displayName = "Interface fully-qualified name",
             description = "A fully-qualified interface name to search for.",
             example = "org.openrewrite.Recipe")
-    private final String interfaceFullyQualifiedName;
+    String interfaceFullyQualifiedName;
 
-    public FindImplementations(String interfaceFullyQualifiedName) {
-        this.interfaceFullyQualifiedName = interfaceFullyQualifiedName;
-    }
+    @Option(displayName = "Match on inherited types",
+            description = "When enabled, find methods that are overrides of the method pattern.",
+            required = false)
+    @Nullable
+    Boolean matchInherited;
 
     @Override
     public String getDisplayName() {
