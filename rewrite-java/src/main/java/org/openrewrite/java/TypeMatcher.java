@@ -99,10 +99,10 @@ public class TypeMatcher {
     }
 
     private static boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {
-        return context.BANG() == null
-               && context.AND() == null
-               && context.OR() == null
-               && context.classNameOrInterface().DOTDOT().isEmpty()
-               && context.classNameOrInterface().WILDCARD().isEmpty();
+        return context.BANG() == null &&
+               context.AND() == null &&
+               context.OR() == null &&
+               context.classNameOrInterface().DOTDOT().isEmpty() &&
+               context.classNameOrInterface().WILDCARD().isEmpty();
     }
 }
