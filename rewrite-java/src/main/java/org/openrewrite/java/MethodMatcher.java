@@ -62,18 +62,21 @@ import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
  */
 @SuppressWarnings("NotNullFieldNotInitialized")
 public class MethodMatcher {
-    private static final JavaType.ShallowClass OBJECT_CLASS = JavaType.ShallowClass.build("java.lang.Object");
     private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
     private static final String ASPECTJ_DOTDOT_PATTERN = StringUtils.aspectjNameToPattern("..");
 
     @Getter
     private Pattern targetTypePattern;
+
     @Getter
     private Pattern methodNamePattern;
+
     @Getter
     private Pattern argumentPattern;
+
     @Nullable
     private String targetType;
+
     @Nullable
     private String methodName;
 
@@ -116,10 +119,10 @@ public class MethodMatcher {
 
     private static boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {
         return context.BANG() == null
-                && context.AND() == null
-                && context.OR() == null
-                && context.classNameOrInterface().DOTDOT().isEmpty()
-                && context.classNameOrInterface().WILDCARD().isEmpty();
+               && context.AND() == null
+               && context.OR() == null
+               && context.classNameOrInterface().DOTDOT().isEmpty()
+               && context.classNameOrInterface().WILDCARD().isEmpty();
     }
 
     private static boolean isPlainIdentifier(MethodSignatureParser.SimpleNamePatternContext context) {
@@ -149,10 +152,10 @@ public class MethodMatcher {
 
     boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
         return TypeUtils.isOfTypeWithName(
-                        type,
-                        matchOverrides,
-                        this::matchesTargetTypeName
-                );
+                type,
+                matchOverrides,
+                this::matchesTargetTypeName
+        );
     }
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
@@ -206,7 +209,7 @@ public class MethodMatcher {
         // aspectJUtils does not support matching classes separated by packages.
         // [^.]* is the product of a fully wild card match for a method. `* foo()`
         boolean matchesTargetType = (targetType == null && "[^.]*".equals(targetTypePattern.pattern()))
-                || matchesTargetType(enclosing.getType());
+                                    || matchesTargetType(enclosing.getType());
         if (!matchesTargetType) {
             return false;
         }
@@ -265,8 +268,8 @@ public class MethodMatcher {
         }
 
         if (method.getSelect() != null
-                && method.getSelect() instanceof J.Identifier
-                && !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
+            && method.getSelect() instanceof J.Identifier
+            && !matchesSelectBySimpleNameAlone(((J.Identifier) method.getSelect()))) {
             return false;
         }
 
@@ -281,11 +284,11 @@ public class MethodMatcher {
         if (targetType != null) {
             return targetType.equals(select.getSimpleName()) || targetType.endsWith('.' + select.getSimpleName());
         }
-        return targetTypePattern.matcher(select.getSimpleName()).matches()
-            || Pattern.compile(targetTypePattern.pattern()
-                        .replaceAll(".*" + Pattern.quote(ASPECTJ_DOT_PATTERN), "")
-                        .replaceAll(".*" + Pattern.quote(ASPECTJ_DOTDOT_PATTERN), ""))
-                .matcher(select.getSimpleName()).matches();
+        return targetTypePattern.matcher(select.getSimpleName()).matches() ||
+               Pattern.compile(targetTypePattern.pattern()
+                               .replaceAll(".*" + Pattern.quote(ASPECTJ_DOT_PATTERN), "")
+                               .replaceAll(".*" + Pattern.quote(ASPECTJ_DOTDOT_PATTERN), ""))
+                       .matcher(select.getSimpleName()).matches();
     }
 
     private String argumentsFromExpressionTypes(J.MethodInvocation method) {
@@ -314,8 +317,8 @@ public class MethodMatcher {
             hopefullyFullyQualifiedMethod = targetType + "." + methodNamePattern.pattern();
         } else {
             hopefullyFullyQualifiedMethod = targetTypePattern.pattern()
-                    .replace(ASPECTJ_DOT_PATTERN, ".")
-                    + "." + methodNamePattern.pattern();
+                                                    .replace(ASPECTJ_DOT_PATTERN, ".")
+                                            + "." + methodNamePattern.pattern();
         }
         return fieldAccess.isFullyQualifiedClassReference(hopefullyFullyQualifiedMethod);
     }
@@ -327,7 +330,7 @@ public class MethodMatcher {
                 return ((JavaType.Primitive) type).getClassName();
             }
             return ((JavaType.Primitive) type).getKeyword();
-        } else if(type instanceof JavaType.Unknown) {
+        } else if (type instanceof JavaType.Unknown) {
             return "*";
         } else if (type instanceof JavaType.FullyQualified) {
             return ((JavaType.FullyQualified) type).getFullyQualifiedName();
@@ -353,7 +356,7 @@ public class MethodMatcher {
         }
 
         return typePattern(method.getDeclaringType()) + " " +
-                method.getName() + "(" + parameters + ")";
+               method.getName() + "(" + parameters + ")";
     }
 }
 

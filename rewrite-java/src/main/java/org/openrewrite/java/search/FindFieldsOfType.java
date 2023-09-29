@@ -19,6 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.FieldMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -40,6 +41,12 @@ public class FindFieldsOfType extends Recipe {
             example = "org.slf4j.api.Logger")
     String fullyQualifiedTypeName;
 
+    @Option(displayName = "Match on overrides",
+            description = "When enabled, find methods that are overrides of the method pattern.",
+            required = false)
+    @Nullable
+    Boolean matchOverrides;
+
     @Override
     public String getDisplayName() {
         return "Find fields of type";
@@ -59,7 +66,8 @@ public class FindFieldsOfType extends Recipe {
                     return multiVariable;
                 }
                 if (multiVariable.getTypeExpression() != null &&
-                        hasElementType(multiVariable.getTypeExpression().getType(), fullyQualifiedTypeName) &&
+                        hasElementType(multiVariable.getTypeExpression().getType(), fullyQualifiedTypeName,
+                                Boolean.TRUE.equals(matchOverrides)) &&
                         isField(getCursor())) {
                     return SearchResult.found(multiVariable);
                 }
@@ -76,7 +84,7 @@ public class FindFieldsOfType extends Recipe {
                     return multiVariable;
                 }
                 if (multiVariable.getTypeExpression() != null &&
-                        hasElementType(multiVariable.getTypeExpression().getType(), fullyQualifiedTypeName)  &&
+                        hasElementType(multiVariable.getTypeExpression().getType(), fullyQualifiedTypeName, true)  &&
                         isField(getCursor())) {
                     vs.add(multiVariable);
                 }
@@ -103,20 +111,20 @@ public class FindFieldsOfType extends Recipe {
         return true;
     }
 
-    private static boolean hasElementType(@Nullable JavaType type, String fullyQualifiedName) {
+    private static boolean hasElementType(@Nullable JavaType type, String fullyQualifiedName,
+                                          boolean matchOverrides) {
         if (type instanceof JavaType.Array) {
-            return hasElementType(((JavaType.Array) type).getElemType(), fullyQualifiedName);
+            return hasElementType(((JavaType.Array) type).getElemType(), fullyQualifiedName, matchOverrides);
         } else if (type instanceof JavaType.FullyQualified) {
-            return fullyQualifiedName.equals(((JavaType.FullyQualified) type).getFullyQualifiedName());
+            return new FieldMatcher(fullyQualifiedName, matchOverrides).matches(type);
         } else if (type instanceof JavaType.GenericTypeVariable) {
             JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) type;
             for (JavaType bound : generic.getBounds()) {
-                if (hasElementType(bound, fullyQualifiedName)) {
+                if (hasElementType(bound, fullyQualifiedName, matchOverrides)) {
                     return true;
                 }
             }
         }
         return false;
     }
-
 }
