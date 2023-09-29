@@ -33,10 +33,6 @@ public class ParentPomsInUse extends DataTable<ParentPomsInUse.Row> {
 
     @Value
     public static class Row {
-        @Column(displayName = "Project name",
-                description = "The name of the project that contains the parent.")
-        String projectName;
-
         @Column(displayName = "Group",
                 description = "The first part of a parent coordinate `com.google.guava:guava:VERSION`.")
         String groupId;
@@ -54,10 +50,5 @@ public class ParentPomsInUse extends DataTable<ParentPomsInUse.Row> {
                 description = "The resolved dated snapshot version or `null` if this parent is not a snapshot.")
         @Nullable
         String datedSnapshotVersion;
-
-        @Column(displayName = "Relative path",
-                description = "The relative path to the parent.")
-        @Nullable
-        String relativePath;
     }
 }

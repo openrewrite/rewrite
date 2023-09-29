@@ -37,7 +37,6 @@ class ParentPomInsightTest implements RewriteTest {
         rewriteRun(
           spec -> spec.dataTable(ParentPomsInUse.Row.class, rows -> {
               assertThat(rows).hasSize(1);
-              assertThat(rows.get(0).getProjectName()).isEqualTo("demo");
               assertThat(rows.get(0).getGroupId()).isEqualTo("org.springframework.boot");
               assertThat(rows.get(0).getArtifactId()).isEqualTo("spring-boot-starter-parent");
               assertThat(rows.get(0).getVersion()).isEqualTo("3.1.4");
@@ -86,8 +85,8 @@ class ParentPomInsightTest implements RewriteTest {
     void multiModuleOnlyRoot() {
         rewriteRun(
           spec -> spec.dataTableAsCsv(ParentPomsInUse.class.getName(), """
-            projectName,groupId,artifactId,version,datedSnapshotVersion,relativePath
-            parent,org.springframework.boot,"spring-boot-starter-parent",2.5.0,,
+            projectName,groupId,artifactId,version,datedSnapshotVersion
+            parent,org.springframework.boot,"spring-boot-starter-parent",2.5.0,
             """),
           mavenProject("parent",
             pomXml(
