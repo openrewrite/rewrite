@@ -16,6 +16,7 @@
 package org.openrewrite.java.search;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -24,6 +25,9 @@ import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
 public class FindImplementations extends Recipe {
+    @Option(displayName = "Interface fully-qualified name",
+            description = "A fully-qualified interface name to search for.",
+            example = "org.openrewrite.Recipe")
     private final String interfaceFullyQualifiedName;
 
     public FindImplementations(String interfaceFullyQualifiedName) {
