@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.marker.Implicit;
 import org.openrewrite.kotlin.style.TabsAndIndentsStyle;
+import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 import org.openrewrite.kotlin.tree.K;
 
 import java.util.Iterator;
@@ -35,13 +36,15 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
     private final Tree stopAfter;
 
     private final TabsAndIndentsStyle style;
+    private final WrappingAndBracesStyle wrappingStyle;
 
-    public TabsAndIndentsVisitor(TabsAndIndentsStyle style) {
-        this(style, null);
+    public TabsAndIndentsVisitor(TabsAndIndentsStyle style, WrappingAndBracesStyle wrappingStyle) {
+        this(style, wrappingStyle, null);
     }
 
-    public TabsAndIndentsVisitor(TabsAndIndentsStyle style, @Nullable Tree stopAfter) {
+    public TabsAndIndentsVisitor(TabsAndIndentsStyle style, WrappingAndBracesStyle wrappingStyle, @Nullable Tree stopAfter) {
         this.style = style;
+        this.wrappingStyle = wrappingStyle;
         this.stopAfter = stopAfter;
     }
 
@@ -98,14 +101,17 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                 tree instanceof J.ForEachLoop ||
                 tree instanceof J.WhileLoop ||
                 tree instanceof J.Case ||
-                tree instanceof J.EnumValueSet) {
+                tree instanceof J.EnumValueSet ||
+                (tree instanceof J.FieldAccess || tree instanceof J.MethodInvocation)
+                        && !wrappingStyle.getChainedFunctionCalls().getUseContinuationIndent()
+        ) {
             getCursor().putMessage("indentType", IndentType.INDENT);
         } else if (tree instanceof K.ExpressionStatement ||
-                   tree instanceof K.StatementExpression ||
-                   tree instanceof K.KReturn ||
-                   tree instanceof K.When ||
-                   tree instanceof K.WhenBranch ||
-                   (tree != null && tree.getMarkers().findFirst(ImplicitReturn.class).isPresent())) {
+                tree instanceof K.StatementExpression ||
+                tree instanceof K.KReturn ||
+                tree instanceof K.When ||
+                tree instanceof K.WhenBranch ||
+                (tree != null && tree.getMarkers().findFirst(ImplicitReturn.class).isPresent())) {
             // skip, do nothing
         } else {
             getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
@@ -145,7 +151,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
 
             if ((loc == Space.Location.CLASS_KIND ||
                     loc == Space.Location.METHOD_DECLARATION_PREFIX)
-                && getCursor().getValue() instanceof J.ClassDeclaration) {
+                    && getCursor().getValue() instanceof J.ClassDeclaration) {
                 J.ClassDeclaration c = getCursor().getValue();
                 if (!c.getLeadingAnnotations().isEmpty()) {
                     alignToAnnotation = true;
@@ -271,7 +277,8 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                             }
                         } else {
                             elem = visitAndCast(elem, p);
-                            after = indentTo(right.getAfter(), t == lastArg ? indent : style.getContinuationIndent(), loc.getAfterLocation());
+                            Integer indentSize = wrappingStyle.getFunctionDeclarationParameters().getUseContinuationIndent() ? style.getContinuationIndent() : style.getIndentSize();
+                            after = indentTo(right.getAfter(), t == lastArg ? indent : indentSize, loc.getAfterLocation());
                         }
                         break;
                     }
@@ -314,7 +321,8 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                         getCursor().getParentOrThrow().putMessage("lastIndent", indent);
                         elem = visitAndCast(elem, p);
                         after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
-                        getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
+                        int increment = wrappingStyle.getChainedFunctionCalls().getUseContinuationIndent() ? style.getContinuationIndent() : style.getIndentSize();
+                        getCursor().getParentOrThrow().putMessage("lastIndent", indent + increment);
                         break;
                     }
                     case ANNOTATION_ARGUMENT:
@@ -336,6 +344,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                 switch (loc) {
                     case NEW_CLASS_ARGUMENTS:
                     case METHOD_INVOCATION_ARGUMENT:
+                        int chainedIncrement = wrappingStyle.getChainedFunctionCalls().getUseContinuationIndent() ? style.getContinuationIndent() : style.getIndentSize();
                         if (!elem.getPrefix().getLastWhitespace().contains("\n")) {
                             JContainer<J> args = getCursor().getParentOrThrow().getValue();
                             boolean anyOtherArgOnOwnLine = false;
@@ -358,12 +367,12 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                             if (!(elem instanceof J.MethodInvocation)) {
                                 getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
                             } else if (elem.getPrefix().getLastWhitespace().contains("\n")) {
-                                getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                                getCursor().putMessage("lastIndent", indent + chainedIncrement);
                             } else {
                                 J.MethodInvocation methodInvocation = (J.MethodInvocation) elem;
                                 Expression select = methodInvocation.getSelect();
                                 if (select instanceof J.FieldAccess || select instanceof J.Identifier || select instanceof J.MethodInvocation) {
-                                    getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                                    getCursor().putMessage("lastIndent", indent + chainedIncrement);
                                 }
                             }
                         }
@@ -396,14 +405,25 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
 
         int indent = getCursor().getNearestMessage("lastIndent", 0);
         if (container.getBefore().getLastWhitespace().contains("\n")) {
+            int increment;
+            switch (loc) {
+                case NEW_CLASS_ARGUMENTS:
+                case METHOD_INVOCATION_ARGUMENTS:
+                    increment = wrappingStyle.getFunctionCallArguments().getUseContinuationIndent() ? style.getContinuationIndent() : style.getIndentSize();
+                    break;
+                default:
+                    increment = style.getContinuationIndent();
+                    break;
+            }
             switch (loc) {
                 case TYPE_PARAMETERS:
                 case IMPLEMENTS:
                 case THROWS:
                 case NEW_CLASS_ARGUMENTS:
-                    before = indentTo(container.getBefore(), indent + style.getContinuationIndent(), loc.getBeforeLocation());
-                    getCursor().putMessage("indentType",  IndentType.ALIGN);
-                    getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                case METHOD_INVOCATION_ARGUMENTS:
+                    before = indentTo(container.getBefore(), indent + increment, loc.getBeforeLocation());
+                    getCursor().putMessage("indentType", IndentType.ALIGN);
+                    getCursor().putMessage("lastIndent", indent + increment);
                     js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
                     break;
                 default:
@@ -413,18 +433,19 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         } else {
             switch (loc) {
                 case IMPLEMENTS:
+                    getCursor().putMessage("indentType", wrappingStyle.getExtendsImplementsPermitsList().getUseContinuationIndent() ? IndentType.CONTINUATION_INDENT : IndentType.INDENT);
+                    break;
                 case METHOD_INVOCATION_ARGUMENTS:
                 case NEW_CLASS_ARGUMENTS:
+                    getCursor().putMessage("indentType", wrappingStyle.getFunctionCallArguments().getUseContinuationIndent() ? IndentType.CONTINUATION_INDENT : IndentType.INDENT);
+                    break;
                 case TYPE_PARAMETERS:
                 case THROWS:
                     getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
-                    before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
-                    js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
                     break;
-                default:
-                    before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
-                    js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
             }
+            before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
+            js = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, loc.getElementLocation(), p));
         }
 
         setCursor(getCursor().getParent());
@@ -543,7 +564,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                         char c = chars[i];
                         if (c == '\n') {
                             multiline.append(c);
-                            for (int j = 0; j < Math.abs(shift) && i+j+1 < chars.length && (chars[j + i + 1] == ' ' || chars[j + i + 1] == '\t'); j++) {
+                            for (int j = 0; j < Math.abs(shift) && i + j + 1 < chars.length && (chars[j + i + 1] == ' ' || chars[j + i + 1] == '\t'); j++) {
                                 i++;
                             }
                         } else {
@@ -558,12 +579,12 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         } else if (comment instanceof Javadoc.DocComment) {
             final Javadoc.DocComment docComment = (Javadoc.DocComment) comment;
             return docComment.withBody(ListUtils.map(docComment.getBody(), (i, jdoc) -> {
-                if(!(jdoc instanceof Javadoc.LineBreak)) {
+                if (!(jdoc instanceof Javadoc.LineBreak)) {
                     return jdoc;
                 }
                 Javadoc.LineBreak lineBreak = (Javadoc.LineBreak) jdoc;
                 String linebreak;
-                if(lineBreak.getMargin().charAt(0) == '\r') {
+                if (lineBreak.getMargin().charAt(0) == '\r') {
                     linebreak = "\r\n";
                 } else {
                     linebreak = "\n";
@@ -619,7 +640,8 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         }
 
         int size = 0;
-        for (char c : whitespace.toCharArray()) {
+        for (int i = 0; i < whitespace.length(); i++) {
+            char c = whitespace.charAt(i);
             size += c == '\t' ? style.getTabSize() : 1;
             if (c == '\n' || c == '\r') {
                 size = 0;

@@ -18,6 +18,8 @@ package org.openrewrite.kotlin.style;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.kotlin.KotlinStyle;
+import org.openrewrite.style.Style;
+import org.openrewrite.style.StyleHelper;
 
 @Value
 @With
@@ -35,6 +37,8 @@ public class WrappingAndBracesStyle implements KotlinStyle {
     BinaryExpression binaryExpression;
     WhenStatements whenStatements;
     BracesPlacement bracesPlacement;
+    ExpressionBodyFunctions expressionBodyFunctions;
+    ElvisExpressions elvisExpressions;
 
     @Value
     @With
@@ -119,5 +123,22 @@ public class WrappingAndBracesStyle implements KotlinStyle {
     @With
     public static class BracesPlacement {
         Boolean putLeftBraceOnNewLine;
+    }
+
+    @Value
+    @With
+    public static class ExpressionBodyFunctions {
+        Boolean useContinuationIndent;
+    }
+
+    @Value
+    @With
+    public static class ElvisExpressions {
+        Boolean useContinuationIndent;
+    }
+
+    @Override
+    public Style applyDefaults() {
+        return StyleHelper.merge(IntelliJ.wrappingAndBraces(), this);
     }
 }

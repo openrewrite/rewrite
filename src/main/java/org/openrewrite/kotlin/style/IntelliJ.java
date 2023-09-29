@@ -58,6 +58,7 @@ public class IntelliJ extends NamedStyles {
 
     public static ImportLayoutStyle importLayout() {
         return ImportLayoutStyle.builder()
+//                .packageToFold("java.util.*", true)
                 .packageToFold("kotlinx.android.synthetic.*", true)
                 .packageToFold("io.ktor.*", true)
                 .importAllOthers()
@@ -101,7 +102,9 @@ public class IntelliJ extends NamedStyles {
                 new WrappingAndBracesStyle.TryStatement(false, false),
                 new WrappingAndBracesStyle.BinaryExpression(false),
                 new WrappingAndBracesStyle.WhenStatements(false, true),
-                new WrappingAndBracesStyle.BracesPlacement(false)
+                new WrappingAndBracesStyle.BracesPlacement(false),
+                new WrappingAndBracesStyle.ExpressionBodyFunctions(false),
+                new WrappingAndBracesStyle.ElvisExpressions(false)
         );
     }
 

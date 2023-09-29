@@ -166,7 +166,7 @@ class AutoFormatVisitorTest implements RewriteTest {
                           bar: String
                   ) {
                       foo
-                              .length
+                          .length
                   }
 
                   fun expressionBodyMethod() =

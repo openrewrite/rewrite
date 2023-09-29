@@ -48,7 +48,7 @@ class WrappingAndBracesTest implements RewriteTest {
         return spec -> spec
           .recipes(
             toRecipe(() -> new WrappingAndBracesVisitor<>(wrapping.apply(IntelliJ.wrappingAndBraces()))),
-            toRecipe(() -> new TabsAndIndentsVisitor<>(IntelliJ.tabsAndIndents())),
+            toRecipe(() -> new TabsAndIndentsVisitor<>(IntelliJ.tabsAndIndents(), IntelliJ.wrappingAndBraces())),
             toRecipe(() -> new SpacesVisitor<>(spaces.apply(IntelliJ.spaces())))
           )
           .parser(KotlinParser.builder().styles(singletonList(
