@@ -118,11 +118,11 @@ public class MethodMatcher {
     }
 
     private static boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {
-        return context.BANG() == null
-               && context.AND() == null
-               && context.OR() == null
-               && context.classNameOrInterface().DOTDOT().isEmpty()
-               && context.classNameOrInterface().WILDCARD().isEmpty();
+        return context.BANG() == null &&
+               context.AND() == null &&
+               context.OR() == null &&
+               context.classNameOrInterface().DOTDOT().isEmpty() &&
+               context.classNameOrInterface().WILDCARD().isEmpty();
     }
 
     private static boolean isPlainIdentifier(MethodSignatureParser.SimpleNamePatternContext context) {
@@ -160,8 +160,8 @@ public class MethodMatcher {
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private boolean matchesMethodName(String methodName) {
-        return this.methodName != null && this.methodName.equals(methodName)
-               || this.methodName == null && methodNamePattern.matcher(methodName).matches();
+        return this.methodName != null && this.methodName.equals(methodName) ||
+               this.methodName == null && methodNamePattern.matcher(methodName).matches();
     }
 
     private boolean matchesParameterTypes(List<JavaType> parameterTypes) {
