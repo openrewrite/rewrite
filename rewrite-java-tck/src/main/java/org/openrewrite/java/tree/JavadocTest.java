@@ -1660,4 +1660,51 @@ class JavadocTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3575")
+    void varargsMethod() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  /**
+                   * A dummy main method. This method is not actually called, but we'll use its Javadoc comment to test that
+                   * OpenRewrite can handle references like the following: {@link A#varargsMethod(String...)}.
+                   *
+                   * @param args The arguments to the method.
+                   */
+                  public static void main(String[] args) {
+                      System.out.println("Hello, world! This is my original class' main method.");
+                  }
+                  public static void varargsMethod(String... args) {
+                      System.out.println("Hello, world! This is my original class' varargs method.");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3575")
+    void arrayMethod() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  /**
+                   * A dummy main method. This method is not actually called, but we'll use its Javadoc comment to test that
+                   * OpenRewrite can handle references like the following: {@link A#main(String[])}.
+                   *
+                   * @param args The arguments to the method.
+                   */
+                  public static void main(String[] args) {
+                      System.out.println("Hello, world! This is my original class' main method.");
+                  }
+              }
+              """
+          )
+        );
+    }
 }
