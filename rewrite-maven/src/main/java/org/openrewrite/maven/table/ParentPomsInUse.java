@@ -33,9 +33,9 @@ public class ParentPomsInUse extends DataTable<ParentPomsInUse.Row> {
 
     @Value
     public static class Row {
-        @Column(displayName = "Project name",
-                description = "The name of the project that contains the parent.")
-        String projectName;
+        @Column(displayName = "Project artifactId",
+                description = "The artifactId of the project that contains the parent.")
+        String projectArtifactId;
 
         @Column(displayName = "Group",
                 description = "The first part of a parent coordinate `org.springframework.boot`.")
@@ -50,15 +50,9 @@ public class ParentPomsInUse extends DataTable<ParentPomsInUse.Row> {
         @Nullable
         String version;
 
-        @Column(displayName = "Dated snapshot version",
-                description = "The resolved dated snapshot version or `null` if this parent is not a snapshot.")
-        @Nullable
-        String datedSnapshotVersion;
-
         @Column(displayName = "Relative path",
                 description = "The relative path to the parent.")
         @Nullable
         String relativePath;
-
     }
 }

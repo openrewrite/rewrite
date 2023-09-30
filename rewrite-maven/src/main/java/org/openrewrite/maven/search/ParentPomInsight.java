@@ -21,7 +21,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.maven.table.ParentPomsInUse;
@@ -72,12 +71,9 @@ public class ParentPomInsight extends Recipe {
                     String artifactId = resolvedPom.getValue(tag.getChildValue("artifactId").orElse(null));
                     if (matchesGlob(groupId, groupIdPattern) && matchesGlob(artifactId, artifactIdPattern)) {
                         String version = resolvedPom.getValue(tag.getChildValue("version").orElse(null));
-                        String projectName = getCursor().firstEnclosingOrThrow(Xml.Document.class)
-                                .getMarkers().findFirst(JavaProject.class)
-                                .map(JavaProject::getProjectName).orElse("");
                         String relativePath = tag.getChildValue("relativePath").orElse(null);
                         inUse.insertRow(ctx, new ParentPomsInUse.Row(
-                                projectName, groupId, artifactId, version, resolvedPom.getDatedSnapshotVersion(), relativePath));
+                                resolvedPom.getArtifactId(), groupId, artifactId, version, relativePath));
                         return SearchResult.found(t);
                     }
                 }

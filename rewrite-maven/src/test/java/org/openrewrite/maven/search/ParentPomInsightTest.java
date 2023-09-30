@@ -35,16 +35,17 @@ class ParentPomInsightTest implements RewriteTest {
     @Test
     void findParent() {
         rewriteRun(
-          spec -> spec.dataTable(ParentPomsInUse.Row.class, rows -> {
-              assertThat(rows).singleElement().satisfies(row -> {
-                  assertThat(row.getProjectName()).isEqualTo("demo");
+          spec -> spec.dataTable(ParentPomsInUse.Row.class, rows -> assertThat(rows)
+            .singleElement()
+            .satisfies(row -> {
+                  assertThat(row.getProjectArtifactId()).isEqualTo("demo");
                   assertThat(row.getGroupId()).isEqualTo("org.springframework.boot");
                   assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-parent");
                   assertThat(row.getVersion()).isEqualTo("3.1.4");
-                  assertThat(row.getDatedSnapshotVersion()).isNull();
                   assertThat(row.getRelativePath()).isNull();
-              });
-          }),
+              }
+            )
+          ),
           mavenProject("demo",
             pomXml(
               """
@@ -90,10 +91,10 @@ class ParentPomInsightTest implements RewriteTest {
           spec -> spec
             .recipe(new ParentPomInsight("*", "*"))
             .dataTableAsCsv(ParentPomsInUse.class.getName(), """
-              projectName,groupId,artifactId,version,datedSnapshotVersion,relativePath
-              sample,org.springframework.boot,"spring-boot-starter-parent",2.5.0,,
-              module1,org.sample,sample,1.0.0,,../
-              module2,org.sample,sample,1.0.0,,../
+              projectArtifactId,groupId,artifactId,version,relativePath
+              sample,org.springframework.boot,"spring-boot-starter-parent",2.5.0,
+              module1,org.sample,sample,1.0.0,../
+              module2,org.sample,sample,1.0.0,../
               """),
           mavenProject("sample",
             pomXml(
