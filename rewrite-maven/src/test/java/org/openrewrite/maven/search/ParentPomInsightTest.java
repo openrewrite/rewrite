@@ -36,11 +36,14 @@ class ParentPomInsightTest implements RewriteTest {
     void findParent() {
         rewriteRun(
           spec -> spec.dataTable(ParentPomsInUse.Row.class, rows -> {
-              assertThat(rows).hasSize(1);
-              assertThat(rows.get(0).getGroupId()).isEqualTo("org.springframework.boot");
-              assertThat(rows.get(0).getArtifactId()).isEqualTo("spring-boot-starter-parent");
-              assertThat(rows.get(0).getVersion()).isEqualTo("3.1.4");
-              assertThat(rows.get(0).getDatedSnapshotVersion()).isNull();
+              assertThat(rows).singleElement().satisfies(row -> {
+                  assertThat(row.getProjectName()).isEqualTo("demo");
+                  assertThat(row.getGroupId()).isEqualTo("org.springframework.boot");
+                  assertThat(row.getArtifactId()).isEqualTo("spring-boot-starter-parent");
+                  assertThat(row.getVersion()).isEqualTo("3.1.4");
+                  assertThat(row.getDatedSnapshotVersion()).isNull();
+                  assertThat(row.getRelativePath()).isNull();
+              });
           }),
           mavenProject("demo",
             pomXml(
@@ -84,11 +87,15 @@ class ParentPomInsightTest implements RewriteTest {
     @Test
     void multiModuleOnlyRoot() {
         rewriteRun(
-          spec -> spec.dataTableAsCsv(ParentPomsInUse.class.getName(), """
-            groupId,artifactId,version,datedSnapshotVersion
-            org.springframework.boot,"spring-boot-starter-parent",2.5.0,
-            """),
-          mavenProject("parent",
+          spec -> spec
+            .recipe(new ParentPomInsight("*", "*"))
+            .dataTableAsCsv(ParentPomsInUse.class.getName(), """
+              projectName,groupId,artifactId,version,datedSnapshotVersion,relativePath
+              sample,org.springframework.boot,"spring-boot-starter-parent",2.5.0,,
+              module1,org.sample,sample,1.0.0,,../
+              module2,org.sample,sample,1.0.0,,../
+              """),
+          mavenProject("sample",
             pomXml(
               """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -146,6 +153,19 @@ class ParentPomInsightTest implements RewriteTest {
                     <artifactId>module1</artifactId>
                   </project>
                   """,
+                """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <!--~~>--><parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath>../</relativePath>
+                    </parent>
+                    <artifactId>module1</artifactId>
+                  </project>
+                  """,
                 spec -> spec.path("module1/pom.xml")
               )),
             mavenProject("module2",
@@ -155,6 +175,19 @@ class ParentPomInsightTest implements RewriteTest {
                   <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
                     <modelVersion>4.0.0</modelVersion>
                     <parent>
+                      <groupId>org.sample</groupId>
+                      <artifactId>sample</artifactId>
+                      <version>1.0.0</version>
+                      <relativePath>../</relativePath>
+                    </parent>
+                    <artifactId>module2</artifactId>
+                  </project>
+                  """,
+                """
+                  <?xml version="1.0" encoding="UTF-8"?>
+                  <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                    <modelVersion>4.0.0</modelVersion>
+                    <!--~~>--><parent>
                       <groupId>org.sample</groupId>
                       <artifactId>sample</artifactId>
                       <version>1.0.0</version>
