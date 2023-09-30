@@ -23,7 +23,11 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.maven.Assertions.pomXml;
 
-class ExplicitGroupIdTest implements RewriteTest {
+class ExplicitPluginGroupIdTest implements RewriteTest {
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.recipe(new ExplicitPluginGroupId());
+    }
 
     private static final String BEFORE = """
       <project>
@@ -44,6 +48,7 @@ class ExplicitGroupIdTest implements RewriteTest {
         </build>
       </project>
       """;
+
     private static final String AFTER = """
       <project>
         <groupId>com.mycompany.app</groupId>
@@ -64,11 +69,6 @@ class ExplicitGroupIdTest implements RewriteTest {
         </build>
       </project>
       """;
-
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spec.recipe(new ExplicitGroupId());
-    }
 
     @Test
     @DocumentExample

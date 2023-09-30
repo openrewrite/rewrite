@@ -19,7 +19,7 @@ name: org.openrewrite.maven.BestPractices
 displayName: Apache Maven best practices
 description: Applies best practices to Maven POMs.
 recipeList:
-  - org.openrewrite.maven.cleanup.ExplicitGroupId
+  - org.openrewrite.maven.cleanup.ExplicitPluginGroupId
   - org.openrewrite.maven.cleanup.PrefixlessExpressions
 
 ---

@@ -27,7 +27,7 @@ import org.openrewrite.xml.tree.Xml;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class ExplicitGroupId extends Recipe {
+public class ExplicitPluginGroupId extends Recipe {
     @Override
     public String getDisplayName() {
         return "Add explicit `groupId` to Maven plugins";
