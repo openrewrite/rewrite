@@ -85,7 +85,7 @@ class ParentPomInsightTest implements RewriteTest {
     void multiModuleOnlyRoot() {
         rewriteRun(
           spec -> spec.dataTableAsCsv(ParentPomsInUse.class.getName(), """
-            projectName,groupId,artifactId,version,datedSnapshotVersion
+            groupId,artifactId,version,datedSnapshotVersion
             org.springframework.boot,"spring-boot-starter-parent",2.5.0,
             """),
           mavenProject("parent",
