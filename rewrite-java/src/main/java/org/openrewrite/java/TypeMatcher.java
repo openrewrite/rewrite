@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import lombok.Getter;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.MethodSignatureLexer;
 import org.openrewrite.java.internal.grammar.MethodSignatureParser;
@@ -28,40 +29,27 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.regex.Pattern;
 
+import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
+
 @SuppressWarnings("NotNullFieldNotInitialized")
 @Getter
 public class TypeMatcher {
+    private static final String ASPECTJ_DOT_PATTERN = StringUtils.aspectjNameToPattern(".");
+
+    @SuppressWarnings("NotNullFieldNotInitialized")
+    @Getter
     private Pattern targetTypePattern;
+
+    @Nullable
+    private String targetType;
 
     private final String signature;
 
     /**
-     * Whether to match overridden forms of the method on subclasses of {@link #targetTypePattern}.
+     * Whether to match on subclasses of {@link #targetTypePattern}.
      */
+    @Getter
     private final boolean matchInherited;
-
-    public TypeMatcher(String signature, boolean matchInherited) {
-        this.signature = signature;
-        this.matchInherited = matchInherited;
-        MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
-                CharStreams.fromString(signature + " *(..)"))));
-
-        new MethodSignatureParserBaseVisitor<Void>() {
-            @Override
-            public Void visitMethodPattern(MethodSignatureParser.MethodPatternContext ctx) {
-                targetTypePattern = Pattern.compile(new TypeVisitor().visitTargetTypePattern(ctx.targetTypePattern()));
-                return null;
-            }
-        }.visit(parser.methodPattern());
-    }
-
-    public TypeMatcher(String signature) {
-        this(signature, false);
-    }
-
-    public boolean matches(@Nullable JavaType type) {
-        return matchesTargetType(TypeUtils.asFullyQualified(type));
-    }
 
     public boolean matches(@Nullable TypeTree tt) {
         return tt != null && matches(tt.getType());
@@ -73,29 +61,52 @@ public class TypeMatcher {
                        "." + signature.substring(signature.lastIndexOf('.') + 1))).matches();
     }
 
-    boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
-        if (type == null) {
-            return false;
-        }
+    public TypeMatcher(String fieldType) {
+        this(fieldType, false);
+    }
 
-        if (targetTypePattern.matcher(type.getFullyQualifiedName()).matches()) {
-            return true;
-        } else if (!"java.lang.Object".equals(type.getFullyQualifiedName()) && matchesTargetType(type.getSupertype() == null ? JavaType.ShallowClass.build("java.lang.Object") : type.getSupertype())) {
-            return true;
-        }
+    public TypeMatcher(String fieldType, boolean matchInherited) {
+        this.signature = fieldType;
+        this.matchInherited = matchInherited;
 
-        if (matchInherited) {
-            if (matchesTargetType(type.getSupertype())) {
-                return true;
-            }
+        if (StringUtils.isBlank(fieldType)) {
+            targetTypePattern = Pattern.compile(".*");
+        } else {
+            MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
+                    CharStreams.fromString(fieldType))));
 
-            for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
-                if (matchesTargetType(anInterface)) {
-                    return true;
+            new MethodSignatureParserBaseVisitor<Void>() {
+                @Override
+                public Void visitTargetTypePattern(MethodSignatureParser.TargetTypePatternContext ctx) {
+                    String pattern = new TypeVisitor().visitTargetTypePattern(ctx);
+                    targetTypePattern = Pattern.compile(new TypeVisitor().visitTargetTypePattern(ctx));
+                    targetType = isPlainIdentifier(ctx)
+                            ? pattern.replace(ASPECTJ_DOT_PATTERN, ".").replace("\\", "")
+                            : null;
+                    return null;
                 }
-            }
+            }.visitTargetTypePattern(parser.targetTypePattern());
         }
+    }
 
-        return false;
+    public boolean matches(@Nullable JavaType type) {
+        return TypeUtils.isOfTypeWithName(
+                TypeUtils.asFullyQualified(type),
+                matchInherited,
+                this::matchesTargetTypeName
+        );
+    }
+
+    private boolean matchesTargetTypeName(String fullyQualifiedTypeName) {
+        return this.targetType != null && fullyQualifiedNamesAreEqual(this.targetType, fullyQualifiedTypeName) ||
+               this.targetType == null && this.targetTypePattern.matcher(fullyQualifiedTypeName).matches();
+    }
+
+    private static boolean isPlainIdentifier(MethodSignatureParser.TargetTypePatternContext context) {
+        return context.BANG() == null &&
+               context.AND() == null &&
+               context.OR() == null &&
+               context.classNameOrInterface().DOTDOT().isEmpty() &&
+               context.classNameOrInterface().WILDCARD().isEmpty();
     }
 }

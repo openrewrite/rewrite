@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
@@ -33,6 +34,12 @@ public class FindImplementations extends Recipe {
             description = "A fully-qualified interface name to search for.",
             example = "org.openrewrite.Recipe")
     String interfaceFullyQualifiedName;
+
+    @Option(displayName = "Match on inherited types",
+            description = "When enabled, find methods that are overrides of the method pattern.",
+            required = false)
+    @Nullable
+    Boolean matchInherited;
 
     @Override
     public String getDisplayName() {

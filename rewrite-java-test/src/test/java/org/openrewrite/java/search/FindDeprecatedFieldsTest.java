@@ -41,7 +41,7 @@ class FindDeprecatedFieldsTest implements RewriteTest {
     @Test
     void ignoreDeprecationsInDeprecatedMethod() {
         rewriteRun(
-          spec -> spec.recipe(new FindDeprecatedFields("org.old.types..*", true)),
+          spec -> spec.recipe(new FindDeprecatedFields("org.old.types..*", null, true)),
           java(
             """
               import org.old.types.D;
@@ -59,7 +59,7 @@ class FindDeprecatedFieldsTest implements RewriteTest {
     @Test
     void ignoreDeprecationsInDeprecatedClass() {
         rewriteRun(
-          spec -> spec.recipe(new FindDeprecatedFields("org.old.types..*", true)),
+          spec -> spec.recipe(new FindDeprecatedFields("org.old.types..*", null, true)),
           java(
             """
               import org.old.types.D;
@@ -79,7 +79,7 @@ class FindDeprecatedFieldsTest implements RewriteTest {
     @Test
     void findDeprecations() {
         rewriteRun(
-          spec -> spec.recipe(new FindDeprecatedFields("org.old.types..*", false)),
+          spec -> spec.recipe(new FindDeprecatedFields("org.old.types..*", null, false)),
           java(
             """
               import org.old.types.D;
