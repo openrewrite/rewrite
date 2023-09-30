@@ -69,20 +69,24 @@ public class TypeMatcher {
         this.signature = fieldType;
         this.matchInherited = matchInherited;
 
-        MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
-                CharStreams.fromString(fieldType))));
+        if (StringUtils.isBlank(fieldType)) {
+            targetTypePattern = Pattern.compile(".*");
+        } else {
+            MethodSignatureParser parser = new MethodSignatureParser(new CommonTokenStream(new MethodSignatureLexer(
+                    CharStreams.fromString(fieldType))));
 
-        new MethodSignatureParserBaseVisitor<Void>() {
-            @Override
-            public Void visitTargetTypePattern(MethodSignatureParser.TargetTypePatternContext ctx) {
-                String pattern = new TypeVisitor().visitTargetTypePattern(ctx);
-                targetTypePattern = Pattern.compile(new TypeVisitor().visitTargetTypePattern(ctx));
-                targetType = isPlainIdentifier(ctx)
-                        ? pattern.replace(ASPECTJ_DOT_PATTERN, ".").replace("\\", "")
-                        : null;
-                return null;
-            }
-        }.visitTargetTypePattern(parser.targetTypePattern());
+            new MethodSignatureParserBaseVisitor<Void>() {
+                @Override
+                public Void visitTargetTypePattern(MethodSignatureParser.TargetTypePatternContext ctx) {
+                    String pattern = new TypeVisitor().visitTargetTypePattern(ctx);
+                    targetTypePattern = Pattern.compile(new TypeVisitor().visitTargetTypePattern(ctx));
+                    targetType = isPlainIdentifier(ctx)
+                            ? pattern.replace(ASPECTJ_DOT_PATTERN, ".").replace("\\", "")
+                            : null;
+                    return null;
+                }
+            }.visitTargetTypePattern(parser.targetTypePattern());
+        }
     }
 
     public boolean matches(@Nullable JavaType type) {
