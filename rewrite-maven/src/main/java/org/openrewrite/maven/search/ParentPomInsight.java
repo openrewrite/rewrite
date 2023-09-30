@@ -67,18 +67,13 @@ public class ParentPomInsight extends Recipe {
                 Xml.Tag t = super.visitTag(tag, ctx);
                 if (isParentTag()) {
                     ResolvedPom resolvedPom = getResolutionResult().getPom();
-                    if (matchesGlob(resolvedPom.getValue(tag.getChildValue("groupId").orElse(null)), groupIdPattern) &&
-                        matchesGlob(resolvedPom.getValue(tag.getChildValue("artifactId").orElse(null)), artifactIdPattern)) {
-
-                        t = SearchResult.found(t);
-
-                        String groupId = t.getChildValue("groupId").orElse(null);
-                        String artifactId = t.getChildValue("artifactId").orElse(null);
-                        String version = tag.getChildValue("version").orElse(null);
-                        inUse.insertRow(ctx, new ParentPomsInUse.Row(
-                                groupId, artifactId, version,
-                                resolvedPom.getDatedSnapshotVersion()
-                        ));
+                    String groupId = resolvedPom.getValue(tag.getChildValue("groupId").orElse(null));
+                    String artifactId = resolvedPom.getValue(tag.getChildValue("artifactId").orElse(null));
+                    if (matchesGlob(groupId, groupIdPattern) && matchesGlob(artifactId, artifactIdPattern)) {
+                        String version = resolvedPom.getValue(tag.getChildValue("version").orElse(null));
+                        inUse.insertRow(ctx, new ParentPomsInUse.Row(groupId, artifactId, version,
+                                resolvedPom.getDatedSnapshotVersion()));
+                        return SearchResult.found(t);
                     }
                 }
                 return t;
