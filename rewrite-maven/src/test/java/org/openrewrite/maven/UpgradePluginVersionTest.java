@@ -35,6 +35,7 @@ class UpgradePluginVersionTest implements RewriteTest {
             "quarkus-maven-plugin",
             "1.13.5.Final",
             null,
+            null,
             null
           )),
           pomXml(
@@ -88,6 +89,7 @@ class UpgradePluginVersionTest implements RewriteTest {
             "io.quarkus",
             "quarkus-maven-plugin",
             "1.13.5.Final",
+            null,
             null,
             null
           )),
@@ -147,6 +149,7 @@ class UpgradePluginVersionTest implements RewriteTest {
             "quarkus-maven-plugin",
             "1.13.5.Final",
             null,
+            null,
             null
           )),
           pomXml(
@@ -179,6 +182,7 @@ class UpgradePluginVersionTest implements RewriteTest {
             "org.openrewrite.maven",
             "rewrite-maven-plugin",
             "~4.2",
+            null,
             null,
             null
           )),
@@ -232,6 +236,7 @@ class UpgradePluginVersionTest implements RewriteTest {
             "org.openrewrite.maven",
             "rewrite-maven-plugin",
             "4.2.x",
+            null,
             null,
             null
           )),
@@ -317,7 +322,8 @@ class UpgradePluginVersionTest implements RewriteTest {
             "rewrite-maven-plugin",
             "4.2.x",
             null,
-            true
+            true,
+            null
           )),
           pomXml(
             """
@@ -405,6 +411,7 @@ class UpgradePluginVersionTest implements RewriteTest {
             "rewrite-maven-plugin",
             "4.2.3",
             null,
+            null,
             null
           )),
           pomXml(
@@ -477,6 +484,7 @@ class UpgradePluginVersionTest implements RewriteTest {
             "*",
             "2.4.x",
             null,
+            null,
             null
           )),
           pomXml(
@@ -539,6 +547,7 @@ class UpgradePluginVersionTest implements RewriteTest {
             "*",
             "*",
             "2.4.x",
+            null,
             null,
             null
           )),

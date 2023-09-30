@@ -19,7 +19,21 @@ name: org.openrewrite.maven.BestPractices
 displayName: Apache Maven best practices
 description: Applies best practices to Maven POMs.
 recipeList:
+  - org.openrewrite.maven.cleanup.ExplicitPluginVersion
   - org.openrewrite.maven.cleanup.PrefixlessExpressions
+
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.openrewrite.maven.cleanup.ExplicitPluginVersion
+displayName: Explicit plugin version
+description: Add explicit plugin versions to POMs for reproducibility, as [MNG-4173](https://issues.apache.org/jira/browse/MNG-4173) removes automatic version resolution for POM plugins.
+recipeList:
+  - org.openrewrite.maven.UpgradePluginVersion:
+      groupId: *
+      artifactId: *
+      newVersion: latest.release
+      trustParent: true
+      addVersionIfMissing: true
 
 ---
 type: specs.openrewrite.org/v1beta/recipe

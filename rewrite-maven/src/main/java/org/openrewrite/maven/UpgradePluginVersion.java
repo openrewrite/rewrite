@@ -80,6 +80,12 @@ public class UpgradePluginVersion extends Recipe {
     @Nullable
     Boolean trustParent;
 
+    @Option(displayName = "Add version if missing",
+            description = "If the plugin is missing a version, add the latest release. Defaults to false.",
+            required = false)
+    @Nullable
+    Boolean addVersionIfMissing;
+
     @SuppressWarnings("ConstantConditions")
     @Override
     public Validated<Object> validate() {
@@ -110,29 +116,30 @@ public class UpgradePluginVersion extends Recipe {
                 if (isPluginTag(groupId, artifactId)) {
                     Optional<Xml.Tag> versionTag = tag.getChild("version");
                     Optional<String> maybeVersionValue = versionTag.flatMap(Xml.Tag::getValue);
-                    if (maybeVersionValue.isPresent()) {
-                        String versionValue = maybeVersionValue.get();
-                        String versionLookup = versionValue.startsWith("${")
-                                ? super.getResolutionResult().getPom().getValue(versionValue.trim())
-                                : versionValue;
+                    if (maybeVersionValue.isPresent() || Boolean.TRUE.equals(addVersionIfMissing)) {
+                        String versionLookup = null;
+                        if (maybeVersionValue.isPresent()) {
+                            String versionValue = maybeVersionValue.get();
+                            versionLookup = versionValue.startsWith("${")
+                                    ? super.getResolutionResult().getPom().getValue(versionValue.trim())
+                                    : versionValue;
+                        }
 
-                        if (versionLookup != null) {
-                            try {
-                                String tagGroupId = getResolutionResult().getPom().getValue(
-                                        tag.getChildValue("groupId").orElse(groupId)
-                                );
-                                String tagArtifactId = getResolutionResult().getPom().getValue(
-                                        tag.getChildValue("artifactId").orElse(artifactId)
-                                );
-                                assert tagGroupId != null;
-                                assert tagArtifactId != null;
-                                findNewerDependencyVersion(tagGroupId, tagArtifactId, versionLookup, ctx).ifPresent(newer -> {
-                                    ChangePluginVersionVisitor changeDependencyVersion = new ChangePluginVersionVisitor(tagGroupId, tagArtifactId, newer);
-                                    doAfterVisit(changeDependencyVersion);
-                                });
-                            } catch (MavenDownloadingException e) {
-                                return e.warn(tag);
-                            }
+                        try {
+                            String tagGroupId = getResolutionResult().getPom().getValue(
+                                    tag.getChildValue("groupId").orElse(groupId)
+                            );
+                            String tagArtifactId = getResolutionResult().getPom().getValue(
+                                    tag.getChildValue("artifactId").orElse(artifactId)
+                            );
+                            assert tagGroupId != null;
+                            assert tagArtifactId != null;
+                            findNewerDependencyVersion(tagGroupId, tagArtifactId, versionLookup, ctx).ifPresent(newer -> {
+                                ChangePluginVersionVisitor changeDependencyVersion = new ChangePluginVersionVisitor(tagGroupId, tagArtifactId, newer);
+                                doAfterVisit(changeDependencyVersion);
+                            });
+                        } catch (MavenDownloadingException e) {
+                            return e.warn(tag);
                         }
                     }
                     return tag;
