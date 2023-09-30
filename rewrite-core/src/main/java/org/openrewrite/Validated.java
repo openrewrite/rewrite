@@ -66,7 +66,8 @@ public interface Validated<T> extends Iterable<Validated<T>> {
 
     /**
      * Validate that the Predicate will evaluate to 'true' on the supplied value.
-     * When the Predicate evaluates to 'false' the error message will be of the form:
+     * When the Predicate evaluates to 'false' the error message will be of the
+     * form:
      * <p>
      * "[property] was '[value]' but it [message]"
      *
@@ -76,11 +77,19 @@ public interface Validated<T> extends Iterable<Validated<T>> {
      * @param test     The test predicate
      * @param <T>      The property value type.
      * @return A validation result
+     * @implNote To support lazy evaluation of chained validations like
+     *           {@code someValidation.and(Validate.test(...))} this returns an
+     *           {@link Invalid} that may later return {@code true} when being asked
+     *           {@link #isValid()}. Since the error reporting is based on the
+     *           {@link Invalid} type, that's the only way to not break the overall design.
      */
     static <T> Validated<T> test(String property, String message, @Nullable T value, Predicate<T> test) {
-        return test.test(value) ?
-                valid(property, value) :
-                invalid(property, value, message.replace("{}", value == null ? "null" : value.toString()));
+        return new Invalid<T>(property, value, message.replace("{}", value == null ? "null" : value.toString()), null) {
+            @Override
+            public boolean isValid() {
+                return test.test(value);
+            }
+        };
     }
 
     /**
