@@ -86,7 +86,7 @@ class ParentPomInsightTest implements RewriteTest {
         rewriteRun(
           spec -> spec.dataTableAsCsv(ParentPomsInUse.class.getName(), """
             projectName,groupId,artifactId,version,datedSnapshotVersion
-            parent,org.springframework.boot,"spring-boot-starter-parent",2.5.0,
+            org.springframework.boot,"spring-boot-starter-parent",2.5.0,
             """),
           mavenProject("parent",
             pomXml(
