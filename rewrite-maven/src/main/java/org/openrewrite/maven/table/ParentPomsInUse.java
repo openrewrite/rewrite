@@ -28,7 +28,7 @@ public class ParentPomsInUse extends DataTable<ParentPomsInUse.Row> {
     public ParentPomsInUse(Recipe recipe) {
         super(recipe, Row.class,
                 ParentPomsInUse.class.getName(),
-                "Dependencies in use", "Direct and transitive dependencies in use.");
+                "Maven parent POMs in use", "Projects, GAVs and relativePaths for Maven parent POMs in use.");
     }
 
     @Value
@@ -38,11 +38,11 @@ public class ParentPomsInUse extends DataTable<ParentPomsInUse.Row> {
         String projectName;
 
         @Column(displayName = "Group",
-                description = "The first part of a parent coordinate `com.google.guava:guava:VERSION`.")
+                description = "The first part of a parent coordinate `org.springframework.boot`.")
         String groupId;
 
         @Column(displayName = "Artifact",
-                description = "The second part of a parent coordinate `com.google.guava:guava:VERSION`.")
+                description = "The second part of a parent coordinate `spring-boot-starter-*`.")
         String artifactId;
 
         @Column(displayName = "Version",
