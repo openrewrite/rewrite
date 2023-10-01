@@ -22,6 +22,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.search.FindPlugin;
 import org.openrewrite.maven.table.MavenMetadataFailures;
 import org.openrewrite.maven.tree.MavenMetadata;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTagVisitor;
@@ -129,17 +130,14 @@ public class UpgradePluginVersion extends Recipe {
                         }
 
                         try {
-                            String tagGroupId = getResolutionResult().getPom().getValue(
-                                    tag.getChildValue("groupId").orElse(groupId)
-                            );
-                            String tagArtifactId = getResolutionResult().getPom().getValue(
-                                    tag.getChildValue("artifactId").orElse(artifactId)
-                            );
+                            ResolvedPom resolvedPom = getResolutionResult().getPom();
+                            String tagGroupId = resolvedPom.getValue(tag.getChildValue("groupId").orElse(groupId));
+                            String tagArtifactId = resolvedPom.getValue(tag.getChildValue("artifactId").orElse(artifactId));
                             assert tagGroupId != null;
                             assert tagArtifactId != null;
-                            findNewerDependencyVersion(tagGroupId, tagArtifactId, versionLookup, ctx).ifPresent(newer -> {
-                                doAfterVisit(new ChangePluginVersionVisitor(tagGroupId, tagArtifactId, newer, Boolean.TRUE.equals(addVersionIfMissing)));
-                            });
+                            findNewerDependencyVersion(tagGroupId, tagArtifactId, versionLookup, ctx).ifPresent(newer ->
+                                doAfterVisit(new ChangePluginVersionVisitor(tagGroupId, tagArtifactId, newer, Boolean.TRUE.equals(addVersionIfMissing)))
+                            );
                         } catch (MavenDownloadingException e) {
                             return e.warn(tag);
                         }
@@ -165,10 +163,10 @@ public class UpgradePluginVersion extends Recipe {
 
     @Value
     private static class ChangePluginVersionVisitor extends MavenVisitor<ExecutionContext> {
-        private final String groupId;
-        private final String artifactId;
-        private final String newVersion;
-        private final boolean addVersionIfMissing;
+        String groupId;
+        String artifactId;
+        String newVersion;
+        boolean addVersionIfMissing;
 
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
