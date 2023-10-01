@@ -50,8 +50,6 @@ public class Substitutions {
             Map<String, String> typedPatternByName = new HashMap<>();
             String previous = substituted;
             substituted = propertyPlaceholderHelper.replacePlaceholders(substituted, key -> {
-                int i = index.getAndIncrement();
-
                 String s;
                 if (!key.isEmpty()) {
                     TemplateParameterParser parser = new TemplateParameterParser(new CommonTokenStream(new TemplateParameterLexer(
@@ -69,13 +67,16 @@ public class Substitutions {
                             throw new IllegalArgumentException("The parameter " + paramName + " must be defined before it is referenced.");
                         }
                     } else {
+                        int i = index.getAndIncrement();
                         s = substituteTypedPattern(key, i, typedPattern);
                         if (ctx.typedPattern().parameterName() != null) {
-                            typedPatternByName.put(ctx.typedPattern().parameterName().Identifier().getText(), s);
+                            String paramName = ctx.typedPattern().parameterName().Identifier().getText();
+                            typedPatternByName.put(paramName, s);
                         }
                         requiredParameters.incrementAndGet();
                     }
                 } else {
+                    int i = index.getAndIncrement();
                     s = substituteUntyped(parameters[i], i);
                     requiredParameters.incrementAndGet();
                 }
