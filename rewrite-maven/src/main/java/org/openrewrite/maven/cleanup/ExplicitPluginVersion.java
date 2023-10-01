@@ -20,7 +20,11 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.maven.UpgradePluginVersion;
+import org.openrewrite.maven.tree.MavenResolutionResult;
+import org.openrewrite.maven.tree.Plugin;
 import org.openrewrite.xml.tree.Xml;
+
+import java.util.List;
 
 public class ExplicitPluginVersion extends Recipe {
     @Override
@@ -42,9 +46,17 @@ public class ExplicitPluginVersion extends Recipe {
                 if (isPluginTag() && !t.getChild("version").isPresent()) {
                     String groupId = t.getChildValue("groupId").orElse("*");
                     String artifactId = t.getChildValue("artifactId").orElse("*");
-                    doAfterVisit(new UpgradePluginVersion(groupId, artifactId, "latest.release", null, true, true).getVisitor());
+                    if (!parentManagedPluginVersion(groupId, artifactId, getResolutionResult())) {
+                        doAfterVisit(new UpgradePluginVersion(groupId, artifactId, "latest.release", null, true, true).getVisitor());
+                    }
                 }
                 return t;
+            }
+
+            private boolean parentManagedPluginVersion(String groupId, String artifactId, MavenResolutionResult resolutionResult) {
+                List<Plugin> pluginManagement = resolutionResult.getPom().getPluginManagement();
+                return pluginManagement.stream()
+                        .anyMatch(p -> groupId.equals(p.getGroupId()) && artifactId.equals(p.getArtifactId()));
             }
         };
     }
