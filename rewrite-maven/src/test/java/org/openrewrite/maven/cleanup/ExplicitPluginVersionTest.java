@@ -26,7 +26,7 @@ import static org.openrewrite.maven.Assertions.pomXml;
 class ExplicitPluginVersionTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipeFromResource("/META-INF/rewrite/maven.yml", "org.openrewrite.maven.cleanup.ExplicitPluginVersion");
+        spec.recipe(new ExplicitPluginVersion());
     }
 
     private static final String BEFORE = """
@@ -59,7 +59,7 @@ class ExplicitPluginVersionTest implements RewriteTest {
             <plugin>
               <groupId>org.apache.maven.plugins</groupId>
               <artifactId>maven-compiler-plugin</artifactId>
-              <version>3.8.0</version>
+              <version>3.11.0</version>
               <configuration>
                 <source>1.8</source>
                 <target>1.8</target>
@@ -73,13 +73,37 @@ class ExplicitPluginVersionTest implements RewriteTest {
     @Test
     @DocumentExample
     @Issue("https://github.com/openrewrite/rewrite/issues/2735")
-    void addGroupId() {
+    void shouldAddLatest() {
         rewriteRun(pomXml(BEFORE, AFTER));
     }
 
     @Test
-    void noopIfPresent() {
-        rewriteRun(pomXml(AFTER));
+    void shouldNotUpgradeExisting() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.apache.maven.plugins</groupId>
+                      <artifactId>maven-compiler-plugin</artifactId>
+                      <!-- version already present, not upgraded -->
+                      <version>3.8.0</version>
+                      <configuration>
+                        <source>1.8</source>
+                        <target>1.8</target>
+                      </configuration>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
     }
 
     @Test

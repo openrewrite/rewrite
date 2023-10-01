@@ -37,7 +37,7 @@ public interface VersionComparator extends Comparator<String> {
 
     int compare(@Nullable String currentVersion, String v1, String v2);
 
-    default Optional<String> upgrade(@Nullable String currentVersion, Collection<String> availableVersions) {
+    default Optional<String> upgrade(String currentVersion, Collection<String> availableVersions) {
         boolean seen = false;
         String best = null;
         for (String availableVersion : availableVersions) {
