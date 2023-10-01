@@ -18,13 +18,11 @@ package org.openrewrite.maven.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.maven.MavenVisitor;
 import org.openrewrite.maven.UpgradePluginVersion;
-import org.openrewrite.maven.tree.MavenResolutionResult;
-import org.openrewrite.maven.tree.Plugin;
+import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.tree.Xml;
-
-import java.util.List;
 
 public class ExplicitPluginVersion extends Recipe {
     @Override
@@ -44,19 +42,16 @@ public class ExplicitPluginVersion extends Recipe {
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
                 if (isPluginTag() && !t.getChild("version").isPresent()) {
-                    String groupId = t.getChildValue("groupId").orElse("*");
-                    String artifactId = t.getChildValue("artifactId").orElse("*");
-                    if (!parentManagedPluginVersion(groupId, artifactId, getResolutionResult())) {
+                    ResolvedPom resolvedPom = getResolutionResult().getPom();
+                    String groupId = resolvedPom.getValue(tag.getChildValue("groupId").orElse("org.apache.maven.plugins"));
+                    String artifactId = resolvedPom.getValue(tag.getChildValue("artifactId").orElse("*"));
+                    // Do not override parent plugin versions
+                    if (resolvedPom.getPluginManagement().stream()
+                            .noneMatch(p -> groupId.equals(p.getGroupId()) && StringUtils.matchesGlob(p.getArtifactId(), artifactId))) {
                         doAfterVisit(new UpgradePluginVersion(groupId, artifactId, "latest.release", null, true, true).getVisitor());
                     }
                 }
                 return t;
-            }
-
-            private boolean parentManagedPluginVersion(String groupId, String artifactId, MavenResolutionResult resolutionResult) {
-                List<Plugin> pluginManagement = resolutionResult.getPom().getPluginManagement();
-                return pluginManagement.stream()
-                        .anyMatch(p -> groupId.equals(p.getGroupId()) && artifactId.equals(p.getArtifactId()));
             }
         };
     }
