@@ -24,6 +24,7 @@ import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.marker.Implicit;
+import org.openrewrite.kotlin.marker.SingleExpressionBlock;
 import org.openrewrite.kotlin.style.TabsAndIndentsStyle;
 import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 import org.openrewrite.kotlin.tree.K;
@@ -94,7 +95,9 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                 tree instanceof J.ArrayDimension ||
                 tree instanceof J.ClassDeclaration) {
             getCursor().putMessage("indentType", IndentType.ALIGN);
-        } else if (tree instanceof J.Block ||
+        } else if (tree instanceof  J.Block && tree.getMarkers().findFirst(SingleExpressionBlock.class).isPresent()) {
+            getCursor().putMessage("indentType", wrappingStyle.getExpressionBodyFunctions().getUseContinuationIndent() ? IndentType.CONTINUATION_INDENT : IndentType.INDENT);
+        } else if (tree instanceof  J.Block ||
                 tree instanceof J.If ||
                 tree instanceof J.If.Else ||
                 tree instanceof J.ForLoop ||
@@ -211,6 +214,17 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         }
 
         return s;
+    }
+
+    @Override
+    public <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc, P p) {
+        if (loc == JLeftPadded.Location.VARIABLE_INITIALIZER) {
+            // this formatting option also applies to variable declarations
+            getCursor().putMessage("indentType",
+                    wrappingStyle.getExpressionBodyFunctions().getUseContinuationIndent() ? IndentType.CONTINUATION_INDENT : IndentType.INDENT);
+        }
+
+        return super.visitLeftPadded(left, loc, p);
     }
 
     @Override

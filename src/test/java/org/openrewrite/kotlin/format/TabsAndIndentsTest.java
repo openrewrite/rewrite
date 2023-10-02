@@ -56,6 +56,16 @@ class TabsAndIndentsTest implements RewriteTest {
           )));
     }
 
+    private static Consumer<RecipeSpec> wrappingAndBraces(UnaryOperator<WrappingAndBracesStyle> with) {
+        return spec -> spec.recipe(toRecipe(() -> new TabsAndIndentsVisitor<>(IntelliJ.tabsAndIndents(), with.apply(IntelliJ.wrappingAndBraces()))))
+          .parser(KotlinParser.builder().styles(singletonList(
+            new NamedStyles(
+              Tree.randomId(), "test", "test", "test", emptySet(),
+              singletonList(with.apply(IntelliJ.wrappingAndBraces()))
+            )
+          )));
+    }
+
     private static Consumer<RecipeSpec> style(UnaryOperator<TabsAndIndentsStyle> tabsAndIndents, UnaryOperator<WrappingAndBracesStyle> wrappingAndBraces) {
         return spec -> spec.recipe(toRecipe(() -> new TabsAndIndentsVisitor<>(
             tabsAndIndents.apply(IntelliJ.tabsAndIndents()), wrappingAndBraces.apply(IntelliJ.wrappingAndBraces()))))
@@ -688,6 +698,31 @@ class TabsAndIndentsTest implements RewriteTest {
                       })
                   }
               }
+              """
+          )
+        );
+    }
+
+    @Test
+    void expressionBodyFunctions() {
+        rewriteRun(
+          kotlin(
+            """
+              val i =
+                  1
+              fun f() =
+                  2
+              """
+          )
+        );
+        rewriteRun(
+          wrappingAndBraces(style -> style.withExpressionBodyFunctions(style.getExpressionBodyFunctions().withUseContinuationIndent(true))),
+          kotlin(
+            """
+              val i =
+                      1
+              fun f() =
+                      2
               """
           )
         );
