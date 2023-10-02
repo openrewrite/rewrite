@@ -301,7 +301,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
     }
 
     private Space prefix(Token token) {
-        int start = token.getStartIndex();
+        int start = getCursorIndex(token.getStartIndex());
         if (start < cursor) {
             return Space.EMPTY;
         }
