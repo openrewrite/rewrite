@@ -212,12 +212,10 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                 }
             }
         }
-        // Defaulted to `true` in IntelliJ's Kotlin formatting.
-        boolean beforeTypeParameterLeftAngleBracket = true;
         if (c.getPadding().getTypeParameters() != null) {
             c = c.getPadding().withTypeParameters(
                     spaceBefore(c.getPadding().getTypeParameters(),
-                            beforeTypeParameterLeftAngleBracket, true)
+                            false, true)
             );
         }
         if (c.getPadding().getTypeParameters() != null) {

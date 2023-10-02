@@ -75,7 +75,7 @@ class SpacesTest implements RewriteTest {
     }
 
     @Nested
-    class beforeParensTest {
+    class BeforeParens {
         @DocumentExample
         @Test
         void beforeParensMethodDeclaration() {
@@ -405,7 +405,7 @@ class SpacesTest implements RewriteTest {
     }
 
     @Nested
-    class aroundOperatorsTest {
+    class AroundOperators {
         @Test
         void aroundOperatorsAssignmentFalse() {
             rewriteRun(
@@ -1292,7 +1292,7 @@ class SpacesTest implements RewriteTest {
                       class Test<T> where T: Comparable<T>, T: CharSequence
                       """,
                     """
-                      class Test <T> where T : Comparable<T>, T : CharSequence
+                      class Test<T> where T : Comparable<T>, T : CharSequence
                       """
                   )
                 );
@@ -2638,7 +2638,7 @@ class SpacesTest implements RewriteTest {
                     """
                       import java.util.ArrayList
 
-                      class Test <T, U> {
+                      class Test<T, U> {
                           fun <T2 : T> foo(): T2? {
                               val myList: List<T2> = ArrayList()
                               return null
@@ -2713,7 +2713,7 @@ class SpacesTest implements RewriteTest {
                       }
                       """,
                     """
-                      class Test <T> {
+                      class Test<T> {
                       }
                       """
                   )

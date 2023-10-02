@@ -173,7 +173,7 @@ class AutoFormatVisitorTest implements RewriteTest {
                       "abc"
               }
 
-              class AnotherClass <T : Any> : Some()
+              class AnotherClass<T : Any> : Some()
               """
           )
         );
