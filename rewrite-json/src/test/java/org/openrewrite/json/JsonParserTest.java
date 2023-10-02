@@ -146,4 +146,18 @@ public class JsonParserTest implements RewriteTest {
           json("")
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3582")
+    @Test
+    void multiBytesUnicode() {
+        rewriteRun(
+          json(
+            """
+              {
+                "🤖"  :   "robot"
+              }
+              """
+          )
+        );
+    }
 }

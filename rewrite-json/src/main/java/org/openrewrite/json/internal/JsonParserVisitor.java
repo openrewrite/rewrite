@@ -49,12 +49,49 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
 
     private int cursor = 0;
 
-    public JsonParserVisitor(Path path, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source) {
+    // Whether the source has multi bytes (> 2 bytes) unicode characters
+    private final boolean hasMultiBytesUnicode;
+    // Antlr index to source index mapping
+    private final int[] indexes;
+
+    public JsonParserVisitor(Path path,
+                             @Nullable FileAttributes fileAttributes,
+                             EncodingDetectingInputStream sourceInput
+                             ) {
         this.path = path;
         this.fileAttributes = fileAttributes;
-        this.source = source.readFully();
-        this.charset = source.getCharset();
-        this.charsetBomMarked = source.isCharsetBomMarked();
+        this.source = sourceInput.readFully();
+        this.charset = sourceInput.getCharset();
+        this.charsetBomMarked = sourceInput.isCharsetBomMarked();
+
+        boolean hasMultiBytesUnicode = false;
+        int[] pos = new int[source.length() + 1];
+        int cursor = 0;
+        int i = 1;
+        pos[0] = 0;
+
+        while (cursor < source.length()) {
+            int newCursor = source.offsetByCodePoints(cursor, 1);
+            if (newCursor > cursor + 1) {
+                hasMultiBytesUnicode = true;
+            }
+            pos[i++] = newCursor;
+            cursor = newCursor;
+        }
+
+        this.hasMultiBytesUnicode = hasMultiBytesUnicode;
+        this.indexes = hasMultiBytesUnicode ? pos : null;
+    }
+
+    /**
+     * Characters index to source index mapping, valid only when `hasMultiBytesUnicode` is true.
+     * Antlr index is based on characters index and reader is based on source index.
+     * If there are any >2 bytes unicode characters in source code, it will make the index mismatch.
+     * @param index index from Antlr
+     * @return corrected cursor index
+     */
+    private int getCursorIndex(int index) {
+        return hasMultiBytesUnicode ? indexes[index] : index;
     }
 
     @Override
@@ -264,7 +301,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
     }
 
     private Space prefix(Token token) {
-        int start = token.getStartIndex();
+        int start = getCursorIndex(token.getStartIndex());
         if (start < cursor) {
             return Space.EMPTY;
         }
@@ -281,7 +318,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
 
         T t = conversion.apply(ctx, prefix(ctx));
         if (ctx.getStop() != null) {
-            cursor = ctx.getStop().getStopIndex() + (Character.isWhitespace(source.charAt(ctx.getStop().getStopIndex())) ? 0 : 1);
+            cursor = getCursorIndex(ctx.getStop().getStopIndex()) + (Character.isWhitespace(source.charAt(getCursorIndex(ctx.getStop().getStopIndex()))) ? 0 : 1);
         }
 
         return t;
@@ -289,7 +326,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
 
     private <T> T convert(TerminalNode node, BiFunction<TerminalNode, Space, T> conversion) {
         T t = conversion.apply(node, prefix(node));
-        cursor = node.getSymbol().getStopIndex() + 1;
+        cursor = getCursorIndex(node.getSymbol().getStopIndex())  + 1;
         return t;
     }
 
