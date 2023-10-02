@@ -221,7 +221,9 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public J.Block visitBlock(J.Block block, P p) {
         J.Block b = super.visitBlock(block, p);
-        if (!b.getMarkers().findFirst(OmitBraces.class).isPresent() && !b.getEnd().getWhitespace().contains("\n")) {
+        if (!b.getMarkers().findFirst(OmitBraces.class).isPresent() &&
+                !b.getStatements().isEmpty() &&
+                !b.getEnd().getWhitespace().contains("\n")) {
             b = b.withEnd(withNewline(b.getEnd()));
         }
         return b;

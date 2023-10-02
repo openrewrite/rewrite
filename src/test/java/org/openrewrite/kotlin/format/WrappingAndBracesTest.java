@@ -552,5 +552,14 @@ class WrappingAndBracesTest implements RewriteTest {
         );
     }
 
-
+    @Test
+    void emptyClassBody() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {}
+              """
+          )
+        );
+    }
 }
