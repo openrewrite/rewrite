@@ -233,9 +233,8 @@ class ChangeTypeTest implements RewriteTest {
           spec -> spec.recipe(new ChangeType("java.util.ArrayList", "java.util.LinkedList", true)),
           kotlin(
             """
-              import java.util.ArrayList
-
               import java.util.ArrayList as MyList
+              import java.util.ArrayList
 
               fun main() {
                   val list = ArrayList<String>()
@@ -243,9 +242,8 @@ class ChangeTypeTest implements RewriteTest {
               }
               """,
             """
-              import java.util.LinkedList
-              
               import java.util.LinkedList as MyList
+              import java.util.LinkedList
 
               fun main() {
                   val list = LinkedList<String>()
@@ -271,9 +269,8 @@ class ChangeTypeTest implements RewriteTest {
               }
               """,
             """
-              import java.util.LinkedList
-              
               import java.util.LinkedList as MyList
+              import java.util.LinkedList
 
               fun main() {
                   val list = LinkedList<String>()

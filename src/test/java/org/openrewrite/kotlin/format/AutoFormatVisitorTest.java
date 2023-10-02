@@ -18,13 +18,18 @@ package org.openrewrite.kotlin.format;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.AddImportTest;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static java.util.Collections.emptySet;
+import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class AutoFormatVisitorTest implements RewriteTest {
@@ -352,6 +357,54 @@ class AutoFormatVisitorTest implements RewriteTest {
               }
           }
           """);
+    }
+
+    @Test
+    void reorderImportsDefault() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.util.LinkedList
+              import java.util.HashMap
+              import java.util.Calendar
+
+              class T(l: LinkedList<String>, h: HashMap<String, String>, c: Calendar)
+              """,
+            """
+              import java.util.Calendar
+              import java.util.HashMap
+              import java.util.LinkedList
+
+              class T(l: LinkedList<String>, h: HashMap<String, String>, c: Calendar)
+              """
+          )
+        );
+    }
+
+    @Test
+    void reorderImportsAliasesSeparately() {
+        rewriteRun(
+          spec -> spec.parser(KotlinParser.builder().styles(singletonList(
+            new NamedStyles(
+              randomId(), "test", "test", "test", emptySet(),
+              singletonList((AddImportTest.importAliasesSeparatelyStyle()))
+            )
+          ))),
+          kotlin(
+            """
+              import java.util.regex.Pattern as Pat
+              import java.util.*
+
+              class T(s: StringJoiner, p: Pat)
+              """,
+            """
+              import java.util.*
+              import java.util.regex.Pattern as Pat
+
+              class T(s: StringJoiner, p: Pat)
+              """
+          )
+        );
     }
 }
 

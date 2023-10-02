@@ -83,7 +83,13 @@ public class ImportLayoutStyle implements KotlinStyle {
     private final List<Block> blocksNoCatchalls;
     private final List<Block> blocksOnlyCatchalls;
 
-    public ImportLayoutStyle(int topLevelSymbolsToUseStarImport, int javaStaticsAndEnumsToUseStarImport, List<Block> layout, List<Block> packagesToFold) {
+    private final boolean importAliasesSeparately;
+
+    public ImportLayoutStyle(int topLevelSymbolsToUseStarImport,
+                             int javaStaticsAndEnumsToUseStarImport,
+                             List<Block> layout,
+                             List<Block> packagesToFold,
+                             boolean importAliasesSeparately) {
         this.topLevelSymbolsToUseStarImport = topLevelSymbolsToUseStarImport;
         this.javaStaticsAndEnumsToUseStarImport = javaStaticsAndEnumsToUseStarImport;
         this.layout = layout.isEmpty() ? IntelliJ.importLayout().getLayout() : layout;
@@ -94,6 +100,9 @@ public class ImportLayoutStyle implements KotlinStyle {
                 .collect(Collectors.partitioningBy(Block.AllOthers.class::isInstance));
         blocksNoCatchalls = blockGroups.get(false);
         blocksOnlyCatchalls = blockGroups.get(true);
+
+        // This setting is by default enabled on Intellij's UI, but in reality, it's turned off.
+        this.importAliasesSeparately = importAliasesSeparately;
     }
 
     /**
@@ -124,7 +133,7 @@ public class ImportLayoutStyle implements KotlinStyle {
         // the import to add at most. we don't even want to star fold other non-adjacent imports in the same
         // block that should be star folded according to the layout style (minimally invasive change).
         List<JRightPadded<J.Import>> ideallyOrdered =
-                new ImportLayoutStyle(Integer.MAX_VALUE, Integer.MAX_VALUE, layout, packagesToFold)
+                new ImportLayoutStyle(Integer.MAX_VALUE, Integer.MAX_VALUE, layout, packagesToFold, importAliasesSeparately)
                         .orderImports(ListUtils.concat(originalImports, paddedToAdd), new HashSet<>());
 
         if (ideallyOrdered.size() == originalImports.size()) {
@@ -394,9 +403,10 @@ public class ImportLayoutStyle implements KotlinStyle {
         private final List<Block> packagesToFold = new ArrayList<>();
         private int topLevelSymbolsToUseStarImport = 5;
         private int javaStaticsAndEnumsToUseStarImport = 3;
+        private boolean importAliasesSeparately = false;
 
         public Builder importAllOthers() {
-            blocks.add(new Block.AllOthers());
+            blocks.add(new Block.AllOthers(!importAliasesSeparately));
             return this;
         }
 
@@ -416,7 +426,7 @@ public class ImportLayoutStyle implements KotlinStyle {
         }
 
         public Builder importPackage(String packageWildcard, Boolean withSubpackages) {
-            blocks.add(new Block.ImportPackage(packageWildcard, withSubpackages));
+            blocks.add(new Block.ImportPackage(packageWildcard, withSubpackages, !importAliasesSeparately));
             return this;
         }
 
@@ -425,7 +435,7 @@ public class ImportLayoutStyle implements KotlinStyle {
         }
 
         public Builder packageToFold(String packageWildcard, Boolean withSubpackages) {
-            packagesToFold.add(new Block.ImportPackage(packageWildcard, withSubpackages));
+            packagesToFold.add(new Block.ImportPackage(packageWildcard, withSubpackages, !importAliasesSeparately));
             return this;
         }
 
@@ -443,6 +453,11 @@ public class ImportLayoutStyle implements KotlinStyle {
             return this;
         }
 
+        public Builder importAliasesSeparately(boolean importAliasesSeparately) {
+            this.importAliasesSeparately = importAliasesSeparately;
+            return this;
+        }
+
         public ImportLayoutStyle build() {
             for (Block block : blocks) {
                 if (block instanceof Block.AllOthers) {
@@ -452,7 +467,7 @@ public class ImportLayoutStyle implements KotlinStyle {
                             .collect(toList()));
                 }
             }
-            return new ImportLayoutStyle(topLevelSymbolsToUseStarImport, javaStaticsAndEnumsToUseStarImport, blocks, packagesToFold);
+            return new ImportLayoutStyle(topLevelSymbolsToUseStarImport, javaStaticsAndEnumsToUseStarImport, blocks, packagesToFold, importAliasesSeparately);
         }
     }
 
@@ -611,6 +626,7 @@ public class ImportLayoutStyle implements KotlinStyle {
 
         @SuppressWarnings("deprecation")
         class ImportPackage implements Block {
+            boolean acceptAliasImport;
 
             // VisibleForTesting
             static final Comparator<JRightPadded<J.Import>> IMPORT_SORTING = (i1, i2) -> {
@@ -633,7 +649,8 @@ public class ImportLayoutStyle implements KotlinStyle {
 
             private final Pattern packageWildcard;
 
-            public ImportPackage(String packageWildcard, boolean withSubpackages) {
+            public ImportPackage(String packageWildcard, boolean withSubpackages, boolean acceptAliasImport) {
+                this.acceptAliasImport = acceptAliasImport;
                 this.packageWildcard = Pattern.compile(packageWildcard
                         .replace(".", "\\.")
                         .replace("*", withSubpackages ? ".+" : "[^.]+"));
@@ -645,7 +662,11 @@ public class ImportLayoutStyle implements KotlinStyle {
 
             @Override
             public boolean accept(JRightPadded<J.Import> anImport) {
-                return anImport.getElement().getAlias() == null && packageWildcard.matcher(anImport.getElement().getQualid().printTrimmed()).matches();
+                if ((!acceptAliasImport) && (anImport.getElement().getAlias() != null)) {
+                    return false;
+                }
+
+                return packageWildcard.matcher(anImport.getElement().getQualid().printTrimmed()).matches();
             }
 
             @Override
@@ -717,8 +738,8 @@ public class ImportLayoutStyle implements KotlinStyle {
         class AllOthers extends ImportPackage {
             private Collection<ImportPackage> packageImports = emptyList();
 
-            public AllOthers() {
-                super("*", true);
+            public AllOthers(boolean acceptAlias) {
+                super("*", true, acceptAlias);
             }
 
             public void setPackageImports(Collection<ImportPackage> packageImports) {
@@ -745,7 +766,7 @@ public class ImportLayoutStyle implements KotlinStyle {
             private Collection<ImportPackage> packageImports = emptyList();
 
             public AllAliases() {
-                super("*", true);
+                super("*", true, true);
             }
 
             public void setPackageImports(Collection<ImportPackage> packageImports) {
