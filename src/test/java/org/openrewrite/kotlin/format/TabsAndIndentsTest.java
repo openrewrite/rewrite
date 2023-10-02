@@ -2168,4 +2168,18 @@ class TabsAndIndentsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void propertyGetter() {
+        rewriteRun(
+          kotlin(
+            """
+              class JavaLocation {
+                  val bootClasspath: String
+                      get() = ""
+              }
+              """
+          )
+        );
+    }
 }

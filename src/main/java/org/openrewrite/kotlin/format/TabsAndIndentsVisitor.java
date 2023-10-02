@@ -98,6 +98,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         } else if (tree instanceof  J.Block && tree.getMarkers().findFirst(SingleExpressionBlock.class).isPresent()) {
             getCursor().putMessage("indentType", wrappingStyle.getExpressionBodyFunctions().getUseContinuationIndent() ? IndentType.CONTINUATION_INDENT : IndentType.INDENT);
         } else if (tree instanceof  J.Block ||
+                tree instanceof K.Property ||
                 tree instanceof J.If ||
                 tree instanceof J.If.Else ||
                 tree instanceof J.ForLoop ||

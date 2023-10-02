@@ -238,7 +238,7 @@ class AutoFormatVisitorTest implements RewriteTest {
           kotlin(
             """
               val String.extension: Any
-                      get() = ""
+                  get() = ""
               """
           )
         );
