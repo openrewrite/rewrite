@@ -2420,13 +2420,15 @@ class KotlinParserVisitor(
         var label: J.Identifier? = null
         val node = getRealPsiElement(returnExpression) as KtReturnExpression?
         val explicitReturn = node != null
-        var prefix = Space.EMPTY
+        val prefix: Space?
         if (explicitReturn) {
             prefix = sourceBefore("return")
             if (node!!.labeledExpression != null) {
                 skip("@")
                 label = createIdentifier(returnExpression.target.labelName)
             }
+        } else {
+            prefix = whitespace()
         }
         var returnExpr: Expression? = null
         if (returnExpression.result !is FirUnitExpression) {

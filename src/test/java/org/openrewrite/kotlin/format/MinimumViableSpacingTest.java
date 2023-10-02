@@ -397,4 +397,21 @@ class MinimumViableSpacingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void blockWithImplicitReturn() {
+        rewriteRun(
+          spec -> spec.recipes(
+            toRecipe(() -> new MinimumViableSpacingVisitor<>())
+          ),
+          kotlin(
+            """
+              val maybeOne = listOf(1, 2).firstOrNull {
+                  print("Found $it")
+                  it == 1
+              }
+              """
+          )
+        );
+    }
 }
