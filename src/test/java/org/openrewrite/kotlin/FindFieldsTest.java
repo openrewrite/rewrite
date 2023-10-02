@@ -26,7 +26,7 @@ public class FindFieldsTest implements RewriteTest {
     @Test
     void jvmStaticField() {
         rewriteRun(
-          spec -> spec.recipe(new FindFields("java.lang.Integer", "MAX_VALUE")),
+          spec -> spec.recipe(new FindFields("java.lang.Integer", false, "MAX_VALUE")),
           kotlin(
             """
               import java.lang.Integer
