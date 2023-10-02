@@ -2182,4 +2182,20 @@ class TabsAndIndentsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void methodInvocationAnnotation() {
+        rewriteRun(
+          kotlin(
+            """
+              class AutoToString {
+                  fun test0() {
+                      @Suppress
+                      print("")
+                  }
+              }
+              """
+          )
+        );
+    }
 }
