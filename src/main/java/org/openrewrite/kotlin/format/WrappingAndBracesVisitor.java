@@ -22,6 +22,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.marker.OmitBraces;
+import org.openrewrite.kotlin.marker.PrimaryConstructor;
 import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 
 import java.util.List;
@@ -97,6 +98,10 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
     @Override
     public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, P p) {
         J.MethodDeclaration m = super.visitMethodDeclaration(method, p);
+        if (m.getMarkers().findFirst(PrimaryConstructor.class).isPresent()) {
+            return m;
+        }
+
         m = m.withLeadingAnnotations(withNewlines(m.getLeadingAnnotations()));
 
         List<J.Modifier> modifiers = method.getModifiers();

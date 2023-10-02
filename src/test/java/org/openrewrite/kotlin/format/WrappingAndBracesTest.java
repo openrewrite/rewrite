@@ -562,4 +562,15 @@ class WrappingAndBracesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void primaryConstructorAnnotations() {
+        rewriteRun(
+          kotlin(
+            """
+              class T @Suppress constructor()
+              """
+          )
+        );
+    }
 }
