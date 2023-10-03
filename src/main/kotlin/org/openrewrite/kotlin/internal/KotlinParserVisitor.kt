@@ -2525,6 +2525,7 @@ class KotlinParserVisitor(
     }
 
     override fun visitResolvedQualifier(resolvedQualifier: FirResolvedQualifier, data: ExecutionContext): J? {
+        val prefix = whitespace()
         val fieldAccess = resolvedQualifier.packageFqName.asString()
         val resolvedName =
                 if (resolvedQualifier.relativeClassFqName == null) "" else "." + resolvedQualifier.relativeClassFqName!!.asString()
@@ -2563,12 +2564,14 @@ class KotlinParserVisitor(
             val typeArgs = mapTypeArguments(resolvedQualifier.typeArguments, data)
             typeTree = J.ParameterizedType(
                     randomId(),
-                    Space.EMPTY,
+                    prefix,
                     Markers.EMPTY,
                     typeTree,
                     typeArgs,
                     type(resolvedQualifier)
             )
+        } else {
+            typeTree = (typeTree as J).withPrefix(prefix)
         }
         return typeTree
     }

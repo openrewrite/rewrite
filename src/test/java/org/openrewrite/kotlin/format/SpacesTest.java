@@ -2721,4 +2721,20 @@ class SpacesTest implements RewriteTest {
             }
         }
     }
+
+    @Test
+    void qualifiedReference() {
+        rewriteRun(
+          kotlin(
+            """
+              class A {
+                  private sealed class RelTypes {
+                      object KNOWS : RelTypes()
+                  }
+                  private val v: RelTypes = RelTypes.KNOWS
+              }
+              """
+          )
+        );
+    }
 }
