@@ -2243,4 +2243,20 @@ class TabsAndIndentsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void implicitVoidReturn() {
+        rewriteRun(
+          kotlin(
+            """
+              class A {
+                  init {
+                      let {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }

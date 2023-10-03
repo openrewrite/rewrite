@@ -29,6 +29,7 @@ import org.openrewrite.kotlin.marker.SingleExpressionBlock;
 import org.openrewrite.kotlin.style.TabsAndIndentsStyle;
 import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.kotlin.tree.KSpace;
 
 import java.util.Iterator;
 import java.util.List;
@@ -96,9 +97,9 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                 tree instanceof J.ArrayDimension ||
                 tree instanceof J.ClassDeclaration) {
             getCursor().putMessage("indentType", IndentType.ALIGN);
-        } else if (tree instanceof  J.Block && tree.getMarkers().findFirst(SingleExpressionBlock.class).isPresent()) {
+        } else if (tree instanceof J.Block && tree.getMarkers().findFirst(SingleExpressionBlock.class).isPresent()) {
             getCursor().putMessage("indentType", wrappingStyle.getExpressionBodyFunctions().getUseContinuationIndent() ? IndentType.CONTINUATION_INDENT : IndentType.INDENT);
-        } else if (tree instanceof  J.Block ||
+        } else if (tree instanceof J.Block ||
                 tree instanceof K.Property ||
                 tree instanceof K.AnnotatedExpression ||
                 tree instanceof J.If ||
@@ -137,6 +138,17 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
     public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, P p) {
         // FIXME fix formatting of control sections
         return control;
+    }
+
+    @Override
+    public Space visitSpace(Space space, KSpace.Location loc, P p) {
+        if (loc == KSpace.Location.KRETURN_PREFIX &&
+                getCursor().<K.KReturn>getValue().getExpression().getMarkers().findFirst(ImplicitReturn.class).isPresent() &&
+                getCursor().<K.KReturn>getValue().getExpression().getExpression() == null) {
+            // implicit returns without any expression are not indented
+            return space;
+        }
+        return super.visitSpace(space, loc, p);
     }
 
     @Override
