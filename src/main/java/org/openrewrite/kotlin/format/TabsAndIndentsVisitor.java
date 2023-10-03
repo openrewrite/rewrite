@@ -24,6 +24,7 @@ import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.marker.Implicit;
+import org.openrewrite.kotlin.marker.OmitBraces;
 import org.openrewrite.kotlin.marker.SingleExpressionBlock;
 import org.openrewrite.kotlin.style.TabsAndIndentsStyle;
 import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
@@ -147,9 +148,14 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         }
 
         boolean alignToAnnotation = false;
+        Object value = getCursor().getValue();
         Cursor parent = getCursor().getParent();
         if (parent != null && parent.getValue() instanceof J.Annotation) {
             parent.getParentOrThrow().putMessage("afterAnnotation", true);
+        } else if (loc == Space.Location.BLOCK_PREFIX &&
+                ((J.Block) value).getMarkers().findFirst(OmitBraces.class).isPresent() &&
+                ((J.Block) value).getStatements().isEmpty()) {
+            return space;
         } else if (parent != null && !getCursor().getParentOrThrow().getPath(J.Annotation.class::isInstance).hasNext()) {
             // when annotations are on their own line, other parts of the declaration that follow are aligned left to it
             alignToAnnotation = getCursor().pollNearestMessage("afterAnnotation") != null &&

@@ -2229,4 +2229,18 @@ class TabsAndIndentsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void trailingAnnotationCommentBeforeClass() {
+        rewriteRun(
+          kotlin(
+            """
+              class T {
+                  @Suppress // comment
+                  class A
+              }
+              """
+          )
+        );
+    }
 }

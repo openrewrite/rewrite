@@ -201,10 +201,10 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
                 c = c.withModifiers(withNewline(c.getModifiers()));
             } else {
                 J.ClassDeclaration.Kind kind = c.getAnnotations().getKind();
-                if (!kind.getPrefix().getWhitespace().contains("\n")) {
-                    c = c.getAnnotations().withKind(kind.withPrefix(
-                            kind.getPrefix().withWhitespace("\n" + kind.getPrefix().getWhitespace())
-                    ));
+                Space kindPrefix = kind.getPrefix();
+                if (!kindPrefix.getWhitespace().contains("\n") && kindPrefix.getComments().isEmpty()) {
+                    kindPrefix = kindPrefix.withWhitespace("\n" + kindPrefix.getWhitespace());
+                    c = c.getAnnotations().withKind(kind.withPrefix(kindPrefix));
                 }
             }
         }
