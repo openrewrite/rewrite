@@ -89,10 +89,11 @@ public interface JavaParser extends Parser {
             boolean lacking = true;
             for (URI cpEntry : runtimeClasspath) {
                 String cpEntryString = cpEntry.toString();
-                if (jarPattern.matcher(cpEntryString).find()
-                    || (explodedPattern.matcher(cpEntryString).find()
-                        && Paths.get(cpEntry).toFile().isDirectory())) {
-                    artifacts.add(Paths.get(cpEntry));
+                Path cpEntryPath = Paths.get(cpEntry);
+                if (jarPattern.matcher(cpEntryString).find() ||
+                    (explodedPattern.matcher(cpEntryString).find() &&
+                     cpEntryPath.toFile().isDirectory())) {
+                    artifacts.add(cpEntryPath);
                     lacking = false;
                     // Do not break because jarPattern matches "foo-bar-1.0.jar" and "foo-1.0.jar" to "foo"
                 }
@@ -199,7 +200,7 @@ public interface JavaParser extends Parser {
                 //noinspection ConstantValue
                 throw new IllegalArgumentException("Unable to find classpath resource dependencies beginning with: " +
                                                    missingArtifactNames.stream().map(a -> "'" + a + "'").sorted().collect(joining(", ", "", ".\n")) +
-                                                   "The caller is of type " + (caller == null ? "NO CALLER IDENTIFIED" : caller.getName()) + ".\n" +
+                                                   "The caller is of type " + caller.getName() + ".\n" +
                                                    "The resources resolvable from the caller's classpath are: " +
                                                    resources.stream().map(Resource::getPath).sorted().collect(joining(", "))
                 );
