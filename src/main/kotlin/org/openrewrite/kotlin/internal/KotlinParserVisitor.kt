@@ -1442,6 +1442,14 @@ class KotlinParserVisitor(
                 hasParentheses = true
                 lPAROffset = firstChild.node.startOffset
             }
+        } else if (firCall.psi is KtArrayAccessExpression) {
+            hasParentheses = true
+        } else if (firCall.psi is KtCallExpression && (firCall.psi as KtCallExpression).valueArgumentList != null) {
+            val argList = (firCall.psi as KtCallExpression).valueArgumentList!!
+            if (argList.firstChild.node.elementType == KtTokens.LPAR) {
+                hasParentheses = true
+                lPAROffset = argList.firstChild.startOffset
+            }
         }
 
         val flattenedExpressions = firArguments.stream()
@@ -1498,7 +1506,8 @@ class KotlinParserVisitor(
         } else {
             var isTrailingLambda = false
             for (i in flattenedExpressions.indices) {
-                isTrailingLambda = hasTrailingLambda && i == argumentCount - 1
+                val lastArg = i == argumentCount - 1
+                isTrailingLambda = hasTrailingLambda && lastArg
                 val expression = flattenedExpressions[i]
 
                 // Didn't find a way to proper reset the cursor, so have to do a hard reset here
@@ -1512,13 +1521,14 @@ class KotlinParserVisitor(
                     expressions.add(padRight(expr, Space.EMPTY))
                     break
                 }
-                val padding = whitespace()
+                // don't consume trailing space if the call doesn't have any parentheses
+                val padding = if (lastArg && !hasParentheses) Space.EMPTY else whitespace()
                 var trailingComma: TrailingComma? = null
                 if (!isInfix) {
                     if (isLastArgumentLambda && i == argumentCount - 2) {
                         trailingComma = if (skip(",")) TrailingComma(randomId(), whitespace()) else null
                         skip(closing)
-                    } else if (i == argumentCount - 1) {
+                    } else if (lastArg) {
                         trailingComma = if (skip(",")) TrailingComma(randomId(), whitespace()) else null
                     } else {
                         skip(",")
