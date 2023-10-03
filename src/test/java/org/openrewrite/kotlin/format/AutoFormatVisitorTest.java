@@ -139,7 +139,6 @@ class AutoFormatVisitorTest implements RewriteTest {
             """
               open class Some {
                   private val f: (Int) -> Int = { a: Int -> a * 2 }
-
                   fun foo(): Int {
                       val test: Int = 12
                       for (i in 10..42) {
@@ -211,6 +210,7 @@ class AutoFormatVisitorTest implements RewriteTest {
               import org.junit.jupiter.api.Test
 
               class GraphQLMultiQueryRequestTest {
+              
                   @Suppress
                   @Test
                   fun testSerializeInputClassWithProjectionAndMultipleQueries() {
@@ -321,6 +321,7 @@ class AutoFormatVisitorTest implements RewriteTest {
             """
               class A {
                   companion object {
+              
                       @JvmField
                       val GRANT_TYPE = "password"
                   }

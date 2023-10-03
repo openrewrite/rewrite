@@ -22,6 +22,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.marker.OmitBraces;
+import org.openrewrite.kotlin.marker.SingleExpressionBlock;
 import org.openrewrite.kotlin.style.BlankLinesStyle;
 import org.openrewrite.kotlin.tree.K;
 
@@ -29,6 +30,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Objects.requireNonNull;
 
@@ -50,7 +52,7 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
     private static final int minimumBlankLines_AroundFieldInInterface = 0;
     private static final int minimumBlankLines_AroundField = 0;
     private static final int minimumBlankLines_AroundMethodInInterface = 1;
-    private static final int minimumBlankLines_AroundMethod = 1;
+    private static final int minimumBlankLines_AfterDeclarationWithBody = 1;
     private static final int minimumBlankLines_BeforeMethodBody = 0;
     private static final int minimumBlankLines_AroundInitializer = 1;
 
@@ -123,7 +125,7 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
                 }
             } else if (statements.get(i - 1).getElement() instanceof J.Block) {
                 s = minimumLines(s, minimumBlankLines_AroundInitializer);
-            } else if (s.getElement() instanceof J.ClassDeclaration) {
+            } else if (s.getElement() instanceof J.ClassDeclaration || s.getElement() instanceof K.ClassDeclaration) {
                 // Apply `style.getMinimum().getAroundClass()` to inner classes.
                 s = minimumLines(s, minimumBlankLines_AroundClass);
             }
@@ -231,18 +233,15 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
                             declMax = Math.max(declMax, minimumBlankLines_AroundField);
                             j = minimumLines(j, minimumBlankLines_AroundField);
                         }
-                    } else if (j instanceof J.MethodDeclaration) {
+                    } else if (j instanceof J.MethodDeclaration || j instanceof K.MethodDeclaration) {
                         if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Interface) {
                             declMax = Math.max(declMax, minimumBlankLines_AroundMethodInInterface);
                             j = minimumLines(j, minimumBlankLines_AroundMethodInInterface);
-                        } else {
-                            declMax = Math.max(declMax, minimumBlankLines_AroundMethod);
-                            j = minimumLines(j, minimumBlankLines_AroundMethod);
                         }
                     } else if (j instanceof J.Block) {
                         declMax = Math.max(declMax, minimumBlankLines_AroundInitializer);
                         j = minimumLines(j, minimumBlankLines_AroundInitializer);
-                    } else if (j instanceof J.ClassDeclaration) {
+                    } else if (j instanceof J.ClassDeclaration || j instanceof K.ClassDeclaration) {
                         declMax = Math.max(declMax, minimumBlankLines_AroundClass);
                         j = minimumLines(j, minimumBlankLines_AroundClass);
                     }
@@ -263,8 +262,8 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
                     declMax = Math.max(declMax, minimumBlankLines_AroundField);
                     j = minimumLines(j, minimumBlankLines_AroundField);
                 } else if (j instanceof J.MethodDeclaration || j instanceof K.MethodDeclaration) {
-                    declMax = Math.max(declMax, minimumBlankLines_AroundMethod);
-                    j = minimumLines(j, minimumBlankLines_AroundMethod);
+                    declMax = Math.max(declMax, minimumBlankLines_AfterDeclarationWithBody);
+                    j = minimumLines(j, minimumBlankLines_AfterDeclarationWithBody);
                 } else if (j instanceof J.Block) {
                     declMax = Math.max(declMax, minimumBlankLines_AroundInitializer);
                     j = minimumLines(j, minimumBlankLines_AroundInitializer);
@@ -284,33 +283,41 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
         J.Block b = super.visitBlock(block, p);
         b = b.withEnd(keepMaximumLines(b.getEnd(), style.getKeepMaximum().getBeforeEndOfBlock()));
 
-        List<Statement> blockStatements = b.getStatements();
-        blockStatements = ListUtils.map(blockStatements, (index, statement) -> {
-            if (index == 0) {
-                return statement;
-            }
-
-            if (statement instanceof J.MethodDeclaration) {
-                J.MethodDeclaration m = (J.MethodDeclaration) statement;
+        AtomicBoolean previousWithBody = new AtomicBoolean();
+        List<JRightPadded<Statement>> blockStatements = b.getPadding().getStatements();
+        blockStatements = ListUtils.map(blockStatements, (index, padded) -> {
+            Statement statement = padded.getElement();
+            if (statement instanceof J.MethodDeclaration || statement instanceof K.MethodDeclaration) {
+                J.MethodDeclaration m = statement instanceof J.MethodDeclaration ? (J.MethodDeclaration) statement :
+                        ((K.MethodDeclaration) statement).getMethodDeclaration();
+                if (previousWithBody.get()) {
+                    m = minimumLines(m, minimumBlankLines_AfterDeclarationWithBody);
+                }
+                if (m.getBody() != null && !m.getBody().getMarkers().findFirst(SingleExpressionBlock.class).isPresent()) {
+                    previousWithBody.set(true);
+                } else {
+                    previousWithBody.set(false);
+                }
                 if (!m.getPrefix().getComments().isEmpty()) {
-                    return minimumLines(m, style.getMinimum().getBeforeDeclarationWithCommentOrAnnotation());
+                    m = minimumLines(m, style.getMinimum().getBeforeDeclarationWithCommentOrAnnotation());
                 }
 
                 if (!m.getLeadingAnnotations().isEmpty()) {
-                    return minimumLines(m, style.getMinimum().getBeforeDeclarationWithCommentOrAnnotation());
+                    m = minimumLines(m, style.getMinimum().getBeforeDeclarationWithCommentOrAnnotation());
                 }
+                statement = statement instanceof J.MethodDeclaration ? m : ((K.MethodDeclaration) statement).withMethodDeclaration(m);
             } else if (statement instanceof J.VariableDeclarations) {
                 J.VariableDeclarations v = (J.VariableDeclarations) statement;
 
                 if (!v.getLeadingAnnotations().isEmpty()) {
-                    return minimumLines(v, style.getMinimum().getBeforeDeclarationWithCommentOrAnnotation());
+                    statement = minimumLines(v, style.getMinimum().getBeforeDeclarationWithCommentOrAnnotation());
                 }
             }
 
-            return statement;
+            return padded.withElement(statement);
         });
 
-        b = b.withStatements(blockStatements);
+        b = b.getPadding().withStatements(blockStatements);
         return b;
     }
 

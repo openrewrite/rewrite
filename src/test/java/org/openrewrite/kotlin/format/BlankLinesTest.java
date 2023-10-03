@@ -100,6 +100,7 @@ class BlankLinesTest implements RewriteTest {
                           field1 = 2
                       }
 
+                      fun test0() = 1
                       fun test1() {
                           object : Runnable {
                               override fun run() {
@@ -127,6 +128,7 @@ class BlankLinesTest implements RewriteTest {
                           field1 = 2
                       }
 
+                      fun test0() = 1
                       fun test1() {
                           object : Runnable {
                               override fun run() {
@@ -448,6 +450,9 @@ class BlankLinesTest implements RewriteTest {
                       annotation class Annotation
 
                       class Bar {
+                      
+                      
+                      
                           @Annotation
                           val a = 42
 
@@ -482,8 +487,9 @@ class BlankLinesTest implements RewriteTest {
           kotlin(
             """
               class A {
+              
                   private val id: Long = 0 // this comment will move to wrong place
-
+              
                   fun id(): Long {
                       return id;
                   }
