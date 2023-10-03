@@ -60,7 +60,7 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
                 J.MethodDeclaration m = (J.MethodDeclaration) j;
                 // no new line for constructor
                 if ("<constructor>".equals(Optional.ofNullable(m.getMethodType()).map(JavaType.Method::getName).orElse(""))) {
-                     return j;
+                    return j;
                 }
             }
 
@@ -237,7 +237,7 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
     private Space withNewline(Space space) {
         if (space.getComments().isEmpty()) {
             space = space.withWhitespace("\n" + space.getWhitespace());
-        } else if (space.getComments().get(space.getComments().size()-1).isMultiline()) {
+        } else if (space.getComments().get(space.getComments().size() - 1).isMultiline()) {
             space = space.withComments(ListUtils.mapLast(space.getComments(), c -> c.withSuffix("\n")));
         }
 
