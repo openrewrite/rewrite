@@ -107,6 +107,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                 tree instanceof J.WhileLoop ||
                 tree instanceof J.Case ||
                 tree instanceof J.EnumValueSet ||
+                tree instanceof J.Ternary ||
                 (tree instanceof J.FieldAccess || tree instanceof J.MethodInvocation)
                         && !wrappingStyle.getChainedFunctionCalls().getUseContinuationIndent()
         ) {

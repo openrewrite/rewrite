@@ -2213,4 +2213,20 @@ class TabsAndIndentsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void ternaryIndentation() {
+        rewriteRun(
+          kotlin(
+            """
+              fun f(): String? {
+                  val values = (listOf("") as List<String>?)
+                      ?.map { it }
+                      ?: return null
+                  return values.joinToString("")
+              }
+              """
+          )
+        );
+    }
 }
