@@ -164,6 +164,7 @@ public class ClasspathScanningLoader implements ResourceLoader {
         for (ClassInfo classInfo : result.getSubclasses(className)) {
             Class<?> recipeClass = classInfo.loadClass();
             if (recipeClass.getName().equals(DeclarativeRecipe.class.getName()) ||
+                (recipeClass.getModifiers() & Modifier.PUBLIC) == 0 ||
                 // `ScanningRecipe` is an example of an abstract `Recipe` subtype
                 (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
                 continue;
