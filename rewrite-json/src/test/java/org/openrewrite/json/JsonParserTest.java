@@ -154,7 +154,9 @@ public class JsonParserTest implements RewriteTest {
           json(
             """
               {
-                "🤖"  :   "robot"
+                "🤖"    : "robot",
+                "robot" : "🤖",
+                "நடித்த" : 3 /* 🇩🇪 */
               }
               """
           )
