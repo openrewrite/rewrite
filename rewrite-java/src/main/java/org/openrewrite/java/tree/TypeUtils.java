@@ -532,7 +532,7 @@ public class TypeUtils {
         return t;
     }
 
-    public static boolean isDefaultAccessLevel(final Set<Flag> flags) {
+    private static boolean isDefaultAccessLevel(final Set<Flag> flags) {
         return !flags.contains(Flag.Public) && !flags.contains(Flag.Protected) && !flags.contains(Flag.Private);
     }
 
