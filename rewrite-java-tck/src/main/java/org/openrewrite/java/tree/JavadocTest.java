@@ -1707,4 +1707,23 @@ class JavadocTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void emptyAttributes() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * DEFINE TENANCY TenantB AS <TenantB OCID>
+               * ENDORSE GROUP <TenantA user group name> TO {OBJECTSTORAGE_NAMESPACE_READ} IN TENANCY TenantB
+               *
+               * DEFINE TENANCY TenantA AS <TenantA OCID>
+               * DEFINE GROUP TenantAGroup AS <TenantA user group OCID>
+               * ADMIT GROUP TenantAGroup OF TENANCY TenantA TO {OBJECTSTORAGE_NAMESPACE_READ} IN TENANCY
+               */
+              class Test {}
+              """
+          )
+        );
+    }
 }
