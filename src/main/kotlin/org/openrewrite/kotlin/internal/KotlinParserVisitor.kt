@@ -2135,7 +2135,7 @@ class KotlinParserVisitor(
             }
 
             // type constraints
-            typeConstraints = mapTypeConstraints(property, property.psi?.getChildOfType<KtTypeConstraintList>(), true, data)
+            typeConstraints = mapTypeConstraints(property, property.psi?.getChildOfType<KtTypeConstraintList>(), data)
 
             var equals: PsiElement? = null
             var propertyNode: KtProperty? = null
@@ -2744,7 +2744,11 @@ class KotlinParserVisitor(
         }
 
         // type constraints
-        val typeConstraints = mapTypeConstraints(simpleFunction, simpleFunction.psi?.getChildOfType<KtTypeConstraintList>(), simpleFunction.body != null, data)
+        val typeConstraints = mapTypeConstraints(
+            simpleFunction,
+            simpleFunction.psi?.getChildOfType<KtTypeConstraintList>(),
+            data
+        )
 
         val body = mapFunctionBody(simpleFunction, data)
 
@@ -4109,7 +4113,6 @@ class KotlinParserVisitor(
         val typeConstraints = mapTypeConstraints(
             regularClass,
             regularClass.psi?.getChildOfType<KtTypeConstraintList>(),
-            regularClass.declarations.any { it.source !is KtFakeSourceElement },
             data
         )
 
@@ -4232,7 +4235,7 @@ class KotlinParserVisitor(
         return if (typeConstraints != null) K.ClassDeclaration(randomId(), Markers.EMPTY, classDeclaration, typeConstraints) else classDeclaration
     }
 
-    private fun mapTypeConstraints(memberDeclaration: FirMemberDeclaration, typeConstraintList: KtTypeConstraintList?, padLast: Boolean, data: ExecutionContext): K.TypeConstraints? {
+    private fun mapTypeConstraints(memberDeclaration: FirMemberDeclaration, typeConstraintList: KtTypeConstraintList?, data: ExecutionContext): K.TypeConstraints? {
         if (typeConstraintList == null) {
             return null
         }
@@ -4245,6 +4248,7 @@ class KotlinParserVisitor(
 
         val params: MutableList<JRightPadded<J.TypeParameter>> = ArrayList()
         for ((index, c) in typeConstraintList.constraints.withIndex()) {
+            val isLast = index == typeConstraintList.constraints.size - 1
             val paramName = c.subjectTypeParameterName!!.getIdentifier()!!.text
             val firTypeParameter = memberDeclaration.typeParameters.find { (it as FirTypeParameter).name.asString() == paramName } as FirTypeParameter
             val bound = firTypeParameter.bounds.find { it.psi == c.lastChild }
@@ -4261,21 +4265,23 @@ class KotlinParserVisitor(
             val colon = whitespace()
             skip(":")
             params += padRight(
-                    J.TypeParameter(
-                            randomId(),
-                            paramPrefix,
-                            Markers.EMPTY.addIfAbsent(TypeReferencePrefix(randomId(), colon)),
-                            annotations,
-                            typeParamName,
-                            JContainer.build(
-                                    Space.EMPTY,
-                                    listOf(padRight(visitElement(bound!!, data) as TypeTree, null)),
-                                    Markers.EMPTY
-                            )
-                    ),
-                    if (padLast || index < typeConstraintList.constraints.size - 1) whitespace() else Space.EMPTY
+                J.TypeParameter(
+                        randomId(),
+                        paramPrefix,
+                        Markers.EMPTY.addIfAbsent(TypeReferencePrefix(randomId(), colon)),
+                        annotations,
+                        typeParamName,
+                        JContainer.build(
+                            Space.EMPTY,
+                            listOf(padRight(visitElement(bound!!, data) as TypeTree, null)),
+                            Markers.EMPTY
+                        )
+                ),
+                if (isLast) Space.EMPTY else whitespace()
             )
-            skip(",")
+            if (!isLast) {
+                skip(",")
+            }
         }
         return K.TypeConstraints(
                 randomId(),
