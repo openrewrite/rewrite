@@ -2135,7 +2135,7 @@ class KotlinParserVisitor(
             }
 
             // type constraints
-            typeConstraints = mapTypeConstraints(property, property.psi?.getChildOfType<KtTypeConstraintList>(), data)
+            typeConstraints = mapTypeConstraints(property, property.psi?.getChildOfType<KtTypeConstraintList>(), true, data)
 
             var equals: PsiElement? = null
             var propertyNode: KtProperty? = null
@@ -2744,7 +2744,7 @@ class KotlinParserVisitor(
         }
 
         // type constraints
-        val typeConstraints = mapTypeConstraints(simpleFunction, simpleFunction.psi?.getChildOfType<KtTypeConstraintList>(), data)
+        val typeConstraints = mapTypeConstraints(simpleFunction, simpleFunction.psi?.getChildOfType<KtTypeConstraintList>(), simpleFunction.body != null, data)
 
         val body = mapFunctionBody(simpleFunction, data)
 
@@ -4106,7 +4106,12 @@ class KotlinParserVisitor(
         }
 
         // type constraints
-        val typeConstraints = mapTypeConstraints(regularClass, regularClass.psi?.getChildOfType<KtTypeConstraintList>(), data)
+        val typeConstraints = mapTypeConstraints(
+            regularClass,
+            regularClass.psi?.getChildOfType<KtTypeConstraintList>(),
+            regularClass.declarations.any { it.source !is KtFakeSourceElement },
+            data
+        )
 
         saveCursor = cursor
         val bodyPrefix = whitespace()
@@ -4227,7 +4232,7 @@ class KotlinParserVisitor(
         return if (typeConstraints != null) K.ClassDeclaration(randomId(), Markers.EMPTY, classDeclaration, typeConstraints) else classDeclaration
     }
 
-    private fun mapTypeConstraints(memberDeclaration: FirMemberDeclaration, typeConstraintList: KtTypeConstraintList?, data: ExecutionContext): K.TypeConstraints? {
+    private fun mapTypeConstraints(memberDeclaration: FirMemberDeclaration, typeConstraintList: KtTypeConstraintList?, padLast: Boolean, data: ExecutionContext): K.TypeConstraints? {
         if (typeConstraintList == null) {
             return null
         }
@@ -4239,7 +4244,7 @@ class KotlinParserVisitor(
         }
 
         val params: MutableList<JRightPadded<J.TypeParameter>> = ArrayList()
-        for (c in typeConstraintList.constraints) {
+        for ((index, c) in typeConstraintList.constraints.withIndex()) {
             val paramName = c.subjectTypeParameterName!!.getIdentifier()!!.text
             val firTypeParameter = memberDeclaration.typeParameters.find { (it as FirTypeParameter).name.asString() == paramName } as FirTypeParameter
             val bound = firTypeParameter.bounds.find { it.psi == c.lastChild }
@@ -4268,7 +4273,7 @@ class KotlinParserVisitor(
                                     Markers.EMPTY
                             )
                     ),
-                    whitespace()
+                    if (padLast || index < typeConstraintList.constraints.size - 1) whitespace() else Space.EMPTY
             )
             skip(",")
         }

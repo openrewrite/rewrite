@@ -94,8 +94,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                 tree instanceof J.Import ||
                 tree instanceof J.Label ||
                 tree instanceof J.DoWhileLoop ||
-                tree instanceof J.ArrayDimension ||
-                tree instanceof J.ClassDeclaration) {
+                tree instanceof J.ArrayDimension) {
             getCursor().putMessage("indentType", IndentType.ALIGN);
         } else if (tree instanceof J.Block && tree.getMarkers().findFirst(SingleExpressionBlock.class).isPresent()) {
             getCursor().putMessage("indentType", wrappingStyle.getExpressionBodyFunctions().getUseContinuationIndent() ? IndentType.CONTINUATION_INDENT : IndentType.INDENT);
@@ -110,6 +109,8 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                 tree instanceof J.Case ||
                 tree instanceof J.EnumValueSet ||
                 tree instanceof J.Ternary ||
+                tree instanceof J.ClassDeclaration ||
+                tree instanceof K.ClassDeclaration ||
                 (tree instanceof J.FieldAccess || tree instanceof J.MethodInvocation)
                         && !wrappingStyle.getChainedFunctionCalls().getUseContinuationIndent()
         ) {
@@ -196,7 +197,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
 
         int indent = getCursor().getNearestMessage("lastIndent", 0);
 
-        IndentType indentType = getCursor().getParentOrThrow().getNearestMessage("indentType", IndentType.ALIGN);
+        IndentType indentType = parent.getNearestMessage("indentType", IndentType.ALIGN);
 
         // block spaces are always aligned to their parent
         boolean alignBlockPrefixToParent = loc.equals(Space.Location.BLOCK_PREFIX) && space.getWhitespace().contains("\n") &&

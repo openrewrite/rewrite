@@ -2245,6 +2245,19 @@ class TabsAndIndentsTest implements RewriteTest {
     }
 
     @Test
+    void emptyClassWithWhereClause() {
+        rewriteRun(
+          kotlin(
+            """
+              class T {
+                  class A<T> where T : Any
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void implicitVoidReturn() {
         rewriteRun(
           kotlin(
