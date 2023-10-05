@@ -349,7 +349,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
         }
 
         // The javadoc ends with trailing whitespace.
-        if (cursor < source.length() && source.substring(cursor).contains(" ")) {
+        if (cursor < source.length()) {
             String trailingWhitespace = source.substring(cursor);
             if (trailingWhitespace.contains("\n")) {
                 // 1 or more newlines.

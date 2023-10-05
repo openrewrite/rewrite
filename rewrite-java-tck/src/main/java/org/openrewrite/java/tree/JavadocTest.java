@@ -1726,4 +1726,19 @@ class JavadocTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void trailingTab() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * See <a href="">here</a>\t
+               */
+              class Test {
+              }
+              """
+          )
+        );
+    }
 }
