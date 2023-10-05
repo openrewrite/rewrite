@@ -400,34 +400,30 @@ class MappingTest implements RewriteTest {
       " '\\n' ",
       " '\n' ",
       " \n ",
-      " \"\\.\" ",
       " \"\\0\" ",
       " \"\\0\" ",
       " \"\\a\" ",
       " \"\\a\" ",
       " \"\\b\" ",
-      " \"\b\" ",
       " \"\\t\" ",
       " \"\t\" ",
       " \"\\n\" ",
       " \"\n\" ",
       " \"\\v\" ",
       " \"\\f\" ",
-      " \"\f\" ",
       " \"\\r\" ",
       " \"\r\" ",
       " \"\\e\" ",
       " \"\\\\\" ",
-      " \"\\\" ",
       " \"\\\"\" ",
-      " \"\"\" ",
       " \"\\N\" ",
       " \"\\_\" ",
       " \"\\L\" ",
       " \"\\P\" ",
     })
-    void escapeSequences() {
+    void escapeSequences(String str) {
         rewriteRun(
-          yaml("escaped-value: $string"));
+          yaml("escaped-value: $string".replace("$string", str))
+        );
     }
 }
