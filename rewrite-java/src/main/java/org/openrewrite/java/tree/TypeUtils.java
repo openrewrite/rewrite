@@ -235,9 +235,16 @@ public class TypeUtils {
                     }
                 }
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
-                return fullyQualifiedNamesAreEqual(to, classFrom.getFullyQualifiedName()) ||
-                       isAssignableTo(to, classFrom.getSupertype()) ||
-                       classFrom.getInterfaces().stream().anyMatch(i -> isAssignableTo(to, i));
+                if (fullyQualifiedNamesAreEqual(to, classFrom.getFullyQualifiedName()) ||
+                        isAssignableTo(to, classFrom.getSupertype())) {
+                    return true;
+                }
+                for (JavaType.FullyQualified i : classFrom.getInterfaces()) {
+                    if (isAssignableTo(to, i)) {
+                        return true;
+                    }
+                }
+                return false;
             } else if (from instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable genericFrom = (JavaType.GenericTypeVariable) from;
                 for (JavaType bound : genericFrom.getBounds()) {

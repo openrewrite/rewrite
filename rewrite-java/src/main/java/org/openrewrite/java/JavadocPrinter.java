@@ -35,7 +35,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     public Javadoc visitAttribute(Javadoc.Attribute attribute, PrintOutputCapture<P> p) {
         beforeSyntax(attribute, p);
         p.append(attribute.getName());
-        if (attribute.getSpaceBeforeEqual() != null) {
+        if (attribute.getSpaceBeforeEqual() != null && !attribute.getSpaceBeforeEqual().isEmpty()) {
             visit(attribute.getSpaceBeforeEqual(), p);
             if (attribute.getValue() != null) {
                 p.append('=');
