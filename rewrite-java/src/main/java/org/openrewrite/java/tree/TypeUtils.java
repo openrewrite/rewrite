@@ -309,16 +309,26 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(Pattern to, @Nullable JavaType from) {
+        return isAssignableTo(type -> {
+            if (type instanceof JavaType.FullyQualified) {
+                return to.matcher(((JavaType.FullyQualified) type).getFullyQualifiedName()).matches();
+            } else if (type instanceof JavaType.Primitive) {
+                return to.matcher(((JavaType.Primitive) type).getKeyword()).matches();
+            }
+            return false;
+        }, from);
+    }
+
+    public static boolean isAssignableTo(Predicate<JavaType> predicate, @Nullable JavaType from) {
         try {
             if (from instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
 
-                if (to.matcher(classFrom.getFullyQualifiedName()).matches() ||
-                    isAssignableTo(to, classFrom.getSupertype())) {
+                if (predicate.test(classFrom) || isAssignableTo(predicate, classFrom.getSupertype())) {
                     return true;
                 }
                 for (JavaType.FullyQualified anInterface : classFrom.getInterfaces()) {
-                    if (isAssignableTo(to, anInterface)) {
+                    if (isAssignableTo(predicate, anInterface)) {
                         return true;
                     }
                 }
@@ -326,17 +336,17 @@ public class TypeUtils {
             } else if (from instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable genericFrom = (JavaType.GenericTypeVariable) from;
                 for (JavaType bound : genericFrom.getBounds()) {
-                    if (isAssignableTo(to, bound)) {
+                    if (isAssignableTo(predicate, bound)) {
                         return true;
                     }
                 }
             } else if (from instanceof JavaType.Variable) {
-                return isAssignableTo(to, ((JavaType.Variable) from).getType());
+                return isAssignableTo(predicate, ((JavaType.Variable) from).getType());
             } else if (from instanceof JavaType.Method) {
-                return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
+                return isAssignableTo(predicate, ((JavaType.Method) from).getReturnType());
             } else if (from instanceof JavaType.Primitive) {
                 JavaType.Primitive primitive = (JavaType.Primitive) from;
-                return to.toString().equals(primitive.getKeyword());
+                return predicate.test(primitive);
             }
         } catch (Exception e) {
             return false;
