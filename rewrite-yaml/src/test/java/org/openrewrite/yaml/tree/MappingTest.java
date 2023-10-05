@@ -423,7 +423,7 @@ class MappingTest implements RewriteTest {
     })
     void escapeSequences(String str) {
         rewriteRun(
-          yaml("escaped-value: $string".replace("$string", str))
+          yaml("escaped-value: " + str)
         );
     }
 }
