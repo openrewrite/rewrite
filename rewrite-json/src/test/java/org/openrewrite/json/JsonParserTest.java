@@ -162,4 +162,18 @@ public class JsonParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void unicodeEscapes() {
+        rewriteRun(
+          json(
+            """
+              {
+                "nul": "\\u0000",
+                "reverse-solidus": "\\u005c",
+              }
+              """
+          )
+        );
+    }
 }

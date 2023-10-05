@@ -116,4 +116,17 @@ class YamlParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void unicodeEscapes() {
+        rewriteRun(
+          yaml(
+            """
+              root:
+                "nul": "\\u0000"
+                "reverse-solidus": "\\u005c"
+              """
+          )
+        );
+    }
 }
