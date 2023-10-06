@@ -162,7 +162,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
         }
         if (!((Tree) old).getId().equals(currentValue.getId())) {
             throw new IllegalArgumentException("Updating the cursor in place is only supported for mutations on a Tree instance " +
-                                               "that maintain the same ID after the mutation.");
+                    "that maintain the same ID after the mutation.");
         }
         cursor = new Cursor(cursor.getParentOrThrow(), currentValue);
         return cursor;
@@ -309,7 +309,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 if (t != null && afterVisit != null) {
                     for (TreeVisitor<?, P> v : afterVisit) {
                         if (v != null) {
-                             v.setCursor(new Cursor(cursor, tree));
+                            v.setCursor(new Cursor(cursor, tree));
                             //noinspection unchecked
                             t = (T) v.visit(t, p);
                         }
@@ -362,9 +362,13 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     public Markers visitMarkers(@Nullable Markers markers, P p) {
-        return markers == null || markers == Markers.EMPTY ?
-                Markers.EMPTY :
-                markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> this.visitMarker(marker, p)));
+        if (markers == null || markers == Markers.EMPTY) {
+            return Markers.EMPTY;
+        } else if (markers.getMarkers().isEmpty()) {
+            // optimization to avoid allocation cost for lambda
+            return markers;
+        }
+        return markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> this.visitMarker(marker, p)));
     }
 
     public <M extends Marker> M visitMarker(Marker marker, P p) {
@@ -407,7 +411,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
             }
         }
         throw new IllegalArgumentException("Expected to find a tree type somewhere in the type parameters of the " +
-                                           "type hierarchy of visitor " + getClass().getName());
+                "type hierarchy of visitor " + getClass().getName());
     }
 
     public <R extends Tree, V extends TreeVisitor<R, P>> V adapt(Class<? extends V> adaptTo) {
