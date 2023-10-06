@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.kotlin.internal.CompiledSource;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
@@ -95,19 +96,32 @@ public class KotlinTypeSignatureBuilderTest {
                 .getSymbol(), null);
     }
 
+    @Nullable
+    public FirProperty getProperty(String field) {
+        return getCompiledSource().getDeclarations().stream()
+          .map(FirRegularClass.class::cast)
+          .flatMap(it -> it.getDeclarations().stream())
+          .filter(FirProperty.class::isInstance)
+          .map(FirProperty.class::cast)
+          .filter(it -> field.equals(it.getName().asString()))
+          .findFirst()
+          .orElse(null);
+    }
+
     public String fieldPropertyGetterSignature(String field) {
-        FirProperty getter = getCompiledSource().getDeclarations().stream()
-                .map(FirRegularClass.class::cast)
-                .flatMap(it -> it.getDeclarations().stream())
-                .filter(FirProperty.class::isInstance)
-                .map(FirProperty.class::cast)
-                .filter(it -> field.equals(it.getName().asString()))
-                .findFirst()
-                .orElseThrow();
-        if (getter.getGetter() == null) {
-            throw new UnsupportedOperationException("No getter for " + field);
+        FirProperty property = getProperty(field);
+        if (property == null || property.getGetter() == null) {
+            throw new UnsupportedOperationException("No filed or getter for " + field);
         }
-        return signatureBuilder().methodDeclarationSignature(getter.getGetter().getSymbol(), getCompiledSource().getSymbol());
+        return signatureBuilder().methodDeclarationSignature(property.getGetter().getSymbol(), getCompiledSource().getSymbol());
+    }
+
+    public String fieldPropertySetterSignature(String field) {
+        FirProperty property = getProperty(field);
+        if (property == null || property.getSetter() == null) {
+            throw new UnsupportedOperationException("No filed or setter for " + field);
+        }
+        return signatureBuilder().methodDeclarationSignature(property.getSetter().getSymbol(), getCompiledSource().getSymbol());
     }
 
     public Object firstMethodParameterSignature(String methodName) {
@@ -167,6 +181,12 @@ public class KotlinTypeSignatureBuilderTest {
     void gettableField() {
         assertThat(fieldPropertyGetterSignature("gettableField"))
                 .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=accessor,return=kotlin.Int,parameters=[]}");
+    }
+
+    @Test
+    void settableField() {
+        assertThat(fieldPropertySetterSignature("settableField"))
+          .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=accessor,return=kotlin.Unit,parameters=[kotlin.String]}");
     }
 
     @Test

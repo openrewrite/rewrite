@@ -32,6 +32,11 @@ abstract class KotlinTypeGoat<T, S> {
     val gettableField: Int
         get() = 10
 
+    var settableField : String = ""
+        set ( value ) {
+            field = value
+        }
+
 //    abstract class InheritedKotlinTypeGoat<T, U> : KotlinTypeGoat<T, U>() where U : PT<U>, U : C
 
     enum class EnumTypeA {
