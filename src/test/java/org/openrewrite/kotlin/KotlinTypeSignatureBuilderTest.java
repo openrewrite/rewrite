@@ -68,7 +68,7 @@ public class KotlinTypeSignatureBuilderTest {
                 .map(FirFunction.class::cast)
                 .findFirst()
                 .orElseThrow()
-                .getSymbol());
+                .getSymbol(), null);
     }
 
     public Object innerClassSignature(String innerClassSimpleName) {
@@ -93,6 +93,21 @@ public class KotlinTypeSignatureBuilderTest {
                 .findFirst()
                 .orElseThrow()
                 .getSymbol(), null);
+    }
+
+    public String fieldPropertyGetterSignature(String field) {
+        FirProperty getter = getCompiledSource().getDeclarations().stream()
+                .map(FirRegularClass.class::cast)
+                .flatMap(it -> it.getDeclarations().stream())
+                .filter(FirProperty.class::isInstance)
+                .map(FirProperty.class::cast)
+                .filter(it -> field.equals(it.getName().asString()))
+                .findFirst()
+                .orElseThrow();
+        if (getter.getGetter() == null) {
+            throw new UnsupportedOperationException("No getter for " + field);
+        }
+        return signatureBuilder().methodDeclarationSignature(getter.getGetter().getSymbol(), getCompiledSource().getSymbol());
     }
 
     public Object firstMethodParameterSignature(String methodName) {
@@ -127,7 +142,7 @@ public class KotlinTypeSignatureBuilderTest {
                 .filter(it -> methodName.equals(it.getName().asString()))
                 .findFirst()
                 .orElseThrow()
-                .getSymbol());
+                .getSymbol(), null);
     }
 
     @Test
@@ -146,6 +161,12 @@ public class KotlinTypeSignatureBuilderTest {
     void fieldType() {
         assertThat(fieldSignature("field"))
             .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=field,type=kotlin.Int}");
+    }
+
+    @Test
+    void gettableField() {
+        assertThat(fieldPropertyGetterSignature("gettableField"))
+                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=accessor,return=kotlin.Int,parameters=[]}");
     }
 
     @Test

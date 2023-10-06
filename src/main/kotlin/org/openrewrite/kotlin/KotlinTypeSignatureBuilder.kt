@@ -25,6 +25,7 @@ import org.jetbrains.kotlin.fir.java.declarations.FirJavaField
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaMethod
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaValueParameter
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
+import org.jetbrains.kotlin.fir.resolve.toFirRegularClass
 import org.jetbrains.kotlin.fir.resolve.toFirRegularClassSymbol
 import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag
@@ -68,7 +69,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
             }
 
             is FirFunction -> {
-                return methodDeclarationSignature(type.symbol)
+                return methodDeclarationSignature(type.symbol, ownerSymbol)
             }
 
             is FirVariable -> {
@@ -640,7 +641,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
      * Generate the method declaration signature.
      */
     @OptIn(SymbolInternals::class)
-    fun methodDeclarationSignature(symbol: FirFunctionSymbol<out FirFunction>): String {
+    fun methodDeclarationSignature(symbol: FirFunctionSymbol<out FirFunction>,
+                                   ownerSymbol: @Nullable FirBasedSymbol<*>?): String {
         var s: String =
             when {
                 symbol is FirConstructorSymbol -> {
@@ -650,7 +652,10 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
                     classSignature(symbol.dispatchReceiverType!!)
                 }
                 symbol.getOwnerLookupTag() != null && symbol.getOwnerLookupTag()!!.toFirRegularClassSymbol(firSession) != null -> {
-                    classSignature(symbol.getOwnerLookupTag()!!.toFirRegularClassSymbol(firSession)!!)
+                    classSignature(symbol.getOwnerLookupTag()!!.toFirRegularClass(firSession)!!)
+                }
+                ownerSymbol != null -> {
+                    signature(ownerSymbol.fir)
                 }
                 else -> {
                     "{undefined}"

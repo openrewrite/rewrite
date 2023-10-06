@@ -15,11 +15,12 @@
  */
 @file:Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN", "unused")
 
-// Whenever this class is changed, make a corresponding change in JavaTypeGoat in the main resources folder.
+// Whenever this class is changed, make a corresponding change in KotlinTypeGoat in the main resources folder.
 package org.openrewrite.kotlin
 
 import java.lang.Object
 
+// TODO: FIX ME. Files needs to declare fields and methods to assert type mapping.
 @AnnotationWithRuntimeRetention
 @AnnotationWithSourceRetention
 abstract class KotlinTypeGoat<T, S> {
@@ -27,6 +28,9 @@ abstract class KotlinTypeGoat<T, S> {
     val parameterizedField: PT<TypeA> = object : PT<TypeA> {}
 
     val field: Int = 10
+
+    val gettableField: Int
+        get() = 10
 
 //    abstract class InheritedKotlinTypeGoat<T, U> : KotlinTypeGoat<T, U>() where U : PT<U>, U : C
 

@@ -500,7 +500,7 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
     ): JavaType.Method? {
         val methodSymbol = function?.symbol
         if (methodSymbol != null) {
-            val signature = signatureBuilder.methodDeclarationSignature(function.symbol)
+            val signature = signatureBuilder.methodDeclarationSignature(function.symbol, ownerFallBack)
             val existing = typeCache.get<JavaType.Method>(signature)
             if (existing != null) {
                 return existing
