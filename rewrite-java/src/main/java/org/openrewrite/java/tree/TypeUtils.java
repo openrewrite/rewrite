@@ -415,12 +415,11 @@ public class TypeUtils {
             }
         }
 
-        // Check if access level is default then check if subclass package is the same from parent class
-        if (isDefaultAccessLevel(method.getFlags())) {
-            methodResult = methodResult.filter(m -> m.getDeclaringType().getPackageName().equals(dt.getPackageName()));
-        }
-
-        return methodResult.filter(m -> !m.getFlags().contains(Flag.Private) && !m.getFlags().contains(Flag.Static));
+        return methodResult
+                .filter(m -> !m.getFlags().contains(Flag.Private))
+                .filter(m -> !m.getFlags().contains(Flag.Static))
+                // If access level is default then check if subclass package is the same from parent class
+                .filter(m -> m.getFlags().contains(Flag.Public) || m.getDeclaringType().getPackageName().equals(dt.getPackageName()));
     }
 
     public static Optional<JavaType.Method> findDeclaredMethod(@Nullable JavaType.FullyQualified clazz, String name, List<JavaType> argumentTypes) {
@@ -537,10 +536,6 @@ public class TypeUtils {
             return JavaType.Unknown.getInstance();
         }
         return t;
-    }
-
-    private static boolean isDefaultAccessLevel(final Set<Flag> flags) {
-        return !flags.contains(Flag.Public) && !flags.contains(Flag.Protected) && !flags.contains(Flag.Private);
     }
 
     static boolean deepEquals(@Nullable List<? extends JavaType> ts1, @Nullable List<? extends JavaType> ts2) {
