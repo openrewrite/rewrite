@@ -1083,11 +1083,9 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
             for (bound: FirTypeRef in typeParameter.bounds) {
                 bounds.add(type(bound))
             }
-            if ("out" == typeParameter.variance.label) {
-                variance = JavaType.GenericTypeVariable.Variance.COVARIANT
-            } else if ("in" == typeParameter.variance.label) {
+            if (typeParameter.variance == Variance.IN_VARIANCE) {
                 variance = JavaType.GenericTypeVariable.Variance.CONTRAVARIANT
-            } else {
+            } else if (bounds.isNotEmpty()) {
                 variance = JavaType.GenericTypeVariable.Variance.COVARIANT
             }
         }
