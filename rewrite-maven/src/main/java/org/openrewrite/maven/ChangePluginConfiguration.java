@@ -22,10 +22,16 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XPathMatcher;
+import org.openrewrite.xml.XsltTransformation;
+import org.openrewrite.xml.XsltTransformationVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.Charset;
 import java.util.Optional;
 
 import static org.openrewrite.xml.AddOrUpdateChild.addOrUpdateChild;
@@ -54,6 +60,17 @@ public class ChangePluginConfiguration extends Recipe {
     @Nullable
     String configuration;
 
+    @Nullable
+    @Language("xml")
+    @Option(displayName = "XSLT Configuration transformation",
+            description = "The transformation to be applied on the <configuration> element.")
+    String xslt;
+
+    @Nullable
+    @Option(displayName = "XSLT Configuration transformation classpath resource",
+            description = "The transformation to be applied on the <configuration> element provided as a classpath resource.")
+    String xsltResource;
+
     @Override
     public String getDisplayName() {
         return "Change Maven plugin configuration";
@@ -74,24 +91,45 @@ public class ChangePluginConfiguration extends Recipe {
                     Optional<Xml.Tag> maybePlugin = plugins.getChildren().stream()
                             .filter(plugin ->
                                     "plugin".equals(plugin.getName()) &&
-                                            groupId.equals(plugin.getChildValue("groupId").orElse(null)) &&
-                                            artifactId.equals(plugin.getChildValue("artifactId").orElse(null))
+                                    groupId.equals(plugin.getChildValue("groupId").orElse(null)) &&
+                                    artifactId.equals(plugin.getChildValue("artifactId").orElse(null))
                             )
                             .findAny();
                     if (maybePlugin.isPresent()) {
                         Xml.Tag plugin = maybePlugin.get();
-                        if (configuration == null) {
+                        if (configuration == null && xslt == null && xsltResource == null) {
                             plugins = filterChildren(plugins, plugin,
                                     child -> !(child instanceof Xml.Tag && "configuration".equals(((Xml.Tag) child).getName())));
-                        } else {
+                        } else if (configuration != null && xslt == null && xsltResource == null) {
                             plugins = addOrUpdateChild(plugins, plugin,
                                     Xml.Tag.build("<configuration>\n" + configuration + "\n</configuration>"),
                                     getCursor().getParentOrThrow());
+                        } else if (configuration == null) {
+                            Optional<Xml.Tag> configurationTag = plugin.getChild("configuration");
+                            if (configurationTag.isPresent()) {
+                                String xsltTransformation = loadResource(xslt, xsltResource);
+                                plugins = addOrUpdateChild(plugins, plugin,
+                                        XsltTransformationVisitor.transformTag(configurationTag.get().printTrimmed(getCursor()), xsltTransformation),
+                                        getCursor().getParentOrThrow());
+                            }
                         }
                     }
                 }
                 return plugins;
             }
         };
+    }
+
+    private static String loadResource(String xslt, String xsltResource) {
+        if (StringUtils.isBlank(xsltResource)) {
+            return xslt;
+        }
+        try (InputStream is = XsltTransformation.class.getResourceAsStream(StringUtils.trimIndent(xsltResource))) {
+            assert is != null;
+            return !StringUtils.isBlank(xsltResource) ? StringUtils.readFully(is, Charset.defaultCharset())
+                    : xslt;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

@@ -20,6 +20,7 @@ dependencies {
     api("com.fasterxml.jackson.core:jackson-annotations")
 
     compileOnly(project(":rewrite-test"))
+    compileOnly("org.slf4j:slf4j-api:1.7.+")
 
     implementation("org.antlr:antlr4:4.11.1")
     implementation("io.micrometer:micrometer-core:1.9.+")
