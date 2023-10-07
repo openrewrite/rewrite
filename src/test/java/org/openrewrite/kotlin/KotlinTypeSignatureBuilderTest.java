@@ -179,14 +179,14 @@ public class KotlinTypeSignatureBuilderTest {
 
     @Test
     void gettableField() {
-        assertThat(fieldPropertyGetterSignature("gettableField"))
+        assertThat(fieldPropertyGetterSignature("field"))
                 .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=accessor,return=kotlin.Int,parameters=[]}");
     }
 
     @Test
     void settableField() {
-        assertThat(fieldPropertySetterSignature("settableField"))
-          .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=accessor,return=kotlin.Unit,parameters=[kotlin.String]}");
+        assertThat(fieldPropertySetterSignature("field"))
+          .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=accessor,return=kotlin.Unit,parameters=[kotlin.Int]}");
     }
 
     @Test
@@ -253,13 +253,12 @@ public class KotlinTypeSignatureBuilderTest {
                 .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=inner,return=kotlin.Unit,parameters=[org.openrewrite.kotlin.C$Inner]}");
     }
 
-    @Disabled("Requires parsing intersection types")
     @Test
-    void inheritedJavaTypeGoat() {
-        assertThat(firstMethodParameterSignature("inheritedJavaTypeGoat"))
-                .isEqualTo("org.openrewrite.java.JavaTypeGoat$InheritedJavaTypeGoat<Generic{T}, Generic{U extends org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}>");
-        assertThat(methodSignature("inheritedJavaTypeGoat"))
-                .isEqualTo("org.openrewrite.java.JavaTypeGoat{name=inheritedJavaTypeGoat,return=org.openrewrite.java.JavaTypeGoat$InheritedJavaTypeGoat<Generic{T}, Generic{U extends org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}>,parameters=[org.openrewrite.java.JavaTypeGoat$InheritedJavaTypeGoat<Generic{T}, Generic{U extends org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}>]}");
+    void inheritedKotlinTypeGoat() {
+        assertThat(firstMethodParameterSignature("inheritedKotlinTypeGoat"))
+                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat$InheritedKotlinTypeGoat<Generic{T}, Generic{U extends org.openrewrite.kotlin.PT<Generic{U}> & org.openrewrite.kotlin.C}>");
+        assertThat(methodSignature("inheritedKotlinTypeGoat"))
+                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=inheritedKotlinTypeGoat,return=org.openrewrite.kotlin.KotlinTypeGoat$InheritedKotlinTypeGoat<Generic{T}, Generic{U extends org.openrewrite.kotlin.PT<Generic{U}> & org.openrewrite.kotlin.C}>,parameters=[org.openrewrite.kotlin.KotlinTypeGoat$InheritedKotlinTypeGoat<Generic{T}, Generic{U extends org.openrewrite.kotlin.PT<Generic{U}> & org.openrewrite.kotlin.C}>]}");
     }
 
     @Disabled("Requires reference of type params from parent class")
@@ -269,39 +268,34 @@ public class KotlinTypeSignatureBuilderTest {
                 .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat$ExtendsKotlinTypeGoat");
     }
 
-    @Disabled("Requires parsing intersection types")
     @Test
     void genericIntersection() {
         assertThat(firstMethodParameterSignature("genericIntersection"))
-                .isEqualTo("Generic{U extends org.openrewrite.java.JavaTypeGoat$TypeA & org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}");
+                .isEqualTo("Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat$TypeA & org.openrewrite.kotlin.PT<Generic{U}> & org.openrewrite.kotlin.C}");
         assertThat(methodSignature("genericIntersection"))
-                .isEqualTo("org.openrewrite.java.JavaTypeGoat{name=genericIntersection,return=Generic{U extends org.openrewrite.java.JavaTypeGoat$TypeA & org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C},parameters=[Generic{U extends org.openrewrite.java.JavaTypeGoat$TypeA & org.openrewrite.java.PT<Generic{U}> & org.openrewrite.java.C}]}");
+                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=genericIntersection,return=Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat$TypeA & org.openrewrite.kotlin.PT<Generic{U}> & org.openrewrite.kotlin.C},parameters=[Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat$TypeA & org.openrewrite.kotlin.PT<Generic{U}> & org.openrewrite.kotlin.C}]}");
     }
 
-    @Disabled("Requires parsing intersection types")
     @Test
     void recursiveIntersection() {
         assertThat(firstMethodParameterSignature("recursiveIntersection"))
-                .isEqualTo("Generic{U extends org.openrewrite.java.JavaTypeGoat$Extension<Generic{U}> & org.openrewrite.java.Intersection<Generic{U}>}");
+                .isEqualTo("Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat$Extension<Generic{U}> & org.openrewrite.kotlin.Intersection<Generic{U}>}");
         assertThat(methodSignature("recursiveIntersection"))
-                .isEqualTo("org.openrewrite.java.JavaTypeGoat{name=recursiveIntersection,return=void,parameters=[Generic{U extends org.openrewrite.java.JavaTypeGoat$Extension<Generic{U}> & org.openrewrite.java.Intersection<Generic{U}>}]}");
+                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=recursiveIntersection,return=kotlin.Unit,parameters=[Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat$Extension<Generic{U}> & org.openrewrite.kotlin.Intersection<Generic{U}>}]}");
     }
 
-    @Disabled
     @Test
     void genericRecursiveInClassDefinition() {
         assertThat(lastClassTypeParameter())
-                .isEqualTo("Generic{S in org.openrewrite.kotlin.PT<Generic{S}> & org.openrewrite.kotlin.C}");
+                .isEqualTo("Generic{S extends org.openrewrite.kotlin.PT<Generic{S}> & org.openrewrite.kotlin.C}");
     }
 
-    @Disabled
     @Test
     void genericRecursiveInMethodDeclaration() {
-        // <U : KotlinTypeGoat<U, *>> genericRecursive(n: KotlinTypeGoat<out Array<U>, *>): KotlinTypeGoat<out Array<U>, *>
         assertThat(firstMethodParameterSignature("genericRecursive"))
-                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat<Generic{ extends kotlin.Array<Generic{U}>, Generic{*}>");
+                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat<Generic{out kotlin.Array<Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{*}>}>}, Generic{*}>");
         assertThat(methodSignature("genericRecursive"))
-                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=genericRecursive,return=org.openrewrite.kotlin.KotlinTypeGoat<Generic{? extends Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{?}>}[]}, Generic{?}>,parameters=[org.openrewrite.kotlin.KotlinTypeGoat<Generic{? extends Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{?}>}[]}, Generic{?}>]}");
+                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=genericRecursive,return=org.openrewrite.kotlin.KotlinTypeGoat<Generic{out kotlin.Array<Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{*}>}>}, Generic{*}>,parameters=[org.openrewrite.kotlin.KotlinTypeGoat<Generic{out kotlin.Array<Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{*}>}>}, Generic{*}>]}");
     }
 
     @Test

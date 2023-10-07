@@ -23,21 +23,16 @@ import java.lang.Object
 // TODO: FIX ME. Files needs to declare fields and methods to assert type mapping.
 @AnnotationWithRuntimeRetention
 @AnnotationWithSourceRetention
-abstract class KotlinTypeGoat<T, S> {
-    //abstract class KotlinTypeGoat<T, S> where S: PT<S>, S: C {
+abstract class KotlinTypeGoat<T, S> where S: PT<S>, S: C {
     val parameterizedField: PT<TypeA> = object : PT<TypeA> {}
 
-    val field: Int = 10
-
-    val gettableField: Int
-        get() = 10
-
-    var settableField : String = ""
-        set ( value ) {
+    var field: Int = 10
+        get() = field
+        set(value) {
             field = value
         }
 
-//    abstract class InheritedKotlinTypeGoat<T, U> : KotlinTypeGoat<T, U>() where U : PT<U>, U : C
+    abstract class InheritedKotlinTypeGoat<T, U> : KotlinTypeGoat<T, U>() where U : PT<U>, U : C
 
     enum class EnumTypeA {
         FOO, BAR(),
@@ -70,11 +65,11 @@ abstract class KotlinTypeGoat<T, S> {
     abstract fun inner(n: C.Inner)
     abstract fun enumTypeA(n: EnumTypeA)
     abstract fun enumTypeB(n: EnumTypeB)
-    //    abstract fun <U> inheritedJavaTypeGoat(n: InheritedKotlinTypeGoat<T, U>): InheritedKotlinTypeGoat<T, U> where U : PT<U>, U : C
-//    abstract fun <U> genericIntersection(n: U): U where U : TypeA, U : PT<U>, U : C
+    abstract fun <U> inheritedKotlinTypeGoat(n: InheritedKotlinTypeGoat<T, U>): InheritedKotlinTypeGoat<T, U> where U : PT<U>, U : C
+    abstract fun <U> genericIntersection(n: U): U where U : TypeA, U : PT<U>, U : C
     abstract fun genericT(n: T): T // remove after signatures are common.
 
-//    abstract fun <U> recursiveIntersection(n: U) where U : KotlinTypeGoat.Extension<U>, U : Intersection<U>
+    abstract fun <U> recursiveIntersection(n: U) where U : Extension<U>, U : Intersection<U>
 
     abstract fun javaType(n: Object)
 }
@@ -85,9 +80,9 @@ interface C {
 
 interface PT<T>
 
-//internal interface Intersection<T> where T : KotlinTypeGoat.Extension<T>, T : Intersection<T> {
-//    val intersectionType: T
-//}
+internal interface Intersection<T> where T : KotlinTypeGoat.Extension<T>, T : Intersection<T> {
+    val intersectionType: T
+}
 
 @Retention(AnnotationRetention.SOURCE)
 internal annotation class AnnotationWithSourceRetention

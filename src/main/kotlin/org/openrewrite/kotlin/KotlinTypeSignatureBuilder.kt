@@ -312,7 +312,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
             return "Generic{$name}"
         }
         val s = StringBuilder("Generic{").append(name)
-        val boundSigs = StringJoiner(", ")
+        val boundSigs = StringJoiner(" & ")
         for (bound in typeParameter.bounds) {
             if (bound !is FirImplicitNullableAnyTypeRef) {
                 boundSigs.add(signature(bound))
@@ -320,7 +320,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
         }
         val boundSigStr = boundSigs.toString()
         if (!boundSigStr.isEmpty()) {
-            s.append(": ").append(boundSigStr)
+            s.append(" extends ").append(boundSigStr)
         }
         typeVariableNameStack!!.remove(name)
         return s.append("}").toString()
@@ -330,7 +330,6 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
      * Generate a ConeTypeProject signature.
      */
     private fun coneTypeProjectionSignature(type: ConeTypeProjection): String {
-        val typeSignature: String
         val s = StringBuilder()
         if (type is ConeKotlinTypeProjectionIn) {
             val (type1) = type
@@ -364,10 +363,14 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
                 s.append(">")
             }
         } else if (type is ConeTypeParameterType) {
-            s.append("Generic{")
-            typeSignature = convertKotlinFqToJavaFq(type.toString())
-            s.append(typeSignature)
-            s.append("}")
+            val symbol: FirClassifierSymbol<*>? = type.lookupTag.toSymbol(firSession)
+            if (symbol != null) {
+                s.append(signature(symbol))
+            } else {
+                s.append("Generic{")
+                s.append(convertKotlinFqToJavaFq(type.toString()))
+                s.append("}")
+            }
         } else if (type is ConeFlexibleType) {
             s.append(signature(type.lowerBound))
         } else if (type is ConeDefinitelyNotNullType) {
@@ -494,7 +497,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
             return "Generic{$name}"
         }
         val s = StringBuilder("Generic{").append(name)
-        val boundSigs = StringJoiner(", ")
+        val boundSigs = StringJoiner(" & ")
         for (type in typeParameter.upperBounds) {
             if (type.classifier != null && "java.lang.Object" != type.classifierQualifiedName) {
                 boundSigs.add(signature(type))

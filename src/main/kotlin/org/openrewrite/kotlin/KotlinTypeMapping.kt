@@ -46,6 +46,7 @@ import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaConstr
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaMethod
 import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource
 import org.jetbrains.kotlin.name.StandardClassIds
+import org.jetbrains.kotlin.types.Variance
 import org.openrewrite.Incubating
 import org.openrewrite.java.JavaTypeMapping
 import org.openrewrite.java.internal.JavaTypeCache
@@ -212,6 +213,7 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
     ): JavaType.FullyQualified {
         val firClass: FirClass
         var resolvedTypeRef: FirResolvedTypeRef? = null
+        var typeArguments: Array<out ConeTypeProjection>? = null
         if (classType is FirResolvedTypeRef) {
             // The resolvedTypeRef is used to create parameterized types.
             resolvedTypeRef = classType
@@ -244,6 +246,9 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
                     return JavaType.Unknown.getInstance()
                 }
             }
+        } else if (classType is ConeClassLikeType) {
+            firClass = classType.toRegularClassSymbol(firSession)!!.fir
+            typeArguments = classType.typeArguments
         } else {
             firClass = classType as FirClass
         }
@@ -373,8 +378,12 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
             if (pt == null) {
                 pt = JavaType.Parameterized(null, null, null)
                 typeCache.put(signature, pt)
-                val typeParameters: MutableList<JavaType> = ArrayList(firClass.typeParameters.size)
-                if (resolvedTypeRef != null && resolvedTypeRef.type.typeArguments.isNotEmpty()) {
+                val typeParameters: MutableList<JavaType> = ArrayList(typeArguments?.size ?: firClass.typeParameters.size)
+                if (typeArguments != null) {
+                    for (typeArgument: ConeTypeProjection in typeArguments) {
+                        typeParameters.add(type(typeArgument))
+                    }
+                } else if (resolvedTypeRef != null && resolvedTypeRef.type.typeArguments.isNotEmpty()) {
                     for (typeArgument: ConeTypeProjection in resolvedTypeRef.type.typeArguments) {
                         typeParameters.add(type(typeArgument))
                     }
@@ -974,7 +983,6 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
     ): JavaType? {
         var resolvedType: JavaType? = JavaType.Unknown.getInstance()
 
-        // TODO: fix for multiple bounds.
         val isGeneric = type is ConeKotlinTypeProjectionIn ||
                 type is ConeKotlinTypeProjectionOut ||
                 type is ConeStarProjection ||
@@ -999,14 +1007,35 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
             typeCache.put(signature, gtv)
             if (type is ConeKotlinTypeProjectionIn) {
                 variance = JavaType.GenericTypeVariable.Variance.CONTRAVARIANT
-                val classSymbol = type.type.toRegularClassSymbol(firSession)
                 bounds = ArrayList(1)
-                bounds.add(if (classSymbol != null) type(classSymbol.fir) else JavaType.Unknown.getInstance())
+                bounds.add(type(type.type))
             } else if (type is ConeKotlinTypeProjectionOut) {
                 variance = JavaType.GenericTypeVariable.Variance.COVARIANT
-                val classSymbol = type.type.toRegularClassSymbol(firSession)
                 bounds = ArrayList(1)
-                bounds.add(if (classSymbol != null) type(classSymbol.fir) else JavaType.Unknown.getInstance())
+                bounds.add(type(type.type))
+            } else if (type is ConeTypeParameterType) {
+                val classifierSymbol: FirClassifierSymbol<*>? = type.lookupTag.toSymbol(firSession)
+                if (classifierSymbol is FirTypeParameterSymbol) {
+                    variance = when (classifierSymbol.variance) {
+                        Variance.INVARIANT -> {
+                            if (classifierSymbol.resolvedBounds.none { it !is FirImplicitNullableAnyTypeRef }) JavaType.GenericTypeVariable.Variance.INVARIANT else JavaType.GenericTypeVariable.Variance.COVARIANT
+                        }
+
+                        Variance.IN_VARIANCE -> {
+                            JavaType.GenericTypeVariable.Variance.CONTRAVARIANT
+                        }
+
+                        Variance.OUT_VARIANCE -> {
+                            JavaType.GenericTypeVariable.Variance.COVARIANT
+                        }
+                    }
+                    bounds = ArrayList(classifierSymbol.resolvedBounds.size)
+                    for (bound: FirResolvedTypeRef in classifierSymbol.resolvedBounds) {
+                        if (bound !is FirImplicitNullableAnyTypeRef) {
+                            bounds.add(type(bound))
+                        }
+                    }
+                }
             }
             gtv.unsafeSet(name, variance, bounds)
             resolvedType = gtv
@@ -1032,6 +1061,10 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
             typeCache.put(signature, JavaType.Unknown.getInstance())
             return JavaType.Unknown.getInstance()
         }
+        if (signatureBuilder.signature(classSymbol.fir) != signature) {
+            // The signature contains generic bounded types and needs to be resolved.
+            return classType(coneClassLikeType, signature, ownerSymbol)
+        }
         return type(classSymbol.fir, ownerSymbol)
     }
 
@@ -1054,6 +1087,8 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
                 variance = JavaType.GenericTypeVariable.Variance.COVARIANT
             } else if ("in" == typeParameter.variance.label) {
                 variance = JavaType.GenericTypeVariable.Variance.CONTRAVARIANT
+            } else {
+                variance = JavaType.GenericTypeVariable.Variance.COVARIANT
             }
         }
         gtv.unsafeSet(gtv.name, variance, bounds)
