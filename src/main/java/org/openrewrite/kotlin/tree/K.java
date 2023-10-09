@@ -249,6 +249,11 @@ public interface K extends J {
                     .collect(Collectors.toList());
         }
 
+        /**
+         * K.CompilationUnits may contain K.ClassDeclarations, which isn't supported through withClasses.
+         * Please use withStatements to update the statements of this compilation unit.
+         */
+        @Deprecated
         @Override
         public K.CompilationUnit withClasses(List<J.ClassDeclaration> classes) {
             return getPadding().withClasses(JRightPadded.withElements(this.getPadding().getClasses(), classes));
