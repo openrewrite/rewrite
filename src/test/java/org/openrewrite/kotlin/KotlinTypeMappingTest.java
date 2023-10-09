@@ -17,10 +17,10 @@ package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -29,6 +29,7 @@ import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -306,18 +307,28 @@ public class KotlinTypeMappingTest {
     class ParsingTest implements RewriteTest {
         @Test
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/303")
-        @ExpectedToFail
         void coneTypeProjection() {
             rewriteRun(
               kotlin(
                 """
-                  val labels: List<String> = listOf("")
-                  val label: String = ""
-                  val newLabels = buildList {
-                      addAll(labels)
-                      add(label)
+                  val newList = buildList {
+                      addAll(listOf(""))
                   }
-                  """
+                  """, spec -> spec.afterRecipe(cu -> {
+                    MethodMatcher methodMatcher = new MethodMatcher("kotlin.collections.MutableList addAll(..)");
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<AtomicBoolean>() {
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
+                            if (methodMatcher.matches(method)) {
+                                assertThat(method.getMethodType().toString()).isEqualTo("kotlin.collections.MutableList<Generic{E}>{name=addAll,return=kotlin.Boolean,parameters=[kotlin.collections.Collection<Generic{E}>]}");
+                                found.set(true);
+                            }
+                            return super.visitMethodInvocation(method, found);
+                        }
+                    }.visit(cu, found);
+                    assertThat(found.get()).isTrue();
+                })
               )
             );
         }
