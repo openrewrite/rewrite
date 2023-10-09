@@ -112,7 +112,7 @@ class KotlinParserVisitor(
     private val generatedFirProperties: MutableMap<TextRange, FirProperty>
 
     // Associate top-level function and property declarations to the file.
-    private var currentFile: FirFile? = null
+    private val ownerStack: ArrayDeque<FirDeclaration> = ArrayDeque()
     private var aliasImportMap: MutableMap<String, String>
 
     init {
@@ -134,7 +134,7 @@ class KotlinParserVisitor(
     private fun type(obj: Any?, ownerFallBack: FirBasedSymbol<*>? = null) = typeMapping.type(obj, ownerFallBack)
 
     override fun visitFile(file: FirFile, data: ExecutionContext): J {
-        currentFile = file
+        ownerStack.push(file)
         generatedFirProperties.clear()
         var annotations: List<J.Annotation>? = null
         val annotationList = PsiTreeUtil.findChildOfType(
@@ -3281,7 +3281,7 @@ class KotlinParserVisitor(
                         name,
                         emptyList(),
                         if (initializer != null) padLeft(sourceBefore("="), convertToExpression(initializer, data)!!) else null,
-                        typeMapping.variableType(valueParameter.symbol, null, getCurrentFile())
+                        name.fieldType
                 )
         )
         val vars: MutableList<JRightPadded<J.VariableDeclarations.NamedVariable>> = ArrayList(1)
@@ -4551,9 +4551,9 @@ class KotlinParserVisitor(
         val msg = StringBuilder(typeName)
         msg.append(" is not supported at cursor: ")
         msg.append(source, cursor, min(source.length, cursor + 30))
-        if (currentFile != null) {
+        if (ownerStack.isNotEmpty()) {
             msg.append("in file: ")
-            msg.append(currentFile!!.name)
+            msg.append((ownerStack.last as FirFile).name)
         }
         return msg.toString()
     }
@@ -4593,7 +4593,19 @@ class KotlinParserVisitor(
                     j as Expression
             )
         }
-        return visitElement0(firElement, data)
+
+        var newOwner = false
+        try {
+            if (firElement is FirClass || firElement is FirSimpleFunction) {
+                ownerStack.push(firElement as FirDeclaration)
+                newOwner = true
+            }
+            return visitElement0(firElement, data)
+        } finally {
+            if (newOwner) {
+                ownerStack.pop()
+            }
+        }
     }
 
     private fun visitElement0(firElement: FirElement, data: ExecutionContext): J? {
@@ -4733,7 +4745,7 @@ class KotlinParserVisitor(
     }
 
     private fun createIdentifier(name: String?, firElement: FirElement): J.Identifier {
-        val type = type(firElement, getCurrentFile())
+        val type = type(firElement, owner(firElement)?.symbol)
         return createIdentifier(
                 name ?: "",
                 if (type is JavaType.Variable) type.type else type,
@@ -4741,20 +4753,20 @@ class KotlinParserVisitor(
         )
     }
 
+    private fun owner(firElement: FirElement): FirDeclaration? {
+        if (ownerStack.peek() == firElement) {
+            return ownerStack.elementAt(1)
+        }
+        return ownerStack.peek()
+    }
+
     @OptIn(SymbolInternals::class)
     private fun createIdentifier(name: String, namedReference: FirResolvedNamedReference): J.Identifier {
         val resolvedSymbol = namedReference.resolvedSymbol
         if (resolvedSymbol is FirVariableSymbol<*>) {
-            var owner: JavaType.FullyQualified? = null
-            val lookupTag: ConeClassLikeLookupTag? = resolvedSymbol.containingClassLookupTag()
-            if (lookupTag != null && lookupTag.toSymbol(firSession) !is FirAnonymousObjectSymbol) {
-                // TODO check type attribution for `FirAnonymousObjectSymbol` case
-                owner =
-                        type(lookupTag.toFirRegularClassSymbol(firSession)!!.fir) as JavaType.FullyQualified?
-            }
             return createIdentifier(
                     name, type(namedReference, getCurrentFile()),
-                    typeMapping.variableType(resolvedSymbol, owner, getCurrentFile())
+                    typeMapping.variableType(resolvedSymbol, null, owner(namedReference)!!.symbol)
             )
         }
         return createIdentifier(name, namedReference as FirElement)
@@ -4956,7 +4968,7 @@ class KotlinParserVisitor(
     }
 
     private fun getCurrentFile(): FirBasedSymbol<*>? {
-        return if (currentFile == null) null else currentFile!!.symbol
+        return if (ownerStack.isEmpty()) null else ownerStack.last.symbol
     }
 
     private fun at(c: Char) = cursor < source.length && source[cursor] == c

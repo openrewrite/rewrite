@@ -561,6 +561,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
             if (owner.contains("<")) {
                 owner = owner.substring(0, owner.indexOf('<'))
             }
+        } else if (ownerSymbol is FirFunctionSymbol<*>) {
+            owner = methodDeclarationSignature(ownerSymbol, null)
         } else if (ownerSymbol != null) {
             owner = classSignature(ownerSymbol.fir)
         }

@@ -855,7 +855,7 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
     @OptIn(SymbolInternals::class)
     fun variableType(
         symbol: FirVariableSymbol<out FirVariable>?,
-        owner: JavaType.FullyQualified?,
+        owner: JavaType?,
         ownerFallBack: FirBasedSymbol<*>?
     ): JavaType.Variable? {
         if (symbol == null) {
@@ -875,7 +875,15 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
         typeCache.put(signature, variable)
         val annotations = listAnnotations(symbol.annotations)
         var resolvedOwner: JavaType? = owner
-        if (owner == null && ownerFallBack != null) {
+        if (owner == null) {
+            val lookupTag: ConeClassLikeLookupTag? = symbol.containingClassLookupTag()
+            if (lookupTag != null && lookupTag.toSymbol(firSession) !is FirAnonymousObjectSymbol) {
+                // TODO check type attribution for `FirAnonymousObjectSymbol` case
+                resolvedOwner =
+                    type(lookupTag.toFirRegularClassSymbol(firSession)!!.fir) as JavaType.FullyQualified?
+            }
+        }
+        if (resolvedOwner == null && ownerFallBack != null) {
             // There isn't a way to link a Callable back to the owner unless it's a class member, but class members already set the owner.
             // The fallback isn't always safe and may result in type erasure.
             // We'll need to find the owner in the parser to set this on properties and variables in local scopes.
@@ -890,7 +898,7 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
         return variable
     }
 
-    fun variableType(javaField: JavaField, owner: JavaType.FullyQualified?): JavaType.Variable? {
+    fun variableType(javaField: JavaField, owner: JavaType?): JavaType.Variable? {
         val signature = signatureBuilder.variableSignature(javaField)
         val existing = typeCache.get<JavaType.Variable>(signature)
         if (existing != null) {

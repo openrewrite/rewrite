@@ -112,10 +112,19 @@ public class KotlinTypeMappingTest {
         assertThat(id.getType()).isInstanceOf(JavaType.Class.class);
         assertThat(id.getType().toString()).isEqualTo("kotlin.Int");
 
-        assertThat(property.getGetter().getMethodType().toString().substring(property.getGetter().getMethodType().toString().indexOf("openRewriteFileKt"))).isEqualTo("openRewriteFileKt{name=accessor,return=kotlin.Int,parameters=[]}");
+
+        JavaType.FullyQualified declaringType = property.getGetter().getMethodType().getDeclaringType();
+        assertThat(declaringType.getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
+        assertThat(property.getGetter().getMethodType().getName()).isEqualTo("accessor");
+        assertThat(property.getGetter().getMethodType().getReturnType()).isEqualTo(id.getType());
         assertThat(property.getGetter().getMethodType()).isEqualTo(property.getGetter().getName().getType());
-        assertThat(property.getSetter().getMethodType().toString().substring(property.getGetter().getMethodType().toString().indexOf("openRewriteFileKt"))).isEqualTo("openRewriteFileKt{name=accessor,return=kotlin.Unit,parameters=[kotlin.Int]}");
+        assertThat(property.getGetter().getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=accessor,return=kotlin.Int,parameters=[]}");
+
+        declaringType = property.getSetter().getMethodType().getDeclaringType();
+        assertThat(declaringType.getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
+        assertThat(property.getSetter().getMethodType().getName()).isEqualTo("accessor");
         assertThat(property.getSetter().getMethodType()).isEqualTo(property.getSetter().getName().getType());
+        assertThat(property.getSetter().getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=accessor,return=kotlin.Unit,parameters=[kotlin.Int]}");
     }
 
     @Test
