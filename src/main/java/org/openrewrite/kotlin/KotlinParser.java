@@ -316,6 +316,12 @@ public class KotlinParser implements Parser {
         public String getDslName() {
             return "kotlin";
         }
+
+        public KotlinParser.Builder clone() {
+            KotlinParser.Builder clone = (KotlinParser.Builder)super.clone();
+            clone.typeCache = this.typeCache.clone();
+            return clone;
+        }
     }
 
     public CompiledSource parse(List<Parser.Input> sources, Disposable disposable, ExecutionContext ctx) {
