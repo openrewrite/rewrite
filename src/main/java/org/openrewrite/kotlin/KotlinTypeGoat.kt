@@ -20,7 +20,9 @@ package org.openrewrite.kotlin
 
 import java.lang.Object
 
-// TODO: FIX ME. Files needs to declare fields and methods to assert type mapping.
+const val field = 10
+fun function() {}
+
 @AnnotationWithRuntimeRetention
 @AnnotationWithSourceRetention
 abstract class KotlinTypeGoat<T, S> where S: PT<S>, S: C {

@@ -44,7 +44,7 @@ public class KotlinTypeSignatureBuilderTest {
             .moduleName("test")
             .build()
             .parse(singletonList(new Parser.Input(Paths.get("KotlinTypeGoat.kt"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))), disposable,
-                    new ParsingExecutionContextView(new InMemoryExecutionContext(Throwable::printStackTrace)));;
+                    new ParsingExecutionContextView(new InMemoryExecutionContext(Throwable::printStackTrace)));
 
     @AfterAll
     static void afterAll() {
@@ -63,6 +63,7 @@ public class KotlinTypeSignatureBuilderTest {
 
     public String constructorSignature() {
         return signatureBuilder().methodDeclarationSignature(getCompiledSource().getDeclarations().stream()
+                .filter(FirRegularClass.class::isInstance)
                 .map(FirRegularClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
                 .filter(FirConstructor.class::isInstance)
@@ -74,6 +75,7 @@ public class KotlinTypeSignatureBuilderTest {
 
     public Object innerClassSignature(String innerClassSimpleName) {
         return signatureBuilder().signature(getCompiledSource().getDeclarations().stream()
+                .filter(FirRegularClass.class::isInstance)
                 .map(FirRegularClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
                 .filter(FirRegularClass.class::isInstance)
@@ -86,6 +88,7 @@ public class KotlinTypeSignatureBuilderTest {
 
     public String fieldSignature(String field) {
         return signatureBuilder().variableSignature(getCompiledSource().getDeclarations().stream()
+                .filter(FirRegularClass.class::isInstance)
                 .map(FirRegularClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
                 .filter(FirProperty.class::isInstance)
@@ -99,13 +102,14 @@ public class KotlinTypeSignatureBuilderTest {
     @Nullable
     public FirProperty getProperty(String field) {
         return getCompiledSource().getDeclarations().stream()
-          .map(FirRegularClass.class::cast)
-          .flatMap(it -> it.getDeclarations().stream())
-          .filter(FirProperty.class::isInstance)
-          .map(FirProperty.class::cast)
-          .filter(it -> field.equals(it.getName().asString()))
-          .findFirst()
-          .orElse(null);
+                .filter(FirRegularClass.class::isInstance)
+                .map(FirRegularClass.class::cast)
+                .flatMap(it -> it.getDeclarations().stream())
+                .filter(FirProperty.class::isInstance)
+                .map(FirProperty.class::cast)
+                .filter(it -> field.equals(it.getName().asString()))
+                .findFirst()
+                .orElse(null);
     }
 
     public String fieldPropertyGetterSignature(String field) {
@@ -126,6 +130,7 @@ public class KotlinTypeSignatureBuilderTest {
 
     public Object firstMethodParameterSignature(String methodName) {
         return signatureBuilder().signature(getCompiledSource().getDeclarations().stream()
+                .filter(FirRegularClass.class::isInstance)
                 .map(FirRegularClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
                 .filter(FirSimpleFunction.class::isInstance)
@@ -140,6 +145,7 @@ public class KotlinTypeSignatureBuilderTest {
 
     public Object lastClassTypeParameter() {
         return signatureBuilder().signature(getCompiledSource().getDeclarations().stream()
+                .filter(FirRegularClass.class::isInstance)
                 .map(FirRegularClass.class::cast)
                 .findFirst()
                 .orElseThrow()
@@ -149,6 +155,7 @@ public class KotlinTypeSignatureBuilderTest {
 
     public String methodSignature(String methodName) {
         return signatureBuilder().methodDeclarationSignature(getCompiledSource().getDeclarations().stream()
+                .filter(FirRegularClass.class::isInstance)
                 .map(FirRegularClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
                 .filter(FirSimpleFunction.class::isInstance)
@@ -157,6 +164,24 @@ public class KotlinTypeSignatureBuilderTest {
                 .findFirst()
                 .orElseThrow()
                 .getSymbol(), null);
+    }
+
+    @Test
+    void fileField() {
+        FirProperty firProperty = getCompiledSource().getDeclarations().stream()
+          .filter(it -> it instanceof FirProperty && "field".equals(((FirProperty) it).getName().asString()))
+          .map(it -> (FirProperty) it).findFirst().orElseThrow();
+        assertThat(signatureBuilder().variableSignature(firProperty.getSymbol(), getCompiledSource().getSymbol()))
+          .isEqualTo("KotlinTypeGoatKt{name=field,type=kotlin.Int}");
+    }
+
+    @Test
+    void fileFunction() {
+        FirSimpleFunction function = getCompiledSource().getDeclarations().stream()
+          .filter(it -> it instanceof FirSimpleFunction && "function".equals(((FirSimpleFunction) it).getName().asString()))
+          .map(it -> (FirSimpleFunction) it).findFirst().orElseThrow();
+        assertThat(signatureBuilder().methodDeclarationSignature(function.getSymbol(), getCompiledSource().getSymbol()))
+          .isEqualTo("KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[]}");
     }
 
     @Test

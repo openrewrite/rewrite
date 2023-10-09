@@ -15,10 +15,13 @@
  */
 package org.openrewrite.kotlin;
 
+import org.jetbrains.kotlin.fir.declarations.FirProperty;
+import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
+import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.Flag;
@@ -28,9 +31,13 @@ import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RewriteTest;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT;
@@ -40,26 +47,26 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 @SuppressWarnings("ConstantConditions")
 public class KotlinTypeMappingTest {
     private static final String goat = StringUtils.readFully(KotlinTypeMappingTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
-
+    private static final K.CompilationUnit cu;
     private static final K.ClassDeclaration goatClassDeclaration;
 
     static {
         InMemoryExecutionContext ctx = new InMemoryExecutionContext();
         ctx.putMessage(REQUIRE_PRINT_EQUALS_INPUT, false);
-        //noinspection OptionalGetWithoutIsPresent
-        goatClassDeclaration = requireNonNull(((K.CompilationUnit) KotlinParser.builder()
-          .logCompilationWarningsAndErrors(true)
-          .build()
-          .parse(ctx, goat)
-          .findFirst()
-          .get())
+        cu = (K.CompilationUnit) KotlinParser.builder()
+            .logCompilationWarningsAndErrors(true)
+            .build()
+            .parseInputs(singletonList(new Parser.Input(Paths.get("KotlinTypeGoat.kt"), () -> new ByteArrayInputStream(goat.getBytes(StandardCharsets.UTF_8)))), null, ctx)
+            .findFirst()
+            .orElseThrow();
+
+        goatClassDeclaration = cu
           .getStatements()
           .stream()
           .filter(K.ClassDeclaration.class::isInstance)
           .findFirst()
           .map(K.ClassDeclaration.class::cast)
-          .orElseThrow()
-        );
+          .orElseThrow();
     }
 
     private static final JavaType.Parameterized goatType =
@@ -126,6 +133,31 @@ public class KotlinTypeMappingTest {
         assertThat(property.getSetter().getMethodType().getName()).isEqualTo("accessor");
         assertThat(property.getSetter().getMethodType()).isEqualTo(property.getSetter().getName().getType());
         assertThat(property.getSetter().getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=accessor,return=kotlin.Unit,parameters=[kotlin.Int]}");
+    }
+
+    @Test
+    void fileField() {
+        J.VariableDeclarations.NamedVariable nv = cu.getStatements().stream()
+          .filter(it -> it instanceof J.VariableDeclarations)
+          .flatMap(it -> ((J.VariableDeclarations) it).getVariables().stream())
+          .filter(it -> "field".equals(it.getSimpleName())).findFirst().orElseThrow();
+
+        assertThat(nv.getName().getType().toString()).isEqualTo("kotlin.Int");
+        assertThat(nv.getName().getFieldType()).isEqualTo(nv.getVariableType());
+        assertThat(nv.getVariableType().toString())
+          .isEqualTo("KotlinTypeGoatKt{name=field,type=kotlin.Int}");
+    }
+
+    @Test
+    void fileFunction() {
+        J.MethodDeclaration md = cu.getStatements().stream()
+            .filter(it -> it instanceof J.MethodDeclaration)
+              .map(J.MethodDeclaration.class::cast)
+                .filter(it -> "function".equals(it.getSimpleName())).findFirst().orElseThrow();
+
+        assertThat(md.getName().getType()).isEqualTo(md.getMethodType());
+        assertThat(md.getMethodType().toString())
+          .isEqualTo("KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[]}");
     }
 
     @Test

@@ -577,6 +577,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
             }
         } else if (ownerSymbol is FirFunctionSymbol<*>) {
             owner = methodDeclarationSignature(ownerSymbol, null)
+        } else if (ownerSymbol is FirFileSymbol) {
+            owner = convertFileNameToFqn(ownerSymbol.fir.name)
         } else if (ownerSymbol != null) {
             owner = classSignature(ownerSymbol.fir)
         }
