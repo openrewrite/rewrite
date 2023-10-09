@@ -364,5 +364,67 @@ public class KotlinTypeMappingTest {
               )
             );
         }
+
+        @Test
+        void destructs() {
+            rewriteRun(
+              kotlin(
+                """
+                  fun foo() {
+                      val ( a , b , c ) = Triple ( 1 , 2 , 3 )
+                  }
+                  """, spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<AtomicBoolean>() {
+                        @Override
+                        public K.DestructuringDeclaration visitDestructuringDeclaration(K.DestructuringDeclaration destructuringDeclaration, AtomicBoolean atomicBoolean) {
+                            atomicBoolean.set(true);
+                            return super.visitDestructuringDeclaration(destructuringDeclaration, atomicBoolean);
+                        }
+
+                        @Override
+                        public J.NewClass visitNewClass(J.NewClass newClass, AtomicBoolean atomicBoolean) {
+                            if ("Triple".equals(((J.Identifier) newClass.getClazz()).getSimpleName())) {
+                                assertThat(newClass.getClazz().getType().toString()).isEqualTo("kotlin.Triple<Generic{A}, Generic{B}, Generic{C}>");
+                                assertThat(newClass.getConstructorType().toString()).isEqualTo("kotlin.Triple{name=<constructor>,return=kotlin.Triple,parameters=[Generic{A},Generic{B},Generic{C}]}");
+                            }
+                            return super.visitNewClass(newClass, atomicBoolean);
+                        }
+
+                        @Override
+                        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, AtomicBoolean atomicBoolean) {
+                            switch (variable.getSimpleName()) {
+                                case "<destruct>" -> assertThat(variable.getName().getType().toString())
+                                  .isEqualTo("kotlin.Triple<kotlin.Int, kotlin.Int, kotlin.Int>");
+                                case "a" -> {
+                                    assertThat(variable.getVariableType().toString())
+                                      .isEqualTo("openRewriteFile0Kt{name=a,type=kotlin.Int}");
+                                    assertThat(variable.getInitializer()).isInstanceOf(J.MethodInvocation.class);
+                                    assertThat(((J.MethodInvocation) variable.getInitializer()).getMethodType().toString())
+                                      .isEqualTo("kotlin.Triple<kotlin.Int, kotlin.Int, kotlin.Int>{name=component1,return=kotlin.Int,parameters=[]}");
+                                }
+                                case "b" -> {
+                                    assertThat(variable.getVariableType().toString())
+                                      .isEqualTo("openRewriteFile0Kt{name=b,type=kotlin.Int}");
+                                    assertThat(variable.getInitializer()).isInstanceOf(J.MethodInvocation.class);
+                                    assertThat(((J.MethodInvocation) variable.getInitializer()).getMethodType().toString())
+                                      .isEqualTo("kotlin.Triple<kotlin.Int, kotlin.Int, kotlin.Int>{name=component2,return=kotlin.Int,parameters=[]}");
+                                }
+                                case "c" -> {
+                                    assertThat(variable.getVariableType().toString())
+                                      .isEqualTo("openRewriteFile0Kt{name=c,type=kotlin.Int}");
+                                    assertThat(variable.getInitializer()).isInstanceOf(J.MethodInvocation.class);
+                                    assertThat(((J.MethodInvocation) variable.getInitializer()).getMethodType().toString())
+                                      .isEqualTo("kotlin.Triple<kotlin.Int, kotlin.Int, kotlin.Int>{name=component3,return=kotlin.Int,parameters=[]}");
+                                }
+                            }
+                            return super.visitVariable(variable, atomicBoolean);
+                        }
+                    }.visit(cu, found);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
     }
 }

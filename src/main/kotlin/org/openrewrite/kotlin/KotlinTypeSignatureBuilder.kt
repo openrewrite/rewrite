@@ -604,6 +604,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
         var owner = "{undefined}"
         if (functionCall.explicitReceiver != null) {
             owner = signature(functionCall.explicitReceiver!!.typeRef)
+        } else if ((functionCall.calleeReference as FirResolvedNamedReference).resolvedSymbol is FirConstructorSymbol) {
+            return signature((functionCall.calleeReference as FirResolvedNamedReference).resolvedSymbol as FirConstructorSymbol)
         } else if (functionCall.calleeReference is FirResolvedNamedReference) {
             if ((functionCall.calleeReference as FirResolvedNamedReference).resolvedSymbol is FirNamedFunctionSymbol) {
                 val resolvedSymbol =

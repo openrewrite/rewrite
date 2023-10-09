@@ -789,7 +789,9 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
             if ((functionCall.calleeReference as FirResolvedNamedReference).resolvedSymbol is FirNamedFunctionSymbol) {
                 val resolvedSymbol =
                     (functionCall.calleeReference as FirResolvedNamedReference).resolvedSymbol as FirNamedFunctionSymbol
-                if (resolvedSymbol.containingClassLookupTag() != null) {
+                if (resolvedSymbol.dispatchReceiverType is ConeClassLikeType) {
+                    resolvedDeclaringType = TypeUtils.asFullyQualified(type(resolvedSymbol.dispatchReceiverType))
+                } else if (resolvedSymbol.containingClassLookupTag() != null) {
                     val lookupTag: ConeClassLikeLookupTag = resolvedSymbol.containingClassLookupTag()!!
                     val classSymbol: FirRegularClassSymbol? = lookupTag.toFirRegularClassSymbol(firSession)
                     if (classSymbol != null) {

@@ -577,6 +577,7 @@ class KotlinParserVisitor(
         val args: JContainer<Expression>
         saveCursor = cursor
         val before = whitespace()
+        var constructorType: JavaType.Method? = null
         args = if (source[cursor] == '(') {
             if (anonymousObject.declarations.isNotEmpty() &&
                     anonymousObject.declarations[0] is FirPrimaryConstructor &&
@@ -586,6 +587,10 @@ class KotlinParserVisitor(
                 cursor(saveCursor)
                 val delegatedConstructor =
                         (anonymousObject.declarations[0] as FirPrimaryConstructor).delegatedConstructor!!
+                val type = typeMapping.type((delegatedConstructor.calleeReference as FirResolvedNamedReference).resolvedSymbol)
+                if (type is JavaType.Method) {
+                    constructorType = type
+                }
                 mapFunctionalCallArguments(delegatedConstructor)
             } else {
                 skip("(")
@@ -641,7 +646,7 @@ class KotlinParserVisitor(
             clazz,
             args,
             body,
-            null
+            constructorType
         )
     }
 
@@ -1385,7 +1390,7 @@ class KotlinParserVisitor(
                                                 Markers.EMPTY,
                                                 emptyList(),
                                                 initializer.name.asString(),
-                                                null,
+                                                typeMapping.type((propertiesPairs[0].second as FirProperty).returnTypeRef),
                                                 null
                                         ),
                                         emptyList(),
@@ -3776,7 +3781,7 @@ class KotlinParserVisitor(
                     Markers.EMPTY,
                     emptyList(),
                     componentCall.calleeReference.name.asString(),
-                    null,
+                    type,
                     null
             )
         } else {
