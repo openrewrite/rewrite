@@ -41,14 +41,28 @@ class FindRecipesTest implements RewriteTest {
                 RewriteRecipeSource.Row row = rows.get(0);
                 assertThat(row.getDisplayName()).isEqualTo("My recipe");
                 assertThat(row.getDescription()).isEqualTo("This is my recipe.");
+                assertThat(row.getOptions()).isEqualTo("{\"options\": [{\"name\": \"methodPattern\",\"displayName\": \"Method pattern\",\"description\": \"A method pattern that is used to find matching method declarations/invocations.\",\"example\": \"org.mockito.Matchers anyVararg()\"},{\"name\": \"newAccessLevel\",\"displayName\": \"New access level\",\"description\": \"New method access level to apply to the method.\",\"example\": \"public\",\"valid\": [\"private\",\"protected\",\"package\",\"public\"]}]}");
             }),
           java(
             """
+              import org.openrewrite.Option;
               import org.openrewrite.internal.lang.NonNullApi;
               import org.openrewrite.Recipe;
+              import org.openrewrite.internal.lang.Nullable;
               
               @NonNullApi
               class MyRecipe extends Recipe {
+                @Option(displayName = "Method pattern",
+                        description = "A method pattern that is used to find matching method declarations/invocations.",
+                        example = "org.mockito.Matchers anyVararg()")
+                String methodPattern;
+              
+                @Option(displayName = "New access level",
+                        description = "New method access level to apply to the method.",
+                        example = "public",
+                        valid = {"private", "protected", "package", "public"})
+                String newAccessLevel;
+              
                 @Override
                 public String getDisplayName() {
                     return "My recipe";
@@ -61,11 +75,24 @@ class FindRecipesTest implements RewriteTest {
               }
               """,
             """
+              import org.openrewrite.Option;
               import org.openrewrite.internal.lang.NonNullApi;
               import org.openrewrite.Recipe;
+              import org.openrewrite.internal.lang.Nullable;
               
               @NonNullApi
               class /*~~>*/MyRecipe extends Recipe {
+                @Option(displayName = "Method pattern",
+                        description = "A method pattern that is used to find matching method declarations/invocations.",
+                        example = "org.mockito.Matchers anyVararg()")
+                String methodPattern;
+                
+                @Option(displayName = "New access level",
+                        description = "New method access level to apply to the method.",
+                        example = "public",
+                        valid = {"private", "protected", "package", "public"})
+                String newAccessLevel;
+                
                 @Override
                 public String getDisplayName() {
                     return "My recipe";

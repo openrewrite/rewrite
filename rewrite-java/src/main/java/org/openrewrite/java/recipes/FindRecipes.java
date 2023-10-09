@@ -19,13 +19,18 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.search.UsesType;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.table.RewriteRecipeSource;
+
+import java.util.ArrayList;
+import java.util.List;
 
 import static java.util.Objects.requireNonNull;
 
@@ -47,7 +52,10 @@ public class FindRecipes extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         MethodMatcher getDisplayName = new MethodMatcher("org.openrewrite.Recipe getDisplayName()", true);
         MethodMatcher getDescription = new MethodMatcher("org.openrewrite.Recipe getDescription()", true);
+        AnnotationMatcher optionAnnotation = new AnnotationMatcher("@org.openrewrite.Option");
         return Preconditions.check(new UsesType<>("org.openrewrite.Recipe", false), new JavaIsoVisitor<ExecutionContext>() {
+            final List<J.VariableDeclarations> options = new ArrayList<>();
+
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
@@ -56,11 +64,20 @@ public class FindRecipes extends Recipe {
                             getCursor().getMessage("displayName"),
                             getCursor().getMessage("description"),
                             RewriteRecipeSource.RecipeType.Java,
-                            getCursor().firstEnclosingOrThrow(J.CompilationUnit.class).printAllTrimmed()
+                            getCursor().firstEnclosingOrThrow(J.CompilationUnit.class).printAllTrimmed(),
+                            convertOptionsToJSON(options)
                     ));
                     return classDecl.withName(SearchResult.found(classDecl.getName()));
                 }
                 return cd;
+            }
+
+            @Override
+            public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
+                if (multiVariable.getLeadingAnnotations().stream().anyMatch(optionAnnotation::matches)) {
+                    options.add(multiVariable);
+                }
+                return super.visitVariableDeclarations(multiVariable, executionContext);
             }
 
             @Override
@@ -75,6 +92,70 @@ public class FindRecipes extends Recipe {
                             requireNonNull(((J.Literal) aReturn.getExpression()).getValue()));
                 }
                 return super.visitReturn(aReturn, ctx);
+            }
+
+            private String convertOptionsToJSON(List<J.VariableDeclarations> options) {
+                StringBuilder sb = new StringBuilder();
+                sb.append("{");
+                sb.append("\"options\": [");
+                for (int i = 0; i < options.size(); i++) {
+                    J.VariableDeclarations option = options.get(i);
+                    sb.append("{");
+                    sb.append("\"name\": \"").append(option.getVariables().get(0).getSimpleName()).append("\"");
+                    sb.append(mapOptionAnnotation(option.getLeadingAnnotations()));
+                    sb.append("}");
+                    if (i < options.size() - 1) {
+                        sb.append(",");
+                    }
+                }
+                sb.append("]");
+                sb.append("}");
+                return sb.toString();
+            }
+
+            private String mapOptionAnnotation(List<J.Annotation> leadingAnnotations) {
+                StringBuilder sb = new StringBuilder();
+                for (J.Annotation annotation : leadingAnnotations) {
+                    if (optionAnnotation.matches(annotation) && annotation.getArguments() != null) {
+                        for (Expression argument : annotation.getArguments()) {
+                            if (argument instanceof J.Assignment) {
+                                J.Assignment assignment = (J.Assignment) argument;
+                                if (assignment.getVariable() instanceof J.Identifier) {
+                                    J.Identifier identifier = (J.Identifier) assignment.getVariable();
+                                    if ("displayName".equals(identifier.getSimpleName())) {
+                                        sb.append(",\"displayName\": \"").append(((J.Literal) assignment.getAssignment()).getValue()).append("\"");
+                                    }
+                                    if ("description".equals(identifier.getSimpleName())) {
+                                        sb.append(",\"description\": \"").append(((J.Literal) assignment.getAssignment()).getValue()).append("\"");
+                                    }
+                                    if ("example".equals(identifier.getSimpleName())) {
+                                        sb.append(",\"example\": \"").append(((J.Literal) assignment.getAssignment()).getValue()).append("\"");
+                                    }
+                                    if ("required".equals(identifier.getSimpleName())) {
+                                        sb.append(",\"required\": ").append(((J.Literal) assignment.getAssignment()).getValue());
+                                    }
+                                    if ("valid".equals(identifier.getSimpleName())) {
+                                        sb.append(",\"valid\": [");
+                                        J.NewArray newArray = (J.NewArray) assignment.getAssignment();
+                                        if (newArray.getInitializer() != null) {
+                                            List<Expression> initializer = newArray.getInitializer();
+                                            for (int i = 0; i < initializer.size(); i++) {
+                                                Expression expression = initializer.get(i);
+                                                J.Literal literal = (J.Literal) expression;
+                                                if (i > 0) {
+                                                    sb.append(",");
+                                                }
+                                                sb.append("\"").append(literal.getValue()).append("\"");
+                                            }
+                                        }
+                                        sb.append("]");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                return sb.toString();
             }
         });
     }
