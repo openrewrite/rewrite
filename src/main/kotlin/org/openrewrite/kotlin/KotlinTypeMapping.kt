@@ -21,6 +21,7 @@ import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.Visibility
 import org.jetbrains.kotlin.fir.FirSession
+import org.jetbrains.kotlin.fir.analysis.checkers.getContainingClassSymbol
 import org.jetbrains.kotlin.fir.containingClassLookupTag
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.utils.isLocal
@@ -878,11 +879,13 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession) : Java
         val annotations = listAnnotations(symbol.annotations)
         var resolvedOwner: JavaType? = owner
         if (owner == null) {
-            val lookupTag: ConeClassLikeLookupTag? = symbol.containingClassLookupTag()
-            if (lookupTag != null && lookupTag.toSymbol(firSession) !is FirAnonymousObjectSymbol) {
-                // TODO check type attribution for `FirAnonymousObjectSymbol` case
-                resolvedOwner =
-                    type(lookupTag.toFirRegularClassSymbol(firSession)!!.fir) as JavaType.FullyQualified?
+            // TODO: fix type attribution for anonymous objects. Currently, returns JavaType.Unknown.
+            if (symbol.dispatchReceiverType != null) {
+                resolvedOwner = type(symbol.dispatchReceiverType)
+            } else if (symbol.getContainingClassSymbol(firSession) != null) {
+                if (symbol.getContainingClassSymbol(firSession) !is FirAnonymousObjectSymbol) {
+                    resolvedOwner = type(symbol.getContainingClassSymbol(firSession)!!.fir)
+                }
             }
         }
         if (resolvedOwner == null && ownerFallBack != null) {

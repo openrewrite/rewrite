@@ -345,11 +345,6 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
             s.append("Generic{in ")
             s.append(signature(type1))
             s.append("}")
-        } else if (type is ConeCapturedType) {
-            val (type1) = type
-            s.append("Generic{in ")
-            s.append(signature(type1))
-            s.append("}")
         } else if (type is ConeKotlinTypeProjectionOut) {
             val (type1) = type
             s.append("Generic{out ")
@@ -394,8 +389,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
             }
             s.append(boundSigs)
             s.append("}")
-        } else if (type is ConeCapturedType && type.lowerType == null) {
-            s.append("*")
+        } else if (type is ConeCapturedType) {
+            s.append("Generic{*}")
         } else if (type is ConeStubTypeForChainInference) {
             if (type.typeArguments.isNotEmpty()) {
                 throw UnsupportedOperationException("Unsupported ConeTypeProjection contains type arguments" + type.javaClass.getName())

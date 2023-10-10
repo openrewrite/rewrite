@@ -366,6 +366,34 @@ public class KotlinTypeMappingTest {
         }
 
         @Test
+        void coneProjection() {
+            rewriteRun(
+              kotlin(
+                """
+                  val map = mapOf(Pair("one", 1)) as? Map<*, *>
+                  val s = map.orEmpty().entries.joinToString { (key, value) -> "$key: $value" }
+                  """, spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<AtomicBoolean>() {
+                        @Override
+                        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, AtomicBoolean atomicBoolean) {
+                            if ("entries".equals(fieldAccess.getSimpleName())) {
+                                assertThat(fieldAccess.getName().getType().toString())
+                                  .isEqualTo("kotlin.collections.Set<kotlin.collections.Map$Entry<Generic{*}, kotlin.Any>>");
+                                assertThat(fieldAccess.getName().getFieldType().toString())
+                                  .isEqualTo("kotlin.collections.Map<Generic{*}, kotlin.Any>{name=entries,type=kotlin.collections.Set<kotlin.collections.Map$Entry<Generic{*}, kotlin.Any>>}");
+                                found.set(true);
+                            }
+                            return super.visitFieldAccess(fieldAccess, atomicBoolean);
+                        }
+                    }.visit(cu, found);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
+
+        @Test
         void destructs() {
             rewriteRun(
               kotlin(
