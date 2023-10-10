@@ -15,10 +15,15 @@
  */
 package org.openrewrite.java.recipes;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.JsonNodeFactory;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.ValueNode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
@@ -31,6 +36,7 @@ import org.openrewrite.table.RewriteRecipeSource;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import static java.util.Objects.requireNonNull;
 
@@ -95,26 +101,16 @@ public class FindRecipes extends Recipe {
             }
 
             private String convertOptionsToJSON(List<J.VariableDeclarations> options) {
-                StringBuilder sb = new StringBuilder();
-                sb.append("{");
-                sb.append("\"options\": [");
-                for (int i = 0; i < options.size(); i++) {
-                    J.VariableDeclarations option = options.get(i);
-                    sb.append("{");
-                    sb.append("\"name\": \"").append(option.getVariables().get(0).getSimpleName()).append("\"");
-                    sb.append(mapOptionAnnotation(option.getLeadingAnnotations()));
-                    sb.append("}");
-                    if (i < options.size() - 1) {
-                        sb.append(",");
-                    }
+                ArrayNode optionsArray = JsonNodeFactory.instance.arrayNode();
+                for (J.VariableDeclarations option : options) {
+                    ObjectNode optionNode = optionsArray.addObject();
+                    optionNode.put("name", option.getVariables().get(0).getSimpleName());
+                    mapOptionAnnotation(option.getLeadingAnnotations(), optionNode);
                 }
-                sb.append("]");
-                sb.append("}");
-                return sb.toString();
+                return optionsArray.toString();
             }
 
-            private String mapOptionAnnotation(List<J.Annotation> leadingAnnotations) {
-                StringBuilder sb = new StringBuilder();
+            private void mapOptionAnnotation(List<J.Annotation> leadingAnnotations, ObjectNode optionNode) {
                 for (J.Annotation annotation : leadingAnnotations) {
                     if (optionAnnotation.matches(annotation) && annotation.getArguments() != null) {
                         for (Expression argument : annotation.getArguments()) {
@@ -122,40 +118,38 @@ public class FindRecipes extends Recipe {
                                 J.Assignment assignment = (J.Assignment) argument;
                                 if (assignment.getVariable() instanceof J.Identifier) {
                                     J.Identifier identifier = (J.Identifier) assignment.getVariable();
-                                    if ("displayName".equals(identifier.getSimpleName())) {
-                                        sb.append(",\"displayName\": \"").append(((J.Literal) assignment.getAssignment()).getValue()).append("\"");
-                                    }
-                                    if ("description".equals(identifier.getSimpleName())) {
-                                        sb.append(",\"description\": \"").append(((J.Literal) assignment.getAssignment()).getValue()).append("\"");
-                                    }
-                                    if ("example".equals(identifier.getSimpleName())) {
-                                        sb.append(",\"example\": \"").append(((J.Literal) assignment.getAssignment()).getValue()).append("\"");
-                                    }
-                                    if ("required".equals(identifier.getSimpleName())) {
-                                        sb.append(",\"required\": ").append(((J.Literal) assignment.getAssignment()).getValue());
-                                    }
-                                    if ("valid".equals(identifier.getSimpleName())) {
-                                        sb.append(",\"valid\": [");
+                                    if (assignment.getAssignment() instanceof J.Literal) {
+                                        optionNode.put(identifier.getSimpleName(), mapValue(((J.Literal) assignment.getAssignment()).getValue()));
+                                    } else if (assignment.getAssignment() instanceof J.NewArray) {
                                         J.NewArray newArray = (J.NewArray) assignment.getAssignment();
                                         if (newArray.getInitializer() != null) {
-                                            List<Expression> initializer = newArray.getInitializer();
-                                            for (int i = 0; i < initializer.size(); i++) {
-                                                Expression expression = initializer.get(i);
-                                                J.Literal literal = (J.Literal) expression;
-                                                if (i > 0) {
-                                                    sb.append(",");
+                                            ArrayNode valuesArray = optionNode.putArray(identifier.getSimpleName());
+                                            for (Expression expression : newArray.getInitializer()) {
+                                                if (expression instanceof J.Literal) {
+                                                    valuesArray.add(mapValue(((J.Literal) expression).getValue()));
                                                 }
-                                                sb.append("\"").append(literal.getValue()).append("\"");
                                             }
                                         }
-                                        sb.append("]");
                                     }
                                 }
                             }
                         }
+                        break;
                     }
                 }
-                return sb.toString();
+            }
+
+            private ValueNode mapValue(@Nullable Object value) {
+                if (value instanceof String) {
+                    return JsonNodeFactory.instance.textNode((String) value);
+                } else if (value instanceof Boolean) {
+                    return JsonNodeFactory.instance.booleanNode((Boolean) value);
+                } else if (value instanceof Integer) {
+                    return JsonNodeFactory.instance.numberNode((Integer) value);
+                } else if (value == null) {
+                    return JsonNodeFactory.instance.nullNode();
+                }
+                throw new IllegalArgumentException(Objects.toString(value));
             }
         });
     }

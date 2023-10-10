@@ -41,7 +41,7 @@ class FindRecipesTest implements RewriteTest {
                 RewriteRecipeSource.Row row = rows.get(0);
                 assertThat(row.getDisplayName()).isEqualTo("My recipe");
                 assertThat(row.getDescription()).isEqualTo("This is my recipe.");
-                assertThat(row.getOptions()).isEqualTo("{\"options\": [{\"name\": \"methodPattern\",\"displayName\": \"Method pattern\",\"description\": \"A method pattern that is used to find matching method declarations/invocations.\",\"example\": \"org.mockito.Matchers anyVararg()\"},{\"name\": \"newAccessLevel\",\"displayName\": \"New access level\",\"description\": \"New method access level to apply to the method.\",\"example\": \"public\",\"valid\": [\"private\",\"protected\",\"package\",\"public\"]}]}");
+                assertThat(row.getOptions()).isEqualTo("[{\"name\":\"methodPattern\",\"displayName\":\"Method pattern\",\"description\":\"A method pattern that is used to find matching method declarations/invocations.\",\"example\":\"org.mockito.Matchers anyVararg()\"},{\"name\":\"newAccessLevel\",\"displayName\":\"New access level\",\"description\":\"New method access level to apply to the method, like \\\"public\\\".\",\"example\":\"public\",\"valid\":[\"private\",\"protected\",\"package\",\"public\"],\"required\":false}]");
             }),
           java(
             """
@@ -58,9 +58,10 @@ class FindRecipesTest implements RewriteTest {
                 String methodPattern;
               
                 @Option(displayName = "New access level",
-                        description = "New method access level to apply to the method.",
+                        description = "New method access level to apply to the method, like \\"public\\".",
                         example = "public",
-                        valid = {"private", "protected", "package", "public"})
+                        valid = {"private", "protected", "package", "public"},
+                        required = false)
                 String newAccessLevel;
               
                 @Override
@@ -88,9 +89,10 @@ class FindRecipesTest implements RewriteTest {
                 String methodPattern;
                 
                 @Option(displayName = "New access level",
-                        description = "New method access level to apply to the method.",
+                        description = "New method access level to apply to the method, like \\"public\\".",
                         example = "public",
-                        valid = {"private", "protected", "package", "public"})
+                        valid = {"private", "protected", "package", "public"},
+                        required = false)
                 String newAccessLevel;
                 
                 @Override
