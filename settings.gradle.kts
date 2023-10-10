@@ -42,7 +42,7 @@ val includedProjects = file("IDE.properties").let {
 }.toSet()
 
 if(!file("IDE.properties").exists() || includedProjects.contains("tools")) {
-//    includeBuild("tools")
+    includeBuild("tools")
 }
 
 include(*allProjects.toTypedArray())
