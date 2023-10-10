@@ -88,15 +88,19 @@ public class FindRecipes extends Recipe {
 
             @Override
             public J.Return visitReturn(J.Return aReturn, ExecutionContext ctx) {
-                J.MethodDeclaration method = getCursor().firstEnclosingOrThrow(J.MethodDeclaration.class);
-                if (getDisplayName.matches(method.getMethodType()) && aReturn.getExpression() instanceof J.Literal) {
-                    getCursor().putMessageOnFirstEnclosing(J.ClassDeclaration.class, "displayName",
-                            requireNonNull(((J.Literal) aReturn.getExpression()).getValue()));
+                J j = getCursor().dropParentUntil(it -> it instanceof J.MethodDeclaration || it instanceof J.ClassDeclaration).getValue();
+                if (j instanceof J.MethodDeclaration) {
+                    J.MethodDeclaration method = (J.MethodDeclaration) j;
+                    if (getDisplayName.matches(method.getMethodType()) && aReturn.getExpression() instanceof J.Literal) {
+                        getCursor().putMessageOnFirstEnclosing(J.ClassDeclaration.class, "displayName",
+                                requireNonNull(((J.Literal) aReturn.getExpression()).getValue()));
+                    }
+                    if (getDescription.matches(method.getMethodType()) && aReturn.getExpression() instanceof J.Literal) {
+                        getCursor().putMessageOnFirstEnclosing(J.ClassDeclaration.class, "description",
+                                requireNonNull(((J.Literal) aReturn.getExpression()).getValue()));
+                    }
                 }
-                if (getDescription.matches(method.getMethodType()) && aReturn.getExpression() instanceof J.Literal) {
-                    getCursor().putMessageOnFirstEnclosing(J.ClassDeclaration.class, "description",
-                            requireNonNull(((J.Literal) aReturn.getExpression()).getValue()));
-                }
+
                 return super.visitReturn(aReturn, ctx);
             }
 
