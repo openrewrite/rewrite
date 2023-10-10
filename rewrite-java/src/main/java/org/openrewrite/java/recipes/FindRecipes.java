@@ -119,7 +119,7 @@ public class FindRecipes extends Recipe {
                                 if (assignment.getVariable() instanceof J.Identifier) {
                                     J.Identifier identifier = (J.Identifier) assignment.getVariable();
                                     if (assignment.getAssignment() instanceof J.Literal) {
-                                        optionNode.put(identifier.getSimpleName(), mapValue(((J.Literal) assignment.getAssignment()).getValue()));
+                                        optionNode.set(identifier.getSimpleName(), mapValue(((J.Literal) assignment.getAssignment()).getValue()));
                                     } else if (assignment.getAssignment() instanceof J.NewArray) {
                                         J.NewArray newArray = (J.NewArray) assignment.getAssignment();
                                         if (newArray.getInitializer() != null) {
