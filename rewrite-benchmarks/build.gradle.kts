@@ -4,7 +4,7 @@ plugins {
 }
 
 dependencies {
-    jmh("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
+    jmh("org.eclipse.jgit:org.eclipse.jgit:6.6.+")
     jmh("com.google.code.findbugs:jsr305:latest.release")
     jmh("org.projectlombok:lombok:latest.release")
 
