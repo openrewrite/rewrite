@@ -79,7 +79,7 @@ public interface JavaParser extends Parser {
      * matching jars can be found.
      */
     static List<Path> dependenciesFromClasspath(String... artifactNames) {
-        List<URI> runtimeClasspath = new ClassGraph().getClasspathURIs();
+        List<URI> runtimeClasspath = new ClassGraph().disableNestedJarScanning().getClasspathURIs();
         List<Path> artifacts = new ArrayList<>(artifactNames.length);
         List<String> missingArtifactNames = new ArrayList<>(artifactNames.length);
         for (String artifactName : artifactNames) {
