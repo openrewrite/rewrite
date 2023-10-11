@@ -186,7 +186,7 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession, firFil
                     if (classifierSymbol != null && classifierSymbol.fir is FirTypeParameter) {
                         return resolveConeTypeProjection(classifierSymbol.fir as FirTypeParameter, signature)
                     }
-                } else if (coneKotlinType is ConeClassLikeType) {
+                } else if (coneKotlinType is ConeClassLikeType || coneKotlinType is ConeIntersectionType) {
                     return type(coneKotlinType, ownerFallBack)
                 }
                 return classType(type, signature, ownerFallBack)
@@ -1074,7 +1074,12 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession, firFil
                 resolvedType = resolveConeLikeClassType(type, signature, ownerSymbol)
             } else if (type is ConeFlexibleType) {
                 resolvedType = type(type.lowerBound)
+            } else if (type is ConeDefinitelyNotNullType) {
+                resolvedType = type(type.original)
             }
+        }
+        if (resolvedType is JavaType.Unknown) {
+            // TODO: handle cases that result in an Unknown like FirAnonymousObjectSymbol.
         }
         return resolvedType
     }
@@ -1087,6 +1092,9 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession, firFil
     ): JavaType? {
         val classSymbol = coneClassLikeType.toRegularClassSymbol(firSession)
         if (classSymbol == null) {
+            if (coneClassLikeType.lookupTag.toSymbol(firSession) is FirAnonymousObjectSymbol) {
+                // TODO: handle anonymous objects.
+            }
             typeCache.put(signature, JavaType.Unknown.getInstance())
             return JavaType.Unknown.getInstance()
         }
