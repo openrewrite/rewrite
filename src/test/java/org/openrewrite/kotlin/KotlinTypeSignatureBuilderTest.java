@@ -52,7 +52,7 @@ public class KotlinTypeSignatureBuilderTest {
     }
 
     public KotlinTypeSignatureBuilder signatureBuilder() {
-        return new KotlinTypeSignatureBuilder(compiledSource.getFirSession());
+        return new KotlinTypeSignatureBuilder(compiledSource.getFirSession(), compiledSource.getSources().iterator().next().getFirFile().getSymbol());
     }
 
     private FirFile getCompiledSource() {
@@ -181,7 +181,7 @@ public class KotlinTypeSignatureBuilderTest {
           .filter(it -> it instanceof FirSimpleFunction && "function".equals(((FirSimpleFunction) it).getName().asString()))
           .map(it -> (FirSimpleFunction) it).findFirst().orElseThrow();
         assertThat(signatureBuilder().methodDeclarationSignature(function.getSymbol(), getCompiledSource().getSymbol()))
-          .isEqualTo("KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[]}");
+          .isEqualTo("KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[org.openrewrite.kotlin.C]}");
     }
 
     @Test

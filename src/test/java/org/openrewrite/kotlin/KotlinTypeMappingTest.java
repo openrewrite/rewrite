@@ -15,8 +15,6 @@
  */
 package org.openrewrite.kotlin;
 
-import org.jetbrains.kotlin.fir.declarations.FirProperty;
-import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
@@ -157,7 +155,13 @@ public class KotlinTypeMappingTest {
 
         assertThat(md.getName().getType()).isEqualTo(md.getMethodType());
         assertThat(md.getMethodType().toString())
-          .isEqualTo("KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[]}");
+          .isEqualTo("KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[org.openrewrite.kotlin.C]}");
+
+        J.VariableDeclarations.NamedVariable nv = ((J.VariableDeclarations) md.getParameters().get(0)).getVariables().get(0);
+        assertThat(nv.getVariableType()).isEqualTo(nv.getName().getFieldType());
+        assertThat(nv.getType().toString()).isEqualTo("org.openrewrite.kotlin.C");
+        assertThat(nv.getVariableType().toString())
+          .isEqualTo("KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[org.openrewrite.kotlin.C]}{name=arg,type=org.openrewrite.kotlin.C}");
     }
 
     @Test
@@ -201,7 +205,7 @@ public class KotlinTypeMappingTest {
     @Test
     void generic() {
         JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("generic")).getTypeParameters().get(0);
-        assertThat(generic.getName()).isEqualTo("");
+        assertThat(generic.getName()).isEqualTo("?");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
         assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
     }
@@ -209,7 +213,7 @@ public class KotlinTypeMappingTest {
     @Test
     void genericContravariant() {
         JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) TypeUtils.asParameterized(firstMethodParameter("genericContravariant")).getTypeParameters().get(0);
-        assertThat(generic.getName()).isEqualTo("");
+        assertThat(generic.getName()).isEqualTo("?");
         assertThat(generic.getVariance()).isEqualTo(CONTRAVARIANT);
         assertThat(TypeUtils.asFullyQualified(generic.getBounds().get(0)).getFullyQualifiedName()).
           isEqualTo("org.openrewrite.kotlin.C");
@@ -239,7 +243,7 @@ public class KotlinTypeMappingTest {
         JavaType.Parameterized param = (JavaType.Parameterized) firstMethodParameter("genericRecursive");
         JavaType typeParam = param.getTypeParameters().get(0);
         JavaType.GenericTypeVariable generic = (JavaType.GenericTypeVariable) typeParam;
-        assertThat(generic.getName()).isEqualTo("");
+        assertThat(generic.getName()).isEqualTo("?");
         assertThat(generic.getVariance()).isEqualTo(COVARIANT);
         assertThat(TypeUtils.asParameterized(generic.getBounds().get(0))).isNotNull();
 
@@ -357,6 +361,32 @@ public class KotlinTypeMappingTest {
                                 found.set(true);
                             }
                             return super.visitMethodInvocation(method, found);
+                        }
+                    }.visit(cu, found);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
+
+        @Test
+        void genericIntersectionType() {
+            rewriteRun(
+              kotlin(
+                """
+                  val l = listOf ( "foo" to "1" , "bar" to 2 )
+                  """, spec -> spec.afterRecipe(cu -> {
+                    MethodMatcher methodMatcher = new MethodMatcher("kotlin.collections.CollectionsKt listOf(..)");
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<AtomicBoolean>() {
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean atomicBoolean) {
+                            if (methodMatcher.matches(method)) {
+                                assertThat(method.getMethodType().toString())
+                                  .isEqualTo("kotlin.collections.CollectionsKt{name=listOf,return=kotlin.collections.List<kotlin.Pair<kotlin.String, Generic{kotlin.Comparable<Generic{*}> & java.io.Serializable}>>,parameters=[kotlin.Array<Generic{? extends Generic{T}}>]}");
+                                found.set(true);
+                            }
+                            return super.visitMethodInvocation(method, atomicBoolean);
                         }
                     }.visit(cu, found);
                     assertThat(found.get()).isTrue();

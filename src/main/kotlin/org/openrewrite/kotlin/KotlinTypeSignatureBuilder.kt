@@ -44,7 +44,7 @@ import org.openrewrite.internal.lang.Nullable
 import org.openrewrite.java.JavaTypeSignatureBuilder
 import java.util.*
 
-class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeSignatureBuilder {
+class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val firFileSymbol: FirFileSymbol) : JavaTypeSignatureBuilder {
     private var typeVariableNameStack: MutableSet<String>? = null
     override fun signature(type: @Nullable Any?): String {
         return signature(type, null)
@@ -167,6 +167,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
                     } else {
                         parameterizedTypeRef(coneKotlinType.lowerBound)
                     }
+                } else if (coneKotlinType is ConeClassLikeType) {
+                    return signature(coneKotlinType)
                 }
                 return if (coneKotlinType.typeArguments.isNotEmpty()) {
                     parameterizedTypeRef(coneKotlinType)
@@ -576,6 +578,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
             owner = convertFileNameToFqn(ownerSymbol.fir.name)
         } else if (ownerSymbol != null) {
             owner = classSignature(ownerSymbol.fir)
+        } else {
+            owner = convertFileNameToFqn(firFileSymbol.fir.name)
         }
         val typeSig =
             if (symbol.fir is FirJavaField || symbol.fir is FirEnumEntry) {
@@ -642,6 +646,9 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
                 }
             }
         }
+        if (owner == "{undefined}") {
+            owner = convertFileNameToFqn(firFileSymbol.fir.name)
+        }
         var s = owner
         val namedReference = functionCall.calleeReference
         s += if (namedReference is FirResolvedNamedReference &&
@@ -676,7 +683,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession) : JavaTypeS
                     signature(ownerSymbol.fir)
                 }
                 else -> {
-                    "{undefined}"
+                    convertFileNameToFqn(firFileSymbol.fir.name)
                 }
             }
         s += if (symbol is FirConstructorSymbol) {

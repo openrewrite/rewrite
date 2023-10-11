@@ -37,7 +37,6 @@ import org.jetbrains.kotlin.fir.expressions.impl.FirSingleExpressionBlock
 import org.jetbrains.kotlin.fir.expressions.impl.FirUnitExpression
 import org.jetbrains.kotlin.fir.references.*
 import org.jetbrains.kotlin.fir.resolve.toFirRegularClassSymbol
-import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
@@ -123,7 +122,7 @@ class KotlinParserVisitor(
         charset = `is`.charset
         charsetBomMarked = `is`.isCharsetBomMarked
         this.styles = styles
-        typeMapping = KotlinTypeMapping(typeCache, firSession)
+        typeMapping = KotlinTypeMapping(typeCache, firSession, kotlinSource.firFile!!.symbol)
         this.data = data
         this.firSession = firSession
         this.nodes = kotlinSource.nodes
