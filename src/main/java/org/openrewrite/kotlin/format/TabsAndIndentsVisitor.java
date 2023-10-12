@@ -240,7 +240,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
 
     @Override
     public <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc, P p) {
-        if (loc == JLeftPadded.Location.VARIABLE_INITIALIZER) {
+        if (loc == JLeftPadded.Location.VARIABLE_INITIALIZER || loc == JLeftPadded.Location.ASSIGNMENT) {
             // this formatting option also applies to variable declarations
             getCursor().putMessage("indentType",
                     wrappingStyle.getExpressionBodyFunctions().getUseContinuationIndent() ? IndentType.CONTINUATION_INDENT : IndentType.INDENT);

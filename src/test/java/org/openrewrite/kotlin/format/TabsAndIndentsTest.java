@@ -2274,4 +2274,19 @@ class TabsAndIndentsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void fieldAssignment() {
+        rewriteRun(
+          kotlin(
+            """
+              class Point(var x: Int, var y: Int)
+              fun x(p: Point) {
+                  p.x =
+                      3
+              }
+              """
+          )
+        );
+    }
 }
