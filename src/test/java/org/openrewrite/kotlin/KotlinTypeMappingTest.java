@@ -162,6 +162,12 @@ public class KotlinTypeMappingTest {
         assertThat(nv.getType().toString()).isEqualTo("org.openrewrite.kotlin.C");
         assertThat(nv.getVariableType().toString())
           .isEqualTo("KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[org.openrewrite.kotlin.C]}{name=arg,type=org.openrewrite.kotlin.C}");
+
+        J.VariableDeclarations.NamedVariable inMethod = ((J.VariableDeclarations) md.getBody().getStatements().get(0)).getVariables().get(0);
+        assertThat(inMethod.getVariableType()).isEqualTo(inMethod.getName().getFieldType());
+        assertThat(inMethod.getType().toString()).isEqualTo("kotlin.Int");
+        assertThat(inMethod.getVariableType().toString())
+          .isEqualTo("KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[org.openrewrite.kotlin.C]}{name=inFun,type=kotlin.Int}");
     }
 
     @Test

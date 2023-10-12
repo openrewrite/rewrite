@@ -21,7 +21,9 @@ package org.openrewrite.kotlin
 import java.lang.Object
 
 const val field = 10
-fun function(arg: C) {}
+fun function(arg: C) {
+    val inFun = 10
+}
 
 @AnnotationWithRuntimeRetention
 @AnnotationWithSourceRetention
