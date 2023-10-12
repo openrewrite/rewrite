@@ -31,6 +31,15 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     private final Tree stopAfter;
 
     @Override
+    public J.Import visitImport(J.Import _import, P p) {
+        J.Import i = super.visitImport(_import, p);
+        if (i.getQualid().getPrefix().isEmpty()) {
+            i = i.withQualid(i.getQualid().withPrefix(Space.SINGLE_SPACE));
+        }
+        return i;
+    }
+
+    @Override
     public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, P p) {
         J.ClassDeclaration c = super.visitClassDeclaration(classDecl, p);
 
@@ -168,6 +177,16 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             r = r.withExpression(r.getExpression().withPrefix(r.getExpression().getPrefix().withWhitespace(" ")));
         }
         return r;
+    }
+
+    @Override
+    public J.AnnotatedType visitAnnotatedType(J.AnnotatedType annotatedType, P p) {
+        J.AnnotatedType t = super.visitAnnotatedType(annotatedType, p);
+        if (!t.getAnnotations().isEmpty() && t.getTypeExpression().getPrefix().isEmpty() &&
+                t.getAnnotations().get(t.getAnnotations().size() - 1).getArguments() == null) {
+            t = t.withTypeExpression(t.getTypeExpression().withPrefix(Space.SINGLE_SPACE));
+        }
+        return t;
     }
 
     @Override

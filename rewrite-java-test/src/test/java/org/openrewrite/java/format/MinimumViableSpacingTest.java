@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -163,6 +164,25 @@ class MinimumViableSpacingTest implements RewriteTest {
               """,
             """
               public final class A{public static String foo(){return "foo";}}
+              """
+          )
+        );
+    }
+
+    @Test
+    void spaceAfterParameterlessTypeAnnotation() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("annotations")),
+          java(
+            """
+              import org.jetbrains.annotations.Nullable;
+              
+              public final class A {
+                  private @Nullable String foo;
+              }
+              """,
+            """
+              import org.openrewrite.internal.lang.Nullable;public final class A{private @Nullable String foo;}
               """
           )
         );
