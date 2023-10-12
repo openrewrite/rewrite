@@ -4317,7 +4317,7 @@ class KotlinParserVisitor(
                 Space.EMPTY,
                 Markers.EMPTY,
                 emptyList(),
-                node.name!!,
+                "<constructor>",
                 type as? JavaType.Method,
                 null
         )
