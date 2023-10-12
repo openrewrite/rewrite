@@ -227,7 +227,9 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                                     alignTo = firstArg.getPrefix().getLastWhitespace().length() - 1;
                                 } else {
                                     String source = method.print(getCursor());
-                                    alignTo = source.indexOf(firstArg.print(getCursor())) - 1;
+                                    int firstArgIndex = source.indexOf(firstArg.print(getCursor()));
+                                    int lineBreakIndex = source.lastIndexOf('\n', firstArgIndex);
+                                    alignTo = (firstArgIndex - (lineBreakIndex == -1 ? 0 : lineBreakIndex)) - 1;
                                 }
                                 getCursor().getParentOrThrow().putMessage("lastIndent", alignTo - style.getContinuationIndent());
                                 elem = visitAndCast(elem, p);
