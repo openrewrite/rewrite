@@ -96,6 +96,14 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession, firFil
                 return javaType
             }
 
+            is ConeClassLikeType -> {
+                return resolveConeLikeClassType(type, signature, ownerFallBack)
+            }
+
+            is ConeFlexibleType -> {
+                return type(type.lowerBound)
+            }
+
             is FirClass -> {
                 return classType(type, signature, ownerFallBack)
             }
@@ -140,7 +148,7 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession, firFil
     ): JavaType? {
         when (type) {
             is ConeTypeProjection -> {
-                return resolveConeTypeProjection(type, signature, ownerFallBack)
+                return resolveConeTypeProjection(type, signature)
             }
 
             is FirExpression -> {
@@ -219,43 +227,51 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession, firFil
         val firClass: FirClass
         var resolvedTypeRef: FirResolvedTypeRef? = null
         var typeArguments: Array<out ConeTypeProjection>? = null
-        if (classType is FirResolvedTypeRef) {
-            // The resolvedTypeRef is used to create parameterized types.
-            resolvedTypeRef = classType
-            var type = resolvedTypeRef.type
-            if (type is ConeFlexibleType) {
-                // for platform types the lower bound is the nullable type
-                type = type.lowerBound
-            }
-            val symbol = type.toRegularClassSymbol(firSession)
-            if (symbol == null) {
-                typeCache.put(signature, JavaType.Unknown.getInstance())
-                return JavaType.Unknown.getInstance()
-            }
-            firClass = symbol.fir
-        } else if (classType is FirResolvedQualifier) {
-            when (classType.symbol) {
-                is FirTypeAliasSymbol -> {
-                    return classType(
-                        (classType.symbol as FirTypeAliasSymbol).resolvedExpandedTypeRef,
-                        signature,
-                        ownerFallBack
-                    )
+        when (classType) {
+            is FirResolvedTypeRef -> {
+                // The resolvedTypeRef is used to create parameterized types.
+                resolvedTypeRef = classType
+                var type = resolvedTypeRef.type
+                if (type is ConeFlexibleType) {
+                    // for platform types the lower bound is the nullable type
+                    type = type.lowerBound
                 }
-
-                is FirRegularClassSymbol -> {
-                    firClass = classType.symbol!!.fir as FirClass
-                }
-
-                else -> {
+                val symbol = type.toRegularClassSymbol(firSession)
+                if (symbol == null) {
+                    typeCache.put(signature, JavaType.Unknown.getInstance())
                     return JavaType.Unknown.getInstance()
                 }
+                firClass = symbol.fir
             }
-        } else if (classType is ConeClassLikeType) {
-            firClass = classType.toRegularClassSymbol(firSession)!!.fir
-            typeArguments = classType.typeArguments
-        } else {
-            firClass = classType as FirClass
+
+            is FirResolvedQualifier -> {
+                when (classType.symbol) {
+                    is FirTypeAliasSymbol -> {
+                        return classType(
+                            (classType.symbol as FirTypeAliasSymbol).resolvedExpandedTypeRef,
+                            signature,
+                            ownerFallBack
+                        )
+                    }
+
+                    is FirRegularClassSymbol -> {
+                        firClass = classType.symbol!!.fir as FirClass
+                    }
+
+                    else -> {
+                        return JavaType.Unknown.getInstance()
+                    }
+                }
+            }
+
+            is ConeClassLikeType -> {
+                firClass = classType.toRegularClassSymbol(firSession)!!.fir
+                typeArguments = classType.typeArguments
+            }
+
+            else -> {
+                firClass = classType as FirClass
+            }
         }
         val sym = firClass.symbol
         val classFqn: String = convertClassIdToFqn(sym.classId)
@@ -437,10 +453,7 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession, firFil
             if (classifier.fields.isNotEmpty()) {
                 fields = ArrayList(classifier.fields.size)
                 for (field: JavaField in classifier.fields) {
-                    val vt = variableType(field, clazz)
-                    if (vt != null) {
-                        fields.add(vt)
-                    }
+                    fields.add(variableType(field, clazz))
                 }
             }
             var methods: MutableList<JavaType.Method>? = null
@@ -486,7 +499,7 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession, firFil
                 methods
             )
         }
-        if (!classifier.typeParameters.isEmpty()) {
+        if (classifier.typeParameters.isNotEmpty()) {
             val jfq = typeCache.get<JavaType.FullyQualified>(signature)
             if (jfq is JavaType.Class) {
                 throw IllegalStateException("Expected JavaType.Parameterized for signature : $signature")
@@ -520,7 +533,7 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession, firFil
                 return existing
             }
             var paramNames: MutableList<String>? = null
-            if (!methodSymbol.valueParameterSymbols.isEmpty()) {
+            if (methodSymbol.valueParameterSymbols.isNotEmpty()) {
                 paramNames = ArrayList(methodSymbol.valueParameterSymbols.size)
                 for (p: FirValueParameterSymbol in methodSymbol.valueParameterSymbols) {
                     val s = p.name.asString()
@@ -576,7 +589,7 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession, firFil
         return null
     }
 
-    fun methodDeclarationType(
+    private fun methodDeclarationType(
         javaMethod: JavaMethod?,
         declaringType: JavaType.FullyQualified?
     ): JavaType.Method? {
@@ -587,7 +600,7 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession, firFil
                 return existing
             }
             var paramNames: MutableList<String>? = null
-            if (!javaMethod.valueParameters.isEmpty()) {
+            if (javaMethod.valueParameters.isNotEmpty()) {
                 paramNames = ArrayList(javaMethod.valueParameters.size)
                 val valueParameters = javaMethod.valueParameters
                 // Generate names for parameters that match the output for the Java compiler.
@@ -909,7 +922,7 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession, firFil
         return variable
     }
 
-    fun variableType(javaField: JavaField, owner: JavaType?): JavaType.Variable? {
+    private fun variableType(javaField: JavaField, owner: JavaType?): JavaType.Variable {
         val signature = signatureBuilder.variableSignature(javaField)
         val existing = typeCache.get<JavaType.Variable>(signature)
         if (existing != null) {
@@ -994,11 +1007,9 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession, firFil
         }
     }
 
-    @OptIn(SymbolInternals::class)
     private fun resolveConeTypeProjection(
         type: ConeTypeProjection,
-        signature: String,
-        ownerSymbol: FirBasedSymbol<*>?
+        signature: String
     ): JavaType? {
         var resolvedType: JavaType? = JavaType.Unknown.getInstance()
 
@@ -1068,18 +1079,6 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession, firFil
             }
             gtv.unsafeSet(name, variance, bounds)
             resolvedType = gtv
-        } else {
-            // The ConeTypeProjection is not a generic type, so it must be a class type.
-            if (type is ConeClassLikeType) {
-                resolvedType = resolveConeLikeClassType(type, signature, ownerSymbol)
-            } else if (type is ConeFlexibleType) {
-                resolvedType = type(type.lowerBound)
-            } else if (type is ConeDefinitelyNotNullType) {
-                resolvedType = type(type.original)
-            }
-        }
-        if (resolvedType is JavaType.Unknown) {
-            // TODO: handle cases that result in an Unknown like FirAnonymousObjectSymbol.
         }
         return resolvedType
     }
@@ -1256,7 +1255,7 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession, firFil
 
     private fun mapClassifierType(type: JavaClassifierType, signature: String): JavaType {
         val javaType = type(type.classifier)
-        if (!type.typeArguments.isEmpty()) {
+        if (type.typeArguments.isNotEmpty()) {
             var fq = TypeUtils.asFullyQualified(javaType)
             fq = if (fq is JavaType.Parameterized) fq.type else fq
             var pt = typeCache.get<JavaType.Parameterized>(signature)
@@ -1359,7 +1358,7 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession, firFil
     private fun skipAnnotation(symbol: FirClassLikeSymbol<*>?): Boolean {
         if (symbol != null) {
             for (annotation: FirAnnotation in symbol.annotations) {
-                if (annotation is FirAnnotationCall && !annotation.argumentList.arguments.isEmpty()) {
+                if (annotation is FirAnnotationCall && annotation.argumentList.arguments.isNotEmpty()) {
                     for (argument: FirExpression in annotation.argumentList.arguments) {
                         if (argument is FirPropertyAccessExpression) {
                             val callRefSymbol = (argument.calleeReference as FirResolvedNamedReference).resolvedSymbol

@@ -241,9 +241,9 @@ public class KotlinTypeSignatureBuilderTest {
     @Test
     void generic() {
         assertThat(firstMethodParameterSignature("generic"))
-                .isEqualTo("org.openrewrite.kotlin.PT<Generic{out org.openrewrite.kotlin.C}>");
+                .isEqualTo("org.openrewrite.kotlin.PT<Generic{? extends org.openrewrite.kotlin.C}>");
         assertThat(methodSignature("generic"))
-                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=generic,return=org.openrewrite.kotlin.PT<Generic{out org.openrewrite.kotlin.C}>,parameters=[org.openrewrite.kotlin.PT<Generic{out org.openrewrite.kotlin.C}>]}");
+                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=generic,return=org.openrewrite.kotlin.PT<Generic{? extends org.openrewrite.kotlin.C}>,parameters=[org.openrewrite.kotlin.PT<Generic{? extends org.openrewrite.kotlin.C}>]}");
     }
 
     @Test
@@ -257,9 +257,9 @@ public class KotlinTypeSignatureBuilderTest {
     @Test
     void genericContravariant() {
         assertThat(firstMethodParameterSignature("genericContravariant"))
-                .isEqualTo("org.openrewrite.kotlin.PT<Generic{in org.openrewrite.kotlin.C}>");
+                .isEqualTo("org.openrewrite.kotlin.PT<Generic{? super org.openrewrite.kotlin.C}>");
         assertThat(methodSignature("genericContravariant"))
-                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=genericContravariant,return=org.openrewrite.kotlin.PT<Generic{in org.openrewrite.kotlin.C}>,parameters=[org.openrewrite.kotlin.PT<Generic{in org.openrewrite.kotlin.C}>]}");
+                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=genericContravariant,return=org.openrewrite.kotlin.PT<Generic{? super org.openrewrite.kotlin.C}>,parameters=[org.openrewrite.kotlin.PT<Generic{? super org.openrewrite.kotlin.C}>]}");
     }
 
     @Test
@@ -318,9 +318,9 @@ public class KotlinTypeSignatureBuilderTest {
     @Test
     void genericRecursiveInMethodDeclaration() {
         assertThat(firstMethodParameterSignature("genericRecursive"))
-                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat<Generic{out kotlin.Array<Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{*}>}>}, Generic{*}>");
+                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat<Generic{? extends kotlin.Array<Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{*}>}>}, Generic{*}>");
         assertThat(methodSignature("genericRecursive"))
-                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=genericRecursive,return=org.openrewrite.kotlin.KotlinTypeGoat<Generic{out kotlin.Array<Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{*}>}>}, Generic{*}>,parameters=[org.openrewrite.kotlin.KotlinTypeGoat<Generic{out kotlin.Array<Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{*}>}>}, Generic{*}>]}");
+                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=genericRecursive,return=org.openrewrite.kotlin.KotlinTypeGoat<Generic{? extends kotlin.Array<Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{*}>}>}, Generic{*}>,parameters=[org.openrewrite.kotlin.KotlinTypeGoat<Generic{? extends kotlin.Array<Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{*}>}>}, Generic{*}>]}");
     }
 
     @Test

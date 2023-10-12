@@ -330,7 +330,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             }
         }
         val boundSigStr = boundSigs.toString()
-        if (!boundSigStr.isEmpty()) {
+        if (boundSigStr.isNotEmpty()) {
             s.append(" extends ").append(boundSigStr)
         }
         typeVariableNameStack!!.remove(name)
@@ -344,12 +344,12 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         val s = StringBuilder()
         if (type is ConeKotlinTypeProjectionIn) {
             val (type1) = type
-            s.append("Generic{in ")
+            s.append("Generic{? super ")
             s.append(signature(type1))
             s.append("}")
         } else if (type is ConeKotlinTypeProjectionOut) {
             val (type1) = type
-            s.append("Generic{out ")
+            s.append("Generic{? extends ")
             s.append(signature(type1))
             s.append("}")
         } else if (type is ConeStarProjection) {
