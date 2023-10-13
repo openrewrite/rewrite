@@ -3023,8 +3023,13 @@ class KotlinParserVisitor(
         val variance = typeParameter.variance
         val name: Expression
         var bounds: JContainer<TypeTree>? = null
-        if (variance == Variance.IN_VARIANCE) {
-            markers = markers.addIfAbsent(GenericType(randomId(), GenericType.Variance.CONTRAVARIANT))
+        if (variance == Variance.IN_VARIANCE || variance == Variance.OUT_VARIANCE) {
+            val varianceType = if (variance == Variance.IN_VARIANCE)
+                    GenericType.Variance.CONTRAVARIANT
+                else GenericType.Variance.COVARIANT
+            val keyword = if (variance == Variance.IN_VARIANCE) "in" else "out"
+
+            markers = markers.addIfAbsent(GenericType(randomId(), varianceType))
             name = J.Identifier(
                     randomId(),
                     Space.EMPTY,
@@ -3035,23 +3040,7 @@ class KotlinParserVisitor(
                     null
             )
             bounds = JContainer.build(
-                    sourceBefore("in"),
-                    listOf(padRight(createIdentifier(typeParameter.name.asString(), typeParameter), Space.EMPTY)),
-                    Markers.EMPTY
-            )
-        } else if (variance == Variance.OUT_VARIANCE) {
-            markers = markers.addIfAbsent(GenericType(randomId(), GenericType.Variance.COVARIANT))
-            name = J.Identifier(
-                    randomId(),
-                    Space.EMPTY,
-                    Markers.build(listOf(Implicit(randomId()))),
-                    emptyList(),
-                    "Any",
-                    null,
-                    null
-            )
-            bounds = JContainer.build(
-                    sourceBefore("out"),
+                    sourceBefore(keyword),
                     listOf(padRight(createIdentifier(typeParameter.name.asString(), typeParameter), Space.EMPTY)),
                     Markers.EMPTY
             )
