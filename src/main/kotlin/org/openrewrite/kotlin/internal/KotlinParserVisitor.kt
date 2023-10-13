@@ -4012,10 +4012,8 @@ class KotlinParserVisitor(
             name = createIdentifier(regularClass.name.asString(), regularClass)
         } else {
             val saveCursor = cursor
-            name = createIdentifier("", regularClass)
-            name = name
-                    .withSimpleName(regularClass.name.asString())
-                    .withPrefix(Space.EMPTY)
+            name = createIdentifier("<companion>", regularClass)
+            name = name.withPrefix(Space.EMPTY)
                     .withMarkers(name.markers.addIfAbsent(Implicit(randomId())))
             cursor = saveCursor
         }
