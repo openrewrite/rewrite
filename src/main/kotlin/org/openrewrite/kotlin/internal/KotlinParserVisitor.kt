@@ -3030,7 +3030,7 @@ class KotlinParserVisitor(
                     Space.EMPTY,
                     Markers.build(listOf(Implicit(randomId()))),
                     emptyList(),
-                    "Any",
+                    "<Any>",
                     null,
                     null
             )
