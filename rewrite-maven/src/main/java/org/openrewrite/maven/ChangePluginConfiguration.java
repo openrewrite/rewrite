@@ -104,7 +104,7 @@ public class ChangePluginConfiguration extends Recipe {
                             plugins = addOrUpdateChild(plugins, plugin,
                                     Xml.Tag.build("<configuration>\n" + configuration + "\n</configuration>"),
                                     getCursor().getParentOrThrow());
-                        } else if (configuration == null) {
+                        } else if (xslt != null || xsltResource != null) {
                             Optional<Xml.Tag> configurationTag = plugin.getChild("configuration");
                             if (configurationTag.isPresent()) {
                                 String xsltTransformation = loadResource(xslt, xsltResource);
