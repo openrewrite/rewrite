@@ -572,6 +572,9 @@ class KotlinParserVisitor(
                 clazz = visitElement(anonymousObject.superTypeRefs[0], data) as TypeTree?
             }
         }
+        if (anonymousObject.source is KtFakeSourceElement) {
+            markers = markers.addIfAbsent(Implicit(randomId()))
+        }
 
         val args: JContainer<Expression>
         saveCursor = cursor
@@ -4176,15 +4179,9 @@ class KotlinParserVisitor(
                 enumSet = padRight(
                         J.EnumValueSet(
                                 randomId(),
-                                enumValues[0].element.prefix ?: Space.EMPTY,
+                                Space.EMPTY,
                                 Markers.EMPTY,
-                                ListUtils.map(
-                                        enumValues
-                                ) { i: Int, ev: JRightPadded<J.EnumValue> ->
-                                    if (i == 0) ev.withElement(
-                                            ev.element.withPrefix(Space.EMPTY) ?: ev.element
-                                    ) else ev
-                                },
+                                enumValues,
                                 semicolonPresent.get()
                         ),
                         Space.EMPTY
@@ -4546,7 +4543,7 @@ class KotlinParserVisitor(
     }
 
     override fun visitErrorTypeRef(errorTypeRef: FirErrorTypeRef, data: ExecutionContext): J {
-        throw UnsupportedOperationException(generateUnsupportedMessage("FirErrorTypeRef"))
+        return createIdentifier(errorTypeRef.psi!!.text)
     }
 
     private fun generateUnsupportedMessage(typeName: String): String {
