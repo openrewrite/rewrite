@@ -200,6 +200,17 @@ public class KotlinTypeMappingTest {
         JavaType.Parameterized parameterized = (JavaType.Parameterized) firstMethodParameter("parameterized");
         assertThat(parameterized.getType().getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.PT");
         assertThat(TypeUtils.asFullyQualified(parameterized.getTypeParameters().get(0)).getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.C");
+
+        J.MethodDeclaration md = goatClassDeclaration.getClassDeclaration().getBody().getStatements().stream()
+          .filter(it -> (it instanceof J.MethodDeclaration) && "parameterized".equals(((J.MethodDeclaration) it).getSimpleName()))
+          .map(J.MethodDeclaration.class::cast).findFirst().orElseThrow();
+        assertThat(md.getMethodType().toString())
+          .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=parameterized,return=org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>,parameters=[org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>]}");
+        J.VariableDeclarations vd = ((J.VariableDeclarations) md.getParameters().get(0));
+        assertThat(vd.getTypeExpression().getType().toString())
+          .isEqualTo("org.openrewrite.kotlin.PT<org.openrewrite.kotlin.C>");
+        assertThat(((J.ParameterizedType) vd.getTypeExpression()).getClazz().getType().toString())
+          .isEqualTo("org.openrewrite.kotlin.PT");
     }
 
     @Test

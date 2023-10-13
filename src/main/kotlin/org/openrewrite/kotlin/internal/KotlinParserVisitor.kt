@@ -2478,7 +2478,7 @@ class KotlinParserVisitor(
             if (j is J.ParameterizedType) {
                 // The identifier on a parameterized type of the FIR does not contain type information and must be added separately.
                 val parameterizedType = j
-                j = parameterizedType.withClazz(parameterizedType.clazz.withType(type))
+                j = parameterizedType.withClazz(parameterizedType.clazz.withType(if (type is JavaType.Parameterized) type.type else type))
             }
             return j!!
         } else {
