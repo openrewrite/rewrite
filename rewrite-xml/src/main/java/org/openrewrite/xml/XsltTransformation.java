@@ -89,9 +89,7 @@ public class XsltTransformation extends Recipe {
                 .map(HasSourcePath<ExecutionContext>::new)
                 .toArray(TreeVisitor[]::new));
 
-        visitor = Preconditions.check(check, visitor);
-
-        return visitor;
+        return Preconditions.check(check, visitor);
     }
 
     @Override
