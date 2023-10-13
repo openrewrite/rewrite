@@ -100,7 +100,7 @@ public class ChangePluginConfiguration extends Recipe {
                         if (configuration == null && xslt == null && xsltResource == null) {
                             plugins = filterChildren(plugins, plugin,
                                     child -> !(child instanceof Xml.Tag && "configuration".equals(((Xml.Tag) child).getName())));
-                        } else if (configuration != null && xslt == null && xsltResource == null) {
+                        } else if (configuration != null) {
                             plugins = addOrUpdateChild(plugins, plugin,
                                     Xml.Tag.build("<configuration>\n" + configuration + "\n</configuration>"),
                                     getCursor().getParentOrThrow());
