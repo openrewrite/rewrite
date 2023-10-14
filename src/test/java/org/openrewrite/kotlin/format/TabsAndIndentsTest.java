@@ -2230,6 +2230,19 @@ class TabsAndIndentsTest implements RewriteTest {
               """
           )
         );
+        rewriteRun(
+          wrappingAndBraces(style -> style.withElvisExpressions(style.getElvisExpressions().withUseContinuationIndent(true))),
+          kotlin(
+            """
+              fun f(): String? {
+                  val values = (listOf("") as List<String>?)
+                      ?.map { it }
+                          ?: return null
+                  return values.joinToString("")
+              }
+              """
+          )
+        );
     }
 
     @Test
