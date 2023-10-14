@@ -2303,4 +2303,26 @@ class TabsAndIndentsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void longMethodChainWithMultiLineParameters() {
+        rewriteRun(
+          kotlin(
+            """
+              class Foo {
+                  fun test(): String {
+                      return "foobar"
+                          .substring(
+                              1
+                          ).substring(
+                              2
+                          ).substring(
+                              3
+                          )
+                  }
+              }
+              """
+          )
+        );
+    }
 }
