@@ -881,4 +881,16 @@ class BlankLinesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void annotatedPrimaryConstructor() {
+        rewriteRun(
+          blankLines(),
+          kotlin(
+            """
+              class A @Suppress constructor(val a: Boolean,): Any()
+              """
+          )
+        );
+    }
 }
