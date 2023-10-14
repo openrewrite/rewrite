@@ -284,6 +284,7 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
         J.Block b = super.visitBlock(block, p);
         b = b.withEnd(keepMaximumLines(b.getEnd(), style.getKeepMaximum().getBeforeEndOfBlock()));
 
+        J parent = getCursor().getParentTreeCursor().getValue();
         AtomicBoolean previousWithBody = new AtomicBoolean();
         List<JRightPadded<Statement>> blockStatements = b.getPadding().getStatements();
         blockStatements = ListUtils.map(blockStatements, (index, padded) -> {
@@ -310,7 +311,7 @@ public class BlankLinesVisitor<P> extends KotlinIsoVisitor<P> {
             } else if (statement instanceof J.VariableDeclarations) {
                 J.VariableDeclarations v = (J.VariableDeclarations) statement;
 
-                if (!v.getLeadingAnnotations().isEmpty()) {
+                if (!v.getLeadingAnnotations().isEmpty() && (parent instanceof J.ClassDeclaration || parent instanceof J.NewClass && index > 0)) {
                     statement = minimumLines(v, style.getMinimum().getBeforeDeclarationWithCommentOrAnnotation());
                 }
             }

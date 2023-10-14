@@ -893,4 +893,48 @@ class BlankLinesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void annotatedLocalVariable() {
+        rewriteRun(
+          blankLines(),
+          kotlin(
+            """
+              fun f() {
+                  @Suppress val i = 1
+                  @Suppress val j = 1
+              }
+              
+              val o = object {
+                  @Suppress val i = 1
+                  @Suppress val j = 1
+              }
+              
+              class T {
+                  @Suppress val i = 1
+                  @Suppress val j = 1
+              }
+              """,
+            """
+              fun f() {
+                  @Suppress val i = 1
+                  @Suppress val j = 1
+              }
+              
+              val o = object {
+                  @Suppress val i = 1
+              
+                  @Suppress val j = 1
+              }
+              
+              class T {
+              
+                  @Suppress val i = 1
+              
+                  @Suppress val j = 1
+              }
+              """
+          )
+        );
+    }
 }
