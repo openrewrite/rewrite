@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.format;
 
 
+import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -77,11 +78,13 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
     public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
 
         J.VariableDeclarations variableDeclarations = super.visitVariableDeclarations(multiVariable, p);
-        if (getCursor().getParent() != null && getCursor().getParent().firstEnclosing(J.class) instanceof J.Block) {
-
+        Cursor parentCursor = getCursor().getParentTreeCursor();
+        if (parentCursor.getValue() instanceof J.Block) {
             variableDeclarations = variableDeclarations.withLeadingAnnotations(withNewlines(variableDeclarations.getLeadingAnnotations()));
 
-            if (!variableDeclarations.getLeadingAnnotations().isEmpty()) {
+            J grandparent;
+            if (!variableDeclarations.getLeadingAnnotations().isEmpty() &&
+                    ((grandparent = parentCursor.getParentTreeCursor().getValue()) instanceof J.ClassDeclaration || grandparent instanceof J.NewClass)) {
                 if (!variableDeclarations.getModifiers().isEmpty()) {
                     variableDeclarations = variableDeclarations.withModifiers(withNewline(variableDeclarations.getModifiers()));
                 } else if (variableDeclarations.getTypeExpression() != null &&
@@ -246,10 +249,6 @@ public class WrappingAndBracesVisitor<P> extends KotlinIsoVisitor<P> {
 
     private List<J.Modifier> withNewline(List<J.Modifier> modifiers) {
         J.Modifier firstModifier = modifiers.iterator().next();
-        if (firstModifier.getType() == J.Modifier.Type.Final) {
-            return modifiers;
-        }
-
         if (!firstModifier.getPrefix().getWhitespace().contains("\n")) {
             return ListUtils.mapFirst(modifiers,
                     mod -> mod.withPrefix(

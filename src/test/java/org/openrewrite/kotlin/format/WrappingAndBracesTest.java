@@ -376,14 +376,6 @@ class WrappingAndBracesTest implements RewriteTest {
                       @Suppress("ALL") var foo: Int
                   }
               }
-              """,
-            """
-              class Test {
-                  public fun doSomething() {
-                      @Suppress("ALL")
-               var foo: Int
-                  }
-              }
               """
           )
         );
@@ -582,6 +574,50 @@ class WrappingAndBracesTest implements RewriteTest {
               class T {
                   @Suppress // comment
                   class A
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void annotatedLocalVariable() {
+        rewriteRun(
+          kotlin(
+            """
+              fun f() {
+                  @Suppress val i = 1
+                  @Suppress val j = 1
+              }
+              
+              val o = object {
+                  @Suppress val i = 1
+                  @Suppress val j = 1
+              }
+              
+              class T {
+                  @Suppress val i = 1
+                  @Suppress val j = 1
+              }
+              """,
+            """
+              fun f() {
+                  @Suppress val i = 1
+                  @Suppress val j = 1
+              }
+              
+              val o = object {
+                  @Suppress
+               val i = 1
+                  @Suppress
+               val j = 1
+              }
+              
+              class T {
+                  @Suppress
+               val i = 1
+                  @Suppress
+               val j = 1
               }
               """
           )
