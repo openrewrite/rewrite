@@ -221,6 +221,18 @@ public interface JavaParser extends Parser {
             version = 8;
         }
 
+        if (version >= 21) {
+            try {
+                javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
+                        .forName("org.openrewrite.java.Java21Parser")
+                        .getDeclaredMethod("builder")
+                        .invoke(null);
+                return javaParser;
+            } catch (Exception e) {
+                //Fall through, look for a parser on an older version.
+            }
+        }
+
         if (version >= 17) {
             try {
                 javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
@@ -253,7 +265,7 @@ public interface JavaParser extends Parser {
             return javaParser;
         } catch (Exception e) {
             throw new IllegalStateException("Unable to create a Java parser instance. " +
-                    "`rewrite-java-8`, `rewrite-java-11`, or `rewrite-java-17` must be on the classpath.", e);
+                    "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, or `rewrite-java-21` must be on the classpath.", e);
         }
     }
 

@@ -66,7 +66,7 @@ dependencies {
     testRuntimeOnly(gradleApi())
     testRuntimeOnly("com.gradle:gradle-enterprise-gradle-plugin:latest.release")
     testRuntimeOnly("com.google.guava:guava:latest.release")
-    testRuntimeOnly(project(":rewrite-java-17"))
+    testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
 }
 

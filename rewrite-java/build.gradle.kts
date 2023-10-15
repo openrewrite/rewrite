@@ -48,7 +48,7 @@ dependencies {
     }
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-java-test"))
-    testRuntimeOnly(project(":rewrite-java-17"))
+    testRuntimeOnly(project(":rewrite-java-21"))
     testImplementation("com.tngtech.archunit:archunit:1.0.1")
     testImplementation("com.tngtech.archunit:archunit-junit5:1.0.1")
 

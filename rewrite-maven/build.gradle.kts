@@ -44,7 +44,7 @@ dependencies {
     testImplementation("guru.nidi:graphviz-java:latest.release")
 
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
-    testRuntimeOnly(project(":rewrite-java-17"))
+    testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.rocksdb:rocksdbjni:latest.release")
 }
 
