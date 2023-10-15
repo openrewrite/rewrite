@@ -26,6 +26,7 @@ import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.marker.Implicit;
 import org.openrewrite.kotlin.marker.OmitBraces;
 import org.openrewrite.kotlin.marker.SingleExpressionBlock;
+import org.openrewrite.kotlin.marker.TrailingLambdaArgument;
 import org.openrewrite.kotlin.style.TabsAndIndentsStyle;
 import org.openrewrite.kotlin.style.WrappingAndBracesStyle;
 import org.openrewrite.kotlin.tree.K;
@@ -399,7 +400,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                                 break;
                             }
                         }
-                        if (!(elem instanceof J.Binary)) {
+                        if (!(elem instanceof J.Binary) && !elem.getMarkers().findFirst(TrailingLambdaArgument.class).isPresent()) {
                             if (!(elem instanceof J.MethodInvocation)) {
                                 getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
                             } else if (elem.getPrefix().getLastWhitespace().contains("\n")) {

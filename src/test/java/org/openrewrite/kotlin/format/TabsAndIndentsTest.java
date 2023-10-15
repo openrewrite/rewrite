@@ -2318,20 +2318,29 @@ class TabsAndIndentsTest implements RewriteTest {
     }
 
     @Test
-    void longMethodChainWithMultiLineParameters() {
+    void trailingLambda() {
         rewriteRun(
           kotlin(
             """
-              class Foo {
-                  fun test(): String {
-                      return "foobar"
-                          .substring(
-                              1
-                          ).substring(
-                              2
-                          ).substring(
-                              3
-                          )
+              import java.io.Closeable
+              
+              data class PrinterInput(
+                  val buildDuration: Long,
+                  val taskDurations: Collection<Pair<String, Long>>,
+                  val maxWidth: Int,
+                  val showBars: Boolean,
+              )
+              
+              interface Printer : Closeable {
+              
+                  fun print(input: PrinterInput) {
+                      // find the maxes needed for formatting
+                      val (maxLabelLen, maxDuration, maxFormattedDurationLen) = input.taskDurations.fold(
+                          Triple(-1, -1L, -1)
+                      ) { acc, elem ->
+                          val maxDuration = maxOf(acc.second, elem.second)
+                          Triple(maxOf(acc.first, elem.first.length), maxDuration, maxOf(acc.third, maxDuration.toInt()))
+                      }
                   }
               }
               """
