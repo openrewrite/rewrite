@@ -16,7 +16,6 @@
 package org.openrewrite.xml;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.Marker;
