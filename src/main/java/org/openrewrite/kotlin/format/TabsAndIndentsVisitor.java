@@ -113,7 +113,8 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                 tree instanceof J.ClassDeclaration ||
                 tree instanceof K.ClassDeclaration ||
                 (tree instanceof J.FieldAccess || tree instanceof J.MethodInvocation)
-                        && !wrappingStyle.getChainedFunctionCalls().getUseContinuationIndent()
+                        && !wrappingStyle.getChainedFunctionCalls().getUseContinuationIndent() ||
+                tree instanceof J.Annotation
         ) {
             getCursor().putMessage("indentType", IndentType.INDENT);
         } else if (tree instanceof K.ExpressionStatement ||

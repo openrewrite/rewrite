@@ -309,8 +309,8 @@ class TabsAndIndentsTest implements RewriteTest {
             """
               class Test {
                   @Suppress(
-                          "unchecked",
-                          "ALL"
+                      "unchecked",
+                      "ALL"
                   )
                   val id: String = "1"
               }
@@ -1074,7 +1074,7 @@ class TabsAndIndentsTest implements RewriteTest {
                             
               class Test {
                   @Suppress(
-                          "unchecked"
+                      "unchecked"
                   )
                   @Anno
                   var id: Int = 0
@@ -1519,8 +1519,8 @@ class TabsAndIndentsTest implements RewriteTest {
 
               class Test {
                   @Throws(
-                          IOException::class,
-                          Exception::class)
+                      IOException::class,
+                      Exception::class)
                   fun method() {
                   }
 
