@@ -67,7 +67,6 @@ public class XsltTransformationVisitor extends XmlVisitor<ExecutionContext> {
                 return document.withRoot(Xml.Tag.build(os.toString().replace("\r", "")));
             }
         } catch (IOException | TransformerException e) {
-            log.error(e.getMessage(), e);
             throw new RuntimeException("XSLT transformation exception: " + e.getMessage(), e);
         }
     }
