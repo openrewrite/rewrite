@@ -16,8 +16,7 @@ dependencies {
     implementation("com.github.ben-manes.caffeine:caffeine:2.+")
 
     implementation("org.antlr:antlr4:4.11.1")
-    // FIXME: switch to `latest.release`
-    // when https://github.com/resilience4j/resilience4j/issues/1472 is resolved
+    // Use 1.7.0 due https://github.com/resilience4j/resilience4j/issues/1472, it has been resolved in Resilience4j 2.x, but that requires Java 17
     implementation("io.github.resilience4j:resilience4j-retry:1.7.0")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
