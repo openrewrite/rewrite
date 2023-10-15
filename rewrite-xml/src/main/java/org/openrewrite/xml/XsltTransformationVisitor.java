@@ -64,10 +64,6 @@ public class XsltTransformationVisitor extends XmlVisitor<ExecutionContext> {
             Source text = new StreamSource(new ByteArrayInputStream(originalDocument.getBytes()));
             try (ByteArrayOutputStream os = new ByteArrayOutputStream()) {
                 transformer.transform(text, new StreamResult(os));
-                if (log.isDebugEnabled()) {
-                    log.debug("Original document: {}", originalDocument);
-                    log.debug("New document: {}", os);
-                }
                 return document.withRoot(Xml.Tag.build(os.toString().replace("\r", "")));
             }
         } catch (IOException | TransformerException e) {
