@@ -35,7 +35,6 @@ import java.util.Objects;
 
 import static org.openrewrite.Tree.randomId;
 
-@Slf4j
 @RequiredArgsConstructor
 public class XsltTransformationVisitor extends XmlVisitor<ExecutionContext> {
 
