@@ -59,11 +59,18 @@ public class AddProperty extends Recipe {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new PropertiesVisitor<ExecutionContext>() {
+    public Validated<Object> validate() {
+        return Validated.none()
+                .and(Validated.required("property", property))
+                .and(Validated.required("value", value));
+    }
+
+    @Override
+    public PropertiesIsoVisitor<ExecutionContext> getVisitor() {
+        return new PropertiesIsoVisitor<ExecutionContext>() {
             @Override
-            public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
-                Properties.File p = (Properties.File) super.visitFile(file, executionContext);
+            public Properties.File visitFile(Properties.File file, ExecutionContext executionContext) {
+                Properties.File p = super.visitFile(file, executionContext);
                 if (!StringUtils.isBlank(property) && !StringUtils.isBlank(value)) {
                     Set<Properties.Entry> properties = FindProperties.find(p, property, false);
                     if (properties.isEmpty()) {

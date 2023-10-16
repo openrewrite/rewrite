@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -27,6 +28,7 @@ import java.util.UUID;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 @JsonPropertyOrder({"@c"}) // serialize type info first
+@JsonIgnoreProperties(ignoreUnknown = true)
 public interface Tree {
     @SuppressWarnings("unused")
     @JsonProperty("@c")
@@ -36,7 +38,7 @@ public interface Tree {
 
     static UUID randomId() {
         //noinspection ConstantConditions
-        return MetricsHelper.UUID_TIMER.record(UUID::randomUUID);
+        return UUID.randomUUID();
     }
 
     /**

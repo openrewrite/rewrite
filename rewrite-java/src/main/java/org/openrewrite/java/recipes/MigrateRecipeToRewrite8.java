@@ -345,7 +345,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                             }
                             return memberRef;
                         }
-                    }.visitNonNull(visitMethod, ctx);
+                    }.visitNonNull(visitMethod, ctx, getCursor().getParent());
 
                     maybeAddImport("org.openrewrite.internal.lang.Nullable");
                     maybeAddImport("org.openrewrite.Tree");

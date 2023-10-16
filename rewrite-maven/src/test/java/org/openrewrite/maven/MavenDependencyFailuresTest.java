@@ -217,38 +217,38 @@ class MavenDependencyFailuresTest implements RewriteTest {
 
     @Test
     void unresolvableDependency() {
-          rewriteRun(
-            spec -> spec.executionContext(new InMemoryExecutionContext()),
-            pomXml(
-              """
-                <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <dependencies>
-                    <dependency>
-                      <groupId>com.google.guava</groupId>
-                      <artifactId>guava</artifactId>
-                      <version>doesnotexist</version>
-                    </dependency>
-                    <dependency>
-                      <groupId>com.google.another</groupId>
-                      <artifactId>${doesnotexist}</artifactId>
-                    </dependency>
-                    <dependency>
-                      <groupId>com.google.yetanother</groupId>
-                      <artifactId>${doesnotexist}</artifactId>
-                      <version>1</version>
-                    </dependency>
-                  </dependencies>
-                </project>
-                """,
-              spec -> spec.afterRecipe(after -> {
-                  Optional<ParseExceptionResult> maybeParseException = after.getMarkers().findFirst(ParseExceptionResult.class);
-                  assertThat(maybeParseException).isPresent();
-              })
-            )
-          );
+        rewriteRun(
+          spec -> spec.executionContext(new InMemoryExecutionContext()),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>doesnotexist</version>
+                  </dependency>
+                  <dependency>
+                    <groupId>com.google.another</groupId>
+                    <artifactId>${doesnotexist}</artifactId>
+                  </dependency>
+                  <dependency>
+                    <groupId>com.google.yetanother</groupId>
+                    <artifactId>${doesnotexist}</artifactId>
+                    <version>1</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(after -> {
+                Optional<ParseExceptionResult> maybeParseException = after.getMarkers().findFirst(ParseExceptionResult.class);
+                assertThat(maybeParseException).hasValueSatisfying(per -> assertThat(per.getMessage()).contains("Unable to download POM. Tried repositories"));
+            })
+          )
+        );
     }
 
     @Test

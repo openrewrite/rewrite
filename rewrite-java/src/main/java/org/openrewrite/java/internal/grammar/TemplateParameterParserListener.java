@@ -33,6 +33,26 @@ public interface TemplateParameterParserListener extends ParseTreeListener {
 	 */
 	void exitMatcherPattern(TemplateParameterParser.MatcherPatternContext ctx);
 	/**
+	 * Enter a parse tree produced by {@link TemplateParameterParser#typedPattern}.
+	 * @param ctx the parse tree
+	 */
+	void enterTypedPattern(TemplateParameterParser.TypedPatternContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link TemplateParameterParser#typedPattern}.
+	 * @param ctx the parse tree
+	 */
+	void exitTypedPattern(TemplateParameterParser.TypedPatternContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link TemplateParameterParser#patternType}.
+	 * @param ctx the parse tree
+	 */
+	void enterPatternType(TemplateParameterParser.PatternTypeContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link TemplateParameterParser#patternType}.
+	 * @param ctx the parse tree
+	 */
+	void exitPatternType(TemplateParameterParser.PatternTypeContext ctx);
+	/**
 	 * Enter a parse tree produced by {@link TemplateParameterParser#matcherParameter}.
 	 * @param ctx the parse tree
 	 */
@@ -42,6 +62,16 @@ public interface TemplateParameterParserListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitMatcherParameter(TemplateParameterParser.MatcherParameterContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link TemplateParameterParser#parameterName}.
+	 * @param ctx the parse tree
+	 */
+	void enterParameterName(TemplateParameterParser.ParameterNameContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link TemplateParameterParser#parameterName}.
+	 * @param ctx the parse tree
+	 */
+	void exitParameterName(TemplateParameterParser.ParameterNameContext ctx);
 	/**
 	 * Enter a parse tree produced by {@link TemplateParameterParser#matcherName}.
 	 * @param ctx the parse tree

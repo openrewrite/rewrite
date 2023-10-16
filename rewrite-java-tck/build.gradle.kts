@@ -11,8 +11,8 @@ dependencies {
 
     if (System.getProperty("idea.active") != null ||
             System.getProperty("idea.sync.active") != null) {
-        // so we can run tests in the IDE with the IntelliJ runner
-        runtimeOnly(project(":rewrite-java-17"))
+        // so we can run tests in the IDE with the IntelliJ IDEA runner
+        runtimeOnly(project(":rewrite-java-21"))
     }
 }
 

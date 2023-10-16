@@ -27,7 +27,7 @@ import org.openrewrite.yaml.tree.Yaml;
 @EqualsAndHashCode(callSuper = true)
 public class MergeYaml extends Recipe {
     @Option(displayName = "Key path",
-            description = "A JsonPath expression used to find matching keys.",
+            description = "A [JsonPath](https://github.com/json-path/JsonPath) expression used to find matching keys.",
             example = "$.metadata")
     String key;
 

@@ -35,6 +35,18 @@ class CreateTextFileTest implements RewriteTest {
         );
     }
 
+    @Test
+    void hasCreatedFileWithTrailingNewline() {
+        rewriteRun(
+          spec -> spec.recipe(new CreateTextFile("foo\n", ".github/CODEOWNERS", false)),
+          text(
+            null,
+            "foo\n",
+            spec -> spec.path(".github/CODEOWNERS").noTrim()
+          )
+        );
+    }
+
     @DocumentExample
     @Test
     void hasOverwrittenFile() {

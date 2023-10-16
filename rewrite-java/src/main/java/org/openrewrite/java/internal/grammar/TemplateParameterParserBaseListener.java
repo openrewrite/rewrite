@@ -44,6 +44,30 @@ public class TemplateParameterParserBaseListener implements TemplateParameterPar
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterTypedPattern(TemplateParameterParser.TypedPatternContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTypedPattern(TemplateParameterParser.TypedPatternContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterPatternType(TemplateParameterParser.PatternTypeContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitPatternType(TemplateParameterParser.PatternTypeContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterMatcherParameter(TemplateParameterParser.MatcherParameterContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -51,6 +75,18 @@ public class TemplateParameterParserBaseListener implements TemplateParameterPar
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitMatcherParameter(TemplateParameterParser.MatcherParameterContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterParameterName(TemplateParameterParser.ParameterNameContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitParameterName(TemplateParameterParser.ParameterNameContext ctx) { }
 	/**
 	 * {@inheritDoc}
 	 *

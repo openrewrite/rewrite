@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -71,6 +72,7 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
                         randomId(),
                         i.getPrefix(),
                         i.getMarkers(),
+                        emptyList(),
                         toName,
                         i.getType(),
                         new JavaType.Variable(

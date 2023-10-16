@@ -15,11 +15,13 @@
  */
 package org.openrewrite.java.tree;
 
+import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaTypeSignatureBuilder;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.IntStream;
 
@@ -36,10 +38,14 @@ public class TypeUtils {
                );
     }
 
+    public static String toFullyQualifiedName(String fqn) {
+        return fqn.replace('$', '.');
+    }
+
     public static boolean fullyQualifiedNamesAreEqual(@Nullable String fqn1, @Nullable String fqn2) {
         if (fqn1 != null && fqn2 != null) {
             return fqn1.equals(fqn2) || fqn1.length() == fqn2.length()
-                                        && fqn1.replace("$", ".").equals(fqn2.replace("$", "."));
+                                        && toFullyQualifiedName(fqn1).equals(toFullyQualifiedName(fqn2));
         }
         return fqn1 == null && fqn2 == null;
     }
@@ -124,7 +130,7 @@ public class TypeUtils {
      */
     public static boolean isOfClassType(@Nullable JavaType type, String fqn) {
         if (type instanceof JavaType.FullyQualified) {
-            return TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) type).getFullyQualifiedName(), (fqn));
+            return TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) type).getFullyQualifiedName(), fqn);
         } else if (type instanceof JavaType.Variable) {
             return isOfClassType(((JavaType.Variable) type).getType(), fqn);
         } else if (type instanceof JavaType.Method) {
@@ -133,6 +139,42 @@ public class TypeUtils {
             return isOfClassType(((JavaType.Array) type).getElemType(), fqn);
         } else if (type instanceof JavaType.Primitive) {
             return type == JavaType.Primitive.fromKeyword(fqn);
+        }
+        return false;
+    }
+
+    /**
+     * @param type          The declaring type of the method invocation or constructor.
+     * @param matchOverride Whether to match the {@code Object} type.
+     * @return True if the declaring type matches the criteria of this matcher.
+     */
+    @Incubating(since = "8.1.4")
+    public static boolean isOfTypeWithName(
+            @Nullable JavaType.FullyQualified type,
+            boolean matchOverride,
+            Predicate<String> matcher
+    ) {
+        if (type == null || type instanceof JavaType.Unknown) {
+            return false;
+        }
+        if (matcher.test(type.getFullyQualifiedName())) {
+            return true;
+        }
+        if (matchOverride) {
+            if (!"java.lang.Object".equals(type.getFullyQualifiedName()) &&
+                isOfTypeWithName(TYPE_OBJECT, true, matcher)) {
+                return true;
+            }
+
+            if (isOfTypeWithName(type.getSupertype(), true, matcher)) {
+                return true;
+            }
+
+            for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
+                if (isOfTypeWithName(anInterface, true, matcher)) {
+                    return true;
+                }
+            }
         }
         return false;
     }
@@ -193,9 +235,16 @@ public class TypeUtils {
                     }
                 }
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
-                return to.equals(classFrom.getFullyQualifiedName()) ||
-                       isAssignableTo(to, classFrom.getSupertype()) ||
-                       classFrom.getInterfaces().stream().anyMatch(i -> isAssignableTo(to, i));
+                if (fullyQualifiedNamesAreEqual(to, classFrom.getFullyQualifiedName()) ||
+                        isAssignableTo(to, classFrom.getSupertype())) {
+                    return true;
+                }
+                for (JavaType.FullyQualified i : classFrom.getInterfaces()) {
+                    if (isAssignableTo(to, i)) {
+                        return true;
+                    }
+                }
+                return false;
             } else if (from instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable genericFrom = (JavaType.GenericTypeVariable) from;
                 for (JavaType bound : genericFrom.getBounds()) {
@@ -260,27 +309,44 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(Pattern to, @Nullable JavaType from) {
+        return isAssignableTo(type -> {
+            if (type instanceof JavaType.FullyQualified) {
+                return to.matcher(((JavaType.FullyQualified) type).getFullyQualifiedName()).matches();
+            } else if (type instanceof JavaType.Primitive) {
+                return to.matcher(((JavaType.Primitive) type).getKeyword()).matches();
+            }
+            return false;
+        }, from);
+    }
+
+    public static boolean isAssignableTo(Predicate<JavaType> predicate, @Nullable JavaType from) {
         try {
             if (from instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
 
-                return to.matcher(classFrom.getFullyQualifiedName()).matches() ||
-                       isAssignableTo(to, classFrom.getSupertype()) ||
-                       classFrom.getInterfaces().stream().anyMatch(i -> isAssignableTo(to, i));
+                if (predicate.test(classFrom) || isAssignableTo(predicate, classFrom.getSupertype())) {
+                    return true;
+                }
+                for (JavaType.FullyQualified anInterface : classFrom.getInterfaces()) {
+                    if (isAssignableTo(predicate, anInterface)) {
+                        return true;
+                    }
+                }
+                return false;
             } else if (from instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable genericFrom = (JavaType.GenericTypeVariable) from;
                 for (JavaType bound : genericFrom.getBounds()) {
-                    if (isAssignableTo(to, bound)) {
+                    if (isAssignableTo(predicate, bound)) {
                         return true;
                     }
                 }
             } else if (from instanceof JavaType.Variable) {
-                return isAssignableTo(to, ((JavaType.Variable) from).getType());
+                return isAssignableTo(predicate, ((JavaType.Variable) from).getType());
             } else if (from instanceof JavaType.Method) {
-                return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
+                return isAssignableTo(predicate, ((JavaType.Method) from).getReturnType());
             } else if (from instanceof JavaType.Primitive) {
                 JavaType.Primitive primitive = (JavaType.Primitive) from;
-                return to.toString().equals(primitive.getKeyword());
+                return predicate.test(primitive);
             }
         } catch (Exception e) {
             return false;
@@ -358,7 +424,12 @@ public class TypeUtils {
                 }
             }
         }
-        return methodResult.filter(m -> !m.getFlags().contains(Flag.Private) && !m.getFlags().contains(Flag.Static));
+
+        return methodResult
+                .filter(m -> !m.getFlags().contains(Flag.Private))
+                .filter(m -> !m.getFlags().contains(Flag.Static))
+                // If access level is default then check if subclass package is the same from parent class
+                .filter(m -> m.getFlags().contains(Flag.Public) || m.getDeclaringType().getPackageName().equals(dt.getPackageName()));
     }
 
     public static Optional<JavaType.Method> findDeclaredMethod(@Nullable JavaType.FullyQualified clazz, String name, List<JavaType> argumentTypes) {

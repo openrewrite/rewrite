@@ -148,8 +148,8 @@ public class MavenResolutionResult implements Marker {
         this.parent = parent;
     }
 
-    public void unsafeSetModules(List<MavenResolutionResult> modules) {
-        this.modules = new ArrayList<>(modules);
+    public void unsafeSetModules(@Nullable List<MavenResolutionResult> modules) {
+        this.modules = modules == null ? emptyList() : new ArrayList<>(modules);
     }
 
     @Nullable

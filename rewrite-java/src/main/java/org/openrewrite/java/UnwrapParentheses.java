@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
 import org.openrewrite.java.tree.J;
 
 public class UnwrapParentheses<P> extends JavaVisitor<P> {
@@ -29,8 +30,11 @@ public class UnwrapParentheses<P> extends JavaVisitor<P> {
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, P p) {
         if (scope.isScope(parens) && isUnwrappable(getCursor())) {
             J tree = parens.getTree().withPrefix(parens.getPrefix());
-            if (tree.getPrefix().isEmpty() && getCursor().getParentOrThrow().getValue() instanceof J.Return) {
-                tree = tree.withPrefix(tree.getPrefix().withWhitespace(" "));
+            if (tree.getPrefix().isEmpty()) {
+                Object parent = getCursor().getParentOrThrow().getValue();
+                if (parent instanceof J.Return || parent instanceof J.Throw) {
+                    tree = tree.withPrefix(tree.getPrefix().withWhitespace(" "));
+                }
             }
             return tree;
         }
@@ -41,13 +45,13 @@ public class UnwrapParentheses<P> extends JavaVisitor<P> {
         if (!(parensScope.getValue() instanceof J.Parentheses)) {
             return false;
         }
-        J parent = parensScope.getParentTreeCursor().getValue();
+        Tree parent = parensScope.getParentTreeCursor().getValue();
         if (parent instanceof J.If ||
-                parent instanceof J.Switch ||
-                parent instanceof J.Synchronized ||
-                parent instanceof J.Try.Catch ||
-                parent instanceof J.TypeCast ||
-                parent instanceof J.WhileLoop) {
+            parent instanceof J.Switch ||
+            parent instanceof J.Synchronized ||
+            parent instanceof J.Try.Catch ||
+            parent instanceof J.TypeCast ||
+            parent instanceof J.WhileLoop) {
             return false;
         } else if (parent instanceof J.DoWhileLoop) {
             return !(parensScope.getValue() == ((J.DoWhileLoop) parent).getWhileCondition());

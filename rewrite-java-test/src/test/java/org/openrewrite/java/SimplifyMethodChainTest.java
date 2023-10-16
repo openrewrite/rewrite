@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.Arrays;
@@ -25,10 +26,11 @@ import static org.openrewrite.java.Assertions.java;
 class SimplifyMethodChainTest implements RewriteTest {
 
     @Test
+    @DocumentExample
     void simplify() {
         rewriteRun(
           spec -> spec.recipe(new SimplifyMethodChain(
-            Arrays.asList("A b()", "B c()"), "c2")),
+            Arrays.asList("A b()", "B c()"), "c2", false)),
           java(
             """
               class A {

@@ -298,6 +298,12 @@ recipeList:
       oldRecipeFullyQualifiedClassName: org.openrewrite.java.cleanup.ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNull
       newRecipeFullyQualifiedClassName: org.openrewrite.staticanalysis.ReplaceValidateNotNullHavingVarargsWithObjectsRequireNonNull
   - org.openrewrite.java.recipes.UpdateMovedRecipe:
+      oldRecipeFullyQualifiedClassName: org.openrewrite.java.cleanup.SimplifyBooleanExpression
+      newRecipeFullyQualifiedClassName: org.openrewrite.staticanalysis.SimplifyBooleanExpression
+  - org.openrewrite.java.recipes.UpdateMovedRecipe:
+      oldRecipeFullyQualifiedClassName: org.openrewrite.java.cleanup.SimplifyBooleanReturn
+      newRecipeFullyQualifiedClassName: org.openrewrite.staticanalysis.SimplifyBooleanReturn
+  - org.openrewrite.java.recipes.UpdateMovedRecipe:
       oldRecipeFullyQualifiedClassName: org.openrewrite.java.cleanup.SimplifyCompoundStatement
       newRecipeFullyQualifiedClassName: org.openrewrite.staticanalysis.SimplifyCompoundStatement
   - org.openrewrite.java.recipes.UpdateMovedRecipe:
@@ -330,6 +336,9 @@ recipeList:
   - org.openrewrite.java.recipes.UpdateMovedRecipe:
       oldRecipeFullyQualifiedClassName: org.openrewrite.java.cleanup.UnnecessaryPrimitiveAnnotations
       newRecipeFullyQualifiedClassName: org.openrewrite.staticanalysis.UnnecessaryPrimitiveAnnotations
+  - org.openrewrite.java.recipes.UpdateMovedRecipe:
+      oldRecipeFullyQualifiedClassName: org.openrewrite.java.cleanup.UnnecessaryParentheses
+      newRecipeFullyQualifiedClassName: org.openrewrite.staticanalysis.UnnecessaryParentheses
   - org.openrewrite.java.recipes.UpdateMovedRecipe:
       oldRecipeFullyQualifiedClassName: org.openrewrite.java.cleanup.UnnecessaryThrows
       newRecipeFullyQualifiedClassName: org.openrewrite.staticanalysis.UnnecessaryThrows
@@ -375,3 +384,6 @@ recipeList:
   - org.openrewrite.java.recipes.UpdateMovedRecipe:
       oldRecipeFullyQualifiedClassName: org.openrewrite.java.cleanup.WriteOctalValuesAsDecimal
       newRecipeFullyQualifiedClassName: org.openrewrite.staticanalysis.WriteOctalValuesAsDecimal
+  - org.openrewrite.java.recipes.UpdateMovedRecipe:
+      oldRecipeFullyQualifiedClassName: org.openrewrite.gradle.plugins.AddGradleEnterprise
+      newRecipeFullyQualifiedClassName: org.openrewrite.gradle.plugins.AddGradleEnterpriseGradlePlugin

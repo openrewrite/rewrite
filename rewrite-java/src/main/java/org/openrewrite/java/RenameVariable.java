@@ -87,7 +87,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                     }
                 } else if (currentNameScope.size() == 1 && isVariableName(parent.getValue(), ident)) {
                     if (parent.getValue() instanceof J.VariableDeclarations.NamedVariable) {
-                        J variableDeclaration = parent.getParentTreeCursor().getValue();
+                        Tree variableDeclaration = parent.getParentTreeCursor().getValue();
                         J maybeParameter = getCursor().dropParentUntil(is -> is instanceof JavaSourceFile || is instanceof J.ClassDeclaration || is instanceof J.MethodDeclaration).getValue();
                         if (maybeParameter instanceof J.MethodDeclaration) {
                             J.MethodDeclaration methodDeclaration = (J.MethodDeclaration) maybeParameter;
@@ -119,10 +119,7 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             } else if(value instanceof J.VariableDeclarations) {
                 J.VariableDeclarations v = (J.VariableDeclarations) value;
                 return ident != v.getTypeExpression();
-            } else if(value instanceof J.ParameterizedType) {
-                return false;
-            }
-            return true;
+            } else return !(value instanceof J.ParameterizedType);
         }
 
         /**

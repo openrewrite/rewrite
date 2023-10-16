@@ -30,6 +30,7 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.function.Predicate;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class StringUtils {
     private StringUtils() {
@@ -102,13 +103,11 @@ public class StringUtils {
         if (end == start) {
             end++;
         }
-        char[] charArray = text.substring(start, end).toCharArray();
-
         StringBuilder trimmed = new StringBuilder();
-        for (int i = 0; i < charArray.length; i++) {
+        for (int i = start; i < end; i++) {
             int j = i;
-            for (; j < charArray.length; j++) {
-                char c = charArray[j];
+            for (; j < end; j++) {
+                char c = text.charAt(j);
                 if (c == '\r' || c == '\n') {
                     trimmed.append(c);
                     break;
@@ -138,7 +137,8 @@ public class StringUtils {
         int minIndent = Integer.MAX_VALUE;
         int whiteSpaceCount = 0;
         boolean contentEncountered = false;
-        for (char c : text.toCharArray()) {
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
             if (c == '\n' || c == '\r') {
                 if (contentEncountered) {
                     minIndent = Math.min(whiteSpaceCount, minIndent);
@@ -262,7 +262,7 @@ public class StringUtils {
             }
 
             byte[] bytes = bos.toByteArray();
-            return new String(bytes, 0, bytes.length, charset);
+            return new String(bytes, charset);
         } catch (IOException e) {
             throw new UnsupportedOperationException(e);
         }
@@ -355,7 +355,6 @@ public class StringUtils {
      * @return the number of times the substring is found in the target. 0 if no occurrences are found.
      */
     public static int countOccurrences(@NonNull String text, @NonNull String substring) {
-
         if (text.isEmpty() || substring.isEmpty()) {
             return 0;
         }
@@ -564,7 +563,8 @@ public class StringUtils {
 
     public static String indent(String text) {
         StringBuilder indent = new StringBuilder();
-        for (char c : text.toCharArray()) {
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
             if (c == '\n' || c == '\r') {
                 return indent.toString();
             } else if (Character.isWhitespace(c)) {
@@ -637,6 +637,9 @@ public class StringUtils {
         return true;
     }
 
+    private static final Pattern SINGLE_DOT_OR_DOLLAR = Pattern.compile("(?:([^.]+)|^)\\.(?:([^.]+)|$)");
+    private static final String SINGLE_DOT_OR_DOLLAR_REPLACEMENT = "$1" + Matcher.quoteReplacement("[.$]") + "$2";
+
     /**
      * See <a href="https://eclipse.org/aspectj/doc/next/progguide/semantics-pointcuts.html#type-patterns">https://eclipse.org/aspectj/doc/next/progguide/semantics-pointcuts.html#type-patterns</a>
      * <p>
@@ -648,11 +651,11 @@ public class StringUtils {
      * the code is in any declaration of a type whose name begins with "com.xerox.".
      */
     public static String aspectjNameToPattern(String name) {
-        return name
+        String replaced = name
                 .replace("$", "\\$")
                 .replace("[", "\\[")
-                .replace("]", "\\]")
-                .replaceAll("(?:([^.]+)|^)\\.(?:([^.]+)|$)", "$1" + Matcher.quoteReplacement("[.$]") + "$2")
+                .replace("]", "\\]");
+        return SINGLE_DOT_OR_DOLLAR.matcher(replaced).replaceAll(SINGLE_DOT_OR_DOLLAR_REPLACEMENT)
                 .replace("*", "[^.]*")
                 .replace("..", "\\.(.+\\.)?");
     }
@@ -709,36 +712,32 @@ public class StringUtils {
         boolean inMultiLineComment = false;
         boolean inSingleLineComment = false;
 
-        int delimIndex = cursor;
-        for (; delimIndex < source.length(); delimIndex++) {
+        int length = source.length();
+        for (; cursor < length; cursor++) {
+            char current = source.charAt(cursor);
             if (inSingleLineComment) {
-                if (source.charAt(delimIndex) == '\n') {
-                    inSingleLineComment = false;
-                }
-            } else {
-                if (source.length() > delimIndex + 1) {
-                    switch (source.substring(delimIndex, delimIndex + 2)) {
-                        case "//":
-                            inSingleLineComment = true;
-                            delimIndex++;
-                            continue;
-                        case "/*":
-                            inMultiLineComment = true;
-                            delimIndex++;
-                            continue;
-                        case "*/":
-                            inMultiLineComment = false;
-                            delimIndex++;
-                            continue;
-                    }
+                inSingleLineComment = current != '\n';
+                continue;
+            } else if (length > cursor + 1) {
+                char next = source.charAt(cursor + 1);
+                if (current == '/' && next == '/') {
+                    inSingleLineComment = true;
+                    cursor++;
+                    continue;
+                } else if (current == '/' && next == '*') {
+                    inMultiLineComment = true;
+                    cursor++;
+                    continue;
+                } else if (current == '*' && next == '/') {
+                    inMultiLineComment = false;
+                    cursor++;
+                    continue;
                 }
             }
-            if (!inMultiLineComment && !inSingleLineComment) {
-                if (!Character.isWhitespace(source.substring(delimIndex, delimIndex + 1).charAt(0))) {
-                    break; // found it!
-                }
+            if (!inMultiLineComment && !Character.isWhitespace(current)) {
+                break; // found it!
             }
         }
-        return delimIndex;
+        return cursor;
     }
 }

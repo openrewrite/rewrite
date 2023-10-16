@@ -32,7 +32,7 @@ public class FindParseFailuresTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindParseFailures(5));
+        spec.recipe(new FindParseFailures(5, null, null));
     }
 
     @Test

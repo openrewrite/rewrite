@@ -46,34 +46,35 @@ public class HclParser implements Parser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        return acceptedInputs(sourceFiles).map(sourceFile -> {
+        return acceptedInputs(sourceFiles).map(input -> {
             try {
-                EncodingDetectingInputStream is = sourceFile.getSource(ctx);
+                parsingListener.startedParsing(input);
+                EncodingDetectingInputStream is = input.getSource(ctx);
                 String sourceStr = is.readFully();
 
                 HCLLexer lexer = new HCLLexer(CharStreams.fromString(sourceStr));
                 lexer.removeErrorListeners();
-                lexer.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
+                lexer.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
                 HCLParser parser = new HCLParser(new CommonTokenStream(lexer));
                 parser.removeErrorListeners();
-                parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
+                parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
                 Hcl.ConfigFile configFile = (Hcl.ConfigFile) new HclParserVisitor(
-                        sourceFile.getRelativePath(relativeTo),
+                        input.getRelativePath(relativeTo),
                         sourceStr,
                         is.getCharset(),
                         is.isCharsetBomMarked(),
-                        sourceFile.getFileAttributes()
+                        input.getFileAttributes()
                 ).visitConfigFile(parser.configFile());
 
                 configFile = configFile.withMarkers(Markers.build(styles));
 
-                parsingListener.parsed(sourceFile, configFile);
-                return (SourceFile) configFile;
+                parsingListener.parsed(input, configFile);
+                return requirePrintEqualsInput(configFile, input, relativeTo, ctx);
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
-                return ParseError.build(this, sourceFile, relativeTo, ctx, t);
+                return ParseError.build(this, input, relativeTo, ctx, t);
             }
         });
     }

@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.*;
@@ -38,6 +39,21 @@ import java.util.stream.StreamSupport;
 import static java.util.stream.Collectors.toList;
 
 public interface Parser {
+    @Incubating(since = "8.2.0")
+    default SourceFile requirePrintEqualsInput(SourceFile sourceFile, Parser.Input input, @Nullable Path relativeTo, ExecutionContext ctx) {
+        if (ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true) &&
+            !sourceFile.printEqualsInput(input, ctx)) {
+            return ParseError.build(
+                    this,
+                    input,
+                    relativeTo,
+                    ctx,
+                    new IllegalStateException(sourceFile.getSourcePath() + " is not print idempotent.")
+            ).withErroneous(sourceFile);
+        }
+        return sourceFile;
+    }
+
     default Stream<SourceFile> parse(Iterable<Path> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return parseInputs(StreamSupport
                         .stream(sourceFiles.spliterator(), false)

@@ -22,6 +22,8 @@ import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.OptionDescriptor;
+import org.openrewrite.internal.InMemoryDiffEntry;
+import org.openrewrite.internal.RecipeIntrospectionUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
@@ -29,6 +31,7 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
+import org.openrewrite.tree.ParseError;
 
 import java.io.ByteArrayInputStream;
 import java.nio.file.Path;
@@ -41,8 +44,7 @@ import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.fail;
+import static org.assertj.core.api.Assertions.*;
 import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 
 @SuppressWarnings("unused")
@@ -156,17 +158,26 @@ public interface RewriteTest extends SourceSpecs {
                 .as("A recipe must be specified")
                 .isNotNull();
 
-        assertThat(recipe.validate().failures())
-                .as("Recipe validation must have no failures")
-                .isEmpty();
-
         if (!(recipe instanceof AdHocRecipe) && !(recipe instanceof CompositeRecipe) &&
+            !(recipe.equals(Recipe.noop())) &&
             testClassSpec.serializationValidation &&
             testMethodSpec.serializationValidation) {
             RecipeSerializer recipeSerializer = new RecipeSerializer();
             assertThat(recipeSerializer.read(recipeSerializer.write(recipe)))
                     .as("Recipe must be serializable/deserializable")
                     .isEqualTo(recipe);
+            assertThatCode(() -> {
+                Recipe r = RecipeIntrospectionUtils.constructRecipe(recipe.getClass());
+                // getRecipeList should not fail with default parameters from RecipeIntrospectionUtils.
+                r.getRecipeList();
+                // We add recipes to HashSet in some places, we need to validate that hashCode and equals does not fail.
+                //noinspection ResultOfMethodCallIgnored
+                r.hashCode();
+                //noinspection EqualsWithItself,ResultOfMethodCallIgnored
+                r.equals(r);
+            })
+                    .as("Recipe must be able to instantiate via RecipeIntrospectionUtils")
+                    .doesNotThrowAnyException();
             validateRecipeNameAndDescription(recipe);
             validateRecipeOptions(recipe);
         }
@@ -200,6 +211,11 @@ public interface RewriteTest extends SourceSpecs {
         for (SourceSpec<?> s : sourceSpecs) {
             s.customizeExecutionContext.accept(executionContext);
         }
+        List<Validated<Object>> validations = new ArrayList<>();
+        recipe.validateAll(executionContext, validations);
+        assertThat(validations)
+                .as("Recipe validation must have no failures")
+                .noneMatch(Validated::isInvalid);
 
         Map<Parser.Builder, List<SourceSpec<?>>> sourceSpecsByParser = new HashMap<>();
         List<Parser.Builder> methodSpecParsers = testMethodSpec.parsers;
@@ -366,7 +382,8 @@ public interface RewriteTest extends SourceSpecs {
                                 .as("Expected a new file for the source path but there was an existing file already present: " +
                                     sourceSpec.getSourcePath())
                                 .isNull();
-                        String actual = result.getAfter().printAll(out.clone()).trim();
+                        String actual = result.getAfter().printAll(out.clone());
+                        actual = sourceSpec.noTrim ? actual : actual.trim();
                         String expected = sourceSpec.noTrim ?
                                 sourceSpec.after.apply(actual) :
                                 trimIndentPreserveCRLF(sourceSpec.after.apply(actual));
@@ -421,9 +438,22 @@ public interface RewriteTest extends SourceSpecs {
         nextSourceFile:
         for (Map.Entry<SourceFile, SourceSpec<?>> specForSourceFile : specBySourceFile.entrySet()) {
             SourceSpec<?> sourceSpec = specForSourceFile.getValue();
+            SourceFile source = specForSourceFile.getKey();
+            if (source instanceof ParseError) {
+                ParseError parseError = (ParseError) source;
+                if (parseError.getErroneous() != null) {
+                    assertContentEquals(
+                            parseError,
+                            parseError.getText(),
+                            parseError.getErroneous().printAll(),
+                            "Bug in source parser or printer resulted in the following difference for"
+                    );
+                }
+            }
+
             for (Result result : allResults) {
-                if ((result.getBefore() == null && specForSourceFile.getKey() == null) ||
-                    (result.getBefore() != null && result.getBefore().getId().equals(specForSourceFile.getKey().getId()))) {
+                if ((result.getBefore() == null && source == null) ||
+                    (result.getBefore() != null && result.getBefore().getId().equals(source.getId()))) {
                     if (result.getAfter() != null) {
                         String expectedAfter = sourceSpec.after == null ? null :
                                 sourceSpec.after.apply(result.getAfter().printAll(out.clone()));
@@ -432,15 +462,7 @@ public interface RewriteTest extends SourceSpecs {
                             String expected = sourceSpec.noTrim ?
                                     expectedAfter :
                                     trimIndentPreserveCRLF(expectedAfter);
-                            assertThat(actual)
-                                    .as(() -> {
-                                        SourceFile expectedSourceFile = new DelegateSourceFileForDiff(result.getAfter(), expected);
-                                        String diff = new Result(expectedSourceFile, result.getAfter(), Collections.emptyList()).diff();
-                                        return String.format("Unexpected result in \"%s\"%s",
-                                                result.getAfter().getSourcePath(),
-                                                diff.isEmpty() ? "" : "\n" + diff);
-                                    })
-                                    .isEqualTo(expected);
+                            assertContentEquals(result.getAfter(), expected, actual, "Unexpected result in");
                             sourceSpec.eachResult.accept(result.getAfter(), testMethodSpec, testClassSpec);
                         } else {
                             boolean isRemote = result.getAfter() instanceof Remote;
@@ -489,8 +511,8 @@ public interface RewriteTest extends SourceSpecs {
             // if we get here, there was no result.
             if (sourceSpec.after != null) {
                 String actual = sourceSpec.noTrim ?
-                        specForSourceFile.getKey().printAll(out.clone()) :
-                        trimIndentPreserveCRLF(specForSourceFile.getKey().printAll(out.clone()));
+                        source.printAll(out.clone()) :
+                        trimIndentPreserveCRLF(source.printAll(out.clone()));
                 String before = sourceSpec.noTrim ?
                         sourceSpec.before :
                         trimIndentPreserveCRLF(sourceSpec.before);
@@ -501,11 +523,11 @@ public interface RewriteTest extends SourceSpecs {
                         .as("To assert that a Recipe makes no change, supply only \"before\" source.")
                         .isNotEqualTo(before);
                 assertThat(actual)
-                        .as("The recipe should have made the following change to \"" + specForSourceFile.getKey().getSourcePath() + "\"")
+                        .as("The recipe should have made the following change to \"" + source.getSourcePath() + "\"")
                         .isEqualTo(expected);
             }
             //noinspection unchecked
-            ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(specForSourceFile.getKey());
+            ((Consumer<SourceFile>) sourceSpec.afterRecipe).accept(source);
         }
 
         SoftAssertions newFilesGenerated = new SoftAssertions();
@@ -527,6 +549,27 @@ public interface RewriteTest extends SourceSpecs {
                 fail("The recipe added a source file \"" + result.getAfter().getSourcePath()
                      + "\" that was not expected.");
             }
+        }
+    }
+
+    static void assertContentEquals(SourceFile sourceFile, String expected, String actual, String errorMessagePrefix) {
+        try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
+                sourceFile.getSourcePath(),
+                sourceFile.getSourcePath(),
+                null,
+                expected,
+                actual,
+                Collections.emptySet()
+        )) {
+            assertThat(actual)
+                    .as(errorMessagePrefix + " \"%s\":\n%s", sourceFile.getSourcePath(), diffEntry.getDiff())
+                    .isEqualTo(expected);
+
+        } catch (LinkageError e) {
+            // in case JGit fails to load properly
+            assertThat(actual)
+                    .as(errorMessagePrefix + " \"%s\"", sourceFile.getSourcePath())
+                    .isEqualTo(expected);
         }
     }
 
@@ -606,6 +649,7 @@ class DelegateSourceFileForDiff implements SourceFile {
         return out.getOut();
     }
 
+    @SuppressWarnings("unused") // Lombok delegate exclude
     interface PrintAll {
         <P> String printAll(PrintOutputCapture<P> out);
     }

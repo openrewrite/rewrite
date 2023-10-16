@@ -16,8 +16,7 @@ dependencies {
     implementation("com.github.ben-manes.caffeine:caffeine:2.+")
 
     implementation("org.antlr:antlr4:4.11.1")
-    // FIXME: switch to `latest.release`
-    // when https://github.com/resilience4j/resilience4j/issues/1472 is resolved
+    // Use 1.7.0 due https://github.com/resilience4j/resilience4j/issues/1472, it has been resolved in Resilience4j 2.x, but that requires Java 17
     implementation("io.github.resilience4j:resilience4j-retry:1.7.0")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile")
@@ -31,7 +30,7 @@ dependencies {
 
     compileOnly("org.rocksdb:rocksdbjni:latest.release")
     compileOnly(project(":rewrite-yaml"))
-    compileOnly(project(":rewrite-properties"))
+    implementation(project(":rewrite-properties"))
 
     implementation("io.micrometer:micrometer-core:1.9.+")
 
@@ -44,7 +43,7 @@ dependencies {
     testImplementation("guru.nidi:graphviz-java:latest.release")
 
     testRuntimeOnly("org.mapdb:mapdb:latest.release")
-    testRuntimeOnly(project(":rewrite-java-17"))
+    testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("org.rocksdb:rocksdbjni:latest.release")
 }
 

@@ -261,10 +261,22 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitLambda(J.Lambda lambda, PrintOutputCapture<P> p) {
             beforeSyntax(lambda, Space.Location.LAMBDA_PREFIX, p);
-            p.append('{');
+            LambdaStyle ls = lambda.getMarkers().findFirst(LambdaStyle.class)
+                    .orElse(new LambdaStyle(null, false, !lambda.getParameters().getParameters().isEmpty()));
+            boolean parenthesized = lambda.getParameters().isParenthesized();
+            if(!ls.isJavaStyle()) {
+                p.append('{');
+            }
             visitMarkers(lambda.getParameters().getMarkers(), p);
+            visitSpace(lambda.getParameters().getPrefix(), Space.Location.LAMBDA_PARAMETERS_PREFIX, p);
+            if(parenthesized) {
+                p.append('(');
+            }
             visitRightPadded(lambda.getParameters().getPadding().getParams(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
-            if (!lambda.getParameters().getParameters().isEmpty()) {
+            if(parenthesized) {
+                p.append(')');
+            }
+            if (ls.isArrow()) {
                 visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
                 p.append("->");
             }
@@ -275,7 +287,9 @@ public class GroovyPrinter<P> extends GroovyVisitor<PrintOutputCapture<P>> {
             } else {
                 visit(lambda.getBody(), p);
             }
-            p.append('}');
+            if(!ls.isJavaStyle()) {
+                p.append('}');
+            }
             afterSyntax(lambda, p);
             return lambda;
         }

@@ -154,7 +154,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
         return "Add a Maven dependency to a `pom.xml` file in the correct scope based on where it is used.";
     }
 
-    static class Scanned {
+    public static class Scanned {
         boolean usingType;
         Map<JavaProject, String> scopeByProject = new HashMap<>();
     }

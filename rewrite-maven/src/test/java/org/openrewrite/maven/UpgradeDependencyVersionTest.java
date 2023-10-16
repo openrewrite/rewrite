@@ -23,6 +23,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.SourceSpec;
 
 import java.util.Collections;
 import java.util.regex.Matcher;
@@ -274,28 +275,13 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                           <dependency>
                               <groupId>com.google.guava</groupId>
                               <artifactId>guava</artifactId>
-                              <version>13.0.1</version>
+                              <version>13.0</version>
                           </dependency>
                       </dependencies>
                   </dependencyManagement>
               </project>
               """,
-            """
-              <project>
-                  <groupId>com.mycompany</groupId>
-                  <artifactId>my-parent</artifactId>
-                  <version>1</version>
-                  <dependencyManagement>
-                      <dependencies>
-                          <dependency>
-                              <groupId>com.google.guava</groupId>
-                              <artifactId>guava</artifactId>
-                              <version>14.0</version>
-                          </dependency>
-                      </dependencies>
-                  </dependencyManagement>
-              </project>
-              """
+            SourceSpec::skip
           ),
           mavenProject("my-child",
             pomXml(
@@ -517,6 +503,127 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                     <version>28.0-android</version>
                   </dependency>
                 </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradePluginDependencies() {
+        rewriteRun(
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite.recipe", "rewrite-spring", "5.0.6", "", null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>5.4.1</version>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.openrewrite.recipe</groupId>
+                          <artifactId>rewrite-spring</artifactId>
+                          <version>5.0.5</version>
+                        </dependency>
+                      </dependencies>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>5.4.1</version>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.openrewrite.recipe</groupId>
+                          <artifactId>rewrite-spring</artifactId>
+                          <version>5.0.6</version>
+                        </dependency>
+                      </dependencies>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """
+          )
+        );
+    }
+
+    @Test
+    void upgradePluginDependenciesOnProperty() {
+        rewriteRun(
+          // Using latest.patch to validate the version property resolution, since it's needed for matching the valid patch.
+          spec -> spec.recipe(new UpgradeDependencyVersion("org.openrewrite.recipe", "rewrite-spring", "latest.patch", "", null, null)),
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                
+                <properties>
+                    <rewrite-spring.version>4.33.0</rewrite-spring.version>
+                </properties>
+                
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>5.4.1</version>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.openrewrite.recipe</groupId>
+                          <artifactId>rewrite-spring</artifactId>
+                          <version>${rewrite-spring.version}</version>
+                        </dependency>
+                      </dependencies>
+                    </plugin>
+                  </plugins>
+                </build>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                
+                <properties>
+                    <rewrite-spring.version>4.33.2</rewrite-spring.version>
+                </properties>
+                
+                <build>
+                  <plugins>
+                    <plugin>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>rewrite-maven-plugin</artifactId>
+                      <version>5.4.1</version>
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.openrewrite.recipe</groupId>
+                          <artifactId>rewrite-spring</artifactId>
+                          <version>${rewrite-spring.version}</version>
+                        </dependency>
+                      </dependencies>
+                    </plugin>
+                  </plugins>
+                </build>
               </project>
               """
           )

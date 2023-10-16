@@ -15,16 +15,30 @@
  */
 package org.openrewrite.java;
 
+import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Javadoc;
 
 public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
-    protected JavaVisitor<P> javaVisitor;
+    /**
+     * Don't use directly. Use {@link #javaVisitorVisit(Tree, Object)} instead.
+     */
+    private final JavaVisitor<P> javaVisitor;
 
     public JavadocVisitor(JavaVisitor<P> javaVisitor) {
         this.javaVisitor = javaVisitor;
+    }
+
+    @Nullable
+    protected J javaVisitorVisit(@Nullable Tree tree, P p) {
+        Cursor previous = javaVisitor.getCursor();
+        J j = javaVisitor.visit(tree, p, getCursor());
+        javaVisitor.setCursor(previous);
+        return j;
     }
 
     public Javadoc visitAttribute(Javadoc.Attribute attribute, P p) {
@@ -104,7 +118,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
     public Javadoc visitInlinedValue(Javadoc.InlinedValue inlinedValue, P p) {
         Javadoc.InlinedValue i = inlinedValue;
         i = i.withSpaceBeforeTree(ListUtils.map(i.getSpaceBeforeTree(), s -> visit(s, p)));
-        i = i.withTree(javaVisitor.visit(i.getTree(), p));
+        i = i.withTree(javaVisitorVisit(i.getTree(), p));
         i = i.withEndBrace(ListUtils.map(i.getEndBrace(), b -> visit(b, p)));
         return i;
     }
@@ -144,7 +158,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
     public Javadoc visitProvides(Javadoc.Provides provides, P p) {
         Javadoc.Provides pr = provides;
         pr = pr.withSpaceBeforeServiceType(ListUtils.map(pr.getSpaceBeforeServiceType(), s -> visit(s, p)));
-        pr = pr.withServiceType(javaVisitor.visit(pr.getServiceType(), p));
+        pr = pr.withServiceType(javaVisitorVisit(pr.getServiceType(), p));
         pr = pr.withDescription(ListUtils.map(pr.getDescription(), d -> visit(d, p)));
         return pr;
     }
@@ -182,8 +196,8 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
     public Javadoc visitSerialField(Javadoc.SerialField serialField, P p) {
         Javadoc.SerialField s = serialField;
         s = s.withMarkers(visitMarkers(s.getMarkers(), p));
-        s = s.withName((J.Identifier) javaVisitor.visit(s.getName(), p));
-        s = s.withType(javaVisitor.visit(s.getType(), p));
+        s = s.withName((J.Identifier) javaVisitorVisit(s.getName(), p));
+        s = s.withType(javaVisitorVisit(s.getType(), p));
         s = s.withDescription(ListUtils.map(s.getDescription(), desc -> visit(desc, p)));
         return s;
     }
@@ -218,7 +232,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
     public Javadoc visitThrows(Javadoc.Throws aThrows, P p) {
         Javadoc.Throws e = aThrows;
         e = e.withMarkers(visitMarkers(e.getMarkers(), p));
-        e = e.withExceptionName(javaVisitor.visit(e.getExceptionName(), p));
+        e = e.withExceptionName(javaVisitorVisit(e.getExceptionName(), p));
         e = e.withSpaceBeforeExceptionName(ListUtils.map(e.getSpaceBeforeExceptionName(), s -> visit(s, p)));
         e = e.withDescription(ListUtils.map(e.getDescription(), desc -> visit(desc, p)));
         return e;
@@ -240,7 +254,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
     public Javadoc visitUses(Javadoc.Uses uses, P p) {
         Javadoc.Uses u = uses;
         u = u.withBeforeServiceType(ListUtils.map(u.getBeforeServiceType(), b -> visit(b, p)));
-        u = u.withServiceType(javaVisitor.visit(u.getServiceType(), p));
+        u = u.withServiceType(javaVisitorVisit(u.getServiceType(), p));
         u = u.withDescription(ListUtils.map(u.getDescription(), d -> visit(d, p)));
         return u;
     }
@@ -254,7 +268,7 @@ public class JavadocVisitor<P> extends TreeVisitor<Javadoc, P> {
 
     public Javadoc visitReference(Javadoc.Reference reference, P p) {
         Javadoc.Reference r = reference;
-        r = r.withTree(javaVisitor.visit(r.getTree(), p));
+        r = r.withTree(javaVisitorVisit(r.getTree(), p));
         r = r.withLineBreaks(ListUtils.map(r.getLineBreaks(), l -> visit(l, p)));
         return r;
     }

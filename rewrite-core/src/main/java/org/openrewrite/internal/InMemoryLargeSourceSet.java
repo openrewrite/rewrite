@@ -21,6 +21,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Generated;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 
+import java.nio.file.Path;
 import java.util.*;
 import java.util.function.UnaryOperator;
 
@@ -121,6 +122,18 @@ public class InMemoryLargeSourceSet implements LargeSourceSet {
         }
 
         return new InMemoryChangeset(changes);
+    }
+
+    @Nullable
+    @Override
+    public SourceFile getBefore(Path sourcePath) {
+        List<SourceFile> sourceFiles = getInitialState().ls;
+        for (SourceFile s : sourceFiles) {
+            if (s.getSourcePath().equals(sourcePath)) {
+                return s;
+            }
+        }
+        return null;
     }
 
     @RequiredArgsConstructor

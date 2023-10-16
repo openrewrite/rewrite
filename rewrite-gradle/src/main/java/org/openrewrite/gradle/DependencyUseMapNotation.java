@@ -171,7 +171,7 @@ public class DependencyUseMapNotation extends Recipe {
                 randomId(),
                 Space.format(" "),
                 Markers.EMPTY,
-                JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, key, null, null)),
+                JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), key, null, null)),
                 e,
                 null
         );

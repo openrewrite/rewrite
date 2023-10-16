@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.gradle.table.GradleWrappersInUse;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
@@ -38,6 +39,8 @@ import static org.openrewrite.gradle.util.GradleWrapper.WRAPPER_PROPERTIES_LOCAT
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class FindGradleWrapper extends Recipe {
+    transient GradleWrappersInUse wrappersInUse = new GradleWrappersInUse(this);
+
     private static final Pattern GRADLE_VERSION = Pattern.compile("gradle-(.*?)-(all|bin).zip");
 
     @Option(displayName = "Version expression",
@@ -96,6 +99,12 @@ public class FindGradleWrapper extends Recipe {
                     boolean requireVersion = !StringUtils.isNullOrEmpty(version);
                     String currentDistribution = matcher.group(2);
                     boolean requireMeta = !StringUtils.isNullOrEmpty(distribution);
+
+                    wrappersInUse.insertRow(ctx, new GradleWrappersInUse.Row(
+                            currentVersion,
+                            currentDistribution
+                    ));
+
                     if (requireVersion) {
                         VersionComparator versionComparator = Semver.validate(version, versionPattern).getValue();
                         if (versionComparator == null || versionComparator.isValid(null, currentVersion)) {
@@ -111,6 +120,8 @@ public class FindGradleWrapper extends Recipe {
                         if (currentDistribution.matches(distribution)) {
                             return SearchResult.found(entry);
                         }
+                    } else {
+                        return SearchResult.found(entry);
                     }
                 }
                 return entry;

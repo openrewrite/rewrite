@@ -831,7 +831,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
               import static java.util.Collections.*;
               
               class Test {
-                  ConcurrentHashMap<String, String> m = new ConcurrentHashMap(emptyMap());
+                  ConcurrentHashMap<String, String> m = new ConcurrentHashMap<>(emptyMap());
               }
               """
           )
@@ -973,7 +973,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 }
 
                 public static void helloWorld() {
-                    System.out.println("hello world!");              
+                    System.out.println("hello world!");
                 }
               }
               """
@@ -1003,7 +1003,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                   public static void main(String[] args) {
                     var uniqueCount = B1;
                     helloWorld();
-                  }              
+                  }
               }
               """
           )
@@ -1030,7 +1030,7 @@ class RemoveUnusedImportsTest implements RewriteTest {
                 }
 
                 public static void helloWorld() {
-                    System.out.println("hello world!");              
+                    System.out.println("hello world!");
                 }
               }
               """
@@ -1065,7 +1065,214 @@ class RemoveUnusedImportsTest implements RewriteTest {
                     var uniqueCount = B1;
                     var uniqueCountNested = C1;
                     helloWorld();
-                  }              
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3275")
+    @Test
+    void doesNotRemoveReferencedClassesBeingUsedAsParameters() {
+        rewriteRun(
+          java(
+            """
+              package com.Source.mine;
+
+              public class A {
+                  public static final short SHORT1 = (short)1;
+                  
+                  public short getShort1() {
+                    return SHORT1;
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.test;
+
+              import com.Source.mine.A;
+              
+              class Test {
+                  void f(A classA) {
+                    classA.getShort1();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3275")
+    @Test
+    void doesNotRemoveReferencedClassesBeingUsedAsParametersUnusualPackageName() {
+        rewriteRun(
+          java(
+            """
+              package com.Source.$;
+
+              public class A {
+                  public static final short SHORT1 = (short)1;
+
+                  public short getShort1() {
+                    return SHORT1;
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              package com.test;
+
+              import com.Source.$.A;
+
+              class Test {
+                  void f(A classA) {
+                    classA.getShort1();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3275")
+    @Test
+    void doesNotRemoveWildCardImport() {
+        rewriteRun(
+          java(
+            """
+              package com.Source.mine;
+
+              public class A {
+                  public void f() {}
+              }
+              """
+          ),
+          java(
+            """
+              package com.Source.mine;
+
+              public class B {
+                  public void f() {}
+              }
+              """
+          ),
+          java(
+            """
+              package com.Source.mine;
+
+              public class C {
+                  public void f() {}
+              }
+              """
+          ),
+          java(
+            """
+              package com.Source.mine;
+
+              public class Record {
+                  public A theOne() { return new A(); }
+                  public B theOther1() { return new B(); }
+                  public C theOther2() { return new C(); }
+              }
+              """
+          ),
+          java(
+            """
+              package com.test;
+
+              import com.Source.mine.Record;
+              import com.Source.mine.*;
+
+              class Test {
+                  void f(Record r) {
+                    A a = r.theOne();
+                    B b = r.theOther1();
+                    C c = r.theOther2();
+                  }
+              }
+              """,
+            """
+              package com.test;
+
+              import com.Source.mine.Record;
+              import com.Source.mine.A;
+              import com.Source.mine.B;
+              import com.Source.mine.C;
+
+              class Test {
+                  void f(Record r) {
+                    A a = r.theOne();
+                    B b = r.theOther1();
+                    C c = r.theOther2();
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3275")
+    @Test
+    void doesNotUnfoldWildCardImport() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveUnusedImports()),
+          java(
+            """
+              package com.Source.mine;
+
+              public class A {
+                  public void f() {}
+              }
+              """
+          ),
+          java(
+            """
+              package com.Source.mine;
+
+              public class B {
+                  public void f() {}
+              }
+              """
+          ),
+          java(
+            """
+              package com.Source.mine;
+
+              public class C {
+                  public void f() {}
+              }
+              """
+          ),
+          java(
+            """
+              package com.Source.mine;
+
+              public class Record {
+                  public A theOne() { return new A(); }
+                  public B theOther1() { return new B(); }
+                  public C theOther2() { return new C(); }
+              }
+              """
+          ),
+          java(
+            """
+              package com.test;
+
+              import com.Source.mine.Record;
+              import com.Source.mine.A;
+              import com.Source.mine.B;
+              import com.Source.mine.C;
+
+              class Test {
+                  void f(Record r) {
+                    A a = r.theOne();
+                    B b = r.theOther1();
+                    C c = r.theOther2();
+                  }
               }
               """
           )

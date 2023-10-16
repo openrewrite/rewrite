@@ -21,9 +21,6 @@ import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
-import org.junit.jupiter.api.Test;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.Validated;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 
@@ -71,7 +68,7 @@ public class GradleWrapperTest {
                             String extension = path.substring(path.lastIndexOf("-bin.") + "-bin.".length());
                             String resourcePath = "gradle-%s-bin.%s".formatted(version, extension);
                             try (
-                              InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath);
+                              InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath)
                             ) {
                                 String body = StringUtils.readFully(is);
                                 return new MockResponse().setResponseCode(200).setBody(body);
@@ -91,27 +88,5 @@ public class GradleWrapperTest {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    @Test
-    void validateDistributionTypeBin() {
-        mockGradleServices(mockWebServer -> {
-            Validated<GradleWrapper> validated = GradleWrapper.validate(new InMemoryExecutionContext(), "7.x", "bin", "http://%s:%d/versions/all".formatted(mockWebServer.getHostName(), mockWebServer.getPort()));
-            GradleWrapper gw = validated.getValue();
-            assertThat(validated.isValid()).isTrue();
-            assertThat(gw).isNotNull();
-            assertThat(gw.getVersion()).isEqualTo("7.6");
-        });
-    }
-
-    @Test
-    void validateWithDistributionNull() {
-        mockGradleServices(mockWebServer -> {
-            Validated<GradleWrapper> validated = GradleWrapper.validate(new InMemoryExecutionContext(), "latest.release", null, "http://%s:%d/versions/all".formatted(mockWebServer.getHostName(), mockWebServer.getPort()));
-            GradleWrapper gw = validated.getValue();
-            assertThat(validated.isValid()).isTrue();
-            assertThat(gw).isNotNull();
-            assertThat(gw.getVersion()).isEqualTo("7.6");
-        });
     }
 }

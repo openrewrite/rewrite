@@ -20,6 +20,7 @@ import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 
 public class HttpSenderExecutionContextView extends DelegatingExecutionContext {
     private static final String HTTP_SENDER = "org.openrewrite.httpSender";
+    private static final String LARGE_FILE_HTTP_SENDER = "org.openrewrite.largeFileHttpSender";
 
     public HttpSenderExecutionContextView(ExecutionContext delegate) {
         super(delegate);
@@ -39,5 +40,14 @@ public class HttpSenderExecutionContextView extends DelegatingExecutionContext {
 
     public HttpSender getHttpSender() {
         return getMessage(HTTP_SENDER, new HttpUrlConnectionSender());
+    }
+
+    public HttpSenderExecutionContextView setLargeFileHttpSender(HttpSender httpSender) {
+        putMessage(LARGE_FILE_HTTP_SENDER, httpSender);
+        return this;
+    }
+
+    public HttpSender getLargeFileHttpSender() {
+        return getMessage(LARGE_FILE_HTTP_SENDER, new HttpUrlConnectionSender());
     }
 }
