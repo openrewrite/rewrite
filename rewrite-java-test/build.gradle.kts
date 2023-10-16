@@ -9,7 +9,7 @@ dependencies {
 
     testImplementation("io.github.classgraph:classgraph:latest.release")
     testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
-    testRuntimeOnly(project(":rewrite-java-17"))
+    testRuntimeOnly(project(":rewrite-java-21"))
     testRuntimeOnly("junit:junit:4.13.2") {
         because("Used for RemoveUnneededAssertionTest")
     }
@@ -29,8 +29,8 @@ tasks.withType<Javadoc> {
 }
 
 tasks.named<JavaCompile>("compileTestJava") {
-    sourceCompatibility = JavaVersion.VERSION_17.toString()
-    targetCompatibility = JavaVersion.VERSION_17.toString()
+    sourceCompatibility = JavaVersion.VERSION_21.toString()
+    targetCompatibility = JavaVersion.VERSION_21.toString()
 
     options.release.set(null as Int?) // remove `--release 8` set in `org.openrewrite.java-base`
 }

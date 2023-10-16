@@ -18,8 +18,8 @@ dependencies {
 
 tasks.withType<JavaCompile> {
     // allows --add-exports to in spite of the JDK's restrictions on this
-    sourceCompatibility = JavaVersion.VERSION_17.toString()
-    targetCompatibility = JavaVersion.VERSION_17.toString()
+    sourceCompatibility = JavaVersion.VERSION_21.toString()
+    targetCompatibility = JavaVersion.VERSION_21.toString()
 
     options.release.set(null as Int?) // remove `--release 8` set in `org.openrewrite.java-base`
     options.compilerArgs.addAll(
@@ -37,11 +37,11 @@ tasks.withType<JavaCompile> {
 //Javadoc compiler will complain about the use of the internal types.
 tasks.withType<Javadoc> {
     exclude(
-        "**/ReloadableJava17JavadocVisitor**",
-        "**/ReloadableJava17Parser**",
-        "**/ReloadableJava17ParserVisitor**",
-        "**/ReloadableJava17TypeMapping**",
-        "**/ReloadableJava17TypeSignatureBuilder**"
+        "**/ReloadableJava21JavadocVisitor**",
+        "**/ReloadableJava21Parser**",
+        "**/ReloadableJava21ParserVisitor**",
+        "**/ReloadableJava21TypeMapping**",
+        "**/ReloadableJava21TypeSignatureBuilder**"
     )
 }
 
