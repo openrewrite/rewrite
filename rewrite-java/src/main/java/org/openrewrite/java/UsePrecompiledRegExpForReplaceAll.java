@@ -87,16 +87,22 @@ public class UsePrecompiledRegExpForReplaceAll extends Recipe {
         }
 
         @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation invocation, ExecutionContext executionContext) {
             final boolean alreadyProcessingAPattern = patternProcessingInProgress.get();
-            if (!REPLACE_ALL_METHOD_MATCHER.matches(method) || alreadyProcessingAPattern) {
-                return super.visitMethodInvocation(method, executionContext);
+            if (!REPLACE_ALL_METHOD_MATCHER.matches(invocation) || alreadyProcessingAPattern) {
+                return super.visitMethodInvocation(invocation, executionContext);
             }
 
             patternProcessingInProgress.set(true);
 
-            final J.MethodInvocation invocation = super.visitMethodInvocation(method, executionContext);
-            final String regexPatternVariableName = VariableNameUtils.generateVariableName(PATTERN_VAR, getCursor(), VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER);
+            final String regexPatternVariableName =
+                    VariableNameUtils
+                            .generateVariableName(
+                                    PATTERN_VAR,
+                                    getCursor(),
+                                    VariableNameUtils.GenerationStrategy.INCREMENT_NUMBER
+                            );
+
             final Object regexPatternIdentifier = new J.Identifier(
                     randomId(),
                     Space.SINGLE_SPACE,
@@ -105,12 +111,12 @@ public class UsePrecompiledRegExpForReplaceAll extends Recipe {
                     JavaType.buildType(Pattern.class.getName()),
                     null);
 
-            final Cursor cursor = getCursor();
+            final Cursor cursor = updateCursor(invocation);
             cursor.putMessageOnFirstEnclosing(J.ClassDeclaration.class, REG_EXP_KEY, invocation.getArguments().get(0));
             cursor.putMessageOnFirstEnclosing(J.ClassDeclaration.class, REG_EXP_KEY + "_NAME", regexPatternVariableName);
 
             return super.visitMethodInvocation(MATCHER_TEMPLATE.apply(
-                    getCursor(),
+                    cursor,
                     invocation.getCoordinates().replace(),
                     regexPatternIdentifier, invocation.getSelect(),
                     invocation.getArguments().get(1)), executionContext);
