@@ -20,7 +20,6 @@ val allProjects = listOf(
         "rewrite-java-tck",
         "rewrite-java-test",
         "rewrite-java-17",
-        "rewrite-java-21",
         "rewrite-json",
         "rewrite-maven",
         "rewrite-properties",
@@ -72,7 +71,8 @@ if (System.getProperty("idea.active") == null &&
         System.getProperty("idea.sync.active") == null) {
     include(
             "rewrite-java-8",
-            "rewrite-java-11"
+            "rewrite-java-11",
+            "rewrite-java-21"
     )
 }
 
