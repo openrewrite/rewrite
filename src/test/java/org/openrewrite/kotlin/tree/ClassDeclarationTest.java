@@ -328,21 +328,21 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin("object Companion"),
           kotlin(
             """
-              class Test {
+              class TestA {
                   companion object
               }
               """
           ),
           kotlin(
             """
-              class Test {
+              class TestB {
                   companion object Foo
               }
               """
           ),
           kotlin(
             """
-              class Test {
+              class TestC {
                   companion object Companion
               }
               """

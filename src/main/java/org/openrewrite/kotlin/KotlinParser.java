@@ -31,6 +31,7 @@ import org.jetbrains.kotlin.cli.jvm.compiler.VfsBasedProjectEnvironment;
 import org.jetbrains.kotlin.cli.jvm.config.JvmContentRootsKt;
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
+import org.jetbrains.kotlin.com.intellij.openapi.util.text.StringUtilRt;
 import org.jetbrains.kotlin.com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.kotlin.com.intellij.psi.FileViewProvider;
 import org.jetbrains.kotlin.com.intellij.psi.PsiManager;
@@ -43,8 +44,7 @@ import org.jetbrains.kotlin.fir.DependencyListForCliModule;
 import org.jetbrains.kotlin.fir.FirSession;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.java.FirProjectSessionProvider;
-import org.jetbrains.kotlin.fir.pipeline.AnalyseKt;
-import org.jetbrains.kotlin.fir.pipeline.FirUtilsKt;
+import org.jetbrains.kotlin.fir.pipeline.*;
 import org.jetbrains.kotlin.fir.resolve.ScopeSession;
 import org.jetbrains.kotlin.fir.session.FirSessionConfigurator;
 import org.jetbrains.kotlin.fir.session.FirSessionFactoryHelper;
@@ -56,6 +56,7 @@ import org.jetbrains.kotlin.platform.jvm.JvmPlatforms;
 import org.jetbrains.kotlin.psi.KtFile;
 import org.jetbrains.kotlin.resolve.jvm.platform.JvmPlatformAnalyzerServices;
 import org.jetbrains.kotlin.utils.PathUtil;
+import org.junit.platform.commons.util.StringUtils;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
@@ -369,7 +370,7 @@ public class KotlinParser implements Parser {
                 fileName = source.getPath().toString();
             }
 
-            VirtualFile vFile = new LightVirtualFile(fileName, KotlinFileType.INSTANCE, source.getSource(ctx).readFully());
+            VirtualFile vFile = new LightVirtualFile(fileName, KotlinFileType.INSTANCE, StringUtilRt.convertLineSeparators(source.getSource(ctx).readFully()));
             final FileViewProvider fileViewProvider = new SingleRootFileViewProvider(
                     PsiManager.getInstance(environment.getProject()),
                     vFile
@@ -431,6 +432,19 @@ public class KotlinParser implements Parser {
         List<FirFile> rawFir = FirUtilsKt.buildFirFromKtFiles(firSession, ktFiles);
         Pair<ScopeSession, List<FirFile>> result = AnalyseKt.runResolution(firSession, rawFir);
         AnalyseKt.runCheckers(firSession, result.getFirst(), result.getSecond(), diagnosticsReporter);
+//        ModuleCompilerAnalyzedOutput analyzedOutput = new ModuleCompilerAnalyzedOutput(firSession, result.getFirst(), result.getSecond());
+//        FirResult firResult = new FirResult(singletonList(analyzedOutput));
+//
+//        Fir2IrExtensions extensions = Fir2IrExtensions.Default.INSTANCE;
+//        Fir2IrConfiguration irConfiguration = new Fir2IrConfiguration(
+//                languageVersionSettings,
+//                compilerConfiguration.getBoolean(JVMConfigurationKeys.LINK_VIA_SIGNATURES),
+//                compilerConfiguration.putIfAbsent(EVALUATED_CONST_TRACKER, EvaluatedConstTracker.Companion.create())
+//        );
+//        // TODO: add generation extensions
+//        List<IrGenerationExtension> irGenerationExtensions = new ArrayList<>();
+//        Fir2IrActualizedResult actualizedResult = convertToIrAndActualizeForJvm(firResult, extensions, irConfiguration, irGenerationExtensions, diagnosticsReporter);
+
         assert kotlinSources.size() == result.getSecond().size();
         List<FirFile> second = result.getSecond();
         for (int i = 0; i < second.size(); i++) {

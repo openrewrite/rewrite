@@ -87,7 +87,6 @@ import kotlin.collections.HashMap
 import kotlin.math.max
 import kotlin.math.min
 
-
 class KotlinParserVisitor(
         kotlinSource: KotlinSource,
         relativeTo: Path?,
