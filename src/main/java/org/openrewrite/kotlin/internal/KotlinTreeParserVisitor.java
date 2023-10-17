@@ -256,7 +256,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitBreakExpression(KtBreakExpression expression, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        return new J.Break(
+                randomId(),
+                prefix(expression),
+                Markers.EMPTY,
+                createIdentifier(expression.getTargetLabel().getIdentifier(), null)
+        );
     }
 
     @Override
@@ -657,7 +662,17 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitLabeledExpression(KtLabeledExpression expression, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        J j = expression.getBaseExpression().accept(this, data);
+        return new J.Label(
+                randomId(),
+                prefix(expression),
+                Markers.EMPTY,
+                padRight(
+                        createIdentifier(expression.getNameIdentifier(), null),
+                        suffix(expression.getNameIdentifier())
+                ),
+                convertToStatement(j)
+        );
     }
 
 
@@ -1063,7 +1078,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitThisExpression(KtThisExpression expression, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        return new K.KThis(
+                randomId(),
+                prefix(expression),
+                Markers.EMPTY,
+                null, // TODO
+                type(expression)
+        );
     }
 
     @Override
