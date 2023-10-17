@@ -339,7 +339,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   Test withData(Object... arg0) {
                       return this;
                   }
-
+              
                   void method(Test t) {
                       t = t.withData(withData()
                               .withData(t
@@ -485,7 +485,7 @@ class TabsAndIndentsTest implements RewriteTest {
                                   return 0;
                               })
                       )
-                              .collect(Collectors.toList());
+                      .collect(Collectors.toList());
                   }
               }
               """
@@ -507,7 +507,7 @@ class TabsAndIndentsTest implements RewriteTest {
                                       0
                               )
                       )
-                              .collect(Collectors.toList());
+                      .collect(Collectors.toList());
                   }
               }
               """
@@ -2320,14 +2320,66 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               public enum WorkflowStatus {
-                  @SuppressWarnings("value1")
-                  VALUE1,
-                  @SuppressWarnings("value2")
-                  VALUE2,
-                  @SuppressWarnings("value3")
-                  VALUE3,
-                  @SuppressWarnings("value4")
-                  VALUE4
+                  @Nullable
+                  VALUE1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void longMethodChainWithMultiLineParameters_Correct() {
+        rewriteRun(
+          java(
+            """
+              class Foo {
+                  String test() {
+                      return "foobar"
+                              .substring(
+                                      1
+                              ).substring(
+                                      2
+                              ).substring(
+                                      3
+                              );
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void longMethodChainWithMultiLineParameters_Incorrect() {
+        rewriteRun(
+          java(
+            """
+              class Foo {
+              String test() {
+              return "foobar"
+              .substring(
+              1
+              ).substring(
+              2
+              ).substring(
+              3
+              );
+              }
+              }
+              """,
+            """
+              class Foo {
+                  String test() {
+                      return "foobar"
+                              .substring(
+                                      1
+                              ).substring(
+                                      2
+                              ).substring(
+                                      3
+                              );
+                  }
               }
               """
           )
