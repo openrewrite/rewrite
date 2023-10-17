@@ -325,6 +325,7 @@ public class PsiTreePrinter {
                 || tree instanceof K.ExpressionStatement
                 || tree instanceof K.ListLiteral
                 || tree instanceof J.Package
+                || tree instanceof J.ForEachLoop
         ) {
             return "";
         }
