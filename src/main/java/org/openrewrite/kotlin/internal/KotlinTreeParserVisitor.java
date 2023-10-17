@@ -2861,6 +2861,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             return J.Binary.Type.LessThanOrEqual;
         else if (elementType == KtTokens.PERC)
             return J.Binary.Type.Modulo;
+        else if (elementType == KtTokens.ANDAND)
+            return J.Binary.Type.And;
         else
             return null;
     }
