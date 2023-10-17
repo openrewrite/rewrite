@@ -150,6 +150,25 @@ class LambdaTest implements RewriteTest {
         );
     }
 
+    @Test
+    void redundantArrow() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.util.function.Supplier
+              
+              class Test {
+                  fun method(n: Int) {
+                      val ns: Supplier<Int> = Supplier { ->
+                          n
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/110")
     @Test
     void unusedVar() {
