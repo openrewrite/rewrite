@@ -226,12 +226,19 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitBinaryWithTypeRHSExpression(KtBinaryExpressionWithTypeRHS expression, ExecutionContext data) {
-        if (expression.getOperationReference().getReferencedNameElementType() == KtTokens.AS_KEYWORD) {
+        IElementType type = expression.getOperationReference().getReferencedNameElementType();
+
+        if (type == KtTokens.AS_KEYWORD || type == KtTokens.AS_SAFE) {
             J.Identifier clazz = expression.getRight().accept(this, data).withPrefix(prefix(expression.getRight()));
+            Markers markers = Markers.EMPTY;
+            if (type == KtTokens.AS_SAFE) {
+                markers = markers.addIfAbsent(new IsNullSafe(randomId(), Space.EMPTY));
+            }
+
             return new J.TypeCast(
                     randomId(),
                     prefix(expression),
-                    Markers.EMPTY,
+                    markers,
                     new J.ControlParentheses(
                             randomId(),
                             suffix(expression.getLeft()),

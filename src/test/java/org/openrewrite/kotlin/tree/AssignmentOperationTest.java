@@ -117,9 +117,9 @@ class AssignmentOperationTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail("Fixed by psi-based-parser")
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/305")
-    @ExpectedToFail
     void augmentedAssignmentAnnotation() {
         rewriteRun(
           kotlin(
