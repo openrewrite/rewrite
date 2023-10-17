@@ -144,7 +144,7 @@ class LambdaTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              val sum: (Int, Int, ) -> Int = { x, y, -> x + y }
+              val sum: (Int, Int, ) -> Int = { x, y , -> x + y }
               """
           )
         );

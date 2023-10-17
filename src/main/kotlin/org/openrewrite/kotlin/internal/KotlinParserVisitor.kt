@@ -430,27 +430,9 @@ class KotlinParserVisitor(
         }
         var params = J.Lambda.Parameters(randomId(), Space.EMPTY, Markers.EMPTY, false, valueParams)
         val saveCursor = cursor
-        val arrowPrefix = whitespace()
-        if (skip("->")) {
-            params = if (params.parameters.isEmpty()) {
-                params.padding.withParams(
-                        listOf(
-                                JRightPadded
-                                        .build(J.Empty(randomId(), Space.EMPTY, Markers.EMPTY) as J)
-                                        .withAfter(arrowPrefix)
-                        )
-                )
-            } else {
-                params.padding.withParams(
-                        ListUtils.mapLast(
-                                params.padding.params
-                        ) { param: JRightPadded<J> ->
-                            param.withAfter(
-                                    arrowPrefix
-                            )
-                        })
-            }
-        } else {
+        var arrowPrefix = whitespace()
+        if (!skip("->")) {
+            arrowPrefix = Space.EMPTY
             cursor(saveCursor)
         }
         val skip = Collections.newSetFromMap(IdentityHashMap<FirElement, Boolean>())
@@ -486,7 +468,7 @@ class KotlinParserVisitor(
                 prefix,
                 markers,
                 params,
-                Space.EMPTY,
+                arrowPrefix,
                 body,
                 null
         )
