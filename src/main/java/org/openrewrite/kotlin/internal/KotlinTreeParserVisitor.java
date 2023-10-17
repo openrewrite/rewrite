@@ -64,7 +64,6 @@ import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 
-import java.lang.annotation.Annotation;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
@@ -377,7 +376,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitContinueExpression(KtContinueExpression expression, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        return new J.Continue(
+                randomId(),
+                prefix(expression.getParent()),
+                Markers.EMPTY,
+                null
+        );
     }
 
     @Override
@@ -1197,7 +1201,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitWhileExpression(KtWhileExpression expression, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        return new J.WhileLoop(
+                randomId(),
+                prefix(expression),
+                Markers.EMPTY,
+                mapControlParentheses(expression.getCondition(), data),
+                JRightPadded.build((Statement) expression.getBody().accept(this, data))
+        );
     }
 
     @Override
