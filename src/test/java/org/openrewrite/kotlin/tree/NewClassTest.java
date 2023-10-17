@@ -59,13 +59,7 @@ class NewClassTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              package a.b
-              class Test
-              """
-          ),
-          kotlin(
-            """
-              val type : a . b . Test = a . b . Test ( )
+              val type : java . util . ArrayList<String> = java . util . ArrayList<String> ( )
               """
           )
         );
@@ -76,15 +70,7 @@ class NewClassTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              package a.b
-              class Test {
-                  class Inner
-              }
-              """
-          ),
-          kotlin(
-            """
-              val type : a . b . Test . Inner = a . b . Test . Inner ( )
+              val type : java . util . AbstractMap . SimpleEntry<String, String> = java . util . AbstractMap . SimpleEntry<String, String> ( "", "" )
               """
           )
         );

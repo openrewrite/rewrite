@@ -18,7 +18,6 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -264,8 +263,12 @@ class MethodDeclarationTest implements RewriteTest {
     })
     void variance(String param) {
         rewriteRun(
-          kotlin("interface PT < T >"),
-          kotlin("fun generic ( n : PT < %s > ) { }".formatted(param))
+          kotlin(
+            """
+              interface PT < T >
+              fun generic ( n : PT < %s > ) { }
+              """.formatted(param)
+          )
         );
     }
 

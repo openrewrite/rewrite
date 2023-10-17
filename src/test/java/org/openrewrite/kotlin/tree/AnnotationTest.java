@@ -118,14 +118,14 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              @Target ( AnnotationTarget . LOCAL_VARIABLE )
-              @Retention ( AnnotationRetention . SOURCE )
-              annotation class Test ( val values : Array < String > )
+              @Target (  AnnotationTarget . LOCAL_VARIABLE   )
+              @Retention  ( AnnotationRetention . SOURCE )
+              annotation class Test ( val values : Array <  String > )
               """
           ),
           kotlin(
             """
-              @Test( values = [ "a" , "b" , "c" ] )
+              @Test( values =  [   "a"    ,     "b" ,  "c"   ]    )
               val a = 42
               """
           )
@@ -151,7 +151,7 @@ class AnnotationTest implements RewriteTest {
           kotlin(
             """
               annotation class Test ( val values : Array < String > )
-              @Test( values = [ "a" , "b" , /* trailing comma */ ] )
+              @Test( values = [ "a" , "b" ,  /* trailing comma */ ] )
               val a = 42
               """
           )
@@ -275,7 +275,7 @@ class AnnotationTest implements RewriteTest {
           kotlin(ANNOTATION),
           kotlin(
             """
-              class Example ( @param : Ann val quux : String )
+              class Example  (   @param    :     Ann val  quux   :     String )
               """
           )
         );
@@ -327,7 +327,7 @@ class AnnotationTest implements RewriteTest {
           kotlin(
             """
               fun example ( ) {
-                val ( @Ann a , @Ann b , @Ann c ) = Triple ( 1 , 2 , 3 )
+                val (  @Ann   a , @Ann b , @Ann c ) = Triple ( 1 , 2 , 3 )
               }
               """
           )
@@ -366,7 +366,7 @@ class AnnotationTest implements RewriteTest {
             """
               fun method ( ) {
                   val list = listOf ( 1 , 2 , 3 )
-                  list . filterIndexed { index , _ -> @Ann index % 2 == 0 }
+                  list . filterIndexed { index  ,   _    -> @Ann  index   %    2 == 0 }
               }
               """
             )
@@ -396,7 +396,7 @@ class AnnotationTest implements RewriteTest {
             """
               annotation class Ann
 
-              @Suppress()
+              @Suppress( )
               @Ann
               class A {
               }

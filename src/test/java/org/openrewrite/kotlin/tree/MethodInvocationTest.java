@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.marker.IndexedAccess;
@@ -179,7 +178,7 @@ class MethodInvocationTest implements RewriteTest {
           kotlin(
             """
               fun method ( arg : Any ) {
-                  val l = listOf ( 1 , 2 , 3 )
+                  val l  =   listOf    (     1 ,  2   ,    3     )
               }
               """
           )
@@ -625,7 +624,7 @@ class MethodInvocationTest implements RewriteTest {
           kotlin(
             """
               val arr = IntArray(1)
-              val a0 = arr[0]
+              val a0 =  arr   [    0     ]
               """
           )
         );

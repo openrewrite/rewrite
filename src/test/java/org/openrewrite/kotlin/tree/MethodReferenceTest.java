@@ -63,7 +63,7 @@ class MethodReferenceTest implements RewriteTest {
     @Test
     void getJavaClass() {
         rewriteRun(
-          kotlin("val a = Integer :: class . java ")
+          kotlin("val a = Integer ::   class  .     java ")
         );
     }
 

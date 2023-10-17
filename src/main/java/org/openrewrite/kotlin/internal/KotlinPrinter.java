@@ -775,6 +775,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.append('{');
                 }
 
+                visitSpace(lambda.getParameters().getPrefix(), Space.Location.LAMBDA_PARAMETER, p);
                 visitLambdaParameters(lambda.getParameters(), p);
                 if (!lambda.getParameters().getParameters().isEmpty()) {
                     visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);

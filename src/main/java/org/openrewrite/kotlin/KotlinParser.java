@@ -56,15 +56,12 @@ import org.jetbrains.kotlin.platform.jvm.JvmPlatforms;
 import org.jetbrains.kotlin.psi.KtFile;
 import org.jetbrains.kotlin.resolve.jvm.platform.JvmPlatformAnalyzerServices;
 import org.jetbrains.kotlin.utils.PathUtil;
-import org.junit.platform.commons.util.StringUtils;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.marker.JavaSourceSet;
-import org.openrewrite.kotlin.internal.CompiledSource;
-import org.openrewrite.kotlin.internal.KotlinParserVisitor;
-import org.openrewrite.kotlin.internal.KotlinSource;
+import org.openrewrite.kotlin.internal.*;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.tree.ParseError;
@@ -93,6 +90,7 @@ import static org.jetbrains.kotlin.cli.jvm.config.JvmContentRootsKt.*;
 import static org.jetbrains.kotlin.config.CommonConfigurationKeys.*;
 import static org.jetbrains.kotlin.config.JVMConfigurationKeys.DO_NOT_CLEAR_BINDING_CONTEXT;
 import static org.jetbrains.kotlin.incremental.IncrementalFirJvmCompilerRunnerKt.configureBaseRoots;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class KotlinParser implements Parser {
@@ -165,7 +163,7 @@ public class KotlinParser implements Parser {
                         compilerCus.getSources().stream()
                                 .map(kotlinSource -> {
                                     try {
-                                        KotlinParserVisitor mappingVisitor = new KotlinParserVisitor(
+                                        KotlinParserVisitor firParserVisitor = new KotlinParserVisitor(
                                                 kotlinSource,
                                                 relativeTo,
                                                 styles,
@@ -175,7 +173,50 @@ public class KotlinParser implements Parser {
                                         );
 
                                         assert kotlinSource.getFirFile() != null;
-                                        SourceFile kcu = (SourceFile) mappingVisitor.visitFile(kotlinSource.getFirFile(), new InMemoryExecutionContext());
+                                        SourceFile kcuFir = (SourceFile) firParserVisitor.visitFile(kotlinSource.getFirFile(), ctx);
+                                        SourceFile kcu = kcuFir;
+
+                                        // Turn this flag on locally only to develop psi-based-parser
+                                        boolean switchToPsiParser = false;
+                                        if (switchToPsiParser) {
+                                            // debug purpose only, to be removed
+                                            System.out.println(PsiTreePrinter.print(kotlinSource.getInput()));
+                                            System.out.println(PsiTreePrinter.print(kotlinSource.getKtFile()));
+                                            System.out.println(PsiTreePrinter.print(kotlinSource.getFirFile()));
+
+                                            // PSI based parser
+                                            SourceFile kcuPsi;
+                                            KotlinTypeMapping typeMapping = new KotlinTypeMapping(new JavaTypeCache(), firSession, kotlinSource.getFirFile().getSymbol());
+                                            PsiElementAssociations psiFirMapping = new PsiElementAssociations(typeMapping, kotlinSource.getFirFile());
+                                            psiFirMapping.initialize();
+                                            KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, firSession, typeMapping, psiFirMapping, styles, relativeTo, ctx);
+                                            try {
+                                                kcuPsi = psiParser.parse();
+                                            } catch (UnsupportedOperationException ignore) {
+                                                throw ignore;
+                                            }
+
+                                            if (kcuPsi == null) {
+                                                kcuPsi = kcuFir;
+                                                System.out.println("=========\n LST and types from FIR-based-parser");
+                                                System.out.println(PsiTreePrinter.print(kcuFir));
+                                            } else {
+                                                // compare kcuPsi and kcuFir LST structure and all types
+                                                String treeFir = PsiTreePrinter.print(kcuFir);
+                                                String treePsi = PsiTreePrinter.print(kcuPsi);
+
+                                                // Debug purpose only, to be removed
+                                                System.out.println("=========\n LST and types from FIR-based-parser");
+                                                System.out.println(treeFir);
+                                                System.out.println("=========\n LST and types from PSI-based-parser");
+                                                System.out.println(treePsi);
+
+                                                assertEquals(treeFir, treePsi);
+                                            }
+
+                                            kcu = kcuPsi;
+                                        }
+
                                         parsingListener.parsed(kotlinSource.getInput(), kcu);
                                         return requirePrintEqualsInput(kcu, kotlinSource.getInput(), relativeTo, ctx);
                                     } catch (Throwable t) {

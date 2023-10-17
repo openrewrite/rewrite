@@ -34,7 +34,7 @@ class WhenTest implements RewriteTest {
               class A {
                 val a = 1
                 fun method ( ) {
-                    val a = A ( )
+                    val a =   A  ( )
                     val b = a
                 }
               }

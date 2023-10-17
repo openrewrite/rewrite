@@ -19,7 +19,6 @@ package org.openrewrite.kotlin.style;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.style.NamedStyles;
@@ -27,7 +26,6 @@ import org.openrewrite.test.RewriteTest;
 
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings({"All", "RedundantVisibilityModifier"})
 class AutodetectTest implements RewriteTest {

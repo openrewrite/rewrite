@@ -25,7 +25,7 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-public class MethodMatcherTest implements RewriteTest {
+class MethodMatcherTest implements RewriteTest {
 
     @Test
     void matchesTopLevelFunction() {

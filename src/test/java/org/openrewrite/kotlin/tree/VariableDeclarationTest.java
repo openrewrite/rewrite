@@ -51,9 +51,26 @@ class VariableDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void deSugar() {
+        rewriteRun(
+          kotlin("""
+            val a = if (2 !in 1 .. 10) "X" else "Y"
+            """
+          )
+        );
+    }
+
+    @Test
+    void yikes() {
+        rewriteRun(
+          kotlin("val b =  !   (    (     1 .  plus   (    2     ) +  2   )    !in      1 ..  3   )    .     not( )")
+        );
+    }
+
+    @Test
     void singleVariableDeclarationWithTypeConstraint() {
         rewriteRun(
-          kotlin("val a : Int = 1")
+          kotlin("val a = ArrayList<String>()")
         );
     }
 
@@ -214,7 +231,7 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
+              val map =   mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
               """
           )
         );
@@ -233,7 +250,7 @@ class VariableDeclarationTest implements RewriteTest {
           kotlin(
             """
               import org.foo.Test
-              val a : Test < * > = null
+              val a : Test  <   *    >     = null
               """
           )
         );
@@ -256,8 +273,8 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun example ( ) {
-                val ( a , b , c ) = Triple ( 1 , 2 , 3 )
+              fun example  (   )    {
+                val   (    a     , b  ,   c    )     = Triple  (   1    ,     "Two" ,  3   )
               }
               """
           )
@@ -285,7 +302,7 @@ class VariableDeclarationTest implements RewriteTest {
           kotlin(
             """
               class User {
-                  val value: Int by lazy { 10 }
+                  val value  :   Int    by     lazy {  10   }
               }
               """
           )
@@ -347,7 +364,8 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              operator fun String.provideDelegate(thisRef: T, prop: kotlin.reflect.KProperty<*>): kotlin.properties.ReadOnlyProperty<T, Any> {
+              operator fun String.provideDelegate(thisRef: T,
+                     prop :  kotlin   .    reflect     . KProperty  <*>   ): kotlin.properties.ReadOnlyProperty<T, Any> {
                   return null!!
               }
               class T {
@@ -395,7 +413,7 @@ class VariableDeclarationTest implements RewriteTest {
                   val value : String = ""
               }
               fun method ( input : Any ) {
-                  val split = ( input as StringValue ) . value . split ( "-" ) . toTypedArray ( )
+                  val split = (  input   as    StringValue     ) .  value   .    split ( "-" ) .  toTypedArray   ( )
               }
               """
           )
@@ -424,7 +442,7 @@ class VariableDeclarationTest implements RewriteTest {
             """
               class SomeParameterized<T>
               abstract class Test {
-                  abstract val SomeParameterized < Int > . receivedMember : Int
+                  abstract val SomeParameterized <  Int > . receivedMember : Int
               }
               """
           )
@@ -439,8 +457,8 @@ class VariableDeclarationTest implements RewriteTest {
           kotlin(
             """
               var s : String = ""
-                  set ( value ) {
-                      field = value
+                  set  (   value    )     {
+                      field  =   value
                   }
               """
           )

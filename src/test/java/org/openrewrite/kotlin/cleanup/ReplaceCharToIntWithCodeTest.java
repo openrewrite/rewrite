@@ -20,7 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.kotlin.Assertions.*;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 
 
 public class ReplaceCharToIntWithCodeTest implements RewriteTest {

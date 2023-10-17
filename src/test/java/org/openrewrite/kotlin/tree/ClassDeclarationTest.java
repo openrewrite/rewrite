@@ -130,7 +130,7 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              interface C {
+              interface  C   {
                   class Inner {
                   }
               }
@@ -156,7 +156,7 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void enumClass() {
         rewriteRun(
-          kotlin("enum class A")
+          kotlin("enum  class A")
         );
     }
 
@@ -210,14 +210,14 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void primaryConstructor() {
         rewriteRun(
-          kotlin("class Test ( val answer : Int )")
+          kotlin("class Test  (   val    answer : Int )")
         );
     }
 
     @Test
     void primaryConstructorWithAnySupertype() {
         rewriteRun(
-          kotlin("class Test : Any()")
+          kotlin("class Test  :   Any    (     )")
         );
     }
 
@@ -246,7 +246,7 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void explicitInlineConstructor() {
         rewriteRun(
-          kotlin("class Test internal constructor ( )")
+          kotlin("class Test  internal   constructor    ( )")
         );
     }
 
@@ -353,7 +353,7 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void variance() {
         rewriteRun(
-          kotlin("interface A < in R >"),
+          kotlin("interface A  <   in    R     >"),
           kotlin("interface B < out R >")
         );
     }
@@ -414,7 +414,7 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin("""
             class Test {
-                init {
+                init   {
                     println ( "Hello, world!" )
                 }
             }

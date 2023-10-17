@@ -36,7 +36,7 @@ class EnumTest implements RewriteTest {
           kotlin(
             """
               enum class A {
-                  B , C ,
+                  B  ,   C    ,
                   D
               }
               """
@@ -51,7 +51,7 @@ class EnumTest implements RewriteTest {
           kotlin(
             """
               enum class A {
-                  B , C() ,
+                  B , C (  )   ,
                   D
               }
               """
@@ -59,7 +59,7 @@ class EnumTest implements RewriteTest {
           kotlin(
             """
               enum class EnumTypeB(val label: String) {
-                  FOO("foo")
+                  FOO (  "foo"   ) 
               }
               """
           )
@@ -102,8 +102,8 @@ class EnumTest implements RewriteTest {
             """
               enum class A {
                   B , C ,
-                  D , // trailing comma
-              }
+                  D ,  // trailing comma 
+                 }
               """
           )
         );
@@ -129,7 +129,7 @@ class EnumTest implements RewriteTest {
           kotlin(
             """
               enum class Test : java.io.Serializable {
-                  FOO {
+                  FOO   {
                       fun foo() = print("foo",)
                   }
               }

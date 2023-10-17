@@ -542,6 +542,11 @@ public interface K extends J {
                 return t.operator == operator ? t : new K.Binary(t.id, t.prefix, t.markers, t.left, operator, t.right, t.after, t.type);
             }
         }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
+        }
     }
 
     @SuppressWarnings("unused")

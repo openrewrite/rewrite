@@ -30,7 +30,7 @@ class LambdaTest implements RewriteTest {
           kotlin(
             """
               fun method ( ) {
-                  val square = { number : Int -> number * number }
+                  val square =  {   number    :     Int ->  number   *    number     }
               }
               """
           )

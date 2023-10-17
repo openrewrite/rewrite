@@ -29,7 +29,7 @@ import kotlin.collections.ArrayDeque
 @Getter
 class KotlinSource(
     var input: Parser.Input,
-    ktFile: KtFile
+    val ktFile: KtFile
 ) {
     val nodes: Map<Int, ASTNode>
 
