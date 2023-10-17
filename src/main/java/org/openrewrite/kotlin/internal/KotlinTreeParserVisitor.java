@@ -260,7 +260,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 randomId(),
                 prefix(expression),
                 Markers.EMPTY,
-                createIdentifier(expression.getTargetLabel().getIdentifier(), null)
+                expression.getTargetLabel() != null ? createIdentifier(expression.getTargetLabel().getIdentifier(), null) : null
         );
     }
 
@@ -425,10 +425,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitDoWhileExpression(KtDoWhileExpression expression, ExecutionContext data) {
-        J.Label label = null;
-//        if (expression.lalabel != null) {
-//            label = visitElement(doWhileLoop.label!!, data) as J.Label?
-//        }
         return new J.DoWhileLoop(
                 randomId(),
                 prefix(expression),
@@ -510,7 +506,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         if (expression instanceof KtFunctionLiteral) {
             KtFunctionLiteral ktFunctionLiteral = (KtFunctionLiteral) expression;
             Markers markers = Markers.EMPTY;
-            J.Label label = null;
             ktFunctionLiteral.getLBrace();
             boolean hasBraces = true;
             boolean omitDestruct = false;
@@ -996,11 +991,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitReturnExpression(KtReturnExpression expression, ExecutionContext data) {
-        J.Identifier label = null;
-        if (expression.getLabeledExpression() != null) {
-            throw new UnsupportedOperationException("TODO");
-        }
-
         KtExpression returnedExpression = expression.getReturnedExpression();
         Expression returnExpr = returnedExpression != null ?
                 convertToExpression(returnedExpression.accept(this, data).withPrefix(prefix(returnedExpression))) :
@@ -1013,7 +1003,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         Markers.EMPTY,
                         returnExpr
                 ),
-                label
+                expression.getTargetLabel() != null ? createIdentifier(expression.getTargetLabel().getIdentifier(), null) : null
         );
     }
 
