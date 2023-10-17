@@ -4531,8 +4531,8 @@ class KotlinParserVisitor(
     }
 
     override fun visitErrorTypeRef(errorTypeRef: FirErrorTypeRef, data: ExecutionContext): J {
-//        return createIdentifier(errorTypeRef.psi!!.text)
-        throw UnsupportedOperationException(generateUnsupportedMessage("FirErrorTypeRef"))
+        return createIdentifier(errorTypeRef.psi!!.text, JavaType.Unknown.getInstance(), null)
+//        throw UnsupportedOperationException(generateUnsupportedMessage("FirErrorTypeRef"))
     }
 
     private fun generateUnsupportedMessage(typeName: String): String {
