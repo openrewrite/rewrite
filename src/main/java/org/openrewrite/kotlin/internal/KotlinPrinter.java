@@ -495,22 +495,22 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     keyword = "!=";
                     break;
                 case BitAnd:
-                    keyword = "&";
+                    keyword = "and";
                     break;
                 case BitOr:
-                    keyword = "|";
+                    keyword = "or";
                     break;
                 case BitXor:
-                    keyword = "^";
+                    keyword = "xor";
                     break;
                 case LeftShift:
-                    keyword = "<<";
+                    keyword = "shl";
                     break;
                 case RightShift:
-                    keyword = ">>";
+                    keyword = "shr";
                     break;
                 case UnsignedRightShift:
-                    keyword = ">>>";
+                    keyword = "ushr";
                     break;
                 case Or:
                     keyword = (binary.getMarkers().findFirst(LogicalComma.class).isPresent()) ? "," : "||";

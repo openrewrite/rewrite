@@ -2839,6 +2839,23 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     private J.Binary.Type mapJBinaryType(KtOperationReferenceExpression operationReference) {
         IElementType elementType = operationReference.getOperationSignTokenType();
 
+        if (elementType == null) {
+            String operator = operationReference.getText();
+            if ("and".equals(operator)) {
+                return J.Binary.Type.BitAnd;
+            } else if ("or".equals(operator)) {
+                return J.Binary.Type.BitOr;
+            } else if ("xor".equals(operator)) {
+                return J.Binary.Type.BitXor;
+            } else if ("shl".equals(operator)) {
+                return J.Binary.Type.LeftShift;
+            } else if ("shr".equals(operator)) {
+                return J.Binary.Type.RightShift;
+            } else if ("ushr".equals(operator)) {
+                return J.Binary.Type.UnsignedRightShift;
+            }
+        }
+
         if (elementType == KtTokens.PLUS)
             return J.Binary.Type.Addition;
         else if (elementType == KtTokens.MINUS)
