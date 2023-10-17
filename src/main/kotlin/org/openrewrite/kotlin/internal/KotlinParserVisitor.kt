@@ -428,13 +428,25 @@ class KotlinParserVisitor(
                 }
             }
         }
-        var params = J.Lambda.Parameters(randomId(), Space.EMPTY, Markers.EMPTY, false, valueParams)
         val saveCursor = cursor
         var arrowPrefix = whitespace()
-        if (!skip("->")) {
+        if (skip("->")) {
+            if (valueParams.isEmpty()) {
+                // add `J.Empty` to distinguish from lambda without explicit arrow
+                valueParams.add(
+                    JRightPadded(
+                        J.Empty(randomId(), Space.EMPTY, Markers.EMPTY),
+                        Space.EMPTY,
+                        Markers.EMPTY
+                    )
+                )
+            }
+        } else {
             arrowPrefix = Space.EMPTY
             cursor(saveCursor)
         }
+        val params = J.Lambda.Parameters(randomId(), Space.EMPTY, Markers.EMPTY, false, valueParams)
+
         val skip = Collections.newSetFromMap(IdentityHashMap<FirElement, Boolean>())
         if (omitDestruct && anonymousFunction.body != null) {
             // FIXME: replace with destruct declaration
