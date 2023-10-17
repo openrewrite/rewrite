@@ -558,7 +558,27 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitFunctionType(KtFunctionType type, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        List<JRightPadded<TypeTree>> params;
+        if (type.getParameters().isEmpty()) {
+            params = singletonList(JRightPadded
+                    .<TypeTree>build(new J.Empty(randomId(), prefix(type.getParameterList().getNode().findChildByType(KtTokens.RPAR).getPsi()), Markers.EMPTY))
+                    .withAfter(Space.EMPTY));
+        } else {
+            params = type.getParameters().stream().map(
+                    p -> padRight((TypeTree) p.accept(this, data), suffix(p))).collect(Collectors.toList()
+            );
+        }
+        return new K.FunctionType(
+                randomId(),
+                prefix(type),
+                Markers.EMPTY, //.addIfAbsent(new IsNullable(randomId(), Space.EMPTY)), // TODO
+                emptyList(), // TODO
+                emptyList(), // TODO
+                type.getReceiver() != null ? padRight((NameTree) type.getReceiver().accept(this, data), Space.EMPTY) : null,
+                JContainer.build(params),
+                null,
+                type.getReturnTypeReference().accept(this, data).withPrefix(prefix(type.getReturnTypeReference()))
+        );
     }
 
     @Override
@@ -2252,11 +2272,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         J.Block body;
-        if (function.getBodyBlockExpression() == null) {
-            body = convertToBlock(function.getBodyExpression(), data).withPrefix(prefix(function.getEqualsToken()));
-        } else {
+        if (function.getBodyBlockExpression() != null) {
             body = function.getBodyBlockExpression().accept(this, data)
                     .withPrefix(prefix(function.getBodyBlockExpression()));
+        } else if (function.getBodyExpression() != null) {
+            body = convertToBlock(function.getBodyExpression(), data).withPrefix(prefix(function.getEqualsToken()));
+        } else {
+            body = null;
         }
 
         return new J.MethodDeclaration(
