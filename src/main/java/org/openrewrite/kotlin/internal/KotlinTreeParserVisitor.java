@@ -592,12 +592,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
         return new K.FunctionType(
                 randomId(),
-                prefix(type),
+                Space.EMPTY,
                 Markers.EMPTY, //.addIfAbsent(new IsNullable(randomId(), Space.EMPTY)), // TODO
                 emptyList(), // TODO
                 emptyList(), // TODO
                 type.getReceiver() != null ? padRight((NameTree) type.getReceiverTypeReference().accept(this, data), suffix(type.getReceiver())) : null,
-                JContainer.build(prefix(type.getParameterList()), params, Markers.EMPTY),
+                JContainer.build(prefix(type), params, Markers.EMPTY),
                 null,
                 type.getReturnTypeReference().accept(this, data).withPrefix(prefix(type.getReturnTypeReference()))
         );
@@ -1816,7 +1816,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                             typeTree,
                             args
                     );
-                    superTypes.add(padRight(delegationCall, Space.EMPTY));
+                    superTypes.add(padRight(delegationCall, suffix(superTypeCallEntry)));
                 } else if (superTypeListEntry instanceof KtSuperTypeEntry) {
                     TypeTree typeTree = (TypeTree) superTypeListEntry.accept(this, data);
 
@@ -2482,6 +2482,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             type = J.Unary.Type.PreIncrement;
         } else if (elementType.equals(KtTokens.MINUS)) {
             type = J.Unary.Type.Negative;
+        } else if (elementType.equals(KtTokens.PLUSEQ)) {
+            type = J.Unary.Type.Positive;
         } else {
             throw new UnsupportedOperationException("TODO");
         }
@@ -2766,7 +2768,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitTypeReference(KtTypeReference typeReference, ExecutionContext data) {
         // TODO: fix NPE.
-        return typeReference.getTypeElement().accept(this, data);
+        J j = typeReference.getTypeElement().accept(this, data);
+        if (j instanceof K.FunctionType && typeReference.getModifierList() != null && typeReference.getModifierList().hasModifier(KtTokens.SUSPEND_KEYWORD)) {
+            j = ((K.FunctionType) j).withModifiers(singletonList(new J.Modifier(randomId(), Space.EMPTY, Markers.EMPTY, "suspend", J.Modifier.Type.LanguageExtension, emptyList())));
+        }
+        return j;
     }
 
     @Override
@@ -2820,10 +2826,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             return K.Binary.Type.RangeTo;
         } else if (elementType == KtTokens.RANGE_UNTIL) {
             return K.Binary.Type.RangeUntil;
+        } else if (elementType == KtTokens.IN_KEYWORD) {
+            return K.Binary.Type.Contains;
         } else if (elementType == KtTokens.EQ) {
             return null;
         } else {
-            throw new UnsupportedOperationException("Unsupported OPERATION_REFERENCE type :" + elementType);
+            throw new UnsupportedOperationException("Unsupported OPERATION_REFERENCE type: " + elementType);
         }
     }
 
@@ -2865,10 +2873,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 return J.Modifier.Type.Private;
             case "sealed":
                 return J.Modifier.Type.Sealed;
+            case "annotation":
+            case "data":
             case "enum":
             case "open":
-            case "annotation":
             case "inner":
+            case "value":
                 return J.Modifier.Type.LanguageExtension;
             case "abstract":
                 return J.Modifier.Type.Abstract;
