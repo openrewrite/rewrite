@@ -183,7 +183,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
     }
 
     fun getFunctionType(psi: KtExpression): ExpressionType? {
-        val fir = fir(psi) { it is FirFunctionCall } as FirFunctionCall?
+        val fir = fir(psi) { it is FirFunctionCall } as? FirFunctionCall
 
         if (fir == null) {
             return null
