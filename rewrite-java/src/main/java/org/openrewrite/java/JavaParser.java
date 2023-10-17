@@ -264,9 +264,11 @@ public interface JavaParser extends Parser {
                     .invoke(null);
             return javaParser;
         } catch (Exception e) {
-            throw new IllegalStateException("Unable to create a Java parser instance. " +
-                    "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, or `rewrite-java-21` must be on the classpath.", e);
+            //Fall through to an exception without making this the "cause".
         }
+
+        throw new IllegalStateException("Unable to create a Java parser instance. " +
+                                        "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, or `rewrite-java-21` must be on the classpath.");
     }
 
     @Override
