@@ -157,8 +157,14 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitAnnotatedExpression(KtAnnotatedExpression expression, ExecutionContext data) {
         List<KtAnnotationEntry> ktAnnotations = expression.getAnnotationEntries();
         List<J.Annotation> annotations = new ArrayList<>(ktAnnotations.size());
-        for (KtAnnotationEntry ktAnnotation : ktAnnotations) {
-            annotations.add((J.Annotation) ktAnnotation.accept(this, data));
+
+        for (int i = 0 ; i < ktAnnotations.size(); i ++) {
+            KtAnnotationEntry ktAnnotation = ktAnnotations.get(i);
+            J.Annotation anno = (J.Annotation) ktAnnotation.accept(this, data);
+            if (i == 0) {
+                anno = anno.withPrefix(merge(prefix(expression), anno.getPrefix()));
+            }
+            annotations.add(anno);
         }
 
         return new K.AnnotatedExpression(
