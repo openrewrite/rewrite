@@ -1048,7 +1048,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitThrowExpression(KtThrowExpression expression, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        return new J.Throw(
+                randomId(),
+                prefix(expression),
+                Markers.EMPTY,
+                convertToExpression(expression.getThrownExpression().accept(this, data))
+        );
     }
 
     @Override
