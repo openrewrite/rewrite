@@ -29,7 +29,7 @@ class DoWhileTest implements RewriteTest {
             """
               fun test() {
                   var i = 0
-                  do { i ++ } while ( i < 10 )
+                  do  {   i ++ } while  (   i < 10 )
               }
               """
           )

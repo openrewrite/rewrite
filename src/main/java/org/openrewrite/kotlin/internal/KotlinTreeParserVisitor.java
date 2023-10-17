@@ -418,7 +418,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 JRightPadded.build(expression.getBody().accept(this, data)
                         .withPrefix(prefix(expression.getBody().getParent()))
                 ),
-                padLeft(prefix(expression.getWhileKeyword()), mapControlParentheses(expression.getCondition(), data))
+                padLeft(prefix(expression.getWhileKeyword()), mapControlParentheses(expression.getCondition(), data).withPrefix(prefix(expression.getLeftParenthesis())))
         );
     }
 
@@ -1205,8 +1205,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 randomId(),
                 prefix(expression),
                 Markers.EMPTY,
-                mapControlParentheses(expression.getCondition(), data),
-                JRightPadded.build((Statement) expression.getBody().accept(this, data))
+                mapControlParentheses(expression.getCondition(), data).withPrefix(prefix(expression.getLeftParenthesis())),
+                JRightPadded.build(expression.getBody().accept(this, data).withPrefix(prefix(expression.getBody().getParent())))
         );
     }
 
@@ -2393,12 +2393,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         assert expression.getBaseExpression() != null;
 
         KtSimpleNameExpression ktSimpleNameExpression = expression.getOperationReference();
-        if (ktSimpleNameExpression == null || !("!".equals(ktSimpleNameExpression.getReferencedName()))) {
-            throw new UnsupportedOperationException("TODO");
-        }
-
-        if (expression.getOperationReference() != null &&
-                expression.getOperationReference().getReferencedNameElementType().equals(KtTokens.EXCL)) {
+        IElementType elementType = ktSimpleNameExpression.getReferencedNameElementType();
+        if (elementType.equals(KtTokens.EXCL)) {
             return new J.Unary(
                     randomId(),
                     prefix(expression),
@@ -2407,9 +2403,27 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     expression.getBaseExpression().accept(this, data).withPrefix(suffix(ktSimpleNameExpression)),
                     type(expression)
             );
+        } else if (elementType.equals(KtTokens.MINUSMINUS)) {
+            return new J.Unary(
+                    randomId(),
+                    prefix(expression),
+                    Markers.EMPTY,
+                    padLeft(prefix(expression.getOperationReference()), J.Unary.Type.PreDecrement),
+                    expression.getBaseExpression().accept(this, data).withPrefix(suffix(ktSimpleNameExpression)),
+                    type(expression)
+            );
+        } else if (elementType.equals(KtTokens.PLUSPLUS)) {
+            return new J.Unary(
+                    randomId(),
+                    prefix(expression),
+                    Markers.EMPTY,
+                    padLeft(prefix(expression.getOperationReference()), J.Unary.Type.PreIncrement),
+                    expression.getBaseExpression().accept(this, data).withPrefix(suffix(ktSimpleNameExpression)),
+                    type(expression)
+            );
+        } else {
+            throw new UnsupportedOperationException("TODO");
         }
-
-        throw new UnsupportedOperationException("TODO");
     }
 
     @Override
@@ -2421,6 +2435,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             j = j.withMarkers(j.getMarkers().addIfAbsent(new CheckNotNull(randomId(), prefix(expression.getOperationReference()))));
         } else if (referencedNameElementType == KtTokens.PLUSPLUS) {
             j = new J.Unary(randomId(), prefix(expression), Markers.EMPTY, padLeft(prefix(expression.getOperationReference()), J.Unary.Type.PostIncrement), (Expression) j, type(expression));
+        } else if (referencedNameElementType == KtTokens.MINUSMINUS) {
+            j = new J.Unary(randomId(), prefix(expression), Markers.EMPTY, padLeft(prefix(expression.getOperationReference()), J.Unary.Type.PostDecrement), (Expression) j, type(expression));
         } else {
             throw new UnsupportedOperationException("TODO");
         }
