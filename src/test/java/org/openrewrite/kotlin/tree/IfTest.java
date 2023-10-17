@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -157,11 +156,12 @@ class IfTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/298")
-    @ExpectedToFail
     void functionCallCondition() {
         rewriteRun(
           kotlin(
             """
+              import kotlin.text.Regex
+
               fun foo(choices: List<Pair<String, String>>, peekedHeader: Regex) {
                   for ((_, adapter) in choices) {
                       if (adapter.matches(peekedHeader)) {
