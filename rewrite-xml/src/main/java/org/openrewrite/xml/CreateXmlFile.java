@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,14 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.text;
+package org.openrewrite.xml;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.*;
+import org.openrewrite.CreateFileVisitor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Option;
+import org.openrewrite.ScanningRecipe;
+import org.openrewrite.SourceFile;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -30,16 +37,11 @@ import static java.util.Collections.emptyList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
-
-    @Option(displayName = "File contents",
-            description = "Multiline text content for the file.",
-            example = "Some text.")
-    String fileContents;
+public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
 
     @Option(displayName = "Relative file path",
             description = "File path of new file.",
-            example = "foo/bar/baz.txt")
+            example = "foo/bar/baz.yaml")
     String relativeFileName;
 
     @Option(displayName = "Overwrite existing file",
@@ -48,47 +50,42 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
     @Nullable
     Boolean overwriteExisting;
 
-    @Override
-    public String getDisplayName() {
-        return "Create text file";
+    @JsonCreator
+    public CreateXmlFile(
+            @JsonProperty("relativeFileName") String relativeFileName,
+            @JsonProperty("overwriteExisting") @Nullable Boolean overwriteExisting
+    ) {
+        this.relativeFileName = relativeFileName;
+        this.overwriteExisting = overwriteExisting;
     }
 
     @Override
-    public String getDescription() {
-        return "Creates a new plain text file.";
+    public @NonNull String getDisplayName() {
+        return "Create XML file";
     }
 
     @Override
-    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
+    public @NonNull String getDescription() {
+        return "Create a new XML file.";
+    }
+
+    @Override
+    public @NonNull AtomicBoolean getInitialValue(@NonNull ExecutionContext ctx) {
         return new AtomicBoolean(true);
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean shouldCreate) {
+    public @NonNull TreeVisitor<?, ExecutionContext> getScanner(@NonNull AtomicBoolean shouldCreate) {
         return new CreateFileVisitor(relativeFileName, shouldCreate);
     }
 
     @Override
-    public Collection<SourceFile> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
-        if(shouldCreate.get()) {
-            return PlainTextParser.builder().build().parse(fileContents)
+    public @NonNull Collection<SourceFile> generate(AtomicBoolean shouldCreate, @NonNull ExecutionContext ctx) {
+        if (shouldCreate.get()) {
+            return XmlParser.builder().build().parse("")
                     .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
                     .collect(Collectors.toList());
         }
         return emptyList();
-    }
-
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean created) {
-        Path path = Paths.get(relativeFileName);
-        return new PlainTextVisitor<ExecutionContext>() {
-            @Override
-            public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.toString().equals(text.getSourcePath().toString())) {
-                    return text.withText(fileContents);
-                }
-                return text;
-            }
-        };
     }
 }
