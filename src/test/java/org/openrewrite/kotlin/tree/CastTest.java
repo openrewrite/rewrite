@@ -50,4 +50,17 @@ class CastTest implements RewriteTest {
           )
         );
     }
+
+    @ExpectedToFail
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/276")
+    void parenthesize2() {
+        rewriteRun(
+          kotlin(
+            """
+              val b = "s" as ( ( /*c1*/ (String?) /*c2*/ ) )
+              """
+          )
+        );
+    }
 }
