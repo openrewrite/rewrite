@@ -2476,23 +2476,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitPrefixExpression(KtPrefixExpression expression, ExecutionContext data) {
         assert expression.getBaseExpression() != null;
-
-        KtSimpleNameExpression ktSimpleNameExpression = expression.getOperationReference();
-        IElementType elementType = ktSimpleNameExpression.getReferencedNameElementType();
-        J.Unary.Type type;
-        if (elementType == KtTokens.EXCL) {
-            type = J.Unary.Type.Not;
-        } else if (elementType == KtTokens.MINUSMINUS) {
-            type = J.Unary.Type.PreDecrement;
-        } else if (elementType == KtTokens.PLUSPLUS) {
-            type = J.Unary.Type.PreIncrement;
-        } else if (elementType == KtTokens.MINUS) {
-            type = J.Unary.Type.Negative;
-        } else if (elementType == KtTokens.PLUSEQ) {
-            type = J.Unary.Type.Positive;
-        } else if (elementType == KtTokens.PLUS) {
-            type = J.Unary.Type.Positive;
-        } else {
+        J.Unary.Type type = mapJUnaryType(expression.getOperationReference());
+        if (type == null) {
             throw new UnsupportedOperationException("TODO");
         }
         return new J.Unary(
@@ -2500,7 +2485,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 prefix(expression),
                 Markers.EMPTY,
                 padLeft(prefix(expression.getOperationReference()), type),
-                expression.getBaseExpression().accept(this, data).withPrefix(suffix(ktSimpleNameExpression)),
+                expression.getBaseExpression().accept(this, data).withPrefix(suffix(expression.getOperationReference())),
                 type(expression)
         );
     }
@@ -2896,6 +2881,27 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             return J.Binary.Type.Or;
         else
             return null;
+    }
+
+    @Nullable
+    private J.Unary.Type mapJUnaryType(KtSimpleNameExpression operationReference) {
+        IElementType elementType = operationReference.getReferencedNameElementType();
+
+        if (elementType == KtTokens.EXCL) {
+            return J.Unary.Type.Not;
+        } else if (elementType == KtTokens.MINUSMINUS) {
+            return J.Unary.Type.PreDecrement;
+        } else if (elementType == KtTokens.PLUSPLUS) {
+            return J.Unary.Type.PreIncrement;
+        } else if (elementType == KtTokens.MINUS) {
+            return J.Unary.Type.Negative;
+        } else if (elementType == KtTokens.PLUSEQ) {
+            return J.Unary.Type.Positive;
+        } else if (elementType == KtTokens.PLUS) {
+            return J.Unary.Type.Positive;
+        } else {
+            return null;
+        }
     }
 
     private J.Modifier.Type mapModifierType(PsiElement modifier) {
