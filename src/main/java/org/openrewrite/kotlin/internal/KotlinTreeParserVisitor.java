@@ -2480,15 +2480,17 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         KtSimpleNameExpression ktSimpleNameExpression = expression.getOperationReference();
         IElementType elementType = ktSimpleNameExpression.getReferencedNameElementType();
         J.Unary.Type type;
-        if (elementType.equals(KtTokens.EXCL)) {
+        if (elementType == KtTokens.EXCL) {
             type = J.Unary.Type.Not;
-        } else if (elementType.equals(KtTokens.MINUSMINUS)) {
+        } else if (elementType == KtTokens.MINUSMINUS) {
             type = J.Unary.Type.PreDecrement;
-        } else if (elementType.equals(KtTokens.PLUSPLUS)) {
+        } else if (elementType == KtTokens.PLUSPLUS) {
             type = J.Unary.Type.PreIncrement;
-        } else if (elementType.equals(KtTokens.MINUS)) {
+        } else if (elementType == KtTokens.MINUS) {
             type = J.Unary.Type.Negative;
-        } else if (elementType.equals(KtTokens.PLUSEQ)) {
+        } else if (elementType == KtTokens.PLUSEQ) {
+            type = J.Unary.Type.Positive;
+        } else if (elementType == KtTokens.PLUS) {
             type = J.Unary.Type.Positive;
         } else {
             throw new UnsupportedOperationException("TODO");
