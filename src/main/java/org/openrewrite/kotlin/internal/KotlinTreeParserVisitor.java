@@ -1944,11 +1944,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             if (d instanceof KtEnumEntry) {
                 continue;
             }
-
-            J j = d.accept(this, data).withPrefix(prefix(d));
-            Statement statement = convertToStatement(j);
-            JRightPadded<Statement> build = maybeSemicolon(statement, d);
-            list.add(build);
+            list.add(maybeSemicolon(convertToStatement(d.accept(this, data)), d));
         }
 
         return new J.Block(
@@ -2223,7 +2219,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         J.TypeParameters typeParameters = null;
         TypeTree returnTypeExpression = null;
 
-
         if (function.getTypeParameterList() != null) {
             typeParameters = new J.TypeParameters(
                     randomId(),
@@ -2239,17 +2234,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             modifiers.add(buildFinalModifier().withPrefix(prefix(function.getFunKeyword())));
         }
 
-        modifiers.add(
-                new J.Modifier(
-                        randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        "fun",
-                        J.Modifier.Type.LanguageExtension,
-                        emptyList()
-                )
-        );
-
+        modifiers.add(new J.Modifier(randomId(), Space.EMPTY, Markers.EMPTY, "fun", J.Modifier.Type.LanguageExtension, emptyList()));
 
         if (function.getNameIdentifier() == null) {
             throw new UnsupportedOperationException("TODO");
@@ -2286,15 +2271,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                                     randomId(),
                                     Space.EMPTY,
                                     Markers.EMPTY.addIfAbsent(new Extension(randomId())),
-                                    new J.Identifier(
-                                            randomId(),
-                                            Space.EMPTY,
-                                            Markers.EMPTY,
-                                            emptyList(),
-                                            "<receiverType>",
-                                            null,
-                                            null
-                                    ),
+                                    createIdentifier("<receiverType>", Space.EMPTY, null, null),
                                     emptyList(),
                                     padLeft(Space.EMPTY, receiver),
                                     null
@@ -2339,7 +2316,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.MethodDeclaration(
                 randomId(),
-                prefix(function),
+                merge(prefix(function), infix(function)),
                 markers,
                 leadingAnnotations,
                 modifiers,
@@ -2618,7 +2595,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
                 Tree.randomId(),
-                prefix(property), // overlaps with right-padding of previous statement
+                merge(prefix(property), infix(property)), // overlaps with right-padding of previous statement
                 markers,
                 leadingAnnotations,
                 modifiers,
