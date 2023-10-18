@@ -18,6 +18,8 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.regex.Pattern;
+
 import static org.openrewrite.java.Assertions.java;
 
 class UsePrecompiledRegExpForReplaceAllTest implements RewriteTest {
@@ -101,7 +103,7 @@ class UsePrecompiledRegExpForReplaceAllTest implements RewriteTest {
     }
 
     @Test
-    void replaceReplaceWithinAStreamMapLambda() {
+    void replaceReplaceAllWithinAStreamMapLambda() {
         rewriteRun(recipeSpec -> recipeSpec.recipe(new UsePrecompiledRegExpForReplaceAll()), java("""
           import java.util.List;
           import java.util.stream.Stream;
@@ -127,7 +129,7 @@ class UsePrecompiledRegExpForReplaceAllTest implements RewriteTest {
     }
 
     @Test
-    void replaceReplaceWithinAOptionMapLambda() {
+    void replaceReplaceAllWithinAOptionMapLambda() {
         rewriteRun(recipeSpec -> recipeSpec.recipe(new UsePrecompiledRegExpForReplaceAll()), java("""
           import java.util.Optional;
 
@@ -148,5 +150,152 @@ class UsePrecompiledRegExpForReplaceAllTest implements RewriteTest {
               }
           }
           """));
+    }
+
+    @Test
+    void replaceReplaceAllWithinAnonymousInnerClass() {
+        rewriteRun(recipeSpec -> recipeSpec.recipe(new UsePrecompiledRegExpForReplaceAll()), java("""
+          import java.lang.reflect.InvocationTargetException;
+
+          class A {
+              public void replace() {
+                  String outerInit = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
+                  String outerChanged = outerInit.replaceAll("\\\\.\\\\.\\\\.", " <>");
+                  
+                  System.out.println(outerChanged);
+              
+                  final Object anonymousInner = new Object() {
+                      public void doReplace() {
+                          String init = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
+                          String changed = init.replaceAll("\\\\.\\\\.\\\\.", " -");
+                          
+                          System.out.println(changed);
+                      }
+                  };
+                  
+                  try {
+                      anonymousInner.getClass().getMethod("doReplace").invoke(anonymousInner);
+                  }
+                  catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+                      e.printStackTrace();
+                  }
+              }
+          }
+          """, """
+            import java.lang.reflect.InvocationTargetException;
+            
+            class A {
+                private static final java.util.regex.Pattern openRewriteReplaceAllPattern1 = Pattern.compile("\\\\.\\\\.\\\\.");
+                private static final java.util.regex.Pattern openRewriteReplaceAllPattern = Pattern.compile("\\\\.\\\\.\\\\.");
+                public void replace() {
+                    String outerInit = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
+                    String outerChanged = openRewriteReplaceAllPattern.matcher(outerInit).replaceAll(" <>");
+         
+                    System.out.println(outerChanged);
+
+                    final Object anonymousInner = new Object() {
+                        public void doReplace() {
+                            String init = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
+                            String changed = openRewriteReplaceAllPattern1.matcher(init).replaceAll(" -");
+                            
+                            System.out.println(changed);
+                        }
+                    };
+                    
+                    try {
+                        anonymousInner.getClass().getMethod("doReplace").invoke(anonymousInner);
+                    }
+                    catch (NoSuchMethodException | IllegalAccessException | InvocationTargetException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+            """));
+    }
+
+    @Test
+    void replaceReplaceAllWithinInnerClass() {
+        rewriteRun(recipeSpec -> recipeSpec.recipe(new UsePrecompiledRegExpForReplaceAll()), java("""
+          class A {
+              public void replace() {
+                  String init = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
+                  String changed = init.replaceAll("\\\\.\\\\.\\\\.", " <>");
+                         
+                  System.out.println(changed);
+              }
+              
+              class B {
+                  public void replace() {
+                      String init = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
+                      String changed = init.replaceAll("\\\\.\\\\.\\\\.", " -");
+                             
+                      System.out.println(changed);
+                  }
+              }
+          }
+          """, """
+          class A {
+              private static final java.util.regex.Pattern openRewriteReplaceAllPattern = Pattern.compile("\\\\.\\\\.\\\\.");
+              public void replace() {
+                  String init = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
+                  String changed = openRewriteReplaceAllPattern.matcher(init).replaceAll(" <>");
+              
+                  System.out.println(changed);
+              }
+              
+              class B {
+                  private static final java.util.regex.Pattern openRewriteReplaceAllPattern1 = Pattern.compile("\\\\.\\\\.\\\\.");
+                  public void replace() {
+                      String init = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
+                      String changed = openRewriteReplaceAllPattern1.matcher(init).replaceAll(" -");
+              
+                      System.out.println(changed);
+                  }
+              }
+          }
+            """));
+    }
+
+    @Test
+    void replaceReplaceAllWithinStaticInnerClass() {
+        rewriteRun(recipeSpec -> recipeSpec.recipe(new UsePrecompiledRegExpForReplaceAll()), java("""
+          class A {
+              public void replace() {
+                  String init = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
+                  String changed = init.replaceAll("\\\\.\\\\.\\\\.", " <>");
+                         
+                  System.out.println(changed);
+              }
+              
+              static class B {
+                  public void replace() {
+                      String init = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
+                      String changed = init.replaceAll("\\\\.\\\\.\\\\.", " -");
+                             
+                      System.out.println(changed);
+                  }
+              }
+          }
+          """, """
+          class A {
+              private static final java.util.regex.Pattern openRewriteReplaceAllPattern = Pattern.compile("\\\\.\\\\.\\\\.");
+              public void replace() {
+                  String init = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
+                  String changed = openRewriteReplaceAllPattern.matcher(init).replaceAll(" <>");
+              
+                  System.out.println(changed);
+              }
+
+              static class B {
+                  private static final java.util.regex.Pattern openRewriteReplaceAllPattern1 = Pattern.compile("\\\\.\\\\.\\\\.");
+                  public void replace() {
+                      String init = "Bob is a Bird... Bob is a Plane... Bob is Superman!";
+                      String changed = openRewriteReplaceAllPattern1.matcher(init).replaceAll(" -");
+              
+                      System.out.println(changed);
+                  }
+              }
+          }
+            """));
     }
 }

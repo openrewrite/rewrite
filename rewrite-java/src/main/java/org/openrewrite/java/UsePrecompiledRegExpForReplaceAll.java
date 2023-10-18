@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.marker.Markers;
 
+import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
@@ -64,7 +65,7 @@ public class UsePrecompiledRegExpForReplaceAll extends Recipe {
             final J.Block processedBlock = super.visitBlock(block, executionContext);
             final Cursor parentOrThrow = getCursor().getParentOrThrow();
             if (parentOrThrow.getValue() instanceof J.ClassDeclaration) {
-                final Object regExp = parentOrThrow.pollNearestMessage(REG_EXP_KEY);
+                final Object regExp = parentOrThrow.pollMessage(REG_EXP_KEY);
                 if (regExp == null) {
                     return processedBlock;
                 }
@@ -107,6 +108,7 @@ public class UsePrecompiledRegExpForReplaceAll extends Recipe {
                     randomId(),
                     Space.SINGLE_SPACE,
                     Markers.EMPTY,
+                    Collections.emptyList(),
                     regexPatternVariableName,
                     JavaType.buildType(Pattern.class.getName()),
                     null);
