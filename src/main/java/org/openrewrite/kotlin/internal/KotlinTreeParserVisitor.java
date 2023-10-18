@@ -687,7 +687,25 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitIsExpression(KtIsExpression expression, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        Markers markers = Markers.EMPTY;
+
+        Expression element = convertToExpression(expression.getLeftHandSide().accept(this, data));
+
+        if (expression.getOperationReference().getReferencedNameElementType() == KtTokens.NOT_IS) {
+            markers = markers.addIfAbsent(new NotIs(randomId()));
+        }
+
+        J clazz = expression.getTypeReference().accept(this, data);
+
+        return new  J.InstanceOf(
+                randomId(),
+                prefix(expression),
+                markers,
+                padRight(element, prefix(expression.getOperationReference())),
+                clazz,
+                null,
+                type(expression)
+        );
     }
 
     @Override
@@ -2768,8 +2786,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitTypeReference(KtTypeReference typeReference, ExecutionContext data) {
         // TODO: fix NPE.
-        J j = typeReference.getTypeElement().accept(this, data);
-        if (j instanceof K.FunctionType && typeReference.getModifierList() != null && typeReference.getModifierList().hasModifier(KtTokens.SUSPEND_KEYWORD)) {
+        J j = typeReference.getTypeElement().accept(this, data).withPrefix(prefix(typeReference));
+        if (j instanceof K.FunctionType &&
+                typeReference.getModifierList() != null &&
+                typeReference.getModifierList().hasModifier(KtTokens.SUSPEND_KEYWORD)) {
             j = ((K.FunctionType) j).withModifiers(singletonList(new J.Modifier(randomId(), Space.EMPTY, Markers.EMPTY, "suspend", J.Modifier.Type.LanguageExtension, emptyList())));
         }
         return j;
