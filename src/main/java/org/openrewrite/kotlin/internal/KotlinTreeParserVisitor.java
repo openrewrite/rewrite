@@ -585,7 +585,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 if (ktParameter.getNameIdentifier() != null) {
                     typeTree = new K.FunctionType.Parameter(
                             randomId(),
-                            Markers.EMPTY,
+                            Markers.EMPTY.addIfAbsent(new TypeReferencePrefix(randomId(), prefix(ktParameter.getColon()))),
                             createIdentifier(ktParameter.getNameIdentifier(), null),
                             (TypeTree) ktParameter.getTypeReference().accept(this, data)
                     );
