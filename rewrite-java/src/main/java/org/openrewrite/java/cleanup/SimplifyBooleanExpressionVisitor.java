@@ -22,27 +22,15 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.UnwrapParentheses;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
 
 import java.util.Collections;
 
-import static java.util.Objects.requireNonNull;
-
 public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionContext> {
     private static final String MAYBE_AUTO_FORMAT_ME = "MAYBE_AUTO_FORMAT_ME";
-
-    @Override
-    public J visit(@Nullable Tree tree, ExecutionContext ctx) {
-        if (tree instanceof JavaSourceFile) {
-            JavaSourceFile cu = (JavaSourceFile) requireNonNull(super.visit(tree, ctx));
-            if (tree != cu) {
-                // recursive simplification
-                cu = (JavaSourceFile) visitNonNull(cu, ctx);
-            }
-            return cu;
-        }
-        return super.visit(tree, ctx);
-    }
 
     @Override
     public J visitBinary(J.Binary binary, ExecutionContext ctx) {
