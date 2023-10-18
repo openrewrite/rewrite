@@ -261,7 +261,7 @@ public class RemoveUnusedImports extends Recipe {
                             changed = true;
                         }
                     } else {
-                        if (usedWildcardImports.size() == 1 && usedWildcardImports.contains(elem.getPackageName()) && !elem.getTypeName().contains("$")) {
+                        if (usedWildcardImports.size() == 1 && usedWildcardImports.contains(elem.getPackageName()) && !elem.getTypeName().contains("$") && !conflictsWithJavaLang(elem)) {
                             anImport.used = false;
                             changed = true;
                         }
@@ -296,6 +296,17 @@ public class RemoveUnusedImports extends Recipe {
             }
 
             return cu;
+        }
+
+        private static boolean conflictsWithJavaLang(J.Import elem) {
+            try {
+                ClassLoader.getSystemClassLoader().loadClass("java.lang." + elem.getClassName());
+                // If we get here, the import conflicts with java.lang, since it was loaded successfully
+                return true;
+            } catch (ClassNotFoundException e) {
+                // Expected when the import does not conflict with java.lang
+                return false;
+            }
         }
     }
 
