@@ -428,7 +428,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitDestructuringDeclarationEntry(KtDestructuringDeclarationEntry multiDeclarationEntry, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        return createIdentifier(multiDeclarationEntry, type(multiDeclarationEntry)).withPrefix(prefix(multiDeclarationEntry));
     }
 
     @Override
@@ -826,7 +826,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         if (parameter.getDestructuringDeclaration() != null) {
-            throw new UnsupportedOperationException("TODO");
+            return mapDestructuringDeclaration(parameter.getDestructuringDeclaration(), data)
+                    .withPrefix(prefix(parameter));
         }
 
         J.Identifier name = createIdentifier(parameter.getNameIdentifier(), type(parameter));
@@ -1962,7 +1963,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<J.Modifier> modifiers = new ArrayList<>();
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>();
-        JLeftPadded<Expression> paddedInitializer;
+        JLeftPadded<Expression> paddedInitializer = null;
 
         J.Modifier modifier = new J.Modifier(
                 Tree.randomId(),
@@ -1974,13 +1975,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         );
         modifiers.add(modifier);
 
-        if (multiDeclaration.getInitializer() == null) {
-            throw new UnsupportedOperationException("TODO");
+        if (multiDeclaration.getInitializer() != null) {
+            paddedInitializer = padLeft(suffix(multiDeclaration.getRPar()),
+                    convertToExpression(multiDeclaration.getInitializer().accept(this, data))
+                            .withPrefix(prefix(multiDeclaration.getInitializer())));
         }
-
-        paddedInitializer = padLeft(suffix(multiDeclaration.getRPar()),
-                convertToExpression(multiDeclaration.getInitializer().accept(this, data))
-                        .withPrefix(prefix(multiDeclaration.getInitializer())));
 
         List<KtDestructuringDeclarationEntry> entries = multiDeclaration.getEntries();
         for (int i = 0; i < entries.size(); i++) {
@@ -2019,11 +2018,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             );
 
             JavaType.Method methodType = null;
-            if (paddedInitializer.getElement() instanceof J.NewClass) {
+            if (paddedInitializer != null && paddedInitializer.getElement() instanceof J.NewClass) {
                 // TODO: fix what is NC for?
                 J.NewClass nc = (J.NewClass) paddedInitializer.getElement();
                 methodType = methodInvocationType(entry);
             }
+
             J.MethodInvocation initializer = buildSyntheticDestructInitializer(i + 1)
                     .withMethodType(methodType);
             namedVariable = namedVariable.getPadding().withInitializer(padLeft(Space.SINGLE_SPACE, initializer));
@@ -3224,6 +3224,38 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return ktAnnotationEntries.stream()
                 .map(annotation -> (J.Annotation) annotation.accept(this, data))
                 .collect(Collectors.toList());
+    }
+
+    private J.VariableDeclarations mapDestructuringDeclaration(KtDestructuringDeclaration ktDestructuringDeclaration, ExecutionContext data) {
+        List<KtDestructuringDeclarationEntry> entries = ktDestructuringDeclaration.getEntries();
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = new ArrayList<>(entries.size());
+
+        for (KtDestructuringDeclarationEntry ktDestructuringDeclarationEntry : entries) {
+            J.Identifier name = ( J.Identifier) ktDestructuringDeclarationEntry.accept(this, data);
+
+            J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
+                    randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    name,
+                    emptyList(),
+                    null,
+                    variableType(ktDestructuringDeclaration)
+                );
+            variables.add(padRight(namedVariable, suffix(ktDestructuringDeclarationEntry)));
+        }
+
+        return new J.VariableDeclarations(
+                randomId(),
+                prefix(ktDestructuringDeclaration),
+                Markers.EMPTY.addIfAbsent(new OmitEquals(randomId())),
+                emptyList(),
+                emptyList(),
+                null,
+                null,
+                emptyList(),
+                variables
+        );
     }
 
     private J.Modifier mapModifier(PsiElement modifier, List<J.Annotation> annotations) {

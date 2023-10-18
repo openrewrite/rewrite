@@ -46,7 +46,7 @@ class ForLoopTest implements RewriteTest {
             """
               fun method() {
                   val map = mapOf ( 1 to "one" , 2 to "two" , 3 to "three" )
-                  for ( ( key , value ) in map ) {
+                  for (  (   key    , value  )   in    map ) {
                       print ( key )
                       print ( ", " )
                       println ( value )
