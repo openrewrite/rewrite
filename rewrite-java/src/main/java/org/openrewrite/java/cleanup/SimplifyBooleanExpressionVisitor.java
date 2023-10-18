@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.cleanup;
 
-import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
@@ -52,49 +51,37 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
         if (asBinary.getOperator() == J.Binary.Type.And) {
             if (isLiteralFalse(asBinary.getLeft())) {
-                maybeUnwrapParentheses();
                 j = asBinary.getLeft();
             } else if (isLiteralFalse(asBinary.getRight())) {
-                maybeUnwrapParentheses();
                 j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
             } else if (isLiteralTrue(asBinary.getLeft())) {
-                maybeUnwrapParentheses();
                 j = asBinary.getRight();
             } else if (isLiteralTrue(asBinary.getRight())) {
-                maybeUnwrapParentheses();
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
             } else if (removeAllSpace(asBinary.getLeft()).printTrimmed(getCursor())
                     .equals(removeAllSpace(asBinary.getRight()).printTrimmed(getCursor()))) {
-                maybeUnwrapParentheses();
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Or) {
             if (isLiteralTrue(asBinary.getLeft())) {
-                maybeUnwrapParentheses();
                 j = asBinary.getLeft();
             } else if (isLiteralTrue(asBinary.getRight())) {
-                maybeUnwrapParentheses();
                 j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
             } else if (isLiteralFalse(asBinary.getLeft())) {
-                maybeUnwrapParentheses();
                 j = asBinary.getRight();
             } else if (isLiteralFalse(asBinary.getRight())) {
-                maybeUnwrapParentheses();
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
             } else if (removeAllSpace(asBinary.getLeft()).printTrimmed(getCursor())
                     .equals(removeAllSpace(asBinary.getRight()).printTrimmed(getCursor()))) {
-                maybeUnwrapParentheses();
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Equal) {
             if (isLiteralTrue(asBinary.getLeft())) {
                 if (shouldSimplifyEqualsOn(asBinary.getRight())) {
-                    maybeUnwrapParentheses();
                     j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
                 }
             } else if (isLiteralTrue(asBinary.getRight())) {
                 if (shouldSimplifyEqualsOn(asBinary.getLeft())) {
-                    maybeUnwrapParentheses();
                     j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(" "));
                 }
             } else {
@@ -103,12 +90,10 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         } else if (asBinary.getOperator() == J.Binary.Type.NotEqual) {
             if (isLiteralFalse(asBinary.getLeft())) {
                 if (shouldSimplifyEqualsOn(asBinary.getRight())) {
-                    maybeUnwrapParentheses();
                     j = asBinary.getRight().withPrefix(asBinary.getRight().getPrefix().withWhitespace(""));
                 }
             } else if (isLiteralFalse(asBinary.getRight())) {
                 if (shouldSimplifyEqualsOn(asBinary.getLeft())) {
-                    maybeUnwrapParentheses();
                     j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(" "));
                 }
             } else {
@@ -124,6 +109,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     @Override
     public J postVisit(J tree, ExecutionContext ctx) {
         J j = super.postVisit(tree, ctx);
+        if (j instanceof J.Parentheses) {
+            j = new UnwrapParentheses<>((J.Parentheses<?>) j).visit(j, ctx, getCursor().getParentOrThrow());
+        }
         if (j != null && getCursor().pollMessage(MAYBE_AUTO_FORMAT_ME) != null) {
             j = autoFormat(j, ctx);
         }
@@ -137,13 +125,10 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
         if (asUnary.getOperator() == J.Unary.Type.Not) {
             if (isLiteralTrue(asUnary.getExpression())) {
-                maybeUnwrapParentheses();
                 j = ((J.Literal) asUnary.getExpression()).withValue(false).withValueSource("false");
             } else if (isLiteralFalse(asUnary.getExpression())) {
-                maybeUnwrapParentheses();
                 j = ((J.Literal) asUnary.getExpression()).withValue(true).withValueSource("true");
             } else if (asUnary.getExpression() instanceof J.Unary && ((J.Unary) asUnary.getExpression()).getOperator() == J.Unary.Type.Not) {
-                maybeUnwrapParentheses();
                 j = ((J.Unary) asUnary.getExpression()).getExpression();
             }
         }
@@ -163,25 +148,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         if (isEmpty.matches(asMethod)
                 && select instanceof J.Literal
                 && select.getType() == JavaType.Primitive.String) {
-            maybeUnwrapParentheses();
             return booleanLiteral(method, J.Literal.isLiteralValue(select, ""));
         }
         return j;
-    }
-
-    /**
-     * Specifically for removing immediately-enclosing parentheses on Identifiers and Literals.
-     * This queues a potential unwrap operation for the next visit. After unwrapping something, it's possible
-     * there are more Simplifications this recipe can identify and perform, which is why visitCompilationUnit
-     * checks for any changes to the entire Compilation Unit, and if so, queues up another SimplifyBooleanExpression
-     * recipe call. This convergence loop eventually reconciles any remaining Boolean Expression Simplifications
-     * the recipe can perform.
-     */
-    private void maybeUnwrapParentheses() {
-        Cursor c = getCursor().getParentOrThrow().getParentTreeCursor();
-        if (c.getValue() instanceof J.Parentheses) {
-            doAfterVisit(new UnwrapParentheses<>(c.getValue()));
-        }
     }
 
     private boolean isLiteralTrue(@Nullable Expression expression) {
@@ -207,13 +176,11 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         boolean leftIsNull = isNullLiteral(left);
         boolean rightIsNull = isNullLiteral(right);
         if (leftIsNull && rightIsNull) {
-            maybeUnwrapParentheses();
             return booleanLiteral(asBinary, valueIfEqual);
         }
         boolean leftIsNonNullLiteral = isNonNullLiteral(left);
         boolean rightIsNonNullLiteral = isNonNullLiteral(right);
         if ((leftIsNull && rightIsNonNullLiteral) || (rightIsNull && leftIsNonNullLiteral)) {
-            maybeUnwrapParentheses();
             return booleanLiteral(asBinary, !valueIfEqual);
         }
 
