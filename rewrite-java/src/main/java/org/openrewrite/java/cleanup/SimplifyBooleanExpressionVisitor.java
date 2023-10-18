@@ -23,7 +23,6 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.UnwrapParentheses;
-import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.tree.*;
 
 import java.util.Collections;
@@ -125,8 +124,8 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     @Override
     public J postVisit(J tree, ExecutionContext ctx) {
         J j = super.postVisit(tree, ctx);
-        if (getCursor().pollMessage(MAYBE_AUTO_FORMAT_ME) != null) {
-            j = new AutoFormatVisitor<>().visit(j, ctx, getCursor().getParentOrThrow());
+        if (j != null && getCursor().pollMessage(MAYBE_AUTO_FORMAT_ME) != null) {
+            j = autoFormat(j, ctx);
         }
         return j;
     }
