@@ -331,7 +331,22 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitCatchSection(KtCatchClause catchClause, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        J.VariableDeclarations paramDecl = (J.VariableDeclarations) catchClause.getCatchParameter().accept(this, data);
+        J.ControlParentheses param = new J.ControlParentheses<>(
+                randomId(),
+                prefix(catchClause.getParameterList()),
+                Markers.EMPTY,
+                padRight(paramDecl, prefix(catchClause.getParameterList().getRightParenthesis()))
+        );
+
+        J.Block body = (J.Block) catchClause.getCatchBody().accept(this, data);
+        return new J.Try.Catch(
+                randomId(),
+                prefix(catchClause),
+                Markers.EMPTY,
+                param,
+                body
+        );
     }
 
     @Override
@@ -1153,7 +1168,27 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitTryExpression(KtTryExpression expression, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        List<KtCatchClause> ktCatchClauses = expression.getCatchClauses();
+        J.Block block = (J.Block) expression.getTryBlock().accept(this, data);
+        List<J.Try.Catch> catches = new ArrayList(ktCatchClauses.size());
+        JLeftPadded<J.Block> finallyBlock = null;
+        for (KtCatchClause catchClause : ktCatchClauses) {
+            catches.add((J.Try.Catch) catchClause.accept(this, data));
+        }
+
+        if (expression.getFinallyBlock() != null) {
+            throw new UnsupportedOperationException("TODO");
+        }
+
+        return new J.Try(
+                randomId(),
+                prefix(expression),
+                Markers.EMPTY,
+                null,
+                block,
+                catches,
+                finallyBlock
+        );
     }
 
     @Override
