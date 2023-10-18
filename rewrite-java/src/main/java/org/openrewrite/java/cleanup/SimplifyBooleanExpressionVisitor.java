@@ -108,7 +108,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
 
     @Override
     public J postVisit(J tree, ExecutionContext ctx) {
-        J j = super.postVisit(tree, ctx);
+        J j = tree;
         if (j instanceof J.Parentheses) {
             j = new UnwrapParentheses<>((J.Parentheses<?>) j).visit(j, ctx, getCursor().getParentOrThrow());
         }
@@ -124,18 +124,44 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         J.Unary asUnary = (J.Unary) j;
 
         if (asUnary.getOperator() == J.Unary.Type.Not) {
-            if (isLiteralTrue(asUnary.getExpression())) {
-                j = ((J.Literal) asUnary.getExpression()).withValue(false).withValueSource("false");
-            } else if (isLiteralFalse(asUnary.getExpression())) {
-                j = ((J.Literal) asUnary.getExpression()).withValue(true).withValueSource("true");
-            } else if (asUnary.getExpression() instanceof J.Unary && ((J.Unary) asUnary.getExpression()).getOperator() == J.Unary.Type.Not) {
-                j = ((J.Unary) asUnary.getExpression()).getExpression();
+            Expression expr = asUnary.getExpression();
+            if (isLiteralTrue(expr)) {
+                j = ((J.Literal) expr).withValue(false).withValueSource("false");
+            } else if (isLiteralFalse(expr)) {
+                j = ((J.Literal) expr).withValue(true).withValueSource("true");
+            } else if (expr instanceof J.Unary && ((J.Unary) expr).getOperator() == J.Unary.Type.Not) {
+                j = ((J.Unary) expr).getExpression();
+            } else if (expr instanceof J.Parentheses && ((J.Parentheses<?>) expr).getTree() instanceof J.Binary) {
+                J.Binary binary = (J.Binary) ((J.Parentheses<?>) expr).getTree();
+                J.Binary.Type negated = negate(binary.getOperator());
+                if (negated != binary.getOperator()) {
+                    j = binary.withOperator(negated);
+                }
             }
         }
         if (asUnary != j) {
             getCursor().getParentTreeCursor().putMessage(MAYBE_AUTO_FORMAT_ME, "");
         }
         return j;
+    }
+
+    private J.Binary.Type negate(J.Binary.Type operator) {
+        switch (operator) {
+            case LessThan:
+                return J.Binary.Type.GreaterThanOrEqual;
+            case GreaterThan:
+                return J.Binary.Type.LessThanOrEqual;
+            case LessThanOrEqual:
+                return J.Binary.Type.GreaterThan;
+            case GreaterThanOrEqual:
+                return J.Binary.Type.LessThan;
+            case Equal:
+                return J.Binary.Type.NotEqual;
+            case NotEqual:
+                return J.Binary.Type.Equal;
+            default:
+                return operator;
+        }
     }
 
     private final MethodMatcher isEmpty = new MethodMatcher("java.lang.String isEmpty()");
@@ -210,10 +236,10 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     /**
      * Override this method to disable simplification of equals expressions,
      * specifically for Kotlin while that is not yet part of the OpenRewrite/rewrite.
-     *
+     * <p>
      * Comparing Kotlin nullable type `?` with tree/false can not be simplified,
      * e.g. `X?.fun() == true` is not equivalent to `X?.fun()`
-     *
+     * <p>
      * Subclasses will want to check if the `org.openrewrite.kotlin.marker.IsNullSafe`
      * marker is present.
      *

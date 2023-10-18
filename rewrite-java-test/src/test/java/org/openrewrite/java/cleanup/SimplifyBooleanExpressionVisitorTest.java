@@ -124,6 +124,62 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     }
 
     @Test
+    void doubleNegationWithParentheses() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  {
+                      boolean a = !!(!(!true));
+                      boolean b = !(!a);
+                  }
+              }
+              """,
+            """
+              public class A {
+                  {
+                      boolean a = true;
+                      boolean b = a;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void doubleNegatedBinaryWithParentheses() {
+        rewriteRun(
+          java(
+            """
+              public class A {
+                  {
+                      boolean a1 = !(1 == 1);
+                      boolean a2 = !(1 != 1);
+                      boolean a3 = !(1 < 1);
+                      boolean a4 = !(1 <= 1);
+                      boolean a5 = !(1 > 1);
+                      boolean a6 = !(1 >= 1);
+                  }
+              }
+              """,
+            """
+              public class A {
+                  {
+                      boolean a1 = 1 != 1;
+                      boolean a2 = 1 == 1;
+                      boolean a3 = 1 >= 1;
+                      boolean a4 = 1 > 1;
+                      boolean a5 = 1 <= 1;
+                      boolean a6 = 1 < 1;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void simplifyEqualsLiteralTrue() {
         rewriteRun(
           java(
