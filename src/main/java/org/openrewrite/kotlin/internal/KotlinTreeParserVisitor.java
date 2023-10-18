@@ -1115,7 +1115,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitSuperExpression(KtSuperExpression expression, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        return createIdentifier(expression, type(expression)).withPrefix(prefix(expression));
     }
 
     @Override
