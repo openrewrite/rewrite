@@ -603,6 +603,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 params.add(apply);
             }
         }
+
         return new K.FunctionType(
                 randomId(),
                 Space.EMPTY,
@@ -610,8 +611,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 emptyList(), // TODO
                 emptyList(), // TODO
                 type.getReceiver() != null ? padRight((NameTree) type.getReceiverTypeReference().accept(this, data), suffix(type.getReceiver())) : null,
-                JContainer.build(prefix(type), params, Markers.EMPTY),
-                null,
+                JContainer.build(prefix(type.getParameterList()), params, Markers.EMPTY),
+                suffix(type.getParameterList()),
                 type.getReturnTypeReference().accept(this, data).withPrefix(prefix(type.getReturnTypeReference()))
         );
     }

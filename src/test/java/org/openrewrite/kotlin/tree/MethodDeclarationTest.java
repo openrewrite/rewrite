@@ -60,7 +60,7 @@ class MethodDeclarationTest implements RewriteTest {
     @Test
     void functionTypeWithReceiver() {
         rewriteRun(
-          kotlin("fun method ( arg : String . ( ) -> String ) { }")
+          kotlin("fun method (  arg   :    String .  (   )    -> String  ) { }")
         );
     }
 
