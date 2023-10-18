@@ -17,6 +17,9 @@ dependencies {
 }
 
 tasks.withType<JavaCompile> {
+    javaCompiler = javaToolchains.compilerFor {
+        languageVersion = JavaLanguageVersion.of(JavaVersion.VERSION_21.toString())
+    }
     // allows --add-exports to in spite of the JDK's restrictions on this
     sourceCompatibility = JavaVersion.VERSION_21.toString()
     targetCompatibility = JavaVersion.VERSION_21.toString()

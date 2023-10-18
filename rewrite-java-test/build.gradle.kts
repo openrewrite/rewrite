@@ -29,6 +29,10 @@ tasks.withType<Javadoc> {
 }
 
 tasks.named<JavaCompile>("compileTestJava") {
+    javaCompiler = javaToolchains.compilerFor {
+        languageVersion = JavaLanguageVersion.of(JavaVersion.VERSION_21.toString())
+    }
+
     sourceCompatibility = JavaVersion.VERSION_21.toString()
     targetCompatibility = JavaVersion.VERSION_21.toString()
 
@@ -36,6 +40,9 @@ tasks.named<JavaCompile>("compileTestJava") {
 }
 
 tasks.withType<Test> {
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(JavaVersion.VERSION_21.toString())
+    }
     systemProperty("junit.jupiter.extensions.autodetection.enabled", true)
 }
 
