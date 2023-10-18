@@ -49,10 +49,10 @@ class WhenTest implements RewriteTest {
           kotlin(
             """
               fun method ( i : Int ) : String {
-                  when {
-                      i == 1 -> return "1"
-                      i == 2 -> return "2"
-                      else -> {
+                  when  {
+                      i == 1  ->   return "1"
+                      i == 2   ->  return "2"
+                      else    ->  {
                           return "42"
                       }
                   }

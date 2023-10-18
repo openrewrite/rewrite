@@ -1335,17 +1335,72 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitWhenConditionWithExpression(KtWhenConditionWithExpression condition, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        return condition.getExpression().accept(this, data);
     }
 
     @Override
     public J visitWhenEntry(KtWhenEntry ktWhenEntry, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        List<JRightPadded<Expression>> expressions = new ArrayList<>(1);
+
+        if (ktWhenEntry.getElseKeyword() != null) {
+            expressions.add(padRight(createIdentifier("else", Space.EMPTY, null, null), prefix(ktWhenEntry.getArrow())));
+        } else {
+            KtWhenCondition[] ktWhenConditions = ktWhenEntry.getConditions();
+            if (ktWhenConditions.length != 1) {
+                throw new UnsupportedOperationException("TODO");
+            }
+
+            KtWhenCondition ktWhenCondition = ktWhenConditions[0];
+            Expression expr = convertToExpression(ktWhenCondition.accept(this, data));
+            expressions.add(padRight(expr, prefix(ktWhenEntry.getArrow())));
+        }
+
+        JContainer<Expression> expressionContainer = JContainer.build(Space.EMPTY, expressions, Markers.EMPTY);
+
+        J body = ktWhenEntry.getExpression().accept(this, data);
+
+        return new K.WhenBranch(
+                randomId(),
+                prefix(ktWhenEntry),
+                Markers.EMPTY,
+                expressionContainer,
+                padRight(body, Space.EMPTY)
+        );
     }
 
     @Override
     public J visitWhenExpression(KtWhenExpression expression, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        J.ControlParentheses<J> controlParentheses = null;
+
+        if (expression.getSubjectExpression() != null) {
+            throw new UnsupportedOperationException("TODO");
+        }
+
+        List<KtWhenEntry> whenEntries = expression.getEntries();
+        List<JRightPadded<Statement>> statements = new ArrayList<>(whenEntries.size());
+
+        for (KtWhenEntry whenEntry : whenEntries) {
+            K.WhenBranch whenBranch = (K.WhenBranch) whenEntry.accept(this, data);
+            statements.add(padRight(whenBranch, Space.EMPTY));
+        }
+
+        J.Block body = new J.Block(
+                randomId(),
+                prefix(expression.getOpenBrace()),
+                Markers.EMPTY,
+                new JRightPadded<>(false, Space.EMPTY, Markers.EMPTY),
+                statements,
+                prefix(expression.getCloseBrace())
+        );
+
+        return new K.When(
+                randomId(),
+                prefix(expression),
+                Markers.EMPTY,
+                controlParentheses,
+                body,
+                type(expression)
+        );
     }
 
     @Override
