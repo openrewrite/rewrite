@@ -32,12 +32,13 @@ class CreateJavaClassTest implements RewriteTest {
                         "org.openrewrite.example",
                         "ExampleClass",
                         "package %s;\n\npublic class %s {}",
-                        null
+                        null,
+                        "foo/bar/"
                 )),
                 java(
                         null,
                         "package org.openrewrite.example;\n\npublic class ExampleClass {}\n",
-                        spec -> spec.path("src/main/java/org/openrewrite/example/ExampleClass.java")
+                        spec -> spec.path("foo/bar/src/main/java/org/openrewrite/example/ExampleClass.java")
                 )
         );
     }
@@ -51,7 +52,8 @@ class CreateJavaClassTest implements RewriteTest {
                         "org.openrewrite.example",
                         "ExampleClass",
                         "package %s;\n\npublic class %s {}",
-                        true
+                        true,
+                        null
                 )),
                 java(
                         "package org.openrewrite.example;\n\npublic class ExampleClass { Object o = null; }",
@@ -69,7 +71,8 @@ class CreateJavaClassTest implements RewriteTest {
                         "org.openrewrite.example",
                         "ExampleClass",
                         "package %s;\n\npublic class %s {}\n",
-                        false
+                        false,
+                        null
                 )),
                 java(
                         "package org.openrewrite.example;\n\npublic class ExampleClass { Object o = null; }\n",
@@ -86,6 +89,7 @@ class CreateJavaClassTest implements RewriteTest {
                         "org.openrewrite.example",
                         "ExampleClass",
                         "package %s;\n\npublic class %s {}\n",
+                        null,
                         null
                 )),
                 java(
@@ -103,7 +107,8 @@ class CreateJavaClassTest implements RewriteTest {
                         "org.openrewrite.example",
                         "ExampleClass2",
                         "package %s;\n\npublic class %s {}\n",
-                        true
+                        true,
+                        null
                 )),
                 java(
                         "package org.openrewrite.example;\n\npublic class ExampleClass1 { Object o = null; }\n",

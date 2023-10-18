@@ -82,19 +82,28 @@ public class CreateJavaClass extends ScanningRecipe<AtomicBoolean> {
     @Nullable
     Boolean overwriteExisting;
 
+    @Option(displayName = "Relative directory path",
+            description = "Directory path of new class.",
+            required = false,
+            example = "foo/bar")
+    @Nullable
+    String relativePath;
+
     @JsonCreator
     public CreateJavaClass(
             @JsonProperty("sourceRoot") String sourceRoot,
             @JsonProperty("packageName") String packageName,
             @JsonProperty("className") String className,
             @Language("java") @JsonProperty("classTemplate") String classTemplate,
-            @JsonProperty("overwriteExisting") @Nullable Boolean overwriteExisting
+            @JsonProperty("overwriteExisting") @Nullable Boolean overwriteExisting,
+            @JsonProperty("relativePath") @Nullable String relativePath
     ) {
         this.sourceRoot = sourceRoot;
         this.packageName = packageName;
         this.className = className;
         this.classTemplate = classTemplate;
         this.overwriteExisting = overwriteExisting;
+        this.relativePath = relativePath;
     }
 
     @Override
@@ -151,6 +160,21 @@ public class CreateJavaClass extends ScanningRecipe<AtomicBoolean> {
     }
 
     private @NonNull String getSourcePath() {
-        return String.format("src/%s/java/%s/%s.java", sourceRoot, packageName.replace('.', '/'), className);
+        String relativePath = this.getRelativePath();
+        if (relativePath == null) {
+            relativePath = "";
+        }
+
+        if (!relativePath.isEmpty() && !relativePath.endsWith("/")) {
+            relativePath = relativePath + "/";
+        }
+
+        return String.format(
+                "%ssrc/%s/java/%s/%s.java",
+                relativePath,
+                sourceRoot,
+                packageName.replace('.', '/'),
+                className
+        );
     }
 }
