@@ -21,7 +21,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.UnwrapParentheses;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -98,7 +97,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     public J postVisit(J tree, ExecutionContext ctx) {
         J j = tree;
         if (j instanceof J.Parentheses) {
-            j = new UnwrapParentheses<>((J.Parentheses<?>) j).visit(j, ctx, getCursor().getParentOrThrow());
+            j = new UnnecessaryParenthesesVisitor<>().visit(j, ctx, getCursor().getParentOrThrow());
         }
         if (j != null && getCursor().pollMessage(MAYBE_AUTO_FORMAT_ME) != null) {
             j = autoFormat(j, ctx);
@@ -123,7 +122,13 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 J.Binary binary = (J.Binary) ((J.Parentheses<?>) expr).getTree();
                 J.Binary.Type negated = negate(binary.getOperator());
                 if (negated != binary.getOperator()) {
-                    j = binary.withOperator(negated);
+                    j = binary.withOperator(negated).withPrefix(j.getPrefix());
+                }
+            } else if (expr instanceof J.Parentheses && ((J.Parentheses<?>) expr).getTree() instanceof J.Unary) {
+                J.Unary unary1 = (J.Unary) ((J.Parentheses<?>) expr).getTree();
+                J.Unary.Type operator = unary1.getOperator();
+                if (operator == J.Unary.Type.Not) {
+                    j = unary1.getExpression().withPrefix(j.getPrefix());
                 }
             }
         }
