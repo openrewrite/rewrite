@@ -277,6 +277,17 @@ class BinaryTest implements RewriteTest {
     }
 
     @Test
+    void elvis() {
+        rewriteRun(
+          kotlin(
+            """
+              val a = "S" ?: "X"
+              """
+          )
+        );
+    }
+
+    @Test
     void rem() {
         rewriteRun(
           kotlin(

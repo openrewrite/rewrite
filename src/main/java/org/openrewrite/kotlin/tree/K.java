@@ -506,6 +506,7 @@ public interface K extends J {
 
         public enum Type {
             Contains,
+            Elvis,
             NotContains,
             @Deprecated // kept for backwards compatibility
             Get,
