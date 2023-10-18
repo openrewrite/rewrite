@@ -581,7 +581,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitFinallySection(KtFinallySection finallySection, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        return finallySection.getFinalExpression().accept(this, data);
     }
 
     @Override
@@ -1177,7 +1177,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         if (expression.getFinallyBlock() != null) {
-            throw new UnsupportedOperationException("TODO");
+            finallyBlock = padLeft(prefix(expression.getFinallyBlock()), (J.Block) expression.getFinallyBlock().accept(this, data));
         }
 
         return new J.Try(

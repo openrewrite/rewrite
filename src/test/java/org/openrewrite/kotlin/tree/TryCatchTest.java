@@ -46,7 +46,8 @@ class TryCatchTest implements RewriteTest {
             """
               fun method ( ) {
                   try {
-                  } finally {
+                  }  finally   {
+                      val x = 0
                   }
               }
               """
