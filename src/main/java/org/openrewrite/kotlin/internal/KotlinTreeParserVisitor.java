@@ -1373,7 +1373,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         for (int i = 0; i < declarations.size(); i++) {
             boolean last = i == declarations.size() - 1;
             KtDeclaration declaration = declarations.get(i);
-            Statement statement = convertToStatement(declaration.accept(this, data).withPrefix(prefix(declaration)));
+            Statement statement = convertToStatement(declaration.accept(this, data));
             statements.add(padRight(statement, last ? suffix(declaration) : Space.EMPTY));
         }
 
@@ -1870,7 +1870,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.ClassDeclaration(
                 randomId(),
-                prefix(klass),
+                merge(prefix(klass), infix(klass)) ,
                 markers,
                 leadingAnnotations,
                 modifiers,
@@ -3191,6 +3191,21 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             return Space.EMPTY;
         }
         return space(whitespace);
+    }
+
+    private Space infix(@Nullable PsiElement element) {
+        if (element == null) {
+            return Space.EMPTY;
+        }
+        List<PsiElement> children = getAllChildren(element);
+
+        for (PsiElement child : children) {
+            if (!isSpace(child.getNode())) {
+                return prefix(child);
+            }
+        }
+
+        return Space.EMPTY;
     }
 
     private boolean isSpace(ASTNode node) {
