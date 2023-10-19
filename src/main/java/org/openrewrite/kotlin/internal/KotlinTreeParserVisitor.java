@@ -1305,7 +1305,14 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitWhenConditionInRange(KtWhenConditionInRange condition, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        K.Binary.Type operator = condition.isNegated() ? K.Binary.Type.NotContains : K.Binary.Type.Contains;
+        Expression left = new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY);
+        return new K.Binary(randomId(), prefix(condition), Markers.EMPTY, left,
+                padLeft(Space.EMPTY, operator),
+                convertToExpression(condition.getRangeExpression().accept(this, data)),
+                Space.EMPTY,
+                type(condition)
+        );
     }
 
     @Override
