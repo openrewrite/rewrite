@@ -61,11 +61,11 @@ public class FindProperties extends Recipe {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, context);
-                if (isPropertyTag() && propertyMatcher.matcher(tag.getName()).matches()) {
+                if (isPropertyTag() && propertyMatcher.matcher(t.getName()).matches()) {
                     t = SearchResult.found(t);
                 }
 
-                Optional<String> value = tag.getValue();
+                Optional<String> value = t.getValue();
                 if (value.isPresent() && propertyUsageMatcher.matcher(value.get()).matches()) {
                     //noinspection unchecked
                     t = t.withContent(ListUtils.mapFirst((List<Content>) t.getContent(), v ->
