@@ -395,7 +395,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
             m = ko.withPrefix(visitSpace(ko.getPrefix(), KSpace.Location.OBJECT_PREFIX, p));
         } else if (marker instanceof SpreadArgument) {
             SpreadArgument sa = (SpreadArgument) marker;
-            m = sa.withSuffix(visitSpace(sa.getSuffix(), KSpace.Location.SPREAD_ARGUMENT_SUFFIX, p));
+            m = sa.withPrefix(visitSpace(sa.getPrefix(), KSpace.Location.SPREAD_ARGUMENT_PREFIX, p));
         } else if (marker instanceof TypeReferencePrefix) {
             TypeReferencePrefix tr = (TypeReferencePrefix) marker;
             m = tr.withPrefix(visitSpace(tr.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p));

@@ -966,6 +966,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.append(',');
                 }
 
+                SpreadArgument spread = arg.getElement().getMarkers().findFirst(SpreadArgument.class).orElse(null);
+                if (spread != null) {
+                    kotlinPrinter.visitSpace(spread.getPrefix(), KSpace.Location.SPREAD_ARGUMENT_PREFIX, p);
+                    p.append('*');
+                }
                 visitRightPadded(arg, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT, p);
             }
 
@@ -1209,9 +1214,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 // TODO the space should then probably be printed anyway (could contain a comment)
                 p.append(',');
                 visitSpace(((TrailingComma) marker).getSuffix(), Space.Location.LANGUAGE_EXTENSION, p);
-            } else if (marker instanceof SpreadArgument) {
-                p.append('*');
-                kotlinPrinter.visitSpace(((SpreadArgument) marker).getSuffix(), KSpace.Location.SPREAD_ARGUMENT_SUFFIX, p);
             }
 
             return super.visitMarker(marker, p);

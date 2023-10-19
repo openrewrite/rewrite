@@ -414,12 +414,16 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
                                             SpreadArgument spreadArgument = arg.getElement().getMarkers().findFirst(SpreadArgument.class).get();
                                             arg = arg.withElement(
                                                     arg.getElement().withMarkers(arg.getMarkers().setByType(spreadArgument
-                                                            .withSuffix(updateSpace(spreadArgument.getSuffix(), style.getAroundOperators().getUnary()))))
+                                                            .withPrefix(updateSpace(spreadArgument.getPrefix(), before))))
+                                            );
+                                            arg = arg.withElement(
+                                                    spaceBefore(arg.getElement(), style.getAroundOperators().getUnary())
+                                            );
+                                        } else {
+                                            arg = arg.withElement(
+                                                    spaceBefore(arg.getElement(), before)
                                             );
                                         }
-                                        arg = arg.withElement(
-                                                spaceBefore(arg.getElement(), before)
-                                        );
                                         if (index == argsSize - 1) {
                                             arg = spaceAfter(arg, false);
                                         } else {
