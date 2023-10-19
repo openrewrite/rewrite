@@ -38,7 +38,7 @@ public class FindProperties extends Recipe {
 
     @Option(displayName = "Property pattern",
             description = "Regular expression pattern used to match property tag names.",
-            example = "guava*")
+            example = "guava.*")
     String propertyPattern;
 
     UUID searchId = randomId();
@@ -55,11 +55,8 @@ public class FindProperties extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        Pattern propertyMatcher = Pattern.compile(propertyPattern
-                .replace(".", "\\.")
-                .replace("*", ".*"));
-        Pattern propertyUsageMatcher = Pattern.compile(
-                ".*\\$\\{" + propertyMatcher.pattern() + "}.*");
+        Pattern propertyMatcher = Pattern.compile(propertyPattern);
+        Pattern propertyUsageMatcher = Pattern.compile(".*\\$\\{" + propertyMatcher.pattern() + "}.*");
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
