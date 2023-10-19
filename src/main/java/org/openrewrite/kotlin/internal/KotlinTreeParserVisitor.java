@@ -1373,7 +1373,14 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         J.ControlParentheses<J> controlParentheses = null;
 
         if (expression.getSubjectExpression() != null) {
-            throw new UnsupportedOperationException("TODO");
+            J subject = expression.getSubjectExpression().accept(this, data);
+            controlParentheses = new J.ControlParentheses<>(
+                    randomId(),
+                    prefix(expression.getLeftParenthesis()),
+                    Markers.EMPTY,
+                    padRight(convertToExpression(subject),
+                    prefix(expression.getRightParenthesis()))
+                );
         }
 
         List<KtWhenEntry> whenEntries = expression.getEntries();

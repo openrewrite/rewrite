@@ -68,7 +68,7 @@ class WhenTest implements RewriteTest {
           kotlin(
             """
               fun method ( i : Int ) : String {
-                  when ( i ) {
+                  when (  i   ) {
                       1 , 2 , 3 -> return "1 or 2 or 3"
                       else -> {
                           return "42"
