@@ -1335,7 +1335,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitWhenConditionWithExpression(KtWhenConditionWithExpression condition, ExecutionContext data) {
-        return condition.getExpression().accept(this, data);
+        return condition.getExpression().accept(this, data).withPrefix(prefix(condition));
     }
 
     @Override
@@ -1346,17 +1346,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             expressions.add(padRight(createIdentifier("else", Space.EMPTY, null, null), prefix(ktWhenEntry.getArrow())));
         } else {
             KtWhenCondition[] ktWhenConditions = ktWhenEntry.getConditions();
-            if (ktWhenConditions.length != 1) {
-                throw new UnsupportedOperationException("TODO");
+            for (KtWhenCondition ktWhenCondition : ktWhenConditions) {
+                Expression expr = convertToExpression(ktWhenCondition.accept(this, data));
+                expressions.add(padRight(expr, suffix(ktWhenCondition)));
             }
-
-            KtWhenCondition ktWhenCondition = ktWhenConditions[0];
-            Expression expr = convertToExpression(ktWhenCondition.accept(this, data));
-            expressions.add(padRight(expr, prefix(ktWhenEntry.getArrow())));
         }
 
         JContainer<Expression> expressionContainer = JContainer.build(Space.EMPTY, expressions, Markers.EMPTY);
-
         J body = ktWhenEntry.getExpression().accept(this, data);
 
         return new K.WhenBranch(
