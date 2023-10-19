@@ -27,7 +27,7 @@ class FindPropertiesTest implements RewriteTest {
     @Test
     void findProperty() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperties("guava*")),
+          spec -> spec.recipe(new FindProperties("guava.*")),
           pomXml(
             """
               <project>
@@ -72,7 +72,7 @@ class FindPropertiesTest implements RewriteTest {
     @Test
     void doesNotMatchOtherPropertyUsages() {
         rewriteRun(
-          spec -> spec.recipe(new FindProperties("guava*")),
+          spec -> spec.recipe(new FindProperties("guava.*")),
           pomXml(
             """
               <project>
