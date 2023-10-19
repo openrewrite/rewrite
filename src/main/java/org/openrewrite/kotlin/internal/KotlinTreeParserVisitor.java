@@ -22,6 +22,7 @@ import org.jetbrains.kotlin.com.intellij.psi.*;
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.tree.LeafPsiElement;
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.tree.PsiErrorElementImpl;
 import org.jetbrains.kotlin.com.intellij.psi.tree.IElementType;
+import org.jetbrains.kotlin.com.intellij.psi.tree.TokenSet;
 import org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.kotlin.fir.ClassMembersKt;
 import org.jetbrains.kotlin.fir.FirElement;
@@ -1179,7 +1180,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<J.Modifier> modifiers = new ArrayList<>();
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
         List<J.Annotation> lastAnnotations = new ArrayList<>();
-        modifiers.add(new J.Modifier(randomId(), Space.EMPTY, markers, "typealias", J.Modifier.Type.LanguageExtension, emptyList()));
+        modifiers.add(new J.Modifier(randomId(), prefix(typeAlias.getTypeAliasKeyword()), markers, "typealias", J.Modifier.Type.LanguageExtension, emptyList()));
+
+        mapModifiers(typeAlias.getModifierList(), leadingAnnotations, lastAnnotations, data);
 
         if (typeAlias.getIdentifyingElement() == null) {
             throw new UnsupportedOperationException("TODO");
@@ -1207,7 +1210,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 randomId(),
                 prefix(typeAlias),
                 markers,
-                emptyList(),
+                leadingAnnotations,
                 modifiers,
                 name,
                 null,
@@ -1241,6 +1244,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             throw new UnsupportedOperationException("TODO");
         }
 
+        mapModifiers(parameter.getModifierList(), annotations, emptyList(), data);
+
         if (parameter.getVariance() == Variance.INVARIANT) {
             if (parameter.getModifierList() != null && parameter.getModifierList().getNode().findChildByType(KtTokens.REIFIED_KEYWORD) != null) {
                 markers = markers.addIfAbsent(new Reified(randomId()));
@@ -1259,9 +1264,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             GenericType.Variance variance = parameter.getVariance() == Variance.IN_VARIANCE ?
                     GenericType.Variance.CONTRAVARIANT : GenericType.Variance.COVARIANT;
             markers = markers.addIfAbsent(new GenericType(randomId(), variance));
-            name = createIdentifier("<Any>", Space.EMPTY, null).withMarkers(Markers.build(singletonList(new Implicit(randomId())))); //  new J.Identifier(
+            name = createIdentifier("<Any>", Space.EMPTY, null).withMarkers(Markers.build(singletonList(new Implicit(randomId()))));
+
+            String varianceKeyword = parameter.getVariance() == Variance.IN_VARIANCE ? "in" : "out";
+            PsiElement varianceKeywordPsi = findLeafElement(parameter.getModifierList(), varianceKeyword);
+
             bounds = JContainer.build(
-                    Space.EMPTY,
+                    prefix(varianceKeywordPsi),
                     singletonList(padRight(
                             createIdentifier(parameter.getNameIdentifier(), type(parameter)), Space.EMPTY)),
                     Markers.EMPTY);
@@ -2907,12 +2916,25 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitTypeReference(KtTypeReference typeReference, ExecutionContext data) {
-        // TODO: fix NPE.
-        J j = typeReference.getTypeElement().accept(this, data).withPrefix(prefix(typeReference));
+        List<J.Annotation> leadingAnnotations = new ArrayList<>();
+        List<J.Annotation> lastAnnotations = new ArrayList<>();
+        boolean prefixConsumed = false;
+
+        mapModifiers(typeReference.getModifierList(), leadingAnnotations, lastAnnotations, data);
+        if (!leadingAnnotations.isEmpty()) {
+            leadingAnnotations = ListUtils.mapFirst(leadingAnnotations, anno -> anno.withPrefix(prefix(typeReference)));
+            prefixConsumed = true;
+        }
+
+        J j = typeReference.getTypeElement().accept(this, data)
+                .withPrefix( prefixConsumed ? prefix(typeReference.getTypeElement()) : merge(prefix(typeReference), prefix(typeReference.getTypeElement())));
         if (j instanceof K.FunctionType &&
                 typeReference.getModifierList() != null &&
                 typeReference.getModifierList().hasModifier(KtTokens.SUSPEND_KEYWORD)) {
-            j = ((K.FunctionType) j).withModifiers(singletonList(new J.Modifier(randomId(), Space.EMPTY, Markers.EMPTY, "suspend", J.Modifier.Type.LanguageExtension, emptyList())));
+            j = ((K.FunctionType) j).withModifiers(singletonList(new J.Modifier(randomId(), Space.EMPTY, Markers.EMPTY, "suspend", J.Modifier.Type.LanguageExtension, emptyList())))
+                    .withLeadingAnnotations(leadingAnnotations);
+        } else if (j instanceof J.Identifier) {
+            j = ((J.Identifier) j).withAnnotations(leadingAnnotations);
         }
         return j;
     }
@@ -3526,6 +3548,18 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             children.add(it);
         }
         return children;
+    }
+
+    @Nullable
+    private PsiElement findLeafElement(PsiElement parent, String text) {
+        List<PsiElement> children = getAllChildren(parent);
+        for (PsiElement child : children) {
+            if (child instanceof LeafPsiElement && child.getText().equals(text)) {
+                return child;
+            }
+        }
+
+        return null;
     }
 
 }

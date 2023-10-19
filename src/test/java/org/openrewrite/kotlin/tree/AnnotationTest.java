@@ -352,7 +352,7 @@ class AnnotationTest implements RewriteTest {
                       @Ann return (@Ann s)
                   }
               }
-              @Ann typealias Other = @Ann String
+              @Ann typealias Other =   @Ann  String
               """
           )
         );
