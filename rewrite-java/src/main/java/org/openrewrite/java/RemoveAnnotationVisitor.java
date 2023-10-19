@@ -18,12 +18,14 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -52,6 +54,9 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
                 }
             }
         }
+
+        maybeRemoveAnnotationParameterImports(leadingAnnotations);
+
         return c;
     }
 
@@ -79,6 +84,9 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
                 }
             }
         }
+
+        maybeRemoveAnnotationParameterImports(leadingAnnotations);
+
         return m;
     }
 
@@ -102,6 +110,8 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
                 }
             }
         }
+
+        maybeRemoveAnnotationParameterImports(leadingAnnotations);
 
         return v;
     }
@@ -132,6 +142,23 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
                 }
             }
         }
+
         return newLeadingAnnotations;
+    }
+
+    /**
+     * If the annotation has parameters, then the imports for the parameter types may need to be removed.
+     *
+     * @param annotations the list of annotations to check
+     */
+    private void maybeRemoveAnnotationParameterImports(List<J.Annotation> annotations) {
+        annotations
+                .stream()
+                .filter(a -> a.getArguments() != null && !a.getArguments().isEmpty())
+                .flatMap(a -> a.getArguments().stream())
+                .map(Expression::getType)
+                .map(TypeUtils::asFullyQualified)
+                .filter(Objects::nonNull)
+                .forEach(e -> maybeRemoveImport(TypeUtils.asFullyQualified(e)));
     }
 }

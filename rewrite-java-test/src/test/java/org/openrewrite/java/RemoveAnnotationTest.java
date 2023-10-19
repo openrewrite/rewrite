@@ -538,4 +538,79 @@ class RemoveAnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void unusedAnnotationParameterImports() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@javax.ejb.TransactionAttribute")),
+          java(
+            """
+              package javax.ejb;
+               
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+               
+              /**
+               * The transaction attribute annotation.
+               */
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target({ElementType.METHOD,ElementType.TYPE})
+              public @interface TransactionAttribute {
+                  TransactionAttributeType value() default TransactionAttributeType.REQUIRED;
+              }
+              """
+          ),
+          java(
+            """
+              package javax.ejb;
+                        
+              /**
+               * The Transaction annotations
+               */
+              public enum TransactionAttributeType {
+                  MANDATORY,
+                  REQUIRED,
+                  REQUIRES_NEW,
+                  SUPPORTS,
+                  NOT_SUPPORTED,
+                  NEVER,
+              }
+              """
+          ),
+          java(
+            """
+              import javax.ejb.TransactionAttributeType;
+              import javax.ejb.TransactionAttribute;
+                            
+              @TransactionAttribute(TransactionAttributeType.NEVER)
+              public class ClassAnnotatedTransactionalService {
+                  public void doWork() {}
+              }
+              """,
+            """
+              public class ClassAnnotatedTransactionalService {
+                  public void doWork() {}
+              }
+              """
+          ),
+          java(
+            """
+              import javax.ejb.TransactionAttributeType;
+              import javax.ejb.TransactionAttribute;
+                            
+              public class MethodAnnotatedTransactionalService {
+                  @TransactionAttribute(TransactionAttributeType.NEVER)
+                  public void doWork() {}
+              }
+              """,
+            """
+              public class MethodAnnotatedTransactionalService {
+                  public void doWork() {}
+              }
+              """
+          )
+        );
+    }
 }
