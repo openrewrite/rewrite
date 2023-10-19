@@ -229,7 +229,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         IElementType type = expression.getOperationReference().getReferencedNameElementType();
 
         if (type == KtTokens.AS_KEYWORD || type == KtTokens.AS_SAFE) {
-            J.Identifier clazz = expression.getRight().accept(this, data).withPrefix(prefix(expression.getRight()));
+            J clazz = expression.getRight().accept(this, data).withPrefix(prefix(expression.getRight()));
             Markers markers = Markers.EMPTY;
             if (type == KtTokens.AS_SAFE) {
                 markers = markers.addIfAbsent(new IsNullSafe(randomId(), Space.EMPTY));
@@ -1384,8 +1384,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     randomId(),
                     prefix(expression.getLeftParenthesis()),
                     Markers.EMPTY,
-                    padRight(convertToExpression(subject),
-                    prefix(expression.getRightParenthesis()))
+                    padRight(subject, prefix(expression.getRightParenthesis()))
                 );
         }
 

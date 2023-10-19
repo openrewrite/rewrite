@@ -219,7 +219,7 @@ class WhenTest implements RewriteTest {
                   val condition: Int = 11
                   when {
                       condition < 20   ->    'c'
-                      condition < 10   ->    -1
+                      condition < 10   ->    2
                       condition > 10   ->    (true)
                       else             ->    0.9
                   }
