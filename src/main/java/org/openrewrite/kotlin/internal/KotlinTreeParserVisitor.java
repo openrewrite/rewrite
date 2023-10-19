@@ -427,7 +427,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 randomId(),
                 prefix(expression.getParent()),
                 Markers.EMPTY,
-                null
+                expression.getTargetLabel() != null ? createIdentifier(expression.getTargetLabel().getIdentifier(), null) : null
         );
     }
 
@@ -626,7 +626,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 emptyList(), // TODO
                 emptyList(), // TODO
                 type.getReceiver() != null ? padRight((NameTree) type.getReceiverTypeReference().accept(this, data), suffix(type.getReceiver())) : null,
-                JContainer.build(prefix(type.getParameterList()), params, Markers.EMPTY),
+                JContainer.build(prefix(type), params, Markers.EMPTY),
                 suffix(type.getParameterList()),
                 type.getReturnTypeReference().accept(this, data).withPrefix(prefix(type.getReturnTypeReference()))
         );
@@ -3217,11 +3217,20 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     private Space prefix(@Nullable PsiElement element) {
+        return prefix(element, false);
+    }
+
+    @NotNull
+    private Space prefix(@Nullable PsiElement element, boolean checkParent) {
         if (element == null) {
             return Space.EMPTY;
         }
 
         PsiElement whitespace = element.getPrevSibling();
+        while (checkParent && (whitespace == null || !isSpace(whitespace.getNode()))) {
+            element = element.getParent();
+            whitespace = element.getPrevSibling();
+        }
         if (whitespace == null || !isSpace(whitespace.getNode())) {
             return Space.EMPTY;
         }
