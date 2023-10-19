@@ -607,15 +607,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 } else {
                     typeTree = (TypeTree) ktParameter.getTypeReference().accept(this, data);
                 }
-                Markers markers = Markers.EMPTY;
-                if (i == parameters.size() - 1) {
-                    PsiElement maybeComma = PsiTreeUtil.findSiblingForward(ktParameter, KtTokens.COMMA, null);
-                    if (maybeComma != null && maybeComma.getNode().getElementType() == KtTokens.COMMA) {
-                        markers = markers.addIfAbsent(new TrailingComma(randomId(), suffix(maybeComma)));
-                    }
-                }
-                JRightPadded<TypeTree> apply = padRight(typeTree.withPrefix(prefix(ktParameter)), suffix(ktParameter), markers);
-                params.add(apply);
+                params.add(maybeTrailingComma(ktParameter, padRight(typeTree.withPrefix(prefix(ktParameter)), suffix(ktParameter)), i == parameters.size() - 1));
             }
         }
 
@@ -752,14 +744,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<KtParameter> valueParameters = functionLiteral.getValueParameters();
         for (int i = 0; i < valueParameters.size(); i++) {
             KtParameter ktParameter = valueParameters.get(i);
-            Markers paramMarkers = Markers.EMPTY;
-            if (i == valueParameters.size() - 1) {
-                PsiElement maybeComma = PsiTreeUtil.findSiblingForward(ktParameter, KtTokens.COMMA, null);
-                if (maybeComma != null && maybeComma.getNode().getElementType() == KtTokens.COMMA) {
-                    paramMarkers = paramMarkers.addIfAbsent(new TrailingComma(randomId(), suffix(maybeComma)));
-                }
-            }
-            valueParams.add(padRight(ktParameter.accept(this, data).withPrefix(prefix(ktParameter)), suffix(ktParameter), paramMarkers));
+            J expr = ktParameter.accept(this, data).withPrefix(prefix(ktParameter));
+            valueParams.add(maybeTrailingComma(ktParameter, padRight(expr, suffix(ktParameter)), i == valueParameters.size() - 1));
         }
 
         J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), prefix(functionLiteral.getValueParameterList()), Markers.EMPTY, false, valueParams);
@@ -929,14 +915,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
             for (int i = 0; i < ktParameters.size(); i++) {
                 KtParameter ktParameter = ktParameters.get(i);
-                Markers markers = Markers.EMPTY;
-                if (i == ktParameters.size() - 1) {
-                    PsiElement maybeComma = PsiTreeUtil.findSiblingForward(ktParameter, KtTokens.COMMA, null);
-                    if (maybeComma != null && maybeComma.getNode().getElementType() == KtTokens.COMMA) {
-                        markers = markers.addIfAbsent(new TrailingComma(randomId(), suffix(maybeComma)));
-                    }
-                }
-                statements.add(padRight(convertToStatement(ktParameter.accept(this, data)), suffix(ktParameter), markers));
+                Statement statement = convertToStatement(ktParameter.accept(this, data));
+                statements.add(maybeTrailingComma(ktParameter, padRight(statement, suffix(ktParameter)), i == ktParameters.size() - 1));
             }
 
             if (ktParameters.isEmpty()) {
@@ -1346,9 +1326,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             expressions.add(padRight(createIdentifier("else", Space.EMPTY, null, null), prefix(ktWhenEntry.getArrow())));
         } else {
             KtWhenCondition[] ktWhenConditions = ktWhenEntry.getConditions();
-            for (KtWhenCondition ktWhenCondition : ktWhenConditions) {
+            for (int i = 0; i < ktWhenConditions.length; i++) {
+                KtWhenCondition ktWhenCondition = ktWhenConditions[i];
                 Expression expr = convertToExpression(ktWhenCondition.accept(this, data));
-                expressions.add(padRight(expr, suffix(ktWhenCondition)));
+                expressions.add(maybeTrailingComma(ktWhenCondition, padRight(expr, suffix(ktWhenCondition)), i == ktWhenConditions.length - 1));
             }
         }
 
@@ -1362,6 +1343,18 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 expressionContainer,
                 padRight(body, Space.EMPTY)
         );
+    }
+
+    @NotNull
+    private <T> JRightPadded<T> maybeTrailingComma(KtElement element, JRightPadded<T> padded, boolean last) {
+        if (!last) {
+            return padded;
+        }
+        PsiElement maybeComma = PsiTreeUtil.findSiblingForward(element, KtTokens.COMMA, null);
+        if (maybeComma != null && maybeComma.getNode().getElementType() == KtTokens.COMMA) {
+            padded = padded.withMarkers(padded.getMarkers().addIfAbsent(new TrailingComma(randomId(), suffix(maybeComma))));
+        }
+        return padded;
     }
 
     @Override
@@ -1774,14 +1767,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             if (!arguments.isEmpty()) {
                 for (int i = 0; i < arguments.size(); i++) {
                     KtValueArgument arg = arguments.get(i);
-                    JRightPadded<Expression> padded = padRight(convertToExpression(arg.accept(this, data)).withPrefix(prefix(arg)), suffix(arg));
-                    if (i == arguments.size() - 1) {
-                        PsiElement maybeComma = PsiTreeUtil.findSiblingForward(arg, KtTokens.COMMA, null);
-                        if (maybeComma != null && maybeComma.getNode().getElementType() == KtTokens.COMMA) {
-                            padded = padded.withMarkers(padded.getMarkers().addIfAbsent(new TrailingComma(randomId(), suffix(maybeComma))));
-                        }
-                    }
-                    expressions.add(padded);
+                    Expression expr = convertToExpression(arg.accept(this, data)).withPrefix(prefix(arg));
+                    expressions.add(maybeTrailingComma(arg, padRight(expr, suffix(arg)), i == arguments.size() - 1));
                 }
             } else {
                 expressions.add(padRight(new J.Empty(randomId(), prefix(expression.getValueArgumentList().getRightParenthesis()), Markers.EMPTY), Space.EMPTY));
