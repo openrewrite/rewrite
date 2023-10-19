@@ -355,7 +355,6 @@ public class StringUtils {
      * @return the number of times the substring is found in the target. 0 if no occurrences are found.
      */
     public static int countOccurrences(@NonNull String text, @NonNull String substring) {
-
         if (text.isEmpty() || substring.isEmpty()) {
             return 0;
         }

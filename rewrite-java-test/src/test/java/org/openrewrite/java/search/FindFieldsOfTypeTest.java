@@ -16,7 +16,8 @@
 package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.DocumentExample;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -28,7 +29,7 @@ class FindFieldsOfTypeTest implements RewriteTest {
     @Test
     void findFieldNotVariable() {
         rewriteRun(
-          spec -> spec.recipe(new FindFieldsOfType("java.io.File")),
+          spec -> spec.recipe(new FindFieldsOfType("java.io.File", null)),
           java(
             """
               import java.io.*;
@@ -42,24 +43,26 @@ class FindFieldsOfTypeTest implements RewriteTest {
         );
     }
 
-    @DocumentExample
-    @Test
-    void findPrivateNonInheritedField() {
+    @ParameterizedTest
+    @ValueSource(strings = {"java.util.List", "java.util.*", "java.util..*"})
+    void findPrivateNonInheritedField(String type) {
         rewriteRun(
-          spec -> spec.recipe(new FindFieldsOfType("java.util.List")),
+          spec -> spec.recipe(new FindFieldsOfType(type, null)),
           java(
             """
-              import java.util.*;
+              import java.security.SecureRandom;
+              import java.util.List;
               public class A {
                  private List<?> list;
-                 private Set<?> set;
+                 private SecureRandom rand;
               }
               """,
             """
-              import java.util.*;
+              import java.security.SecureRandom;
+              import java.util.List;
               public class A {
                  /*~~>*/private List<?> list;
-                 private Set<?> set;
+                 private SecureRandom rand;
               }
               """
           )
@@ -69,7 +72,7 @@ class FindFieldsOfTypeTest implements RewriteTest {
     @Test
     void findArrayOfType() {
         rewriteRun(
-          spec -> spec.recipe(new FindFieldsOfType("java.lang.String")),
+          spec -> spec.recipe(new FindFieldsOfType("java.lang.String", null)),
           java(
             """
               import java.util.*;
@@ -83,7 +86,7 @@ class FindFieldsOfTypeTest implements RewriteTest {
                  /*~~>*/private String[] s;
               }
               """
-            )
+          )
         );
     }
 
@@ -91,7 +94,7 @@ class FindFieldsOfTypeTest implements RewriteTest {
     @Test
     void skipsMultiCatches() {
         rewriteRun(
-          spec -> spec.recipe(new FindFieldsOfType("java.io.File")),
+          spec -> spec.recipe(new FindFieldsOfType("java.io.File", null)),
           java(
             """
               import java.io.*;
@@ -116,5 +119,4 @@ class FindFieldsOfTypeTest implements RewriteTest {
           )
         );
     }
-
 }

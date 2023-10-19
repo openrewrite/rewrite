@@ -60,7 +60,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleEnterpriseMavenExtension.Accumulator> {
+public class AddDevelocityMavenExtension extends ScanningRecipe<AddDevelocityMavenExtension.Accumulator> {
     private static final String GRADLE_ENTERPRISE_MAVEN_EXTENSION_ARTIFACT_ID = "gradle-enterprise-maven-extension";
     private static final String EXTENSIONS_XML_PATH = ".mvn/extensions.xml";
     private static final String GRADLE_ENTERPRISE_XML_PATH = ".mvn/gradle-enterprise.xml";
@@ -85,7 +85,7 @@ public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleE
     String version;
 
     @Option(displayName = "Server URL",
-            description = "The URL of the Gradle Enterprise server.",
+            description = "The URL of the Develocity server.",
             example = "https://scans.gradle.com/")
     String server;
 
@@ -138,12 +138,12 @@ public class AddGradleEnterpriseMavenExtension extends ScanningRecipe<AddGradleE
 
     @Override
     public String getDisplayName() {
-        return "Add Gradle Enterprise Maven extension";
+        return "Add the Develocity Maven extension";
     }
 
     @Override
     public String getDescription() {
-        return "To integrate Gradle Enterprise Maven extension into maven projects, ensure that the " +
+        return "To integrate the Develocity Maven extension into Maven projects, ensure that the " +
                "`gradle-enterprise-maven-extension` is added to the `.mvn/extensions.xml` file if not already present. " +
                "Additionally, configure the extension by adding the `.mvn/gradle-enterprise.xml` configuration file.";
     }

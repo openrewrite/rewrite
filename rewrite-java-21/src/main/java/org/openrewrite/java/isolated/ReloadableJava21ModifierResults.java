@@ -13,13 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.template;
+package org.openrewrite.java.isolated;
 
-import org.openrewrite.Incubating;
 import org.openrewrite.java.tree.J;
 
-@Incubating(since = "8.3.0")
-@FunctionalInterface
-public interface Matcher<T extends J> {
-    boolean matches(T t);
+import java.util.List;
+public final class ReloadableJava21ModifierResults {
+
+    private final List<J.Annotation> leadingAnnotations;
+    private final List<J.Modifier> modifiers;
+
+    public ReloadableJava21ModifierResults(List<J.Annotation> leadingAnnotations, List<J.Modifier> modifiers) {
+        this.leadingAnnotations = leadingAnnotations;
+        this.modifiers = modifiers;
+    }
+
+    public List<J.Annotation> getLeadingAnnotations() {
+        return leadingAnnotations;
+    }
+
+    public List<J.Modifier> getModifiers() {
+        return modifiers;
+    }
 }

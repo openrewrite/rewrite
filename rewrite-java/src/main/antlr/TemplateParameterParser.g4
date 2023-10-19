@@ -3,13 +3,26 @@ parser grammar TemplateParameterParser;
 options { tokenVocab=TemplateParameterLexer; }
 
 matcherPattern
-    :   matcherName LPAREN matcherParameter* RPAREN
+    : typedPattern
+    | parameterName
+    ;
+
+typedPattern
+    : (parameterName COLON)? patternType
+    ;
+
+patternType
+    : matcherName LPAREN ((matcherParameter COMMA)* matcherParameter)? RPAREN
     ;
 
 matcherParameter
     :   FullyQualifiedName
     |   Identifier
     |   Number
+    ;
+
+parameterName
+    : Identifier
     ;
 
 matcherName

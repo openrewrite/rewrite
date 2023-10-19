@@ -13,16 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.template;
+package org.openrewrite.java;
 
-import org.openrewrite.Incubating;
-import org.openrewrite.java.tree.Expression;
+import org.junit.jupiter.api.Tag;
 
-import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-@Incubating(since = "8.3.0")
-@Target(ElementType.PARAMETER)
-public @interface Matches {
-    Class<? extends Matcher<? super Expression>> value();
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.TYPE;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@Retention(RUNTIME)
+@Target({TYPE, METHOD})
+@Tag("java21")
+public @interface MinimumJava21 {
 }

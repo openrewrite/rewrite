@@ -13,14 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.template;
+@NonNullApi
+@NonNullFields
+package org.openrewrite.java.isolated;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-
-@Target(ElementType.PARAMETER)
-@Retention(RetentionPolicy.SOURCE)
-public @interface Primitive {
-}
+import org.openrewrite.internal.lang.NonNullApi;
+import org.openrewrite.internal.lang.NonNullFields;

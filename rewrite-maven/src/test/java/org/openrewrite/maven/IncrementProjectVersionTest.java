@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.java.Assertions.mavenProject;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 public class IncrementProjectVersionTest implements RewriteTest {
@@ -68,6 +69,54 @@ public class IncrementProjectVersionTest implements RewriteTest {
                   <version>8.5.0.0-SNAPSHOT</version>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void incrementParentVersion() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1.0.0</version>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>com.mycompany</groupId>
+                  <artifactId>my-parent</artifactId>
+                  <version>1.1.0</version>
+              </project>
+              """
+          ),
+          mavenProject("my-child",
+            pomXml(
+              """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>1.0.0</version>
+                    </parent>
+                    <groupId>com.mycompany</groupId>
+                    <artifactId>my-child</artifactId>
+                </project>
+                """,
+              """
+                <project>
+                    <parent>
+                        <groupId>com.mycompany</groupId>
+                        <artifactId>my-parent</artifactId>
+                        <version>1.1.0</version>
+                    </parent>
+                    <groupId>com.mycompany</groupId>
+                    <artifactId>my-child</artifactId>
+                </project>
+                """
+            )
           )
         );
     }

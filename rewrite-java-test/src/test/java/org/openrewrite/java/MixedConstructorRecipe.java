@@ -13,16 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.template;
+package org.openrewrite.java;
 
-import org.openrewrite.Incubating;
-import org.openrewrite.java.tree.Expression;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import org.openrewrite.Recipe;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Target;
+public class MixedConstructorRecipe extends Recipe {
+    public MixedConstructorRecipe() {
+        this(true);
+    }
 
-@Incubating(since = "8.3.0")
-@Target(ElementType.PARAMETER)
-public @interface NotMatches {
-    Class<? extends Matcher<? super Expression>> value();
+    @JsonCreator
+    public MixedConstructorRecipe(boolean opt) {
+    }
+
+    @Override
+    public String getDisplayName() {
+        return "Mixed constructor";
+    }
+
+    @Override
+    public String getDescription() {
+        return "A recipe with more than one constructor, with one marked as the primary.";
+    }
 }

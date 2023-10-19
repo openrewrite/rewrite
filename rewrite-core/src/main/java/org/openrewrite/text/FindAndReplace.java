@@ -17,17 +17,16 @@ package org.openrewrite.text;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import lombok.With;
 import org.openrewrite.*;
 import org.openrewrite.binary.Binary;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.quark.Quark;
 import org.openrewrite.remote.Remote;
 
 import java.util.Arrays;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -95,19 +94,6 @@ public class FindAndReplace extends Recipe {
         return "Simple text find and replace. When the original source file is a language-specific Lossless Semantic " +
                "Tree, this operation irreversibly converts the source file to a plain text file. Subsequent recipes " +
                "will not be able to operate on language-specific type.";
-    }
-
-
-    /**
-     * Ensure that the same replacement is not applied to the same file more than once per recipe run.
-     * Used to avoid the situation where replacing "a" with "ab" results in something like "abb".
-     */
-    @Value
-    @With
-    static class AlreadyReplaced implements Marker {
-        UUID id;
-        String find;
-        String replace;
     }
 
     @Override
