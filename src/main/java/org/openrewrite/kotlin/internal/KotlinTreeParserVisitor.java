@@ -1175,7 +1175,45 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitTypeAlias(KtTypeAlias typeAlias, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        Markers markers = Markers.EMPTY;
+        List<J.Modifier> modifiers = new ArrayList<>();
+        List<J.Annotation> leadingAnnotations = new ArrayList<>();
+        List<J.Annotation> lastAnnotations = new ArrayList<>();
+        modifiers.add(new J.Modifier(randomId(), Space.EMPTY, markers, "typealias", J.Modifier.Type.LanguageExtension, emptyList()));
+
+        if (typeAlias.getIdentifyingElement() == null) {
+            throw new UnsupportedOperationException("TODO");
+        }
+
+        J.Identifier name = createIdentifier(typeAlias.getIdentifyingElement(), type(typeAlias.getTypeReference()));// typeAlias.getIdentifyingElement().accept(this, data);
+        Expression expr = convertToExpression(typeAlias.getTypeReference().accept(this, data));
+
+        JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = padRight(
+                new J.VariableDeclarations.NamedVariable(
+                        randomId(),
+                        Space.EMPTY,
+                        Markers.EMPTY,
+                        // typealias does not have a name.
+                        createIdentifier("", Space.EMPTY, null, null),
+                        emptyList(),
+                        padLeft(suffix(typeAlias.getIdentifyingElement()), expr),
+                        null
+                ), Space.EMPTY
+        );
+
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars= singletonList(namedVariable);
+
+        return new J.VariableDeclarations(
+                randomId(),
+                prefix(typeAlias),
+                markers,
+                emptyList(),
+                modifiers,
+                name,
+                null,
+                emptyList(),
+                vars
+        );
     }
 
     @Override

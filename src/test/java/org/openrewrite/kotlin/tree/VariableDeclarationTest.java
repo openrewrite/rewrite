@@ -627,4 +627,27 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void typealias() {
+        rewriteRun(
+          kotlin(
+            """
+              class Other
+              typealias  OldAlias   =    Other
+              """
+          )
+        );
+    }
+
+    @Test
+    void typealiasLambda() {
+        rewriteRun(
+          kotlin(
+            """
+              typealias Operation =  (Int , Int )   ->    Int
+              """
+          )
+        );
+    }
 }
