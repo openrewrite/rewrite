@@ -1247,8 +1247,15 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         mapModifiers(parameter.getModifierList(), annotations, emptyList(), data);
 
         if (parameter.getVariance() == Variance.INVARIANT) {
-            if (parameter.getModifierList() != null && parameter.getModifierList().getNode().findChildByType(KtTokens.REIFIED_KEYWORD) != null) {
-                markers = markers.addIfAbsent(new Reified(randomId()));
+            PsiElement reifiedKeyword = findLeafElement(parameter.getModifierList(), "reified");
+            if (reifiedKeyword != null) {
+                J.Annotation reified = new J.Annotation(randomId(),
+                        prefix(reifiedKeyword),
+                        Markers.EMPTY.addIfAbsent(new Modifier(randomId())),
+                        createIdentifier("reified", Space.EMPTY, null, null),
+                        JContainer.empty()
+                );
+                annotations.add(reified);
             }
 
             name = createIdentifier(parameter.getNameIdentifier(), type(parameter));
@@ -3551,7 +3558,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     @Nullable
-    private PsiElement findLeafElement(PsiElement parent, String text) {
+    private PsiElement findLeafElement(@Nullable PsiElement parent, String text) {
+        if (parent == null) {
+            return null;
+        }
+
         List<PsiElement> children = getAllChildren(parent);
         for (PsiElement child : children) {
             if (child instanceof LeafPsiElement && child.getText().equals(text)) {
