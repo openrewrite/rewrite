@@ -20,5 +20,5 @@ dependencies {
     testImplementation(project(":rewrite-java-test"))
     testImplementation("org.junit-pioneer:junit-pioneer:2.0.0")
     testRuntimeOnly("org.codehaus.groovy:groovy-all:latest.release")
-    testRuntimeOnly(project(":rewrite-java-21"))
+    testRuntimeOnly(project(":rewrite-java-17"))
 }

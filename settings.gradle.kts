@@ -19,7 +19,7 @@ val allProjects = listOf(
         "rewrite-java",
         "rewrite-java-tck",
         "rewrite-java-test",
-        "rewrite-java-17",
+        "rewrite-java-17", // remove this when rewrite recipe gradle plugin moves to 21
         "rewrite-java-21",
         "rewrite-json",
         "rewrite-maven",
@@ -72,7 +72,9 @@ if (System.getProperty("idea.active") == null &&
         System.getProperty("idea.sync.active") == null) {
     include(
             "rewrite-java-8",
-            "rewrite-java-11"
+            "rewrite-java-11",
+            "rewrite-java-17",
+            "rewrite-java-21"
     )
 }
 

@@ -229,6 +229,20 @@ class MappingTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3632")
+    @Test
+    void multilineScalar() {
+        rewriteRun(
+          yaml(
+            """
+              data: &anc |
+                  @this is a long string@
+              bar: *anc
+              """
+          )
+        );
+    }
+
     @Test
     void literals() {
         rewriteRun(

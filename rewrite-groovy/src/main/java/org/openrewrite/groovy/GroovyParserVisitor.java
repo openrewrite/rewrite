@@ -700,6 +700,20 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitAssertStatement(AssertStatement statement) {
+            Space prefix = whitespace();
+            skip("assert");
+            Expression condition = visit(statement.getBooleanExpression());
+            JLeftPadded<Expression> message = null;
+            if (!(statement.getMessageExpression() instanceof ConstantExpression) || !((ConstantExpression) statement.getMessageExpression()).isNullExpression()) {
+                Space messagePrefix = whitespace();
+                skip(":");
+                message = padLeft(messagePrefix, visit(statement.getMessageExpression()));
+            }
+            queue.add(new J.Assert(randomId(), prefix, Markers.EMPTY, condition, message));
+        }
+
+        @Override
         public void visitBinaryExpression(BinaryExpression binary) {
             queue.add(insideParentheses(binary, fmt -> {
                 Expression left = visit(binary.getLeftExpression());
@@ -1145,7 +1159,7 @@ public class GroovyParserVisitor {
                     throw new IllegalStateException("Unexpected constant type " + type);
                 }
 
-                if (source.charAt(cursor) == '+' && !text.startsWith("+")) {
+                if (cursor < source.length() && source.charAt(cursor) == '+' && !text.startsWith("+")) {
                     // A unaryPlus operator is implied on numerics and needs to be manually detected / added via the source.
                     text = "+" + text;
                 }
@@ -1185,10 +1199,12 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitNotExpression(NotExpression expression) {
-            Space fmt = sourceBefore("!");
-            JLeftPadded<J.Unary.Type> op = padLeft(EMPTY, J.Unary.Type.Not);
-            Expression expr = visit(expression.getExpression());
-            queue.add(new J.Unary(randomId(), fmt, Markers.EMPTY, op, expr, typeMapping.type(expression.getType())));
+            queue.add(insideParentheses(expression, fmt -> {
+                skip("!");
+                JLeftPadded<J.Unary.Type> op = padLeft(EMPTY, J.Unary.Type.Not);
+                Expression expr = visit(expression.getExpression());
+                return new J.Unary(randomId(), fmt, Markers.EMPTY, op, expr, typeMapping.type(expression.getType()));
+            }));
         }
 
         @Override
