@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
@@ -332,6 +333,13 @@ public class KotlinTypeMappingTest {
         assertThat(clazzMethod.getAnnotations().get(0).getClassName()).isEqualTo("AnnotationWithRuntimeRetention");
     }
 
+    @Disabled
+    @Test
+    void receiver() {
+        JavaType.Method receiverMethod = methodType("receiver");
+        assertThat(receiverMethod.toString()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=receiver,return=kotlin.Unit,parameters=[org.openrewrite.kotlin.KotlinTypeGoat$TypeA,org.openrewrite.kotlin.C]}");
+    }
+
     @Test
     void recursiveIntersection() {
         JavaType.GenericTypeVariable clazz = TypeUtils.asGeneric(firstMethodParameter("recursiveIntersection"));
@@ -468,6 +476,7 @@ public class KotlinTypeMappingTest {
             );
         }
 
+        @SuppressWarnings({"KotlinConstantConditions", "UnusedUnaryOperator", "RedundantExplicitType"})
         @Test
         void whenExpression() {
             //noinspection RemoveRedundantQualifierName

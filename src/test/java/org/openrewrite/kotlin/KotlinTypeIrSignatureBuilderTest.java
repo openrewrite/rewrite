@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ package org.openrewrite.kotlin;
 
 import org.jetbrains.kotlin.com.intellij.openapi.Disposable;
 import org.jetbrains.kotlin.com.intellij.openapi.util.Disposer;
-import org.jetbrains.kotlin.fir.declarations.*;
+import org.jetbrains.kotlin.ir.declarations.*;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -31,13 +31,12 @@ import org.openrewrite.tree.ParsingExecutionContextView;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
-import java.util.Objects;
 
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class KotlinTypeSignatureBuilderTest {
-    private static final String goat = StringUtils.readFully(KotlinTypeSignatureBuilderTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
+public class KotlinTypeIrSignatureBuilderTest {
+    private static final String goat = StringUtils.readFully(KotlinTypeIrSignatureBuilderTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
 
     private static final Disposable disposable = Disposer.newDisposable();
     private static final CompiledSource compiledSource = KotlinParser.builder()
@@ -52,35 +51,34 @@ public class KotlinTypeSignatureBuilderTest {
         Disposer.dispose(disposable);
     }
 
-    public KotlinTypeSignatureBuilder signatureBuilder() {
-        return new KotlinTypeSignatureBuilder(compiledSource.getFirSession(), Objects.requireNonNull(compiledSource.getSources().iterator().next().getFirFile()).getSymbol());
+    public KotlinTypeIrSignatureBuilder signatureBuilder() {
+        return new KotlinTypeIrSignatureBuilder();
     }
 
-    private FirFile getCompiledSource() {
-        FirFile file = compiledSource.getSources().iterator().next().getFirFile();
+    private IrFile getCompiledSource() {
+        IrFile file = compiledSource.getSources().iterator().next().getIrFile();
         assert file != null;
         return file;
     }
 
     public String constructorSignature() {
         return signatureBuilder().methodDeclarationSignature(getCompiledSource().getDeclarations().stream()
-                .filter(FirRegularClass.class::isInstance)
-                .map(FirRegularClass.class::cast)
+                .filter(IrClass.class::isInstance)
+                .map(IrClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
-                .filter(FirConstructor.class::isInstance)
-                .map(FirFunction.class::cast)
+                .filter(IrConstructor.class::isInstance)
+                .map(IrConstructor.class::cast)
                 .findFirst()
-                .orElseThrow()
-                .getSymbol(), null);
+                .orElseThrow());
     }
 
     public Object innerClassSignature(String innerClassSimpleName) {
         return signatureBuilder().signature(getCompiledSource().getDeclarations().stream()
-                .filter(FirRegularClass.class::isInstance)
-                .map(FirRegularClass.class::cast)
+                .filter(IrClass.class::isInstance)
+                .map(IrClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
-                .filter(FirRegularClass.class::isInstance)
-                .map(FirRegularClass.class::cast)
+                .filter(IrClass.class::isInstance)
+                .map(IrClass.class::cast)
                 .filter(it -> innerClassSimpleName.equals(it.getName().asString()))
                 .findFirst()
                 .orElseThrow()
@@ -89,65 +87,64 @@ public class KotlinTypeSignatureBuilderTest {
 
     public String fieldSignature(String field) {
         return signatureBuilder().variableSignature(getCompiledSource().getDeclarations().stream()
-                .filter(FirRegularClass.class::isInstance)
-                .map(FirRegularClass.class::cast)
+                .filter(IrClass.class::isInstance)
+                .map(IrClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
-                .filter(FirProperty.class::isInstance)
-                .map(FirProperty.class::cast)
+                .filter(IrProperty.class::isInstance)
+                .map(IrProperty.class::cast)
                 .filter(it -> field.equals(it.getName().asString()))
                 .findFirst()
-                .orElseThrow()
-                .getSymbol(), null);
+                .orElseThrow());
     }
 
     @Nullable
-    public FirProperty getProperty(String field) {
+    public IrProperty getProperty(String field) {
         return getCompiledSource().getDeclarations().stream()
-                .filter(FirRegularClass.class::isInstance)
-                .map(FirRegularClass.class::cast)
+                .filter(IrClass.class::isInstance)
+                .map(IrClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
-                .filter(FirProperty.class::isInstance)
-                .map(FirProperty.class::cast)
+                .filter(IrProperty.class::isInstance)
+                .map(IrProperty.class::cast)
                 .filter(it -> field.equals(it.getName().asString()))
                 .findFirst()
                 .orElse(null);
     }
 
     public String fieldPropertyGetterSignature(String field) {
-        FirProperty property = getProperty(field);
+        IrProperty property = getProperty(field);
         if (property == null || property.getGetter() == null) {
             throw new UnsupportedOperationException("No filed or getter for " + field);
         }
-        return signatureBuilder().methodDeclarationSignature(property.getGetter().getSymbol(), getCompiledSource().getSymbol());
+        return signatureBuilder().methodDeclarationSignature(property.getGetter());
     }
 
     public String fieldPropertySetterSignature(String field) {
-        FirProperty property = getProperty(field);
+        IrProperty property = getProperty(field);
         if (property == null || property.getSetter() == null) {
             throw new UnsupportedOperationException("No filed or setter for " + field);
         }
-        return signatureBuilder().methodDeclarationSignature(property.getSetter().getSymbol(), getCompiledSource().getSymbol());
+        return signatureBuilder().methodDeclarationSignature(property.getSetter());
     }
 
     public Object firstMethodParameterSignature(String methodName) {
         return signatureBuilder().signature(getCompiledSource().getDeclarations().stream()
-                .filter(FirRegularClass.class::isInstance)
-                .map(FirRegularClass.class::cast)
+                .filter(IrClass.class::isInstance)
+                .map(IrClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
-                .filter(FirSimpleFunction.class::isInstance)
-                .map(FirSimpleFunction.class::cast)
+                .filter(IrFunction.class::isInstance)
+                .map(IrFunction.class::cast)
                 .filter(it -> methodName.equals(it.getName().asString()))
                 .findFirst()
                 .orElseThrow()
                 .getValueParameters()
                 .get(0)
-                .getReturnTypeRef());
+                .getType());
     }
 
     public Object lastClassTypeParameter() {
         return signatureBuilder().signature(getCompiledSource().getDeclarations().stream()
-                .filter(FirRegularClass.class::isInstance)
-                .map(FirRegularClass.class::cast)
+                .filter(IrClass.class::isInstance)
+                .map(IrClass.class::cast)
                 .findFirst()
                 .orElseThrow()
                 .getTypeParameters()
@@ -156,33 +153,32 @@ public class KotlinTypeSignatureBuilderTest {
 
     public String methodSignature(String methodName) {
         return signatureBuilder().methodDeclarationSignature(getCompiledSource().getDeclarations().stream()
-                .filter(FirRegularClass.class::isInstance)
-                .map(FirRegularClass.class::cast)
+                .filter(IrClass.class::isInstance)
+                .map(IrClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
-                .filter(FirSimpleFunction.class::isInstance)
-                .map(FirSimpleFunction.class::cast)
+                .filter(IrFunction.class::isInstance)
+                .map(IrFunction.class::cast)
                 .filter(it -> methodName.equals(it.getName().asString()))
                 .findFirst()
-                .orElseThrow()
-                .getSymbol(), null);
+                .orElseThrow());
     }
 
     @Test
     void fileField() {
-        FirProperty firProperty = getCompiledSource().getDeclarations().stream()
-          .filter(it -> it instanceof FirProperty && "field".equals(((FirProperty) it).getName().asString()))
-          .map(it -> (FirProperty) it).findFirst().orElseThrow();
-        assertThat(signatureBuilder().variableSignature(firProperty.getSymbol(), getCompiledSource().getSymbol()))
-          .isEqualTo("KotlinTypeGoatKt{name=field,type=kotlin.Int}");
+        IrProperty property = getCompiledSource().getDeclarations().stream()
+          .filter(it -> it instanceof IrProperty && "field".equals(((IrProperty) it).getName().asString()))
+          .map(it -> (IrProperty) it).findFirst().orElseThrow();
+        assertThat(signatureBuilder().variableSignature(property))
+          .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoatKt{name=field,type=kotlin.Int}");
     }
 
     @Test
     void fileFunction() {
-        FirSimpleFunction function = getCompiledSource().getDeclarations().stream()
-          .filter(it -> it instanceof FirSimpleFunction && "function".equals(((FirSimpleFunction) it).getName().asString()))
-          .map(it -> (FirSimpleFunction) it).findFirst().orElseThrow();
-        assertThat(signatureBuilder().methodDeclarationSignature(function.getSymbol(), getCompiledSource().getSymbol()))
-          .isEqualTo("KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[org.openrewrite.kotlin.C]}");
+        IrFunction function = getCompiledSource().getDeclarations().stream()
+          .filter(it -> it instanceof IrFunction && "function".equals(((IrFunction) it).getName().asString()))
+          .map(it -> (IrFunction) it).findFirst().orElseThrow();
+        assertThat(signatureBuilder().methodDeclarationSignature(function))
+          .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[org.openrewrite.kotlin.C]}");
     }
 
     @Test
@@ -206,13 +202,13 @@ public class KotlinTypeSignatureBuilderTest {
     @Test
     void gettableField() {
         assertThat(fieldPropertyGetterSignature("field"))
-                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=accessor,return=kotlin.Int,parameters=[]}");
+                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=<get-field>,return=kotlin.Int,parameters=[]}");
     }
 
     @Test
     void settableField() {
         assertThat(fieldPropertySetterSignature("field"))
-          .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=accessor,return=kotlin.Unit,parameters=[kotlin.Int]}");
+          .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=<set-field>,return=kotlin.Unit,parameters=[kotlin.Int]}");
     }
 
     @Test

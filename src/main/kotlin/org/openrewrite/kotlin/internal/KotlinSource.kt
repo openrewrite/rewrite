@@ -20,6 +20,7 @@ import lombok.Setter
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.fir.declarations.FirFile
+import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
 import org.openrewrite.Parser
@@ -35,6 +36,9 @@ class KotlinSource(
 
     @Setter
     var firFile: FirFile? = null
+
+    @Setter
+    var irFile: IrFile? = null
 
     init {
         nodes = map(ktFile)
