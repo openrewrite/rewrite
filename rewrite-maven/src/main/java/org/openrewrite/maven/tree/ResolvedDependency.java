@@ -49,6 +49,7 @@ public class ResolvedDependency implements Serializable {
      * Direct dependencies only that survived conflict resolution and exclusion.
      */
     @NonFinal
+    @EqualsAndHashCode.Exclude // dependencies can be circular
     List<ResolvedDependency> dependencies;
 
     List<License> licenses;
@@ -74,6 +75,7 @@ public class ResolvedDependency implements Serializable {
 
     /**
      * Only used by dependency resolution to avoid unnecessary empty list allocations for leaf dependencies.
+     *
      * @param dependencies A dependency list
      */
     void unsafeSetDependencies(List<ResolvedDependency> dependencies) {

@@ -74,9 +74,26 @@ public class PrintMavenAsDotTest implements RewriteTest {
             3 -> 6 [taillabel="Test"];
             3 -> 7 [taillabel="Test"];
             3 -> 8 [taillabel="Test"];
+            8 -> 6 [taillabel="Test"];
             2 -> 4 [taillabel="Test"];
+            4 -> 6 [taillabel="Test"];
+            4 -> 3 [taillabel="Test"];
+            3 -> 6 [taillabel="Test"];
+            3 -> 7 [taillabel="Test"];
+            3 -> 8 [taillabel="Test"];
+            8 -> 6 [taillabel="Test"];
             2 -> 5 [taillabel="Test"];
+            5 -> 6 [taillabel="Test"];
             5 -> 9 [taillabel="Test"];
+            9 -> 6 [taillabel="Test"];
+            9 -> 7 [taillabel="Test"];
+            9 -> 8 [taillabel="Test"];
+            8 -> 6 [taillabel="Test"];
+            5 -> 3 [taillabel="Test"];
+            3 -> 6 [taillabel="Test"];
+            3 -> 7 [taillabel="Test"];
+            3 -> 8 [taillabel="Test"];
+            8 -> 6 [taillabel="Test"];
             })~~>--><project>
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>

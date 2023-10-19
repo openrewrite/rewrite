@@ -582,17 +582,26 @@ public class ResolvedPom {
                                     .getResolutionListener()
                                     .clear();
                             return resolveDependencies(scope, requirements, downloader, ctx);
-                        } else if (contains(dependencies, ga, d.getClassifier())) {
-                            // we've already resolved this previously and the requirement didn't change,
-                            // so just skip and continue on
-                            continue;
                         }
                     }
 
                     if ((d.getGav().getGroupId() != null && d.getGav().getGroupId().startsWith("${") && d.getGav().getGroupId().endsWith("}")) ||
-                        (d.getGav().getArtifactId().startsWith("${") && d.getGav().getArtifactId().endsWith("}")) ||
-                        (d.getGav().getVersion() != null && d.getGav().getVersion().startsWith("${") && d.getGav().getVersion().endsWith("}"))) {
+                            (d.getGav().getArtifactId().startsWith("${") && d.getGav().getArtifactId().endsWith("}")) ||
+                            (d.getGav().getVersion() != null && d.getGav().getVersion().startsWith("${") && d.getGav().getVersion().endsWith("}"))) {
                         throw new MavenDownloadingException("Could not resolve property", null, d.getGav());
+                    }
+
+                    ResolvedDependency resolved = find(dependencies, ga, d.getClassifier());
+                    if (resolved != null) {
+                        // build link between the including dependency and this one
+                        ResolvedDependency includedBy = dd.getDependent();
+                        if (includedBy != null) {
+                            if (includedBy.getDependencies().isEmpty()) {
+                                includedBy.unsafeSetDependencies(new ArrayList<>());
+                            }
+                            includedBy.getDependencies().add(resolved);
+                        }
+                        continue;
                     }
 
                     Pom dPom = downloader.download(d.getGav(), null, dd.definedIn, getRepositories());
@@ -606,7 +615,7 @@ public class ResolvedPom {
                         cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
                     }
 
-                    ResolvedDependency resolved = new ResolvedDependency(dPom.getRepository(),
+                    resolved = new ResolvedDependency(dPom.getRepository(),
                             resolvedPom.getGav(), dd.getDependency(), emptyList(),
                             resolvedPom.getRequested().getLicenses(),
                             resolvedPom.getValue(dd.getDependency().getType()),
@@ -646,7 +655,7 @@ public class ResolvedPom {
                         if (d.getExclusions() != null) {
                             for (GroupArtifact exclusion : d.getExclusions()) {
                                 if (matchesGlob(getValue(d2.getGroupId()), getValue(exclusion.getGroupId())) &&
-                                    matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
+                                        matchesGlob(getValue(d2.getArtifactId()), getValue(exclusion.getArtifactId()))) {
                                     if (resolved.getEffectiveExclusions().isEmpty()) {
                                         resolved.unsafeSetEffectiveExclusions(new ArrayList<>());
                                     }
@@ -677,14 +686,15 @@ public class ResolvedPom {
         return dependencies;
     }
 
-    private boolean contains(List<ResolvedDependency> dependencies, GroupArtifact ga, @Nullable String classifier) {
+    @Nullable
+    private ResolvedDependency find(List<ResolvedDependency> dependencies, GroupArtifact ga, @Nullable String classifier) {
         for (ResolvedDependency it : dependencies) {
             if (it.getGroupId().equals(ga.getGroupId()) && it.getArtifactId().equals(ga.getArtifactId()) &&
-                (Objects.equals(classifier, it.getClassifier()))) {
-                return true;
+                    (Objects.equals(classifier, it.getClassifier()))) {
+                return it;
             }
         }
-        return false;
+        return null;
     }
 
     private Scope getDependencyScope(Dependency d2, ResolvedPom containingPom) {

@@ -20,16 +20,17 @@ import org.junit.jupiter.api.io.TempDir;
 import org.openrewrite.*;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.maven.cache.InMemoryMavenPomCache;
+import org.openrewrite.maven.internal.MavenPomDownloader;
 import org.openrewrite.maven.table.MavenMetadataFailures;
-import org.openrewrite.maven.tree.MavenRepository;
+import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.tree.Xml;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
@@ -48,7 +49,7 @@ class MavenDependencyFailuresTest implements RewriteTest {
             .cycles(1)
             .expectedCyclesThatMakeChanges(1)
             .dataTable(MavenMetadataFailures.Row.class, failures ->
-                assertThat(failures.stream().map(MavenMetadataFailures.Row::getMavenRepositoryUri).distinct()).containsExactlyInAnyOrder("https://repo.maven.apache.org/maven2")),
+              assertThat(failures.stream().map(MavenMetadataFailures.Row::getMavenRepositoryUri).distinct()).containsExactlyInAnyOrder("https://repo.maven.apache.org/maven2")),
           pomXml(
             """
               <project>
@@ -275,6 +276,41 @@ class MavenDependencyFailuresTest implements RewriteTest {
                 </dependencies>
               </project>
               """
+          )
+        );
+    }
+
+    @Test
+    void circularDependency(@TempDir Path tempDir) {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>io.grpc</groupId>
+                    <artifactId>grpc-core</artifactId>
+                    <version>1.58.0</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            spec -> spec.afterRecipe(after -> {
+                Optional<MavenResolutionResult> resolutionResult = after.getMarkers().findFirst(MavenResolutionResult.class);
+                assertThat(resolutionResult).isPresent();
+
+                ExecutionContext ctx = new InMemoryExecutionContext(Throwable::printStackTrace);
+                MavenPomDownloader pomDownloader = new MavenPomDownloader(Collections.emptyMap(), ctx);
+                Map<String, ResolvedDependency> resolvedDependencies = resolutionResult.get().getPom().resolveDependencies(Scope.Runtime, pomDownloader, ctx).stream()
+                  .collect(Collectors.toMap(d -> d.getGroupId() + ':' + d.getArtifactId() + ':' + d.getVersion(), d -> d));
+                assertThat(resolvedDependencies.get("io.grpc:grpc-core:1.58.0").getDependencies())
+                  .anySatisfy(d -> assertThat(d.getArtifactId()).isEqualTo("grpc-util"));
+                assertThat(resolvedDependencies.get("io.grpc:grpc-util:1.58.0").getDependencies())
+                  .anySatisfy(d -> assertThat(d.getArtifactId()).isEqualTo("grpc-core"));
+            })
           )
         );
     }
