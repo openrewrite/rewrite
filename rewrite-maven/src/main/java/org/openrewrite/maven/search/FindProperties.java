@@ -76,10 +76,14 @@ public class FindProperties extends Recipe {
         };
     }
 
+    /**
+     *
+     * @param xml The xml document of the pom.xml
+     * @param propertyPattern Regular expression pattern used to match property tag names
+     * @return Set of Maven project property tags that matches the {@code propertyPattern} within a pom.xml
+     */
     public static Set<Xml.Tag> find(Xml.Document xml, String propertyPattern) {
-        Pattern propertyMatcher = Pattern.compile(propertyPattern
-                .replace(".", "\\.")
-                .replace("*", ".*"));
+        Pattern propertyMatcher = Pattern.compile(propertyPattern);
         Set<Xml.Tag> found = new HashSet<>();
         new MavenVisitor<Set<Xml.Tag>>() {
             @Override
