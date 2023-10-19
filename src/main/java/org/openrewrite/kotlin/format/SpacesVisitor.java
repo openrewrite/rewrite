@@ -534,7 +534,17 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     public K.When visitWhen(K.When when, P p) {
         K.When w = super.visitWhen(when, p);
         if (w.getSelector() != null) {
-            w = w.withSelector(spaceBefore(w.getSelector(), style.getBeforeParentheses().getWhenParentheses()));
+            w = w.withSelector(spaceBefore(
+                    w.getSelector().getPadding().withTree(
+                            spaceAfter(
+                                    w.getSelector().getPadding().getTree().withElement(
+                                            spaceBefore(w.getSelector().getPadding().getTree().getElement(), false
+                                            )
+                                    ),
+                                    false
+                            )
+                    ), style.getBeforeParentheses().getWhenParentheses())
+            );
         }
         return w;
     }
@@ -718,7 +728,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
 
     @Override
     public J.VariableDeclarations visitVariableDeclarations(J.VariableDeclarations multiVariable, P p) {
-        J.VariableDeclarations mv =  super.visitVariableDeclarations(multiVariable, p);
+        J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, p);
         mv = mv.withMarkers(spaceBeforeColonAfterDeclarationName(mv.getMarkers()));
 
         if (multiVariable.getMarkers().findFirst(TypeReferencePrefix.class).orElse(null) != null &&
@@ -750,10 +760,15 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     public J.Binary visitBinary(J.Binary binary, P p) {
         J.Binary b = super.visitBinary(binary, p);
         J.Binary.Type operator = b.getOperator();
+        boolean logicalComma = b.getMarkers().findFirst(LogicalComma.class).isPresent();
         switch (operator) {
             case And:
             case Or:
-                b = applyBinarySpaceAround(b, style.getAroundOperators().getLogical());
+                b = applyBinarySpaceAround(
+                        b,
+                        !logicalComma && style.getAroundOperators().getLogical(),
+                        logicalComma || style.getAroundOperators().getLogical()
+                );
                 break;
             case Equal:
             case NotEqual:
@@ -807,77 +822,27 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         return b;
     }
 
-    private J.Binary applyBinarySpaceAround(J.Binary binary, boolean useSpaceAround) {
+    private J.Binary applyBinarySpaceAround(J.Binary binary, boolean spaceAround) {
+        return applyBinarySpaceAround(binary, spaceAround, spaceAround);
+    }
+
+    private J.Binary applyBinarySpaceAround(J.Binary binary, boolean spaceBefore, boolean spaceAfter) {
         J.Binary.Padding padding = binary.getPadding();
         JLeftPadded<J.Binary.Type> operator = padding.getOperator();
-        if (useSpaceAround) {
-            if (StringUtils.isNullOrEmpty(operator.getBefore().getWhitespace())) {
-                binary = padding.withOperator(
-                        operator.withBefore(
-                                operator.getBefore().withWhitespace(" ")
-                        )
-                );
-            }
-            if (StringUtils.isNullOrEmpty(binary.getRight().getPrefix().getWhitespace())) {
-                binary = binary.withRight(
-                        binary.getRight().withPrefix(
-                                binary.getRight().getPrefix().withWhitespace(" ")
-                        )
-                );
-            }
-        } else {
-            if (" ".equals(operator.getBefore().getWhitespace())) {
-                binary = padding.withOperator(
-                        operator.withBefore(
-                                operator.getBefore().withWhitespace("")
-                        )
-                );
-            }
-            if (" ".equals(binary.getRight().getPrefix().getWhitespace())) {
-                binary = binary.withRight(
-                        binary.getRight().withPrefix(
-                                binary.getRight().getPrefix().withWhitespace("")
-                        )
-                );
-            }
-        }
+        binary = padding.withOperator(
+                operator.withBefore(updateSpace(operator.getBefore(), spaceBefore))
+        );
+        binary = binary.withRight(spaceBefore(binary.getRight(), spaceAfter));
         return binary;
     }
 
     private K.Binary applyBinarySpaceAround(K.Binary binary, boolean useSpaceAround) {
         K.Binary.Padding padding = binary.getPadding();
         JLeftPadded<K.Binary.Type> operator = padding.getOperator();
-        if (useSpaceAround) {
-            if (StringUtils.isNullOrEmpty(operator.getBefore().getWhitespace())) {
-                binary = padding.withOperator(
-                        operator.withBefore(
-                                operator.getBefore().withWhitespace(" ")
-                        )
-                );
-            }
-            if (StringUtils.isNullOrEmpty(binary.getRight().getPrefix().getWhitespace())) {
-                binary = binary.withRight(
-                        binary.getRight().withPrefix(
-                                binary.getRight().getPrefix().withWhitespace(" ")
-                        )
-                );
-            }
-        } else {
-            if (" ".equals(operator.getBefore().getWhitespace())) {
-                binary = padding.withOperator(
-                        operator.withBefore(
-                                operator.getBefore().withWhitespace("")
-                        )
-                );
-            }
-            if (binary.getRight().getPrefix().getWhitespace().equals(" ")) {
-                binary = binary.withRight(
-                        binary.getRight().withPrefix(
-                                binary.getRight().getPrefix().withWhitespace("")
-                        )
-                );
-            }
-        }
+        binary = padding.withOperator(
+                operator.withBefore(updateSpace(operator.getBefore(), useSpaceAround))
+        );
+        binary = binary.withRight(spaceBefore(binary.getRight(), useSpaceAround));
         return binary;
     }
 
@@ -979,13 +944,13 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
             Space after = lastParam.getAfter();
             trailingComma = lastParam.getMarkers().findFirst(TrailingComma.class).isPresent();
             lastParamHasSpace = after.getComments().isEmpty() && onlySpacesAndNotEmpty(after.getWhitespace())
-            || lastParam.getMarkers().findFirst(TrailingComma.class).map(t -> onlySpacesAndNotEmpty(t.getSuffix().getWhitespace())).orElse(false);
+                    || lastParam.getMarkers().findFirst(TrailingComma.class).map(t -> onlySpacesAndNotEmpty(t.getSuffix().getWhitespace())).orElse(false);
             useSpaceBeforeLambdaArrow &= !trailingComma;
         }
 
         if (lastParamHasSpace) {
             boolean useSpace = useSpaceBeforeLambdaArrow;
-            parameters = ListUtils.mapLast(parameters, rp  -> spaceAfter(rp, useSpace));
+            parameters = ListUtils.mapLast(parameters, rp -> spaceAfter(rp, useSpace));
             l = l.withParameters(l.getParameters().getPadding().withParams(parameters));
         } else if (!parameters.isEmpty()) {
             l = l.withArrow(updateSpace(l.getArrow(), useSpaceBeforeLambdaArrow));

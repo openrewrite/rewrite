@@ -2737,4 +2737,33 @@ class SpacesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void when() {
+        rewriteRun(
+          spaces(),
+          kotlin(
+            """
+              fun method ( i : Int ) : String {
+                  when (  i   ) {
+                      1  ,   2    , 3   ->     return "1 or 2 or 3"
+                      else -> {
+                          return "42"
+                      }
+                  }
+              }
+              """,
+            """
+              fun method(i: Int): String {
+                  when (i) {
+                      1, 2, 3 -> return "1 or 2 or 3"
+                      else -> {
+                          return "42"
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }
