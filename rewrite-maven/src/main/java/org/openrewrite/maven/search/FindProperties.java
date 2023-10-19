@@ -36,9 +36,7 @@ import static org.openrewrite.Tree.randomId;
 @Value
 public class FindProperties extends Recipe {
 
-    @Option(displayName = "Property pattern",
-            description = "Regular expression pattern used to match property tag names.",
-            example = "guava*")
+    @Option(displayName = "Property pattern", description = "Regular expression pattern used to match property tag names.", example = "guava*")
     String propertyPattern;
 
     UUID searchId = randomId();
@@ -55,8 +53,11 @@ public class FindProperties extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        Pattern propertyMatcher = Pattern.compile(propertyPattern.replace(".", "\\.")
+        Pattern propertyMatcher = Pattern.compile(propertyPattern
+                .replace(".", "\\.")
                 .replace("*", ".*"));
+        Pattern propertyUsageMatcher = Pattern.compile(
+                ".*\\$\\{" + propertyMatcher.pattern() + "}.*");
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
@@ -66,7 +67,7 @@ public class FindProperties extends Recipe {
                 }
 
                 Optional<String> value = tag.getValue();
-                if (t.getContent() != null && value.isPresent() && value.get().contains("${")) {
+                if (value.isPresent() && propertyUsageMatcher.matcher(value.get()).matches()) {
                     //noinspection unchecked
                     t = t.withContent(ListUtils.mapFirst((List<Content>) t.getContent(), v ->
                             SearchResult.found(v, getResolutionResult().getPom().getValue(value.get()))));
@@ -77,10 +78,11 @@ public class FindProperties extends Recipe {
     }
 
     public static Set<Xml.Tag> find(Xml.Document xml, String propertyPattern) {
-        Pattern propertyMatcher = Pattern.compile(propertyPattern.replace(".", "\\.")
+        Pattern propertyMatcher = Pattern.compile(propertyPattern
+                .replace(".", "\\.")
                 .replace("*", ".*"));
         Set<Xml.Tag> found = new HashSet<>();
-        new MavenVisitor<Set<Xml.Tag>>(){
+        new MavenVisitor<Set<Xml.Tag>>() {
             @Override
             public Xml visitTag(Xml.Tag tag, Set<Xml.Tag> tags) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, tags);
