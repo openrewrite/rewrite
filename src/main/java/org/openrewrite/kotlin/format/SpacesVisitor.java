@@ -346,6 +346,24 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     }
 
     @Override
+    public K.Property visitProperty(K.Property property, P p) {
+        K.Property prop = super.visitProperty(property, p);
+
+        if (prop.getPadding().getReceiver() != null) {
+            prop = prop.getPadding().withReceiver(prop.getPadding().getReceiver().withAfter(updateSpace(prop.getPadding().getReceiver().getAfter(), false)));
+        }
+        if (prop.getVariableDeclarations() != null && !prop.getVariableDeclarations().getVariables().isEmpty()) {
+            prop = prop.withVariableDeclarations(
+                    prop.getVariableDeclarations().withVariables(
+                            ListUtils.mapFirst(prop.getVariableDeclarations().getVariables(),
+                                    v -> spaceBefore(v, false))
+                    )
+            );
+        }
+        return prop;
+    }
+
+    @Override
     public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam, P p) {
         J.TypeParameter pa = super.visitTypeParameter(typeParam, p);
 

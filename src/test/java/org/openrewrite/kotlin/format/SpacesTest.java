@@ -2766,4 +2766,22 @@ class SpacesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void extensionProperty() {
+        rewriteRun(
+          spaces(),
+          kotlin(
+            """
+              val String .  extension   :   Any
+                  get (  )  =  ""
+              """,
+            """
+              val String.extension: Any
+                  get() =  ""
+              """
+          )
+        );
+    }
+
 }
