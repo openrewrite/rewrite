@@ -36,7 +36,9 @@ import static org.openrewrite.Tree.randomId;
 @Value
 public class FindProperties extends Recipe {
 
-    @Option(displayName = "Property pattern", description = "Regular expression pattern used to match property tag names.", example = "guava*")
+    @Option(displayName = "Property pattern",
+            description = "Regular expression pattern used to match property tag names.",
+            example = "guava*")
     String propertyPattern;
 
     UUID searchId = randomId();
