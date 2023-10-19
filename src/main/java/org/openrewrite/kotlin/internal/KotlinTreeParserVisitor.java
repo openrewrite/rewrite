@@ -2702,7 +2702,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         if (getter != null || setter != null || receiver != null) {
             return new K.Property(
                     randomId(),
-                    Space.EMPTY,
+                    prefix(property),
                     markers,
                     typeParameters,
                     variableDeclarations.withPrefix(Space.EMPTY),
