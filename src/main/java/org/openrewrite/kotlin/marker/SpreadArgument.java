@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.marker;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import lombok.Value;
 import lombok.With;
 import org.openrewrite.java.tree.Space;
@@ -26,10 +27,11 @@ import java.util.UUID;
 @With
 public class SpreadArgument implements Marker {
     UUID id;
-    Space prefix;
+    @JsonAlias("prefix") // for backward compatibility
+    Space suffix;
 
-    public SpreadArgument(UUID id, Space prefix) {
+    public SpreadArgument(UUID id, Space suffix) {
         this.id = id;
-        this.prefix = prefix;
+        this.suffix = suffix;
     }
 }

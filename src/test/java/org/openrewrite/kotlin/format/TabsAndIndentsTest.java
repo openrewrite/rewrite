@@ -2347,4 +2347,23 @@ class TabsAndIndentsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void spreadArgumentMethodInvocation() {
+        rewriteRun(
+          kotlin(
+            """
+              fun format(vararg params: String) { }
+              
+              fun test(vararg params: String) {
+                  format(
+                      "a",
+                      *params,
+                      "b"
+                  )
+              }
+              """
+          )
+        );
+    }
 }
