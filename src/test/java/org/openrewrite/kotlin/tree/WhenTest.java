@@ -121,8 +121,8 @@ class WhenTest implements RewriteTest {
             """
               fun method ( i : Any ) : String {
                   when ( i ) {
-                      is Boolean -> return "is"
-                      !is Int -> return "is not"
+                      is  Boolean -> return "is"
+                      !is   Int -> return "is not"
                       else -> return "42"
                   }
               }
@@ -245,7 +245,7 @@ class WhenTest implements RewriteTest {
               fun isReferenceApplicable(myReference: kotlin.reflect.KClass<*>) = when (myReference) {
                   Comparable::class,
                   Iterable::class,
-                  String::class, // trailing comma
+                  String::class   ,   // trailing comma
                       -> true
                   else -> false
               }

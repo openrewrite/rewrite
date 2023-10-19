@@ -1310,7 +1310,24 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitWhenConditionIsPattern(KtWhenConditionIsPattern condition, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        Markers markers = Markers.EMPTY;
+        if (condition.isNegated()) {
+            markers = markers.addIfAbsent(new NotIs(randomId()));
+        }
+
+        Expression element = new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY);
+        JRightPadded<Expression> expr = padRight(element, Space.EMPTY);
+        J clazz =  condition.getTypeReference().accept(this, data);
+
+        return new J.InstanceOf(
+                randomId(),
+                prefix(condition),
+                markers,
+                expr,
+                clazz,
+                null,
+                type(condition)
+        );
     }
 
     @Override
