@@ -516,6 +516,14 @@ public class MavenPomDownloader {
                             RawPom rawPom = RawPom.parse(fis, Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot);
                             Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
 
+                            if("jar".equals(pom.getPackaging())){
+                                Path jar = f.toPath().getParent().resolve(gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".jar");
+                                if (!Files.exists(jar)) {
+                                    // This is a corrupt dependency.
+                                    continue;
+                                }
+                            }
+
                             // so that the repository path is the same regardless of username
                             pom = pom.withRepository(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL);
 
