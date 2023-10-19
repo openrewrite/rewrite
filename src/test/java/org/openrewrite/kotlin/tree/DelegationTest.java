@@ -65,7 +65,7 @@ class DelegationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              class Test(base: Collection<Any>) : Collection<Any> by base
+              class Test(base: Collection<Any>) :  Collection< Any >   by    base
               """
           )
         );

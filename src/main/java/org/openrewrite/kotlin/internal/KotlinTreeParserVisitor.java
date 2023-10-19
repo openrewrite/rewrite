@@ -438,7 +438,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitDelegatedSuperTypeEntry(KtDelegatedSuperTypeEntry specifier, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        TypeTree element = (TypeTree) specifier.getTypeReference().accept(this, data);
+        Expression expr = convertToExpression(specifier.getDelegateExpression().accept(this, data));
+        return new K.DelegatedSuperType(randomId(), Markers.EMPTY, element, suffix(specifier.getTypeReference()), expr).withPrefix(prefix(specifier));
     }
 
     @Override
@@ -1953,7 +1955,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                             args
                     );
                     superTypes.add(padRight(delegationCall, suffix(superTypeCallEntry)));
-                } else if (superTypeListEntry instanceof KtSuperTypeEntry) {
+                } else if (superTypeListEntry instanceof KtSuperTypeEntry ||
+                        superTypeListEntry instanceof KtDelegatedSuperTypeEntry) {
                     TypeTree typeTree = (TypeTree) superTypeListEntry.accept(this, data);
 
                     if (i == 0) {
