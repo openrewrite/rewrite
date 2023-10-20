@@ -650,4 +650,15 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void typedFunctionCallInitializer() {
+        rewriteRun(
+          kotlin(
+            """
+              val x = emptySet  <   String    > (  )
+              """
+          )
+        );
+    }
 }

@@ -1821,17 +1821,15 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             );
         } else if (type == null || type == PsiElementAssociations.ExpressionType.METHOD_INVOCATION) {
             J.Identifier name = (J.Identifier) expression.getCalleeExpression().accept(this, data);
+            JContainer<Expression> typeParams = null;
+
             if (!expression.getTypeArguments().isEmpty()) {
-//                Expression expr = (Expression) expression.accept(this, data);
-                throw new UnsupportedOperationException("TODO");
-//                name = new J.ParameterizedType(
-//                        randomId(),
-//                        name.getPrefix(),
-//                        Markers.EMPTY,
-//                        name.withPrefix(Space.EMPTY),
-//                        JContainer.build(prefix(expression.getTypeArgumentList()), singletonList(padRight(expr, Space.EMPTY)), Markers.EMPTY),
-//                        type(expression)
-//                );
+                List<JRightPadded<Expression>> parameters = new ArrayList<>(expression.getTypeArguments().size());
+                for (KtTypeProjection ktTypeProjection : expression.getTypeArguments()) {
+                    parameters.add(padRight(convertToExpression(ktTypeProjection.accept(this, data)), suffix(ktTypeProjection)));
+                }
+
+                typeParams = JContainer.build(prefix(expression.getTypeArgumentList()), parameters, Markers.EMPTY);
             }
 
             // createIdentifier(expression.getCalleeExpression(), type(expression));
@@ -1861,8 +1859,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     prefix(expression),
                     Markers.EMPTY,
                     null,
-                    null,
-                    name.withType(methodType), // .withPrefix( prefix(expression)),
+                    typeParams,
+                    name.withType(methodType),
                     args,
                     methodType
             );
