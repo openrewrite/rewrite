@@ -18,14 +18,16 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -54,9 +56,6 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
                 }
             }
         }
-
-        maybeRemoveAnnotationParameterImports(leadingAnnotations);
-
         return c;
     }
 
@@ -84,9 +83,6 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
                 }
             }
         }
-
-        maybeRemoveAnnotationParameterImports(leadingAnnotations);
-
         return m;
     }
 
@@ -111,8 +107,6 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
             }
         }
 
-        maybeRemoveAnnotationParameterImports(leadingAnnotations);
-
         return v;
     }
 
@@ -121,6 +115,7 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
         if (annotationMatcher.matches(annotation)) {
             getCursor().getParentOrThrow().putMessage("annotationRemoved", annotation);
             maybeRemoveImport(TypeUtils.asFullyQualified(annotation.getType()));
+            maybeRemoveAnnotationParameterImports(annotation);
             //noinspection ConstantConditions
             return null;
         }
@@ -142,23 +137,58 @@ public class RemoveAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
                 }
             }
         }
-
         return newLeadingAnnotations;
     }
 
     /**
      * If the annotation has parameters, then the imports for the parameter types may need to be removed.
      *
-     * @param annotations the list of annotations to check
+     * @param annotation the annotation to check
      */
-    private void maybeRemoveAnnotationParameterImports(List<J.Annotation> annotations) {
-        annotations
-                .stream()
-                .filter(a -> a.getArguments() != null && !a.getArguments().isEmpty())
-                .flatMap(a -> a.getArguments().stream())
-                .map(Expression::getType)
-                .map(TypeUtils::asFullyQualified)
-                .filter(Objects::nonNull)
-                .forEach(e -> maybeRemoveImport(TypeUtils.asFullyQualified(e)));
+    private void maybeRemoveAnnotationParameterImports(@NonNull J.Annotation annotation) {
+        if (ListUtils.nullIfEmpty(annotation.getArguments()) == null) {
+            return;
+        }
+
+        List<Expression> arguments = annotation.getArguments();
+
+        arguments.forEach(argument -> {
+            if (argument instanceof J.Assignment) {
+                J.Assignment assignment = (J.Assignment) argument;
+                Expression expression = assignment.getAssignment();
+                maybeRemoveImportFromExpression(expression);
+            } else {
+                maybeRemoveImport(TypeUtils.asFullyQualified(argument.getType()));
+            }
+        });
+    }
+
+    private void maybeRemoveImportFromExpression(Expression expression) {
+        if (expression instanceof J.NewArray) {
+            maybeRemoveAnnotationFromArray((J.NewArray) expression);
+        } else if (expression instanceof J.FieldAccess) {
+            maybeRemoveAnnotationFromFieldAccess((J.FieldAccess) expression);
+        } else if (expression instanceof J.Identifier) {
+            JavaType.Variable fieldType = ((J.Identifier) expression).getFieldType();
+            if (fieldType != null) {
+                maybeRemoveImport(TypeUtils.asFullyQualified(fieldType.getOwner()));
+            }
+        } else {
+            maybeRemoveImport(TypeUtils.asFullyQualified(expression.getType()));
+        }
+    }
+
+    private void maybeRemoveAnnotationFromArray(@NonNull J.NewArray newArray) {
+        List<Expression> initializer = newArray.getInitializer();
+        if (ListUtils.nullIfEmpty(initializer) != null) {
+            initializer.forEach(this::maybeRemoveImportFromExpression);
+        }
+    }
+
+    private void maybeRemoveAnnotationFromFieldAccess(@NonNull J.FieldAccess fa) {
+        JavaType.Variable fieldType = fa.getName().getFieldType();
+        if (fieldType != null && fieldType.getOwner() != null) {
+            maybeRemoveImport(TypeUtils.asFullyQualified(fieldType.getOwner()));
+        }
     }
 }

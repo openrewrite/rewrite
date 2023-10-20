@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -608,6 +609,138 @@ class RemoveAnnotationTest implements RewriteTest {
             """
               public class MethodAnnotatedTransactionalService {
                   public void doWork() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unusedPrimitiveOrArraysOrConstantsParameters() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@annotations.pkg.TestAnnotation"))
+            .typeValidationOptions(TypeValidation.builder().build()),
+          java(
+            """
+              package constants.pkg;
+               
+              public class TestConstants {
+                  public static final String CONSTANT_1 = "Test";
+                  public static final String CONSTANT_2 = "Test";
+              }
+              """
+          ),
+          java(
+            """
+              package annotations.pkg;
+               
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+                            
+              import constants.pkg.TestConstants;
+               
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target({ElementType.METHOD,ElementType.TYPE,ElementType.FIELD})
+              public @interface TestAnnotation {
+                  Class<?> clazz() default String.class;
+                  int[] ints() default {1, 2, 3};
+                  long longValue() default 1L;
+                  String text() default "";
+                  Class<?>[] classArray() default {};
+              }
+              """
+          ),
+          java(
+            """
+              package sample.pkg;
+               
+              public class TestArrayClass {
+              }
+              """
+          ),
+          java(
+            """
+              package another.pkg;
+                            
+              import annotations.pkg.TestAnnotation;
+              import constants.pkg.TestConstants;
+              import sample.pkg.TestArrayClass;
+                            
+              @TestAnnotation(clazz = String.class, ints = {1, 2, 3}, longValue = 1L, text = TestConstants.CONSTANT_1, classArray = {TestArrayClass.class})
+              public class AnnotatedClass {
+                            
+                  @TestAnnotation(clazz = String.class, ints = {1, 2, 3}, longValue = 1L, text = TestConstants.CONSTANT_2)
+                  String testField;
+              }
+              """,
+            """
+              package another.pkg;
+                            
+              public class AnnotatedClass {
+                            
+                  String testField;
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void unusedStaticImportsFromAnnotationParameters() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveAnnotation("@annotations.pkg.TestAnnotation"))
+            .typeValidationOptions(TypeValidation.builder().build()),
+          java(
+            """
+              package constants.pkg;
+               
+              public class TestConstants {
+                  public static final String CONSTANT_1 = "Test";
+                  public static final String CONSTANT_2 = "Test";
+              }
+              """
+          ),
+          java(
+            """
+              package annotations.pkg;
+               
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+               
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target({ElementType.TYPE})
+              public @interface TestAnnotation {
+                  String text() default "";
+              }
+              """
+          ),
+          java(
+            """
+              package another.pkg;
+              
+              import annotations.pkg.TestAnnotation;
+
+              import static constants.pkg.TestConstants.CONSTANT_1;
+              import static constants.pkg.TestConstants.CONSTANT_2;
+
+              @TestAnnotation(text = CONSTANT_1)
+              public class AnnotatedClass {
+              
+                  String constant = CONSTANT_2;
+              }
+              """,
+            """
+              package another.pkg;
+
+              import static constants.pkg.TestConstants.CONSTANT_2;
+              
+              public class AnnotatedClass {
+              
+                  String constant = CONSTANT_2;
               }
               """
           )
