@@ -2235,36 +2235,47 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitDotQualifiedExpression(KtDotQualifiedExpression expression, ExecutionContext data) {
         assert expression.getSelectorExpression() != null;
         if (expression.getSelectorExpression() instanceof KtCallExpression) {
-
             KtCallExpression callExpression = (KtCallExpression) expression.getSelectorExpression();
-            if (!callExpression.getTypeArguments().isEmpty()) {
-                throw new UnsupportedOperationException("TODO");
+            J.MethodInvocation methodInvocation = (J.MethodInvocation) callExpression.accept(this, data);
+
+            if (expression.getReceiverExpression() != null) {
+                Expression receiver = convertToExpression(expression.getReceiverExpression().accept(this, data));
+                methodInvocation = methodInvocation.getPadding().withSelect(padRight(receiver, suffix(expression.getReceiverExpression())))
+                        .withName(methodInvocation.getName().withPrefix(prefix(callExpression)))
+                        .withPrefix(prefix(expression));
             }
-            J j = expression.getSelectorExpression().accept(this, data);
-            if (j instanceof J.MethodInvocation) {
-                J.MethodInvocation methodInvocation = (J.MethodInvocation) j;
-                methodInvocation = methodInvocation.getPadding()
-                        .withSelect(
-                                padRight(expression.getReceiverExpression().accept(this, data)
-                                                .withPrefix(prefix(expression.getReceiverExpression())),
-                                        suffix(expression.getReceiverExpression())
-                                )
-                        )
-                        .withName(methodInvocation.getName().withPrefix(methodInvocation.getPrefix()))
-                        .withPrefix(prefix(expression))
-                ;
-                return methodInvocation;
-            }
-            return new J.MethodInvocation(
-                    randomId(),
-                    prefix(expression),
-                    Markers.EMPTY,
-                    padRight(expression.getReceiverExpression().accept(this, data).withPrefix(Space.EMPTY), Space.EMPTY),
-                    null,
-                    expression.getSelectorExpression().accept(this, data).withPrefix(Space.EMPTY),
-                    JContainer.empty(),
-                    methodInvocationType(expression) // TODO: fix for constructors of inner classes
-            );
+
+            return methodInvocation;
+
+//
+//            if (!callExpression.getTypeArguments().isEmpty()) {
+//                throw new UnsupportedOperationException("TODO");
+//            }
+//            J j = expression.getSelectorExpression().accept(this, data);
+//            if (j instanceof J.MethodInvocation) {
+//                J.MethodInvocation methodInvocation = (J.MethodInvocation) j;
+//                methodInvocation = methodInvocation.getPadding()
+//                        .withSelect(
+//                                padRight(expression.getReceiverExpression().accept(this, data)
+//                                                .withPrefix(prefix(expression.getReceiverExpression())),
+//                                        suffix(expression.getReceiverExpression())
+//                                )
+//                        )
+//                        .withName(methodInvocation.getName().withPrefix(methodInvocation.getPrefix()))
+//                        .withPrefix(prefix(expression))
+//                ;
+//                return methodInvocation;
+//            }
+//            return new J.MethodInvocation(
+//                    randomId(),
+//                    prefix(expression),
+//                    Markers.EMPTY,
+//                    padRight(expression.getReceiverExpression().accept(this, data).withPrefix(Space.EMPTY), Space.EMPTY),
+//                    null,
+//                    expression.getSelectorExpression().accept(this, data).withPrefix(Space.EMPTY),
+//                    JContainer.empty(),
+//                    methodInvocationType(expression) // TODO: fix for constructors of inner classes
+//            );
         } else {
             // Maybe need to type check before creating a field access.
             return new J.FieldAccess(

@@ -366,7 +366,7 @@ class AnnotationTest implements RewriteTest {
             """
               fun method ( ) {
                   val list = listOf ( 1 , 2 , 3 )
-                  list . filterIndexed { index  ,   _    -> @Ann  index   %    2 == 0 }
+                  list  .  filterIndexed { index  ,   _    -> @Ann  index   %    2 == 0 }
               }
               """
             )

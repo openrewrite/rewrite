@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.tree;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.kotlin.internal.KotlinParsingException;
@@ -26,6 +27,7 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class JUnknownTest implements RewriteTest {
 
+    @Disabled("No J.Unknown generated anymore")
     @Test
     void fileDeclaration() {
         try {
@@ -48,6 +50,7 @@ class JUnknownTest implements RewriteTest {
         }
     }
 
+    @Disabled("No J.Unknown generated anymore")
     @Test
     void expression() {
         try {

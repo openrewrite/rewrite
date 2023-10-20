@@ -165,7 +165,7 @@ class MethodInvocationTest implements RewriteTest {
               }
               val t = Test ( )
               fun method ( ) {
-                  val a = t . method ( ) ?: null
+                  val a = t  .   method ( ) ?: null
               }
               """
           )
