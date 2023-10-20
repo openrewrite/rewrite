@@ -2383,12 +2383,17 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         modifiers.add(new J.Modifier(randomId(), Space.EMPTY, Markers.EMPTY, "fun", J.Modifier.Type.LanguageExtension, emptyList()));
+        J.Identifier name = null;
 
         if (function.getNameIdentifier() == null) {
-            throw new UnsupportedOperationException("TODO");
+            name = createIdentifier("", Space.EMPTY, type(function));
+
+            // throw new UnsupportedOperationException("TODO");
+        } else {
+            name = createIdentifier(function.getNameIdentifier(), type(function));
         }
 
-        J.Identifier name = createIdentifier(function.getNameIdentifier(), type(function));
+
 
         // parameters
         JContainer<Statement> params;
