@@ -1,18 +1,20 @@
-package org.openrewrite.xml.recipes;
+package org.openrewrite.xml;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Recipe;
-import org.openrewrite.test.RecipeTest;
+import org.openrewrite.test.RewriteTest;
 import org.openrewrite.xml.XmlParser;
 
 import static org.openrewrite.xml.Assertions.xml;
 
-class RemoveEmptyXmlTagsRecipeTest extends RecipeTest {
+class RemoveEmptyXmlTagsRecipeTest implements RewriteTest {
 
     @Test
     void removeEmptyXmlTags() {
         // Test input XML with empty <pluginRepositories> tag.
-        String inputXml = """
+        rewriteRun(
+          spec -> spec.recipe(new RemoveEmptyXmlTagsRecipe()),
+          xml( """
             <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.example</groupId>
@@ -28,10 +30,8 @@ class RemoveEmptyXmlTagsRecipeTest extends RecipeTest {
                     </dependency>
                 </dependencies>
             </project>
-            """;
-
-        // Expected output XML with the <pluginRepositories> tag removed.
-        String expectedXml = """
+            """,
+            """
             <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.example</groupId>
@@ -45,17 +45,7 @@ class RemoveEmptyXmlTagsRecipeTest extends RecipeTest {
                     </dependency>
                 </dependencies>
             </project>
-            """;
-
-        // Create the RemoveEmptyXmlTagsRecipe instance.
-        Recipe recipe = new RemoveEmptyXmlTagsRecipe();
-
-        // Apply the recipe to the input XML and assert the output.
-        assertChanged(
-          recipe,
-          inputXml,
-          expectedXml,
-          "Remove empty XML tags without child elements"
+            """)
         );
     }
 }

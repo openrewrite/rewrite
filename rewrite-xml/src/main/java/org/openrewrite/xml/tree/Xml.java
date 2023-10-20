@@ -465,6 +465,13 @@ public interface Xml extends Tree {
             public String toString() {
                 return "</" + name + ">";
             }
+
+            public boolean isSelfClosing(Xml.Tag tag) {
+                // Check if the tag is self-closing by examining the closing tag.
+                // A self-closing tag ends with "/>".
+                Xml.Tag.Closing closing = tag.getClosing();
+                return closing != null && closing.getBeforeTagDelimiterPrefix().endsWith("/>");
+            }
         }
     }
 

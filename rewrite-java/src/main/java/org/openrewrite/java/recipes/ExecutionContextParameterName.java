@@ -15,48 +15,56 @@
  */
 package org.openrewrite.java.recipes;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.RenameVariable;
-import org.openrewrite.java.search.UsesType;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.tree.TypeUtils;
+import org.junit.jupiter.api.Test;
+import org.openrewrite.test.RewriteTest;
 
-public class ExecutionContextParameterName extends Recipe {
+import static org.openrewrite.java.Assertions.java;
 
-    @Override
-    public String getDisplayName() {
-        return "Use a standard name for `ExecutionContext`";
-    }
+class SetDefaultEstimatedEffortPerOccurrenceTest implements RewriteTest {
 
-    @Override
-    public String getDescription() {
-        return "Visitors that are parameterized with `ExecutionContext` should use the parameter name `ctx`.";
-    }
+    @SuppressWarnings("NullableProblems")
+    @Test
+    void setDefault() {
+        rewriteRun(
+          spec -> spec.recipe(new SetDefaultEstimatedEffortPerOccurrence()),
+          java(
+            """
+              package org.openrewrite;
+              import java.time.Duration;
 
-    @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new UsesType<>("org.openrewrite.Recipe", false), new JavaIsoVisitor<ExecutionContext>() {
-            @Override
-            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
-                J.MethodDeclaration m = super.visitMethodDeclaration(method, ctx);
-                for (Statement parameter : m.getParameters()) {
-                    if (parameter instanceof J.VariableDeclarations) {
-                        J.VariableDeclarations param = (J.VariableDeclarations) parameter;
-                        if (TypeUtils.isOfClassType(param.getType(),
-                                "org.openrewrite.ExecutionContext")) {
-                            m = (J.MethodDeclaration) new RenameVariable<ExecutionContext>(param.getVariables().get(0), "ctx")
-                                    .visitNonNull(m, ctx);
-                        }
-                    }
-                }
-
-                return m;
-            }
-        });
+              public class Recipe {
+                  public Duration getEstimatedEffortPerOccurrence() {
+                      return null;
+                  }
+              }
+              """
+          ),
+          java(
+            """
+              import org.openrewrite.Recipe;
+              class SampleRecipe extends Recipe {
+                  public String getDisplayName() { return null; }
+              
+                  public Object getVisitor() { return null; }
+              }
+              """,
+            """
+              import org.openrewrite.Recipe;
+              
+              import java.time.Duration;
+              
+              class SampleRecipe extends Recipe {
+                  public String getDisplayName() { return null; }
+              
+                  @Override
+                  public Duration getEstimatedEffortPerOccurrence() {
+                      return Duration.ofMinutes(5);
+                  }
+              
+                  public Object getVisitor() { return null; }
+              }
+              """
+          )
+        );
     }
 }
