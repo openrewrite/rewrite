@@ -9,7 +9,7 @@ dependencies {
     jmh("org.projectlombok:lombok:latest.release")
 
     jmh(project(":rewrite-core"))
-    jmh(project(":rewrite-java-21"))
+    jmh(project(":rewrite-java-17"))
     jmh(project(":rewrite-maven"))
     jmh("org.rocksdb:rocksdbjni:latest.release")
     jmh("org.openjdk.jmh:jmh-core:latest.release")

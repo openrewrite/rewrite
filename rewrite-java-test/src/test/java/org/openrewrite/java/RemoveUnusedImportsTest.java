@@ -1632,4 +1632,117 @@ class RemoveUnusedImportsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3607")
+    void conflictWithRecord() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().dependsOn(
+            """
+              package pzrep.p1;
+                
+              public class Record {
+                public A theOne() { return new A(); }
+                public B0 theOther0() { return new B0(); }
+                public B1 theOther1() { return new B1(); }
+                public B2 theOther2() { return new B2(); }
+                public B3 theOther3() { return new B3(); }
+                public B4 theOther4() { return new B4(); }
+                public B5 theOther5() { return new B5(); }
+                public B6 theOther6() { return new B6(); }
+                public B7 theOther7() { return new B7(); }
+                public B8 theOther8() { return new B8(); }
+                public B9 theOther9() { return new B9(); }
+              }
+              """, """
+              package pzrep.p1;
+
+              public class A {
+                public void f() {}
+              }
+              """, """
+              package pzrep.p1;
+
+              public class B0 {
+                public void f() {}
+              }
+              """, """
+              package pzrep.p1;
+
+              public class B1 {
+                public void f() {}
+              }
+              """, """
+              package pzrep.p1;
+
+              public class B2 {
+                public void f() {}
+              }
+              """, """
+              package pzrep.p1;
+
+              public class B3 {
+                public void f() {}
+              }
+              """, """
+              package pzrep.p1;
+
+              public class B4 {
+                public void f() {}
+              }
+              """, """
+              package pzrep.p1;
+
+              public class B5 {
+                public void f() {}
+              }
+              """, """
+              package pzrep.p1;
+
+              public class B6 {
+                public void f() {}
+              }
+              """, """
+              package pzrep.p1;
+
+              public class B7 {
+                public void f() {}
+              }
+              """, """
+              package pzrep.p1;
+
+              public class B8 {
+                public void f() {}
+              }
+              """, """
+              package pzrep.p1;
+
+              public class B9 {
+                public void f() {}
+              }
+              """
+          )),
+          java("""
+            package pzrep.p2;
+
+            import pzrep.p1.Record;
+            import pzrep.p1.*;
+
+            class Client2 {
+                void f(Record r) {
+                  A a = r.theOne();
+                  B0 b0 = r.theOther0();
+                  B1 b1 = r.theOther1();
+                  B2 b2 = r.theOther2();
+                  B3 b3 = r.theOther3();
+                  B4 b4 = r.theOther4();
+                  B5 b5 = r.theOther5();
+                  B6 b6 = r.theOther6();
+                  B7 b7 = r.theOther7();
+                  B8 b8 = r.theOther8();
+                  B9 b9 = r.theOther9();
+                }
+            }
+            """));
+    }
 }

@@ -78,7 +78,6 @@ public interface JavaParser extends Parser {
      * @return A set of paths of jars on the runtime classpath matching the provided artifact names, to the extent such
      * matching jars can be found.
      */
-    @SuppressWarnings("DuplicateExpressions")
     static List<Path> dependenciesFromClasspath(String... artifactNames) {
         List<URI> runtimeClasspath = new ClassGraph().disableNestedJarScanning().getClasspathURIs();
         List<Path> artifacts = new ArrayList<>(artifactNames.length);
@@ -89,11 +88,15 @@ public interface JavaParser extends Parser {
             Pattern explodedPattern = Pattern.compile("/" + artifactName + "/");
             boolean lacking = true;
             for (URI cpEntry : runtimeClasspath) {
+                if (!"file".equals(cpEntry.getScheme())) {
+                    // exclude any `jar` entries which could result from `Bundle-ClassPath` in `MANIFEST.MF`
+                    continue;
+                }
                 String cpEntryString = cpEntry.toString();
+                Path path = Paths.get(cpEntry);
                 if (jarPattern.matcher(cpEntryString).find() ||
-                        (explodedPattern.matcher(cpEntryString).find() &&
-                                Paths.get(cpEntry).toFile().isDirectory())) {
-                    artifacts.add(Paths.get(cpEntry));
+                        explodedPattern.matcher(cpEntryString).find() && path.toFile().isDirectory()) {
+                    artifacts.add(path);
                     lacking = false;
                     // Do not break because jarPattern matches "foo-bar-1.0.jar" and "foo-1.0.jar" to "foo"
                 }
@@ -264,9 +267,11 @@ public interface JavaParser extends Parser {
                     .invoke(null);
             return javaParser;
         } catch (Exception e) {
-            throw new IllegalStateException("Unable to create a Java parser instance. " +
-                    "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, or `rewrite-java-21` must be on the classpath.", e);
+            //Fall through to an exception without making this the "cause".
         }
+
+        throw new IllegalStateException("Unable to create a Java parser instance. " +
+                "`rewrite-java-8`, `rewrite-java-11`, `rewrite-java-17`, or `rewrite-java-21` must be on the classpath.");
     }
 
     @Override
