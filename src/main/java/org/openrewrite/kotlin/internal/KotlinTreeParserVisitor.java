@@ -2781,24 +2781,31 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             return modifiers;
         }
 
-        List<J.Annotation> annotations = new ArrayList<>();
+        boolean isLeadingAnnotation = true;
 
         // don't use iterator of `PsiTreeUtil.firstChild` and `getNextSibling`, since it could skip one layer, example test "paramAnnotation"
         // also don't use `modifierList.getChildren()` since it could miss some element
         List<PsiElement> children = getAllChildren(modifierList);
 
         for (PsiElement child : children) {
-            if (child instanceof LeafPsiElement && child.getNode().getElementType() instanceof KtModifierKeywordToken) {
-                // TODO: fix leading annotations and modifier annotations.
-                modifiers.add(mapModifier(child, annotations));
-            } else if (child instanceof KtAnnotationEntry) {
+            boolean isAnnotation = child instanceof KtAnnotationEntry;
+
+            if (isLeadingAnnotation && isAnnotation) {
                 KtAnnotationEntry ktAnnotationEntry = (KtAnnotationEntry) child;
                 leadingAnnotations.add((J.Annotation) ktAnnotationEntry.accept(this, data));
+            } else {
+                if (child instanceof LeafPsiElement && child.getNode().getElementType() instanceof KtModifierKeywordToken) {
+                    isLeadingAnnotation = false;
+                    modifiers.add(mapModifier(child, emptyList()));
+                } else if (isAnnotation) {
+                    List<J.Annotation> annotations = new ArrayList<>();
+                    annotations.add((J.Annotation) ((KtAnnotationEntry) child).accept(this, data));
+                    modifiers.add(new J.Modifier(randomId(), Space.EMPTY, Markers.EMPTY, "", J.Modifier.Type.LanguageExtension, annotations));
+                }
             }
         }
 
         // TODO. handle lastAnnotations
-
         return modifiers;
     }
 

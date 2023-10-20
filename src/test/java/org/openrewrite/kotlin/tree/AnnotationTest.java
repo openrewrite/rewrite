@@ -209,8 +209,8 @@ class AnnotationTest implements RewriteTest {
             """
               class TestB {
                   public
-                  @get : Ann
-                  @set : Ann
+                  @get  : Ann
+                  @set :  Ann
                   var name : String = ""
               }
               """
