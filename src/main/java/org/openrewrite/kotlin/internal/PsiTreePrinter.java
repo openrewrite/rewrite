@@ -31,6 +31,7 @@ import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef;
 import org.jetbrains.kotlin.fir.types.FirTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
+import org.jetbrains.kotlin.ir.IrElement;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
@@ -362,6 +363,40 @@ public class PsiTreePrinter {
         TreeVisitingPrinter visitor = new TreeVisitingPrinter(true, true);
         visitor.visit(tree, new InMemoryExecutionContext());
         return visitor.print();
+    }
+
+    public static String printIrElement(IrElement irElement) {
+        StringBuilder sb = new StringBuilder();
+//        sb.append(firElement.getClass().getSimpleName());
+//
+//        if (firElement.getSource() != null) {
+//            KtSourceElement source = firElement.getSource();
+//            sb.append(" | ");
+//
+//            if (source instanceof KtRealPsiSourceElement) {
+//                sb.append("Real ");
+//            } else if (source instanceof KtFakeSourceElement) {
+//                sb.append("Fake ");
+//            } else {
+//                sb.append(source.getClass().getSimpleName());
+//            }
+//
+//            sb.append("PSI(")
+//                    .append("[").append(source.getStartOffset())
+//                    .append(",")
+//                    .append(source.getEndOffset())
+//                    .append("]")
+//                    .append(" ")
+//                    .append(source.getElementType())
+//                    .append(")");
+//        }
+//
+//        String firValue = firElementToString(firElement);
+//        if (firValue != null && !firValue.isEmpty()) {
+//            sb.append(" | ").append(firValue);
+//        }
+
+        return sb.toString();
     }
 
     public static String printFirElement(FirElement firElement) {

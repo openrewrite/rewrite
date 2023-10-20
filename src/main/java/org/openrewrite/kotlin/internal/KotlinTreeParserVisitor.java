@@ -82,6 +82,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     private final FirSession firSession;
     private final KotlinTypeMapping typeMapping;
     private final PsiElementAssociations psiElementAssociations;
+    private final PsiElementAssociations2 psiElementAssociations2;
     private final List<NamedStyles> styles;
     private final Path sourcePath;
 
@@ -97,6 +98,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                                    FirSession firSession,
                                    KotlinTypeMapping typeMapping,
                                    PsiElementAssociations psiElementAssociations,
+                                   PsiElementAssociations2 psiElementAssociations2,
                                    List<NamedStyles> styles,
                                    @Nullable Path relativeTo,
                                    ExecutionContext ctx) {
@@ -104,6 +106,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         this.firSession = firSession;
         this.typeMapping = typeMapping;
         this.psiElementAssociations = psiElementAssociations;
+        this.psiElementAssociations2 = psiElementAssociations2;
         this.styles = styles;
         sourcePath = kotlinSource.getInput().getRelativePath(relativeTo);
         fileAttributes = kotlinSource.getInput().getFileAttributes();

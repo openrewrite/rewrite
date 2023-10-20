@@ -194,12 +194,17 @@ public class KotlinParser implements Parser {
                                             System.out.println(PsiTreePrinter.print(kotlinSource.getKtFile()));
                                             System.out.println(PsiTreePrinter.print(kotlinSource.getFirFile()));
 
+                                            // TODO replace JavaTypeCache.
+                                            KotlinIrTypeMapping irTypeMapping = new KotlinIrTypeMapping(new JavaTypeCache());
+                                            PsiElementAssociations2 irMapping = new PsiElementAssociations2(irTypeMapping, kotlinSource.getKtFile(), kotlinSource.getIrFile());
+                                            irMapping.initialize();
+
                                             // PSI based parser
                                             SourceFile kcuPsi;
                                             KotlinTypeMapping typeMapping = new KotlinTypeMapping(new JavaTypeCache(), firSession, kotlinSource.getFirFile().getSymbol());
                                             PsiElementAssociations psiFirMapping = new PsiElementAssociations(typeMapping, kotlinSource.getFirFile());
                                             psiFirMapping.initialize();
-                                            KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, firSession, typeMapping, psiFirMapping, styles, relativeTo, ctx);
+                                            KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, firSession, typeMapping, psiFirMapping, irMapping, styles, relativeTo, ctx);
                                             try {
                                                 kcuPsi = psiParser.parse();
                                             } catch (UnsupportedOperationException ignore) {
@@ -370,7 +375,7 @@ public class KotlinParser implements Parser {
         }
 
         public KotlinParser.Builder clone() {
-            KotlinParser.Builder clone = (KotlinParser.Builder)super.clone();
+            KotlinParser.Builder clone = (KotlinParser.Builder) super.clone();
             clone.typeCache = this.typeCache.clone();
             return clone;
         }
@@ -522,16 +527,16 @@ public class KotlinParser implements Parser {
     }
 
     public enum KotlinLanguageLevel {
-       KOTLIN_1_0,
-       KOTLIN_1_1,
-       KOTLIN_1_2,
-       KOTLIN_1_3,
-       KOTLIN_1_4,
-       KOTLIN_1_5,
-       KOTLIN_1_6,
-       KOTLIN_1_7,
-       KOTLIN_1_8,
-       KOTLIN_1_9
+        KOTLIN_1_0,
+        KOTLIN_1_1,
+        KOTLIN_1_2,
+        KOTLIN_1_3,
+        KOTLIN_1_4,
+        KOTLIN_1_5,
+        KOTLIN_1_6,
+        KOTLIN_1_7,
+        KOTLIN_1_8,
+        KOTLIN_1_9
     }
 
     private CompilerConfiguration compilerConfiguration() {
