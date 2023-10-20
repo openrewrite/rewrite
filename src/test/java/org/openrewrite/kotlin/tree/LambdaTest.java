@@ -159,7 +159,7 @@ class LambdaTest implements RewriteTest {
               
               class Test {
                   fun method(n: Int) {
-                      val ns: Supplier<Int> = Supplier {->
+                      val ns: Supplier<Int> = Supplier {   ->
                           n
                       }
                   }

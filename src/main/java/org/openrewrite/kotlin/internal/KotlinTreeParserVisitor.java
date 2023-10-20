@@ -544,18 +544,20 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             boolean hasBraces = true;
             boolean omitDestruct = false;
 
-            if (ktFunctionLiteral.getValueParameterList() == null) {
-                throw new UnsupportedOperationException("TODO");
-            }
+            List<KtParameter> valueParameters = ktFunctionLiteral.getValueParameters();
+            List<JRightPadded<J>> valueParams = new ArrayList<>(valueParameters.size());
 
-            List<JRightPadded<J>> valueParams = new ArrayList<>(ktFunctionLiteral.getValueParameters().size());
-
-            for (KtParameter ktParameter : ktFunctionLiteral.getValueParameters()) {
-                valueParams.add(padRight(ktParameter.accept(this, data).withPrefix(prefix(ktParameter)), suffix(ktParameter)));
+            if (!valueParameters.isEmpty()) {
+                for (int i = 0; i < valueParameters.size(); i++) {
+                    KtParameter ktParameter = valueParameters.get(i);
+                    J expr = ktParameter.accept(this, data).withPrefix(prefix(ktParameter));
+                    valueParams.add(maybeTrailingComma(ktParameter, padRight(expr, suffix(ktParameter)), i == valueParameters.size() - 1));
+                }
+            } else if (ktFunctionLiteral.getArrow() != null) {
+                valueParams.add(padRight(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY), Space.EMPTY));
             }
 
             J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), prefix(ktFunctionLiteral.getValueParameterList()), Markers.EMPTY, false, valueParams);
-
 
             J.Block body = ktFunctionLiteral.getBodyExpression().accept(this, data)
                     .withPrefix(prefix(ktFunctionLiteral.getBodyExpression()));
@@ -737,36 +739,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         );
     }
 
-
     @Override
     public J visitLambdaExpression(KtLambdaExpression expression, ExecutionContext data) {
         KtFunctionLiteral functionLiteral = expression.getFunctionLiteral();
-        Markers markers = Markers.EMPTY;
-        J.Label label = null;
-        boolean hasBraces = true;
-        boolean omitDestruct = false;
-
-        List<JRightPadded<J>> valueParams = new ArrayList<>(functionLiteral.getValueParameters().size());
-        List<KtParameter> valueParameters = functionLiteral.getValueParameters();
-        for (int i = 0; i < valueParameters.size(); i++) {
-            KtParameter ktParameter = valueParameters.get(i);
-            J expr = ktParameter.accept(this, data).withPrefix(prefix(ktParameter));
-            valueParams.add(maybeTrailingComma(ktParameter, padRight(expr, suffix(ktParameter)), i == valueParameters.size() - 1));
-        }
-
-        J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), prefix(functionLiteral.getValueParameterList()), Markers.EMPTY, false, valueParams);
-        J.Block body = functionLiteral.getBodyExpression().accept(this, data)
-                .withPrefix(prefix(functionLiteral.getBodyExpression()));
-
-        return new J.Lambda(
-                randomId(),
-                prefix(expression),
-                markers,
-                params,
-                prefix(functionLiteral.getArrow()),
-                body,
-                null
-        );
+        return functionLiteral.accept(this, data);
     }
 
     @Override
