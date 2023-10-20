@@ -177,20 +177,20 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
             typeCache.put(fqn, clazz)
 
             var supertype: JavaType.FullyQualified? = null
-            var interfaceSymbols: MutableList<IrSymbolOwner>? = null
+            var interfaceTypes: MutableList<IrType>? = null
             for (sType in irClass.superTypes) {
                 when (val classifier: IrClassifierSymbol? = sType.classifierOrNull) {
                     is IrClassSymbol -> {
                         when (classifier.owner.kind) {
                             ClassKind.CLASS -> {
-                                supertype = TypeUtils.asFullyQualified(type(classifier.owner))
+                                supertype = TypeUtils.asFullyQualified(type(sType))
                             }
 
                             ClassKind.INTERFACE -> {
-                                if (interfaceSymbols == null) {
-                                    interfaceSymbols = ArrayList()
+                                if (interfaceTypes == null) {
+                                    interfaceTypes = ArrayList()
                                 }
-                                interfaceSymbols.add(classifier.owner)
+                                interfaceTypes.add(sType)
                             }
 
                             else -> {
@@ -248,12 +248,10 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
             }
 
             var interfaces: MutableList<JavaType.FullyQualified>? = null
-            if (!interfaceSymbols.isNullOrEmpty()) {
-                interfaces = ArrayList(interfaceSymbols.size)
-                for (interfaceSymbol: IrSymbolOwner in interfaceSymbols) {
-                    val sym: Any =
-                        if (interfaceSymbol is Fir2IrLazyClass) interfaceSymbol.symbol.owner.symbol else interfaceSymbol
-                    val javaType = TypeUtils.asFullyQualified(type(sym))
+            if (!interfaceTypes.isNullOrEmpty()) {
+                interfaces = ArrayList(interfaceTypes.size)
+                for (iType: IrType in interfaceTypes) {
+                    val javaType = TypeUtils.asFullyQualified(type(iType))
                     if (javaType != null) {
                         interfaces.add(javaType)
                     }
