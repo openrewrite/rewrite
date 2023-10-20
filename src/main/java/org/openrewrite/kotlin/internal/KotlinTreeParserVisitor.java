@@ -22,7 +22,6 @@ import org.jetbrains.kotlin.com.intellij.psi.*;
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.tree.LeafPsiElement;
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.tree.PsiErrorElementImpl;
 import org.jetbrains.kotlin.com.intellij.psi.tree.IElementType;
-import org.jetbrains.kotlin.com.intellij.psi.tree.TokenSet;
 import org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.kotlin.fir.ClassMembersKt;
 import org.jetbrains.kotlin.fir.FirElement;
@@ -2021,7 +2020,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 implementings,
                 null,
                 body,
-                (JavaType.FullyQualified) type(klass)
+                (JavaType.FullyQualified) type2(klass)
         );
     }
 
@@ -3136,6 +3135,15 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             return JavaType.Unknown.getInstance();
         }
         return psiElementAssociations.type(psi, owner(psi));
+    }
+
+    // rename
+    @Nullable
+    private JavaType type2(@Nullable KtElement psi) {
+        if (psi == null) {
+            return JavaType.Unknown.getInstance();
+        }
+        return psiElementAssociations2.type(psi);
     }
 
     private JavaType.Primitive primitiveType(PsiElement expression) {

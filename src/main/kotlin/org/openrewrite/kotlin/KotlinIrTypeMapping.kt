@@ -25,6 +25,7 @@ import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
 import org.jetbrains.kotlin.ir.types.*
+import org.jetbrains.kotlin.ir.util.constructors
 import org.jetbrains.kotlin.ir.util.functions
 import org.jetbrains.kotlin.ir.util.kotlinFqName
 import org.jetbrains.kotlin.ir.util.properties
@@ -208,7 +209,18 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
                 if (owner is JavaType.Parameterized) {
                     owner = owner.type
                 }
+            } else if (irClass.parent is IrFunction) {
+                var parent: IrDeclarationParent = irClass.parent
+                while (parent !is IrClass && parent !is IrFile) {
+                    if (parent is IrDeclaration) {
+                        parent = parent.parent
+                    } else {
+                        break
+                    }
+                }
+                owner = TypeUtils.asFullyQualified(type(parent))
             }
+
             var fields: MutableList<JavaType.Variable>? = null
             for (property: IrProperty in irClass.properties) {
                 if (fields == null) {
@@ -219,6 +231,14 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
             }
 
             var methods: MutableList<JavaType.Method>? = null
+            for (function: IrFunction in irClass.constructors) {
+                if (methods == null) {
+                    methods = ArrayList(irClass.functions.toList().size)
+                }
+                val mt = methodDeclarationType(function)
+                methods.add(mt)
+            }
+
             for (function: IrFunction in irClass.functions) {
                 if (methods == null) {
                     methods = ArrayList(irClass.functions.toList().size)
@@ -443,7 +463,7 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
             "public" -> bitMask += 1L
             "private" -> bitMask += 1L shl 1
             "protected" -> bitMask += 1L shl 2
-            "internal", "package-private" -> {}
+            "internal", "package-private", "local" -> {}
             else -> {
                 throw UnsupportedOperationException("Unsupported visibility: ${visibility.name.lowercase()}")
             }
