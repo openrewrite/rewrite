@@ -94,17 +94,14 @@ class ArrayTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail("Fixed by PSI-based-parser")
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/291")
-    @ExpectedToFail
     void incrementArrayElement() {
         rewriteRun(
           kotlin(
             """
               val array = IntArray(1)
-              array.let {
-                  it[0]++
-              }
               val x = array[0]++
               """
           )
