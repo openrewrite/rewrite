@@ -1886,29 +1886,16 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @NotNull
     private J.ClassDeclaration visitClass0(KtClass klass, ExecutionContext data) {
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
-        List<J.Modifier> modifiers = new ArrayList<>();
+        List<J.Annotation> lastAnnotations = new ArrayList<>();
         JContainer<J.TypeParameter> typeParams = null;
         JContainer<TypeTree> implementings = null;
         Markers markers = Markers.EMPTY;
         J.MethodDeclaration primaryConstructor;
 
-        if (klass.getModifierList() != null) {
-            PsiElement child = klass.getModifierList().getFirstChild();
-            while (child != null) {
-                if (!isSpace(child.getNode()) && (!(child instanceof KtAnnotationEntry))) {
-                    modifiers.add(new J.Modifier(randomId(), prefix(child), Markers.EMPTY, child.getText(), mapModifierType(child), emptyList())
-                    );
-                }
-                child = child.getNextSibling();
-            }
-        }
+        List<J.Modifier> modifiers = mapModifiers(klass.getModifierList(), leadingAnnotations, lastAnnotations, data);
 
         if (!klass.hasModifier(KtTokens.OPEN_KEYWORD)) {
             modifiers.add(buildFinalModifier());
-        }
-
-        if (!klass.getAnnotationEntries().isEmpty()) {
-            leadingAnnotations = mapAnnotations(klass.getAnnotationEntries(), data);
         }
 
         J.ClassDeclaration.Kind kind;

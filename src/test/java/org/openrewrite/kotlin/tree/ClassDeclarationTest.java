@@ -165,7 +165,7 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              public @Deprecated ( "message 0" ) abstract @Suppress("") class Test
+              public  @Deprecated ( "message 0" )   abstract    @Suppress("") class Test
               
               @Deprecated ( "message 1" )
               @Suppress ( "" )
