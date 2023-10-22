@@ -2322,7 +2322,7 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               public enum WorkflowStatus {
-                  @Nullable
+                  @SuppressWarnings("ALL")
                   VALUE1
               }
               """
