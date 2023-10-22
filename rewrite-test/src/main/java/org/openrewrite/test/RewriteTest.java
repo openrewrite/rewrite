@@ -455,6 +455,7 @@ public interface RewriteTest extends SourceSpecs {
                 if ((result.getBefore() == null && source == null) ||
                         (result.getBefore() != null && result.getBefore().getId().equals(source.getId()))) {
                     if (result.getAfter() != null) {
+                        String before = result.getBefore() == null ? null : result.getBefore().printAll(out.clone());
                         String actualAfter = result.getAfter().printAll(out.clone());
                         String expectedAfter = sourceSpec.after == null ? null :
                                 sourceSpec.after.apply(actualAfter);
@@ -466,7 +467,8 @@ public interface RewriteTest extends SourceSpecs {
                             sourceSpec.eachResult.accept(result.getAfter(), testMethodSpec, testClassSpec);
                         } else {
                             boolean isRemote = result.getAfter() instanceof Remote;
-                            if (!isRemote && Objects.equals(sourceSpec.before, actualAfter)) {
+                            if (!isRemote && Objects.equals(result.getBefore().getSourcePath(), result.getAfter().getSourcePath()) &&
+                                    Objects.equals(before, actualAfter)) {
                                 fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.");
                             }
 
@@ -476,7 +478,7 @@ public interface RewriteTest extends SourceSpecs {
                             } else {
                                 assertThat(actualAfter)
                                         .as("The recipe must not make changes to \"" + result.getBefore().getSourcePath() + "\"")
-                                        .isEqualTo(result.getBefore().printAll(out.clone()));
+                                        .isEqualTo(before);
                             }
                         }
                     } else {
