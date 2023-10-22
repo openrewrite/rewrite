@@ -850,9 +850,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitParameterList(KtParameterList list, ExecutionContext data) {
-
-
-        throw new UnsupportedOperationException("TODO");
+        throw new UnsupportedOperationException("Unsupport, use mapParameters() instead");
     }
 
     @Override
@@ -1066,7 +1064,62 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitSecondaryConstructor(KtSecondaryConstructor constructor, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        Markers markers = Markers.EMPTY;
+        List<J.Annotation> leadingAnnotations = new ArrayList<>();
+        List<J.Annotation> lastAnnotations = new ArrayList<>();
+        List<J.Modifier> modifiers = mapModifiers(constructor.getModifierList(), leadingAnnotations, lastAnnotations, data);
+
+        modifiers.add(mapModifier(constructor.getConstructorKeyword(), emptyList()));
+
+        JRightPadded<J.VariableDeclarations.NamedVariable> infixReceiver = null;
+        K.ConstructorInvocation delegationCall = null;
+
+
+        J.Identifier name = createIdentifier(constructor.getName(), Space.EMPTY, type(constructor));
+        List<JRightPadded<Statement>> statements = mapParameters(constructor.getValueParameterList(), data);
+        JContainer<Statement> params = JContainer.build(
+                prefix(constructor.getValueParameterList()),
+                statements,
+                Markers.EMPTY
+        );
+        if (constructor.getDelegationCall() != null) {
+            J.Identifier delegateName = createIdentifier(constructor.getDelegationCall().getCalleeExpression(), type(constructor.getDelegationCall().getCalleeExpression()));
+
+            JContainer<Expression> args = mapFunctionCallArguments(constructor.getDelegationCall().getValueArgumentList(), data);
+
+            delegationCall = new K.ConstructorInvocation(
+                    randomId(),
+                    prefix(constructor.getDelegationCall()),
+                    Markers.EMPTY,
+                    delegateName,
+                    args
+                    );
+
+        }
+
+        J.Block body = null;
+
+        J.MethodDeclaration methodDeclaration = new J.MethodDeclaration(
+                randomId(),
+                prefix(constructor),
+                markers,
+                leadingAnnotations,
+                modifiers,
+                null,
+                null,
+                new J.MethodDeclaration.IdentifierWithAnnotations(name, emptyList()),
+                params,
+                null,
+                body,
+                null,
+                methodDeclarationType(constructor)
+        );
+
+        if (delegationCall != null) {
+            return new K.Constructor(randomId(), Markers.EMPTY, methodDeclaration, prefix(constructor.getColon()), delegationCall);
+        }
+
+        return methodDeclaration;
     }
 
     @Override
@@ -3470,6 +3523,52 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 annotations
         );
     }
+
+    private List<JRightPadded<Statement>> mapParameters(@Nullable KtParameterList list, ExecutionContext data) {
+        if (list == null) {
+            return emptyList();
+        }
+
+        List<KtParameter> ktParameters = list.getParameters();
+        List<JRightPadded<Statement>> statements = new ArrayList<>(ktParameters.size());
+
+        for (int i = 0; i < ktParameters.size(); i++) {
+            KtParameter ktParameter = ktParameters.get(i);
+            Statement statement = convertToStatement(ktParameter.accept(this, data));
+            statements.add(maybeTrailingComma(ktParameter, padRight(statement, suffix(ktParameter)), i == ktParameters.size() - 1));
+        }
+
+        if (ktParameters.isEmpty()) {
+            Statement param = new J.Empty(randomId(), prefix(list.getRightParenthesis()), Markers.EMPTY);
+            statements.add(padRight(param, Space.EMPTY));
+        }
+
+        return statements;
+    }
+
+    @Nullable
+    private JContainer<Expression> mapFunctionCallArguments(@Nullable KtValueArgumentList argumentList, ExecutionContext data) {
+        if (argumentList == null) {
+            return null;
+        }
+
+        List<KtValueArgument> ktValueArguments = argumentList.getArguments();
+        List<JRightPadded<Expression>> expressions = new ArrayList<>(ktValueArguments.size());
+
+        for (int i = 0; i < ktValueArguments.size(); i++) {
+            KtValueArgument ktValueArgument = ktValueArguments.get(i);
+            Expression expr = convertToExpression(ktValueArgument.accept(this, data));
+            expressions.add(maybeTrailingComma(ktValueArgument, padRight(expr, suffix(ktValueArgument)), i == ktValueArguments.size() - 1));
+        }
+
+        if (ktValueArguments.isEmpty()) {
+            Expression arg = new J.Empty(randomId(), prefix(argumentList.getRightParenthesis()), Markers.EMPTY);
+            expressions.add(padRight(arg, Space.EMPTY));
+        }
+
+        return JContainer.build(prefix(argumentList), expressions, Markers.EMPTY);
+    }
+
 
     private Space space(PsiElement node) {
         Space space = null;

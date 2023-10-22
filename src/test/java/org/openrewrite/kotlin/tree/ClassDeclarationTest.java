@@ -235,7 +235,7 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin(
             """
               class Test ( val answer : Int ) {
-                  constructor ( ) : this ( 42 )
+                  constructor  (   )    : this  (   42    )
               }
               """
           )
