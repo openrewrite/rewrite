@@ -1068,12 +1068,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
         List<J.Annotation> lastAnnotations = new ArrayList<>();
         List<J.Modifier> modifiers = mapModifiers(constructor.getModifierList(), leadingAnnotations, lastAnnotations, data);
-
         modifiers.add(mapModifier(constructor.getConstructorKeyword(), emptyList()));
-
-        JRightPadded<J.VariableDeclarations.NamedVariable> infixReceiver = null;
-        K.ConstructorInvocation delegationCall = null;
-
 
         J.Identifier name = createIdentifier(constructor.getName(), Space.EMPTY, type(constructor));
         List<JRightPadded<Statement>> statements = mapParameters(constructor.getValueParameterList(), data);
@@ -1082,22 +1077,23 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 statements,
                 Markers.EMPTY
         );
-        if (constructor.getDelegationCall() != null) {
-            J.Identifier delegateName = createIdentifier(constructor.getDelegationCall().getCalleeExpression(), type(constructor.getDelegationCall().getCalleeExpression()));
 
-            JContainer<Expression> args = mapFunctionCallArguments(constructor.getDelegationCall().getValueArgumentList(), data);
+        J.Identifier delegateName = createIdentifier(constructor.getDelegationCall().getCalleeExpression(), type(constructor.getDelegationCall().getCalleeExpression()));
+        JContainer<Expression> args = mapFunctionCallArguments(constructor.getDelegationCall().getValueArgumentList(), data);
 
-            delegationCall = new K.ConstructorInvocation(
-                    randomId(),
-                    prefix(constructor.getDelegationCall()),
-                    Markers.EMPTY,
-                    delegateName,
-                    args
-                    );
+        K.ConstructorInvocation delegationCall = new K.ConstructorInvocation(
+                randomId(),
+                prefix(constructor.getDelegationCall()),
+                Markers.EMPTY,
+                delegateName,
+                args
+        );
 
-        }
 
         J.Block body = null;
+        if (constructor.getBodyExpression() != null) {
+            body = (J.Block) constructor.getBodyExpression().accept(this, data);
+        }
 
         J.MethodDeclaration methodDeclaration = new J.MethodDeclaration(
                 randomId(),
@@ -1115,11 +1111,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 methodDeclarationType(constructor)
         );
 
-        if (delegationCall != null) {
-            return new K.Constructor(randomId(), Markers.EMPTY, methodDeclaration, prefix(constructor.getColon()), delegationCall);
-        }
-
-        return methodDeclaration;
+        return new K.Constructor(randomId(), Markers.EMPTY, methodDeclaration, prefix(constructor.getColon()), delegationCall);
     }
 
     @Override
