@@ -1737,41 +1737,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     Space.EMPTY,
                     type
             );
-        } else if (operationReference.getIdentifier() != null) {
-            String operation = operationReference.getIdentifier().getText();
-            if ("to".equals(operation) || "downTo".equals(operation) || "step".equals(operation)) {
-                Markers markers = Markers.EMPTY
-                        .addIfAbsent(new Infix(randomId()))
-                        .addIfAbsent(new Extension(randomId()));
-
-                Expression selectExp = convertToExpression(expression.getLeft().accept(this, data).withPrefix(prefix(expression.getLeft())));
-                JRightPadded<Expression> select = padRight(selectExp, suffix(expression.getLeft()));
-                J.Identifier name = createIdentifier(operation, Space.EMPTY, methodInvocationType(expression));
-                JContainer<Expression> typeParams = null;
-
-                List<JRightPadded<Expression>> expressions = new ArrayList<>(1);
-                Markers paramMarkers = markers.addIfAbsent(new OmitParentheses(randomId()));
-                Expression rightExp = convertToExpression(expression.getRight().accept(this, data).withPrefix(prefix(expression.getRight())));
-                JRightPadded<Expression> padded = padRight(rightExp, suffix(expression.getRight()));
-                expressions.add(padded);
-                JContainer<Expression> args = JContainer.build(Space.EMPTY, expressions, paramMarkers);
-                JavaType.Method methodType = methodInvocationType(expression);
-
-                return new J.MethodInvocation(
-                        randomId(),
-                        prefix(expression),
-                        markers,
-                        select,
-                        typeParams,
-                        name,
-                        args,
-                        methodType
-                );
-            }
         }
 
-        throw new UnsupportedOperationException("TODO");
+        return mapFunctionCall(expression, data);
     }
+
+
 
     @Nullable
     private J.AssignmentOperation.Type mapAssignmentOperationType(KtOperationReferenceExpression operationReference) {
@@ -3213,6 +3184,36 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             default:
                 throw new UnsupportedOperationException("Unsupported ModifierType : " + modifier);
         }
+    }
+
+    private J.MethodInvocation mapFunctionCall(KtBinaryExpression expression, ExecutionContext data) {
+        Markers markers = Markers.EMPTY
+                .addIfAbsent(new Infix(randomId()))
+                .addIfAbsent(new Extension(randomId()));
+
+        Expression selectExp = convertToExpression(expression.getLeft().accept(this, data).withPrefix(prefix(expression.getLeft())));
+        JRightPadded<Expression> select = padRight(selectExp, Space.EMPTY);
+        J.Identifier name =  (J.Identifier) expression.getOperationReference().accept(this, data); // createIdentifier(operation, Space.EMPTY, methodInvocationType(expression));
+        JContainer<Expression> typeParams = null;
+
+        List<JRightPadded<Expression>> expressions = new ArrayList<>(1);
+        Markers paramMarkers = markers.addIfAbsent(new OmitParentheses(randomId()));
+        Expression rightExp = convertToExpression(expression.getRight().accept(this, data).withPrefix(prefix(expression.getRight())));
+        JRightPadded<Expression> padded = padRight(rightExp, suffix(expression.getRight()));
+        expressions.add(padded);
+        JContainer<Expression> args = JContainer.build(Space.EMPTY, expressions, paramMarkers);
+        JavaType.Method methodType = methodInvocationType(expression);
+
+        return new J.MethodInvocation(
+                randomId(),
+                prefix(expression),
+                markers,
+                select,
+                typeParams,
+                name,
+                args,
+                methodType
+        );
     }
 
     private J.ControlParentheses<Expression> buildIfCondition(KtIfExpression expression) {

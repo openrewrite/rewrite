@@ -337,7 +337,7 @@ class MethodInvocationTest implements RewriteTest {
             """
               infix fun String.modify(block: () -> Unit) = this
               
-              val spec = "test" modify {
+              val spec = "test"  modify   {
                   println("Hello, world!")
               }
               """
