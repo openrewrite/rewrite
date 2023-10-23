@@ -1901,6 +1901,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 for (int i = 0; i < arguments.size(); i++) {
                     KtValueArgument arg = arguments.get(i);
                     Expression expr = convertToExpression(arg.accept(this, data)).withPrefix(prefix(arg));
+                    if (expr.getMarkers().findFirst(TrailingLambdaArgument.class).isPresent() && !expressions.isEmpty()) {
+                        expressions.set(expressions.size() - 1, maybeTrailingComma(arguments.get(i - 1), expressions.get(expressions.size() - 1), true));
+                    }
                     expressions.add(maybeTrailingComma(arg, padRight(expr, suffix(arg)), i == arguments.size() - 1));
                 }
             } else {
