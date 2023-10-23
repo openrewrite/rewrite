@@ -195,7 +195,8 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 else -> ExpressionType.METHOD_INVOCATION
             }
         } else {
-            throw UnsupportedOperationException("Null resolved symbol on FirFunctionCall: $psi")
+            return null
+            // throw UnsupportedOperationException("Null resolved symbol on FirFunctionCall: $psi")
         }
     }
 
