@@ -201,15 +201,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         markers = markers.addIfAbsent(new IndexedAccess(randomId()));
 
         List<KtExpression> indexExpressions = expression.getIndexExpressions();
-        if (indexExpressions.size() != 1) {
-            throw new UnsupportedOperationException("TODO");
+        List<JRightPadded<Expression>> expressions = new ArrayList<>();
+
+        for (KtExpression indexExp : indexExpressions) {
+            expressions.add(padRight(convertToExpression(indexExp.accept(this, data)), suffix(indexExp)));
         }
 
-        List<JRightPadded<Expression>> expressions = new ArrayList<>();
-        KtExpression indexExp = indexExpressions.get(0);
-        expressions.add(padRight(convertToExpression(indexExp.accept(this, data)), suffix(indexExp)));
-        JContainer<Expression> args = JContainer.build(Space.EMPTY, expressions, markers); // expression.getIndicesNode().accept(this, data).withPrefix(Space.EMPTY);
-
+        JContainer<Expression> args = JContainer.build(Space.EMPTY, expressions, markers);
         return new J.MethodInvocation(
                 randomId(),
                 Space.EMPTY,
