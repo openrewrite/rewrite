@@ -806,12 +806,26 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             throw new UnsupportedOperationException("TODO");
         }
 
-        if (parameter.getValOrVarKeyword() != null) {
-            modifiers.add(mapModifier(parameter.getValOrVarKeyword(), Collections.emptyList()));
-        }
+        // todo, simplify this logic
+        int valOrVarOffset = parameter.getValOrVarKeyword() != null ? parameter.getValOrVarKeyword().getTextOffset() : -1;
+        int modifierOffset = parameter.getModifierList() != null ? parameter.getModifierList().getTextOffset() : -1;
 
-        if (parameter.getModifierList() != null) {
-            modifiers.addAll(mapModifiers(parameter.getModifierList(), leadingAnnotations, lastAnnotations, data));
+        if (valOrVarOffset < modifierOffset) {
+            if (parameter.getValOrVarKeyword() != null) {
+                modifiers.add(mapModifier(parameter.getValOrVarKeyword(), Collections.emptyList()));
+            }
+
+            if (parameter.getModifierList() != null) {
+                modifiers.addAll(mapModifiers(parameter.getModifierList(), leadingAnnotations, lastAnnotations, data));
+            }
+        } else {
+            if (parameter.getModifierList() != null) {
+                modifiers.addAll(mapModifiers(parameter.getModifierList(), leadingAnnotations, lastAnnotations, data));
+            }
+
+            if (parameter.getValOrVarKeyword() != null) {
+                modifiers.add(mapModifier(parameter.getValOrVarKeyword(), Collections.emptyList()));
+            }
         }
 
         if (parameter.getDestructuringDeclaration() != null) {
@@ -1832,10 +1846,14 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             } else {
                 List<JRightPadded<Expression>> expressions = new ArrayList<>(arguments.size());
                 Markers markers = Markers.EMPTY;
-
                 for (KtValueArgument arg : arguments) {
                     expressions.add(padRight(convertToExpression(arg.accept(this, data)).withPrefix(prefix(arg)), suffix(arg)));
                 }
+
+                if (!expression.getLambdaArguments().isEmpty()) {
+                    markers = markers.addIfAbsent(new OmitParentheses(randomId()));
+                }
+
                 args = JContainer.build(prefix(expression.getValueArgumentList()), expressions, markers);
             }
             return new J.NewClass(
