@@ -460,7 +460,7 @@ class MethodInvocationTest implements RewriteTest {
           kotlin(
             """
               fun test(bar: String) {
-                "foo $bar".foo()
+                "foo $bar".toInt()
               }
               """
           )
@@ -475,7 +475,7 @@ class MethodInvocationTest implements RewriteTest {
             """
               fun format ( vararg params : String ) { }
               fun test ( ) {
-                format ( * arrayOf ( "foo" , "bar" ) )
+                format (  *   arrayOf ( "foo" , "bar" ) )
               }
               """)
         );

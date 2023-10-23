@@ -1689,7 +1689,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     type(argument.getArgumentExpression())
             );
         } else if (argument.isSpread()) {
-            throw new UnsupportedOperationException("TODO");
+            J j = argument.getArgumentExpression().accept(this, data);
+            return j.withMarkers(j.getMarkers().addIfAbsent(new SpreadArgument(randomId(), prefix(argument))));
         }
 
         J j = argument.getArgumentExpression().accept(this, data).withPrefix(prefix(argument));
@@ -1892,7 +1893,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             if (!arguments.isEmpty()) {
                 for (int i = 0; i < arguments.size(); i++) {
                     KtValueArgument arg = arguments.get(i);
-                    Expression expr = convertToExpression(arg.accept(this, data)).withPrefix(prefix(arg));
+                    Expression expr = convertToExpression(arg.accept(this, data));
                     if (expr.getMarkers().findFirst(TrailingLambdaArgument.class).isPresent() && !expressions.isEmpty()) {
                         expressions.set(expressions.size() - 1, maybeTrailingComma(arguments.get(i - 1), expressions.get(expressions.size() - 1), true));
                     }
