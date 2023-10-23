@@ -20,12 +20,11 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import lombok.experimental.NonFinal;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.Contributor;
-import org.openrewrite.Maintainer;
-import org.openrewrite.Recipe;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.SearchResult;
 
 import java.net.URI;
 import java.time.Duration;
@@ -67,6 +66,11 @@ public class DeclarativeRecipe extends Recipe {
 
     private final List<Recipe> uninitializedRecipes = new ArrayList<>();
     private final List<Recipe> recipeList = new ArrayList<>();
+    private final List<Recipe> preconditions = new ArrayList<>();
+
+    public void addPrecondition(Recipe recipe) {
+        preconditions.add(recipe);
+    }
 
     @JsonIgnore
     private Validated<Object> validation = Validated.test("initialization",
@@ -111,9 +115,78 @@ public class DeclarativeRecipe extends Recipe {
         uninitializedRecipes.clear();
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = true)
+    @RequiredArgsConstructor
+    static class PreconditionBellwether extends Recipe {
+
+        @Override
+        public String getDisplayName() {
+            return "Precondition bellwether";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Evaluates a precondition and makes that result available to the preconditions of other recipes.";
+        }
+
+        TreeVisitor<?, ExecutionContext> precondition;
+
+        @NonFinal
+        transient boolean preconditionApplicable;
+
+        /**
+         * Returns a visitor, suitable for being used as a precondition, that returns as its result whatever this
+         * bellwether evaluated to.
+         */
+        public TreeVisitor<?, ExecutionContext> getFollower() {
+            return new TreeVisitor<Tree, ExecutionContext>() {
+                @Override
+                public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    if(preconditionApplicable) {
+                        return SearchResult.found(tree);
+                    }
+                    return tree;
+                }
+            };
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new TreeVisitor<Tree, ExecutionContext>() {
+                @Override
+                public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    Tree t = precondition.visit(tree, ctx);
+                    preconditionApplicable = t != tree;
+                    return tree;
+                }
+            };
+        }
+    }
+
+
     @Override
     public List<Recipe> getRecipeList() {
-        return recipeList;
+        if(preconditions.isEmpty()) {
+            return recipeList;
+        }
+
+        //noinspection unchecked
+        TreeVisitor<?, ExecutionContext> andPreconditions = Preconditions.and(
+                preconditions.stream().map(Recipe::getVisitor).toArray(TreeVisitor[]::new));
+        PreconditionBellwether bellwether = new PreconditionBellwether(andPreconditions);
+        TreeVisitor<?, ExecutionContext> bellwetherFollower = bellwether.getFollower();
+        List<Recipe> recipeListWithBellwether = new ArrayList<>(recipeList.size() + 1);
+        recipeListWithBellwether.add(bellwether);
+        for (Recipe recipe : recipeList) {
+            if(recipe instanceof ScanningRecipe) {
+                recipeListWithBellwether.add(new PreconditionDecoratedScanningRecipe<>(bellwetherFollower, (ScanningRecipe<?>) recipe));
+            } else {
+                recipeListWithBellwether.add(new PreconditionDecoratedRecipe(bellwetherFollower, recipe));
+            }
+        }
+
+        return recipeListWithBellwether;
     }
 
     public void addUninitialized(Recipe recipe) {
