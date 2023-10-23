@@ -1910,7 +1910,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     expressions.add(maybeTrailingComma(arg, padRight(expr, suffix(arg)), i == arguments.size() - 1));
                 }
             } else {
-                expressions.add(padRight(new J.Empty(randomId(), prefix(expression.getValueArgumentList().getRightParenthesis()), Markers.EMPTY), Space.EMPTY));
+                Space prefix = expression.getValueArgumentList() != null ? prefix(expression.getValueArgumentList().getRightParenthesis()) : Space.EMPTY;
+                expressions.add(padRight(new J.Empty(randomId(), prefix, Markers.EMPTY), Space.EMPTY));
             }
 
             JContainer<Expression> args = JContainer.build(prefix(expression.getValueArgumentList()), expressions, markers);
