@@ -36,7 +36,7 @@ class NewClassTest implements RewriteTest {
           kotlin(
             """
               open class Test ( val a: Int, val b: Int ) {
-                  open fun base() : Boolean {
+                  open  fun   base() : Boolean {
                       return false
                   }
               }
@@ -45,7 +45,7 @@ class NewClassTest implements RewriteTest {
           kotlin(
             """
               val t = object : Test ( 1 , 2 ) {
-                  override fun base ( ) : Boolean {
+                  override  fun   base ( ) : Boolean {
                       return true
                   }
               }

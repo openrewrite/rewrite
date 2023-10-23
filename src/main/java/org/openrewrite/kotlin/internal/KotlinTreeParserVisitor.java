@@ -2427,10 +2427,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         boolean isOpen = function.hasModifier(KtTokens.OPEN_KEYWORD);
         if (!isOpen) {
-            modifiers.add(buildFinalModifier().withPrefix(prefix(function.getFunKeyword())));
+            modifiers.add(buildFinalModifier().withPrefix(Space.EMPTY));
         }
 
-        modifiers.add(new J.Modifier(randomId(), Space.EMPTY, Markers.EMPTY, "fun", J.Modifier.Type.LanguageExtension, emptyList()));
+        modifiers.add(new J.Modifier(randomId(), prefix(function.getFunKeyword()), Markers.EMPTY, "fun", J.Modifier.Type.LanguageExtension, emptyList()));
         J.Identifier name = null;
 
         if (function.getNameIdentifier() == null) {
@@ -2568,17 +2568,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             args = JContainer.empty();
             args = args.withMarkers(Markers.build(singletonList(new OmitParentheses(randomId()))));
         } else {
-            KtValueArgumentList ktArgs = declaration.getSuperTypeList().getEntries().get(0).getStubOrPsiChild(KtStubElementTypes.VALUE_ARGUMENT_LIST);
-            if (ktArgs != null && ktArgs.getArguments().isEmpty()) {
-                args = JContainer.build(
-                        prefix(ktArgs),
-                        singletonList(padRight(new J.Empty(randomId(), prefix(ktArgs.getRightParenthesis()), Markers.EMPTY), Space.EMPTY)
-                        ), Markers.EMPTY
-                );
-            } else {
-                throw new UnsupportedOperationException("TODO, support multiple ObjectDeclaration arguments");
+            if (declaration.getSuperTypeList().getEntries().size() > 1) {
+                throw new UnsupportedOperationException("TODO");
             }
-
+            KtValueArgumentList ktArgs = declaration.getSuperTypeList().getEntries().get(0).getStubOrPsiChild(KtStubElementTypes.VALUE_ARGUMENT_LIST);
+            args = mapFunctionCallArguments(ktArgs, data);
             clazz = declaration.getSuperTypeList().accept(this, data).withPrefix(Space.EMPTY);
         }
 
