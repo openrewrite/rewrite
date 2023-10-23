@@ -26,3 +26,4 @@ dependencies {
 
     testImplementation(project(":rewrite-test"))
     testImplementation(project(":rewrite-maven"))
+}
