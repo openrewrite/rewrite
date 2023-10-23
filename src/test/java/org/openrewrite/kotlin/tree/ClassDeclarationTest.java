@@ -461,7 +461,7 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              abstract class Test ( arg : Test . ( ) -> Unit = { } ) {
+              abstract class Test ( arg : Test  .   ( )  ->   Unit    =  { } ) {
                   init {
                       arg ( )
                   }

@@ -625,7 +625,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 emptyList(), // TODO
                 emptyList(), // TODO
                 type.getReceiver() != null ? padRight((NameTree) type.getReceiverTypeReference().accept(this, data), suffix(type.getReceiver())) : null,
-                JContainer.build(prefix(type), params, Markers.EMPTY),
+                JContainer.build(prefix(type.getParameterList()), params, Markers.EMPTY),
                 suffix(type.getParameterList()),
                 type.getReturnTypeReference().accept(this, data).withPrefix(prefix(type.getReturnTypeReference()))
         );
@@ -741,7 +741,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitLambdaExpression(KtLambdaExpression expression, ExecutionContext data) {
         KtFunctionLiteral functionLiteral = expression.getFunctionLiteral();
-        return functionLiteral.accept(this, data);
+        return functionLiteral.accept(this, data).withPrefix(prefix(expression));
     }
 
     @Override
@@ -821,7 +821,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         JLeftPadded<Expression> initializer =
-                parameter.getDefaultValue() != null ? padLeft(prefix(parameter.getDefaultValue()), (Expression) parameter.getDefaultValue().accept(this, data)) : null;
+                parameter.getDefaultValue() != null ? padLeft(prefix(parameter.getEqualsToken()), (Expression) parameter.getDefaultValue().accept(this, data)) : null;
 
         J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
                 randomId(),
