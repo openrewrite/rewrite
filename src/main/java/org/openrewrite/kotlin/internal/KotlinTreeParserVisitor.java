@@ -161,7 +161,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<KtAnnotationEntry> ktAnnotations = expression.getAnnotationEntries();
         List<J.Annotation> annotations = new ArrayList<>(ktAnnotations.size());
 
-        for (int i = 0 ; i < ktAnnotations.size(); i ++) {
+        for (int i = 0; i < ktAnnotations.size(); i++) {
             KtAnnotationEntry ktAnnotation = ktAnnotations.get(i);
             J.Annotation anno = (J.Annotation) ktAnnotation.accept(this, data);
             if (i == 0) {
@@ -718,7 +718,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         J clazz = expression.getTypeReference().accept(this, data);
 
-        return new  J.InstanceOf(
+        return new J.InstanceOf(
                 randomId(),
                 prefix(expression),
                 markers,
@@ -1234,7 +1234,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 ), Space.EMPTY
         );
 
-        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars= singletonList(namedVariable);
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = singletonList(namedVariable);
 
         return new J.VariableDeclarations(
                 randomId(),
@@ -1436,7 +1436,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         Expression element = new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY);
         JRightPadded<Expression> expr = padRight(element, Space.EMPTY);
-        J clazz =  condition.getTypeReference().accept(this, data);
+        J clazz = condition.getTypeReference().accept(this, data);
 
         return new J.InstanceOf(
                 randomId(),
@@ -1504,7 +1504,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     prefix(expression.getLeftParenthesis()),
                     Markers.EMPTY,
                     padRight(subject, prefix(expression.getRightParenthesis()))
-                );
+            );
         }
 
         List<KtWhenEntry> whenEntries = expression.getEntries();
@@ -2058,7 +2058,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     TypeTree typeTree = (TypeTree) superTypeListEntry.accept(this, data);
 
                     if (i == 0) {
-                        typeTree = typeTree.withPrefix( prefix(klass.getSuperTypeList()));
+                        typeTree = typeTree.withPrefix(prefix(klass.getSuperTypeList()));
                     }
 
                     superTypes.add(padRight(typeTree, suffix(superTypeListEntry)));
@@ -2076,7 +2076,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.ClassDeclaration(
                 randomId(),
-                merge(prefix(klass), infix(klass)) ,
+                merge(prefix(klass), infix(klass)),
                 markers,
                 leadingAnnotations,
                 modifiers,
@@ -2303,13 +2303,19 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         assert expression.getSelectorExpression() != null;
         if (expression.getSelectorExpression() instanceof KtCallExpression) {
             KtCallExpression callExpression = (KtCallExpression) expression.getSelectorExpression();
-            J.MethodInvocation methodInvocation = (J.MethodInvocation) callExpression.accept(this, data);
+            MethodCall methodInvocation = (MethodCall) callExpression.accept(this, data);
 
             if (expression.getReceiverExpression() != null) {
                 Expression receiver = convertToExpression(expression.getReceiverExpression().accept(this, data));
-                methodInvocation = methodInvocation.getPadding().withSelect(padRight(receiver, suffix(expression.getReceiverExpression())))
-                        .withName(methodInvocation.getName().withPrefix(prefix(callExpression)))
-                        .withPrefix(prefix(expression));
+                if (methodInvocation instanceof J.MethodInvocation) {
+                    methodInvocation = ((J.MethodInvocation) methodInvocation).getPadding().withSelect(padRight(receiver, suffix(expression.getReceiverExpression())))
+                            .withName(((J.MethodInvocation) methodInvocation).getName().withPrefix(prefix(callExpression)))
+                            .withPrefix(prefix(expression));
+                } else if (methodInvocation instanceof J.NewClass) {
+                    methodInvocation = ((J.NewClass) methodInvocation).getPadding().withEnclosing(padRight(receiver, suffix(expression.getReceiverExpression())))
+                            .withClazz(((J.NewClass) methodInvocation).getClazz().withPrefix(prefix(callExpression)))
+                            .withPrefix(prefix(expression));
+                }
             }
 
             return methodInvocation;
@@ -3023,12 +3029,22 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         J j = typeReference.getTypeElement().accept(this, data)
-                .withPrefix( prefixConsumed ? prefix(typeReference.getTypeElement()) : merge(prefix(typeReference), prefix(typeReference.getTypeElement())));
+                .withPrefix(prefixConsumed ? prefix(typeReference.getTypeElement()) : merge(prefix(typeReference), prefix(typeReference.getTypeElement())));
         if (j instanceof K.FunctionType &&
                 typeReference.getModifierList() != null &&
                 typeReference.getModifierList().hasModifier(KtTokens.SUSPEND_KEYWORD)) {
-            j = ((K.FunctionType) j).withModifiers(singletonList(new J.Modifier(randomId(), Space.EMPTY, Markers.EMPTY, "suspend", J.Modifier.Type.LanguageExtension, emptyList())))
+            j = ((K.FunctionType) j).withModifiers(singletonList(mapModifier(typeReference.getModifierList().getModifier(KtTokens.SUSPEND_KEYWORD), emptyList())))
                     .withLeadingAnnotations(leadingAnnotations);
+            if (((K.FunctionType) j).getReceiver() != null) {
+                // TODO check if we can simplify this
+                j = ((K.FunctionType) j).withReceiver(
+                        ((K.FunctionType) j).getReceiver().withElement(
+                                ((K.FunctionType) j).getReceiver().getElement().withPrefix(
+                                        prefix(typeReference.getTypeElement())
+                                )
+                        )
+                );
+            }
         } else if (j instanceof J.Identifier) {
             j = ((J.Identifier) j).withAnnotations(leadingAnnotations);
         }
@@ -3512,7 +3528,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = new ArrayList<>(entries.size());
 
         for (KtDestructuringDeclarationEntry ktDestructuringDeclarationEntry : entries) {
-            J.Identifier name = ( J.Identifier) ktDestructuringDeclarationEntry.accept(this, data);
+            J.Identifier name = (J.Identifier) ktDestructuringDeclarationEntry.accept(this, data);
 
             J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
                     randomId(),
@@ -3522,7 +3538,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     emptyList(),
                     null,
                     variableType(ktDestructuringDeclaration)
-                );
+            );
             variables.add(padRight(namedVariable, suffix(ktDestructuringDeclarationEntry)));
         }
 
