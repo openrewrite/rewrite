@@ -61,9 +61,9 @@ public class SourceSpec<T extends SourceFile> implements SourceSpecs {
     final ValidateSource validateSource;
 
     public interface ValidateSource {
-        ValidateSource noop = (sourceFile, testMethodSpec, testClassSpec) -> sourceFile;
+        ValidateSource noop = (sourceFile, typeValidation) -> sourceFile;
 
-        SourceFile accept(SourceFile sourceFile, RecipeSpec testMethodSpec, RecipeSpec testClassSpec);
+        SourceFile accept(SourceFile sourceFile, TypeValidation typeValidation);
     }
 
     final ThrowingConsumer<ExecutionContext> customizeExecutionContext;

@@ -78,6 +78,9 @@ public class RecipeSpec {
     Integer expectedCyclesThatMakeChanges;
 
     @Nullable
+    TypeValidation beforeTypeValidation;
+
+    @Nullable
     TypeValidation typeValidation;
 
     boolean serializationValidation = true;
@@ -240,6 +243,11 @@ public class RecipeSpec {
     int getExpectedCyclesThatMakeChanges(int cycles) {
         return expectedCyclesThatMakeChanges == null ? cycles - 1 :
                 expectedCyclesThatMakeChanges;
+    }
+
+    public RecipeSpec beforeTypeValidationOptions(TypeValidation typeValidation) {
+        this.beforeTypeValidation = typeValidation;
+        return this;
     }
 
     public RecipeSpec typeValidationOptions(TypeValidation typeValidation) {

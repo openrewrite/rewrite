@@ -191,7 +191,7 @@ class AddDependencyTest implements RewriteTest {
     void onlyIfUsingMultipleScopes(String onlyIfUsing) {
         rewriteRun(
           spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing))
-            .typeValidationOptions(TypeValidation.builder().before(false).build()),
+            .beforeTypeValidationOptions(TypeValidation.none()),
           mavenProject("project",
             srcMainJava(
               java(usingGuavaIntMath)
@@ -233,7 +233,7 @@ class AddDependencyTest implements RewriteTest {
         AddDependency addDep = new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, onlyIfUsing, null, null, null, Boolean.TRUE);
         rewriteRun(
           spec -> spec.recipe(addDep)
-            .typeValidationOptions(TypeValidation.builder().before(false).build()),
+            .beforeTypeValidationOptions(TypeValidation.none()),
           mavenProject("project",
             srcMainJava(
               java(usingGuavaIntMath)
@@ -291,7 +291,7 @@ class AddDependencyTest implements RewriteTest {
         AddDependency addDep = new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, "com.google.common.math.IntMath", null, null, null, Boolean.TRUE);
         rewriteRun(
           spec -> spec.recipe(addDep)
-            .typeValidationOptions(TypeValidation.builder().before(false).build()),
+            .beforeTypeValidationOptions(TypeValidation.none()),
           mavenProject("project",
             srcSmokeTestJava(
               java(usingGuavaIntMath)
@@ -346,7 +346,7 @@ class AddDependencyTest implements RewriteTest {
         AddDependency addDep = new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, "com.google.common.math.IntMath", null, null, null, Boolean.TRUE);
         rewriteRun(
           spec -> spec.recipe(addDep)
-            .typeValidationOptions(TypeValidation.builder().before(false).build()),
+            .beforeTypeValidationOptions(TypeValidation.none()),
           mavenProject("project",
             srcSmokeTestJava(
               java(usingGuavaIntMath)
