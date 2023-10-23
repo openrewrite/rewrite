@@ -558,7 +558,7 @@ class MethodInvocationTest implements RewriteTest {
               class Test {
                   fun foo(a : Int, b : (Int) -> Int) = a + b(a)
                   fun bar(): Int =
-                      foo(1,  ) { i -> i } + foo(
+                      foo(1  ,   ) { i -> i } + foo(
                           a = 1,
                       ) { i -> i }
               }
@@ -611,7 +611,7 @@ class MethodInvocationTest implements RewriteTest {
               val r = listOf("descriptor").block()
 
               val block2: Collection<Any>.(String, () -> Unit) -> Unit = {_, _ -> }
-              val r2 = listOf("descriptor").block2("x") {}
+              val r2 = listOf("descriptor").block2("x")  {   }
               """
           )
         );

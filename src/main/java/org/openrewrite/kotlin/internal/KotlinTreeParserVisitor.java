@@ -1682,7 +1682,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             Expression expr = convertToExpression(argument.getArgumentExpression().accept(this, data));
             return new J.Assignment(
                     randomId(),
-                    prefix(argument.getArgumentName()),
+                    prefix(argument),
                     Markers.EMPTY,
                     name,
                     padLeft(suffix(argument.getArgumentName()), expr),
@@ -1881,30 +1881,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 typeParams = JContainer.build(prefix(expression.getTypeArgumentList()), parameters, Markers.EMPTY);
             }
 
-            // createIdentifier(expression.getCalleeExpression(), type(expression));
-            List<KtValueArgument> arguments = expression.getValueArguments();
+            JContainer<Expression> args = mapFunctionCallArguments(expression.getValueArgumentList(), expression.getValueArguments(), data);
+            args = args.withBefore(prefix(expression.getValueArgumentList()));
 
-            List<JRightPadded<Expression>> expressions = new ArrayList<>(arguments.size());
-            Markers markers = Markers.EMPTY;
             if (expression.getValueArgumentList() == null) {
-                markers = markers.addIfAbsent(new OmitParentheses(randomId()));
+                args = args.withMarkers(args.getMarkers().addIfAbsent(new OmitParentheses(randomId())));
             }
-
-            if (!arguments.isEmpty()) {
-                for (int i = 0; i < arguments.size(); i++) {
-                    KtValueArgument arg = arguments.get(i);
-                    Expression expr = convertToExpression(arg.accept(this, data));
-                    if (expr.getMarkers().findFirst(TrailingLambdaArgument.class).isPresent() && !expressions.isEmpty()) {
-                        expressions.set(expressions.size() - 1, maybeTrailingComma(arguments.get(i - 1), expressions.get(expressions.size() - 1), true));
-                    }
-                    expressions.add(maybeTrailingComma(arg, padRight(expr, suffix(arg)), i == arguments.size() - 1));
-                }
-            } else {
-                Space prefix = expression.getValueArgumentList() != null ? prefix(expression.getValueArgumentList().getRightParenthesis()) : Space.EMPTY;
-                expressions.add(padRight(new J.Empty(randomId(), prefix, Markers.EMPTY), Space.EMPTY));
-            }
-
-            JContainer<Expression> args = JContainer.build(prefix(expression.getValueArgumentList()), expressions, markers);
 
             JavaType.Method methodType = methodInvocationType(expression);
             return new J.MethodInvocation(
@@ -3636,6 +3618,39 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return statements;
     }
 
+    private JContainer<Expression> mapFunctionCallArguments(@Nullable KtValueArgumentList valueArgumentList,
+                                                            List<KtValueArgument> ktValueArguments,
+                                                            ExecutionContext data) {
+        List<JRightPadded<Expression>> expressions = new ArrayList<>(ktValueArguments.size());
+        Markers markers = Markers.EMPTY;
+
+        for (int i = 0; i < ktValueArguments.size(); i++) {
+            KtValueArgument ktValueArgument = ktValueArguments.get(i);
+            Expression expr = convertToExpression(ktValueArgument.accept(this, data));
+
+            Markers rpMarkers =  Markers.EMPTY;
+            if (valueArgumentList != null && i == valueArgumentList.getArguments().size() - 1) {
+                PsiElement maybeTrailingComma = findTrailingComma(ktValueArgument);
+                if (maybeTrailingComma != null) {
+                    rpMarkers = rpMarkers.addIfAbsent(new TrailingComma(randomId(), suffix(maybeTrailingComma)));
+                }
+            }
+
+            expressions.add(padRight(expr, suffix(ktValueArgument), rpMarkers));
+        }
+
+        if (ktValueArguments.isEmpty() && valueArgumentList != null) {
+            Expression arg = new J.Empty(randomId(), prefix(valueArgumentList.getRightParenthesis()), Markers.EMPTY);
+            expressions.add(padRight(arg, Space.EMPTY));
+        }
+
+        if (valueArgumentList == null) {
+            markers = markers.addIfAbsent(new OmitParentheses(randomId()));
+        }
+
+        return JContainer.build(Space.EMPTY, expressions, markers);
+    }
+
     @Nullable
     private JContainer<Expression> mapFunctionCallArguments(@Nullable KtValueArgumentList argumentList, ExecutionContext data) {
         if (argumentList == null) {
@@ -3739,6 +3754,18 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             children.add(it);
         }
         return children;
+    }
+
+    @Nullable
+    private PsiElement findTrailingComma(PsiElement element) {
+        PsiElement nextSibling = element.getNextSibling();
+        while (nextSibling != null) {
+            if (nextSibling.getNode().getElementType() == KtTokens.COMMA) {
+                return nextSibling;
+            }
+            nextSibling = nextSibling.getNextSibling();
+        }
+        return null;
     }
 
     @Nullable
