@@ -50,13 +50,14 @@ public class TypeValidation {
         return new TypeValidation(false,false,false,false,false,false);
     }
 
-    public static TypeValidation before(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
+    static TypeValidation before(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
         TypeValidation typeValidation = testMethodSpec.getBeforeTypeValidation() != null ?
                 testMethodSpec.getBeforeTypeValidation() : testClassSpec.getBeforeTypeValidation();
+        // TODO: Default to `after()` is for backwards compatibility
         return typeValidation != null ? typeValidation : after(testMethodSpec, testClassSpec);
     }
 
-    public static TypeValidation after(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
+    static TypeValidation after(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
         TypeValidation typeValidation = testMethodSpec.getTypeValidation() != null ?
                 testMethodSpec.getTypeValidation() : testClassSpec.getTypeValidation();
         return typeValidation != null ? typeValidation : new TypeValidation();
