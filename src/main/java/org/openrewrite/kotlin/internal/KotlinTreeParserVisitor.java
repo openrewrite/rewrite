@@ -952,8 +952,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitPropertyAccessor(KtPropertyAccessor accessor, ExecutionContext data) {
         Markers markers = Markers.EMPTY;
-        List<J.Annotation> leadingAnnotations = mapAnnotations(accessor.getAnnotationEntries(), data);
-        List<J.Modifier> modifiers = new ArrayList<>();
+        List<J.Annotation> leadingAnnotations = new ArrayList<>();
+        List<J.Modifier> modifiers = mapModifiers(accessor.getModifierList(), leadingAnnotations, emptyList(), data);
         J.TypeParameters typeParameters = null;
         TypeTree returnTypeExpression = null;
         List<J.Annotation> lastAnnotations = new ArrayList<>();
@@ -994,7 +994,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         } else if (accessor.getBodyExpression() != null) {
             body = convertToBlock(accessor.getBodyExpression(), data).withPrefix(prefix(accessor.getEqualsToken()));
         } else {
-            throw new UnsupportedOperationException("TODO");
+            params = JContainer.empty();
+            params = params.withBefore(Space.EMPTY)
+                    .withMarkers(Markers.EMPTY.addIfAbsent(new OmitParentheses(randomId())));
         }
 
         return new J.MethodDeclaration(

@@ -60,9 +60,9 @@ class PropertyTest implements RewriteTest {
             """
               class Test {
                   var foo: Long
-                      private set
+                      private   set
                   var bar: Long
-                      @Suppress get
+                      @Suppress  get
               
                   init {
                       foo = 1
