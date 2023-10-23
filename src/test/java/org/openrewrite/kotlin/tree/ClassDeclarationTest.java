@@ -286,7 +286,7 @@ class ClassDeclarationTest implements RewriteTest {
               interface C
               interface D
               
-              class KotlinTypeGoat<T, S> where S : A, T : D, S : B, T : C
+              class KotlinTypeGoat<T, S>  where   S : A, T : D, S : B, T : C
               """
           )
         );

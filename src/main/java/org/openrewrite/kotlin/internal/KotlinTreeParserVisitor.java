@@ -1927,7 +1927,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     @NotNull
-    private J.ClassDeclaration visitClass0(KtClass klass, ExecutionContext data) {
+    private J visitClass0(KtClass klass, ExecutionContext data) {
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
         List<J.Annotation> lastAnnotations = new ArrayList<>();
         JContainer<J.TypeParameter> typeParams = null;
@@ -2036,7 +2036,15 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             typeParams = JContainer.build(prefix(klass.getTypeParameterList()), mapTypeParameters(klass, data), Markers.EMPTY);
         }
 
-        return new J.ClassDeclaration(
+        K.TypeConstraints typeConstraints = null;
+        if (klass.getTypeConstraintList() != null) {
+            typeConstraints = (K.TypeConstraints) klass.getTypeConstraintList().accept(this, data);
+            PsiElement whereKeyword = findLeafElement(klass, "where");
+            typeConstraints = typeConstraints.withConstraints(ListUtils.mapFirst(typeConstraints.getConstraints(), constraint -> constraint.withPrefix(suffix(whereKeyword))))
+                    .withPrefix(prefix(whereKeyword));
+        }
+
+        J.ClassDeclaration classDeclaration = new J.ClassDeclaration(
                 randomId(),
                 merge(prefix(klass), infix(klass)),
                 markers,
@@ -2052,6 +2060,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 body,
                 (JavaType.FullyQualified) type2(klass)
         );
+
+        return (typeConstraints != null)? new K.ClassDeclaration(randomId(), Markers.EMPTY, classDeclaration, typeConstraints) : classDeclaration;
     }
 
     @Override
@@ -2495,12 +2505,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         K.TypeConstraints typeConstraints = null;
         if (function.getTypeConstraintList() != null) {
-            // todo, find `where` keyword, and use prefix(whereKeyWord)
-            // PsiTreeUtil.findSiblingForward(function.getTypeConstraintList(), KtTokens.WHERE_KEYWORD, null);
             typeConstraints = (K.TypeConstraints) function.getTypeConstraintList().accept(this, data);
-            Space afterWhere = prefix(function.getTypeConstraintList());
-            typeConstraints = typeConstraints.withConstraints(ListUtils.mapFirst(typeConstraints.getConstraints(), constraint -> constraint.withPrefix(afterWhere)))
-                    .withPrefix(suffix(function.getTypeReference()));
+            PsiElement whereKeyword = findLeafElement(function, "where");
+            typeConstraints = typeConstraints.withConstraints(ListUtils.mapFirst(typeConstraints.getConstraints(), constraint -> constraint.withPrefix(suffix(whereKeyword))))
+                    .withPrefix(prefix(whereKeyword));
         }
 
         J.Block body;
