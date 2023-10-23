@@ -447,7 +447,7 @@ class MethodInvocationTest implements RewriteTest {
           kotlin(
             """
               fun test() {
-                "foo".foo()
+                "foo".toString()
               }
               """
           )
