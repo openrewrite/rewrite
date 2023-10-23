@@ -304,7 +304,7 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              abstract class Test: suspend () -> String
+              abstract class  Test   :    suspend (  )   ->    String
               """
           )
         );
@@ -400,7 +400,7 @@ class ClassDeclarationTest implements RewriteTest {
               sealed interface InvalidField {
                   val field : String
               }
-              object InvalidEmail : InvalidField {
+              object InvalidEmail  :   InvalidField    {
                   override val field : String = "email"
               }
               """

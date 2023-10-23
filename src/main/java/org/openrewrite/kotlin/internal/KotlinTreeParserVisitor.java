@@ -618,14 +618,19 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             }
         }
 
+        JContainer<TypeTree> parameters = JContainer.build(prefix(type.getParameterList()), params, Markers.EMPTY);
+        if (type.getFirstChild() == type.getParameterList()) {
+            parameters = parameters.withBefore(prefix(type));
+        }
+
         return new K.FunctionType(
                 randomId(),
-                Space.EMPTY,
+                prefix(type),
                 Markers.EMPTY, //.addIfAbsent(new IsNullable(randomId(), Space.EMPTY)), // TODO
                 emptyList(), // TODO
                 emptyList(), // TODO
                 type.getReceiver() != null ? padRight((NameTree) type.getReceiverTypeReference().accept(this, data), suffix(type.getReceiver())) : null,
-                JContainer.build(prefix(type.getParameterList()), params, Markers.EMPTY),
+                parameters,
                 suffix(type.getParameterList()),
                 type.getReturnTypeReference().accept(this, data).withPrefix(prefix(type.getReturnTypeReference()))
         );
@@ -1143,7 +1148,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitSuperTypeEntry(KtSuperTypeEntry specifier, ExecutionContext data) {
-        return specifier.getTypeReference().accept(this, data).withPrefix(prefix(specifier));
+        J j = specifier.getTypeReference().accept(this, data);
+        return j.withPrefix(merge(prefix(specifier), j.getPrefix()));
     }
 
     @Override
@@ -2022,7 +2028,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     TypeTree typeTree = (TypeTree) superTypeListEntry.accept(this, data);
 
                     if (i == 0) {
-                        typeTree = typeTree.withPrefix(prefix(klass.getSuperTypeList()));
+                        typeTree = typeTree.withPrefix( prefix(klass.getSuperTypeList()));
                     }
 
                     superTypes.add(padRight(typeTree, suffix(superTypeListEntry)));
@@ -2579,6 +2585,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitObjectDeclaration(KtObjectDeclaration declaration, ExecutionContext data) {
         Markers markers = Markers.EMPTY;
         List<J.Modifier> modifiers = new ArrayList<>();
+        List<JRightPadded<TypeTree>> superTypes = new ArrayList<>();
+        JContainer<TypeTree> implementings = null;
 
         if (declaration.getModifierList() != null) {
             modifiers.addAll(mapModifiers(declaration.getModifierList(), emptyList(), emptyList(), data));
@@ -2592,6 +2600,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         JContainer<J.TypeParameter> typeParameters = declaration.getTypeParameterList() == null ? null :
                 JContainer.build(prefix(declaration.getTypeParameterList()), mapTypeParameters(declaration, data), Markers.EMPTY);
+
+        if (declaration.getSuperTypeList() != null) {
+            TypeTree clazz = (TypeTree) declaration.getSuperTypeList().accept(this, data)
+                    .withPrefix(prefix(declaration.getSuperTypeList()));
+            superTypes.add(padRight(clazz, Space.EMPTY));
+            implementings = JContainer.build(prefix(declaration.getColon()), superTypes, Markers.EMPTY);
+        }
 
         J.Block body;
         if (declaration.getBody() == null) {
@@ -2621,6 +2636,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     .withMarkers(Markers.EMPTY.addIfAbsent(new Implicit(randomId())));
         }
 
+
         return new J.ClassDeclaration(
                 randomId(),
                 prefix(declaration),
@@ -2638,7 +2654,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 typeParameters,
                 null,
                 null,
-                null,
+                implementings,
                 null,
                 body,
                 (JavaType.FullyQualified) type(declaration)
