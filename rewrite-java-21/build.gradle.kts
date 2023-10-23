@@ -3,6 +3,12 @@ plugins {
     id("jvm-test-suite")
 }
 
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
@@ -16,38 +22,32 @@ dependencies {
     testImplementation(project(":rewrite-test"))
 }
 
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(11))
-    }
-}
-
 tasks.withType<JavaCompile> {
     // allows --add-exports to in spite of the JDK's restrictions on this
-    sourceCompatibility = JavaVersion.VERSION_11.toString()
-    targetCompatibility = JavaVersion.VERSION_11.toString()
+    sourceCompatibility = JavaVersion.VERSION_21.toString()
+    targetCompatibility = JavaVersion.VERSION_21.toString()
 
-    options.release.set(null as? Int?) // remove `--release 8` set in `org.openrewrite.java-base`
+    options.release.set(null as Int?) // remove `--release 8` set in `org.openrewrite.java-base`
     options.compilerArgs.addAll(
-        listOf(
-            "--add-exports", "jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
-            "--add-exports", "jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED",
-            "--add-exports", "jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
-            "--add-exports", "jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED",
-            "--add-exports", "jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
-            "--add-exports", "jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED"
-        )
+            listOf(
+                    "--add-exports", "jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",
+                    "--add-exports", "jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED",
+                    "--add-exports", "jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED",
+                    "--add-exports", "jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED",
+                    "--add-exports", "jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
+                    "--add-exports", "jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED"
+            )
     )
 }
 
 //Javadoc compiler will complain about the use of the internal types.
 tasks.withType<Javadoc> {
     exclude(
-        "**/ReloadableJava11JavadocVisitor**",
-        "**/ReloadableJava11Parser**",
-        "**/ReloadableJava11ParserVisitor**",
-        "**/ReloadableJava11TypeMapping**",
-        "**/ReloadableJava11TypeSignatureBuilder**"
+            "**/ReloadableJava21JavadocVisitor**",
+            "**/ReloadableJava21Parser**",
+            "**/ReloadableJava21ParserVisitor**",
+            "**/ReloadableJava21TypeMapping**",
+            "**/ReloadableJava21TypeSignatureBuilder**"
     )
 }
 
@@ -64,9 +64,7 @@ testing {
             targets {
                 all {
                     testTask.configure {
-                        useJUnitPlatform {
-                            excludeTags("java17", "java21")
-                        }
+                        useJUnitPlatform()
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)
                     }

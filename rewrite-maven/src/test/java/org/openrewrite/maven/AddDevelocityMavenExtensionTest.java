@@ -28,10 +28,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.maven.Assertions.pomXml;
 import static org.openrewrite.xml.Assertions.xml;
 
-class AddGradleEnterpriseMavenExtensionTest implements RewriteTest {
+class AddDevelocityMavenExtensionTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new AddGradleEnterpriseMavenExtension("1.17", "https://foo", null,
+        spec.recipe(new AddDevelocityMavenExtension("1.17", "https://foo", null,
           null, null, null));
     }
 
@@ -127,7 +127,7 @@ class AddGradleEnterpriseMavenExtensionTest implements RewriteTest {
     @Test
     void noVersionSpecified() {
         rewriteRun(
-          spec -> spec.recipe(new AddGradleEnterpriseMavenExtension(null, "https://foo", null, null, null, null)),
+          spec -> spec.recipe(new AddDevelocityMavenExtension(null, "https://foo", null, null, null, null)),
           POM_XML_SOURCE_SPEC,
           xml(
             null,
@@ -181,7 +181,7 @@ class AddGradleEnterpriseMavenExtensionTest implements RewriteTest {
     @Test
     void allSettings() {
         rewriteRun(
-          spec -> spec.recipe(new AddGradleEnterpriseMavenExtension("1.17", "https://foo", true, true, false, AddGradleEnterpriseMavenExtension.PublishCriteria.Failure)),
+          spec -> spec.recipe(new AddDevelocityMavenExtension("1.17", "https://foo", true, true, false, AddDevelocityMavenExtension.PublishCriteria.Failure)),
           POM_XML_SOURCE_SPEC,
           xml(
             null,

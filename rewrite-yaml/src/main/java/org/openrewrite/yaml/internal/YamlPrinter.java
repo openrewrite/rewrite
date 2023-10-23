@@ -157,7 +157,9 @@ public class YamlPrinter<P> extends YamlVisitor<PrintOutputCapture<P>> {
     public Yaml visitAlias(Yaml.Alias alias, PrintOutputCapture<P> p) {
         beforeSyntax(alias, p);
         p.append("*");
-        p.append(alias.getAnchor().getKey());
+        if (alias.getAnchor() != null) {
+            p.append(alias.getAnchor().getKey());
+        }
         afterSyntax(alias, p);
         return alias;
     }

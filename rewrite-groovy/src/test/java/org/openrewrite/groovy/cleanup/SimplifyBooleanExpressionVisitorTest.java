@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.cleanup;
+package org.openrewrite.groovy.cleanup;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
+import org.openrewrite.java.cleanup.SimplifyBooleanExpressionVisitor;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.openrewrite.groovy.Assertions.groovy;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -38,21 +40,21 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void simplifyEqualsLiteralTrueIf() {
         rewriteRun(
-          java(
+          groovy(
             """
-              public class A {
-                  boolean a;
-                  {
-                      if(true == a) {
+              class A {
+                  boolean a
+                  def m() {
+                      if (true == a) {
                       }
                   }
               }
               """,
             """
-              public class A {
-                  boolean a;
-                  {
-                      if(a) {
+              class A {
+                  boolean a
+                  def m() {
+                      if (a) {
                       }
                   }
               }
@@ -64,34 +66,34 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void simplifyBooleanExpressionComprehensive() {
         rewriteRun(
-          java(
+          groovy(
             """
-              public class A {
-                  {
-                      boolean a = !false;
-                      boolean b = (a == true);
-                      boolean c = b || true;
-                      boolean d = c || c;
-                      boolean e = d && d;
-                      boolean f = (e == true) || e;
-                      boolean g = f && false;
-                      boolean h = g;
-                      boolean i = (a != false);
+              class A {
+                  def m() {
+                      boolean a = !false
+                      boolean b = (a == true)
+                      boolean c = b || true
+                      boolean d = c || c
+                      boolean e = d && d
+                      boolean f = (e == true) || e
+                      boolean g = f && false
+                      boolean h = g
+                      boolean i = (a != false)
                   }
               }
               """,
             """
-              public class A {
-                  {
-                      boolean a = true;
-                      boolean b = a;
-                      boolean c = true;
-                      boolean d = c;
-                      boolean e = d;
-                      boolean f = e;
-                      boolean g = false;
-                      boolean h = g;
-                      boolean i = a;
+              class A {
+                  def m() {
+                      boolean a = true
+                      boolean b = a
+                      boolean c = true
+                      boolean d = c
+                      boolean e = d
+                      boolean f = e
+                      boolean g = false
+                      boolean h = g
+                      boolean i = a
                   }
               }
               """
@@ -102,20 +104,20 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void simplifyInvertedBooleanLiteral() {
         rewriteRun(
-          java(
+          groovy(
             """
-              public class A {
-                  {
-                      boolean a = !false;
-                      boolean b = !true;
+              class A {
+                  def m() {
+                      boolean a = !false
+                      boolean b = !true
                   }
               }
               """,
             """
-              public class A {
-                  {
-                      boolean a = true;
-                      boolean b = false;
+              class A {
+                  def m() {
+                      boolean a = true
+                      boolean b = false
                   }
               }
               """
@@ -126,20 +128,20 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void doubleNegationWithParentheses() {
         rewriteRun(
-          java(
+          groovy(
             """
-              public class A {
-                  {
-                      boolean a = !!(!(!true));
-                      boolean b = !(!a);
+              class A {
+                  def m() {
+                      boolean a = !!(!(!true))
+                      boolean b = !(!a)
                   }
               }
               """,
             """
-              public class A {
-                  {
-                      boolean a = true;
-                      boolean b = a;
+              class A {
+                  def m() {
+                      boolean a = true
+                      boolean b = a
                   }
               }
               """
@@ -150,28 +152,28 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void doubleNegatedBinaryWithParentheses() {
         rewriteRun(
-          java(
+          groovy(
             """
-              public class A {
-                  {
-                      boolean a1 = !(1 == 1);
-                      boolean a2 = !(1 != 1);
-                      boolean a3 = !(1 < 1);
-                      boolean a4 = !(1 <= 1);
-                      boolean a5 = !(1 > 1);
-                      boolean a6 = !(1 >= 1);
+              class A {
+                  def m() {
+                      boolean a1 = !(1 == 1)
+                      boolean a2 = !(1 != 1)
+                      boolean a3 = !(1 < 1)
+                      boolean a4 = !(1 <= 1)
+                      boolean a5 = !(1 > 1)
+                      boolean a6 = !(1 >= 1)
                   }
               }
               """,
             """
-              public class A {
-                  {
-                      boolean a1 = 1 != 1;
-                      boolean a2 = 1 == 1;
-                      boolean a3 = 1 >= 1;
-                      boolean a4 = 1 > 1;
-                      boolean a5 = 1 <= 1;
-                      boolean a6 = 1 < 1;
+              class A {
+                  def m() {
+                      boolean a1 = 1 != 1
+                      boolean a2 = 1 == 1
+                      boolean a3 = 1 >= 1
+                      boolean a4 = 1 > 1
+                      boolean a5 = 1 <= 1
+                      boolean a6 = 1 < 1
                   }
               }
               """
@@ -182,20 +184,20 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void simplifyEqualsLiteralTrue() {
         rewriteRun(
-          java(
+          groovy(
             """
-              public class A {
-                  {
-                      boolean a = true;
-                      boolean b = (a == true);
+              class A {
+                  def m() {
+                      boolean a = true
+                      boolean b = (a == true)
                   }
               }
               """,
             """
-              public class A {
-                  {
-                      boolean a = true;
-                      boolean b = a;
+              class A {
+                  def m() {
+                      boolean a = true
+                      boolean b = a
                   }
               }
               """
@@ -206,20 +208,20 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void simplifyOrLiteralTrue() {
         rewriteRun(
-          java(
+          groovy(
             """
-              public class A {
-                  {
-                      boolean b = true;
-                      boolean c = b || true;
+              class A {
+                  def m() {
+                      boolean b = true
+                      boolean c = b || true
                   }
               }
               """,
             """
-              public class A {
-                  {
-                      boolean b = true;
-                      boolean c = true;
+              class A {
+                  def m() {
+                      boolean b = true
+                      boolean c = true
                   }
               }
               """
@@ -230,20 +232,20 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void simplifyOrAlwaysTrue() {
         rewriteRun(
-          java(
+          groovy(
             """
-              public class A {
-                  {
-                      boolean c = true;
-                      boolean d = c || c;
+              class A {
+                  def m() {
+                      boolean c = true
+                      boolean d = c || c
                   }
               }
               """,
             """
-              public class A {
-                  {
-                      boolean c = true;
-                      boolean d = c;
+              class A {
+                  def m() {
+                      boolean c = true
+                      boolean d = c
                   }
               }
               """
@@ -254,20 +256,20 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void simplifyAndAlwaysTrue() {
         rewriteRun(
-          java(
+          groovy(
             """
-              public class A {
-                  {
-                      boolean d = true;
-                      boolean e = d && d;
+              class A {
+                  def m() {
+                      boolean d = true
+                      boolean e = d && d
                   }
               }
               """,
             """
-              public class A {
-                  {
-                      boolean d = true;
-                      boolean e = d;
+              class A {
+                  def m() {
+                      boolean d = true
+                      boolean e = d
                   }
               }
               """
@@ -278,20 +280,20 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void simplifyEqualsLiteralTrueAlwaysTrue() {
         rewriteRun(
-          java(
+          groovy(
             """
-              public class A {
-                  {
-                      boolean e = true;
-                      boolean f = (e == true) || e;
+              class A {
+                  def m() {
+                      boolean e = true
+                      boolean f = (e == true) || e
                   }
               }
               """,
             """
-              public class A {
-                  {
-                      boolean e = true;
-                      boolean f = e;
+              class A {
+                  def m() {
+                      boolean e = true
+                      boolean f = e
                   }
               }
               """
@@ -302,20 +304,20 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void simplifyLiteralFalseAlwaysFalse() {
         rewriteRun(
-          java(
+          groovy(
             """
-              public class A {
-                  {
-                      boolean f = true;
-                      boolean g = f && false;
+              class A {
+                  def m() {
+                      boolean f = true
+                      boolean g = f && false
                   }
               }
               """,
             """
-              public class A {
-                  {
-                      boolean f = true;
-                      boolean g = false;
+              class A {
+                  def m() {
+                      boolean f = true
+                      boolean g = false
                   }
               }
               """
@@ -326,11 +328,11 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void simplifyDoubleNegation() {
         rewriteRun(
-          java(
+          groovy(
             """
-              public class A {
-                  public void doubleNegation(boolean g) {
-                      boolean h = g;
+              class A {
+                  def doubleNegation(boolean g) {
+                      boolean h = g
                   }
               }
               """
@@ -341,20 +343,20 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void simplifyNotEqualsFalse() {
         rewriteRun(
-          java(
+          groovy(
             """
-              public class A {
-                  {
-                      boolean a = true;
-                      boolean i = (a != false);
+              class A {
+                  def m() {
+                      boolean a = true
+                      boolean i = (a != false)
                   }
               }
               """,
             """
-              public class A {
-                  {
-                      boolean a = true;
-                      boolean i = a;
+              class A {
+                  def m() {
+                      boolean a = true
+                      boolean i = a
                   }
               }
               """
@@ -366,12 +368,12 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void autoFormatIsConditionallyApplied() {
         rewriteRun(
-          java(
+          groovy(
             """
-              public class A {
-                  {
-                      boolean a=true;
-                      boolean i=a!=true;
+              class A {
+                  def m() {
+                      boolean a=true
+                      boolean i=a!=true
                   }
               }
               """
@@ -382,21 +384,21 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
     @Test
     void binaryOrBothFalse() {
         rewriteRun(
-          java(
+          groovy(
             """
-              public class A {
-                  {
+              class A {
+                  def m() {
                       if (!true || !true) {
-                          System.out.println("");
+                          System.out.println("")
                       }
                   }
               }
               """,
             """
-              public class A {
-                  {
+              class A {
+                  def m() {
                       if (false) {
-                          System.out.println("");
+                          System.out.println("")
                       }
                   }
               }
@@ -469,9 +471,9 @@ class SimplifyBooleanExpressionVisitorTest implements RewriteTest {
           """;
         String beforeJava = template.formatted(before);
         if (before.equals(after)) {
-            rewriteRun(java(beforeJava));
+            rewriteRun(groovy(beforeJava));
         } else {
-            rewriteRun(java(beforeJava, template.formatted(after)));
+            rewriteRun(groovy(beforeJava, template.formatted(after)));
         }
     }
 }

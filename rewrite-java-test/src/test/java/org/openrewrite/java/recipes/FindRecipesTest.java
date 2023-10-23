@@ -109,4 +109,23 @@ class FindRecipesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void returnInLambda() {
+        rewriteRun(
+          spec -> spec.recipe(new FindRecipes()),
+          java(
+            """
+              import java.util.function.UnaryOperator;
+              
+              class SomeTest {
+                  private final UnaryOperator<String> notEmpty = actual -> {
+                      //noinspection CodeBlock2Expr
+                      return actual + "\\n";
+                  };
+              }
+              """
+          )
+        );
+    }
 }
