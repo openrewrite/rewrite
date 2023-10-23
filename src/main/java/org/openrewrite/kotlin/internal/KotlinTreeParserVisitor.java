@@ -411,7 +411,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitConstructorCalleeExpression(KtConstructorCalleeExpression constructorCalleeExpression, ExecutionContext data) {
-        return constructorCalleeExpression.getTypeReference().accept(this, data).withPrefix(prefix(constructorCalleeExpression));
+        J j = constructorCalleeExpression.getTypeReference().accept(this, data);
+        return j.withPrefix(merge(j.getPrefix(), prefix(constructorCalleeExpression)));
     }
 
     @Override
@@ -1255,12 +1256,38 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitTypeConstraint(KtTypeConstraint constraint, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        List<J.Annotation> annotations = new ArrayList<>();
+        J.Identifier typeParamName = (J.Identifier) constraint.getSubjectTypeParameterName().accept(this, data);
+        TypeTree typeTree = (TypeTree) constraint.getBoundTypeReference().accept(this, data);
+
+        return new J.TypeParameter(
+                randomId(),
+                prefix(constraint),
+                Markers.EMPTY.addIfAbsent(new TypeReferencePrefix(randomId(), suffix(constraint.getSubjectTypeParameterName()))),
+                annotations,
+                typeParamName,
+                JContainer.build(
+                        Space.EMPTY,
+                        singletonList(padRight(typeTree, null)),
+                        Markers.EMPTY
+                )
+        );
     }
 
     @Override
     public J visitTypeConstraintList(KtTypeConstraintList list, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        List<KtTypeConstraint> ktTypeConstraints = list.getConstraints();
+        List<JRightPadded<J.TypeParameter>> params = new ArrayList<>(ktTypeConstraints.size());
+
+        for (KtTypeConstraint ktTypeConstraint : ktTypeConstraints) {
+            params.add(padRight((J.TypeParameter) ktTypeConstraint.accept(this, data), Space.EMPTY));
+        }
+
+        return new K.TypeConstraints(
+                randomId(),
+                Markers.EMPTY,
+                JContainer.build(prefix(list), params, Markers.EMPTY)
+        );
     }
 
     @Override
@@ -2005,7 +2032,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     JContainer<Expression> args;
 
                     if (!superTypeCallEntry.getValueArguments().isEmpty()) {
-                        throw new UnsupportedOperationException("TODO");
+                        args = mapFunctionCallArguments(superTypeCallEntry.getValueArgumentList(), data);
                     } else {
                         KtValueArgumentList ktArgList = superTypeCallEntry.getValueArgumentList();
                         args = JContainer.build(
@@ -2397,7 +2424,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     @NotNull
-    private J.MethodDeclaration visitNamedFunction0(KtNamedFunction function, ExecutionContext data) {
+    private J visitNamedFunction0(KtNamedFunction function, ExecutionContext data) {
         Markers markers = Markers.EMPTY;
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
         List<J.Annotation> lastAnnotations = new ArrayList<>();
@@ -2495,6 +2522,16 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             returnTypeExpression = function.getTypeReference().accept(this, data).withPrefix(prefix(function.getTypeReference()));
         }
 
+        K.TypeConstraints typeConstraints = null;
+        if (function.getTypeConstraintList() != null) {
+            // todo, find `where` keyword, and use prefix(whereKeyWord)
+            // PsiTreeUtil.findSiblingForward(function.getTypeConstraintList(), KtTokens.WHERE_KEYWORD, null);
+            typeConstraints = (K.TypeConstraints) function.getTypeConstraintList().accept(this, data);
+            Space afterWhere = prefix(function.getTypeConstraintList());
+            typeConstraints = typeConstraints.withConstraints(ListUtils.mapFirst(typeConstraints.getConstraints(), constraint -> constraint.withPrefix(afterWhere)))
+                    .withPrefix(suffix(function.getTypeReference()));
+        }
+
         J.Block body;
         if (function.getBodyBlockExpression() != null) {
             body = function.getBodyBlockExpression().accept(this, data)
@@ -2505,7 +2542,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             body = null;
         }
 
-        return new J.MethodDeclaration(
+        J.MethodDeclaration methodDeclaration = new J.MethodDeclaration(
                 randomId(),
                 merge(prefix(function), infix(function)),
                 markers,
@@ -2520,6 +2557,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 null,
                 methodDeclarationType(function)
         );
+
+        return (typeConstraints == null) ? methodDeclaration : new K.MethodDeclaration(randomId(), Markers.EMPTY, methodDeclaration, typeConstraints);
     }
 
     @NotNull

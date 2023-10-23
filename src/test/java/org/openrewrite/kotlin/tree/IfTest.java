@@ -155,7 +155,7 @@ class IfTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
+    @ExpectedToFail("Fixed by PSI based parser")
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/298")
     void functionCallCondition() {

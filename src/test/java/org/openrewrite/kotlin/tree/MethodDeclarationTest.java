@@ -278,7 +278,7 @@ class MethodDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun <T> foo(): Int where T: List<T> {
+              fun <T> foo() :  Int   where    T     : List <  T   > {
                   return 0
               }
               """
