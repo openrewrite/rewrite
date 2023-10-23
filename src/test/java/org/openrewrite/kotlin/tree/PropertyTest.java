@@ -80,7 +80,7 @@ class PropertyTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              val <T> T.plus2: Int where T: CharSequence, T: Comparable<T>
+              val <T> T.plus2: Int where  T   : CharSequence  ,   T : Comparable<T>
                   get() = length + 2
               """
           )

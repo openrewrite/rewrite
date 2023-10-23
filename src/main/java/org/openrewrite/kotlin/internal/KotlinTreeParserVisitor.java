@@ -1294,7 +1294,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<JRightPadded<J.TypeParameter>> params = new ArrayList<>(ktTypeConstraints.size());
 
         for (KtTypeConstraint ktTypeConstraint : ktTypeConstraints) {
-            params.add(padRight((J.TypeParameter) ktTypeConstraint.accept(this, data), Space.EMPTY));
+            params.add(padRight((J.TypeParameter) ktTypeConstraint.accept(this, data), suffix(ktTypeConstraint)));
         }
 
         return new K.TypeConstraints(
@@ -2820,7 +2820,14 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 variables
         );
 
-        if (getter != null || setter != null || receiver != null) {
+        if (property.getTypeConstraintList() != null) {
+            typeConstraints = (K.TypeConstraints) property.getTypeConstraintList().accept(this, data);
+            PsiElement whereKeyword = findLeafElement(property, "where");
+            typeConstraints = typeConstraints.withConstraints(ListUtils.mapFirst(typeConstraints.getConstraints(), constraint -> constraint.withPrefix(suffix(whereKeyword))))
+                    .withPrefix(prefix(whereKeyword));
+        }
+
+        if (getter != null || setter != null || receiver != null || typeConstraints != null) {
             return new K.Property(
                     randomId(),
                     prefix(property),
