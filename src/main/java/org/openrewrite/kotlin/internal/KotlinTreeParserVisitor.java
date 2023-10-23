@@ -1835,7 +1835,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 );
             }
 
-            // createIdentifier(expression.getCalleeExpression(), type(expression));
             List<KtValueArgument> arguments = expression.getValueArguments();
 
             JContainer<Expression> args;
@@ -1843,17 +1842,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 args = JContainer.build(singletonList(padRight(new J.Empty(randomId(), prefix(expression.getValueArgumentList().getRightParenthesis()), Markers.EMPTY), Space.EMPTY)));
                 args = args.withBefore(prefix(expression.getValueArgumentList()));
             } else {
-                List<JRightPadded<Expression>> expressions = new ArrayList<>(arguments.size());
-                Markers markers = Markers.EMPTY;
-                for (KtValueArgument arg : arguments) {
-                    expressions.add(padRight(convertToExpression(arg.accept(this, data)).withPrefix(prefix(arg)), suffix(arg)));
-                }
-
-                if (!expression.getLambdaArguments().isEmpty()) {
-                    markers = markers.addIfAbsent(new OmitParentheses(randomId()));
-                }
-
-                args = JContainer.build(prefix(expression.getValueArgumentList()), expressions, markers);
+                args = mapFunctionCallArguments(expression.getValueArgumentList(), arguments, data);
             }
             return new J.NewClass(
                     randomId(),
@@ -1880,7 +1869,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             }
 
             JContainer<Expression> args = mapFunctionCallArguments(expression.getValueArgumentList(), expression.getValueArguments(), data);
-            args = args.withBefore(prefix(expression.getValueArgumentList()));
 
             if (expression.getValueArgumentList() == null) {
                 args = args.withMarkers(args.getMarkers().addIfAbsent(new OmitParentheses(randomId())));
@@ -3640,7 +3628,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             markers = markers.addIfAbsent(new OmitParentheses(randomId()));
         }
 
-        return JContainer.build(Space.EMPTY, expressions, markers);
+        Space prefix = valueArgumentList != null ? prefix(valueArgumentList) : Space.EMPTY;
+        return JContainer.build(prefix, expressions, markers);
     }
 
     @Nullable
