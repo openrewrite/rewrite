@@ -1836,14 +1836,17 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         if (type == PsiElementAssociations.ExpressionType.CONSTRUCTOR) {
             TypeTree name = (J.Identifier) expression.getCalleeExpression().accept(this, data);
             if (!expression.getTypeArguments().isEmpty()) {
-                // FIXME: create a list.
-                Expression expr = (Expression) expression.getTypeArguments().get(0).accept(this, data);
+                List<JRightPadded<Expression>> parameters = new ArrayList<>(expression.getTypeArguments().size());
+                for (KtTypeProjection ktTypeProjection : expression.getTypeArguments()) {
+                    parameters.add(padRight(convertToExpression(ktTypeProjection.accept(this, data)), suffix(ktTypeProjection)));
+                }
+
                 name = new J.ParameterizedType(
                         randomId(),
                         name.getPrefix(),
                         Markers.EMPTY,
                         name.withPrefix(Space.EMPTY),
-                        JContainer.build(prefix(expression.getTypeArgumentList()), singletonList(padRight(expr, suffix(expression.getTypeArgumentList()))), Markers.EMPTY),
+                        JContainer.build(prefix(expression.getTypeArgumentList()), parameters, Markers.EMPTY),
                         type(expression)
                 );
             }
