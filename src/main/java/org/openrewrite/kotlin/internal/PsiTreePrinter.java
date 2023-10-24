@@ -547,29 +547,6 @@ public class PsiTreePrinter {
         return sb.toString();
     }
 
-    public static String printPsiTree(PsiTree psiTree) {
-        StringBuilder sb = new StringBuilder();
-
-        // 0. print Tokens
-        sb.append("------------").append("\n");
-        sb.append("PSI Tokens").append("\n");
-        for (int i = 0; i < psiTree.getTokens().size(); i++) {
-            PsiToken t = psiTree.getTokens().get(i);
-            sb.append(i).append(": ").append(t).append("\n");
-        }
-
-        // 1. Source code
-        sb.append(printIndexedSourceCode(psiTree.getSource())).append("\n");
-
-        // 2. print AST
-        PsiTreePrinter treePrinter = new PsiTreePrinter();
-        sb.append("------------").append("\n");
-        sb.append("Parsed Full PSI AST").append("\n");
-        treePrinter.printNode(psiTree.getRoot(), 1);
-        sb.append(String.join("\n", treePrinter.outputLines));
-        return sb.toString();
-    }
-
     private String toString(PsiElement psiElement) {
         return psiElement.getTextRange() +
                 " | " +
@@ -612,23 +589,6 @@ public class PsiTreePrinter {
         covered.add(psiElement.getTextRange());
         for (PsiElement childNode : psiElement.getChildren()) {
             collectCovered(childNode, covered);
-        }
-    }
-
-    private void printNode(PsiTree.Node node, int depth) {
-        StringBuilder line = new StringBuilder();
-        line.append(leftPadding(depth));
-        line.append(" ")
-            .append(node.getRange())
-            .append(" | ")
-            .append(node.getType())
-            .append(" | Text: \"")
-            .append(truncate(node.getPsiElement().getText()).replace("\n", "\\n"))
-            .append("\"");
-        connectToLatestSibling(depth);
-        outputLines.add(line);
-        for (PsiTree.Node childNode : node.getChildNodes()) {
-            printNode(childNode, depth + 1);
         }
     }
 
