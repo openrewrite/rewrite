@@ -24,6 +24,8 @@ import org.jetbrains.kotlin.KtSourceElement;
 import org.jetbrains.kotlin.com.intellij.openapi.util.TextRange;
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
 import org.jetbrains.kotlin.fir.FirElement;
+import org.jetbrains.kotlin.fir.backend.FirMetadataSource;
+import org.jetbrains.kotlin.fir.declarations.FirDeclaration;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.declarations.FirProperty;
 import org.jetbrains.kotlin.fir.expressions.*;
@@ -33,6 +35,9 @@ import org.jetbrains.kotlin.fir.types.FirTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
 import org.jetbrains.kotlin.ir.IrElement;
 import org.jetbrains.kotlin.ir.declarations.IrFile;
+import org.jetbrains.kotlin.ir.declarations.IrMetadataSourceOwner;
+import org.jetbrains.kotlin.ir.declarations.MetadataSource;
+import org.jetbrains.kotlin.ir.expressions.IrConst;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
@@ -382,7 +387,7 @@ public class PsiTreePrinter {
                 .append(space.getWhitespace()).append("\"");
         sb.append(" comments=\"")
                 .append(String.join(",", space.getComments().stream().map(c -> c.printComment(new Cursor(null, "root"))).collect(Collectors.toList())))
-                .append("\"");;
+                .append("\"");
         return sb.toString().replace("\n", "\\s\n");
     }
 
@@ -392,39 +397,29 @@ public class PsiTreePrinter {
         return visitor.print();
     }
 
-    public static String printIrElement(IrElement irElement) {
+    public static String printIrElement(IrElement element) {
         StringBuilder sb = new StringBuilder();
-        sb.append(irElement.getClass().getSimpleName());
+        sb.append("(").append(element.getStartOffset()).append(",").append(element.getEndOffset())
+                .append(") | ").append(element.getClass().getSimpleName());
 
-        // TODO
-
-//        if (firElement.getSource() != null) {
-//            KtSourceElement source = firElement.getSource();
-//            sb.append(" | ");
-//
-//            if (source instanceof KtRealPsiSourceElement) {
-//                sb.append("Real ");
-//            } else if (source instanceof KtFakeSourceElement) {
-//                sb.append("Fake ");
-//            } else {
-//                sb.append(source.getClass().getSimpleName());
-//            }
-//
-//            sb.append("PSI(")
-//                    .append("[").append(source.getStartOffset())
-//                    .append(",")
-//                    .append(source.getEndOffset())
-//                    .append("]")
-//                    .append(" ")
-//                    .append(source.getElementType())
-//                    .append(")");
-//        }
-//
-//        String firValue = firElementToString(firElement);
-//        if (firValue != null && !firValue.isEmpty()) {
-//            sb.append(" | ").append(firValue);
-//        }
-
+        if (element instanceof IrMetadataSourceOwner) {
+            IrMetadataSourceOwner irMetadataSourceOwner = (IrMetadataSourceOwner) element;
+            MetadataSource metadata = irMetadataSourceOwner.getMetadata();
+            if (metadata != null) {
+                if (metadata instanceof FirMetadataSource) {
+                    FirMetadataSource firMetadataSource = (FirMetadataSource) irMetadataSourceOwner.getMetadata();
+                    FirDeclaration firDeclaration = firMetadataSource.getFir();
+                    if (firDeclaration != null) {
+                        sb.append(" | ").append(printFirElement(firDeclaration));
+                    }
+                } else {
+                    throw new UnsupportedOperationException("TODO");
+                }
+            }
+        } else if (element instanceof IrConst) {
+            IrConst irConst = (IrConst) element;
+            sb.append(" | ").append(irConst.getValue());
+        }
         return sb.toString();
     }
 
