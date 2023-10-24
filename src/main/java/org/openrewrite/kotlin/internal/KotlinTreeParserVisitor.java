@@ -2602,8 +2602,15 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             if (declaration.getSuperTypeList().getEntries().size() > 1) {
                 throw new UnsupportedOperationException("TODO");
             }
+
             KtValueArgumentList ktArgs = declaration.getSuperTypeList().getEntries().get(0).getStubOrPsiChild(KtStubElementTypes.VALUE_ARGUMENT_LIST);
-            args = mapFunctionCallArguments(ktArgs, data);
+            if (ktArgs != null) {
+                args = mapFunctionCallArguments(ktArgs, data);
+            } else {
+                args = JContainer.empty();
+                args = args.withMarkers(Markers.EMPTY.addIfAbsent(new OmitParentheses(randomId())));
+            }
+
             clazz = declaration.getSuperTypeList().accept(this, data).withPrefix(Space.EMPTY);
         }
 
