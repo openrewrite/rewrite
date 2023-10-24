@@ -154,4 +154,20 @@ class EnumTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void enumWithAnnotation() {
+        rewriteRun(
+          kotlin(
+            """
+              enum class EnumTypeA {
+                  FOO, 
+                  BAR( ),
+                  @Suppress
+                  FUZ
+              }
+              """
+          )
+        );
+    }
 }

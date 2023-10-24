@@ -452,7 +452,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitEnumEntry(KtEnumEntry enumEntry, ExecutionContext data) {
         List<J.Annotation> annotations = new ArrayList<>();
         if (!enumEntry.getAnnotationEntries().isEmpty()) {
-            throw new UnsupportedOperationException("TODO");
+            mapModifiers(enumEntry.getModifierList(), annotations, emptyList(), data);
         }
 
         J.Identifier name = createIdentifier(enumEntry.getNameIdentifier(), type(enumEntry));
