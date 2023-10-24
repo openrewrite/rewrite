@@ -41,7 +41,6 @@ import org.jetbrains.kotlin.fir.symbols.impl.*;
 import org.jetbrains.kotlin.fir.types.ConeClassLikeType;
 import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef;
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
-import org.jetbrains.kotlin.lexer.KtToken;
 import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.parsing.ParseUtilsKt;
 import org.jetbrains.kotlin.psi.*;
@@ -1256,7 +1255,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         // typealias does not have a name.
                         createIdentifier("", Space.EMPTY, null, null),
                         emptyList(),
-                        padLeft(prefix(findLeafElement(typeAlias, "=")), expr),
+                        padLeft(prefix(typeAlias.getNode().findChildByType(KtTokens.EQ).getPsi()), expr),
                         null
                 ), Space.EMPTY
         );
@@ -1330,8 +1329,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         mapModifiers(parameter.getModifierList(), annotations, emptyList(), data);
 
         if (parameter.getVariance() == Variance.INVARIANT) {
-            PsiElement reifiedKeyword = findLeafElement(parameter.getModifierList(), "reified");
-            if (reifiedKeyword != null) {
+            if (parameter.getModifierList() != null && parameter.getModifierList().hasModifier(KtTokens.REIFIED_KEYWORD)) {
+                PsiElement reifiedKeyword = parameter.getModifierList().getModifier(KtTokens.REIFIED_KEYWORD);
                 J.Annotation reified = new J.Annotation(randomId(),
                         prefix(reifiedKeyword),
                         Markers.EMPTY.addIfAbsent(new Modifier(randomId())),
@@ -1356,8 +1355,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             markers = markers.addIfAbsent(new GenericType(randomId(), variance));
             name = createIdentifier("<Any>", Space.EMPTY, null).withMarkers(Markers.build(singletonList(new Implicit(randomId()))));
 
-            String varianceKeyword = parameter.getVariance() == Variance.IN_VARIANCE ? "in" : "out";
-            PsiElement varianceKeywordPsi = findLeafElement(parameter.getModifierList(), varianceKeyword);
+            KtModifierKeywordToken varianceKeyword = parameter.getVariance() == Variance.IN_VARIANCE ? KtTokens.IN_KEYWORD : KtTokens.OUT_KEYWORD;
+            PsiElement varianceKeywordPsi = parameter.getModifierList().getModifier(varianceKeyword);
 
             bounds = JContainer.build(
                     prefix(varianceKeywordPsi),
@@ -2076,7 +2075,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         K.TypeConstraints typeConstraints = null;
         if (klass.getTypeConstraintList() != null) {
             typeConstraints = (K.TypeConstraints) klass.getTypeConstraintList().accept(this, data);
-            PsiElement whereKeyword = findLeafElement(klass, "where");
+            PsiElement whereKeyword = klass.getNode().findChildByType(KtTokens.WHERE_KEYWORD).getPsi();
             typeConstraints = typeConstraints.withConstraints(ListUtils.mapFirst(typeConstraints.getConstraints(), constraint -> constraint.withPrefix(suffix(whereKeyword))))
                     .withPrefix(prefix(whereKeyword));
         }
@@ -2118,9 +2117,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 JRightPadded<J.EnumValue> rp = padRight((J.EnumValue) ktEnumEntry.accept(this, data), Space.EMPTY);
 
                 if (i == classBody.getEnumEntries().size() - 1) {
-                    List<PsiElement> allChildren = getAllChildren(ktEnumEntry);
-                    IElementType lastElementType = allChildren.get(allChildren.size() - 1).getNode().getElementType();
-
                     if (comma != null) {
                         rp = rp.withAfter(prefix(comma));
                         Space afterComma = suffix(comma);
@@ -2544,7 +2540,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         K.TypeConstraints typeConstraints = null;
         if (function.getTypeConstraintList() != null) {
             typeConstraints = (K.TypeConstraints) function.getTypeConstraintList().accept(this, data);
-            PsiElement whereKeyword = findLeafElement(function, "where");
+            PsiElement whereKeyword = function.getNode().findChildByType(KtTokens.WHERE_KEYWORD).getPsi();
             typeConstraints = typeConstraints.withConstraints(ListUtils.mapFirst(typeConstraints.getConstraints(), constraint -> constraint.withPrefix(suffix(whereKeyword))))
                     .withPrefix(prefix(whereKeyword));
         }
@@ -2866,7 +2862,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         if (property.getTypeConstraintList() != null) {
             typeConstraints = (K.TypeConstraints) property.getTypeConstraintList().accept(this, data);
-            PsiElement whereKeyword = findLeafElement(property, "where");
+            PsiElement whereKeyword = property.getNode().findChildByType(KtTokens.WHERE_KEYWORD).getPsi();
             typeConstraints = typeConstraints.withConstraints(ListUtils.mapFirst(typeConstraints.getConstraints(), constraint -> constraint.withPrefix(suffix(whereKeyword))))
                     .withPrefix(prefix(whereKeyword));
         }
@@ -3829,22 +3825,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             }
             nextSibling = nextSibling.getNextSibling();
         }
-        return null;
-    }
-
-    @Nullable
-    private PsiElement findLeafElement(@Nullable PsiElement parent, String text) {
-        if (parent == null) {
-            return null;
-        }
-
-        List<PsiElement> children = getAllChildren(parent);
-        for (PsiElement child : children) {
-            if (child instanceof LeafPsiElement && child.getText().equals(text)) {
-                return child;
-            }
-        }
-
         return null;
     }
 
