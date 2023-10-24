@@ -910,7 +910,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 null,
                 null,
                 null,
-                methodDeclarationType(constructor)
+                type
         );
     }
 
@@ -926,7 +926,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         JContainer<Statement> params = null;
         J.Block body = null;
 
-        name = createIdentifier(accessor.getNamePlaceholder().getText(), prefix(accessor.getNamePlaceholder()), type(accessor));
+        JavaType.Method type = methodDeclarationType(accessor);
+        name = createIdentifier(accessor.getNamePlaceholder().getText(), prefix(accessor.getNamePlaceholder()), type);
 
         List<KtParameter> ktParameters = accessor.getValueParameters();
         if (!ktParameters.isEmpty()) {
@@ -980,7 +981,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 null,
                 body,
                 null,
-                methodDeclarationType(accessor)
+                type
         );
     }
 
@@ -1054,7 +1055,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<J.Modifier> modifiers = mapModifiers(constructor.getModifierList(), leadingAnnotations, lastAnnotations, data);
         modifiers.add(mapModifier(constructor.getConstructorKeyword(), emptyList()));
 
-        J.Identifier name = createIdentifier(constructor.getName(), Space.EMPTY, type(constructor));
+        JavaType.Method type = methodDeclarationType(constructor);
+        J.Identifier name = createIdentifier(constructor.getName(), Space.EMPTY, type);
         List<JRightPadded<Statement>> statements = mapParameters(constructor.getValueParameterList(), data);
         JContainer<Statement> params = JContainer.build(
                 prefix(constructor.getValueParameterList()),
@@ -1092,7 +1094,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 null,
                 body,
                 null,
-                methodDeclarationType(constructor)
+                type
         );
 
         return new K.Constructor(randomId(), Markers.EMPTY, methodDeclaration, prefix(constructor.getColon()), delegationCall);
@@ -2414,10 +2416,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         modifiers.add(new J.Modifier(randomId(), prefix(function.getFunKeyword(), prefixConsumed), Markers.EMPTY, "fun", J.Modifier.Type.LanguageExtension, emptyList()));
         J.Identifier name = null;
 
+        JavaType.Method type = methodDeclarationType(function);
         if (function.getNameIdentifier() == null) {
-            name = createIdentifier("", Space.EMPTY, type(function));
+            name = createIdentifier("", Space.EMPTY, type);
         } else {
-            name = createIdentifier(function.getNameIdentifier(), type(function));
+            name = createIdentifier(function.getNameIdentifier(), type);
         }
 
         // parameters
@@ -2517,7 +2520,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 null,
                 body,
                 null,
-                methodDeclarationType(function)
+                type
         );
 
         return (typeConstraints == null) ? methodDeclaration : new K.MethodDeclaration(randomId(), Markers.EMPTY, methodDeclaration, typeConstraints);

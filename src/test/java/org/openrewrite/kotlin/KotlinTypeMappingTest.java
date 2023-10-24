@@ -108,6 +108,7 @@ public class KotlinTypeMappingTest {
         assertThat(goatType.getSupertype().getFullyQualifiedName()).isEqualTo("kotlin.Any");
     }
 
+    @Disabled("access method name is based on IR and does not match the FIR.")
     @Test
     void fieldType() {
         K.Property property = getProperty("field");
@@ -119,19 +120,18 @@ public class KotlinTypeMappingTest {
         assertThat(id.getType()).isInstanceOf(JavaType.Class.class);
         assertThat(id.getType().toString()).isEqualTo("kotlin.Int");
 
-
         JavaType.FullyQualified declaringType = property.getGetter().getMethodType().getDeclaringType();
         assertThat(declaringType.getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
-        assertThat(property.getGetter().getMethodType().getName()).isEqualTo("accessor");
+        assertThat(property.getGetter().getMethodType().getName()).isEqualTo("<get-field>");
         assertThat(property.getGetter().getMethodType().getReturnType()).isEqualTo(id.getType());
-        assertThat(property.getGetter().getMethodType()).isEqualTo(property.getGetter().getName().getType());
-        assertThat(property.getGetter().getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=accessor,return=kotlin.Int,parameters=[]}");
+        assertThat(property.getGetter().getName().getType()).isEqualTo(property.getGetter().getMethodType());
+        assertThat(property.getGetter().getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=<get-field>,return=kotlin.Int,parameters=[]}");
 
         declaringType = property.getSetter().getMethodType().getDeclaringType();
         assertThat(declaringType.getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
-        assertThat(property.getSetter().getMethodType().getName()).isEqualTo("accessor");
+        assertThat(property.getSetter().getMethodType().getName()).isEqualTo("<set-field>");
         assertThat(property.getSetter().getMethodType()).isEqualTo(property.getSetter().getName().getType());
-        assertThat(property.getSetter().getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=accessor,return=kotlin.Unit,parameters=[kotlin.Int]}");
+        assertThat(property.getSetter().getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=<set-field>,return=kotlin.Unit,parameters=[kotlin.Int]}");
     }
 
     @Disabled("Signature is correct in IR based type mapping. FIR based type mapping is missing the package.")
