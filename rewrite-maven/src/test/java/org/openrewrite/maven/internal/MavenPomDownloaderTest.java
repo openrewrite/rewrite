@@ -51,7 +51,7 @@ import static java.util.Collections.emptyMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SuppressWarnings({"NullableProblems", "HttpUrlsUsage"})
 class MavenPomDownloaderTest {
@@ -269,12 +269,12 @@ class MavenPomDownloaderTest {
                       new MockResponse().setResponseCode(200).setBody(
                         //language=xml
                         """
-                        <project>
-                            <groupId>org.springframework.cloud</groupId>
-                            <artifactId>spring-cloud-dataflow-build</artifactId>
-                            <version>2.10.0-SNAPSHOT</version>
-                        </project>
-                        """) :
+                          <project>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dataflow-build</artifactId>
+                              <version>2.10.0-SNAPSHOT</version>
+                          </project>
+                          """) :
                       new MockResponse().setResponseCode(401).setBody("");
                 }
             });
@@ -485,4 +485,69 @@ class MavenPomDownloaderTest {
         assertThat(merged.getVersioning().getSnapshotVersions().get(0).getValue()).isNotNull();
         assertThat(merged.getVersioning().getSnapshotVersions().get(0).getUpdated()).isNotNull();
     }
+
+    @Test
+    void skipsLocalInvalidArtifactsMissingJar(@TempDir Path localRepository) throws IOException {
+        Path localArtifact = localRepository.resolve("com/bad/bad-artifact");
+        assertThat(localArtifact.toFile().mkdirs()).isTrue();
+        Files.createDirectories(localArtifact.resolve("1"));
+
+        Path localPom = localRepository.resolve("com/bad/bad-artifact/1/bad-artifact-1.pom");
+        Files.writeString(localPom,
+          //language=xml
+          """
+             <project>
+               <groupId>com.bad</groupId>
+               <artifactId>bad-artifact</artifactId>
+               <version>1</version>
+             </project>
+            """
+        );
+
+        MavenRepository mavenLocal = MavenRepository.builder()
+          .id("local")
+          .uri(localRepository.toUri().toString())
+          .snapshots(false)
+          .knownToExist(true)
+          .build();
+
+        // Does not return invalid dependency.
+        assertThrows(MavenDownloadingException.class, () ->
+          new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext())
+            .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
+    }
+
+    @Test
+    void skipsLocalInvalidArtifactsEmptyJar(@TempDir Path localRepository) throws IOException {
+        Path localArtifact = localRepository.resolve("com/bad/bad-artifact");
+        assertThat(localArtifact.toFile().mkdirs()).isTrue();
+        Files.createDirectories(localArtifact.resolve("1"));
+
+        Path localPom = localRepository.resolve("com/bad/bad-artifact/1/bad-artifact-1.pom");
+        Files.writeString(localPom,
+          //language=xml
+          """
+             <project>
+               <groupId>com.bad</groupId>
+               <artifactId>bad-artifact</artifactId>
+               <version>1</version>
+             </project>
+            """
+        );
+        Path localJar = localRepository.resolve("com/bad/bad-artifact/1/bad-artifact-1.jar");
+        Files.writeString(localJar, "");
+
+        MavenRepository mavenLocal = MavenRepository.builder()
+          .id("local")
+          .uri(localRepository.toUri().toString())
+          .snapshots(false)
+          .knownToExist(true)
+          .build();
+
+        // Does not return invalid dependency.
+        assertThrows(MavenDownloadingException.class, () ->
+          new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext())
+            .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
+    }
+
 }

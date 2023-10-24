@@ -517,8 +517,8 @@ public class MavenPomDownloader {
                             Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
 
                             if (pom.getPackaging() == null || "jar".equals(pom.getPackaging())) {
-                                Path jar = f.toPath().resolveSibling(gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".jar");
-                                if (!Files.exists(jar)) {
+                                File jar = f.toPath().resolveSibling(gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".jar").toFile();
+                                if (!jar.exists() || jar.length() == 0) {
                                     // The jar has not been downloaded, making this dependency unusable.
                                     continue;
                                 }
