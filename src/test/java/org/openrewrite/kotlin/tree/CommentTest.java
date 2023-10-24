@@ -16,6 +16,8 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
@@ -94,6 +96,25 @@ class CommentTest implements RewriteTest {
                */
               val a = 1
               """
+          )
+        );
+    }
+
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "class Foo {}",
+            "fun foo() {}"
+    })
+    void multilineComments(String input) {
+        rewriteRun(
+          kotlin(
+            """
+              /*
+               * Comment
+               */
+              %s
+              """.formatted(input)
           )
         );
     }
