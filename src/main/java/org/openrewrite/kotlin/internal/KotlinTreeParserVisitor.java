@@ -1615,7 +1615,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new K.CompilationUnit(
                 Tree.randomId(),
-                Space.EMPTY,
+                prefixAndInfix(file),
                 Markers.build(styles),
                 sourcePath,
                 fileAttributes,
