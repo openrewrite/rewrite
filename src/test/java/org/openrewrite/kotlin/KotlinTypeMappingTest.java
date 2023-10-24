@@ -571,5 +571,6 @@ public class KotlinTypeMappingTest {
               )
             );
         }
+        // TODO: ensure method and variable types from various IR with the same types generate the same java type.
     }
 }

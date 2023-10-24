@@ -160,6 +160,7 @@ public class KotlinParser implements Parser {
         ParsingExecutionContextView pctx = ParsingExecutionContextView.view(ctx);
         ParsingEventListener parsingListener = pctx.getParsingListener();
 
+        // TODO: FIR and disposable may not be necessary using the IR.
         Disposable disposable = Disposer.newDisposable();
         CompiledSource compilerCus;
         try {
@@ -190,21 +191,17 @@ public class KotlinParser implements Parser {
                                         boolean switchToPsiParser = false;
                                         if (switchToPsiParser) {
                                             // debug purpose only, to be removed
-                                            System.out.println(PsiTreePrinter.print(kotlinSource.getInput()));
-                                            System.out.println(PsiTreePrinter.print(kotlinSource.getKtFile()));
-                                            System.out.println(PsiTreePrinter.print(kotlinSource.getFirFile()));
-
-                                            // TODO replace JavaTypeCache.
-                                            KotlinIrTypeMapping irTypeMapping = new KotlinIrTypeMapping(new JavaTypeCache());
-                                            PsiElementAssociations2 irMapping = new PsiElementAssociations2(irTypeMapping, kotlinSource.getKtFile(), kotlinSource.getIrFile());
-                                            irMapping.initialize();
+//                                            System.out.println(PsiTreePrinter.print(kotlinSource.getInput()));
+//                                            System.out.println(PsiTreePrinter.print(kotlinSource.getKtFile()));
+//                                            System.out.println(PsiTreePrinter.print(kotlinSource.getFirFile()));
 
                                             // PSI based parser
                                             SourceFile kcuPsi;
-                                            KotlinTypeMapping typeMapping = new KotlinTypeMapping(new JavaTypeCache(), firSession, kotlinSource.getFirFile().getSymbol());
-                                            PsiElementAssociations psiFirMapping = new PsiElementAssociations(typeMapping, kotlinSource.getFirFile());
-                                            psiFirMapping.initialize();
-                                            KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, firSession, typeMapping, psiFirMapping, irMapping, styles, relativeTo, ctx);
+                                            // TODO replace JavaTypeCache.
+                                            KotlinIrTypeMapping irTypeMapping = new KotlinIrTypeMapping(new JavaTypeCache());
+                                            PsiElementAssociations irMapping = new PsiElementAssociations(irTypeMapping, kotlinSource.getKtFile(), Objects.requireNonNull(kotlinSource.getIrFile()));
+                                            irMapping.initialize();
+                                            KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, irMapping, styles, relativeTo, ctx);
                                             try {
                                                 kcuPsi = psiParser.parse();
                                             } catch (UnsupportedOperationException ignore) {

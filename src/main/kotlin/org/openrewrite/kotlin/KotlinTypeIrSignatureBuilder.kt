@@ -15,18 +15,22 @@
  */
 package org.openrewrite.kotlin
 
+import org.jetbrains.kotlin.fir.lazy.Fir2IrLazyClass
+import org.jetbrains.kotlin.fir.lazy.Fir2IrLazyConstructor
+import org.jetbrains.kotlin.fir.lazy.Fir2IrLazySimpleFunction
+import org.jetbrains.kotlin.ir.backend.js.utils.valueArguments
 import org.jetbrains.kotlin.ir.declarations.*
-import org.jetbrains.kotlin.ir.expressions.IrCall
-import org.jetbrains.kotlin.ir.expressions.IrConstructorCall
+import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
 import org.jetbrains.kotlin.ir.types.*
 import org.jetbrains.kotlin.ir.util.kotlinFqName
 import org.jetbrains.kotlin.ir.util.packageFqName
 import org.jetbrains.kotlin.types.Variance
 import org.openrewrite.java.JavaTypeSignatureBuilder
+import org.openrewrite.java.tree.JavaType
 import java.util.*
 
-class KotlinTypeIrSignatureBuilder: JavaTypeSignatureBuilder {
+class KotlinTypeIrSignatureBuilder : JavaTypeSignatureBuilder {
     private var typeVariableNameStack: MutableSet<String>? = null
 
     override fun signature(type: Any?): String {
@@ -55,6 +59,14 @@ class KotlinTypeIrSignatureBuilder: JavaTypeSignatureBuilder {
                 return signature(baseType.symbol.owner)
             }
 
+            is IrClassReference -> {
+                return signature(baseType.type)
+            }
+
+            is IrConst<*> -> {
+                return primitiveSignature(baseType)
+            }
+
             is IrConstructorCall -> {
                 return signature(baseType.symbol.owner)
             }
@@ -64,19 +76,35 @@ class KotlinTypeIrSignatureBuilder: JavaTypeSignatureBuilder {
             }
 
             is IrField -> {
-                TODO("IrField not yet implemented.")
+                return variableSignature(baseType)
             }
 
             is IrFunction -> {
-                return methodDeclarationSignature(baseType)
+                return methodSignature(baseType)
+            }
+
+            is IrFunctionReference -> {
+                return signature(baseType.symbol.owner)
+            }
+
+            is IrGetValue -> {
+                return signature(baseType.type)
             }
 
             is IrProperty -> {
                 return variableSignature(baseType)
             }
 
+            is IrPropertyReference -> {
+                return variableSignature(baseType.symbol.owner)
+            }
+
             is IrTypeAlias -> {
                 return aliasSignature(baseType)
+            }
+
+            is IrTypeOperatorCall -> {
+                return methodSignature(baseType)
             }
 
             is IrTypeParameter -> {
@@ -90,8 +118,9 @@ class KotlinTypeIrSignatureBuilder: JavaTypeSignatureBuilder {
             is IrValueParameter -> {
                 return variableSignature(baseType)
             }
+
             is IrVariable -> {
-                TODO("IrVariable not yet implemented.")
+                return variableSignature(baseType)
             }
         }
 
@@ -100,7 +129,7 @@ class KotlinTypeIrSignatureBuilder: JavaTypeSignatureBuilder {
 
     private fun aliasSignature(type: IrTypeAlias): String {
         if (type.parent !is IrFile) {
-            TODO()
+            throw UnsupportedOperationException("Unsupported parent of alias signature " + type.javaClass)
         }
         val s = StringBuilder()
         if ((type.parent as IrFile).fqName.asString().isNotEmpty()) {
@@ -133,14 +162,34 @@ class KotlinTypeIrSignatureBuilder: JavaTypeSignatureBuilder {
     }
 
     override fun classSignature(type: Any): String {
-        if (type !is IrClass) {
-            throw UnsupportedOperationException("Unexpected classType: " + type.javaClass)
+        when (type) {
+            is IrSimpleType -> return classSignature(type.classifier.owner)
+            is Fir2IrLazyConstructor -> return classSignature(type.parent)
+            is Fir2IrLazyClass -> return classSignature(type)
+            is IrFile -> return fileSignature(type)
+            is IrExternalPackageFragment -> return packageSignature(type)
+            is IrClass -> {}
+            else -> throw UnsupportedOperationException("Unexpected classType: " + type.javaClass)
         }
+
         val sb = StringBuilder()
         if (type.parent is IrClass) {
             sb.append(classSignature(type.parent)).append("$")
         } else if (type.parent is IrFunction) {
             // TODO: review how Method parents should be represented.
+        } else if (type.packageFqName != null && type.packageFqName!!.asString().isNotEmpty()) {
+            sb.append(type.packageFqName).append(".")
+        }
+        sb.append(type.name)
+        return sb.toString()
+    }
+
+    private fun classSignature(type: Fir2IrLazyClass): String {
+        val sb = StringBuilder()
+        if (type.parent is Fir2IrLazyClass) {
+            sb.append(classSignature(type.parent)).append("$")
+        } else if (type.parent is Fir2IrLazySimpleFunction) {
+            // TODO
         } else if (type.packageFqName != null && type.packageFqName!!.asString().isNotEmpty()) {
             sb.append(type.packageFqName).append(".")
         }
@@ -195,6 +244,10 @@ class KotlinTypeIrSignatureBuilder: JavaTypeSignatureBuilder {
         return sig.append("}").toString()
     }
 
+    private fun packageSignature(type: IrExternalPackageFragment): String {
+        return type.kotlinFqName.asString()
+    }
+
     override fun parameterizedSignature(type: Any): String {
         if (type !is IrSimpleType && type !is IrClass) {
             throw UnsupportedOperationException("Unexpected parameterizedType: " + type.javaClass)
@@ -211,7 +264,20 @@ class KotlinTypeIrSignatureBuilder: JavaTypeSignatureBuilder {
     }
 
     override fun primitiveSignature(type: Any): String {
-        TODO("Not yet implemented")
+        return when (type) {
+            is IrConst<*> -> type.type.classFqName!!.asString()
+            else -> {
+                throw UnsupportedOperationException("Unsupported primitive type" + type.javaClass)
+            }
+        }
+    }
+
+    fun variableSignature(
+        field: IrField
+    ): String {
+        val owner = if (field.parent is IrClass) classSignature(field.parent) else signature(field.parent)
+        val typeSig = signature(field.type)
+        return "$owner{name=${field.name.asString()},type=$typeSig}"
     }
 
     fun variableSignature(
@@ -230,17 +296,27 @@ class KotlinTypeIrSignatureBuilder: JavaTypeSignatureBuilder {
     }
 
     fun variableSignature(
+        variable: IrVariable
+    ): String {
+        val owner = if (variable.parent is IrClass) classSignature(variable.parent) else signature(variable.parent)
+        val typeSig = signature(variable.type)
+        return "$owner{name=${variable.name.asString()},type=$typeSig}"
+    }
+
+    fun variableSignature(
         valueParameter: IrValueParameter
     ): String {
-        val owner = if (valueParameter.parent is IrClass) classSignature(valueParameter.parent) else signature(valueParameter.parent)
+        val owner =
+            if (valueParameter.parent is IrClass) classSignature(valueParameter.parent) else signature(valueParameter.parent)
         val typeSig = signature(valueParameter.type)
         return "$owner{name=${valueParameter.name.asString()},type=$typeSig}"
     }
 
-    fun methodDeclarationSignature(function: IrFunction): String {
-        val parent = when (function.parent) {
-            is IrClass -> classSignature(function.parent)
-            else -> signature(function.parent)
+    fun methodSignature(function: IrFunction): String {
+        val parent = when (val irParent = function.parent) {
+            is IrClass -> classSignature(irParent)
+            is IrField -> signature(irParent.parent)
+            else -> signature(irParent)
         }
         val signature = StringBuilder(parent)
         if (function is IrConstructor) {
@@ -264,6 +340,39 @@ class KotlinTypeIrSignatureBuilder: JavaTypeSignatureBuilder {
         return genericArgumentTypes.toString()
     }
 
+    fun methodSignature(function: IrFunctionAccessExpression): String {
+        val parent = classSignature(function.symbol.owner.parent)
+        val signature = StringBuilder(parent)
+        if (function is IrConstructorCall) {
+            signature.append("{name=<constructor>,return=$parent")
+        } else if (function is IrCall) {
+            signature.append("{name=").append(function.symbol.owner.name)
+            signature.append(",return=").append(signature(function.symbol.owner.returnType))
+        } else {
+            throw UnsupportedOperationException("Unsupported method signature for IrFunctionAccessExpression " + function.javaClass)
+        }
+        signature.append(",parameters=").append(methodArgumentSignature(function)).append("}")
+        return signature.toString()
+    }
+
+    private fun methodArgumentSignature(function: IrFunctionAccessExpression): String {
+        val genericArgumentTypes = StringJoiner(",", "[", "]")
+        if (function.extensionReceiver != null) {
+            genericArgumentTypes.add(signature(function.extensionReceiver!!.type))
+        }
+        for (param: IrExpression? in function.valueArguments) {
+            if (param != null) {
+                genericArgumentTypes.add(signature(param.type))
+            }
+        }
+        return genericArgumentTypes.toString()
+    }
+
+    private fun methodSignature(baseType: IrTypeOperatorCall): String {
+        return ""
+    }
+
+    // TODO: ensure method and variable signatures from various IR with the same types generate the same signature.
     private fun isNotAny(type: IrType): Boolean {
         return !(type.classifierOrNull != null && type.classifierOrNull!!.owner is IrClass && "kotlin.Any" == (type.classifierOrNull!!.owner as IrClass).kotlinFqName.asString())
     }

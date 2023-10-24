@@ -15,165 +15,236 @@
  */
 package org.openrewrite.kotlin.internal
 
-import org.jetbrains.kotlin.KtFakeSourceElement
 import org.jetbrains.kotlin.KtRealPsiSourceElement
+import org.jetbrains.kotlin.com.intellij.openapi.util.TextRange
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
+import org.jetbrains.kotlin.com.intellij.psi.PsiElementVisitor
+import org.jetbrains.kotlin.com.intellij.psi.PsiFile
 import org.jetbrains.kotlin.fir.FirElement
-import org.jetbrains.kotlin.fir.declarations.FirDeclaration
-import org.jetbrains.kotlin.fir.declarations.FirFile
-import org.jetbrains.kotlin.fir.expressions.FirExpression
-import org.jetbrains.kotlin.fir.expressions.FirFunctionCall
-import org.jetbrains.kotlin.fir.expressions.FirReturnExpression
+import org.jetbrains.kotlin.fir.backend.FirMetadataSource
 import org.jetbrains.kotlin.fir.expressions.impl.FirElseIfTrueCondition
 import org.jetbrains.kotlin.fir.expressions.impl.FirSingleExpressionBlock
-import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
-import org.jetbrains.kotlin.fir.references.resolved
-import org.jetbrains.kotlin.fir.resolve.dfa.DfaInternals
-import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol
-import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef
-import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor
-import org.jetbrains.kotlin.psi
-import org.jetbrains.kotlin.psi.KtDeclaration
-import org.jetbrains.kotlin.psi.KtDotQualifiedExpression
-import org.jetbrains.kotlin.psi.KtExpression
+import org.jetbrains.kotlin.ir.IrElement
+import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.visitors.IrElementVisitor
+import org.jetbrains.kotlin.psi.*
 import org.openrewrite.java.tree.JavaType
-import org.openrewrite.kotlin.KotlinTypeMapping
+import org.openrewrite.kotlin.KotlinIrTypeMapping
 
-class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFile) {
+class PsiElementAssociations(val typeMapping: KotlinIrTypeMapping, private val psiFile: PsiFile, val file: IrFile) {
 
-    private val elementMap: MutableMap<PsiElement, MutableList<FirInfo>> = HashMap()
+    private val notMapped: MutableList<IrElement> = ArrayList()
+    private val psiMap: MutableMap<TextRange, MutableList<PsiElement>> = HashMap()
+    private val elementMap: MutableMap<PsiElement, MutableList<IrInfo>> = HashMap()
 
     fun initialize() {
         var depth = 0
-        object : FirDefaultVisitor<Unit, MutableMap<PsiElement, MutableList<FirInfo>>>() {
-            override fun visitElement(element: FirElement, data: MutableMap<PsiElement, MutableList<FirInfo>>) {
-                if (element.source != null && element.source.psi != null) {
-                    val psiElement = element.source!!.psi!!
-                    val firInfo = FirInfo(element, depth)
-                    data.computeIfAbsent(psiElement) { ArrayList() } += firInfo
+        object : PsiElementVisitor() {
+            override fun visitElement(element: PsiElement) {
+                psiMap.computeIfAbsent(element.textRange) { ArrayList() } += element
+                element.acceptChildren(this)
+            }
+        }.visitFile(psiFile)
+
+        object : IrElementVisitor<Unit, MutableMap<PsiElement, MutableList<IrInfo>>> {
+            override fun visitElement(element: IrElement, data: MutableMap<PsiElement, MutableList<IrInfo>>) {
+                if (element is IrMetadataSourceOwner) {
+                    if (element.metadata is FirMetadataSource) {
+                        when (element.metadata) {
+                            is FirMetadataSource.File -> {
+                                val source = (element.metadata!! as FirMetadataSource.File).files[0].source
+                                if (source is KtRealPsiSourceElement) {
+                                    elementMap.computeIfAbsent(source.psi) { ArrayList() } += IrInfo(element, depth)
+                                }
+                            }
+
+                            is FirMetadataSource.Class -> {
+                                val source = (element.metadata!! as FirMetadataSource.Class).fir.source
+                                if (source is KtRealPsiSourceElement) {
+                                    elementMap.computeIfAbsent(source.psi) { ArrayList() } += IrInfo(element, depth)
+                                }
+                            }
+
+                            is FirMetadataSource.Function -> {
+                                val source = (element.metadata!! as FirMetadataSource.Function).fir.source
+                                if (source is KtRealPsiSourceElement) {
+                                    elementMap.computeIfAbsent(source.psi) { ArrayList() } += IrInfo(element, depth)
+                                }
+                            }
+
+                            is FirMetadataSource.Property -> {
+                                val source = (element.metadata!! as FirMetadataSource.Property).fir.source
+                                if (source is KtRealPsiSourceElement) {
+                                    elementMap.computeIfAbsent(source.psi) { ArrayList() } += IrInfo(element, depth)
+                                }
+                            }
+
+                            is FirMetadataSource.Script -> {
+                                val source = (element.metadata!! as FirMetadataSource.Script).fir.source
+                                if (source is KtRealPsiSourceElement) {
+                                    elementMap.computeIfAbsent(source.psi) { ArrayList() } += IrInfo(element, depth)
+                                }
+                            }
+                        }
+                    }
+                } else if (element.startOffset >= 0 && element.endOffset >= 0) {
+                    val textRange = TextRange.create(element.startOffset, element.endOffset)
+                    if (psiMap.containsKey(textRange)) {
+                        val psi = psiMap[textRange]
+                        if (psi != null) {
+                            if (psi.size == 1) {
+                                elementMap.computeIfAbsent(psi.toList()[0]) { ArrayList() } += IrInfo(element, depth)
+                            } else {
+                                for (p in psi) {
+                                    elementMap.computeIfAbsent(p) { ArrayList() } += IrInfo(element, depth)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    notMapped.add(element)
                 }
+
                 depth++
                 element.acceptChildren(this, data)
-                if (element is FirResolvedTypeRef) {
-                    // not sure why this isn't taken care of by `FirResolvedTypeRefImpl#acceptChildren()`
-                    element.delegatedTypeRef?.accept(this, data)
-                }
                 depth--
             }
         }.visitFile(file, elementMap)
-
         validate()
     }
 
     private fun validate() {
-        var found1ToNMapping = false
-        elementMap.forEach { (psi, firList) ->
-            var fakeCount = 0
-            var realCount = 0
-            var otherCount = 0
-            for (firElement in firList) {
-                if (firElement.fir.source is KtRealPsiSourceElement) {
-                    realCount++
-                } else if (firElement.fir.source is KtFakeSourceElement) {
-                    fakeCount++
-                } else {
-                    otherCount++
+        // TODO
+    }
+
+    fun type(psiElement: PsiElement): JavaType? {
+        val ir = primary(psiElement)
+        return if (ir != null) typeMapping.type(ir) else null
+    }
+
+    fun all(psiElement: PsiElement): List<IrElement> {
+        val elements = elementMap[psiElement]
+        if (elements != null) {
+            return elements.map { it.ir }.toList()
+        }
+        return emptyList()
+    }
+
+    fun primary(psiElement: PsiElement): IrElement? {
+        val temp = all(psiElement)
+        val f: ((IrElement) -> Boolean)? = when (psiElement) {
+            is KtFile -> {
+                { it is IrFile }
+            }
+
+            is KtCallExpression -> {
+                { it is IrConstructorCall || it is IrCall || it is IrTypeOperatorCall }
+            }
+
+            is KtClass, is KtObjectDeclaration -> {
+                { it is IrClass }
+            }
+
+            is KtConstantExpression, is KtStringTemplateExpression -> {
+                { it is IrConst<*> }
+            }
+
+            is KtClassLiteralExpression -> {
+                { it is IrClassReference }
+            }
+
+            is KtFunction -> {
+                { it is IrFunction }
+            }
+
+            is KtNameReferenceExpression -> {
+                { it is IrPropertyReference || it is IrFunctionReference || it is IrGetValue || it is IrCall }
+            }
+
+            is KtParameter -> {
+                {
+                    it is IrValueParameter && (it.name.asString() == psiElement.name.toString() || (it.name.asString() == "<unused var>" && psiElement.name.toString() == "_")) ||
+                            it is IrVariable && (it.name.asString() == psiElement.name.toString() || (it.name.asString() == "<unused var>" && psiElement.name.toString() == "_"))
                 }
             }
 
-            // print out logs, debug purpose only, to be removed after complete parser
-            if (false) {
-                found1ToNMapping = realCount > 1
+            is KtPostfixExpression -> {
+                { it is IrVariable }
+            }
 
-                println("---------")
-                println("PSI: $psi")
-                println("FIR: $firList")
+            is KtPrefixExpression -> {
+                { it is IrVariable }
+            }
 
-                println("Found 1 to $realCount Real mapping!")
-                println("    types from $realCount Real elements:")
-                var firstUnknown = false
-                var hasNonUnknown = false
-                for ((index, firElement) in firList.withIndex()) {
-                    if (firElement.fir.source is KtRealPsiSourceElement) {
-                        val type = typeMapping.type(firElement.fir).toString()
-                        if (index == 0 && type.equals("Unknown")) {
-                            firstUnknown = true
-                        }
+            is KtProperty -> {
+                { it is IrProperty || it is IrVariable }
+            }
 
-                        if (!type.equals("Unknown")) {
-                            hasNonUnknown = true
-                        }
+            is KtThisExpression -> {
+                { it is IrGetValue }
+            }
 
-                        val padded = "        -$type".padEnd(30, ' ')
-                        println("$padded - $firElement")
-                    }
-                }
+            is KtTypeParameter -> {
+                { it is IrTypeParameter }
+            }
 
-                if (firstUnknown && hasNonUnknown) {
-                    throw IllegalArgumentException("First type is Unknown!")
-                }
+            is KtVariableDeclaration -> {
+                { it is IrVariable }
+            }
 
-                println("    types from $fakeCount Fake elements:")
-                for (firElement in firList) {
-                    if (firElement.fir.source is KtFakeSourceElement) {
-                        val type = typeMapping.type(firElement.fir).toString()
-                        val padded = "        -$type".padEnd(30, ' ')
-                        println("$padded - $firElement")
+            is KtNameReferenceExpression, is KtLiteralStringTemplateEntry -> {
+                // TODO: FIX in KotlinTreeParserVisitor.
+                null
+            }
 
-                    }
-                }
+            else -> {
+                null
             }
         }
 
-        if (found1ToNMapping) {
-            // throw IllegalArgumentException("Found 1 to N real mapping!")
+        if (f == null) {
+            // TEMP: fix KotlinTreeParserVisitor.
+            if (!(psiElement is KtNameReferenceExpression ||
+                        psiElement is KtLiteralStringTemplateEntry ||
+                        psiElement is KtUserType ||
+                        psiElement is KtBinaryExpression ||
+                        psiElement is KtDotQualifiedExpression)
+            ) {
+                // println()
+            }
+            return null
+        } else {
+            val m = elementMap[psiElement]
+            if (m != null && m.stream().map { it.ir }.noneMatch(f)) {
+                // println()
+            }
         }
+        return ir(psiElement, f)
     }
 
-    fun type(psiElement: PsiElement, ownerFallBack: FirBasedSymbol<*>?): JavaType? {
-        val fir = primary(psiElement)
-        return if (fir != null) typeMapping.type(fir, ownerFallBack) else null
-    }
-
-    fun symbol(psi: KtDeclaration?): FirBasedSymbol<*>? {
-        val fir = fir(psi) { it is FirDeclaration }
-        return if (fir != null) (fir as FirDeclaration).symbol else null
-    }
-
-    fun symbol(psi: KtExpression?): FirBasedSymbol<*>? {
-        val fir = fir(psi) { it is FirResolvedNamedReference }
-        return if (fir is FirResolvedNamedReference) fir.resolvedSymbol else null
-    }
-
-    fun primary(psiElement: PsiElement) =
-        fir(psiElement) { it.source is KtRealPsiSourceElement }
-
-    fun component(psiElement: PsiElement) =
-        fir(psiElement) { it is FirFunctionCall}
-
-    fun fir(psi: PsiElement?, filter: (FirElement) -> Boolean) : FirElement? {
-        var p = psi
-        while (p != null && !elementMap.containsKey(p)) {
-            p = p.parent
-            // don't skip KtDotQualifiedExpression for field access
-//            if (p is KtDotQualifiedExpression) {
-//                return null
-//            }
-        }
-
-        if (p == null) {
+    fun ir(psi: PsiElement?, filter: (IrElement) -> Boolean): IrElement? {
+        if (psi == null) {
             return null
         }
+        val directIrInfos = all(psi).filter { filter.invoke(it) }
+        return if (directIrInfos.isNotEmpty()) directIrInfos[0] else null
+    }
 
-        val allFirInfos = elementMap[p]!!
-        val directFirInfos = allFirInfos.filter { filter.invoke(it.fir) }
-        return if (directFirInfos.isNotEmpty())
-            directFirInfos[0].fir
-        else if (allFirInfos.isNotEmpty())
-            allFirInfos[0].fir
-        else
-            null
+    fun functionType(psiElement: PsiElement): IrFunction? {
+        return ir(psiElement) { it is IrFunction } as? IrFunction ?: return null
+    }
+
+    fun functionCallType(psiElement: PsiElement): IrFunctionAccessExpression? {
+        return ir(psiElement) { it is IrFunctionAccessExpression } as? IrFunctionAccessExpression ?: return null
+    }
+
+    fun propertyType(psiElement: PsiElement): IrProperty? {
+        return ir(psiElement) { it is IrProperty } as? IrProperty ?: return null
+    }
+
+    fun variableType(psiElement: PsiElement): IrVariable? {
+        return ir(psiElement) { it is IrVariable } as? IrVariable ?: return null
     }
 
     enum class ExpressionType {
@@ -182,33 +253,9 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         RETURN_EXPRESSION
     }
 
-    fun getFunctionType(psi: KtExpression): ExpressionType? {
-        val fir = fir(psi) { it is FirFunctionCall } as? FirFunctionCall
-
-        if (fir == null) {
-            return null
-        }
-
-        return if (fir.calleeReference.resolved != null) {
-            when (fir.calleeReference.resolved!!.resolvedSymbol) {
-                is FirConstructorSymbol -> ExpressionType.CONSTRUCTOR
-                else -> ExpressionType.METHOD_INVOCATION
-            }
-        } else {
-            return null
-            // throw UnsupportedOperationException("Null resolved symbol on FirFunctionCall: $psi")
-        }
-    }
-
-    @OptIn(DfaInternals::class)
-    fun getExpressionType(psi: KtExpression): ExpressionType? {
-        val fir = fir(psi) { it is FirExpression }
-        return if (fir is FirReturnExpression) {
-            ExpressionType.RETURN_EXPRESSION
-        } else {
-            // TODO, other expression type if needed
-            null
-        }
+    fun getFunctionCallType(psi: KtExpression): ExpressionType? {
+        val ir = ir(psi) { it is IrFunctionAccessExpression } as? IrFunctionAccessExpression ?: return null
+        return if (ir is IrConstructorCall) ExpressionType.CONSTRUCTOR else ExpressionType.METHOD_INVOCATION
     }
 
     private fun PsiElement.customToString(): String {
@@ -217,31 +264,31 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
 
     override fun toString(): String {
         val sb = StringBuilder()
-        elementMap.forEach{ (psi, firs) ->
-            sb.append(psi.customToString()).append("\n")
-            firs.forEach{ fir ->
-                sb.append("  - $fir\n")
-            }
-            sb.append("\n")
-        }
+//        elementMap.forEach{ (psi, firs) ->
+//            sb.append(t).append("\n")
+//            firs.forEach{ fir ->
+//                sb.append("  - $fir\n")
+//            }
+//            sb.append("\n")
+//        }
         return sb.toString()
     }
 
-    private class FirInfo(
-        val fir: FirElement,
+    private class IrInfo(
+        val ir: IrElement,
         val depth: Int,
     ) {
         override fun toString(): String {
-            val s = PsiTreePrinter.printFirElement(fir)
+            val s = PsiTreePrinter.printIrElement(ir)
             return "FIR($depth, $s)"
         }
     }
 
     companion object {
-        fun printElement(firElement: FirElement) : String {
+        fun printElement(firElement: FirElement): String {
             if (firElement is FirSingleExpressionBlock) {
                 return PsiTreePrinter.firElementToString(firElement.statement)
-            } else  if (firElement is FirElseIfTrueCondition) {
+            } else if (firElement is FirElseIfTrueCondition) {
                 return "true";
             }
 

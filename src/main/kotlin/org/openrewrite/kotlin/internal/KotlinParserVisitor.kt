@@ -45,7 +45,6 @@ import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitNullableAnyTypeRef
 import org.jetbrains.kotlin.fir.types.impl.FirImplicitUnitTypeRef
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor
-import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.psi.*
@@ -70,7 +69,6 @@ import org.openrewrite.java.marker.OmitParentheses
 import org.openrewrite.java.marker.TrailingComma
 import org.openrewrite.java.tree.*
 import org.openrewrite.java.tree.TypeTree.build
-import org.openrewrite.kotlin.KotlinIrTypeMapping
 import org.openrewrite.kotlin.KotlinParser
 import org.openrewrite.kotlin.KotlinTypeMapping
 import org.openrewrite.kotlin.marker.*

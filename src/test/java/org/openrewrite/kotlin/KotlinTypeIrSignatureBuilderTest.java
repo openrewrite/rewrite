@@ -62,7 +62,7 @@ public class KotlinTypeIrSignatureBuilderTest {
     }
 
     public String constructorSignature() {
-        return signatureBuilder().methodDeclarationSignature(getCompiledSource().getDeclarations().stream()
+        return signatureBuilder().methodSignature(getCompiledSource().getDeclarations().stream()
                 .filter(IrClass.class::isInstance)
                 .map(IrClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
@@ -115,7 +115,7 @@ public class KotlinTypeIrSignatureBuilderTest {
         if (property == null || property.getGetter() == null) {
             throw new UnsupportedOperationException("No filed or getter for " + field);
         }
-        return signatureBuilder().methodDeclarationSignature(property.getGetter());
+        return signatureBuilder().methodSignature(property.getGetter());
     }
 
     public String fieldPropertySetterSignature(String field) {
@@ -123,7 +123,7 @@ public class KotlinTypeIrSignatureBuilderTest {
         if (property == null || property.getSetter() == null) {
             throw new UnsupportedOperationException("No filed or setter for " + field);
         }
-        return signatureBuilder().methodDeclarationSignature(property.getSetter());
+        return signatureBuilder().methodSignature(property.getSetter());
     }
 
     public Object firstMethodParameterSignature(String methodName) {
@@ -152,7 +152,7 @@ public class KotlinTypeIrSignatureBuilderTest {
     }
 
     public String methodSignature(String methodName) {
-        return signatureBuilder().methodDeclarationSignature(getCompiledSource().getDeclarations().stream()
+        return signatureBuilder().methodSignature(getCompiledSource().getDeclarations().stream()
                 .filter(IrClass.class::isInstance)
                 .map(IrClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
@@ -177,7 +177,7 @@ public class KotlinTypeIrSignatureBuilderTest {
         IrFunction function = getCompiledSource().getDeclarations().stream()
           .filter(it -> it instanceof IrFunction && "function".equals(((IrFunction) it).getName().asString()))
           .map(it -> (IrFunction) it).findFirst().orElseThrow();
-        assertThat(signatureBuilder().methodDeclarationSignature(function))
+        assertThat(signatureBuilder().methodSignature(function))
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[org.openrewrite.kotlin.C]}");
     }
 

@@ -473,9 +473,9 @@ public class PsiTreePrinter {
             FirWhenBranch whenBranch = (FirWhenBranch) firElement;
             return "when(" + firElementToString(whenBranch.getCondition()) + ")" + " -> " + firElementToString(whenBranch.getResult());
         } else if (firElement.getClass().getSimpleName().equals("FirElseIfTrueCondition")) {
-            return PsiElementAssociations.Companion.printElement(firElement);
+            return PsiElementFirAssociations.Companion.printElement(firElement);
         } else if (firElement.getClass().getSimpleName().equals("FirSingleExpressionBlock")) {
-            return PsiElementAssociations.Companion.printElement(firElement);
+            return PsiElementFirAssociations.Companion.printElement(firElement);
         }
         return "";
     }
