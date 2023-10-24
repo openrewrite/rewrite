@@ -206,28 +206,33 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
 
             var supertype: JavaType.FullyQualified? = null
             var interfaceTypes: MutableList<IrType>? = null
-            for (sType in irClass.superTypes) {
-                when (val classifier: IrClassifierSymbol? = sType.classifierOrNull) {
-                    is IrClassSymbol -> {
-                        when (classifier.owner.kind) {
-                            ClassKind.CLASS -> {
-                                supertype = TypeUtils.asFullyQualified(type(sType))
-                            }
-
-                            ClassKind.INTERFACE -> {
-                                if (interfaceTypes == null) {
-                                    interfaceTypes = ArrayList()
+            // TODO: review
+            //  In Kotlin the super type of java.lang.Object is kotlin.Any.
+            //  This condition matches the super type from the Java compiler, but is technically incorrect from the POV of the Kotlin compiler.
+            if (signature != "java.lang.Object" ) {
+                for (sType in irClass.superTypes) {
+                    when (val classifier: IrClassifierSymbol? = sType.classifierOrNull) {
+                        is IrClassSymbol -> {
+                            when (classifier.owner.kind) {
+                                ClassKind.CLASS -> {
+                                    supertype = TypeUtils.asFullyQualified(type(sType))
                                 }
-                                interfaceTypes.add(sType)
-                            }
 
-                            else -> {
+                                ClassKind.INTERFACE -> {
+                                    if (interfaceTypes == null) {
+                                        interfaceTypes = ArrayList()
+                                    }
+                                    interfaceTypes.add(sType)
+                                }
+
+                                else -> {
+                                }
                             }
                         }
-                    }
 
-                    else -> {
-                        throw UnsupportedOperationException("Unexpected classifier symbol: " + classifier?.javaClass)
+                        else -> {
+                            throw UnsupportedOperationException("Unexpected classifier symbol: " + classifier?.javaClass)
+                        }
                     }
                 }
             }
@@ -289,7 +294,14 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
                     }
                 }
             }
-            clazz.unsafeSet(null, supertype, owner, listAnnotations(irClass.annotations), interfaces, fields, methods)
+            var typeParameters: MutableList<JavaType>? = null
+            if (irClass.typeParameters.isNotEmpty()) {
+                typeParameters = ArrayList(irClass.typeParameters.size)
+                for (tParam in irClass.typeParameters) {
+                    typeParameters.add(type(tParam))
+                }
+            }
+            clazz.unsafeSet(typeParameters, supertype, owner, listAnnotations(irClass.annotations), interfaces, fields, methods)
         }
 
         if (irClass.typeParameters.isNotEmpty()) {
@@ -536,7 +548,7 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
             }
 
             is IrStarProjection -> {
-                GenericTypeVariable(null, "*", INVARIANT, null)
+                GenericTypeVariable(null, "?", INVARIANT, null)
             }
 
             else -> {

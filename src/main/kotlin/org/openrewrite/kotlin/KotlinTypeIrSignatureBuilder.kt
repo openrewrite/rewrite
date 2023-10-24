@@ -234,7 +234,7 @@ class KotlinTypeIrSignatureBuilder : JavaTypeSignatureBuilder {
             }
 
             is IrStarProjection -> {
-                sig.append("*")
+                sig.append("?")
             }
 
             else -> {
