@@ -18,8 +18,13 @@ package org.openrewrite.kotlin
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DescriptorVisibility
 import org.jetbrains.kotlin.descriptors.Modality
+import org.jetbrains.kotlin.fir.lazy.Fir2IrLazyConstructor
+import org.jetbrains.kotlin.fir.lazy.Fir2IrLazySimpleFunction
 import org.jetbrains.kotlin.ir.backend.js.utils.valueArguments
 import org.jetbrains.kotlin.ir.declarations.*
+import org.jetbrains.kotlin.ir.declarations.impl.IrConstructorImpl
+import org.jetbrains.kotlin.ir.declarations.impl.IrFunctionImpl
+import org.jetbrains.kotlin.ir.declarations.impl.IrFunctionWithLateBindingImpl
 import org.jetbrains.kotlin.ir.expressions.*
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrClassifierSymbol
@@ -345,7 +350,15 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
         }
         val method = JavaType.Method(
             null,
-            mapToFlagsBitmap(function.visibility),
+            mapToFlagsBitmap(function.visibility,
+                when (function) {
+                    is IrFunctionImpl -> function.modality
+                    is IrFunctionWithLateBindingImpl -> function.modality
+                    is Fir2IrLazySimpleFunction -> function.modality
+                    is IrConstructorImpl, is Fir2IrLazyConstructor -> null
+                    else -> throw UnsupportedOperationException("Unsupported IrFunction type: " + function.javaClass)
+                }
+            ),
             null,
             if (function is IrConstructor) "<constructor>" else function.name.asString(),
             null,

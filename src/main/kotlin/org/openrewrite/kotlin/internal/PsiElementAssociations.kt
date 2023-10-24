@@ -132,7 +132,7 @@ class PsiElementAssociations(val typeMapping: KotlinIrTypeMapping, private val p
     }
 
     fun primary(psiElement: PsiElement): IrElement? {
-        val temp = all(psiElement)
+        val temp = all(psiElement) // TODO: remove
         val f: ((IrElement) -> Boolean)? = when (psiElement) {
             is KtFile -> {
                 { it is IrFile }
@@ -191,11 +191,6 @@ class PsiElementAssociations(val typeMapping: KotlinIrTypeMapping, private val p
 
             is KtVariableDeclaration -> {
                 { it is IrVariable }
-            }
-
-            is KtNameReferenceExpression, is KtLiteralStringTemplateEntry -> {
-                // TODO: FIX in KotlinTreeParserVisitor.
-                null
             }
 
             else -> {
