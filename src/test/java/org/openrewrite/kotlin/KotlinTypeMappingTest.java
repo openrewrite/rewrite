@@ -575,6 +575,48 @@ public class KotlinTypeMappingTest {
               )
             );
         }
+
+        @Test
+        void variableTypes() {
+            rewriteRun(
+              kotlin(
+                """
+                  val foo1: Int = 42
+                  class Foo(val foo2: Int) {
+                      val foo3: Int = 42
+                      fun m(foo4: Int) {
+                          val use: Int = foo4
+                      }
+                  }
+                  """, spec -> spec.afterRecipe(cu -> {
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer integer) {
+                            switch (variable.getSimpleName()) {
+                                case "foo1": {
+                                    assertThat(variable.getVariableType().toString()).isEqualTo("openRewriteFile0Kt{name=foo1,type=kotlin.Int}");
+                                    break;
+                                }
+                                case "foo2": {
+                                    assertThat(variable.getVariableType().toString()).isEqualTo("Foo{name=foo2,type=kotlin.Int}");
+                                    break;
+                                }
+                                case "foo3": {
+                                    assertThat(variable.getVariableType().toString()).isEqualTo("Foo{name=foo3,type=kotlin.Int}");
+                                    break;
+                                }
+                                case "foo4": {
+                                    assertThat(variable.getVariableType().toString()).isEqualTo("Foo{name=m,return=kotlin.Unit,parameters=[kotlin.Int]}{name=foo4,type=kotlin.Int}");
+                                    break;
+                                }
+                            }
+                            return super.visitVariable(variable, integer);
+                        }
+                    }.visit(cu, 0);
+                })
+              )
+            );
+        }
         // TODO: ensure method and variable types from various IR with the same types generate the same java type.
     }
 }
