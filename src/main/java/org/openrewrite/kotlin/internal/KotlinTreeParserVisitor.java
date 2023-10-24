@@ -2899,9 +2899,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         // don't use iterator of `PsiTreeUtil.firstChild` and `getNextSibling`, since it could skip one layer, example test "paramAnnotation"
         // also don't use `modifierList.getChildren()` since it could miss some element
-        List<PsiElement> children = getAllChildren(modifierList);
-
-        for (PsiElement child : children) {
+        for (Iterator<PsiElement> it = PsiUtilsKt.getAllChildren(modifierList).iterator(); it.hasNext();) {
+            PsiElement child = it.next();
             boolean isAnnotation = child instanceof KtAnnotationEntry;
 
             if (isLeadingAnnotation && isAnnotation) {
@@ -3523,11 +3522,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         if (element == null) {
             return Space.EMPTY;
         }
-        List<PsiElement> children = getAllChildren(element);
 
-        for (PsiElement child : children) {
-            if (!isSpace(child.getNode())) {
-                return prefix(child);
+        for (Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(element).iterator(); iterator.hasNext(); ) {
+            PsiElement it = iterator.next();
+            if (!isSpace(it.getNode())) {
+                return prefix(it);
             }
         }
 
@@ -3789,16 +3788,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 J.Modifier.Type.Final,
                 emptyList()
         );
-    }
-
-    private List<PsiElement> getAllChildren(PsiElement parent) {
-        List<PsiElement> children = new ArrayList<>();
-        Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(parent).iterator();
-        while (iterator.hasNext()) {
-            PsiElement it = iterator.next();
-            children.add(it);
-        }
-        return children;
     }
 
     @Nullable
