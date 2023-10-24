@@ -18,6 +18,7 @@ package org.openrewrite.kotlin;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
@@ -108,7 +109,7 @@ public class KotlinTypeMappingTest {
         assertThat(goatType.getSupertype().getFullyQualifiedName()).isEqualTo("kotlin.Any");
     }
 
-    @Disabled("access method name is based on IR and does not match the FIR.")
+    @ExpectedToFail("Enable when we switch to IR parser.")
     @Test
     void fieldType() {
         K.Property property = getProperty("field");
@@ -134,7 +135,7 @@ public class KotlinTypeMappingTest {
         assertThat(property.getSetter().getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=<set-field>,return=kotlin.Unit,parameters=[kotlin.Int]}");
     }
 
-    @Disabled("Signature is correct in IR based type mapping. FIR based type mapping is missing the package.")
+    @ExpectedToFail("Enable when we switch to IR parser.")
     @Test
     void fileField() {
         J.VariableDeclarations.NamedVariable nv = cu.getStatements().stream()
@@ -148,7 +149,7 @@ public class KotlinTypeMappingTest {
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoatKt{name=field,type=kotlin.Int}");
     }
 
-    @Disabled("Signature is correct in IR based type mapping. FIR based type mapping is missing the package.")
+    @ExpectedToFail("Signature is correct in IR based type mapping. FIR based type mapping is missing the package.")
     @Test
     void fileFunction() {
         J.MethodDeclaration md = cu.getStatements().stream()
@@ -335,7 +336,7 @@ public class KotlinTypeMappingTest {
         assertThat(clazzMethod.getAnnotations().get(0).getClassName()).isEqualTo("AnnotationWithRuntimeRetention");
     }
 
-    @Disabled
+    @ExpectedToFail("Enable when we switch to IR parser.")
     @Test
     void receiver() {
         JavaType.Method receiverMethod = methodType("receiver");
@@ -368,6 +369,7 @@ public class KotlinTypeMappingTest {
 
     @Nested
     class ParsingTest implements RewriteTest {
+        @ExpectedToFail("Enable when we switch to IR parser.")
         @Test
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/303")
         void coneTypeProjection() {
@@ -384,7 +386,7 @@ public class KotlinTypeMappingTest {
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
                             if (methodMatcher.matches(method)) {
-                                assertThat(method.getMethodType().toString()).isEqualTo("kotlin.collections.MutableList<Generic{E}>{name=addAll,return=kotlin.Boolean,parameters=[kotlin.collections.Collection<Generic{E}>]}");
+                                assertThat(method.getMethodType().toString()).isEqualTo("kotlin.collections.MutableList{name=addAll,return=kotlin.Boolean,parameters=[kotlin.collections.List<kotlin.String>]}");
                                 found.set(true);
                             }
                             return super.visitMethodInvocation(method, found);
