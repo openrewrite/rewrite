@@ -33,7 +33,7 @@ public class PreconditionDecoratedScanningRecipe<T>  extends ScanningRecipe<T> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(T acc) {
-        return delegate.getScanner(acc);
+        return Preconditions.check(precondition, delegate.getScanner(acc));
     }
 
     @Override
