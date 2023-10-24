@@ -2041,7 +2041,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         J.ClassDeclaration classDeclaration = new J.ClassDeclaration(
                 randomId(),
-                merge(prefix(klass), infix(klass)),
+                prefixAndInfix(klass),
                 markers,
                 leadingAnnotations,
                 modifiers,
@@ -2506,7 +2506,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         J.MethodDeclaration methodDeclaration = new J.MethodDeclaration(
                 randomId(),
-                merge(prefix(function), infix(function)),
+                prefixAndInfix(function),
                 markers,
                 leadingAnnotations,
                 modifiers,
@@ -2799,7 +2799,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
                 Tree.randomId(),
-                merge(prefix(property), infix(property)), // overlaps with right-padding of previous statement
+                prefixAndInfix(property), // overlaps with right-padding of previous statement
                 markers,
                 leadingAnnotations,
                 modifiers,
@@ -3432,6 +3432,14 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         return Space.EMPTY;
+    }
+
+    private Space prefixAndInfix(@Nullable PsiElement element) {
+        if (element == null) {
+            return Space.EMPTY;
+        }
+
+        return merge(prefix(element), infix(element));
     }
 
     private boolean isSpace(ASTNode node) {
