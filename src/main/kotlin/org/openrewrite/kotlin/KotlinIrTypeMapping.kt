@@ -676,12 +676,39 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
     private fun listAnnotations(annotations: List<IrConstructorCall>): List<JavaType.FullyQualified> {
         val mapped: MutableList<JavaType.FullyQualified> = ArrayList(annotations.size)
         for (annotation: IrConstructorCall in annotations) {
-            val type = TypeUtils.asFullyQualified(type(annotation.type))
-            if (type != null) {
-                mapped.add(type)
+            if (isNotSourceRetention(annotation.type.classifierOrNull?.owner)) {
+                val type = TypeUtils.asFullyQualified(type(annotation.type))
+                if (type != null) {
+                    mapped.add(type)
+                }
             }
         }
         return mapped.toList()
+    }
+
+    private fun isNotSourceRetention(owner: IrSymbolOwner?): Boolean {
+        if (owner is IrMutableAnnotationContainer) {
+            for (ann in owner.annotations) {
+                if (isSourceRetention(ann)) {
+                    return false
+                }
+            }
+        } else {
+            println()
+        }
+        return true
+    }
+
+    private fun isSourceRetention(annotation: IrConstructorCall): Boolean {
+        val sig = signatureBuilder.classSignature(annotation.type)
+        if (sig == "kotlin.annotation.Retention" || sig == "java.lang.annotation") {
+            for (args in annotation.valueArguments) {
+                if (args is IrDeclarationReference && args.symbol.owner is IrDeclarationWithName) {
+                    return (args.symbol.owner as IrDeclarationWithName).name.asString() == "SOURCE"
+                }
+            }
+        }
+        return false
     }
 
     private fun mapKind(kind: ClassKind): JavaType.FullyQualified.Kind {
