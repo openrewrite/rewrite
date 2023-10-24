@@ -99,7 +99,7 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
             }
 
             is IrConstructorCall -> {
-                return type(baseType.symbol.owner)
+                return methodInvocationType(baseType, signature)
             }
 
             is IrExternalPackageFragment -> {
@@ -127,7 +127,7 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
             }
 
             is IrPropertyReference -> {
-                return variableType(baseType.symbol.owner)
+                return variableType(baseType.symbol.owner, signature)
             }
 
             is IrTypeAlias -> {
@@ -147,11 +147,11 @@ class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
             }
 
             is IrValueParameter -> {
-                return variableType(baseType)
+                return variableType(baseType, signature)
             }
 
             is IrVariable -> {
-                return variableType(baseType)
+                return variableType(baseType, signature)
             }
         }
 
