@@ -519,7 +519,7 @@ public class MavenPomDownloader {
                             if (pom.getPackaging() == null || "jar".equals(pom.getPackaging())) {
                                 Path jar = f.toPath().resolveSibling(gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".jar");
                                 if (!Files.exists(jar)) {
-                                    // This is a corrupt dependency.
+                                    // The jar has not been downloaded, making this dependency unusable.
                                     continue;
                                 }
                             }
