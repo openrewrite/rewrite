@@ -517,7 +517,7 @@ public class MavenPomDownloader {
                             Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
 
                             if("jar".equals(pom.getPackaging())){
-                                Path jar = f.toPath().getParent().resolve(gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".jar");
+                                Path jar = f.toPath().resolveSibling(gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".jar");
                                 if (!Files.exists(jar)) {
                                     // This is a corrupt dependency.
                                     continue;
