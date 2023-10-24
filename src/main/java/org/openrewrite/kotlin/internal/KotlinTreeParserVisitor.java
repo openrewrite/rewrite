@@ -2782,10 +2782,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 JContainer.build(prefix(property.getTypeParameterList()), mapTypeParameters(property, data), Markers.EMPTY) : null;
         K.TypeConstraints typeConstraints = null;
         boolean isSetterFirst = false;
+        PsiElement prefixConsumed = findFirstNotSpaceChild(property);
 
         modifiers.add(new J.Modifier(
                 Tree.randomId(),
-                prefix(property.getValOrVarKeyword()),
+                prefix(property.getValOrVarKeyword(), prefixConsumed),
                 Markers.EMPTY,
                 property.isVar() ? "var" : null,
                 property.isVar() ? J.Modifier.Type.LanguageExtension : J.Modifier.Type.Final,
