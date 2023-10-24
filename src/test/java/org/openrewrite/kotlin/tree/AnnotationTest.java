@@ -81,6 +81,22 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
+    void annotationOnEnumEntry() {
+        rewriteRun(
+          spec -> spec.parser(KotlinParser.builder().classpath()),
+          kotlin(ANNOTATION),
+          kotlin(
+            """
+              enum class EnumTypeA {
+                  @Ann
+                  FOO
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void annotationWithDefaultArgument() {
         rewriteRun(
           kotlin(
