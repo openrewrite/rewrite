@@ -43,7 +43,7 @@ class TypeAliasTest implements RewriteTest {
             """
               class Test < T >
 
-              typealias OldAlias < T > = Test < T >
+              typealias OldAlias  <   T    >     = Test < T >
               val a : OldAlias < String > = Test < String> ( )
               """
           )

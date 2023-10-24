@@ -1232,7 +1232,19 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             throw new UnsupportedOperationException("TODO");
         }
 
-        J.Identifier name = createIdentifier(typeAlias.getIdentifyingElement(), type(typeAlias.getTypeReference()));// typeAlias.getIdentifyingElement().accept(this, data);
+        J.Identifier name = createIdentifier(typeAlias.getIdentifyingElement(), type(typeAlias.getTypeReference()));
+        TypeTree typeExpression = name;
+
+        if (typeAlias.getTypeParameterList() != null) {
+            typeExpression = (TypeTree) typeAlias.getTypeParameterList().accept(this, data);
+
+            if (typeExpression instanceof J.ParameterizedType) {
+                Space prefix = name.getPrefix();
+                typeExpression = ((J.ParameterizedType) typeExpression).withClazz(name.withPrefix(Space.EMPTY))
+                        .withPrefix(prefix);
+            }
+        }
+
         Expression expr = convertToExpression(typeAlias.getTypeReference().accept(this, data));
 
         JRightPadded<J.VariableDeclarations.NamedVariable> namedVariable = padRight(
@@ -1243,7 +1255,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         // typealias does not have a name.
                         createIdentifier("", Space.EMPTY, null, null),
                         emptyList(),
-                        padLeft(suffix(typeAlias.getIdentifyingElement()), expr),
+                        padLeft(prefix(findLeafElement(typeAlias, "=")), expr),
                         null
                 ), Space.EMPTY
         );
@@ -1256,7 +1268,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 markers,
                 leadingAnnotations,
                 modifiers,
-                name,
+                typeExpression,
                 null,
                 emptyList(),
                 vars
@@ -1367,7 +1379,28 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitTypeParameterList(KtTypeParameterList list, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        List<KtTypeParameter> ktTypeParameters = list.getParameters();
+        List<JRightPadded<Expression>> expressions = new ArrayList<>(ktTypeParameters.size());
+
+        for (KtTypeParameter ktTypeParameter : ktTypeParameters) {
+            J.Identifier name = createIdentifier(ktTypeParameter, type(ktTypeParameter));
+            expressions.add(padRight(name, suffix(ktTypeParameter)));
+        }
+
+        JContainer<Expression> typeParameters = JContainer.build(
+                prefix(list),
+                expressions,
+                Markers.EMPTY
+        );
+
+        return new J.ParameterizedType(
+                randomId(),
+                Space.EMPTY,
+                Markers.EMPTY,
+                null,
+                typeParameters,
+                null
+        );
     }
 
     @Override
