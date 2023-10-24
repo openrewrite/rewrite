@@ -41,6 +41,7 @@ import org.jetbrains.kotlin.fir.symbols.impl.*;
 import org.jetbrains.kotlin.fir.types.ConeClassLikeType;
 import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef;
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
+import org.jetbrains.kotlin.lexer.KtToken;
 import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.parsing.ParseUtilsKt;
 import org.jetbrains.kotlin.psi.*;
@@ -1969,6 +1970,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         JContainer<TypeTree> implementings = null;
         Markers markers = Markers.EMPTY;
         J.MethodDeclaration primaryConstructor;
+        PsiElement prefixConsumed = findFirstNotSpaceChild(klass);
 
         List<J.Modifier> modifiers = mapModifiers(klass.getModifierList(), leadingAnnotations, lastAnnotations, data);
 
@@ -1980,7 +1982,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         if (klass.getClassKeyword() != null) {
             kind = new J.ClassDeclaration.Kind(
                     randomId(),
-                    prefix(klass.getClassKeyword()),
+                    prefix(klass.getClassKeyword(), prefixConsumed),
                     Markers.EMPTY,
                     emptyList(),
                     J.ClassDeclaration.Kind.Type.Class
@@ -1988,7 +1990,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         } else if (klass.getClassOrInterfaceKeyword() != null) {
             kind = new J.ClassDeclaration.Kind(
                     randomId(),
-                    prefix(klass.getClassOrInterfaceKeyword()),
+                    prefix(klass.getClassOrInterfaceKeyword(), prefixConsumed),
                     Markers.EMPTY,
                     emptyList(),
                     J.ClassDeclaration.Kind.Type.Interface
@@ -2447,6 +2449,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<J.Modifier> modifiers = mapModifiers(function.getModifierList(), leadingAnnotations, lastAnnotations, data);
         J.TypeParameters typeParameters = null;
         TypeTree returnTypeExpression = null;
+        PsiElement prefixConsumed = findFirstNotSpaceChild(function);
 
         if (function.getTypeParameterList() != null) {
             typeParameters = new J.TypeParameters(
@@ -2463,7 +2466,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             modifiers.add(buildFinalModifier().withPrefix(Space.EMPTY));
         }
 
-        modifiers.add(new J.Modifier(randomId(), prefix(function.getFunKeyword()), Markers.EMPTY, "fun", J.Modifier.Type.LanguageExtension, emptyList()));
+        modifiers.add(new J.Modifier(randomId(), prefix(function.getFunKeyword(), prefixConsumed), Markers.EMPTY, "fun", J.Modifier.Type.LanguageExtension, emptyList()));
         J.Identifier name = null;
 
         if (function.getNameIdentifier() == null) {
@@ -3457,6 +3460,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return prefix(element, false);
     }
 
+    private Space prefix(@Nullable PsiElement element, @Nullable PsiElement consumed) {
+        if (element == consumed) {
+            return Space.EMPTY;
+        }
+        return prefix(element, false);
+    }
+
     @NotNull
     private Space prefix(@Nullable PsiElement element, boolean checkParent) {
         if (element == null) {
@@ -3792,6 +3802,21 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             children.add(it);
         }
         return children;
+    }
+
+    @Nullable
+    private PsiElement findFirstNotSpaceChild(PsiElement parent) {
+        Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(parent).iterator();
+        while (iterator.hasNext()) {
+            PsiElement it = iterator.next();
+            IElementType type = it.getNode().getElementType();
+            if (type != KtTokens.EOL_COMMENT &&
+                    type != KtTokens.BLOCK_COMMENT &&
+                    type != KtTokens.WHITE_SPACE) {
+                return it;
+            }
+        }
+        return null;
     }
 
     @Nullable
