@@ -194,9 +194,10 @@ public class KotlinParser implements Parser {
 //                                            System.out.println(PsiTreePrinter.print(kotlinSource.getInput()));
 //                                            System.out.println(PsiTreePrinter.print(kotlinSource.getKtFile()));
 //                                            System.out.println(PsiTreePrinter.print(kotlinSource.getFirFile()));
+//                                            System.out.println(PsiTreePrinter.print(kotlinSource.getIrFile()));
 
                                             // PSI based parser
-                                            SourceFile kcuPsi;
+                                            SourceFile kcuPsi = null;
                                             // TODO replace JavaTypeCache.
                                             KotlinIrTypeMapping irTypeMapping = new KotlinIrTypeMapping(new JavaTypeCache());
                                             PsiElementAssociations irMapping = new PsiElementAssociations(irTypeMapping, kotlinSource.getKtFile(), Objects.requireNonNull(kotlinSource.getIrFile()));

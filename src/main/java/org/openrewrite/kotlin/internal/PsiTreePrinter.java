@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef;
 import org.jetbrains.kotlin.fir.types.FirTypeRef;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
 import org.jetbrains.kotlin.ir.IrElement;
+import org.jetbrains.kotlin.ir.declarations.IrFile;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
@@ -55,7 +56,7 @@ public class PsiTreePrinter {
     private static final String UNVISITED_PREFIX = "#";
 
     // Set to true to print types and verify, otherwise just verify the parse to print idempotent.
-    private final static boolean printTypes = false;
+    private final static boolean printTypes = true;
 
     private final List<StringBuilder> outputLines;
 
@@ -73,6 +74,10 @@ public class PsiTreePrinter {
 
     public static String print(FirFile file) {
         return printFirFile(file);
+    }
+
+    public static String print(IrFile file) {
+        return printIrFile(file);
     }
 
     public static String print(Tree tree) {
@@ -103,7 +108,7 @@ public class PsiTreePrinter {
 
     @AllArgsConstructor
     @Data
-    private static class FirTreeContext {
+    public static class TreePrinterContext {
         List<StringBuilder> lines;
         int depth;
     }
@@ -114,10 +119,10 @@ public class PsiTreePrinter {
         sb.append("------------").append("\n");
         sb.append("FirFile:").append("\n\n");
 
-        FirTreeContext context = new FirTreeContext(lines, 1);
-        new FirDefaultVisitor<Void, FirTreeContext>() {
+        TreePrinterContext context = new TreePrinterContext(lines, 1);
+        new FirDefaultVisitor<Void, TreePrinterContext>() {
             @Override
-            public Void visitElement(@NotNull FirElement firElement, FirTreeContext ctx) {
+            public Void visitElement(@NotNull FirElement firElement, TreePrinterContext ctx) {
                 StringBuilder line = new StringBuilder();
                 line.append(leftPadding(ctx.getDepth()))
                         .append(printFirElement(firElement));
@@ -138,6 +143,28 @@ public class PsiTreePrinter {
                 return null;
             }
         }.visitFile(file, context);
+        sb.append(String.join("\n", lines));
+        return sb.toString();
+    }
+
+    public static class IrPrinter {
+        public void printElement(@NotNull IrElement element, @NotNull PsiTreePrinter.TreePrinterContext ctx) {
+            StringBuilder line = new StringBuilder();
+            line.append(leftPadding(ctx.getDepth()))
+                    .append(printIrElement(element));
+            connectToLatestSibling(ctx.getDepth(), ctx.getLines());
+            ctx.getLines().add(line);
+        }
+    }
+
+    public static String printIrFile(IrFile file) {
+        StringBuilder sb = new StringBuilder();
+        List<StringBuilder> lines = new ArrayList<>();
+        sb.append("------------").append("\n");
+        sb.append("IrFile:").append("\n\n");
+
+        TreePrinterContext context = new TreePrinterContext(lines, 1);
+        new IrTreePrinterVisitor(new IrPrinter()).visitFile(file, context);
         sb.append(String.join("\n", lines));
         return sb.toString();
     }
@@ -367,8 +394,10 @@ public class PsiTreePrinter {
 
     public static String printIrElement(IrElement irElement) {
         StringBuilder sb = new StringBuilder();
-//        sb.append(firElement.getClass().getSimpleName());
-//
+        sb.append(irElement.getClass().getSimpleName());
+
+        // TODO
+
 //        if (firElement.getSource() != null) {
 //            KtSourceElement source = firElement.getSource();
 //            sb.append(" | ");
