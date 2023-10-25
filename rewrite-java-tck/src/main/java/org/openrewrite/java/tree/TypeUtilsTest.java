@@ -65,7 +65,7 @@ class TypeUtilsTest implements RewriteTest {
           java(
             """
               class Superclass {
-                  void foo();
+                  void foo() { }
               }
               """
           ),
@@ -76,6 +76,33 @@ class TypeUtilsTest implements RewriteTest {
               }
               """,
             typeIsPresent()
+          )
+        );
+    }
+
+    @Test
+    void isOverrideOnlyVisible() {
+        rewriteRun(
+          java(
+            """
+              package foo;
+              public class Superclass {
+                  void foo() { }
+              }
+              """
+          ),
+          java(
+            """
+              package bar;
+              import foo.Superclass;
+              class Clazz extends Superclass {
+                  public void foo() { }
+              }
+              """,
+            s -> s.afterRecipe(cu -> {
+                var fooMethodType = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
+                assertThat(TypeUtils.findOverriddenMethod(fooMethodType)).isEmpty();
+            })
           )
         );
     }

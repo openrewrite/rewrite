@@ -36,6 +36,7 @@ import static org.openrewrite.groovy.Assertions.srcMainGroovy;
 import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.properties.Assertions.properties;
 
+@SuppressWarnings("GroovyUnusedAssignment")
 class AddDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
@@ -1117,12 +1118,12 @@ class AddDependencyTest implements RewriteTest {
             srcMainGroovy(
               groovy(
                 """
-                  import java.util.*;
-
+                  import java.util.*
+                  
                   class MyClass {
                       static void main(String[] args) {
-                          Date date = new Date();
-                          System.out.println("Hello world");
+                          Date date = new Date()
+                          System.out.println("Hello world")
                       }
                   }
                   """

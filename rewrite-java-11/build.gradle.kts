@@ -65,7 +65,7 @@ testing {
                 all {
                     testTask.configure {
                         useJUnitPlatform {
-                            excludeTags("java11", "java17")
+                            excludeTags("java17", "java21")
                         }
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)

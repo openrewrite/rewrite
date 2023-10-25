@@ -424,7 +424,12 @@ public class TypeUtils {
                 }
             }
         }
-        return methodResult.filter(m -> !m.getFlags().contains(Flag.Private) && !m.getFlags().contains(Flag.Static));
+
+        return methodResult
+                .filter(m -> !m.getFlags().contains(Flag.Private))
+                .filter(m -> !m.getFlags().contains(Flag.Static))
+                // If access level is default then check if subclass package is the same from parent class
+                .filter(m -> m.getFlags().contains(Flag.Public) || m.getDeclaringType().getPackageName().equals(dt.getPackageName()));
     }
 
     public static Optional<JavaType.Method> findDeclaredMethod(@Nullable JavaType.FullyQualified clazz, String name, List<JavaType> argumentTypes) {
