@@ -19,12 +19,13 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.maven.marker.AlreadyIncremented;
+import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.ResolvedPom;
 import org.openrewrite.xml.ChangeTagValue;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.Optional;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -33,7 +34,7 @@ import static org.openrewrite.internal.StringUtils.matchesGlob;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
-public class IncrementProjectVersion extends Recipe {
+public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, String>> {
 
     @Override
     public String getDisplayName() {
@@ -68,22 +69,25 @@ public class IncrementProjectVersion extends Recipe {
         PATCH
     }
 
-    private static final Pattern SEMVER_PATTERN = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)\\.?(\\d+)?(-.+)?$");
+    @Override
+    public Map<GroupArtifact, String> getInitialValue(ExecutionContext ctx) {
+        return new HashMap<>();
+    }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new MavenIsoVisitor<ExecutionContext>() {
-            private final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
+    public TreeVisitor<?, ExecutionContext> getScanner(Map<GroupArtifact, String> acc) {
+        final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
+        final Pattern SEMVER_PATTERN = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)\\.?(\\d+)?(-.+)?$");
 
+        return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
 
-                if (!PROJECT_MATCHER.matches(getCursor()) || t.getMarkers().findFirst(AlreadyIncremented.class).isPresent()) {
+                if (!PROJECT_MATCHER.matches(getCursor())) {
                     return t;
                 }
                 ResolvedPom resolvedPom = getResolutionResult().getPom();
-
                 if (!(matchesGlob(resolvedPom.getValue(t.getChildValue("groupId").orElse(null)), groupId) &&
                       matchesGlob(resolvedPom.getValue(t.getChildValue("artifactId").orElse(null)), artifactId))) {
                     return t;
@@ -97,10 +101,20 @@ public class IncrementProjectVersion extends Recipe {
                 if(oldVersion == null) {
                     return t;
                 }
+                String newVersion = incrementSemverDigit(oldVersion);
+                if(newVersion.equals(oldVersion)) {
+                    return t;
+                }
+                acc.put(new GroupArtifact(
+                        t.getChildValue("groupId").orElse(null), t.getChildValue("artifactId").orElse(null)),
+                        newVersion);
+                return t;
+            }
 
+            private String incrementSemverDigit(String oldVersion) {
                 Matcher m = SEMVER_PATTERN.matcher(oldVersion);
                 if(!m.matches()) {
-                    return t;
+                    return oldVersion;
                 }
                 String major = m.group(1);
                 String minor = m.group(2);
@@ -130,10 +144,34 @@ public class IncrementProjectVersion extends Recipe {
                 if(extra == null) {
                     extra = "";
                 }
-                String newVersion = major + "." + minor + "." + patch + fourth + extra;
-                t = (Xml.Tag)  new ChangeTagValue("version", null, newVersion).getVisitor()
+                return major + "." + minor + "." + patch + fourth + extra;
+            }
+        };
+
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Map<GroupArtifact, String> acc) {
+        return new MavenIsoVisitor<ExecutionContext>() {
+            final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
+            final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
+
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = super.visitTag(tag, ctx);
+
+                if ((!(PROJECT_MATCHER.matches(getCursor()) || PARENT_MATCHER.matches(getCursor())))
+                    || t.getMarkers().findFirst(AlreadyIncremented.class).isPresent()) {
+                    return t;
+                }
+                String newVersion = acc.get(new GroupArtifact(
+                        t.getChildValue("groupId").orElse(null), t.getChildValue("artifactId").orElse(null)));
+                if(newVersion == null || newVersion.equals(t.getChildValue("version").orElse(null))) {
+                    return t;
+                }
+                t = t.withMarkers(t.getMarkers().add(new AlreadyIncremented(randomId())));
+                return (Xml.Tag) new ChangeTagValue("version", null, newVersion).getVisitor()
                         .visitNonNull(t, ctx);
-                return t.withMarkers(t.getMarkers().add(new AlreadyIncremented(randomId())));
             }
         };
     }

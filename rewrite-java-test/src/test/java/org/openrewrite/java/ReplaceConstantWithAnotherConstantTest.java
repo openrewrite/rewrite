@@ -17,40 +17,31 @@ package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
-import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
 public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
 
-    @Override
-    public void defaults(RecipeSpec spec) {
-        spec
-          .parser(JavaParser.fromJavaVersion()
-            .logCompilationWarningsAndErrors(true)
-            .classpath("guava"));
-    }
-
     @Test
     void replaceConstantInAnnotation() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("com.google.common.base.Charsets.UTF_8", "com.constant.B.UTF_8")),
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "com.constant.B.PATH_SEPARATOR")),
           java(
             """
               package com.constant;
               public class B {
-                  public static final String UTF_8 = "UTF_8";
+                  public static final String PATH_SEPARATOR = ":";
               }
               """
           ),
           java(
             """
-              import com.google.common.base.Charsets;
-                            
-              @SuppressWarnings(Charsets.UTF_8)
+              import java.io.File;
+              
+              @SuppressWarnings(File.pathSeparator)
               class Test {
-                  @SuppressWarnings(value = Charsets.UTF_8)
+                  @SuppressWarnings(value = File.pathSeparator)
                   void foo() {
                       System.out.println("Annotation");
                   }
@@ -58,10 +49,10 @@ public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               """,
             """
               import com.constant.B;
-                  
-              @SuppressWarnings(B.UTF_8)
+              
+              @SuppressWarnings(B.PATH_SEPARATOR)
               class Test {
-                  @SuppressWarnings(value = B.UTF_8)
+                  @SuppressWarnings(value = B.PATH_SEPARATOR)
                   void foo() {
                       System.out.println("Annotation");
                   }
@@ -74,17 +65,18 @@ public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
     @Test
     void replaceConstant() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("com.google.common.base.Charsets.UTF_8", "java.io.File.separator")),
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator")),
           java(
             """
-              import com.google.common.base.Charsets;
+              import java.io.File;
 
-              import static com.google.common.base.Charsets.UTF_8;
+              import static java.io.File.pathSeparator;
 
               class Test {
-                  Object o = Charsets.UTF_8;
+                  Object o = File.pathSeparator;
                   void foo() {
-                      System.out.println(UTF_8);
+                      System.out.println(pathSeparator);
+                      System.out.println(java.io.File.pathSeparator);
                   }
               }
               """,
@@ -97,6 +89,7 @@ public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                   Object o = File.separator;
                   void foo() {
                       System.out.println(separator);
+                      System.out.println(File.separator);
                   }
               }
               """
@@ -113,8 +106,8 @@ public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
               package foo;
 
               public class Bar {
-                  public enum Baz {
-                      QUX
+                  public static class Baz {
+                      public static final String QUX = "QUX";
                   }
               }
               """

@@ -16,7 +16,6 @@
 package org.openrewrite.yaml;
 
 import lombok.Getter;
-import org.openrewrite.internal.lang.NonNull;
 import org.yaml.snakeyaml.events.Event;
 
 import java.io.IOException;
@@ -115,7 +114,7 @@ class FormatPreservingReader extends Reader {
     }
 
     @Override
-    public int read(@NonNull char[] cbuf, int off, int len) throws IOException {
+    public int read(char[] cbuf, int off, int len) throws IOException {
         int read = delegate.read(cbuf, off, len);
         if (read > 0) {
             buffer.ensureCapacity(buffer.size() + read);

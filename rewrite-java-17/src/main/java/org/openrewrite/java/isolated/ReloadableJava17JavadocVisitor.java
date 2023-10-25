@@ -15,12 +15,14 @@
  */
 package org.openrewrite.java.isolated;
 
+import com.sun.source.doctree.ErroneousTree;
+import com.sun.source.doctree.LiteralTree;
+import com.sun.source.doctree.ProvidesTree;
+import com.sun.source.doctree.ReturnTree;
+import com.sun.source.doctree.UsesTree;
 import com.sun.source.doctree.*;
 import com.sun.source.tree.IdentifierTree;
-import com.sun.source.tree.ArrayTypeTree;
-import com.sun.source.tree.MemberSelectTree;
-import com.sun.source.tree.ParameterizedTypeTree;
-import com.sun.source.tree.PrimitiveTypeTree;
+import com.sun.source.tree.*;
 import com.sun.source.util.DocTreeScanner;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
@@ -337,7 +339,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         }
 
         // The javadoc ends with trailing whitespace.
-        if (cursor < source.length() && source.substring(cursor).contains(" ")) {
+        if (cursor < source.length()) {
             String trailingWhitespace = source.substring(cursor);
             if (trailingWhitespace.contains("\n")) {
                 // 1 or more newlines.
@@ -578,14 +580,14 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         if (ref.qualifierExpression != null) {
             try {
                 attr.attribType(ref.qualifierExpression, symbol);
-            } catch(NullPointerException ignored) {
+            } catch (NullPointerException ignored) {
                 // best effort, can result in:
                 // java.lang.NullPointerException: Cannot read field "info" because "env" is null
                 //   at com.sun.tools.javac.comp.Attr.attribType(Attr.java:404)
             }
         }
 
-        if(ref.qualifierExpression != null) {
+        if (ref.qualifierExpression != null) {
             qualifier = (TypedTree) javaVisitor.scan(ref.qualifierExpression, Space.EMPTY);
             qualifierType = qualifier.getType();
             if (ref.memberName != null) {
@@ -677,7 +679,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     @Nullable
     private JavaType.Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
-        if (type instanceof  JavaType.Class) {
+        if (type instanceof JavaType.Class) {
             JavaType.Class classType = (JavaType.Class) type;
 
             nextMethod:
@@ -1077,7 +1079,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     /**
      * A {@link J} may contain new lines in each {@link Space} and each new line will have a corresponding
      * {@link org.openrewrite.java.tree.Javadoc.LineBreak}.
-     *
+     * <p>
      * This method collects the linebreaks associated to new lines in a Space, and removes the applicable linebreaks
      * from the map.
      */

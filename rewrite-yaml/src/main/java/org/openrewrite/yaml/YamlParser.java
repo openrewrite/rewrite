@@ -17,7 +17,10 @@ package org.openrewrite.yaml;
 
 import lombok.Getter;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.FileAttributes;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -36,7 +39,6 @@ import org.yaml.snakeyaml.scanner.Scanner;
 import org.yaml.snakeyaml.scanner.ScannerImpl;
 
 import java.io.IOException;
-import java.io.StringReader;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.*;
@@ -186,15 +188,40 @@ public class YamlParser implements org.openrewrite.Parser {
                         newLine = "";
 
                         ScalarEvent scalar = (ScalarEvent) event;
-                        String scalarValue = scalar.getValue();
-                        if (variableByUuid.containsKey(scalarValue)) {
-                            scalarValue = variableByUuid.get(scalarValue);
-                        }
 
                         Yaml.Anchor anchor = null;
+                        int valueStart;
                         if (scalar.getAnchor() != null) {
                             anchor = buildYamlAnchor(reader, lastEnd, fmt, scalar.getAnchor(), event.getEndMark().getIndex(), true);
                             anchors.put(scalar.getAnchor(), anchor);
+                            valueStart = lastEnd + fmt.length() + scalar.getAnchor().length() + 1 + anchor.getPostfix().length();
+                        } else {
+                            valueStart = lastEnd + fmt.length();
+                        }
+
+                        String scalarValue;
+                        switch (scalar.getScalarStyle()) {
+                            case DOUBLE_QUOTED:
+                            case SINGLE_QUOTED:
+                                scalarValue = reader.readStringFromBuffer(valueStart + 1, event.getEndMark().getIndex() - 2);
+                                break;
+                            case PLAIN:
+                                scalarValue = reader.readStringFromBuffer(valueStart, event.getEndMark().getIndex() - 1);
+                                break;
+                            case LITERAL:
+                                scalarValue = reader.readStringFromBuffer(valueStart + 1, event.getEndMark().getIndex() - 1);
+                                if (scalarValue.endsWith("\n")) {
+                                    newLine = "\n";
+                                    scalarValue = scalarValue.substring(0, scalarValue.length() - 1);
+                                }
+                                break;
+                            case FOLDED:
+                            default:
+                                scalarValue = reader.readStringFromBuffer(valueStart + 1, event.getEndMark().getIndex() - 1);
+                                break;
+                        }
+                        if (variableByUuid.containsKey(scalarValue)) {
+                            scalarValue = variableByUuid.get(scalarValue);
                         }
 
                         Yaml.Scalar.Style style;
@@ -207,15 +234,9 @@ public class YamlParser implements org.openrewrite.Parser {
                                 break;
                             case LITERAL:
                                 style = Yaml.Scalar.Style.LITERAL;
-                                scalarValue = reader.readStringFromBuffer(event.getStartMark().getIndex() + 1, event.getEndMark().getIndex() - 1);
-                                if (scalarValue.endsWith("\n")) {
-                                    newLine = "\n";
-                                    scalarValue = scalarValue.substring(0, scalarValue.length() - 1);
-                                }
                                 break;
                             case FOLDED:
                                 style = Yaml.Scalar.Style.FOLDED;
-                                scalarValue = reader.readStringFromBuffer(event.getStartMark().getIndex() + 1, event.getEndMark().getIndex() - 1);
                                 break;
                             case PLAIN:
                             default:
@@ -347,7 +368,8 @@ public class YamlParser implements org.openrewrite.Parser {
                 lastEnd + eventPrefix.length() + anchorLength, eventEndIndex);
 
         StringBuilder postFix = new StringBuilder();
-        for (char c : whitespaceAndScalar.toCharArray()) {
+        for (int i = 0; i < whitespaceAndScalar.length(); i++) {
+            char c = whitespaceAndScalar.charAt(i);
             if (c != ' ' && c != '\t') {
                 break;
             }

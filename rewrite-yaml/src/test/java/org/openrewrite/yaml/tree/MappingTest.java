@@ -229,6 +229,20 @@ class MappingTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3632")
+    @Test
+    void multilineScalar() {
+        rewriteRun(
+          yaml(
+            """
+              data: &anc |
+                  @this is a long string@
+              bar: *anc
+              """
+          )
+        );
+    }
+
     @Test
     void literals() {
         rewriteRun(
@@ -400,34 +414,30 @@ class MappingTest implements RewriteTest {
       " '\\n' ",
       " '\n' ",
       " \n ",
-      " \"\\.\" ",
       " \"\\0\" ",
       " \"\\0\" ",
       " \"\\a\" ",
       " \"\\a\" ",
       " \"\\b\" ",
-      " \"\b\" ",
       " \"\\t\" ",
       " \"\t\" ",
       " \"\\n\" ",
       " \"\n\" ",
       " \"\\v\" ",
       " \"\\f\" ",
-      " \"\f\" ",
       " \"\\r\" ",
       " \"\r\" ",
       " \"\\e\" ",
       " \"\\\\\" ",
-      " \"\\\" ",
       " \"\\\"\" ",
-      " \"\"\" ",
       " \"\\N\" ",
       " \"\\_\" ",
       " \"\\L\" ",
       " \"\\P\" ",
     })
-    void escapeSequences() {
+    void escapeSequences(String str) {
         rewriteRun(
-          yaml("escaped-value: $string"));
+          yaml("escaped-value: " + str)
+        );
     }
 }

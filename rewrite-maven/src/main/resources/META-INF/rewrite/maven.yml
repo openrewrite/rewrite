@@ -29,6 +29,18 @@ displayName: Drop prefixless expressions in POM
 description: MNG-7404 drops support for prefixless in POMs. This recipe will add the `project.` prefix where missing.
 recipeList:
   - org.openrewrite.maven.RenamePropertyKey:
+      oldKey: basedir
+      newKey: project.basedir
+  - org.openrewrite.maven.RenamePropertyKey:
+      oldKey: build.timestamp
+      newKey: project.build.timestamp
+  - org.openrewrite.maven.RenamePropertyKey:
+      oldKey: groupId
+      newKey: project.groupId
+  - org.openrewrite.maven.RenamePropertyKey:
+      oldKey: artifactId
+      newKey: project.artifactId
+  - org.openrewrite.maven.RenamePropertyKey:
       oldKey: version
       newKey: project.version
   - org.openrewrite.maven.RenamePropertyKey:

@@ -31,6 +31,7 @@ import org.openrewrite.maven.tree.ResolvedDependency;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.SocketTimeoutException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -90,43 +91,38 @@ public class MavenArtifactDownloader {
             return null;
         }
         return mavenArtifactCache.computeArtifact(dependency, () -> {
-            try {
-                String uri = requireNonNull(dependency.getRepository(),
-                        String.format("Repository for dependency '%s' was null.", dependency)).getUri() + "/" +
-                        dependency.getGroupId().replace('.', '/') + '/' +
-                        dependency.getArtifactId() + '/' +
-                        dependency.getVersion() + '/' +
-                        dependency.getArtifactId() + '-' +
-                        (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
-                        ".jar";
+            String uri = requireNonNull(dependency.getRepository(),
+                    String.format("Repository for dependency '%s' was null.", dependency)).getUri() + "/" +
+                    dependency.getGroupId().replace('.', '/') + '/' +
+                    dependency.getArtifactId() + '/' +
+                    dependency.getVersion() + '/' +
+                    dependency.getArtifactId() + '-' +
+                    (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
+                    ".jar";
 
-                InputStream bodyStream;
+            InputStream bodyStream;
 
-                if (uri.startsWith("~")) {
-                    bodyStream = Files.newInputStream(Paths.get(System.getProperty("user.home") + uri.substring(1)));
-                } else {
-                    HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
-                    try(HttpSender.Response response = sendRequest.apply(request.build());
-                        InputStream body = response.getBody()) {
-                        if (!response.isSuccessful() || body == null) {
-                            onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s. Response was %d",
-                                    dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), response.getCode()), null,
-                                    dependency.getRequested().getGav()));
-                            return null;
-                        }
-                        bodyStream = new ByteArrayInputStream(readAllBytes(body));
-                    } catch (Throwable t) {
-                        throw new MavenDownloadingException("Unable to download dependency", t,
-                                dependency.getRequested().getGav());
+            if (uri.startsWith("~")) {
+                bodyStream = Files.newInputStream(Paths.get(System.getProperty("user.home") + uri.substring(1)));
+            } else if ("file".equals(URI.create(uri).getScheme())) {
+                bodyStream = Files.newInputStream(Paths.get(URI.create(uri)));
+            } else {
+                HttpSender.Request.Builder request = applyAuthentication(dependency.getRepository(), httpSender.get(uri));
+                try (HttpSender.Response response = sendRequest.apply(request.build());
+                     InputStream body = response.getBody()) {
+                    if (!response.isSuccessful() || body == null) {
+                        onError.accept(new MavenDownloadingException(String.format("Unable to download dependency %s:%s:%s. Response was %d",
+                                dependency.getGroupId(), dependency.getArtifactId(), dependency.getVersion(), response.getCode()), null,
+                                dependency.getRequested().getGav()));
+                        return null;
                     }
-
+                    bodyStream = new ByteArrayInputStream(readAllBytes(body));
+                } catch (Throwable t) {
+                    throw new MavenDownloadingException("Unable to download dependency", t,
+                            dependency.getRequested().getGav());
                 }
-                return bodyStream;
-
-            } catch (Throwable t) {
-                onError.accept(t);
             }
-            return null;
+            return bodyStream;
         }, onError);
     }
 
