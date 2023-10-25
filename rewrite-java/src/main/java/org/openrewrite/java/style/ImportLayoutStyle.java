@@ -280,7 +280,7 @@ public class ImportLayoutStyle implements JavaStyle {
                         null;
             } else if (finalAfter != null && anImport.getElement().isScope(finalAfter.getElement())) {
                 if (starFold.get()) {
-                    // The added import is always folded, and is the first package occurence in the imports.
+                    // The added import is always folded, and is the first package occurrence in the imports.
                     if (starFoldFrom.get() == starFoldTo.get()) {
                         return Arrays.asList(finalToAdd, finalAfter);
                     } else {

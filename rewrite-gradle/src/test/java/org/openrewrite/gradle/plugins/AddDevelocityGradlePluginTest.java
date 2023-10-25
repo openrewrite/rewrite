@@ -36,12 +36,12 @@ import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.gradle.Assertions.*;
 import static org.openrewrite.test.SourceSpecs.dir;
 
-class AddGradleEnterpriseGradlePluginTest implements RewriteTest {
+class AddDevelocityGradlePluginTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-                .recipe(new AddGradleEnterpriseGradlePlugin("3.x", null, null, null, null, null));
+                .recipe(new AddDevelocityGradlePlugin("3.x", null, null, null, null, null));
     }
 
     private static Consumer<SourceSpec<CompilationUnit>> interpolateResolvedVersion(@Language("groovy") String after) {
@@ -177,7 +177,7 @@ class AddGradleEnterpriseGradlePluginTest implements RewriteTest {
     void withConfigurationInSettings() {
         rewriteRun(
           spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
-            .recipe(new AddGradleEnterpriseGradlePlugin("3.x", "https://ge.sam.com/", true, true, true, AddGradleEnterpriseGradlePlugin.PublishCriteria.Always)),
+            .recipe(new AddDevelocityGradlePlugin("3.x", "https://ge.sam.com/", true, true, true, AddDevelocityGradlePlugin.PublishCriteria.Always)),
           buildGradle(
             ""
           ),
@@ -209,7 +209,7 @@ class AddGradleEnterpriseGradlePluginTest implements RewriteTest {
     void withConfigurationOldInputCapture() {
         rewriteRun(
           spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
-            .recipe(new AddGradleEnterpriseGradlePlugin("3.6", null, null, true, null, null)),
+            .recipe(new AddDevelocityGradlePlugin("3.6", null, null, true, null, null)),
           buildGradle(
             ""
           ),
@@ -233,7 +233,7 @@ class AddGradleEnterpriseGradlePluginTest implements RewriteTest {
     void defaultsToLatestRelease() {
         rewriteRun(
           spec -> spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")))
-            .recipe(new AddGradleEnterpriseGradlePlugin(null, null, null, null, null, null)),
+            .recipe(new AddDevelocityGradlePlugin(null, null, null, null, null, null)),
           buildGradle(
             ""
           ),

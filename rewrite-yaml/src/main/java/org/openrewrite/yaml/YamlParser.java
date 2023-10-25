@@ -241,6 +241,9 @@ public class YamlParser implements org.openrewrite.Parser {
                             case PLAIN:
                             default:
                                 style = Yaml.Scalar.Style.PLAIN;
+                                if (!scalarValue.startsWith("@") && event.getStartMark().getIndex() >= reader.getBufferIndex()) {
+                                    scalarValue = reader.readStringFromBuffer(event.getStartMark().getIndex(), event.getEndMark().getIndex() - 1);
+                                }
                                 break;
                         }
                         BlockBuilder builder = blockStack.isEmpty() ? null : blockStack.peek();
