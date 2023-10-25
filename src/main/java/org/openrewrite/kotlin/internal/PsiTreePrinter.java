@@ -41,7 +41,9 @@ import org.jetbrains.kotlin.ir.expressions.IrConst;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.JavaTypeCache;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.kotlin.KotlinIrTypeMapping;
 import org.openrewrite.kotlin.tree.K;
 
 import java.util.*;
@@ -59,6 +61,7 @@ public class PsiTreePrinter {
 
     private static final String CONTINUE_PREFIX = "----";
     private static final String UNVISITED_PREFIX = "#";
+    private static KotlinIrTypeMapping irTypeMapping = new KotlinIrTypeMapping(new JavaTypeCache());
 
     // Set to true to print types and verify, otherwise just verify the parse to print idempotent.
     private final static boolean printTypes = true;
@@ -397,12 +400,18 @@ public class PsiTreePrinter {
         return visitor.print();
     }
 
+
     public static String printIrElement(IrElement element) {
         StringBuilder sb = new StringBuilder();
         sb.append("(").append(element.getStartOffset()).append(",").append(element.getEndOffset())
                 .append(") | ").append(element.getClass().getSimpleName());
 
         if (element instanceof IrMetadataSourceOwner) {
+            String typeFromIr = getType(element);
+            if (!typeFromIr.isEmpty()) {
+                sb.append(" | IrType = ").append(typeFromIr);
+            }
+
             IrMetadataSourceOwner irMetadataSourceOwner = (IrMetadataSourceOwner) element;
             MetadataSource metadata = irMetadataSourceOwner.getMetadata();
             if (metadata != null) {
@@ -421,6 +430,10 @@ public class PsiTreePrinter {
             sb.append(" | ").append(irConst.getValue());
         }
         return sb.toString();
+    }
+
+    public static String getType(IrElement element) {
+        return irTypeMapping.type(element).toString();
     }
 
     public static String printFirElement(FirElement firElement) {
