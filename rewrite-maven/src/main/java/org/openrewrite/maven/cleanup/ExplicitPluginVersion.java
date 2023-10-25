@@ -27,7 +27,7 @@ import org.openrewrite.xml.tree.Xml;
 public class ExplicitPluginVersion extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Explicit plugin version";
+        return "Add explicit plugin versions";
     }
 
     @Override
