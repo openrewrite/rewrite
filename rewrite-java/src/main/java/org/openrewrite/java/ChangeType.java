@@ -259,6 +259,11 @@ public class ChangeType extends Recipe {
 
         @Override
         public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
+            // Do not modify the identifier if it's on a inner class definition.
+            if (Boolean.TRUE.equals(ignoreDefinition) && getCursor().getParent() != null &&
+                getCursor().getParent().getValue() instanceof J.ClassDeclaration) {
+                return super.visitIdentifier(ident, ctx);
+            }
             // if the ident's type is equal to the type we're looking for, and the classname of the type we're looking for is equal to the ident's string representation
             // Then transform it, otherwise leave it alone
             if (TypeUtils.isOfClassType(ident.getType(), originalType.getFullyQualifiedName())) {
