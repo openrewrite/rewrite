@@ -644,7 +644,10 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     public J visitIdentifier(J.Identifier ident, P p) {
         J.Identifier i = ident;
-        i = i.withAnnotations(ListUtils.map(i.getAnnotations(), a -> visitAndCast(a, p)));
+        if (!i.getAnnotations().isEmpty()) {
+            // performance optimization
+            i = i.withAnnotations(ListUtils.map(i.getAnnotations(), a -> visitAndCast(a, p)));
+        }
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.IDENTIFIER_PREFIX, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
         Expression temp = (Expression) visitExpression(i, p);
