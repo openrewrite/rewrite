@@ -33,7 +33,6 @@ import org.jetbrains.kotlin.ir.declarations.IrVariable;
 import org.jetbrains.kotlin.ir.expressions.IrFunctionAccessExpression;
 import org.jetbrains.kotlin.ir.expressions.IrFunctionReference;
 import org.jetbrains.kotlin.ir.expressions.IrPropertyReference;
-import org.jetbrains.kotlin.ir.types.IrType;
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
 import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.parsing.ParseUtilsKt;
@@ -338,7 +337,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitClassOrObject(KtClassOrObject classOrObject, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        // Should never happen, as both `visitClass()` and `visitObjectDeclaration()` are implemented
+        throw new IllegalArgumentException("Unsupported declaration: " + classOrObject.getText());
     }
 
     @Override
@@ -1688,8 +1688,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     type(argument.getArgumentExpression())
             );
         } else if (argument.isSpread()) {
-            J j = argument.getArgumentExpression().accept(this, data);
-            return j.withMarkers(j.getMarkers().addIfAbsent(new SpreadArgument(randomId(), prefix(argument))));
+            Expression j = (Expression) argument.getArgumentExpression().accept(this, data);
+            return new K.SpreadArgument(
+                    randomId(),
+                    prefix(argument),
+                    Markers.EMPTY,
+                    j
+            );
         }
 
         J j = argument.getArgumentExpression().accept(this, data).withPrefix(prefix(argument));

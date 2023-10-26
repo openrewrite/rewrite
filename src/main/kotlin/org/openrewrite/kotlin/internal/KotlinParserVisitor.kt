@@ -4408,7 +4408,12 @@ class KotlinParserVisitor(
         val prefix = whitespace()
         skip("*")
         val j: J = visitElement(spreadArgumentExpression.expression, data)!!
-        return j.withMarkers(j.markers.addIfAbsent(SpreadArgument(randomId(), prefix)))
+        return K.SpreadArgument(
+            randomId(),
+            prefix,
+            Markers.EMPTY,
+            j as Expression
+        )
     }
 
     override fun visitTypeRef(typeRef: FirTypeRef, data: ExecutionContext): J {

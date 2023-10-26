@@ -277,6 +277,20 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return pr;
     }
 
+    public J visitSpreadArgument(K.SpreadArgument spreadArgument, P p) {
+        K.SpreadArgument s = spreadArgument;
+        s = s.withPrefix(visitSpace(s.getPrefix(), KSpace.Location.SPREAD_ARGUMENT_PREFIX, p));
+        s = s.withMarkers(visitMarkers(s.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(s, p);
+        if (!(temp instanceof K.SpreadArgument)) {
+            return temp;
+        } else {
+            s = (K.SpreadArgument) temp;
+        }
+        s = s.withExpression(visitAndCast(s.getExpression(), p));
+        return s;
+    }
+
     public J visitTypeConstraints(K.TypeConstraints typeConstraints, P p) {
         K.TypeConstraints t = typeConstraints;
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));

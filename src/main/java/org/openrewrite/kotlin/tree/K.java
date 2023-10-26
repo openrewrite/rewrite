@@ -1703,6 +1703,46 @@ public interface K extends J {
         }
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
+    class SpreadArgument implements K, Expression {
+
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+
+        Expression expression;
+
+        public SpreadArgument(UUID id, Space prefix, Markers markers, Expression expression) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.expression = expression;
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return expression.getType() != null ? new JavaType.Array(null, expression.getType()) : null;
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            throw new UnsupportedOperationException("Type of SpreadArgument cannot be changed directly");
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitSpreadArgument(this, p);
+        }
+    }
+
     /**
      * Kotlin defines certain java statements like J.If as expression.
      * <p>

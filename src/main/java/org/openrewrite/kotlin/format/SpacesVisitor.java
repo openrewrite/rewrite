@@ -549,6 +549,13 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
     }
 
     @Override
+    public K.SpreadArgument visitSpreadArgument(K.SpreadArgument spreadArgument, P p) {
+        K.SpreadArgument s = super.visitSpreadArgument(spreadArgument, p);
+        s = s.withExpression(spaceBefore(s.getExpression(), style.getAroundOperators().getUnary()));
+        return s;
+    }
+
+    @Override
     public K.When visitWhen(K.When when, P p) {
         K.When w = super.visitWhen(when, p);
         if (w.getSelector() != null) {

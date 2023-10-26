@@ -402,6 +402,16 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitSpreadArgument(K.SpreadArgument spreadArgument, PrintOutputCapture<P> p) {
+        beforeSyntax(spreadArgument, KSpace.Location.SPREAD_ARGUMENT_PREFIX, p);
+        p.append("*");
+        visit(spreadArgument.getExpression(), p);
+
+        afterSyntax(spreadArgument, p);
+        return spreadArgument;
+    }
+
+    @Override
     public J visitWhen(K.When when, PrintOutputCapture<P> p) {
         beforeSyntax(when, KSpace.Location.WHEN_PREFIX, p);
         p.append("when");

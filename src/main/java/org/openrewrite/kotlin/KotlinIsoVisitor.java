@@ -103,6 +103,11 @@ public class KotlinIsoVisitor<P> extends KotlinVisitor<P> {
     }
 
     @Override
+    public K.SpreadArgument visitSpreadArgument(K.SpreadArgument spreadArgument, P p) {
+        return (K.SpreadArgument) super.visitSpreadArgument(spreadArgument, p);
+    }
+
+    @Override
     public K.TypeConstraints visitTypeConstraints(K.TypeConstraints typeConstraints, P p) {
         return (K.TypeConstraints) super.visitTypeConstraints(typeConstraints, p);
     }
