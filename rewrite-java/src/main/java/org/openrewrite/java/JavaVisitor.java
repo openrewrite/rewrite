@@ -163,19 +163,23 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     @SuppressWarnings("unused")
     public Space visitSpace(Space space, Space.Location loc, P p) {
         //noinspection ConstantValue
-        return space == Space.EMPTY || space == Space.SINGLE_SPACE || space == null ? space :
-                space.withComments(ListUtils.map(space.getComments(), comment -> {
-                    if (comment instanceof Javadoc) {
-                        if (javadocVisitor == null) {
-                            javadocVisitor = getJavadocVisitor();
-                        }
-                        Cursor previous = javadocVisitor.getCursor();
-                        Comment c = (Comment) javadocVisitor.visit((Javadoc) comment, p, getCursor());
-                        javadocVisitor.setCursor(previous);
-                        return c;
-                    }
-                    return comment;
-                }));
+        if (space == Space.EMPTY || space == Space.SINGLE_SPACE || space == null) {
+            return space;
+        } else if (space.getComments().isEmpty()) {
+            return space;
+        }
+        return space.withComments(ListUtils.map(space.getComments(), comment -> {
+            if (comment instanceof Javadoc) {
+                if (javadocVisitor == null) {
+                    javadocVisitor = getJavadocVisitor();
+                }
+                Cursor previous = javadocVisitor.getCursor();
+                Comment c = (Comment) javadocVisitor.visit((Javadoc) comment, p, getCursor());
+                javadocVisitor.setCursor(previous);
+                return c;
+            }
+            return comment;
+        }));
     }
 
     @Nullable
