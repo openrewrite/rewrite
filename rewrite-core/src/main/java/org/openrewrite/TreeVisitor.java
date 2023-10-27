@@ -362,9 +362,13 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     public Markers visitMarkers(@Nullable Markers markers, P p) {
-        return markers == null || markers == Markers.EMPTY ?
-                Markers.EMPTY :
-                markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> this.visitMarker(marker, p)));
+        if (markers == null || markers == Markers.EMPTY) {
+            return Markers.EMPTY;
+        } else if (markers.getMarkers().isEmpty()) {
+            // avoid unnecessary method handle allocation
+            return markers;
+        }
+        return markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> this.visitMarker(marker, p)));
     }
 
     public <M extends Marker> M visitMarker(Marker marker, P p) {

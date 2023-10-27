@@ -1765,4 +1765,41 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void doesNotModifyInnerClassesIfIgnoreDefinitionTrue() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangeType("Test.InnerA", "Test.InnerB", true)),
+          java(
+            """
+
+              public class Test {
+                  private class InnerA {
+                  }
+                  
+                  private class InnerB {
+                  }
+              
+                  public void test(String s) {
+                      InnerA a = new InnerA();
+                  }
+              }
+              """,
+            """
+              public class Test {
+                  private class InnerA {
+                  }
+                  
+                  private class InnerB {
+                  }
+              
+                  public void test(String s) {
+                      InnerB a = new InnerB();
+                  }
+              }
+              """
+          )
+        );
+
+    }
 }

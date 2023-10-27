@@ -59,6 +59,7 @@ public class MavenTagInsertionComparator implements Comparator<Content> {
             "repositories",
             "pluginRepositories",
             "build",
+            "configuration",
             "reports",
             "reporting",
             "profiles"
