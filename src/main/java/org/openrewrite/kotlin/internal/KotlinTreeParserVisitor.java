@@ -2665,10 +2665,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 JContainer.build(prefix(declaration.getTypeParameterList()), mapTypeParameters(declaration, data), Markers.EMPTY);
 
         if (declaration.getSuperTypeList() != null) {
-            TypeTree clazz = declaration.getSuperTypeList().accept(this, data)
-                    .withPrefix(prefix(declaration.getSuperTypeList()));
-            superTypes.add(padRight(clazz, Space.EMPTY));
-            implementings = JContainer.build(prefix(declaration.getColon()), superTypes, Markers.EMPTY);
+            implementings = mapSuperTypeList(declaration.getSuperTypeList(), data);
+            implementings = implementings.withBefore(prefix(declaration.getColon()));
         }
 
         J.Block body;
@@ -3020,12 +3018,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitSuperTypeList(KtSuperTypeList list, ExecutionContext data) {
-        List<KtSuperTypeListEntry> typeListEntries = list.getEntries();
-
-        if (typeListEntries.size() > 1) {
-            throw new UnsupportedOperationException("KtSuperTypeList size is bigger than 1, TODO");
-        }
-        return typeListEntries.get(0).accept(this, data);
+        throw new UnsupportedOperationException("Unsupported, call mapSuperTypeList instead");
     }
 
     @Override
@@ -3677,6 +3670,61 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         return statements;
+    }
+
+    @Nullable
+    private JContainer<TypeTree> mapSuperTypeList(@Nullable KtSuperTypeList ktSuperTypeList, ExecutionContext data) {
+        if (ktSuperTypeList == null) {
+            return null;
+        }
+
+        List<KtSuperTypeListEntry> ktSuperTypeListEntries = ktSuperTypeList.getEntries();
+        List<JRightPadded<TypeTree>> superTypes = new ArrayList<>(ktSuperTypeListEntries.size());
+        Markers markers = Markers.EMPTY;
+
+        for (int i = 0; i < ktSuperTypeListEntries.size(); i++) {
+            KtSuperTypeListEntry superTypeListEntry = ktSuperTypeListEntries.get(i);
+
+            if (superTypeListEntry instanceof KtSuperTypeCallEntry) {
+                KtSuperTypeCallEntry superTypeCallEntry = (KtSuperTypeCallEntry) superTypeListEntry;
+                TypeTree typeTree = (TypeTree) superTypeCallEntry.getCalleeExpression().accept(this, data);
+                JContainer<Expression> args;
+
+                if (!superTypeCallEntry.getValueArguments().isEmpty()) {
+                    args = mapFunctionCallArguments(superTypeCallEntry.getValueArgumentList(), data);
+                } else {
+                    KtValueArgumentList ktArgList = superTypeCallEntry.getValueArgumentList();
+                    args = JContainer.build(
+                            prefix(ktArgList),
+                            singletonList(padRight(new J.Empty(randomId(), prefix(ktArgList.getRightParenthesis()), Markers.EMPTY), Space.EMPTY)),
+                            markers
+                    );
+                }
+
+                K.ConstructorInvocation delegationCall = new K.ConstructorInvocation(
+                        randomId(),
+                        prefix(superTypeListEntry),
+                        Markers.EMPTY,
+                        typeTree,
+                        args
+                );
+                superTypes.add(padRight(delegationCall, suffix(superTypeCallEntry)));
+            } else if (superTypeListEntry instanceof KtSuperTypeEntry ||
+                    superTypeListEntry instanceof KtDelegatedSuperTypeEntry) {
+                TypeTree typeTree = (TypeTree) superTypeListEntry.accept(this, data);
+
+                if (i == 0) {
+                    typeTree = typeTree.withPrefix(prefix(superTypeListEntry));
+                }
+
+                superTypes.add(padRight(typeTree, suffix(superTypeListEntry)));
+            } else {
+                throw new UnsupportedOperationException("TODO");
+            }
+        }
+
+        superTypes = ListUtils.mapFirst(superTypes, rp -> rp.withElement(rp.getElement().withPrefix(merge(prefix(ktSuperTypeList), rp.getElement().getPrefix()))));
+        return JContainer.build(Space.EMPTY, superTypes, Markers.EMPTY);
     }
 
     private JContainer<Expression> mapFunctionCallArguments(@Nullable KtValueArgumentList valueArgumentList,

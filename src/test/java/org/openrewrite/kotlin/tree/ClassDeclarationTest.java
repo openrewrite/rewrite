@@ -324,7 +324,7 @@ class ClassDeclarationTest implements RewriteTest {
             """
               interface A
               interface B
-              object Foo : A, B {}
+              object Foo  :   A    ,      B { }
               """
           )
         );
