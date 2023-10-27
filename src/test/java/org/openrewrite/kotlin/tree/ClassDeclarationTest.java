@@ -16,6 +16,8 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -296,6 +298,19 @@ class ClassDeclarationTest implements RewriteTest {
     void object() {
         rewriteRun(
           kotlin(" object Test")
+        );
+    }
+
+    @Test
+    void objectWithMultipleSuperTypes() {
+        rewriteRun(
+          kotlin(
+            """
+              interface A
+              interface B
+              object Foo : A, B {}
+              """
+          )
         );
     }
 
@@ -609,6 +624,23 @@ class ClassDeclarationTest implements RewriteTest {
                   abstract inner class EntrySet : AbstractMutableSet<MutableMap.MutableEntry<K, V>>()
               }
               """
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "abstract",
+      "internal",
+      "private",
+      "protected",
+      "public",
+      "sealed",
+    })
+    void modifiers(String input) {
+        rewriteRun(
+          kotlin(
+            "%s class Foo".formatted(input)
           )
         );
     }

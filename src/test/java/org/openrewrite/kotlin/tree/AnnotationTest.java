@@ -19,8 +19,11 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -375,6 +378,29 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
+    void lastAnnotations() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class A
+              annotation class B
+              
+              @A
+              internal @B class Foo
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                Optional<Statement> s = cu.getStatements().stream()
+                  .filter(it -> it instanceof J.ClassDeclaration &&
+                    !((J.ClassDeclaration) it).getPadding().getKind().getAnnotations().isEmpty() &&
+                    ((J.ClassDeclaration) it).getPadding().getKind().getAnnotations().get(0)
+                      .getSimpleName().equals("B")).findFirst();
+                assertThat(s.isPresent()).isEqualTo(true);
+            })
+          )
+        );
+    }
+
+    @Test
     void lambdaExpression() {
         rewriteRun(
           kotlin(ANNOTATION),
@@ -414,8 +440,21 @@ class AnnotationTest implements RewriteTest {
 
               @Suppress( )
               @Ann
-              class A {
-              }
+              class A
+              """
+          )
+        );
+    }
+
+    @Test
+    void objectDeclaration() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Ann
+
+              @Ann
+              object A
               """
           )
         );

@@ -199,10 +199,10 @@ public class KotlinParser implements Parser {
                                             // PSI based parser
                                             SourceFile kcuPsi = null;
                                             // TODO replace JavaTypeCache.
-                                            KotlinIrTypeMapping irTypeMapping = new KotlinIrTypeMapping(new JavaTypeCache());
-                                            PsiElementAssociations irMapping = new PsiElementAssociations(irTypeMapping, kotlinSource.getKtFile(), Objects.requireNonNull(kotlinSource.getIrFile()));
-                                            irMapping.initialize();
-                                            KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, irMapping, styles, relativeTo, ctx);
+                                            KotlinTypeMapping typeMapping = new KotlinTypeMapping(new JavaTypeCache(), firSession, kotlinSource.getFirFile().getSymbol());
+                                            PsiElementAssociations associations = new PsiElementAssociations(typeMapping, kotlinSource.getFirFile());
+                                            associations.initialize();
+                                            KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, associations, styles, relativeTo, ctx);
                                             try {
                                                 kcuPsi = psiParser.parse();
                                             } catch (UnsupportedOperationException ignore) {
