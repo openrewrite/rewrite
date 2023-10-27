@@ -385,8 +385,11 @@ class AnnotationTest implements RewriteTest {
           kotlin(
             """
               annotation class A
-              
-              internal @A class Foo
+              annotation class B
+              annotation class C
+              annotation class LAST
+
+              @A final  @B   internal    @C @LAST  class Foo
               """,
             spec -> spec.afterRecipe(cu -> {
                 Optional<Statement> s = cu.getStatements().stream()
