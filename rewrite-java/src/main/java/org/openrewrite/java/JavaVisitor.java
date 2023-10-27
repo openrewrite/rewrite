@@ -648,7 +648,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     public J visitIdentifier(J.Identifier ident, P p) {
         J.Identifier i = ident;
-        if (!i.getAnnotations().isEmpty()) {
+        if (i.getAnnotations() != null && !i.getAnnotations().isEmpty()) {
             // performance optimization
             i = i.withAnnotations(ListUtils.map(i.getAnnotations(), a -> visitAndCast(a, p)));
         }
