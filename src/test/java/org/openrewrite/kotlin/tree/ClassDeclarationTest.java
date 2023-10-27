@@ -153,7 +153,7 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Will be fixed by PSI-based-parser")
+    @ExpectedToFail("Fixed by PSI-based-parser")
     @Test
     void annotationClass() {
         rewriteRun(
