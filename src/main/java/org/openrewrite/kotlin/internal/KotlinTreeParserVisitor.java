@@ -1983,15 +1983,18 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         J.ClassDeclaration.Kind kind;
         if (klass.getClassKeyword() != null) {
-            boolean isAnnotationClass = false;
+            J.ClassDeclaration.Kind.Type classType = J.ClassDeclaration.Kind.Type.Class;
+
             for (J.Modifier mod : modifiers) {
                 if ("annotation".equals(mod.getKeyword())) {
-                    isAnnotationClass = true;
+                    classType = J.ClassDeclaration.Kind.Type.Annotation;
+                    break;
+                } else if ("enum".equals(mod.getKeyword())) {
+                    classType = J.ClassDeclaration.Kind.Type.Enum;
                     break;
                 }
             }
 
-            J.ClassDeclaration.Kind.Type classType = isAnnotationClass ?  J.ClassDeclaration.Kind.Type.Annotation : J.ClassDeclaration.Kind.Type.Class;
             kind = new J.ClassDeclaration.Kind(
                     randomId(),
                     prefix(klass.getClassKeyword(), prefixConsumedSet),
