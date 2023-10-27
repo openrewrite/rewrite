@@ -2034,51 +2034,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             markers = markers.addIfAbsent(new PrimaryConstructor(randomId()));
         }
 
-        if (!klass.getSuperTypeListEntries().isEmpty()) {
-            List<JRightPadded<TypeTree>> superTypes = new ArrayList<>(klass.getSuperTypeListEntries().size());
-
-            for (int i = 0; i < klass.getSuperTypeListEntries().size(); i++) {
-                KtSuperTypeListEntry superTypeListEntry = klass.getSuperTypeListEntries().get(i);
-
-                if (superTypeListEntry instanceof KtSuperTypeCallEntry) {
-                    KtSuperTypeCallEntry superTypeCallEntry = (KtSuperTypeCallEntry) superTypeListEntry;
-                    TypeTree typeTree = (TypeTree) superTypeCallEntry.getCalleeExpression().accept(this, data);
-                    JContainer<Expression> args;
-
-                    if (!superTypeCallEntry.getValueArguments().isEmpty()) {
-                        args = mapFunctionCallArguments(superTypeCallEntry.getValueArgumentList(), data);
-                    } else {
-                        KtValueArgumentList ktArgList = superTypeCallEntry.getValueArgumentList();
-                        args = JContainer.build(
-                                prefix(ktArgList),
-                                singletonList(padRight(new J.Empty(randomId(), prefix(ktArgList.getRightParenthesis()), Markers.EMPTY), Space.EMPTY)),
-                                markers
-                        );
-                    }
-
-                    K.ConstructorInvocation delegationCall = new K.ConstructorInvocation(
-                            randomId(),
-                            prefix(klass.getSuperTypeList()),
-                            Markers.EMPTY,
-                            typeTree,
-                            args
-                    );
-                    superTypes.add(padRight(delegationCall, suffix(superTypeCallEntry)));
-                } else if (superTypeListEntry instanceof KtSuperTypeEntry ||
-                        superTypeListEntry instanceof KtDelegatedSuperTypeEntry) {
-                    TypeTree typeTree = (TypeTree) superTypeListEntry.accept(this, data);
-
-                    if (i == 0) {
-                        typeTree = typeTree.withPrefix(prefix(klass.getSuperTypeList()));
-                    }
-
-                    superTypes.add(padRight(typeTree, suffix(superTypeListEntry)));
-                } else {
-                    throw new UnsupportedOperationException("TODO");
-                }
-            }
-
-            implementings = JContainer.build(prefix(klass.getColon()), superTypes, Markers.EMPTY);
+        if (klass.getSuperTypeList() != null) {
+            implementings = mapSuperTypeList(klass.getSuperTypeList(), data);
+            implementings = implementings.withBefore(prefix(klass.getColon()));
         }
 
         if (!klass.getTypeParameters().isEmpty()) {
