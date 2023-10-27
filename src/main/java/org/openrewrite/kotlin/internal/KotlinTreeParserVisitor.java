@@ -1877,17 +1877,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             );
         } else if (type == null || type == PsiElementAssociations.ExpressionType.METHOD_INVOCATION) {
             J.Identifier name = (J.Identifier) expression.getCalleeExpression().accept(this, data);
-            JContainer<Expression> typeParams = null;
-
-            if (!expression.getTypeArguments().isEmpty()) {
-                List<JRightPadded<Expression>> parameters = new ArrayList<>(expression.getTypeArguments().size());
-                for (KtTypeProjection ktTypeProjection : expression.getTypeArguments()) {
-                    parameters.add(padRight(convertToExpression(ktTypeProjection.accept(this, data)), suffix(ktTypeProjection)));
-                }
-
-                typeParams = JContainer.build(prefix(expression.getTypeArgumentList()), parameters, Markers.EMPTY);
-            }
-
+            JContainer<Expression> typeParams = mapTypeArguments(expression.getTypeArgumentList(), data);
             JContainer<Expression> args = mapFunctionCallArguments(expression.getValueArgumentList(), expression.getValueArguments(), data);
 
             if (expression.getValueArgumentList() == null) {
@@ -1906,10 +1896,35 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     methodType
             );
         } else if (type == PsiElementAssociations.ExpressionType.QUALIFIER) {
-            throw new UnsupportedOperationException("Implement name references.");
+            TypeTree typeTree = (TypeTree) expression.getCalleeExpression().accept(this, data);
+            JContainer<Expression> typeParams = mapTypeArguments(expression.getTypeArgumentList(), data);
+
+            return new J.ParameterizedType(
+                    randomId(),
+                    prefix(expression),
+                    Markers.EMPTY,
+                    typeTree,
+                    typeParams,
+                    type(expression)
+            );
         } else {
             throw new UnsupportedOperationException("ExpressionType not found: " + expression.getCalleeExpression().getText());
         }
+    }
+
+    @Nullable
+    JContainer<Expression> mapTypeArguments(@Nullable KtTypeArgumentList ktTypeArgumentList, ExecutionContext data) {
+        if (ktTypeArgumentList == null) {
+            return null;
+        }
+
+        List<KtTypeProjection> ktTypeProjections = ktTypeArgumentList.getArguments();
+        List<JRightPadded<Expression>> parameters = new ArrayList<>(ktTypeProjections.size());
+        for (KtTypeProjection ktTypeProjection : ktTypeProjections) {
+            parameters.add(padRight(convertToExpression(ktTypeProjection.accept(this, data)), suffix(ktTypeProjection)));
+        }
+
+        return JContainer.build(prefix(ktTypeArgumentList), parameters, Markers.EMPTY);
     }
 
     @Override

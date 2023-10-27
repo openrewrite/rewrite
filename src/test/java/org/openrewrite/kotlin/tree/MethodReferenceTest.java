@@ -46,7 +46,7 @@ class MethodReferenceTest implements RewriteTest {
               class Test < T: Number > ( val answer : T )
               fun method ( ) {
                   val l = listOf ( Test ( 42 ) )
-                  l . map { Test < Int > :: answer }
+                  l . map {  Test <  Int   > :: answer }
               }
               """
           )
