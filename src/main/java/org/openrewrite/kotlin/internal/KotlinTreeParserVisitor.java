@@ -2916,7 +2916,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         // TODO: The FIR does not have a PSI element associated to names, similarly name references from the PSI are not linked to the IR.
         //       The type must be added in context to the parent element.
         //       I.E. IrConstructor assocaited to the KtPrimaryConstructor.
-        return createIdentifier(expression, type(expression));
+        return createIdentifier(expression, type(expression), variableType(expression));
     }
 
     @Override
@@ -3279,6 +3279,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             if (basedSymbol instanceof FirVariableSymbol) {
                 return (JavaType.Variable) psiElementAssociations.getTypeMapping().type(basedSymbol.getFir(), owner(psi));
             }
+        } else if (psi instanceof KtNameReferenceExpression) {
+            FirBasedSymbol<?> basedSymbol = psiElementAssociations.symbol((KtNameReferenceExpression) psi);
+            if (basedSymbol instanceof FirVariableSymbol) {
+                return (JavaType.Variable) psiElementAssociations.getTypeMapping().type(basedSymbol.getFir(), owner(psi));
+            }
+
         }
         return null;
     }
