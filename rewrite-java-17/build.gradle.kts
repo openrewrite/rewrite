@@ -1,3 +1,8 @@
+@file:Suppress("UnstableApiUsage")
+
+import org.gradle.internal.impldep.org.junit.platform.launcher.TagFilter.excludeTags
+
+
 plugins {
     id("org.openrewrite.build.language-library")
     id("jvm-test-suite")
@@ -52,7 +57,10 @@ testing {
         register("compatibilityTest", JvmTestSuite::class) {
             dependencies {
                 implementation(project())
+                implementation(project(":rewrite-test"))
                 implementation(project(":rewrite-java-tck"))
+                implementation(project(":rewrite-java-test"))
+                implementation("org.assertj:assertj-core:latest.release")
             }
 
             targets {
@@ -60,6 +68,9 @@ testing {
                     testTask.configure {
                         useJUnitPlatform {
                             excludeTags("java21")
+                        }
+                        project(":rewrite-java-tck").layout.buildDirectory.dir("classes/java/main").let {
+                            testClassesDirs += files(it)
                         }
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)
