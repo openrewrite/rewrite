@@ -2661,10 +2661,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         modifiers.add(buildFinalModifier());
 
-        if (!declaration.getAnnotationEntries().isEmpty()) {
-            throw new UnsupportedOperationException("TODO");
-        }
-
         JContainer<J.TypeParameter> typeParameters = declaration.getTypeParameterList() == null ? null :
                 JContainer.build(prefix(declaration.getTypeParameterList()), mapTypeParameters(declaration, data), Markers.EMPTY);
 
@@ -2707,13 +2703,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 randomId(),
                 prefix(declaration),
                 markers,
-                emptyList(),
+                leadingAnnotations,
                 modifiers,
                 new J.ClassDeclaration.Kind(
                         randomId(),
                         prefix(declaration.getObjectKeyword()),
                         Markers.EMPTY,
-                        emptyList(), // TODO
+                        lastAnnotations,
                         J.ClassDeclaration.Kind.Type.Class
                 ),
                 name,

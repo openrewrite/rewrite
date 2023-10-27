@@ -84,7 +84,7 @@ public class PsiTreePrinter {
         return printFirFile(file);
     }
 
-    public static String print(IrFile file) {
+    public static String print(@Nullable  IrFile file) {
         return printIrFile(file);
     }
 
@@ -165,7 +165,11 @@ public class PsiTreePrinter {
         }
     }
 
-    public static String printIrFile(IrFile file) {
+    public static String printIrFile(@Nullable IrFile file) {
+        if (file == null) {
+            return "";
+        }
+
         StringBuilder sb = new StringBuilder();
         List<StringBuilder> lines = new ArrayList<>();
         sb.append("------------").append("\n");
