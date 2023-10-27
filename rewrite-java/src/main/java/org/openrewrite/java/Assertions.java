@@ -52,19 +52,14 @@ public class Assertions {
         }
     }
 
-    // validateTypes and assertValidTypes can be merged into a single function once JavaRecipeTest is removed
-    static SourceFile validateTypes(SourceFile after, RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
-        if (after instanceof JavaSourceFile) {
-            TypeValidation typeValidation = testMethodSpec.getTypeValidation() != null ? testMethodSpec.getTypeValidation() : testClassSpec.getTypeValidation();
-            if (typeValidation == null) {
-                typeValidation = new TypeValidation();
-            }
-            assertValidTypes(typeValidation, (JavaSourceFile) after);
+    static SourceFile validateTypes(SourceFile source, TypeValidation typeValidation) {
+        if (source instanceof JavaSourceFile) {
+            assertValidTypes(typeValidation, (JavaSourceFile) source);
         }
-        return after;
+        return source;
     }
 
-    public static void assertValidTypes(TypeValidation typeValidation, J sf) {
+    private static void assertValidTypes(TypeValidation typeValidation, J sf) {
         if (typeValidation.identifiers() || typeValidation.methodInvocations() || typeValidation.methodDeclarations() || typeValidation.classDeclarations()
                 || typeValidation.constructorInvocations()) {
             List<FindMissingTypes.MissingTypeResult> missingTypeResults = FindMissingTypes.findMissingTypes(sf);

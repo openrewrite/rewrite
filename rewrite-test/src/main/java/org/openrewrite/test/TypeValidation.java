@@ -46,7 +46,24 @@ public class TypeValidation {
     @Builder.Default
     private boolean constructorInvocations = true;
 
+    public static TypeValidation all() {
+        return new TypeValidation();
+    }
+
     public static TypeValidation none() {
         return new TypeValidation(false,false,false,false,false,false);
+    }
+
+    static TypeValidation before(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
+        TypeValidation typeValidation = testMethodSpec.getTypeValidation() != null ?
+                testMethodSpec.getTypeValidation() : testClassSpec.getTypeValidation();
+        return typeValidation != null ? typeValidation : new TypeValidation();
+    }
+
+    static TypeValidation after(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
+        TypeValidation typeValidation = testMethodSpec.getAfterTypeValidation() != null ?
+                testMethodSpec.getAfterTypeValidation() : testClassSpec.getAfterTypeValidation();
+        // after type validation defaults to before type validation; possibly this will become stricter in the future
+        return typeValidation != null ? typeValidation : before(testMethodSpec, testClassSpec);
     }
 }

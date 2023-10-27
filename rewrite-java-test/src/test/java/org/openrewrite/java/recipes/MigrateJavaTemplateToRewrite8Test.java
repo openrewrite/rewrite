@@ -148,6 +148,7 @@ public class MigrateJavaTemplateToRewrite8Test implements RewriteTest {
               import lombok.Value;
               import org.openrewrite.ExecutionContext;
               import org.openrewrite.Recipe;
+              import org.openrewrite.java.JavaTemplate;
               import org.openrewrite.java.tree.Expression;
               import org.openrewrite.java.tree.J;
               import java.util.List;
@@ -194,6 +195,7 @@ public class MigrateJavaTemplateToRewrite8Test implements RewriteTest {
               import lombok.Value;
               import org.openrewrite.ExecutionContext;
               import org.openrewrite.Recipe;
+              import org.openrewrite.java.JavaTemplate;
               import org.openrewrite.java.tree.Expression;
               import org.openrewrite.java.tree.J;
               import java.util.List;

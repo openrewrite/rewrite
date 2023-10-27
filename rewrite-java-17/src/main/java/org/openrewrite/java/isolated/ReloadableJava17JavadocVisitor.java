@@ -690,7 +690,11 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                             for (JavaType testParamType : method.getParameterTypes()) {
                                 Type paramType = attr.attribType(param, symbol);
                                 if (testParamType instanceof JavaType.GenericTypeVariable) {
-                                    for (JavaType bound : ((JavaType.GenericTypeVariable) testParamType).getBounds()) {
+                                    List<JavaType> bounds = ((JavaType.GenericTypeVariable) testParamType).getBounds();
+                                    if (bounds.isEmpty() && paramType.tsym != null && "java.lang.Object".equals(paramType.tsym.getQualifiedName().toString())) {
+                                        return method;
+                                    }
+                                    for (JavaType bound : bounds) {
                                         if (paramTypeMatches(bound, paramType)) {
                                             return method;
                                         }

@@ -20,6 +20,7 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 
 import static org.openrewrite.java.Assertions.java;
@@ -38,6 +39,7 @@ class MigrateMarkersSearchResultTest implements RewriteTest {
     @Test
     void migrate() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(
             """
               package org.openrewrite.kubernetes.resource;

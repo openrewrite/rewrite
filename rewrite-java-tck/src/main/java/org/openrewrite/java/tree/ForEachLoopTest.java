@@ -45,8 +45,10 @@ class ForEachLoopTest implements RewriteTest {
           java(
             """
               class Test {
-                  void test() {
+                  void test(int[] n) {
                       for(Integer i : n) test();
+                  }
+                  void test() {
                   }
               }
               """

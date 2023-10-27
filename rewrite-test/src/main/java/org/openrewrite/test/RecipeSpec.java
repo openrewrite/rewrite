@@ -80,6 +80,9 @@ public class RecipeSpec {
     @Nullable
     TypeValidation typeValidation;
 
+    @Nullable
+    TypeValidation afterTypeValidation;
+
     boolean serializationValidation = true;
 
     @Nullable
@@ -259,6 +262,11 @@ public class RecipeSpec {
 
     public RecipeSpec typeValidationOptions(TypeValidation typeValidation) {
         this.typeValidation = typeValidation;
+        return this;
+    }
+
+    public RecipeSpec afterTypeValidationOptions(TypeValidation typeValidation) {
+        this.afterTypeValidation = typeValidation;
         return this;
     }
 
