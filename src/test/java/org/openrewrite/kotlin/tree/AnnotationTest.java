@@ -391,7 +391,7 @@ class AnnotationTest implements RewriteTest {
                   .filter(it -> it instanceof J.ClassDeclaration &&
                     !((J.ClassDeclaration) it).getPadding().getKind().getAnnotations().isEmpty() &&
                     ((J.ClassDeclaration) it).getPadding().getKind().getAnnotations().get(0)
-                      .getSimpleName().equals("B")).findFirst();
+                      .getSimpleName().equals("A")).findFirst();
                 assertThat(s.isPresent()).isEqualTo(true);
             })
           )
