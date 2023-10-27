@@ -21,10 +21,7 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.declarations.FirDeclaration
 import org.jetbrains.kotlin.fir.declarations.FirFile
-import org.jetbrains.kotlin.fir.expressions.FirExpression
-import org.jetbrains.kotlin.fir.expressions.FirFunctionCall
-import org.jetbrains.kotlin.fir.expressions.FirResolvedQualifier
-import org.jetbrains.kotlin.fir.expressions.FirReturnExpression
+import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.impl.FirElseIfTrueCondition
 import org.jetbrains.kotlin.fir.expressions.impl.FirSingleExpressionBlock
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
@@ -36,8 +33,11 @@ import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
 import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor
 import org.jetbrains.kotlin.psi
+import org.jetbrains.kotlin.psi.KtArrayAccessExpression
 import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.psi.KtExpression
+import org.jetbrains.kotlin.psi.KtPostfixExpression
+import org.jetbrains.kotlin.psi.KtPrefixExpression
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.kotlin.KotlinTypeMapping
 
@@ -157,10 +157,6 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         var p = psi
         while (p != null && !elementMap.containsKey(p)) {
             p = p.parent
-            // don't skip KtDotQualifiedExpression for field access
-//            if (p is KtDotQualifiedExpression) {
-//                return null
-//            }
         }
 
         if (p == null) {
@@ -171,8 +167,16 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         val directFirInfos = allFirInfos.filter { filter.invoke(it.fir) }
         return if (directFirInfos.isNotEmpty())
             directFirInfos[0].fir
-        else if (allFirInfos.isNotEmpty())
-            allFirInfos[0].fir
+        else if (allFirInfos.isNotEmpty()) {
+            return when (psi) {
+                is KtPrefixExpression -> allFirInfos.first { it.fir is FirVariableAssignment }.fir
+                is KtPostfixExpression -> allFirInfos.first { it.fir is FirResolvedTypeRef }.fir
+                is KtArrayAccessExpression -> allFirInfos.first { it.fir is FirResolvedNamedReference && it.fir.name.asString() == "get" }.fir
+                else -> {
+                    allFirInfos[0].fir
+                }
+            }
+        }
         else
             null
     }

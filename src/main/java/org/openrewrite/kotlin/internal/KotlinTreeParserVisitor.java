@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.fir.expressions.FirConstExpression;
 import org.jetbrains.kotlin.fir.expressions.FirFunctionCall;
 import org.jetbrains.kotlin.fir.expressions.FirStringConcatenationCall;
 import org.jetbrains.kotlin.fir.references.FirResolvedCallableReference;
+import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
 import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol;
@@ -3312,6 +3313,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
         if (firElement instanceof FirFunctionCall) {
             return psiElementAssociations.getTypeMapping().methodInvocationType((FirFunctionCall) firElement, psiElementAssociations.getFile().getSymbol());
+        }
+        if (firElement instanceof FirResolvedNamedReference) {
+            throw new UnsupportedOperationException("FIXME");
         }
         return null;
     }

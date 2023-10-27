@@ -136,7 +136,11 @@ class ClassDeclarationTest implements RewriteTest {
                   class Inner {
                   }
               }
-              """
+              """, spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.getStatements().stream()
+                  .anyMatch(it -> it instanceof J.ClassDeclaration &&
+                    ((J.ClassDeclaration) it).getKind() == J.ClassDeclaration.Kind.Type.Interface)).isEqualTo(true);
+            })
           )
         );
     }
@@ -151,14 +155,24 @@ class ClassDeclarationTest implements RewriteTest {
     @Test
     void annotationClass() {
         rewriteRun(
-          kotlin("annotation class A")
-        );
+          kotlin("annotation class A",
+            spec -> spec.afterRecipe(cu -> {
+                assertThat(cu.getStatements().stream()
+                  .anyMatch(it -> it instanceof J.ClassDeclaration &&
+                    ((J.ClassDeclaration) it).getKind() == J.ClassDeclaration.Kind.Type.Annotation)).isEqualTo(true);
+            }))
+          );
     }
 
     @Test
     void enumClass() {
         rewriteRun(
-          kotlin("enum  class A")
+          kotlin("enum  class A",
+            spec -> spec.afterRecipe(cu -> {
+              assertThat(cu.getStatements().stream()
+                .anyMatch(it -> it instanceof J.ClassDeclaration &&
+                  ((J.ClassDeclaration) it).getKind() == J.ClassDeclaration.Kind.Type.Enum)).isEqualTo(true);
+          }))
         );
     }
 
