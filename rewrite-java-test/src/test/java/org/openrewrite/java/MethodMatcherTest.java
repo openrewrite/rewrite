@@ -431,7 +431,7 @@ class MethodMatcherTest implements RewriteTest {
     @Test
     void matcherForUnknownType() {
         rewriteRun(
-          spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(
             """
               class Test {

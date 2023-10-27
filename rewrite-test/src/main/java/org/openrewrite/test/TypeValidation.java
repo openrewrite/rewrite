@@ -63,6 +63,7 @@ public class TypeValidation {
     static TypeValidation after(RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
         TypeValidation typeValidation = testMethodSpec.getAfterTypeValidation() != null ?
                 testMethodSpec.getAfterTypeValidation() : testClassSpec.getAfterTypeValidation();
+        // after type validation defaults to before type validation; possibly this will become stricter in the future
         return typeValidation != null ? typeValidation : before(testMethodSpec, testClassSpec);
     }
 }

@@ -30,7 +30,7 @@ class MigrateTestToRewrite8Test implements RewriteTest {
         spec.recipe(new MigrateTestToRewrite8())
           .parser(JavaParser.fromJavaVersion()
             .classpath(JavaParser.runtimeClasspath())
-          ).afterTypeValidationOptions(TypeValidation.none());
+          ).typeValidationOptions(TypeValidation.none());
     }
 
     @DocumentExample

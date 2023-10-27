@@ -737,7 +737,7 @@ class NoWhitespaceBeforeTest implements RewriteTest {
     void doNotStripAnnotationArguments() {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().styles(noWhitespaceBeforeStyle()))
-            .afterTypeValidationOptions(TypeValidation.none()),
+            .typeValidationOptions(TypeValidation.none()),
           java(
             """
               import org.graalvm.compiler.core.common.SuppressFBWarnings;

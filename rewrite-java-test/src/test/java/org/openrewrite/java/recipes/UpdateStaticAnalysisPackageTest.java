@@ -44,6 +44,7 @@ class UpdateStaticAnalysisPackageTest implements RewriteTest {
     @Test
     void changeCleanUpToStaticanalysisForSpecificClassOnly() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(
             """
               package org.openrewrite.java.migrate;

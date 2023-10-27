@@ -39,7 +39,7 @@ class MigrateMarkersSearchResultTest implements RewriteTest {
     @Test
     void migrate() {
         rewriteRun(
-          spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(
             """
               package org.openrewrite.kubernetes.resource;

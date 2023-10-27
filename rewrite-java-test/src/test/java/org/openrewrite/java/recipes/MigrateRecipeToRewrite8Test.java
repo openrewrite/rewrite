@@ -34,7 +34,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
           .parser(JavaParser.fromJavaVersion()
             .classpath(JavaParser.runtimeClasspath())
           )
-          .afterTypeValidationOptions(TypeValidation.none());
+          .typeValidationOptions(TypeValidation.none());
     }
 
     @DocumentExample("`org.openrewrite.java.JavaVisitor.visitJavaSourceFile(JavaSourceFile cu, P p)` is removed, use `org.openrewrite.java.TreeVisitor.visit(@Nullable Tree tree, P p)` instead.")

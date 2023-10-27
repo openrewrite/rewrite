@@ -147,14 +147,14 @@ public class FindMissingTypes extends Recipe {
             JavaType.Method type = mr.getMethodType();
             if (type != null) {
                 if (!isWellFormedType(type, seenTypes)) {
-                    mr = SearchResult.found(mr, "MemberReference method type is missing or malformed");
+                    mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
                 } else if (!type.getName().equals(mr.getReference().getSimpleName()) && !type.isConstructor()) {
                     mr = SearchResult.found(mr, "type information has a different method name '" + type.getName() + "'");
                 }
             } else {
                 JavaType.Variable variableType = mr.getVariableType();
                 if (!isWellFormedType(variableType, seenTypes)) {
-                    mr = SearchResult.found(mr, "MemberReference variable type is missing or malformed");
+                    mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
                 } else if (!variableType.getName().equals(mr.getReference().getSimpleName())) {
                     mr = SearchResult.found(mr, "type information has a different variable name '" + variableType.getName() + "'");
                 }
