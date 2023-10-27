@@ -2571,7 +2571,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             args = JContainer.empty();
             args = args.withMarkers(Markers.build(singletonList(new OmitParentheses(randomId()))));
         } else {
-            if (declaration.getSuperTypeList().getEntries().size() > 1) {
+            if (declaration.getSuperTypeList().getEntries().size() != 1) {
                 throw new UnsupportedOperationException("TODO");
             }
 
@@ -2583,7 +2583,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 args = args.withMarkers(Markers.EMPTY.addIfAbsent(new OmitParentheses(randomId())));
             }
 
-            clazz = declaration.getSuperTypeList().accept(this, data).withPrefix(Space.EMPTY);
+            clazz = (TypeTree) declaration.getSuperTypeList().getEntries().get(0).accept(this, data);
         }
 
         // TODO: fix NPE.

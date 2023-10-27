@@ -248,7 +248,7 @@ class MethodInvocationTest implements RewriteTest {
               fun test ( a : Test ) { }
               
               fun method ( ) {
-                  test ( object : Test ( ) {
+                  test ( object :  Test   ( ) {
                   } )
               }
               """
