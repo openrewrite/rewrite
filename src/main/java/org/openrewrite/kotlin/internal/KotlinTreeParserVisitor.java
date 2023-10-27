@@ -2797,7 +2797,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 Markers.EMPTY,
                 property.isVar() ? "var" : null,
                 property.isVar() ? J.Modifier.Type.LanguageExtension : J.Modifier.Type.Final,
-                Collections.emptyList() // FIXME
+                lastAnnotations
         ));
 
         // Receiver
