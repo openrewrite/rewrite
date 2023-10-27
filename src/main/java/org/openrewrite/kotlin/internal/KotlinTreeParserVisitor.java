@@ -1220,11 +1220,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
             if (typeExpression instanceof J.ParameterizedType) {
                 Space prefix = name.getPrefix();
-                J.ParameterizedType pt = ((J.ParameterizedType) typeExpression).withClazz(name.withPrefix(Space.EMPTY).withPrefix(prefix));
-                if (name.getType() instanceof JavaType.Parameterized) {
-                    pt = pt.withType(name.getType()).withClazz(pt.getClazz().withType(((JavaType.Parameterized) name.getType()).getType()));
-                }
-                typeExpression = pt;
+                typeExpression = ((J.ParameterizedType) typeExpression).withClazz(name.withPrefix(Space.EMPTY).withPrefix(prefix));
             }
         }
 
@@ -3383,7 +3379,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 Markers.EMPTY,
                 emptyList(),
                 name,
-                type,
+                (type instanceof JavaType.Parameterized) ? ((JavaType.Parameterized) type).getType() : type ,
                 fieldType
         );
     }
