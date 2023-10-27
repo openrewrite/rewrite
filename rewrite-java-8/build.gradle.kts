@@ -9,6 +9,9 @@ val compiler = javaToolchains.compilerFor {
 
 val tools = compiler.get().metadata.installationPath.file("lib/tools.jar")
 
+val javaTck = configurations.create("javaTck") {
+    isTransitive = false
+}
 dependencies {
     compileOnly(files(tools))
     compileOnly("org.slf4j:slf4j-api:1.7.+")
@@ -22,6 +25,7 @@ dependencies {
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
 
     testImplementation(project(":rewrite-test"))
+    "javaTck"(project(":rewrite-java-tck"))
 }
 
 java {
@@ -67,9 +71,7 @@ testing {
                         useJUnitPlatform {
                             excludeTags("java11", "java17", "java21")
                         }
-                        project(":rewrite-java-tck").layout.buildDirectory.dir("classes/java/main").let {
-                            testClassesDirs += files(it)
-                        }
+                        testClassesDirs += files(javaTck.files.map { zipTree(it) })
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)
                     }

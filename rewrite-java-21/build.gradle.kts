@@ -10,6 +10,9 @@ java {
         languageVersion.set(JavaLanguageVersion.of(21))
     }
 }
+val javaTck = configurations.create("javaTck") {
+    isTransitive = false
+}
 
 dependencies {
     api(project(":rewrite-core"))
@@ -22,6 +25,7 @@ dependencies {
     implementation("org.ow2.asm:asm:latest.release")
 
     testImplementation(project(":rewrite-test"))
+    "javaTck"(project(":rewrite-java-tck"))
 }
 
 tasks.withType<JavaCompile> {
@@ -70,9 +74,7 @@ testing {
                 all {
                     testTask.configure {
                         useJUnitPlatform()
-                        project(":rewrite-java-tck").layout.buildDirectory.dir("classes/java/main").let {
-                            testClassesDirs += files(it)
-                        }
+                        testClassesDirs += files(javaTck.files.map { zipTree(it) })
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)
                     }
