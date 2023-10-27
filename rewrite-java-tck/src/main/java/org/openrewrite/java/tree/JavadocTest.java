@@ -18,6 +18,7 @@ package org.openrewrite.java.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -389,6 +390,7 @@ class JavadocTest implements RewriteTest {
     @Test
     void exception() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
           java(
             """
               public class A {
@@ -721,6 +723,7 @@ class JavadocTest implements RewriteTest {
     @Test
     void multipleReferenceParameters() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
           java(
             """
               class Test {
@@ -1064,6 +1067,7 @@ class JavadocTest implements RewriteTest {
     @Test
     void methodNotFound() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().methodInvocations(false).build()),
           java(
             """
               interface Test {
@@ -1082,6 +1086,7 @@ class JavadocTest implements RewriteTest {
     @Test
     void typeNotFound() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
           java(
             """
               interface Test {
