@@ -405,7 +405,7 @@ class MethodInvocationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              val x = some . qualified . fooBar ( )
+              val x = some .  qualified   . fooBar ( )
               """
           )
         );

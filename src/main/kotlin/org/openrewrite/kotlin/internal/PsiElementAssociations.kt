@@ -24,6 +24,7 @@ import org.jetbrains.kotlin.fir.declarations.FirFile
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.impl.FirElseIfTrueCondition
 import org.jetbrains.kotlin.fir.expressions.impl.FirSingleExpressionBlock
+import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.resolved
 import org.jetbrains.kotlin.fir.resolve.dfa.DfaInternals
@@ -196,6 +197,9 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         return when (fir) {
             is FirResolvedQualifier -> ExpressionType.QUALIFIER
             is FirFunctionCall -> {
+                if (fir.calleeReference is FirErrorNamedReference)
+                    return null
+
                 when (fir.calleeReference.resolved?.resolvedSymbol) {
                     is FirConstructorSymbol -> ExpressionType.CONSTRUCTOR
                     is FirNamedFunctionSymbol -> ExpressionType.METHOD_INVOCATION
