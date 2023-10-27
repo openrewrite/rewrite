@@ -34,10 +34,12 @@ import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor
 import org.jetbrains.kotlin.psi
 import org.jetbrains.kotlin.psi.KtArrayAccessExpression
+import org.jetbrains.kotlin.psi.KtBinaryExpression
 import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.psi.KtExpression
 import org.jetbrains.kotlin.psi.KtPostfixExpression
 import org.jetbrains.kotlin.psi.KtPrefixExpression
+import org.jetbrains.kotlin.psi.KtWhenConditionInRange
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.kotlin.KotlinTypeMapping
 
@@ -172,6 +174,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 is KtPrefixExpression -> allFirInfos.first { it.fir is FirVariableAssignment }.fir
                 is KtPostfixExpression -> allFirInfos.first { it.fir is FirResolvedTypeRef }.fir
                 is KtArrayAccessExpression -> allFirInfos.first { it.fir is FirResolvedNamedReference && it.fir.name.asString() == "get" }.fir
+                is KtWhenConditionInRange, is KtBinaryExpression -> allFirInfos.first { it.fir is FirFunctionCall }.fir
                 else -> {
                     allFirInfos[0].fir
                 }

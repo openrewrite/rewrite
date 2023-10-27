@@ -105,7 +105,8 @@ class CommentTest implements RewriteTest {
     @ValueSource(strings = {
             "class Foo {}",
             "fun foo() {}",
-            "@file:Suppress(\"PLATFORM_CLASS_MAPPED_TO_KOTLIN\", \"unused\")"
+            "@file:Suppress(\"PLATFORM_CLASS_MAPPED_TO_KOTLIN\", \"unused\")",
+            "package foo"
     })
     void multilineComments(String input) {
         rewriteRun(

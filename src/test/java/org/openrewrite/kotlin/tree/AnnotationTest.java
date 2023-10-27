@@ -17,6 +17,8 @@ package org.openrewrite.kotlin.tree;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -444,16 +446,20 @@ class AnnotationTest implements RewriteTest {
         );
     }
 
-    @Test
-    void objectDeclaration() {
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "@A @B object A",
+      "@A internal @B object A"
+    })
+    void objectDeclaration(String input) {
         rewriteRun(
           kotlin(
             """
-              annotation class Ann
+              annotation class A
+              annotation class B
 
-              @Ann
-              object A
-              """
+              %s
+              """.formatted(input)
           )
         );
     }

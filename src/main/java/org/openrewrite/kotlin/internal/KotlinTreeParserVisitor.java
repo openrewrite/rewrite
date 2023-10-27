@@ -1223,6 +1223,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 typeExpression = ((J.ParameterizedType) typeExpression).withClazz(name.withPrefix(Space.EMPTY))
                         .withPrefix(prefix);
             }
+            throw new UnsupportedOperationException("Type is incorrect through createIdentifier. The identifier should be JavaType.Class instead of JavaType.Parameterized.");
         }
 
         Expression expr = convertToExpression(typeAlias.getTypeReference().accept(this, data));
@@ -2648,7 +2649,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 JContainer.build(prefix(declaration.getTypeParameterList()), mapTypeParameters(declaration, data), Markers.EMPTY);
 
         if (declaration.getSuperTypeList() != null) {
-            TypeTree clazz = (TypeTree) declaration.getSuperTypeList().accept(this, data)
+            TypeTree clazz = declaration.getSuperTypeList().accept(this, data)
                     .withPrefix(prefix(declaration.getSuperTypeList()));
             superTypes.add(padRight(clazz, Space.EMPTY));
             implementings = JContainer.build(prefix(declaration.getColon()), superTypes, Markers.EMPTY);
