@@ -1996,7 +1996,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     randomId(),
                     prefix(klass.getClassKeyword(), prefixConsumedSet),
                     Markers.EMPTY,
-                    emptyList(),
+                    lastAnnotations,
                     classType
             );
         } else if (klass.getClassOrInterfaceKeyword() != null) {
@@ -2905,38 +2905,46 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                                           @NonNull List<J.Annotation> leadingAnnotations,
                                           @NonNull List<J.Annotation> lastAnnotations,
                                           ExecutionContext data) {
+        boolean isLeadingAnnotation = true;
         ArrayList<J.Modifier> modifiers = new ArrayList<>();
+        List<J.Annotation> annotations = new ArrayList<>();
         if (modifierList == null) {
             return modifiers;
         }
-
-        boolean isLeadingAnnotation = true;
 
         // don't use iterator of `PsiTreeUtil.firstChild` and `getNextSibling`, since it could skip one layer, example test "paramAnnotation"
         // also don't use `modifierList.getChildren()` since it could miss some element
         for (Iterator<PsiElement> it = PsiUtilsKt.getAllChildren(modifierList).iterator(); it.hasNext();) {
             PsiElement child = it.next();
-            boolean isAnnotation = child instanceof KtAnnotationEntry;
+            if (isSpace(child.getNode())) {
+                continue;
+            }
 
-            if (isLeadingAnnotation && isAnnotation) {
+            boolean isAnnotation = child instanceof KtAnnotationEntry;
+            boolean isKeyword = child instanceof LeafPsiElement && child.getNode().getElementType() instanceof KtModifierKeywordToken;
+
+            if (isAnnotation) {
                 KtAnnotationEntry ktAnnotationEntry = (KtAnnotationEntry) child;
-                leadingAnnotations.add((J.Annotation) ktAnnotationEntry.accept(this, data));
-            } else {
-                if (child instanceof LeafPsiElement && child.getNode().getElementType() instanceof KtModifierKeywordToken) {
-                    isLeadingAnnotation = false;
-                    modifiers.add(mapModifier(child, emptyList()));
-                } else if (isAnnotation) {
-                    List<J.Annotation> annotations = new ArrayList<>();
-                    annotations.add((J.Annotation) ((KtAnnotationEntry) child).accept(this, data));
-                    modifiers.add(new J.Modifier(randomId(), Space.EMPTY, Markers.EMPTY, "", J.Modifier.Type.LanguageExtension, annotations));
+                J.Annotation annotation = (J.Annotation) ktAnnotationEntry.accept(this, data);
+                if (isLeadingAnnotation) {
+                    leadingAnnotations.add(annotation);
+                } else {
+                    annotations.add(annotation);
                 }
+            } else if (isKeyword) {
+                isLeadingAnnotation = false;
+
+                modifiers.add(mapModifier(child, new ArrayList<>(annotations)));
+                annotations.clear();
             }
         }
 
-        // TODO. handle lastAnnotations
+        if (!annotations.isEmpty()) {
+            lastAnnotations.addAll(annotations);
+        }
+
         return modifiers;
     }
-
 
     @Override
     public J visitPropertyDelegate(KtPropertyDelegate delegate, ExecutionContext data) {

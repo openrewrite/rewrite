@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -392,12 +393,11 @@ class AnnotationTest implements RewriteTest {
               @A final  @B   internal    @C @LAST  class Foo
               """,
             spec -> spec.afterRecipe(cu -> {
-                Optional<Statement> s = cu.getStatements().stream()
-                  .filter(it -> it instanceof J.ClassDeclaration &&
-                    !((J.ClassDeclaration) it).getPadding().getKind().getAnnotations().isEmpty() &&
-                    ((J.ClassDeclaration) it).getPadding().getKind().getAnnotations().get(0)
-                      .getSimpleName().equals("A")).findFirst();
-                assertThat(s.isPresent()).isEqualTo(true);
+                J.ClassDeclaration last = (J.ClassDeclaration) cu.getStatements().get(cu.getStatements().size() - 1);
+                List<J.Annotation> annotationList = last.getPadding().getKind().getAnnotations();
+                assertThat(annotationList.size()).isEqualTo(2);
+                assertThat(annotationList.get(0).getSimpleName()).isEqualTo("C");
+                assertThat(annotationList.get(1).getSimpleName()).isEqualTo("LAST");
             })
           )
         );
