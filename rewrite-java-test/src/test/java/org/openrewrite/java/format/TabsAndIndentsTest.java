@@ -945,7 +945,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void moreAnnotations() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
           java(
             """
               import lombok.EqualsAndHashCode;
@@ -1678,7 +1678,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void failure1() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
           java(
             """
               public class Test {
@@ -2303,7 +2303,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void recordComponents() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
           java(
             """
               public record RenameRequest(

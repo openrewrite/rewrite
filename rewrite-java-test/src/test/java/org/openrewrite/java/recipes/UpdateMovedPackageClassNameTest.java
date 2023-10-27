@@ -28,7 +28,7 @@ class UpdateMovedPackageClassNameTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new UpdateMovedPackageClassName("org.openrewrite.java.cleanup.UnnecessaryCatch",
             "org.openrewrite.staticanalysis.UnnecessaryCatch"))
-            .typeValidationOptions(TypeValidation.none()),
+            .afterTypeValidationOptions(TypeValidation.none()),
           java(
             """
               package org.openrewrite.java.migrate;

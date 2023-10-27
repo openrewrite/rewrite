@@ -245,13 +245,13 @@ public class RecipeSpec {
                 expectedCyclesThatMakeChanges;
     }
 
-    public RecipeSpec beforeTypeValidationOptions(TypeValidation typeValidation) {
-        this.afterTypeValidation = typeValidation;
+    public RecipeSpec typeValidationOptions(TypeValidation typeValidation) {
+        this.typeValidation = typeValidation;
         return this;
     }
 
-    public RecipeSpec typeValidationOptions(TypeValidation typeValidation) {
-        this.typeValidation = typeValidation;
+    public RecipeSpec afterTypeValidationOptions(TypeValidation typeValidation) {
+        this.afterTypeValidation = typeValidation;
         return this;
     }
 

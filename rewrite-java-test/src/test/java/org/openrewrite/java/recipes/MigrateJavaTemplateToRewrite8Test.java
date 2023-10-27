@@ -32,7 +32,7 @@ public class MigrateJavaTemplateToRewrite8Test implements RewriteTest {
           .parser(JavaParser.fromJavaVersion()
             .classpath(JavaParser.runtimeClasspath())
           )
-          .typeValidationOptions(TypeValidation.none());
+          .afterTypeValidationOptions(TypeValidation.none());
     }
 
     @SuppressWarnings("all")

@@ -30,7 +30,7 @@ class FindMissingTypesTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new FindMissingTypes())
-          .typeValidationOptions(TypeValidation.none());
+          .afterTypeValidationOptions(TypeValidation.none());
     }
 
     @DocumentExample
