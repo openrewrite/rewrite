@@ -73,16 +73,4 @@ class CursorTest {
         var cursor = new Cursor(new Cursor(new Cursor(null, 1), t), 2);
         assertThat(cursor.getPathAsStream(v -> v instanceof PlainText).toList()).containsExactly(t);
     }
-
-    @Test
-    void forkKeepsRoot() {
-        var root = new Cursor(null, Cursor.ROOT_VALUE);
-        var cursor = new Cursor(root, new Object());
-        assertThat(cursor.getParent()).isSameAs(root);
-        assertThat(cursor.getRoot()).isSameAs(root);
-
-        var forked = cursor.fork();
-        assertThat(forked.getParent()).isSameAs(root);
-        assertThat(forked.getRoot()).isSameAs(root);
-    }
 }

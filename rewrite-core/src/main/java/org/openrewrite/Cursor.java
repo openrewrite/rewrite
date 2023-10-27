@@ -357,6 +357,6 @@ public class Cursor {
      * @return A new cursor with the same position but an initially clear set of messages.
      */
     public Cursor fork() {
-        return parent == null ? this : new Cursor(parent.fork(), value);
+        return new Cursor(parent == null ? null : parent.fork(), value);
     }
 }
