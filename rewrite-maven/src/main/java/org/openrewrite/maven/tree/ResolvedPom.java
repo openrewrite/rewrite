@@ -61,11 +61,11 @@ public class ResolvedPom {
     Iterable<String> activeProfiles;
 
     public ResolvedPom(Pom requested, Iterable<String> activeProfiles) {
-        this(requested, activeProfiles, emptyMap(), emptyList(), null, emptyList(), emptyList());
+        this(requested, activeProfiles, emptyMap(), emptyList(), null, emptyList(), emptyList(), emptyList());
     }
 
     @JsonCreator
-    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<Dependency> requestedDependencies) {
+    ResolvedPom(Pom requested, Iterable<String> activeProfiles, Map<String, String> properties, List<ResolvedManagedDependency> dependencyManagement, @Nullable List<MavenRepository> initialRepositories, List<MavenRepository> repositories, List<Dependency> requestedDependencies, List<Plugin> pluginManagement) {
         this.requested = requested;
         this.activeProfiles = activeProfiles;
         this.properties = properties;
@@ -73,6 +73,7 @@ public class ResolvedPom {
         this.initialRepositories = initialRepositories;
         this.repositories = repositories;
         this.requestedDependencies = requestedDependencies;
+        this.pluginManagement = pluginManagement;
     }
 
     @NonFinal
@@ -89,6 +90,9 @@ public class ResolvedPom {
 
     @NonFinal
     List<Dependency> requestedDependencies;
+
+    @NonFinal
+    List<Plugin> pluginManagement;
 
     /**
      * Deduplicate dependencies and dependency management dependencies
@@ -140,6 +144,7 @@ public class ResolvedPom {
                 emptyList(),
                 initialRepositories,
                 emptyList(),
+                emptyList(),
                 emptyList()
         ).resolver(ctx, downloader).resolve();
 
@@ -176,6 +181,16 @@ public class ResolvedPom {
         }
         for (int i = 0; i < resolvedRepositories.size(); i++) {
             if (!repositories.get(i).equals(resolvedRepositories.get(i))) {
+                return resolved;
+            }
+        }
+
+        List<Plugin> resolvedPlugins = resolved.getPluginManagement();
+        if (pluginManagement.size() != resolvedPlugins.size()) {
+            return resolved;
+        }
+        for (int i = 0; i < resolvedPlugins.size(); i++) {
+            if (!pluginManagement.get(i).equals(resolvedPlugins.get(i))) {
                 return resolved;
             }
         }
@@ -331,6 +346,8 @@ public class ResolvedPom {
             pomAncestry.clear();
             pomAncestry.add(requested);
             resolveParentDependenciesRecursively(pomAncestry);
+
+            resolveParentPluginManagementRecursively(pomAncestry);
         }
 
         private void resolveParentPropertiesAndRepositoriesRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
@@ -399,6 +416,30 @@ public class ResolvedPom {
             }
         }
 
+        private void resolveParentPluginManagementRecursively(List<Pom> pomAncestry) throws MavenDownloadingException {
+            Pom pom = pomAncestry.get(0);
+
+            mergePluginManagement(pom.getPluginManagement());
+
+            if (pom.getParent() != null) {
+                Pom parentPom = resolveParentPom(pom);
+
+                MavenExecutionContextView.view(ctx)
+                        .getResolutionListener()
+                        .parent(parentPom, pom);
+
+                for (Pom ancestor : pomAncestry) {
+                    if (ancestor.getGav().equals(parentPom.getGav())) {
+                        // parent cycle
+                        return;
+                    }
+                }
+
+                pomAncestry.add(0, parentPom);
+                resolveParentPluginManagementRecursively(pomAncestry);
+            }
+        }
+
         private Pom resolveParentPom(Pom pom) throws MavenDownloadingException {
             @SuppressWarnings("DataFlowIssue") GroupArtifactVersion gav = getValues(pom.getParent().getGav());
             if (gav.getVersion() == null) {
@@ -425,6 +466,18 @@ public class ResolvedPom {
                     requestedDependencies = new ArrayList<>(incomingRequestedDependencies);
                 } else {
                     requestedDependencies.addAll(incomingRequestedDependencies);
+                }
+            }
+        }
+
+        private void mergePluginManagement(List<Plugin> incomingPlugins) {
+            if (!incomingPlugins.isEmpty()) {
+                if (pluginManagement == null || pluginManagement.isEmpty()) {
+                    //It is possible for the plugins to be an empty, immutable list.
+                    //If it's empty, we ensure to create a mutable list.
+                    pluginManagement = new ArrayList<>(incomingPlugins);
+                } else {
+                    pluginManagement.addAll(incomingPlugins);
                 }
             }
         }
@@ -601,7 +654,7 @@ public class ResolvedPom {
                     ResolvedPom resolvedPom = cache.getResolvedDependencyPom(dPom.getGav());
                     if (resolvedPom == null) {
                         resolvedPom = new ResolvedPom(dPom, getActiveProfiles(), emptyMap(),
-                                emptyList(), initialRepositories, emptyList(), emptyList());
+                                emptyList(), initialRepositories, emptyList(), emptyList(), emptyList());
                         resolvedPom.resolver(ctx, downloader).resolveParentsRecursively(dPom);
                         cache.putResolvedDependencyPom(dPom.getGav(), resolvedPom);
                     }
