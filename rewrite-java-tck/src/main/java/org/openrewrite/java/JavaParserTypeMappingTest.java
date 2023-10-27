@@ -141,6 +141,7 @@ public class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTe
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1762")
     @Test
+    @MinimumJava11
     void methodInvocationWithUnknownTypeSymbol() {
         rewriteRun(
           spec -> spec.typeValidationOptions(TypeValidation.builder().constructorInvocations(false).build()),
