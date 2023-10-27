@@ -202,6 +202,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                     else -> throw UnsupportedOperationException("Unsupported resolved symbol: ${fir.calleeReference.resolved?.resolvedSymbol?.javaClass}")
                 }
             }
+            is FirSafeCallExpression -> ExpressionType.METHOD_INVOCATION
             else -> throw UnsupportedOperationException("Unsupported call type: ${fir.javaClass}")
         }
     }
