@@ -9,6 +9,9 @@ val compiler = javaToolchains.compilerFor {
 
 val tools = compiler.get().metadata.installationPath.file("lib/tools.jar")
 
+val javaTck = configurations.create("javaTck") {
+    isTransitive = false
+}
 dependencies {
     compileOnly(files(tools))
     compileOnly("org.slf4j:slf4j-api:1.7.+")
@@ -22,6 +25,7 @@ dependencies {
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:latest.release")
 
     testImplementation(project(":rewrite-test"))
+    "javaTck"(project(":rewrite-java-tck"))
 }
 
 java {
@@ -55,7 +59,10 @@ testing {
         register("compatibilityTest", JvmTestSuite::class) {
             dependencies {
                 implementation(project())
+                implementation(project(":rewrite-test"))
                 implementation(project(":rewrite-java-tck"))
+                implementation(project(":rewrite-java-test"))
+                implementation("org.assertj:assertj-core:latest.release")
             }
 
             targets {
@@ -64,6 +71,7 @@ testing {
                         useJUnitPlatform {
                             excludeTags("java11", "java17", "java21")
                         }
+                        testClassesDirs += files(javaTck.files.map { zipTree(it) })
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)
                     }

@@ -49,6 +49,7 @@ public class ResolvedDependency implements Serializable {
      * Direct dependencies only that survived conflict resolution and exclusion.
      */
     @NonFinal
+    @EqualsAndHashCode.Exclude
     List<ResolvedDependency> dependencies;
 
     List<License> licenses;

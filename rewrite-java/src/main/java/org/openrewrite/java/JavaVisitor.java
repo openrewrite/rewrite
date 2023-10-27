@@ -163,19 +163,23 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     @SuppressWarnings("unused")
     public Space visitSpace(Space space, Space.Location loc, P p) {
         //noinspection ConstantValue
-        return space == Space.EMPTY || space == Space.SINGLE_SPACE || space == null ? space :
-                space.withComments(ListUtils.map(space.getComments(), comment -> {
-                    if (comment instanceof Javadoc) {
-                        if (javadocVisitor == null) {
-                            javadocVisitor = getJavadocVisitor();
-                        }
-                        Cursor previous = javadocVisitor.getCursor();
-                        Comment c = (Comment) javadocVisitor.visit((Javadoc) comment, p, getCursor());
-                        javadocVisitor.setCursor(previous);
-                        return c;
-                    }
-                    return comment;
-                }));
+        if (space == Space.EMPTY || space == Space.SINGLE_SPACE || space == null) {
+            return space;
+        } else if (space.getComments().isEmpty()) {
+            return space;
+        }
+        return space.withComments(ListUtils.map(space.getComments(), comment -> {
+            if (comment instanceof Javadoc) {
+                if (javadocVisitor == null) {
+                    javadocVisitor = getJavadocVisitor();
+                }
+                Cursor previous = javadocVisitor.getCursor();
+                Comment c = (Comment) javadocVisitor.visit((Javadoc) comment, p, getCursor());
+                javadocVisitor.setCursor(previous);
+                return c;
+            }
+            return comment;
+        }));
     }
 
     @Nullable
@@ -644,7 +648,10 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     public J visitIdentifier(J.Identifier ident, P p) {
         J.Identifier i = ident;
-        i = i.withAnnotations(ListUtils.map(i.getAnnotations(), a -> visitAndCast(a, p)));
+        if (!i.getAnnotations().isEmpty()) {
+            // performance optimization
+            i = i.withAnnotations(ListUtils.map(i.getAnnotations(), a -> visitAndCast(a, p)));
+        }
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.IDENTIFIER_PREFIX, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
         Expression temp = (Expression) visitExpression(i, p);

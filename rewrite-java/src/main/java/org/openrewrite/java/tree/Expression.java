@@ -29,7 +29,7 @@ public interface Expression extends J {
     <T extends J> T withType(@Nullable JavaType type);
 
     /**
-     * @return A list of the side effects emitted by the statement, if the statement was decomposed.
+     * @return A list of the side effects emitted by the statement if the statement was decomposed.
      * So for a binary operation, there are up to two potential side effects (the left and right side) and as
      * few as zero if both sides of the expression are something like constants or variable references.
      */
