@@ -43,7 +43,7 @@ class MapEntryTest implements RewriteTest {
             """
               fun foo() {
                   val a = mutableMapOf ( 1 to "one" , 2 to "two" )
-                  a [ 1 ] = "three"
+                  a  [   1    ] = "three"
               }
               """
           )

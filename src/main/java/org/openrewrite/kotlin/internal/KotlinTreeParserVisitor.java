@@ -179,34 +179,53 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitArrayAccessExpression(KtArrayAccessExpression expression, ExecutionContext data) {
-        Markers markers = Markers.EMPTY;
-        boolean hasExplicitReceiver = false;
-        boolean implicitExtensionFunction = false;
-        Expression selectExpr = convertToExpression(expression.getArrayExpression().accept(this, data));
-        JRightPadded<Expression> select = padRight(selectExpr, suffix(expression.getArrayExpression()));
-        JContainer<Expression> typeParams = null;
-        J.Identifier name = createIdentifier("get", Space.EMPTY, methodInvocationType(expression));
+        Expression left = convertToExpression(expression.getArrayExpression().accept(this, data));
 
-        markers = markers.addIfAbsent(new IndexedAccess(randomId()));
-
-        List<KtExpression> indexExpressions = expression.getIndexExpressions();
-        List<JRightPadded<Expression>> expressions = new ArrayList<>();
-
-        for (KtExpression indexExp : indexExpressions) {
-            expressions.add(padRight(convertToExpression(indexExp.accept(this, data)), suffix(indexExp)));
+        if (expression.getIndexExpressions().size() != 1) {
+            throw new UnsupportedOperationException("TODO");
         }
 
-        JContainer<Expression> args = JContainer.build(Space.EMPTY, expressions, markers);
-        return new J.MethodInvocation(
-                randomId(),
-                Space.EMPTY,
-                markers,
-                select,
-                typeParams,
-                name,
-                args,
-                methodInvocationType(expression)
+        return new J.ArrayAccess(randomId(),
+                prefix(expression),
+                Markers.EMPTY,
+                left,
+                new J.ArrayDimension(randomId(),
+                        merge(prefix(expression.getIndicesNode()), prefix(expression.getLeftBracket())),
+                        Markers.EMPTY,
+                        padRight(convertToExpression(expression.getIndexExpressions().get(0).accept(this, data)),
+                                prefix(expression.getRightBracket()))
+                ),
+                null // type(expression)
         );
+//
+//        Markers markers = Markers.EMPTY;
+//        boolean hasExplicitReceiver = false;
+//        boolean implicitExtensionFunction = false;
+//        Expression selectExpr = convertToExpression(expression.getArrayExpression().accept(this, data));
+//        JRightPadded<Expression> select = padRight(selectExpr, suffix(expression.getArrayExpression()));
+//        JContainer<Expression> typeParams = null;
+//        J.Identifier name = createIdentifier("get", Space.EMPTY, methodInvocationType(expression));
+//
+//        markers = markers.addIfAbsent(new IndexedAccess(randomId()));
+//
+//        List<KtExpression> indexExpressions = expression.getIndexExpressions();
+//        List<JRightPadded<Expression>> expressions = new ArrayList<>();
+//
+//        for (KtExpression indexExp : indexExpressions) {
+//            expressions.add(padRight(convertToExpression(indexExp.accept(this, data)), suffix(indexExp)));
+//        }
+//
+//        JContainer<Expression> args = JContainer.build(Space.EMPTY, expressions, markers);
+//        return new J.MethodInvocation(
+//                randomId(),
+//                Space.EMPTY,
+//                markers,
+//                select,
+//                typeParams,
+//                name,
+//                args,
+//                methodInvocationType(expression)
+//        );
     }
 
     @Override
