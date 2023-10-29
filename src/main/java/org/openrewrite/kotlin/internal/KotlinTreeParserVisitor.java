@@ -3272,13 +3272,18 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Nullable
     private JavaType.Variable variableType(PsiElement psi) {
-        if (psi instanceof KtExpression) {
-            FirBasedSymbol<?> basedSymbol = psiElementAssociations.symbol((KtExpression) psi);
+        if (psi instanceof KtDeclaration) {
+            FirBasedSymbol<?> basedSymbol = psiElementAssociations.symbol((KtDeclaration) psi);
             if (basedSymbol instanceof FirVariableSymbol) {
                 return (JavaType.Variable) psiElementAssociations.getTypeMapping().type(basedSymbol.getFir(), owner(psi));
             }
-        }
+        } else if (psi instanceof KtNameReferenceExpression) {
+            FirBasedSymbol<?> basedSymbol = psiElementAssociations.symbol((KtNameReferenceExpression) psi);
+            if (basedSymbol instanceof FirVariableSymbol) {
+                return (JavaType.Variable) psiElementAssociations.getTypeMapping().type(basedSymbol.getFir(), owner(psi));
+            }
 
+        }
         return null;
     }
 
