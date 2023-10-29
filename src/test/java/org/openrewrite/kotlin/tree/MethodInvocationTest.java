@@ -244,11 +244,12 @@ class MethodInvocationTest implements RewriteTest {
           kotlin(
             """
               open class Test
+              interface A
               
               fun test ( a : Test ) { }
               
               fun method ( ) {
-                  test ( object :  Test   ( ) {
+                  test ( object :  Test   ( ),    A {
                   } )
               }
               """
