@@ -117,7 +117,7 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession, firFil
             }
 
             is FirFile -> {
-                return JavaType.ShallowClass.build(convertFileNameToFqn(type.name))
+                return fileType(signature)
             }
 
             is FirJavaTypeRef -> {
@@ -138,6 +138,12 @@ class KotlinTypeMapping(typeCache: JavaTypeCache, firSession: FirSession, firFil
 
             else -> return resolveType(type, signature, ownerFallBack)
         }
+    }
+
+    private fun fileType(signature: String): JavaType? {
+        val fileType = JavaType.ShallowClass.build(signature)
+        typeCache.put(signature, fileType)
+        return fileType
     }
 
     @OptIn(SymbolInternals::class)

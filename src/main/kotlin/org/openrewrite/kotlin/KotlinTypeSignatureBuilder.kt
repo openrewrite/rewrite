@@ -24,6 +24,7 @@ import org.jetbrains.kotlin.fir.getOwnerLookupTag
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaField
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaMethod
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaValueParameter
+import org.jetbrains.kotlin.fir.packageFqName
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.resolve.inference.ConeTypeParameterBasedTypeVariable
 import org.jetbrains.kotlin.fir.resolve.toFirRegularClass
@@ -82,7 +83,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             }
 
             is FirFile -> {
-                return convertFileNameToFqn(type.name)
+                return convertFileNameToFqn(type)
             }
 
             is FirJavaTypeRef -> {
@@ -575,11 +576,11 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         } else if (ownerSymbol is FirFunctionSymbol<*>) {
             owner = methodDeclarationSignature(ownerSymbol, null)
         } else if (ownerSymbol is FirFileSymbol) {
-            owner = convertFileNameToFqn(ownerSymbol.fir.name)
+            owner = convertFileNameToFqn(ownerSymbol.fir)
         } else if (ownerSymbol != null) {
             owner = classSignature(ownerSymbol.fir)
         } else {
-            owner = convertFileNameToFqn(firFileSymbol.fir.name)
+            owner = convertFileNameToFqn(firFileSymbol.fir)
         }
         val typeSig =
             if (symbol.fir is FirJavaField || symbol.fir is FirEnumEntry) {
@@ -647,7 +648,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             }
         }
         if (owner == "{undefined}") {
-            owner = convertFileNameToFqn(firFileSymbol.fir.name)
+            owner = convertFileNameToFqn(firFileSymbol.fir)
         }
         var s = owner
         val namedReference = functionCall.calleeReference
@@ -683,7 +684,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                     signature(ownerSymbol.fir)
                 }
                 else -> {
-                    convertFileNameToFqn(firFileSymbol.fir.name)
+                    convertFileNameToFqn(firFileSymbol.fir)
                 }
             }
         s += if (symbol is FirConstructorSymbol) {
@@ -766,8 +767,13 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             return if (classId == null) "{undefined}" else convertKotlinFqToJavaFq(classId.toString())
         }
 
-        fun convertFileNameToFqn(name: String): String {
-            return name.replace("/", ".").replace("\\", ".").replace(".kt", "Kt")
+        fun convertFileNameToFqn(type: FirFile): String {
+            val sb = StringBuilder()
+            if (type.packageFqName.asString().isNotEmpty()) {
+                sb.append(type.packageFqName.asString()).append(".")
+            }
+            sb.append(type.name.replace("/", ".").replace("\\", ".").replace(".kt", "Kt"))
+            return sb.toString()
         }
 
         /**

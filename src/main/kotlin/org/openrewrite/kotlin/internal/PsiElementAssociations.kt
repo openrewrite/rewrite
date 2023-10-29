@@ -38,6 +38,7 @@ import org.jetbrains.kotlin.psi.KtArrayAccessExpression
 import org.jetbrains.kotlin.psi.KtBinaryExpression
 import org.jetbrains.kotlin.psi.KtDeclaration
 import org.jetbrains.kotlin.psi.KtExpression
+import org.jetbrains.kotlin.psi.KtPackageDirective
 import org.jetbrains.kotlin.psi.KtPostfixExpression
 import org.jetbrains.kotlin.psi.KtPrefixExpression
 import org.jetbrains.kotlin.psi.KtWhenConditionInRange
@@ -137,7 +138,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
 
     fun type(psiElement: PsiElement, ownerFallBack: FirBasedSymbol<*>?): JavaType? {
         val fir = primary(psiElement)
-        return if (fir != null) typeMapping.type(fir, ownerFallBack) else null
+        return if (fir != null) typeMapping.type(fir, ownerFallBack) else JavaType.Unknown.getInstance()
     }
 
     fun symbol(psi: KtDeclaration?): FirBasedSymbol<*>? {
@@ -162,7 +163,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             p = p.parent
         }
 
-        if (p == null) {
+        if (p == null || p is KtPackageDirective) {
             return null
         }
 
@@ -174,7 +175,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             return when (psi) {
                 is KtPrefixExpression -> allFirInfos.first { it.fir is FirVariableAssignment }.fir
                 is KtPostfixExpression -> allFirInfos.first { it.fir is FirResolvedTypeRef }.fir
-                is KtArrayAccessExpression -> allFirInfos.first { it.fir is FirResolvedNamedReference && it.fir.name.asString() == "get" }.fir
+                is KtArrayAccessExpression -> allFirInfos.firstOrNull { it.fir is FirResolvedNamedReference && (it.fir.name.asString() == "get" || it.fir.name.asString() == "set") }?.fir
                 is KtWhenConditionInRange, is KtBinaryExpression -> allFirInfos.first { it.fir is FirFunctionCall }.fir
                 else -> {
                     allFirInfos[0].fir
