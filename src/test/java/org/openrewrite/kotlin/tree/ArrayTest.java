@@ -107,4 +107,44 @@ class ArrayTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void IndexedAccessOperator2D() {
+        rewriteRun(
+          kotlin(
+            """
+              class Matrix(private val rows: Int, private val cols: Int) {
+                  operator fun get(i: Int, j: Int): Int { return 0  }
+                  operator fun set(i: Int, j: Int, value: Int) {}
+              }
+
+              fun method() {
+                  val matrix = Matrix(3, 3)
+                  val x = matrix [  1   , 2  ]
+                  matrix [1, 2] = 3
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void IndexAccessOperatorMulD() {
+        rewriteRun(
+          kotlin(
+            """
+              class MultiDimensionArray(private val dimensions: IntArray) {
+                  operator fun get(vararg indices: Int): Int { return 0 }
+                  operator fun set(vararg indices: Int, value: Int) {}
+              }
+
+              fun method() {
+                  val array = MultiDimensionArray(intArrayOf(2, 3, 4))
+                  array [  1   ,    2 ,  3   ] = 42
+                  val x = array[1, 2, 3]
+              }
+              """
+          )
+        );
+    }
 }
