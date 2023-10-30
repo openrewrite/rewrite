@@ -18,6 +18,7 @@ package org.openrewrite.kotlin.internal;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtNodeTypes;
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
+import org.jetbrains.kotlin.com.intellij.openapi.util.TextRange;
 import org.jetbrains.kotlin.com.intellij.psi.*;
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.tree.LeafPsiElement;
 import org.jetbrains.kotlin.com.intellij.psi.impl.source.tree.PsiErrorElementImpl;
@@ -87,6 +88,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     private final Boolean charsetBomMarked;
     private final Stack<KtElement> ownerStack = new Stack<>();
     private final ExecutionContext executionContext;
+    private final List<Integer> cRLFLocations;
 
     public KotlinTreeParserVisitor(KotlinSource kotlinSource,
                                    PsiElementAssociations psiElementAssociations,
@@ -103,6 +105,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         charsetBomMarked = stream.isCharsetBomMarked();
         ownerStack.push(kotlinSource.getKtFile());
         executionContext = ctx;
+        cRLFLocations = kotlinSource.getCRLFLocations();
     }
 
     public K.CompilationUnit parse() {
@@ -3765,12 +3768,26 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         for (; node != null; node = next(node)) {
             PsiElement finalNode = node;
             if (isWhiteSpace(node)) {
+                String whiteSpace = node.getText();
+
+                // replace `\n` to CRLF back if it's CRLF in the source
+                TextRange range = node.getTextRange();
+                int left = findFirstGreaterOrEqual(cRLFLocations, range.getStartOffset());
+                int right = left != -1 ? findFirstLessOrEqual(cRLFLocations, range.getEndOffset(), left) : -1;
+                boolean hasCRLF = left != -1 && left <= right;
+
+                if (hasCRLF) {
+                    for (int i = right; i >= left; i--) {
+                        whiteSpace = replaceNewLineWithCRLF(whiteSpace, cRLFLocations.get(i) - range.getStartOffset());
+                    }
+                }
+
                 if (space == null) {
-                    space = Space.build(node.getText(), emptyList());
+                    space = Space.build(whiteSpace, emptyList());
                 } else {
                     if (isWhiteSpace(preNode)) {
                         // merge space
-                        space = space.withWhitespace(space.getWhitespace() + node.getText());
+                        space = space.withWhitespace(space.getWhitespace() + whiteSpace);
                     } else {
                         space = space.withComments(ListUtils.mapLast(space.getComments(), c -> c.withSuffix(finalNode.getText())));
                     }
@@ -3854,6 +3871,62 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             nextSibling = nextSibling.getNextSibling();
         }
         return null;
+    }
+
+    private int findFirstGreaterOrEqual(List<Integer> sequence, int target) {
+        int left = 0;
+        int right = sequence.size() - 1;
+        int resultIndex = -1;
+
+        while (left <= right) {
+            int mid = left + (right - left) / 2;
+            int midValue = sequence.get(mid);
+
+            if (midValue >= target) {
+                resultIndex = mid;
+                right = mid - 1;
+            } else {
+                left = mid + 1;
+            }
+        }
+
+        return resultIndex;
+    }
+
+    private int findFirstLessOrEqual(List<Integer> sequence, int target, int left) {
+        int right = sequence.size() - 1;
+        int resultIndex = -1;
+
+        while (left <= right) {
+            int mid = left + (right - left) / 2;
+            int midValue = sequence.get(mid);
+
+            if (midValue <= target) {
+                resultIndex = mid;
+                left = mid + 1;
+            } else {
+                right = mid - 1;
+            }
+        }
+
+        return resultIndex;
+    }
+
+    private String replaceNewLineWithCRLF(String source, int index) {
+        if (index < 0 || index >= source.length()) {
+            return source;
+        }
+
+        StringBuilder sb = new StringBuilder(source);
+        char charAtIndex = source.charAt(index);
+        if (charAtIndex != '\n') {
+            return source;
+        }
+
+        sb.setCharAt(index, '\r');
+        sb.insert(index + 1, '\n');
+
+        return sb.toString();
     }
 
 }

@@ -30,7 +30,8 @@ import kotlin.collections.ArrayDeque
 @Getter
 class KotlinSource(
     var input: Parser.Input,
-    val ktFile: KtFile
+    val ktFile: KtFile,
+    val cRLFLocations : List<Int>
 ) {
     val nodes: Map<Int, ASTNode>
 

@@ -425,7 +425,10 @@ public class KotlinParser implements Parser {
                 fileName = source.getPath().toString();
             }
 
-            VirtualFile vFile = new LightVirtualFile(fileName, KotlinFileType.INSTANCE, StringUtilRt.convertLineSeparators(source.getSource(ctx).readFully()));
+            String sourceText = source.getSource(ctx).readFully();
+            List<Integer> cRLFLocations = getCRLFLocations(sourceText);
+
+            VirtualFile vFile = new LightVirtualFile(fileName, KotlinFileType.INSTANCE, StringUtilRt.convertLineSeparators(sourceText));
             final FileViewProvider fileViewProvider = new SingleRootFileViewProvider(
                     PsiManager.getInstance(environment.getProject()),
                     vFile
@@ -433,7 +436,7 @@ public class KotlinParser implements Parser {
             KtFile file = (KtFile) fileViewProvider.getPsi(KotlinLanguage.INSTANCE);
             assert file != null;
             ktFiles.add(file);
-            kotlinSources.add(new KotlinSource(source, file));
+            kotlinSources.add(new KotlinSource(source, file, cRLFLocations));
         }
 
         BaseDiagnosticsCollector diagnosticsReporter = DiagnosticReporterFactory.INSTANCE.createReporter(false);
@@ -610,5 +613,26 @@ public class KotlinParser implements Parser {
             default:
                 throw new IllegalArgumentException("Unknown language level: " + languageLevel);
         }
+    }
+
+    private List<Integer> getCRLFLocations(String source) {
+        if (source.isEmpty()) {
+            return emptyList();
+        }
+        List<Integer> cRLFIndices = new ArrayList<>();
+        int pos = 0;
+        for (int i = 0; i < source.length(); i++) {
+            char currentChar = source.charAt(i);
+            if (currentChar == '\r') {
+                // Check if the next character is '\n' (CRLF)
+                if (i + 1 < source.length() && source.charAt(i + 1) == '\n') {
+                    cRLFIndices.add(pos);
+                    i++; // Skip the next character ('\n')
+                }
+            }
+            pos++;
+        }
+
+        return cRLFIndices;
     }
 }
