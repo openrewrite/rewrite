@@ -97,7 +97,7 @@ public final class Assertions {
     public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before, Consumer<SourceSpec<K.CompilationUnit>> spec) {
         SourceSpec<K.CompilationUnit> kotlin = new SourceSpec<>(
                 K.CompilationUnit.class, null, KotlinParser.builder(), before,
-                SourceSpec.EachResult.noop,
+                SourceSpec.ValidateSource.noop,
                 Assertions::customizeExecutionContext
         );
         acceptSpec(spec, kotlin);
@@ -107,7 +107,7 @@ public final class Assertions {
     public static SourceSpecs kotlinScript(@Language("kts") @Nullable String before, Consumer<SourceSpec<K.CompilationUnit>> spec) {
         SourceSpec<K.CompilationUnit> kotlinScript = new SourceSpec<>(
                 K.CompilationUnit.class, null, KotlinParser.builder().isKotlinScript(true), before,
-                SourceSpec.EachResult.noop,
+                SourceSpec.ValidateSource.noop,
                 Assertions::customizeExecutionContext
         );
         acceptSpec(spec, kotlinScript);
@@ -122,7 +122,7 @@ public final class Assertions {
     public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before, @Language("kotlin") String after,
                                      Consumer<SourceSpec<K.CompilationUnit>> spec) {
         SourceSpec<K.CompilationUnit> kotlin = new SourceSpec<>(K.CompilationUnit.class, null, KotlinParser.builder(), before,
-                SourceSpec.EachResult.noop,
+                SourceSpec.ValidateSource.noop,
                 Assertions::customizeExecutionContext).after(s -> after);
         acceptSpec(spec, kotlin);
         return kotlin;
