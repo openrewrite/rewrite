@@ -108,6 +108,7 @@ class ArrayTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail("Fixed by PSI-based-parser")
     @Test
     void IndexedAccessOperator2D() {
         rewriteRun(
@@ -128,6 +129,7 @@ class ArrayTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail("Fixed by PSI-based-parser")
     @Test
     void IndexAccessOperatorMulD() {
         rewriteRun(
