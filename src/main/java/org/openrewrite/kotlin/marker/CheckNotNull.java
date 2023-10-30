@@ -22,6 +22,7 @@ import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
+@Deprecated // Use K.Unary with type NotNull instead
 @Value
 @With
 public class CheckNotNull implements Marker {
