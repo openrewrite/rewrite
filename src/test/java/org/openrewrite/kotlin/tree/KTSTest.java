@@ -27,6 +27,7 @@ class KTSTest implements RewriteTest {
         rewriteRun(
           kotlinScript("""
             import java.util.List
+
             println("Hello, World!")
             """)
         );

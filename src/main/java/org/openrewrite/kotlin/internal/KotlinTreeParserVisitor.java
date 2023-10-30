@@ -1056,12 +1056,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitScript(KtScript script, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        return script.getBlockExpression().accept(this, data);
     }
 
     @Override
     public J visitScriptInitializer(KtScriptInitializer initializer, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        J j = initializer.getBody().accept(this, data);
+        return j.withPrefix(merge(prefix(initializer), j.getPrefix()));
     }
 
     @Override
