@@ -23,7 +23,9 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
@@ -47,6 +49,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
 public interface K extends J {
@@ -2123,4 +2126,113 @@ public interface K extends J {
             }
         }
     }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class Unary implements K, Statement, Expression, TypedTree {
+        @Nullable
+        @NonFinal
+        transient WeakReference<K.Unary.Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JLeftPadded<Type> operator;
+
+        public Type getOperator() {
+            return operator.getElement();
+        }
+
+        public K.Unary withOperator(Type operator) {
+            return getPadding().withOperator(this.operator.withElement(operator));
+        }
+
+        @With
+        @Getter
+        Expression expression;
+
+        @With
+        @Nullable
+        @Getter
+        JavaType type;
+
+        @Override
+        public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
+            return K.super.accept(v, p);
+        }
+
+        @Override
+        public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
+            return v.visitUnary(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        @Override
+        @Transient
+        public List<J> getSideEffects() {
+            return getOperator().isModifying() ? singletonList(this) : expression.getSideEffects();
+        }
+
+        public enum Type {
+            NotNull;
+
+            public boolean isModifying() {
+                switch (this) {
+                    case NotNull:
+                    default:
+                        return false;
+                }
+            }
+        }
+
+        public K.Unary.Padding getPadding() {
+            K.Unary.Padding p;
+            if (this.padding == null) {
+                p = new K.Unary.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new K.Unary.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final K.Unary t;
+
+            public JLeftPadded<K.Unary.Type> getOperator() {
+                return t.operator;
+            }
+
+            public K.Unary withOperator(JLeftPadded<K.Unary.Type> operator) {
+                return t.operator == operator ? t : new K.Unary(t.id, t.prefix, t.markers, operator, t.expression, t.type);
+            }
+        }
+    }
+
 }

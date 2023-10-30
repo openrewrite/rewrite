@@ -54,6 +54,7 @@ public class KSpace {
         TOP_LEVEL_STATEMENT,
         TYPE_CONSTRAINTS_PREFIX,
         TYPE_REFERENCE_PREFIX,
+        UNARY_PREFIX,
         WHEN_PREFIX,
         WHEN_BRANCH_EXPRESSION,
     }

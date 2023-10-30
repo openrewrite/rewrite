@@ -2719,7 +2719,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         J j = expression.getBaseExpression().accept(this, data);
         IElementType referencedNameElementType = expression.getOperationReference().getReferencedNameElementType();
         if (referencedNameElementType == KtTokens.EXCLEXCL) {
-            j = j.withMarkers(j.getMarkers().addIfAbsent(new CheckNotNull(randomId(), prefix(expression.getOperationReference()))));
+            // j = j.withMarkers(j.getMarkers().addIfAbsent(new CheckNotNull(randomId(), prefix(expression.getOperationReference()))));
+            j = new K.Unary(randomId(), prefix(expression), Markers.EMPTY, padLeft(prefix(expression.getOperationReference()), K.Unary.Type.NotNull), (Expression) j, type(expression));
         } else if (referencedNameElementType == KtTokens.PLUSPLUS) {
             j = new J.Unary(randomId(), prefix(expression), Markers.EMPTY, padLeft(prefix(expression.getOperationReference()), J.Unary.Type.PostIncrement), (Expression) j, type(expression));
         } else if (referencedNameElementType == KtTokens.MINUSMINUS) {
