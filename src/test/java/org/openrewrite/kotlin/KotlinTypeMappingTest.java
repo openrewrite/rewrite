@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
@@ -121,14 +120,14 @@ public class KotlinTypeMappingTest {
         assertThat(id.getType().toString()).isEqualTo("kotlin.Int");
 
         JavaType.FullyQualified declaringType = property.getGetter().getMethodType().getDeclaringType();
-        assertThat(declaringType.getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoatKt");
+        assertThat(declaringType.getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
         assertThat(property.getGetter().getMethodType().getName()).isEqualTo("accessor"); // FIXME
         assertThat(property.getGetter().getMethodType().getReturnType()).isEqualTo(id.getType());
         assertThat(property.getGetter().getName().getType()).isEqualTo(property.getGetter().getMethodType());
         assertThat(property.getGetter().getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=accessor,return=kotlin.Int,parameters=[]}");
 
         declaringType = property.getSetter().getMethodType().getDeclaringType();
-        assertThat(declaringType.getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoatKt");
+        assertThat(declaringType.getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
         assertThat(property.getSetter().getMethodType().getName()).isEqualTo("accessor"); // FIXME
         assertThat(property.getSetter().getMethodType()).isEqualTo(property.getSetter().getName().getType());
         assertThat(property.getSetter().getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=accessor,return=kotlin.Unit,parameters=[kotlin.Int]}");
