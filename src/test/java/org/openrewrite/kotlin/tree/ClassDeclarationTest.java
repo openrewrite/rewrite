@@ -40,6 +40,15 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void consecutiveCRLF() {
+        rewriteRun(
+          kotlin(
+            "package some.other.name\r\n\r\n\r\n" + "class A { }\r\n\r\n\r\n" + "class B { }"
+          )
+        );
+    }
+
+    @Test
     void whitespaceInPackage() {
         rewriteRun(
           kotlin(
