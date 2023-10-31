@@ -2406,7 +2406,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         if (function.getReceiverTypeReference() != null) {
             markers = markers.addIfAbsent(new Extension(randomId()));
-            Expression receiver = convertToExpression(function.getReceiverTypeReference().accept(this, data)).withPrefix(prefix(function.getReceiverTypeReference()));
+            Expression receiver = convertToExpression(function.getReceiverTypeReference().accept(this, data));
             JRightPadded<J.VariableDeclarations.NamedVariable> infixReceiver = JRightPadded.build(
                             new J.VariableDeclarations.NamedVariable(
                                     randomId(),

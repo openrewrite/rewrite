@@ -321,7 +321,7 @@ class AnnotationTest implements RewriteTest {
           kotlin(ANNOTATION),
           kotlin(
             """
-              fun @receiver : Ann String . myExtension ( ) { }
+              fun @receiver  :   Ann    String     . myExtension  (   )    {      }
               """
           )
         );
