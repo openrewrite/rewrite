@@ -99,6 +99,9 @@ public class FindMissingTypes extends Recipe {
             if (!isWellFormedType(identifier.getType(), seenTypes) && !isAllowedToHaveNullType(identifier)) {
                 identifier = SearchResult.found(identifier, "Identifier type is missing or malformed");
             }
+            if (identifier.getFieldType() != null && !identifier.getSimpleName().equals(identifier.getFieldType().getName())) {
+                identifier = SearchResult.found(identifier, "type information has a different variable name '" + identifier.getFieldType().getName() + "'");
+            }
             return identifier;
         }
 

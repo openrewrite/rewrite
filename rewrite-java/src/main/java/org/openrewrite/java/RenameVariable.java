@@ -83,6 +83,10 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
             if (ident.getSimpleName().equals(renameVariable.getSimpleName())) {
                 if (parent.getValue() instanceof J.FieldAccess) {
                     if (fieldAccessTargetsVariable(parent.getValue())) {
+                        if (ident.getFieldType() != null) {
+                            ident = ident.withFieldType(ident.getFieldType().withName(newName));
+                        }
+                        parent.putMessage("renamed", true);
                         return ident.withSimpleName(newName);
                     }
                 } else if (currentNameScope.size() == 1 && isVariableName(parent.getValue(), ident)) {
@@ -100,6 +104,10 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                     }
 
                     // The size of the stack will be 1 if the identifier is in the right scope.
+                    if (ident.getFieldType() != null) {
+                        ident = ident.withFieldType(ident.getFieldType().withName(newName));
+                    }
+                    parent.putMessage("renamed", true);
                     return ident.withSimpleName(newName);
                 }
             }
@@ -140,7 +148,8 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
 
         @Override
         public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable namedVariable, P p) {
-            if (namedVariable.getSimpleName().equals(renameVariable.getSimpleName())) {
+            boolean nameEquals = namedVariable.getSimpleName().equals(renameVariable.getSimpleName());
+            if (nameEquals) {
                 Cursor parentScope = getCursorToParentScope(getCursor());
                 // The target variable was found and was not declared in a class declaration block.
                 if (currentNameScope.isEmpty()) {
@@ -154,7 +163,12 @@ public class RenameVariable<P> extends JavaIsoVisitor<P> {
                     }
                 }
             }
-            return super.visitVariable(namedVariable, p);
+
+            J.VariableDeclarations.NamedVariable v = super.visitVariable(namedVariable, p);
+            if (nameEquals && v.getVariableType() != null && Boolean.TRUE.equals(getCursor().pollMessage("renamed"))) {
+                v = v.withVariableType(v.getVariableType().withName(newName));
+            }
+            return v;
         }
 
         @Override

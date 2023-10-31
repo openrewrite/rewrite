@@ -38,7 +38,7 @@ public class TypeValidation {
     private boolean methodDeclarations = true;
 
     @Builder.Default
-    private boolean variableDeclarations = false; // FIXME false until recipes have been corrected
+    private boolean variableDeclarations = true;
 
     @Builder.Default
     private boolean methodInvocations = true;
