@@ -381,10 +381,7 @@ public class TypeUtils {
 
     @Nullable
     public static JavaType.FullyQualified asFullyQualified(@Nullable JavaType type) {
-        if (type instanceof JavaType.FullyQualified) {
-            if (type == JavaType.Unknown.getInstance()) {
-                return null;
-            }
+        if (type instanceof JavaType.FullyQualified && !(type instanceof JavaType.Unknown)) {
             return (JavaType.FullyQualified) type;
         }
         return null;
