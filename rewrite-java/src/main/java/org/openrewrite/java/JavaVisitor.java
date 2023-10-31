@@ -715,6 +715,15 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return i;
     }
 
+    public J visitIntersectionType(J.IntersectionType intersectionType, P p) {
+        J.IntersectionType i = intersectionType;
+        i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.INTERSECTION_TYPE_PREFIX, p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withBounds(visitContainer(i.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, p));
+        i = i.withType(visitType(i.getType(), p));
+        return i;
+    }
+
     public J visitLabel(J.Label label, P p) {
         J.Label l = label;
         l = l.withPrefix(visitSpace(l.getPrefix(), Space.Location.LABEL_PREFIX, p));

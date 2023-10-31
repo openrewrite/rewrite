@@ -2885,6 +2885,88 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class IntersectionType implements J, TypeTree {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JContainer<TypeTree> bounds;
+
+        public List<TypeTree> getBounds() {
+            return bounds.getElements();
+        }
+
+        public IntersectionType withBounds(List<TypeTree> bounds) {
+            return getPadding().withBounds(JContainer.withElementsNullable(this.bounds, bounds));
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitIntersectionType(this, p);
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public IntersectionType withType(@Nullable JavaType type) {
+            // cannot overwrite type directly, perform this operation on each bound separately
+            return this;
+        }
+
+        @Override
+        public JavaType getType() {
+            return new JavaType.Intersection(bounds.getPadding().getElements().stream()
+                    .filter(Objects::nonNull)
+                    .map(b -> b.getElement().getType())
+                    .collect(toList()));
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final IntersectionType t;
+
+            @Nullable
+            public JContainer<TypeTree> getBounds() {
+                return t.bounds;
+            }
+
+            public IntersectionType withBounds(@Nullable JContainer<TypeTree> bounds) {
+                return t.bounds == bounds ? t : new IntersectionType(t.id, t.prefix, t.markers, bounds);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class Label implements J, Statement {
         @Nullable
         @NonFinal

@@ -35,4 +35,20 @@ class TypeCastTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void intersectionCast() {
+        rewriteRun(
+          java(
+            """
+              import java.io.Serializable;
+              import java.util.function.BiFunction;
+              
+              class Test {
+                  Serializable s = (Serializable & BiFunction<Integer, Integer, Integer>) Integer::sum;
+              }
+              """
+          )
+        );
+    }
 }
