@@ -44,7 +44,7 @@ public final class Assertions {
     }
 
     // A helper method to adjust white spaces in the input kotlin source to help us detect parse-to-print idempotent issues
-    // Just change from `before` to `adjustSpaces(before)` below to test locally
+    // Just change from `before` to `adjustSpaces(before)` below in the `kotlin()` method to test locally
     @Nullable
     private static String adjustSpaces(@Nullable String input) {
         if (input == null) {
@@ -85,6 +85,7 @@ public final class Assertions {
     }
 
     public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before) {
+        // Change `before` to `adjustSpaces(before)` to test spaces locally here
         return kotlin(before, s -> {
         });
     }

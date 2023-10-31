@@ -574,6 +574,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitFunctionType(KtFunctionType type, ExecutionContext data) {
         List<JRightPadded<TypeTree>> params;
+        Set<PsiElement> consumedSpaces = new HashSet<>();
+
         if (type.getParameters().isEmpty()) {
             params = singletonList(JRightPadded
                     .<TypeTree>build(new J.Empty(randomId(), prefix(requireNonNull(requireNonNull(type.getParameterList()).getNode().findChildByType(KtTokens.RPAR)).getPsi()), Markers.EMPTY))
@@ -601,11 +603,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         JContainer<TypeTree> parameters = JContainer.build(prefix(type.getParameterList()), params, Markers.EMPTY);
         if (type.getFirstChild() == type.getParameterList()) {
             parameters = parameters.withBefore(prefix(type));
+            consumedSpaces.add(findFirstPrefixSpace(type));
         }
 
         return new K.FunctionType(
                 randomId(),
-                prefix(type),
+                prefix(type, consumedSpaces),
                 Markers.EMPTY, //.addIfAbsent(new IsNullable(randomId(), Space.EMPTY)), // TODO
                 emptyList(), // TODO
                 emptyList(), // TODO
@@ -814,7 +817,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         if (parameter.getTypeReference() != null) {
             markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), prefix(parameter.getColon())));
-            typeExpression = parameter.getTypeReference().accept(this, data).withPrefix(prefix(parameter.getTypeReference()));
+            typeExpression = (TypeTree) parameter.getTypeReference().accept(this, data);
             // TODO: get type from IR of KtProperty.
         }
 
@@ -2739,7 +2742,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         if (property.getColon() != null) {
             markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), prefix(property.getColon())));
             typeExpression = (TypeTree) requireNonNull(property.getTypeReference()).accept(this, data);
-            typeExpression = typeExpression.withPrefix(suffix(property.getColon()));
         }
 
         if (property.getGetter() != null) {
@@ -2931,31 +2933,37 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitTypeReference(KtTypeReference typeReference, ExecutionContext data) {
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
         List<J.Annotation> lastAnnotations = new ArrayList<>();
-        boolean prefixConsumed = false;
+        Set<PsiElement> consumedSpaces = new HashSet<>();
 
-        mapModifiers(typeReference.getModifierList(), leadingAnnotations, lastAnnotations, data);
+        List<J.Modifier> modifiers = mapModifiers(typeReference.getModifierList(), leadingAnnotations, lastAnnotations, data);
         if (!leadingAnnotations.isEmpty()) {
             leadingAnnotations = ListUtils.mapFirst(leadingAnnotations, anno -> anno.withPrefix(prefix(typeReference)));
-            prefixConsumed = true;
+            consumedSpaces.add(findFirstPrefixSpace(typeReference));
+        } else if (!modifiers.isEmpty()) {
+            modifiers = ListUtils.mapFirst(modifiers, mod -> mod.withPrefix(prefix(typeReference)));
+            consumedSpaces.add(findFirstPrefixSpace(typeReference));
         }
 
-        J j = requireNonNull(typeReference.getTypeElement()).accept(this, data)
-                .withPrefix(prefixConsumed ? prefix(typeReference.getTypeElement()) : merge(prefix(typeReference), prefix(typeReference.getTypeElement())));
+        J j = requireNonNull(typeReference.getTypeElement()).accept(this, data);
+        j = j.withPrefix(merge(j.getPrefix(), prefix(typeReference, consumedSpaces)));
+
+        consumedSpaces.add(findFirstPrefixSpace(typeReference.getTypeElement()));
+
         if (j instanceof K.FunctionType &&
                 typeReference.getModifierList() != null &&
                 typeReference.getModifierList().hasModifier(KtTokens.SUSPEND_KEYWORD)) {
-            j = ((K.FunctionType) j).withModifiers(singletonList(mapModifier(typeReference.getModifierList().getModifier(KtTokens.SUSPEND_KEYWORD), emptyList())))
-                    .withLeadingAnnotations(leadingAnnotations);
-            if (((K.FunctionType) j).getReceiver() != null) {
-                // TODO check if we can simplify this
-                j = ((K.FunctionType) j).withReceiver(
-                        ((K.FunctionType) j).getReceiver().withElement(
-                                ((K.FunctionType) j).getReceiver().getElement().withPrefix(
-                                        prefix(typeReference.getTypeElement())
-                                )
-                        )
+            K.FunctionType functionType = (K.FunctionType) j;
+            functionType = functionType.withModifiers(modifiers).withLeadingAnnotations(leadingAnnotations);
+
+            if (functionType.getReceiver() != null) {
+                functionType = functionType.withReceiver(
+                        functionType.getReceiver().withElement(functionType.getReceiver().getElement().withPrefix(functionType.getPrefix()))
                 );
+
+                functionType = functionType.withPrefix(Space.EMPTY);
             }
+
+            j = functionType;
         } else if (j instanceof J.Identifier) {
             j = ((J.Identifier) j).withAnnotations(leadingAnnotations);
         }
@@ -2966,6 +2974,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitUserType(KtUserType type, ExecutionContext data) {
         // FIXME: must be mapped through parent element. I.E. functionType.
         J.Identifier name = (J.Identifier) requireNonNull(type.getReferenceExpression()).accept(this, data);
+
+        if (type.getFirstChild() == type.getReferenceExpression()) {
+            name = name.withPrefix(merge(prefix(type), name.getPrefix()));
+        }
+
         NameTree nameTree = name;
 
         if (type.getQualifier() != null) {

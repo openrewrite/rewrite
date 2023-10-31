@@ -422,8 +422,8 @@ class MethodInvocationTest implements RewriteTest {
           kotlin(
             """
               class SomeReceiver
-              suspend inline fun SomeReceiver.method(
-                crossinline body: suspend SomeReceiver.() -> Unit
+              suspend inline fun SomeReceiver  .   method(
+                crossinline body  :   suspend     SomeReceiver .  () -> Unit
               ) {}
               """
           )

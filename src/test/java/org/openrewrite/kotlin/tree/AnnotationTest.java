@@ -172,7 +172,7 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              annotation class Test ( val values : Array < String > )
+              annotation class Test ( val values :   Array < String > )
               @Test( values = [ "a" , "b" ,  /* trailing comma */ ] )
               val a = 42
               """
