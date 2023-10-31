@@ -35,4 +35,17 @@ class DoWhileTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void emptyBody() {
+        rewriteRun(
+          kotlin(
+            """
+              fun infinite() {
+                  do while (true)
+              }
+              """
+          )
+        );
+    }
 }
