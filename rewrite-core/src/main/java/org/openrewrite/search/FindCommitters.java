@@ -19,7 +19,8 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.table.Committers;
+import org.openrewrite.table.CommitsByDay;
+import org.openrewrite.table.DistinctCommitters;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -27,7 +28,8 @@ import java.util.Map;
 import java.util.TreeMap;
 
 public class FindCommitters extends ScanningRecipe<Map<String, GitProvenance.Committer>> {
-    private transient final Committers committers = new Committers(this);
+    private transient final DistinctCommitters committers = new DistinctCommitters(this);
+    private transient final CommitsByDay commitsByDay = new CommitsByDay(this);
 
     @Override
     public String getDisplayName() {
@@ -67,12 +69,19 @@ public class FindCommitters extends ScanningRecipe<Map<String, GitProvenance.Com
     @Override
     public Collection<? extends SourceFile> generate(Map<String, GitProvenance.Committer> acc, ExecutionContext ctx) {
         for (GitProvenance.Committer committer : acc.values()) {
-            committers.insertRow(ctx, new Committers.Row(
+            committers.insertRow(ctx, new DistinctCommitters.Row(
                     committer.getName(),
                     committer.getEmail(),
                     committer.getCommitsByDay().lastKey(),
                     committer.getCommitsByDay().values().stream().mapToInt(Integer::intValue).sum()
             ));
+
+            committer.getCommitsByDay().forEach((day, commits) -> commitsByDay.insertRow(ctx, new CommitsByDay.Row(
+                    committer.getName(),
+                    committer.getEmail(),
+                    day,
+                    commits
+            )));
         }
         return Collections.emptyList();
     }

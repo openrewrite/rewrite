@@ -21,9 +21,9 @@ import org.openrewrite.Recipe;
 
 import java.time.LocalDate;
 
-public class Committers extends DataTable<Committers.Row> {
+public class DistinctCommitters extends DataTable<DistinctCommitters.Row> {
 
-    public Committers(Recipe recipe) {
+    public DistinctCommitters(Recipe recipe) {
         super(recipe,
                 "Repository committers",
                 "The distinct set of committers per repository.");

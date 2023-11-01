@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.marker.GitProvenance;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
-import org.openrewrite.text.PlainTextParser;
 
 import java.time.LocalDate;
 import java.util.List;
