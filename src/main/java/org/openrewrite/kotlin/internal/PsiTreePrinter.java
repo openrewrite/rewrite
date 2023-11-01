@@ -30,14 +30,16 @@ import org.jetbrains.kotlin.fir.declarations.FirFile;
 import org.jetbrains.kotlin.fir.declarations.FirProperty;
 import org.jetbrains.kotlin.fir.expressions.*;
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
-import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef;
-import org.jetbrains.kotlin.fir.types.FirTypeRef;
+import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag;
+import org.jetbrains.kotlin.fir.types.*;
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor;
 import org.jetbrains.kotlin.ir.IrElement;
 import org.jetbrains.kotlin.ir.declarations.IrFile;
 import org.jetbrains.kotlin.ir.declarations.IrMetadataSourceOwner;
 import org.jetbrains.kotlin.ir.declarations.MetadataSource;
 import org.jetbrains.kotlin.ir.expressions.IrConst;
+import org.jetbrains.kotlin.name.ClassId;
+import org.jetbrains.kotlin.name.FqName;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
@@ -474,6 +476,34 @@ public class PsiTreePrinter {
         return sb.toString();
     }
 
+    private static String printConeKotlinType(ConeTypeProjection coneKotlinType) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Type:[").append(coneKotlinType);
+        if (coneKotlinType instanceof ConeClassLikeType) {
+            ConeClassLikeType coneClassLikeType = (ConeClassLikeType) coneKotlinType;
+            ConeClassLikeLookupTag coneClassLikeLookupTag = coneClassLikeType.getLookupTag();
+            ClassId classId = coneClassLikeLookupTag.getClassId();
+
+            FqName packageFqName = classId.getPackageFqName();
+            sb.append(" packageFqName: ").append(packageFqName);
+
+            FqName className = classId.getRelativeClassName();
+            sb.append(" className: ").append(className);
+
+            coneClassLikeLookupTag.getName();
+
+            ConeTypeProjection[] typeArguments = coneClassLikeType.getTypeArguments();
+            if (typeArguments != null && typeArguments.length > 0) {
+                sb.append(" typeArgument: ");
+                for (int i = 0; i < typeArguments.length; i++) {
+                    sb.append(printConeKotlinType(typeArguments[0]));
+                }
+            }
+        }
+        sb.append("]");
+        return sb.toString();
+    }
+
     @Nullable
     public static String firElementToString(FirElement firElement) {
         if (firElement instanceof FirFile) {
@@ -481,7 +511,9 @@ public class PsiTreePrinter {
         } else if (firElement instanceof FirProperty) {
             return ((FirProperty) firElement).getName().toString();
         } else if (firElement instanceof FirResolvedTypeRef) {
-            return "Type = " + ((FirResolvedTypeRef) firElement).getType();
+            FirResolvedTypeRef resolvedTypeRef = (FirResolvedTypeRef) firElement;
+            ConeKotlinType coneKotlinType = resolvedTypeRef.getType();
+            return printConeKotlinType(coneKotlinType);
         } else if (firElement instanceof FirResolvedNamedReference) {
             return ((FirResolvedNamedReference) firElement).getName().toString();
         } else if (firElement instanceof FirFunctionCall) {
