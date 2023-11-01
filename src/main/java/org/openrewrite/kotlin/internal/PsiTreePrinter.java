@@ -496,7 +496,7 @@ public class PsiTreePrinter {
             if (typeArguments != null && typeArguments.length > 0) {
                 sb.append(" typeArgument: ");
                 for (int i = 0; i < typeArguments.length; i++) {
-                    sb.append(printConeKotlinType(typeArguments[0]));
+                    sb.append(printConeKotlinType(typeArguments[i]));
                 }
             }
         }
