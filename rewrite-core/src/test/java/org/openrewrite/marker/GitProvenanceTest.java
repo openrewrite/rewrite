@@ -41,6 +41,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_BRANCH_SECTION;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -65,14 +66,14 @@ class GitProvenanceTest {
     @ParameterizedTest
     @MethodSource("remotes")
     void getOrganizationName(String remote) {
-        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null).getOrganizationName())
+        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null, emptyList()).getOrganizationName())
           .isEqualTo("openrewrite");
     }
 
     @ParameterizedTest
     @MethodSource("remotes")
     void getRepositoryName(String remote) {
-        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null).getRepositoryName())
+        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null, emptyList()).getRepositoryName())
           .isEqualTo("rewrite");
     }
 
@@ -192,7 +193,8 @@ class GitProvenanceTest {
           "master",
           "1234567890abcdef1234567890abcdef12345678",
           null,
-          null);
+          null,
+          emptyList());
 
         assertThat(provenance.getOrganizationName(baseUrl)).isEqualTo("group/subgroup1/subgroup2");
         assertThat(provenance.getRepositoryName()).isEqualTo("repo");
