@@ -103,6 +103,7 @@ class CommentTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
+            "val foo = \"bar\"",
             "class Foo {}",
             "fun foo() {}",
             "@file:Suppress(\"PLATFORM_CLASS_MAPPED_TO_KOTLIN\", \"unused\")",
@@ -117,6 +118,22 @@ class CommentTest implements RewriteTest {
                */
               %s
               """.formatted(input)
+          )
+        );
+    }
+
+    @Test
+    void trailingComments() {
+        rewriteRun(
+          kotlin(
+            """
+              val n : Int = 10
+              fun m ( ) : Int {
+                return 1 + 1
+              }
+              class T ( val a : String ) {
+              }
+              """.replace("\n", "/**/\n").replace(" ", "/**/ ")
           )
         );
     }
