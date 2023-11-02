@@ -2589,7 +2589,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.NewClass(
                 randomId(),
-                prefix(declaration),
+                merge(prefix(expression), prefix(declaration)) ,
                 markers,
                 null,
                 suffix(declaration.getColon()),

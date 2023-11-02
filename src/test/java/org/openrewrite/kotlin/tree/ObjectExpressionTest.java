@@ -38,4 +38,20 @@ class ObjectExpressionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void objectInMethod() {
+        rewriteRun(
+          kotlin(
+            """
+              fun test() {
+                  object : Runnable {
+                      override fun run() {
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
 }
