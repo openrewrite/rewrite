@@ -158,10 +158,10 @@ public interface RewriteTest extends SourceSpecs {
                 .as("A recipe must be specified")
                 .isNotNull();
 
-        if (!(recipe instanceof AdHocRecipe) && !(recipe instanceof CompositeRecipe) &&
-                !(recipe.equals(Recipe.noop())) &&
-                testClassSpec.serializationValidation &&
-                testMethodSpec.serializationValidation) {
+        if (!(recipe instanceof AdHocRecipe) && !(recipe instanceof AdHocScanningRecipe) &&
+            !(recipe instanceof CompositeRecipe) && !(recipe.equals(Recipe.noop())) &&
+            testClassSpec.serializationValidation &&
+            testMethodSpec.serializationValidation) {
             RecipeSerializer recipeSerializer = new RecipeSerializer();
             assertThat(recipeSerializer.read(recipeSerializer.write(recipe)))
                     .as("Recipe must be serializable/deserializable")
