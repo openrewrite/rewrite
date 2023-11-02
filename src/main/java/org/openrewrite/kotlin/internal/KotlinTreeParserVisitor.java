@@ -2347,7 +2347,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitImportDirective(KtImportDirective importDirective, ExecutionContext data) {
         FirResolvedImport resolvedImport = getResolvedImport(importDirective);
-        boolean isStaticImport = resolvedImport instanceof FirResolvedImport && resolvedImport.getResolvedParentClassId() != null;
+        boolean isStaticImport = resolvedImport != null && resolvedImport.getResolvedParentClassId() != null;
         JLeftPadded<Boolean> rpStatic = padLeft(Space.EMPTY, isStaticImport);
         KtImportAlias alias = importDirective.getAlias();
         String text = nodeRangeText(
