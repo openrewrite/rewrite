@@ -2309,8 +2309,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitImportDirective(KtImportDirective importDirective, ExecutionContext data) {
-        boolean hasParentClassId = importDirective.getImportedReference() instanceof KtDotQualifiedExpression;// firElement instanceof FirResolvedImport && ((FirResolvedImport) firElement).getResolvedParentClassId() != null;
-        JLeftPadded<Boolean> statik = padLeft(Space.EMPTY, hasParentClassId);
+        // boolean hasParentClassId = importDirective.getImportedReference() instanceof KtDotQualifiedExpression;
+        // firElement instanceof FirResolvedImport && ((FirResolvedImport) firElement).getResolvedParentClassId() != null;
+        boolean isStaticImport = false;
+        JLeftPadded<Boolean> rpStatic = padLeft(Space.EMPTY, isStaticImport);
         KtImportAlias alias = importDirective.getAlias();
         String text = nodeRangeText(
                 importDirective.getNode().findChildByType(KtTokens.WHITE_SPACE),
@@ -2333,7 +2335,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 randomId(),
                 prefix(importDirective),
                 Markers.EMPTY,
-                statik,
+                rpStatic,
                 (J.FieldAccess) reference,
                 // TODO: fix NPE.
                 alias != null ? padLeft(prefix(alias), createIdentifier(requireNonNull(alias.getNameIdentifier()), null)) : null
