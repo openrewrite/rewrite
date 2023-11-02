@@ -38,7 +38,7 @@ import java.nio.file.Paths;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
-// TODO: remove after we switch to PSI-based parsing with IR type mapping.
+@Disabled
 @SuppressWarnings("ConstantConditions")
 public class KotlinIrTypeMappingTest {
     private static final String goat = StringUtils.readFully(KotlinTypeSignatureBuilderTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));

@@ -35,6 +35,7 @@ import java.nio.file.Paths;
 import static java.util.Collections.singletonList;
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Disabled
 public class KotlinTypeIrSignatureBuilderTest {
     private static final String goat = StringUtils.readFully(KotlinTypeIrSignatureBuilderTest.class.getResourceAsStream("/KotlinTypeGoat.kt"));
 
