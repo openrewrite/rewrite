@@ -32,7 +32,6 @@ import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
 import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.parsing.ParseUtilsKt;
 import org.jetbrains.kotlin.psi.*;
-import org.jetbrains.kotlin.psi.psiUtil.PsiChildRange;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes;
 import org.jetbrains.kotlin.types.Variance;
