@@ -130,7 +130,7 @@ class EnumTest implements RewriteTest {
             """
               enum class Test : java.io.Serializable {
                   FOO   {
-                      fun foo() = print("foo",)
+                      fun foo() = print("bar",)
                   }
               }
               """

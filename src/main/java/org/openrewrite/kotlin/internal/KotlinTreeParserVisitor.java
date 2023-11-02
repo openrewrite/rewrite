@@ -2312,8 +2312,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitImportDirective(KtImportDirective importDirective, ExecutionContext data) {
-        FirElement firElement = null;
-        boolean hasParentClassId = firElement instanceof FirResolvedImport && ((FirResolvedImport) firElement).getResolvedParentClassId() != null;
+        boolean hasParentClassId = importDirective.getImportedReference() instanceof KtDotQualifiedExpression;// firElement instanceof FirResolvedImport && ((FirResolvedImport) firElement).getResolvedParentClassId() != null;
         JLeftPadded<Boolean> statik = padLeft(Space.EMPTY, hasParentClassId);
         KtImportAlias alias = importDirective.getAlias();
         String text = nodeRangeText(

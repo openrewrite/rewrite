@@ -50,7 +50,7 @@ class WhenTest implements RewriteTest {
             """
               fun method ( i : Int ) : String {
                   when  {
-                      i == 1  ->   return "1"
+                      i == 1 || i == 3  ->   return "1"
                       i == 2   ->  return "2"
                       else    ->  {
                           return "42"
@@ -76,6 +76,24 @@ class WhenTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void twoIsConditions() {
+        rewriteRun(
+          kotlin(
+            """
+                fun method ( i : Any ) {
+                  when(i) {
+                      is Int, is Double -> println("Yeah")
+                      else -> {
+                          println("42")
+                      }
+                  }
+                }
+                """
           )
         );
     }
