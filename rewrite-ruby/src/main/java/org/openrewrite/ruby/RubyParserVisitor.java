@@ -133,6 +133,31 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     @Override
+    public J visitIfNode(IfNode node) {
+        Space prefix = sourceBefore("if");
+        J.ControlParentheses<Expression> ifCondition = new J.ControlParentheses<>(
+                randomId(),
+                EMPTY,
+                Markers.EMPTY,
+                padRight((Expression) node.getCondition().accept(this), EMPTY)
+        );
+        JRightPadded<Statement> then = padRight((Statement) node.getThenBody().accept(this), EMPTY);
+        return new J.If(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                ifCondition,
+                then,
+                node.getElseBody() == null ? null : new J.If.Else(
+                        randomId(),
+                        sourceBefore("el"),
+                        Markers.EMPTY,
+                        padRight((Statement) node.getElseBody().accept(this), EMPTY)
+                )
+        );
+    }
+
+    @Override
     public J visitLocalAsgnNode(LocalAsgnNode node) {
         if (node.getValueNode() instanceof OperatorCallNode) {
             // J.AssignmentOp
@@ -301,6 +326,12 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                     null
             );
         }
+    }
+
+    @Override
+    public J visitVCallNode(VCallNode node) {
+        return new J.Identifier(randomId(), sourceBefore(node.getName().asJavaString()),
+                Markers.EMPTY, emptyList(), node.getName().asJavaString(), null, null);
     }
 
     @Override
