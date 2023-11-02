@@ -22,6 +22,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
@@ -57,5 +58,10 @@ public class AssertionsTest implements RewriteTest {
             """
           )
         );
+    }
+
+    @Test
+    void disablePublishingSnapshots() {
+        assertThat(true).isEqualTo(false);
     }
 }

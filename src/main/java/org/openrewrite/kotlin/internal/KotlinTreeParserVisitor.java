@@ -25,21 +25,9 @@ import org.jetbrains.kotlin.com.intellij.psi.impl.source.tree.PsiErrorElementImp
 import org.jetbrains.kotlin.com.intellij.psi.tree.IElementType;
 import org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.kotlin.fir.FirElement;
-import org.jetbrains.kotlin.fir.declarations.FirFile;
-import org.jetbrains.kotlin.fir.declarations.FirFunction;
-import org.jetbrains.kotlin.fir.declarations.FirResolvedImport;
-import org.jetbrains.kotlin.fir.declarations.FirVariable;
-import org.jetbrains.kotlin.fir.expressions.FirConstExpression;
-import org.jetbrains.kotlin.fir.expressions.FirFunctionCall;
-import org.jetbrains.kotlin.fir.expressions.FirStringConcatenationCall;
 import org.jetbrains.kotlin.fir.references.FirResolvedCallableReference;
-import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference;
-import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol;
-import org.jetbrains.kotlin.fir.symbols.impl.FirVariableSymbol;
-import org.jetbrains.kotlin.fir.types.ConeClassLikeType;
-import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef;
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
 import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.parsing.ParseUtilsKt;
@@ -1833,9 +1821,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
         PsiElementAssociations.ExpressionType type = psiElementAssociations.getCallType(expression);
         if (type == PsiElementAssociations.ExpressionType.CONSTRUCTOR) {
+            JavaType.Method mt = methodInvocationType(expression);
             TypeTree name = (J.Identifier) expression.getCalleeExpression().accept(this, data);
-            // FIXME. The PSI may does not require type arguments on parameterized types. Check the FIR.
-            // psiElementAssociations.primary(expression.getCalleeExpression()) => symbol may contain type params.
+            name = name.withType(mt != null ? mt.getReturnType() : JavaType.Unknown.getInstance());
             if (!expression.getTypeArguments().isEmpty()) {
                 List<JRightPadded<Expression>> parameters = new ArrayList<>(expression.getTypeArguments().size());
                 for (KtTypeProjection ktTypeProjection : expression.getTypeArguments()) {
@@ -1846,7 +1834,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         randomId(),
                         name.getPrefix(),
                         Markers.EMPTY,
-                        name.withPrefix(Space.EMPTY),
+                        name.withType(name.getType() instanceof JavaType.Parameterized ? ((JavaType.Parameterized) name.getType()).getType() : name.getType()).withPrefix(Space.EMPTY),
                         JContainer.build(prefix(expression.getTypeArgumentList()), parameters, Markers.EMPTY),
                         type(expression)
                 );
@@ -1870,7 +1858,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     name,
                     args,
                     null,
-                    methodInvocationType(expression)
+                    mt
             );
         } else if (type == null || type == PsiElementAssociations.ExpressionType.METHOD_INVOCATION) {
             J.Identifier name = (J.Identifier) expression.getCalleeExpression().accept(this, data);
@@ -2011,7 +1999,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             throw new UnsupportedOperationException("TODO");
         }
 
-        // TODO: fix NPE.
         J.Identifier name = createIdentifier(requireNonNull(klass.getIdentifyingElement()), type(klass));
 
         J.Block body;
@@ -2862,11 +2849,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         // The correct type cannot consistently be associated to the expression due to the relationship between the PSI and FIR.
         // The parent tree should use the associated FIR to fix mis-mapped types.
         // I.E. MethodInvocations, MethodDeclarations, VariableNames should be set manually through `createIdentifier(psi, type)`
-        J.Identifier name = createIdentifier(expression, type(expression));
-        if (name.getType() instanceof JavaType.Parameterized) {
-            name = name.withType(((JavaType.Parameterized) name.getType()).getType());
-        }
-        return name;
+        return createIdentifier(expression, type(expression));
     }
 
     @Override
@@ -3001,13 +2984,14 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 parameters.add(padRight(convertToExpression(typeProjection.accept(this, data)), suffix(typeProjection)));
             }
 
+            JavaType.Parameterized pt = (JavaType.Parameterized) type(type);
             return new J.ParameterizedType(
                     randomId(),
                     Space.EMPTY,
                     Markers.EMPTY,
-                    nameTree,
+                    pt == null ? nameTree.withType(JavaType.Unknown.getInstance()) : nameTree.withType(pt.getType()),
                     JContainer.build(prefix(type.getTypeArgumentList()), parameters, Markers.EMPTY),
-                    type(type)
+                    pt == null ? JavaType.Unknown.getInstance() : pt
             );
         }
 

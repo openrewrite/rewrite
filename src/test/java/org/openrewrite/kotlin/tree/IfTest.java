@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -155,7 +154,6 @@ class IfTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Fixed by PSI based parser")
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/298")
     void functionCallCondition() {

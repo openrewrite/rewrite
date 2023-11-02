@@ -94,7 +94,7 @@ class ArrayTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Fixed by PSI-based-parser")
+    @ExpectedToFail("array[0]++ is mapped to 9 Fake elements. Find a way to retrieve the correct FIR.")
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/291")
     void incrementArrayElement() {
@@ -108,7 +108,6 @@ class ArrayTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Fixed by PSI-based-parser")
     @Test
     void IndexedAccessOperator2D() {
         rewriteRun(
@@ -129,7 +128,6 @@ class ArrayTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("Fixed by PSI-based-parser")
     @Test
     void IndexAccessOperatorMulD() {
         rewriteRun(

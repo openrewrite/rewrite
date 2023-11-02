@@ -15,13 +15,10 @@
  */
 package org.openrewrite.kotlin;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
@@ -451,7 +448,6 @@ public class KotlinTypeMappingTest {
             );
         }
 
-        @Disabled("Enable with PSI parser")
         @Test
         void implicitInvoke() {
             rewriteRun(
@@ -540,7 +536,6 @@ public class KotlinTypeMappingTest {
             );
         }
 
-        @Disabled("Enable with PSI parser")
         @ParameterizedTest
         @CsvSource(value = {
           "n++~kotlin.Int",
@@ -592,7 +587,6 @@ public class KotlinTypeMappingTest {
             );
         }
 
-        @Disabled("Enable with PSI parser")
         @Test
         void operatorOverload() {
             rewriteRun(
@@ -667,21 +661,21 @@ public class KotlinTypeMappingTest {
                                   .isEqualTo("kotlin.Triple<kotlin.Int, kotlin.Int, kotlin.Int>");
                                 case "a" -> {
                                     assertThat(variable.getVariableType().toString())
-                                      .isEqualTo("openRewriteFile0Kt{name=a,type=kotlin.Int}");
+                                      .isEqualTo("openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[]}{name=a,type=kotlin.Int}");
                                     assertThat(variable.getInitializer()).isInstanceOf(J.MethodInvocation.class);
                                     assertThat(((J.MethodInvocation) variable.getInitializer()).getMethodType().toString())
                                       .isEqualTo("kotlin.Triple<kotlin.Int, kotlin.Int, kotlin.Int>{name=component1,return=kotlin.Int,parameters=[]}");
                                 }
                                 case "b" -> {
                                     assertThat(variable.getVariableType().toString())
-                                      .isEqualTo("openRewriteFile0Kt{name=b,type=kotlin.Int}");
+                                      .isEqualTo("openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[]}{name=b,type=kotlin.Int}");
                                     assertThat(variable.getInitializer()).isInstanceOf(J.MethodInvocation.class);
                                     assertThat(((J.MethodInvocation) variable.getInitializer()).getMethodType().toString())
                                       .isEqualTo("kotlin.Triple<kotlin.Int, kotlin.Int, kotlin.Int>{name=component2,return=kotlin.Int,parameters=[]}");
                                 }
                                 case "c" -> {
                                     assertThat(variable.getVariableType().toString())
-                                      .isEqualTo("openRewriteFile0Kt{name=c,type=kotlin.Int}");
+                                      .isEqualTo("openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[]}{name=c,type=kotlin.Int}");
                                     assertThat(variable.getInitializer()).isInstanceOf(J.MethodInvocation.class);
                                     assertThat(((J.MethodInvocation) variable.getInitializer()).getMethodType().toString())
                                       .isEqualTo("kotlin.Triple<kotlin.Int, kotlin.Int, kotlin.Int>{name=component3,return=kotlin.Int,parameters=[]}");
@@ -737,6 +731,5 @@ public class KotlinTypeMappingTest {
               )
             );
         }
-        // TODO: ensure method and variable types from various IR with the same types generate the same java type.
     }
 }
