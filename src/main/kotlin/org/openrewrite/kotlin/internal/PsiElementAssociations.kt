@@ -237,10 +237,10 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 allFirInfos.size == 1 -> allFirInfos[0].fir
                 // There isn't a RealPsiElement associated to the KT, so, we find the associated FIR element.
                 p is KtArrayAccessExpression -> allFirInfos.firstOrNull { it.fir is FirResolvedNamedReference && (it.fir.name.asString() == "get" || it.fir.name.asString() == "set") }?.fir
-                p is KtPrefixExpression -> allFirInfos.first { it.fir is FirVariableAssignment }.fir
-                p is KtPostfixExpression -> allFirInfos.first { it.fir is FirResolvedTypeRef }.fir
-                p is KtTypeReference -> allFirInfos.first { it.fir is FirResolvedTypeRef }.fir
-                p is KtWhenConditionInRange || p is KtBinaryExpression -> allFirInfos.first { it.fir is FirFunctionCall }.fir
+                p is KtPrefixExpression -> allFirInfos.firstOrNull { it.fir is FirVariableAssignment }?.fir
+                p is KtPostfixExpression -> allFirInfos.firstOrNull { it.fir is FirResolvedTypeRef || it.fir is FirFunctionCall }?.fir
+                p is KtTypeReference -> allFirInfos.firstOrNull { it.fir is FirResolvedTypeRef }?.fir
+                p is KtWhenConditionInRange || p is KtBinaryExpression -> allFirInfos.firstOrNull { it.fir is FirFunctionCall }?.fir
                 else -> {
                     throw IllegalStateException("Unable to determine the FIR element associated to the PSI." + if (psi == null) "null element" else "original PSI: ${psi.javaClass.name}, mapped PSI: ${p.javaClass.name}")
                 }

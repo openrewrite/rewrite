@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -94,7 +93,6 @@ class ArrayTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("array[0]++ is mapped to 9 Fake elements. Find a way to retrieve the correct FIR.")
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/291")
     void incrementArrayElement() {

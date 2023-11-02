@@ -2696,32 +2696,47 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         if (type == null) {
             throw new UnsupportedOperationException("TODO");
         }
+        // FIXME: Add detection of overloads and return the appropriate trees when it is not equivalent to a J.Unary.
+        //        Returning the base type only applies when the expression is equiavalent to a J.Binary.
+        JavaType javaType = type(expression);
+        if (javaType instanceof JavaType.Method) {
+            javaType = ((JavaType.Method) javaType).getReturnType();
+        } else if (javaType instanceof JavaType.Variable) {
+            javaType = ((JavaType.Variable) javaType).getType();
+        }
         return new J.Unary(
                 randomId(),
                 prefix(expression),
                 Markers.EMPTY,
                 padLeft(prefix(expression.getOperationReference()), type),
                 expression.getBaseExpression().accept(this, data).withPrefix(suffix(expression.getOperationReference())),
-                type(expression)
+                javaType
         );
     }
 
     @Override
     public J visitPostfixExpression(KtPostfixExpression expression, ExecutionContext data) {
-        // TODO: fix NPE.
+        // FIXME: Add detection of overloads and return the appropriate trees when it is not equivalent to a J.Unary.
+        //        Returning the base type only applies when the expression is equiavalent to a J.Binary.
+        JavaType type = type(expression);
+        if (type instanceof JavaType.Method) {
+            type = ((JavaType.Method) type).getReturnType();
+        } else if (type instanceof JavaType.Variable) {
+            type = ((JavaType.Variable) type).getType();
+        }
         J j = requireNonNull(expression.getBaseExpression()).accept(this, data);
         IElementType referencedNameElementType = expression.getOperationReference().getReferencedNameElementType();
         if (referencedNameElementType == KtTokens.EXCLEXCL) {
             // j = j.withMarkers(j.getMarkers().addIfAbsent(new CheckNotNull(randomId(), prefix(expression.getOperationReference()))));
-            j = new K.Unary(randomId(), prefix(expression), Markers.EMPTY, padLeft(prefix(expression.getOperationReference()), K.Unary.Type.NotNull), (Expression) j, type(expression));
+            j = new K.Unary(randomId(), prefix(expression), Markers.EMPTY, padLeft(prefix(expression.getOperationReference()), K.Unary.Type.NotNull), (Expression) j, type);
         } else if (referencedNameElementType == KtTokens.PLUSPLUS) {
-            j = new J.Unary(randomId(), prefix(expression), Markers.EMPTY, padLeft(prefix(expression.getOperationReference()), J.Unary.Type.PostIncrement), (Expression) j, type(expression));
+            j = new J.Unary(randomId(), prefix(expression), Markers.EMPTY, padLeft(prefix(expression.getOperationReference()), J.Unary.Type.PostIncrement), (Expression) j, type);
         } else if (referencedNameElementType == KtTokens.MINUSMINUS) {
-            j = new J.Unary(randomId(), prefix(expression), Markers.EMPTY, padLeft(prefix(expression.getOperationReference()), J.Unary.Type.PostDecrement), (Expression) j, type(expression));
+            j = new J.Unary(randomId(), prefix(expression), Markers.EMPTY, padLeft(prefix(expression.getOperationReference()), J.Unary.Type.PostDecrement), (Expression) j, type);
         } else {
             throw new UnsupportedOperationException("TODO");
         }
-        return j; // identifier is missing type. TODO: requires detection of overloads
+        return j;
     }
 
     @Override
