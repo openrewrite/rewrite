@@ -11,6 +11,7 @@ import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.ruby.marker.EnglishOperator;
+import org.openrewrite.ruby.marker.ExplicitDo;
 import org.openrewrite.ruby.marker.ExplicitThen;
 import org.openrewrite.ruby.tree.Ruby;
 
@@ -86,6 +87,12 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 (Expression) node.getEndNode().accept(this),
                 null
         );
+    }
+
+    @Override
+    public J visitFalseNode(FalseNode node) {
+        return new J.Literal(randomId(), sourceBefore("false"), Markers.EMPTY, true, "false",
+                null, JavaType.Primitive.Boolean);
     }
 
     @Override
@@ -351,9 +358,40 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     @Override
+    public J visitTrueNode(TrueNode node) {
+        return new J.Literal(randomId(), sourceBefore("true"), Markers.EMPTY, true, "true",
+                null, JavaType.Primitive.Boolean);
+    }
+
+    @Override
     public J visitVCallNode(VCallNode node) {
         return new J.Identifier(randomId(), sourceBefore(node.getName().asJavaString()),
                 Markers.EMPTY, emptyList(), node.getName().asJavaString(), null, null);
+    }
+
+    @Override
+    public J visitWhileNode(WhileNode node) {
+        Space prefix = sourceBefore("while");
+
+        Space conditionPrefix = whitespace();
+        Expression conditionExpr = (Expression) node.getConditionNode().accept(this);
+        boolean explicitDo = Pattern.compile("\\s+do").matcher(source).find(cursor);
+        J.ControlParentheses<Expression> condition = new J.ControlParentheses<>(
+                randomId(),
+                conditionPrefix,
+                explicitDo ?
+                        Markers.EMPTY.add(new ExplicitDo(randomId())) :
+                        Markers.EMPTY,
+                padRight(conditionExpr, explicitDo ? sourceBefore("do") : EMPTY)
+        );
+
+        return new J.WhileLoop(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                condition,
+                padRight((Statement) node.getBodyNode().accept(this), sourceBefore("end"))
+        );
     }
 
     @Override

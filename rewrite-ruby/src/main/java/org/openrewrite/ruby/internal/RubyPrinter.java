@@ -26,6 +26,7 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.ruby.RubyVisitor;
 import org.openrewrite.ruby.marker.EnglishOperator;
+import org.openrewrite.ruby.marker.ExplicitDo;
 import org.openrewrite.ruby.marker.ExplicitThen;
 import org.openrewrite.ruby.tree.Ruby;
 import org.openrewrite.ruby.tree.RubySpace;
@@ -271,6 +272,8 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
             visitRightPadded(controlParens.getPadding().getTree(), JRightPadded.Location.PARENTHESES, p);
             if (controlParens.getMarkers().findFirst(ExplicitThen.class).isPresent()) {
                 p.append("then");
+            } else if (controlParens.getMarkers().findFirst(ExplicitDo.class).isPresent()) {
+                p.append("do");
             }
             afterSyntax(controlParens, p);
             return controlParens;
@@ -393,6 +396,17 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
             }
             afterSyntax(unary, p);
             return unary;
+        }
+
+        @Override
+        public J visitWhileLoop(J.WhileLoop whileLoop, PrintOutputCapture<P> p) {
+            beforeSyntax(whileLoop, Space.Location.WHILE_PREFIX, p);
+            p.append("while");
+            visit(whileLoop.getCondition(), p);
+            visitStatement(whileLoop.getPadding().getBody(), JRightPadded.Location.WHILE_BODY, p);
+            p.append("end");
+            afterSyntax(whileLoop, p);
+            return whileLoop;
         }
     }
 }
