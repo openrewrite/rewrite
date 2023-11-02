@@ -146,6 +146,10 @@ class KotlinTypeMapping(
                 packageDirective(signature)
             }
 
+            is FirPropertyAccessExpression -> {
+                type(type.calleeReference, signature)
+            }
+
             is FirResolvedNamedReference -> {
                 resolvedNameReferenceType(type, parent, signature)
             }
@@ -280,7 +284,11 @@ class KotlinTypeMapping(
 
             is ConeClassLikeType -> {
                 if (type.toSymbol(firSession) is FirTypeAliasSymbol) {
-                    return classType((type.toSymbol(firSession) as FirTypeAliasSymbol).resolvedExpandedTypeRef.type, parent, signature)
+                    return classType(
+                        (type.toSymbol(firSession) as FirTypeAliasSymbol).resolvedExpandedTypeRef.type,
+                        parent,
+                        signature
+                    )
                 }
                 val ref = type.toRegularClassSymbol(firSession)
                 if (type.typeArguments.isNotEmpty()) {
@@ -476,6 +484,7 @@ class KotlinTypeMapping(
             function.symbol.getOwnerLookupTag()?.toFirRegularClass(firSession) != null -> {
                 type(function.symbol.getOwnerLookupTag()!!.toFirRegularClass(firSession)!!)
             }
+
             parent is FirRegularClass || parent != null -> type(parent)
             else -> type(firFile)
         }
@@ -491,6 +500,7 @@ class KotlinTypeMapping(
             function.receiverParameter != null || function.valueParameters.isNotEmpty() -> {
                 ArrayList(function.valueParameters.size + (if (function.receiverParameter != null) 1 else 0))
             }
+
             else -> null
         }
         if (function.receiverParameter != null) {
@@ -608,14 +618,15 @@ class KotlinTypeMapping(
         val receiver = if (sym is FirFunctionSymbol<*>) sym.receiverParameter else null
         var paramNames: MutableList<String>? = when {
             sym is FirFunctionSymbol<*> && receiver != null ||
-            function.arguments.isNotEmpty() -> {
+                    function.arguments.isNotEmpty() -> {
                 ArrayList(function.arguments.size + (if (receiver != null) 1 else 0))
             }
+
             else -> null
         }
         val paramTypes: MutableList<JavaType>? = if (paramNames != null) ArrayList(paramNames.size) else null
         if (receiver != null) {
-            paramNames!!.add('$'+ "this" + '$')
+            paramNames!!.add('$' + "this" + '$')
         }
         if (function.arguments.isNotEmpty()) {
             when (sym) {
@@ -678,7 +689,8 @@ class KotlinTypeMapping(
                 }
             } else if (!resolvedSymbol.fir.origin.generated &&
                 !resolvedSymbol.fir.origin.fromSupertypes &&
-                !resolvedSymbol.fir.origin.fromSource) {
+                !resolvedSymbol.fir.origin.fromSource
+            ) {
                 declaringType = createShallowClass("kotlin.Library")
             }
         } else if (sym is FirFunctionSymbol<*>) {
@@ -776,17 +788,21 @@ class KotlinTypeMapping(
             variable.symbol.dispatchReceiverType != null -> {
                 declaringType = type(variable.symbol.dispatchReceiverType)
             }
+
             variable.symbol.getContainingClassSymbol(firSession) != null -> {
                 if (variable.symbol.getContainingClassSymbol(firSession) !is FirAnonymousObjectSymbol) {
                     declaringType = type(variable.symbol.getContainingClassSymbol(firSession)!!.fir)
                 }
             }
+
             parent is FirClass -> {
                 declaringType = type(parent)
             }
+
             parent is FirFunction -> {
                 declaringType = methodDeclarationType(parent, null)
             }
+
             else -> declaringType = TypeUtils.asFullyQualified(type(firFile))
         }
 
@@ -1182,7 +1198,12 @@ class KotlinTypeMapping(
         return bitMask
     }
 
-    private fun convertToFlagsBitMap(visibility: Visibility, isStatic: Boolean, isFinal: Boolean, isAbstract: Boolean): Long {
+    private fun convertToFlagsBitMap(
+        visibility: Visibility,
+        isStatic: Boolean,
+        isFinal: Boolean,
+        isAbstract: Boolean
+    ): Long {
         var bitMask: Long = 0
         when (visibility.name) {
             "public" -> bitMask += 1L

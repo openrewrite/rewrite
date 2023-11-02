@@ -1831,13 +1831,26 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     parameters.add(padRight(convertToExpression(ktTypeProjection.accept(this, data)), suffix(ktTypeProjection)));
                 }
 
+                JavaType javaType = type(expression);
+                JavaType nameType = JavaType.Unknown.getInstance();
+                JavaType pt = JavaType.Unknown.getInstance();
+                if (javaType instanceof JavaType.Method) {
+                    pt = ((JavaType.Method) javaType).getReturnType();
+                } else if (javaType instanceof JavaType.Variable) {
+                    pt = ((JavaType.Variable) javaType).getType();
+                } else if (javaType instanceof JavaType.Parameterized) {
+                    pt = javaType;
+                }
+                if (pt instanceof JavaType.Parameterized) {
+                    nameType = ((JavaType.Parameterized) pt).getType();
+                }
                 name = new J.ParameterizedType(
                         randomId(),
                         name.getPrefix(),
                         Markers.EMPTY,
-                        name.withType(name.getType() instanceof JavaType.Parameterized ? ((JavaType.Parameterized) name.getType()).getType() : name.getType()).withPrefix(Space.EMPTY),
+                        name.withType(nameType).withPrefix(Space.EMPTY),
                         JContainer.build(prefix(expression.getTypeArgumentList()), parameters, Markers.EMPTY),
-                        type(expression)
+                        pt
                 );
             }
 
@@ -2255,16 +2268,48 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             KtCallExpression callExpression = (KtCallExpression) expression.getSelectorExpression();
             MethodCall methodInvocation = (MethodCall) callExpression.accept(this, data);
 
-            expression.getReceiverExpression();
             Expression receiver = convertToExpression(expression.getReceiverExpression().accept(this, data));
             if (methodInvocation instanceof J.MethodInvocation) {
                 methodInvocation = ((J.MethodInvocation) methodInvocation).getPadding().withSelect(padRight(receiver, suffix(expression.getReceiverExpression())))
                         .withName(((J.MethodInvocation) methodInvocation).getName().withPrefix(prefix(callExpression)))
                         .withPrefix(prefix(expression));
             } else if (methodInvocation instanceof J.NewClass) {
-                methodInvocation = ((J.NewClass) methodInvocation).getPadding().withEnclosing(padRight(receiver, suffix(expression.getReceiverExpression())))
-                        .withClazz(((J.NewClass) methodInvocation).getClazz().withPrefix(prefix(callExpression)))
-                        .withPrefix(prefix(expression));
+                if (receiver instanceof J.FieldAccess) {
+                    J.NewClass cur = (J.NewClass) methodInvocation;
+                    if (cur.getClazz() instanceof J.ParameterizedType) {
+                        cur = cur.withPrefix(prefix(expression));
+                        J.ParameterizedType pt = (J.ParameterizedType) cur.getClazz();
+                        if (pt != null) {
+                            pt = pt.withClazz(pt.getClazz().withPrefix(prefix(callExpression)));
+                            J.FieldAccess newName = new J.FieldAccess(
+                                    randomId(),
+                                    receiver.getPrefix(),
+                                    Markers.EMPTY,
+                                    receiver.withPrefix(Space.EMPTY),
+                                    padLeft(suffix(expression.getReceiverExpression()), (J.Identifier) pt.getClazz()),
+                                    pt.getType()
+                            );
+                            pt = pt.withClazz(newName);
+                            cur = cur.withClazz(pt);
+                        }
+                        methodInvocation = cur;
+                    } else {
+                        cur = cur.withPrefix(prefix(expression));
+                        J.Identifier id = (J.Identifier) cur.getClazz();
+                        if (id != null) {
+                            id = id.withPrefix(prefix(callExpression));
+                            J.FieldAccess newName = new J.FieldAccess(
+                                    randomId(),
+                                    receiver.getPrefix(),
+                                    Markers.EMPTY,
+                                    receiver.withPrefix(Space.EMPTY),
+                                    padLeft(suffix(expression.getReceiverExpression()), id),
+                                    id.getType()
+                            );
+                            methodInvocation = cur.withClazz(newName);
+                        }
+                    }
+                }
             }
 
             return methodInvocation;

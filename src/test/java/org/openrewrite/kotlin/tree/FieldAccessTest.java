@@ -31,6 +31,32 @@ import static org.openrewrite.test.RewriteTest.toRecipe;
 class FieldAccessTest implements RewriteTest {
 
     @Test
+    void fieldAccessOnParameterizedType() {
+        rewriteRun(
+          kotlin(
+            """
+              class Foo {
+                val s =/*1*/java/*2*/./*3*/util/*4*/./*5*/ArrayList<String>()/*6*/./*7*/toString()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldAccessOnIdentifier() {
+        rewriteRun(
+          kotlin(
+            """
+              class Foo {
+                val sb = /*1*/java/*2*/./*3*/lang/*4*/./*5*/StringBuilder()/*6*/./*7*/toString()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void thisAccess() {
         rewriteRun(
           kotlin(

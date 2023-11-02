@@ -27,7 +27,6 @@ import org.jetbrains.kotlin.fir.references.toResolvedBaseSymbol
 import org.jetbrains.kotlin.fir.resolve.inference.ConeTypeParameterBasedTypeVariable
 import org.jetbrains.kotlin.fir.resolve.providers.toSymbol
 import org.jetbrains.kotlin.fir.resolve.toFirRegularClass
-import org.jetbrains.kotlin.fir.resolve.toSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
@@ -44,7 +43,8 @@ import org.openrewrite.java.JavaTypeSignatureBuilder
 import org.openrewrite.java.tree.JavaType
 import java.util.*
 
-class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val firFile: FirFile) : JavaTypeSignatureBuilder {
+class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val firFile: FirFile) :
+    JavaTypeSignatureBuilder {
     private var typeVariableNameStack: MutableSet<String>? = null
 
     override fun signature(type: Any?): String {
@@ -57,21 +57,27 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             is ConeClassLikeType -> {
                 if (type.typeArguments.isNotEmpty()) parameterizedSignature(type) else classSignature(type)
             }
+
             is ConeFlexibleType -> {
                 signature(type.lowerBound)
             }
+
             is ConeStubTypeForChainInference -> {
                 signature(type.constructor.variable)
             }
+
             is ConeTypeProjection -> {
                 coneTypeProjectionSignature(type)
             }
+
             is ConeTypeParameterBasedTypeVariable -> {
                 signature(type.typeParameterSymbol.fir)
             }
+
             is FirAnonymousFunctionExpression -> {
                 signature(type.anonymousFunction)
             }
+
             is FirBlock -> {
                 // AssignmentOperationTest#augmentedAssignmentAnnotation
                 // There is an issue in the KotlinTreeParserVisitor, PsiElementVisitor,
@@ -79,63 +85,87 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 // Example: AssignmentOperationTest#augmentedAssignmentAnnotation
                 "{undefined}"
             }
+
             is FirClass -> {
                 if (type.typeParameters.isNotEmpty()) parameterizedSignature(type) else classSignature(type)
             }
+
             is FirErrorNamedReference -> {
                 return type.name.asString()
             }
+
             is FirFile -> {
                 fileSignature(type)
             }
+
             is FirFunction -> {
                 methodSignature(type, parent)
             }
+
             is FirFunctionCall -> {
                 methodCallSignature(type)
             }
+
             is FirJavaTypeRef -> {
                 signature(type.type, parent)
             }
+
             is FirOuterClassTypeParameterRef -> {
                 signature(type.symbol.fir)
             }
+
             is FirPackageDirective -> {
                 type.packageFqName.asString()
             }
+
+            is FirPropertyAccessExpression -> {
+                signature(type.calleeReference)
+            }
+
             is FirResolvedNamedReference -> {
                 resolvedNameReferenceSignature(type, parent)
             }
+
             is FirResolvedTypeRef -> {
                 signature(type.coneType)
             }
+
             is FirResolvedQualifier -> {
                 if (type.typeArguments.isNotEmpty()) parameterizedSignature(type) else classSignature(type)
             }
+
             is FirStringConcatenationCall -> {
                 signature(type.typeRef)
             }
+
             is FirTypeParameter -> {
                 typeParameterSignature(type)
             }
+
             is FirTypeProjection -> {
                 typeProjectionSignature(type)
             }
+
             is FirSafeCallExpression -> {
                 signature(type.selector)
             }
+
             is FirVariable -> {
                 variableSignature(type, parent)
             }
+
             is FirVariableAssignment -> {
                 signature(type.lValue.typeRef, parent)
             }
+
             is FirExpression -> {
                 signature(type.typeRef)
             }
+
             is JavaElement -> {
                 javaElement(type)
             }
+
             else -> "{undefined}"
         }
     }
@@ -168,18 +198,21 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             is ConeTypeParameterType -> {
                 signature(type.lookupTag.typeParameterSymbol.fir)
             }
+
             is ConeDefinitelyNotNullType -> {
                 if (type.typeArguments.isNotEmpty()) {
                     TODO()
                 }
                 signature(type.original)
             }
+
             is ConeCapturedType -> {
                 if (type.typeArguments.isNotEmpty()) {
                     TODO()
                 }
                 return "Generic{?}"
             }
+
             is ConeIntersectionType -> {
                 val sig = StringBuilder()
                 sig.append("Generic{")
@@ -191,6 +224,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 sig.append("}")
                 sig.toString()
             }
+
             else -> throw UnsupportedOperationException("Unsupported ConeTypeProjection ${type.javaClass.name}")
         }
     }
@@ -243,14 +277,18 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
     }
 
     @OptIn(SymbolInternals::class)
-    fun methodSignature(function: FirFunction,
-                        parent: Any?): String {
+    fun methodSignature(
+        function: FirFunction,
+        parent: Any?
+    ): String {
         val clazz = when {
             function.symbol is FirConstructorSymbol -> classSignature(function.returnTypeRef)
             function.dispatchReceiverType != null -> classSignature(function.dispatchReceiverType!!)
-            function.symbol.getOwnerLookupTag() != null && function.symbol.getOwnerLookupTag()!!.toFirRegularClass(firSession) != null -> {
+            function.symbol.getOwnerLookupTag() != null && function.symbol.getOwnerLookupTag()!!
+                .toFirRegularClass(firSession) != null -> {
                 classSignature(function.symbol.getOwnerLookupTag()!!.toFirRegularClass(firSession)!!)
             }
+
             parent is FirClass -> classSignature(parent)
             else -> fileSignature(firFile)
         }
@@ -279,7 +317,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         val sym = function.calleeReference.toResolvedBaseSymbol() ?: return "{undefined}"
         var declaringSig: String? = null
         if (function.calleeReference is FirResolvedNamedReference &&
-            (function.calleeReference as FirResolvedNamedReference).resolvedSymbol is FirNamedFunctionSymbol) {
+            (function.calleeReference as FirResolvedNamedReference).resolvedSymbol is FirNamedFunctionSymbol
+        ) {
             val resolvedSymbol =
                 (function.calleeReference as FirResolvedNamedReference).resolvedSymbol as FirNamedFunctionSymbol
             if (resolvedSymbol.dispatchReceiverType is ConeClassLikeType) {
@@ -301,7 +340,8 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 }
             } else if (!resolvedSymbol.fir.origin.generated &&
                 !resolvedSymbol.fir.origin.fromSupertypes &&
-                !resolvedSymbol.fir.origin.fromSource) {
+                !resolvedSymbol.fir.origin.fromSource
+            ) {
                 declaringSig = "kotlin.Library"
             }
         } else if (sym is FirFunctionSymbol<*>) {
@@ -318,6 +358,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 sig.append("{name=${sym.name.asString()}")
                 sig.append(",return=${signature(function.typeRef)}")
             }
+
             else -> throw UnsupportedOperationException("Unsupported function calleeReference: ${function.calleeReference.name}")
         }
 
@@ -338,7 +379,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
 
     @OptIn(SymbolInternals::class)
     private fun resolvedNameReferenceSignature(type: FirResolvedNamedReference, parent: Any?): String {
-        return when(val sym = type.resolvedSymbol) {
+        return when (val sym = type.resolvedSymbol) {
             is FirConstructorSymbol -> signature(sym.fir, parent)
             is FirEnumEntrySymbol -> signature(sym.fir, parent)
             is FirFieldSymbol -> signature(sym.fir, parent)
@@ -381,11 +422,13 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                     Variance.IN_VARIANCE -> {
                         ""
                     }
+
                     Variance.OUT_VARIANCE -> {
                         ""
                     }
                 }
             }
+
             else -> ""
         }
     }
@@ -393,9 +436,12 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
     fun variableSignature(property: FirVariable, parent: Any?): String {
         val sig = StringBuilder()
         val owner = when {
-            property.dispatchReceiverType is ConeClassLikeType && property.dispatchReceiverType!!.toRegularClassSymbol(firSession) != null -> {
+            property.dispatchReceiverType is ConeClassLikeType && property.dispatchReceiverType!!.toRegularClassSymbol(
+                firSession
+            ) != null -> {
                 convertClassIdToFqn(property.dispatchReceiverType!!.toRegularClassSymbol(firSession)!!.classId)
             }
+
             property.symbol.callableId.classId != null -> {
                 var oSig = convertClassIdToFqn(property.symbol.callableId.classId)
                 if (oSig.contains("<")) {
@@ -403,6 +449,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 }
                 oSig
             }
+
             parent is FirFunction -> methodSignature(parent, null)
             parent is FirFile -> fileSignature(parent)
             parent is FirClass -> classSignature(parent)
@@ -421,9 +468,15 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             is JavaArrayType -> javaArraySignature(type)
             is JavaPrimitiveType -> javaPrimitiveSignature(type)
             // The classifier is evaluated separately, because the BinaryJavaClass may have type parameters.
-            is JavaClassifierType -> if (type.typeArguments.isNotEmpty()) javaParameterizedSignature(type) else signature(type.classifier)
+            is JavaClassifierType -> if (type.typeArguments.isNotEmpty()) javaParameterizedSignature(type) else signature(
+                type.classifier
+            )
+
             is BinaryJavaAnnotation -> signature(type.classId.toSymbol(firSession)?.fir)
-            is BinaryJavaClass -> if (type.typeParameters.isNotEmpty()) javaParameterizedSignature(type) else javaClassSignature(type)
+            is BinaryJavaClass -> if (type.typeParameters.isNotEmpty()) javaParameterizedSignature(type) else javaClassSignature(
+                type
+            )
+
             is BinaryJavaTypeParameter -> javaTypeParameterSignature(type)
             is JavaWildcardType -> javaWildCardSignature(type)
             is JavaValueParameter -> signature(type.type)
