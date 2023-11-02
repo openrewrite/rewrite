@@ -57,13 +57,90 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitBinary(J.Binary binary, PrintOutputCapture<P> p) {
+        String keyword = "";
+        switch (binary.getOperator()) {
+            case Addition:
+                keyword = "+";
+                break;
+            case Subtraction:
+                keyword = "-";
+                break;
+            case Multiplication:
+                keyword = "*";
+                break;
+            case Division:
+                keyword = "/";
+                break;
+            case Modulo:
+                keyword = "%";
+                break;
+            case LessThan:
+                keyword = "<";
+                break;
+            case GreaterThan:
+                keyword = ">";
+                break;
+            case LessThanOrEqual:
+                keyword = "<=";
+                break;
+            case GreaterThanOrEqual:
+                keyword = ">=";
+                break;
+            case Equal:
+                keyword = "==";
+                break;
+            case NotEqual:
+                keyword = "!=";
+                break;
+            case BitAnd:
+                keyword = "&";
+                break;
+            case BitOr:
+                keyword = "|";
+                break;
+            case BitXor:
+                keyword = "^";
+                break;
+            case LeftShift:
+                keyword = "<<";
+                break;
+            case RightShift:
+                keyword = ">>";
+                break;
+            case UnsignedRightShift:
+                keyword = ">>>";
+                break;
+            case Or:
+                keyword = "||";
+                if (binary.getMarkers().findFirst(EnglishOperator.class).isPresent()) {
+                    keyword = "or";
+                }
+                break;
+            case And:
+                keyword = "&&";
+                if (binary.getMarkers().findFirst(EnglishOperator.class).isPresent()) {
+                    keyword = "and";
+                }
+                break;
+        }
+        beforeSyntax(binary, Space.Location.BINARY_PREFIX, p);
+        visit(binary.getLeft(), p);
+        visitSpace(binary.getPadding().getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p);
+        p.append(keyword);
+        visit(binary.getRight(), p);
+        afterSyntax(binary, p);
+        return binary;
+    }
+
+    @Override
     public J visitBinary(Ruby.Binary binary, PrintOutputCapture<P> p) {
         String keyword = "";
         switch (binary.getOperator()) {
             case Comparison:
                 keyword = "<=>";
                 break;
-            case Exponent:
+            case Exponentiation:
                 keyword = "**";
                 break;
             case OnesComplement:
@@ -147,80 +224,35 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
-        public J visitBinary(J.Binary binary, PrintOutputCapture<P> p) {
+        public J visitAssignmentOperation(J.AssignmentOperation assignOp, PrintOutputCapture<P> p) {
             String keyword = "";
-            switch (binary.getOperator()) {
+            switch (assignOp.getOperator()) {
                 case Addition:
-                    keyword = "+";
+                    keyword = "+=";
                     break;
                 case Subtraction:
-                    keyword = "-";
+                    keyword = "-=";
                     break;
                 case Multiplication:
-                    keyword = "*";
+                    keyword = "*=";
                     break;
                 case Division:
-                    keyword = "/";
+                    keyword = "/=";
                     break;
                 case Modulo:
-                    keyword = "%";
+                    keyword = "%=";
                     break;
-                case LessThan:
-                    keyword = "<";
-                    break;
-                case GreaterThan:
-                    keyword = ">";
-                    break;
-                case LessThanOrEqual:
-                    keyword = "<=";
-                    break;
-                case GreaterThanOrEqual:
-                    keyword = ">=";
-                    break;
-                case Equal:
-                    keyword = "==";
-                    break;
-                case NotEqual:
-                    keyword = "!=";
-                    break;
-                case BitAnd:
-                    keyword = "&";
-                    break;
-                case BitOr:
-                    keyword = "|";
-                    break;
-                case BitXor:
-                    keyword = "^";
-                    break;
-                case LeftShift:
-                    keyword = "<<";
-                    break;
-                case RightShift:
-                    keyword = ">>";
-                    break;
-                case UnsignedRightShift:
-                    keyword = ">>>";
-                    break;
-                case Or:
-                    keyword = "||";
-                    if (binary.getMarkers().findFirst(EnglishOperator.class).isPresent()) {
-                        keyword = "or";
-                    }
-                    break;
-                case And:
-                    keyword = "&&";
-                    if (binary.getMarkers().findFirst(EnglishOperator.class).isPresent()) {
-                        keyword = "and";
-                    }
+                case Exponentiation:
+                    keyword = "**=";
                     break;
             }
-            beforeSyntax(binary, Space.Location.BINARY_PREFIX, p);
-            visit(binary.getLeft(), p);
-            visitSpace(binary.getPadding().getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p);
+            beforeSyntax(assignOp, Space.Location.ASSIGNMENT_OPERATION_PREFIX, p);
+            visit(assignOp.getVariable(), p);
+            visitSpace(assignOp.getPadding().getOperator().getBefore(), Space.Location.ASSIGNMENT_OPERATION_OPERATOR, p);
             p.append(keyword);
-            visit(binary.getRight(), p);
-            afterSyntax(binary, p);
-            return binary;
+            visit(assignOp.getAssignment(), p);
+            afterSyntax(assignOp, p);
+            return assignOp;
         }
 
         @Override

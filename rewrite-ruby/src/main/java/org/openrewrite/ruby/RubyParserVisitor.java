@@ -133,6 +133,66 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     @Override
+    public J visitLocalAsgnNode(LocalAsgnNode node) {
+        if (node.getValueNode() instanceof OperatorCallNode) {
+            // J.AssignmentOp
+            OperatorCallNode assignOp = (OperatorCallNode) node.getValueNode();
+            Expression variable = (Expression) assignOp.getReceiverNode().accept(this);
+            String op = assignOp.getName().asJavaString() + "=";
+            J.AssignmentOperation.Type type;
+            switch (op) {
+                case "+=":
+                    type = J.AssignmentOperation.Type.Addition;
+                    break;
+                case "-=":
+                    type = J.AssignmentOperation.Type.Subtraction;
+                    break;
+                case "*=":
+                    type = J.AssignmentOperation.Type.Multiplication;
+                    break;
+                case "/=":
+                    type = J.AssignmentOperation.Type.Division;
+                    break;
+                case "%=":
+                    type = J.AssignmentOperation.Type.Modulo;
+                    break;
+                case "**=":
+                    type = J.AssignmentOperation.Type.Exponentiation;
+                    break;
+                default:
+                    throw new UnsupportedOperationException("Unknown assignment operator " + op);
+            }
+            return new J.AssignmentOperation(
+                    randomId(),
+                    variable.getPrefix(),
+                    Markers.EMPTY,
+                    variable.withPrefix(EMPTY),
+                    padLeft(sourceBefore(op), type),
+                    (Expression) ((ListNode) assignOp.getArgsNode()).get(0).accept(this),
+                    null
+            );
+        } else {
+            Space prefix = sourceBefore(node.getName().asJavaString());
+            J.Identifier variable = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), node.getName().asJavaString(), null, null);
+            sourceBefore(variable.getSimpleName());
+            return new J.Assignment(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    variable,
+                    padLeft(sourceBefore("="), (Expression) node.getValueNode().accept(this)),
+                    null
+            );
+        }
+    }
+
+    @Override
+    public J visitLocalVarNode(LocalVarNode node) {
+        return new J.Identifier(randomId(), sourceBefore(node.getName().asJavaString()),
+                Markers.EMPTY, emptyList(), node.getName().asJavaString(), null, null);
+    }
+
+    @Override
     public J visitOperatorCallNode(OperatorCallNode node) {
         String op = node.getName().asJavaString();
         Markers markers = Markers.EMPTY;
@@ -156,7 +216,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 type = J.Binary.Type.Modulo;
                 break;
             case "**":
-                rubyType = Ruby.Binary.Type.Exponent;
+                rubyType = Ruby.Binary.Type.Exponentiation;
                 break;
             case ">>":
                 type = J.Binary.Type.RightShift;

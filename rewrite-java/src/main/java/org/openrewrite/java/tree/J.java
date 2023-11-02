@@ -539,7 +539,7 @@ public interface J extends Tree {
             Division,
             /**
              * Raises the left operand to the power of the right operand.
-             * Unused in Java, used in Python
+             * Unused in Java, used in Python and Ruby
              */
             Exponentiation,
             /**

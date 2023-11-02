@@ -143,7 +143,7 @@ public interface Ruby extends J {
 
         public enum Type {
             Comparison,
-            Exponent,
+            Exponentiation,
             OnesComplement,
             RangeExclusive,
             RangeInclusive,
