@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -41,6 +42,18 @@ class PackageTest implements RewriteTest {
             """
               package org.a;
               class A
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/164")
+    @Test
+    void quotedIdentifier() {
+        rewriteRun(
+          kotlin(
+            """
+              package testData.`object`
               """
           )
         );
