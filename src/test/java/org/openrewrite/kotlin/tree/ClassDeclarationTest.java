@@ -48,6 +48,15 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void crlfAfterComment() {
+        rewriteRun(
+          kotlin(
+            "class Test \r\n {//some comment\r\n}"
+          )
+        );
+    }
+
+    @Test
     void whitespaceInPackage() {
         rewriteRun(
           kotlin(

@@ -3731,7 +3731,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return JContainer.build(prefix(argumentList), expressions, Markers.EMPTY);
     }
 
-
     private Space space(@Nullable PsiElement node) {
         if (node == null) {
             return Space.EMPTY;
@@ -3741,7 +3740,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         PsiElement preNode = null;
 
         for (; node != null; node = next(node)) {
-            PsiElement finalNode = node;
             if (isWhiteSpace(node)) {
                 String whiteSpace = node.getText();
 
@@ -3764,7 +3762,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         // merge space
                         space = space.withWhitespace(space.getWhitespace() + whiteSpace);
                     } else {
-                        space = space.withComments(ListUtils.mapLast(space.getComments(), c -> c.withSuffix(finalNode.getText())));
+                        String finalWs = whiteSpace;
+                        space = space.withComments(ListUtils.mapLast(space.getComments(), c -> c.withSuffix(finalWs)));
                     }
                 }
             } else if (node instanceof PsiComment) {
