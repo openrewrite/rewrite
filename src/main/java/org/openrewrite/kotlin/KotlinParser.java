@@ -22,7 +22,9 @@ import kotlin.jvm.functions.Function1;
 import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
+import org.jetbrains.kotlin.KtRealPsiSourceElement;
 import org.jetbrains.kotlin.cli.common.arguments.K2JVMCompilerArguments;
+import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport;
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector;
 import org.jetbrains.kotlin.cli.common.messages.PrintingMessageCollector;
 import org.jetbrains.kotlin.cli.jvm.compiler.EnvironmentConfigFiles;
@@ -36,6 +38,7 @@ import org.jetbrains.kotlin.com.intellij.openapi.vfs.StandardFileSystems;
 import org.jetbrains.kotlin.com.intellij.openapi.vfs.VirtualFile;
 import org.jetbrains.kotlin.com.intellij.openapi.vfs.VirtualFileManager;
 import org.jetbrains.kotlin.com.intellij.psi.FileViewProvider;
+import org.jetbrains.kotlin.com.intellij.psi.PsiElement;
 import org.jetbrains.kotlin.com.intellij.psi.PsiManager;
 import org.jetbrains.kotlin.com.intellij.psi.SingleRootFileViewProvider;
 import org.jetbrains.kotlin.com.intellij.psi.search.GlobalSearchScope;
@@ -167,6 +170,15 @@ public class KotlinParser implements Parser {
                         compilerCus.getSources().stream()
                                 .map(kotlinSource -> {
                                     try {
+                                        assert kotlinSource.getFirFile() != null;
+                                        assert kotlinSource.getFirFile().getSource() != null;
+                                        PsiElement psi = ((KtRealPsiSourceElement) kotlinSource.getFirFile().getSource()).getPsi();
+                                        AnalyzerWithCompilerReport.SyntaxErrorReport report =
+                                                AnalyzerWithCompilerReport.Companion.reportSyntaxErrors(psi, MessageCollector.Companion.getNONE());
+                                        if (report.isHasErrors()) {
+                                            return ParseError.build(KotlinParser.this, kotlinSource.getInput(), relativeTo, ctx, new RuntimeException());
+                                        }
+
                                         // Turn this flag on locally only to develop psi-based-parser
                                         boolean printTrees = false;
 
