@@ -13,25 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.toml;
+package org.openrewrite.ruby;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.toml.tree.*;
+import org.openrewrite.ruby.tree.*;
 
 import java.util.List;
 
-public class TomlVisitor<P> extends TreeVisitor<Toml, P> {
+public class RubyVisitor<P> extends TreeVisitor<Ruby, P> {
 
     public Space visitSpace(Space space, P p) {
         return space;
     }
 
-    public <T> TomlRightPadded<T> visitRightPadded(@Nullable TomlRightPadded<T> right, P p) {
+    public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, P p) {
         if (right == null) {
             //noinspection ConstantConditions
             return null;
@@ -54,10 +54,10 @@ public class TomlVisitor<P> extends TreeVisitor<Toml, P> {
         Space after = visitSpace(right.getAfter(), p);
         Markers markers = visitMarkers(right.getMarkers(), p);
         return (after == right.getAfter() && t == right.getElement() && markers == right.getMarkers()) ?
-                right : new TomlRightPadded<>(t, after, markers);
+                right : new JRightPadded<>(t, after, markers);
     }
 
-    public <T> TomlLeftPadded<T> visitLeftPadded(@Nullable TomlLeftPadded<T> left, P p) {
+    public <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, P p) {
         if (left == null) {
             //noinspection ConstantConditions
             return null;
@@ -83,10 +83,10 @@ public class TomlVisitor<P> extends TreeVisitor<Toml, P> {
             return null;
         }
 
-        return (before == left.getBefore() && t == left.getElement()) ? left : new TomlLeftPadded<>(before, t, left.getMarkers());
+        return (before == left.getBefore() && t == left.getElement()) ? left : new JLeftPadded<>(before, t, left.getMarkers());
     }
 
-    public <T extends Toml> TomlContainer<T> visitContainer(@Nullable TomlContainer<T> container, P p) {
+    public <T extends Ruby> JContainer<T> visitContainer(@Nullable JContainer<T> container, P p) {
         if (container == null) {
             //noinspection ConstantConditions
             return null;
@@ -94,12 +94,12 @@ public class TomlVisitor<P> extends TreeVisitor<Toml, P> {
         setCursor(new Cursor(getCursor(), container));
 
         Space before = visitSpace(container.getBefore(), p);
-        List<TomlRightPadded<T>> ts = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, p));
+        List<JRightPadded<T>> ts = ListUtils.map(container.getPadding().getElements(), t -> visitRightPadded(t, p));
 
         setCursor(getCursor().getParent());
 
         return ts == container.getPadding().getElements() && before == container.getBefore() ?
                 container :
-                TomlContainer.build(before, ts, container.getMarkers());
+                JContainer.build(before, ts, container.getMarkers());
     }
 }

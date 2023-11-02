@@ -13,38 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.toml.tree;
+package org.openrewrite.ruby.tree;
 
-import lombok.*;
-import lombok.experimental.FieldDefaults;
-import lombok.experimental.NonFinal;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markers;
-import org.openrewrite.toml.TomlVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.ruby.RubyVisitor;
 
-import java.lang.ref.WeakReference;
-import java.nio.charset.Charset;
-import java.nio.file.Path;
-import java.util.List;
-import java.util.UUID;
-
-public interface Toml extends Tree {
+public interface Ruby extends J {
 
     @SuppressWarnings("unchecked")
     @Override
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
-        return (R) acceptToml(v.adapt(TomlVisitor.class), p);
+        return (R) acceptRuby(v.adapt(RubyVisitor.class), p);
     }
 
     @Override
     default <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
-        return v.isAdaptableTo(TomlVisitor.class);
+        return v.isAdaptableTo(RubyVisitor.class);
     }
 
     @Nullable
-    default <P> Toml acceptToml(TomlVisitor<P> v, P p) {
+    default <P> Ruby acceptRuby(RubyVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 

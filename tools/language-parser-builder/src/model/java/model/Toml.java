@@ -15,8 +15,8 @@
  */
 package model;
 
-import org.openrewrite.toml.tree.TomlContainer;
-import org.openrewrite.toml.tree.TomlLeftPadded;
+import org.openrewrite.ruby.tree.TomlContainer;
+import org.openrewrite.ruby.tree.TomlLeftPadded;
 
 import java.nio.charset.Charset;
 import java.nio.file.Path;
