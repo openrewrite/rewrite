@@ -33,6 +33,15 @@ class KTSTest implements RewriteTest {
     }
 
     @Test
+    void topLevelFunctionCall() {
+        rewriteRun(
+          kotlinScript("""
+            println("foo")
+            """)
+        );
+    }
+
+    @Test
     void topLevelForLoop() {
         rewriteRun(
           kotlinScript("""
@@ -41,6 +50,25 @@ class KTSTest implements RewriteTest {
                 println(item)
             }
             """)
+        );
+    }
+
+    @Test
+    void dslSample() {
+        rewriteRun(
+          kotlinScript("""
+            plugins {
+                id("org.flywaydb.flyway") version "8.0.2"
+            }
+            repositories {
+                mavenCentral()
+                maven {
+                    url = uri("https://maven.springframework.org/release")
+                }
+            }
+            """, spec -> spec.afterRecipe(cu -> {
+              System.out.println();
+          }))
         );
     }
 }
