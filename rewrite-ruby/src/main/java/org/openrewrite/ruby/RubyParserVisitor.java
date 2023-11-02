@@ -11,6 +11,7 @@ import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.ruby.marker.EnglishOperator;
+import org.openrewrite.ruby.marker.ExplicitThen;
 import org.openrewrite.ruby.tree.Ruby;
 
 import java.nio.charset.Charset;
@@ -19,6 +20,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
@@ -134,26 +136,46 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
     @Override
     public J visitIfNode(IfNode node) {
+        Markers markers = Markers.EMPTY;
         Space prefix = sourceBefore("if");
+
+        Space ifConditionPrefix = whitespace();
+        Expression ifConditionExpr = (Expression) node.getCondition().accept(this);
+        boolean explicitThen = Pattern.compile("\\s+then").matcher(source).find(cursor);
         J.ControlParentheses<Expression> ifCondition = new J.ControlParentheses<>(
                 randomId(),
-                EMPTY,
-                Markers.EMPTY,
-                padRight((Expression) node.getCondition().accept(this), EMPTY)
+                ifConditionPrefix,
+                explicitThen ?
+                        Markers.EMPTY.add(new ExplicitThen(randomId())) :
+                        Markers.EMPTY,
+                padRight(ifConditionExpr, explicitThen ? sourceBefore("then") : EMPTY)
         );
-        JRightPadded<Statement> then = padRight((Statement) node.getThenBody().accept(this), EMPTY);
+
+        Statement thenElem = (Statement) node.getThenBody().accept(this);
+        JRightPadded<Statement> then = node.getElseBody() == null ?
+                padRight(thenElem, sourceBefore("end")) :
+                padRight(thenElem, EMPTY);
+
+        J.If.Else anElse = null;
+        if (node.getElseBody() != null) {
+            Space elsePrefix = whitespace();
+            skip(source.startsWith("else", cursor) ? "else" : "els");
+            anElse = new J.If.Else(
+                    randomId(),
+                    elsePrefix,
+                    Markers.EMPTY,
+                    padRight((Statement) node.getElseBody().accept(this),
+                            node.getElseBody() instanceof IfNode ? EMPTY : sourceBefore("end"))
+            );
+        }
+
         return new J.If(
                 randomId(),
                 prefix,
-                Markers.EMPTY,
+                markers,
                 ifCondition,
                 then,
-                node.getElseBody() == null ? null : new J.If.Else(
-                        randomId(),
-                        sourceBefore("el"),
-                        Markers.EMPTY,
-                        padRight((Statement) node.getElseBody().accept(this), EMPTY)
-                )
+                anElse
         );
     }
 

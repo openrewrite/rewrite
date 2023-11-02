@@ -26,6 +26,7 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.ruby.RubyVisitor;
 import org.openrewrite.ruby.marker.EnglishOperator;
+import org.openrewrite.ruby.marker.ExplicitThen;
 import org.openrewrite.ruby.tree.Ruby;
 import org.openrewrite.ruby.tree.RubySpace;
 
@@ -216,6 +217,15 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        protected void visitStatement(@Nullable JRightPadded<Statement> paddedStat, JRightPadded.Location location, PrintOutputCapture<P> p) {
+            if (paddedStat != null) {
+                visit(paddedStat.getElement(), p);
+                visitSpace(paddedStat.getAfter(), location.getAfterLocation(), p);
+                visitMarkers(paddedStat.getMarkers(), p);
+            }
+        }
+
+        @Override
         public <M extends Marker> M visitMarker(Marker marker, PrintOutputCapture<P> p) {
             if (marker instanceof org.openrewrite.java.marker.Semicolon) {
                 p.append(';');
@@ -253,6 +263,48 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
             visit(assignOp.getAssignment(), p);
             afterSyntax(assignOp, p);
             return assignOp;
+        }
+
+        @Override
+        public <T extends J> J visitControlParentheses(J.ControlParentheses<T> controlParens, PrintOutputCapture<P> p) {
+            visitSpace(controlParens.getPrefix(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
+            visitRightPadded(controlParens.getPadding().getTree(), JRightPadded.Location.PARENTHESES, p);
+            if (controlParens.getMarkers().findFirst(ExplicitThen.class).isPresent()) {
+                p.append("then");
+            }
+            afterSyntax(controlParens, p);
+            return controlParens;
+        }
+
+        @Override
+        public J visitElse(J.If.Else anElse, PrintOutputCapture<P> p) {
+            beforeSyntax(anElse, Space.Location.ELSE_PREFIX, p);
+            if (anElse.getBody() instanceof J.If) {
+                p.append("els"); // the nested `J.If` will print the remaining `if`
+            } else {
+                p.append("else");
+            }
+            visitStatement(anElse.getPadding().getBody(), JRightPadded.Location.IF_ELSE, p);
+            if (!(anElse.getBody() instanceof J.If)) {
+                p.append("end");
+            }
+            afterSyntax(anElse, p);
+            return anElse;
+        }
+
+        @Override
+        public J visitIf(J.If iff, PrintOutputCapture<P> p) {
+            beforeSyntax(iff, Space.Location.IF_PREFIX, p);
+            p.append("if");
+            visit(iff.getIfCondition(), p);
+            visitStatement(iff.getPadding().getThenPart(), JRightPadded.Location.IF_THEN, p);
+            if (iff.getElsePart() == null) {
+                p.append("end");
+            } else {
+                visit(iff.getElsePart(), p);
+            }
+            afterSyntax(iff, p);
+            return iff;
         }
 
         @Override
