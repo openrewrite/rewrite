@@ -42,7 +42,7 @@ class DoWhileTest implements RewriteTest {
           kotlin(
             """
               fun infinite() {
-                  do while (true)
+                  do   while (true)
               }
               """
           )

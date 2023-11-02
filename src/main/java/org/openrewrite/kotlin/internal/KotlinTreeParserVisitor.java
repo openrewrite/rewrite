@@ -435,10 +435,20 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitDoWhileExpression(KtDoWhileExpression expression, ExecutionContext data) {
-        JRightPadded<Statement> body = null;
+        JRightPadded<Statement> body;
         if (expression.getBody() != null) {
             body = JRightPadded.build(requireNonNull(expression.getBody()).accept(this, data)
                     .withPrefix(prefix(expression.getBody().getParent())));
+        } else {
+            J.Block emptyBlock = new J.Block(
+                    randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY.add(new OmitBraces(randomId())),
+                    new JRightPadded<>(false, Space.EMPTY, Markers.EMPTY),
+                    emptyList(),
+                    Space.EMPTY
+            );
+            body = padRight(emptyBlock, Space.EMPTY);
         }
 
         return new J.DoWhileLoop(
