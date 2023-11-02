@@ -895,8 +895,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 statements.add(maybeTrailingComma(ktParameter, padRight(statement,  endFixAndSuffix(ktParameter)), i == ktParameters.size() - 1));
             }
 
-            // statements = ListUtils.mapLast(statements, rp -> rp.withAfter(merge(rp.getAfter(), prefix(constructor.getValueParameterList().getRightParenthesis()))));
-
             if (ktParameters.isEmpty()) {
                 Statement param = new J.Empty(randomId(), prefix(constructor.getValueParameterList().getRightParenthesis()), Markers.EMPTY);
                 statements.add(padRight(param, Space.EMPTY));
@@ -1642,7 +1640,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 pkg,
                 imports,
                 statements,
-                Space.EMPTY
+                endFix(file.getLastChild())
         );
     }
 
