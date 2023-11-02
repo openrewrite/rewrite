@@ -1597,6 +1597,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitKtFile(KtFile file, ExecutionContext data) {
         List<J.Annotation> annotations = file.getFileAnnotationList() != null ? mapAnnotations(file.getAnnotationEntries(), data) : emptyList();
         Set<PsiElement> consumedSpaces = new HashSet<>();
+        Space eof = Space.EMPTY;
 
         JRightPadded<J.Package> pkg = null;
         if (!file.getPackageFqName().isRoot()) {
@@ -1623,7 +1624,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             boolean last = i == declarations.size() - 1;
             KtDeclaration declaration = declarations.get(i);
             Statement statement = convertToStatement(declaration.accept(this, data));
-            statements.add(padRight(statement, last ? suffix(declaration) : Space.EMPTY));
+            if (last) {
+                eof = endFixAndSuffix(declaration);
+            }
+            statements.add(padRight(statement, Space.EMPTY));
         }
 
         return new K.CompilationUnit(
@@ -1639,7 +1643,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 pkg,
                 imports,
                 statements,
-                endFix(file.getLastChild())
+                eof
         );
     }
 
