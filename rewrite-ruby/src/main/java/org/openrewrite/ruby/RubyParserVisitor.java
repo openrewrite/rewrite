@@ -1,10 +1,8 @@
 package org.openrewrite.ruby;
 
-import org.jruby.ast.FCallNode;
-import org.jruby.ast.Node;
-import org.jruby.ast.RootNode;
-import org.jruby.ast.StrNode;
+import org.jruby.ast.*;
 import org.jruby.ast.visitor.AbstractNodeVisitor;
+import org.jruby.ast.visitor.OperatorCallNode;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
@@ -82,6 +80,69 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                         .withBefore(beforeArgs),
                 null
         );
+    }
+
+    @Override
+    public J visitFixnumNode(FixnumNode node) {
+        return new J.Literal(
+                randomId(),
+                sourceBefore(Long.toString(node.getValue())),
+                Markers.EMPTY,
+                node.getValue(),
+                Long.toString(node.getValue()),
+                null,
+                JavaType.Primitive.Long
+        );
+    }
+
+    @Override
+    public J visitOperatorCallNode(OperatorCallNode node) {
+        String op = node.getName().asJavaString();
+        J.Binary.Type type = null;
+        Ruby.Binary.Type rubyType = null;
+        switch (op) {
+            case "+":
+                type = J.Binary.Type.Addition;
+                break;
+            case "-":
+                type = J.Binary.Type.Subtraction;
+                break;
+            case "*":
+                type = J.Binary.Type.Multiplication;
+                break;
+            case "/":
+                type = J.Binary.Type.Division;
+                break;
+            case "%":
+                type = J.Binary.Type.Modulo;
+                break;
+            case "**":
+                rubyType = Ruby.Binary.Type.Exponent;
+                break;
+        }
+
+        if (type != null) {
+            return new J.Binary(
+                    randomId(),
+                    whitespace(),
+                    Markers.EMPTY,
+                    (Expression) node.getReceiverNode().accept(this),
+                    padLeft(sourceBefore(op), type),
+                    (Expression) node.getArgsNode().childNodes().get(0).accept(this),
+                    null
+            );
+        } else {
+            assert rubyType != null;
+            return new Ruby.Binary(
+                    randomId(),
+                    whitespace(),
+                    Markers.EMPTY,
+                    (Expression) node.getReceiverNode().accept(this),
+                    padLeft(sourceBefore(op), rubyType),
+                    (Expression) node.getArgsNode().childNodes().get(0).accept(this),
+                    null
+            );
+        }
     }
 
     @Override

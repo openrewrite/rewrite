@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2022 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,9 +15,18 @@
  */
 package org.openrewrite.ruby.tree;
 
-public class RubySpace {
+public class RubyLeftPadded {
     public enum Location {
-        BINARY_PREFIX,
-        BINARY_OPERATOR,
+        BINARY_OPERATOR(RubySpace.Location.BINARY_OPERATOR);
+
+        private final RubySpace.Location beforeLocation;
+
+        Location(RubySpace.Location beforeLocation) {
+            this.beforeLocation = beforeLocation;
+        }
+
+        public RubySpace.Location getBeforeLocation() {
+            return beforeLocation;
+        }
     }
 }

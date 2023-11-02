@@ -55,6 +55,28 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         return compilationUnit;
     }
 
+    @Override
+    public J visitBinary(Ruby.Binary binary, PrintOutputCapture<P> p) {
+        String keyword = "";
+        switch (binary.getOperator()) {
+            case Exponent:
+                keyword = "**";
+                break;
+        }
+        beforeSyntax(binary, RubySpace.Location.BINARY_PREFIX, p);
+        visit(binary.getLeft(), p);
+        visitSpace(binary.getPadding().getOperator().getBefore(), RubySpace.Location.BINARY_OPERATOR, p);
+        p.append(keyword);
+        visit(binary.getRight(), p);
+        afterSyntax(binary, p);
+        return binary;
+    }
+
+    protected void beforeSyntax(J j, @SuppressWarnings("unused") RubySpace.Location loc,
+                                PrintOutputCapture<P> p) {
+        beforeSyntax(j.getPrefix(), j.getMarkers(), Space.Location.LANGUAGE_EXTENSION, p);
+    }
+
     protected void beforeSyntax(J j, Space.Location loc, PrintOutputCapture<P> p) {
         beforeSyntax(j.getPrefix(), j.getMarkers(), loc, p);
     }

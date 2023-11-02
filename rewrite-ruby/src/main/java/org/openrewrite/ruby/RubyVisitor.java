@@ -17,8 +17,13 @@ package org.openrewrite.ruby;
 
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.ruby.tree.Ruby;
+import org.openrewrite.ruby.tree.RubyLeftPadded;
+import org.openrewrite.ruby.tree.RubySpace;
 
 public class RubyVisitor<P> extends JavaVisitor<P> {
 
@@ -32,6 +37,14 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         return "ruby";
     }
 
+    public Space visitSpace(Space space, RubySpace.Location loc, P p) {
+        return visitSpace(space, Space.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RubyLeftPadded.Location loc, P p) {
+        return super.visitLeftPadded(left, JLeftPadded.Location.LANGUAGE_EXTENSION, p);
+    }
+
     public Ruby visitCompilationUnit(Ruby.CompilationUnit compilationUnit, P p) {
         Ruby.CompilationUnit c = compilationUnit;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));
@@ -39,5 +52,22 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         c = c.withBodyNode(visit(c.getBodyNode(), p));
         c = c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
         return c;
+    }
+
+    public J visitBinary(Ruby.Binary binary, P p) {
+        Ruby.Binary b = binary;
+        b = b.withPrefix(visitSpace(b.getPrefix(), RubySpace.Location.BINARY_PREFIX, p));
+        b = b.withMarkers(visitMarkers(b.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(b, p);
+        if (!(temp instanceof Ruby.Binary)) {
+            return temp;
+        } else {
+            b = (Ruby.Binary) temp;
+        }
+        b = b.withLeft(visitAndCast(b.getLeft(), p));
+        b = b.getPadding().withOperator(visitLeftPadded(b.getPadding().getOperator(), RubyLeftPadded.Location.BINARY_OPERATOR, p));
+        b = b.withRight(visitAndCast(b.getRight(), p));
+        b = b.withType(visitType(b.getType(), p));
+        return b;
     }
 }
