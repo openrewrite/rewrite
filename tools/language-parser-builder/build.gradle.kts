@@ -26,6 +26,7 @@ dependencies {
     modelAnnotationProcessor("org.projectlombok:lombok:latest.release")
     modelCompileOnly("org.projectlombok:lombok:latest.release")
     modelImplementation("ch.qos.logback:logback-classic:latest.release")
+    modelImplementation("org.openrewrite:rewrite-java-17")
 }
 
 license {

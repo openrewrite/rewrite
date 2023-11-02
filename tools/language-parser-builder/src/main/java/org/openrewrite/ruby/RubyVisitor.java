@@ -86,7 +86,7 @@ public class RubyVisitor<P> extends TreeVisitor<Ruby, P> {
         return (before == left.getBefore() && t == left.getElement()) ? left : new JLeftPadded<>(before, t, left.getMarkers());
     }
 
-    public <T extends Ruby> JContainer<T> visitContainer(@Nullable JContainer<T> container, P p) {
+    public <T extends J> JContainer<T> visitContainer(@Nullable JContainer<T> container, P p) {
         if (container == null) {
             //noinspection ConstantConditions
             return null;
@@ -101,5 +101,13 @@ public class RubyVisitor<P> extends TreeVisitor<Ruby, P> {
         return ts == container.getPadding().getElements() && before == container.getBefore() ?
                 container :
                 JContainer.build(before, ts, container.getMarkers());
+    }
+
+    public Ruby visitCompilationUnit(Ruby.CompilationUnit compilationUnit, P p) {
+        Ruby.CompilationUnit c = compilationUnit;
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withMarkers(visitMarkers(c.getMarkers(), p));
+        c = c.getPadding().withExpressions(visitContainer(c.getPadding().getExpressions(), p));
+        return c;
     }
 }

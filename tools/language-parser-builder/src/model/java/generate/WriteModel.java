@@ -30,7 +30,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.StringJoiner;
-import java.util.function.Supplier;
 
 @RequiredArgsConstructor
 public class WriteModel extends Recipe {
@@ -46,10 +45,10 @@ public class WriteModel extends Recipe {
         return "Expand the model into an AST with Lombok annotations, Padding classes, etc.";
     }
 
-    Supplier<JavaParser> parser = () -> JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()).build();
+    JavaParser.Builder<?, ?> parser = JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath());
 
     JavaVisitor<ExecutionContext> writeModelClass = new JavaIsoVisitor<ExecutionContext>() {
-        final JavaTemplate valueModel = JavaTemplate.builder(this::getCursor,
+        final JavaTemplate valueModel = JavaTemplate.builder(
                 """
                         @Value
                         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -57,7 +56,7 @@ public class WriteModel extends Recipe {
                         """
         ).javaParser(parser).build();
 
-        final JavaTemplate paddedModel = JavaTemplate.builder(this::getCursor,
+        final JavaTemplate paddedModel = JavaTemplate.builder(
                 """
                         @ToString
                         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -67,13 +66,13 @@ public class WriteModel extends Recipe {
                         """
         ).javaParser(parser).build();
 
-        final JavaTemplate idField = JavaTemplate.builder(this::getCursor, "@EqualsAndHashCode.Include UUID id;").javaParser(parser).build();
-        final JavaTemplate prefixField = JavaTemplate.builder(this::getCursor, "Space prefix;").javaParser(parser).build();
-        final JavaTemplate markersField = JavaTemplate.builder(this::getCursor, "Markers markers;").javaParser(parser).build();
-        final JavaTemplate paddingField = JavaTemplate.builder(this::getCursor, "@Nullable @NonFinal transient WeakReference<Padding> padding;").javaParser(parser).build();
-        final JavaTemplate implementsTree = JavaTemplate.builder(this::getCursor, "Toml").javaParser(parser).build();
+        final JavaTemplate idField = JavaTemplate.builder("@EqualsAndHashCode.Include UUID id;").javaParser(parser).build();
+        final JavaTemplate prefixField = JavaTemplate.builder("Space prefix;").javaParser(parser).build();
+        final JavaTemplate markersField = JavaTemplate.builder("Markers markers;").javaParser(parser).build();
+        final JavaTemplate paddingField = JavaTemplate.builder("@Nullable @NonFinal transient WeakReference<Padding> padding;").javaParser(parser).build();
+        final JavaTemplate implementsTree = JavaTemplate.builder("Ruby").javaParser(parser).build();
 
-        final JavaTemplate getPadding = JavaTemplate.builder(this::getCursor,
+        final JavaTemplate getPadding = JavaTemplate.builder(
                 """
                         public Padding getPadding() {
                             Padding p;
@@ -92,7 +91,7 @@ public class WriteModel extends Recipe {
                         """
         ).build();
 
-        final JavaTemplate paddingClass = JavaTemplate.builder(this::getCursor,
+        final JavaTemplate paddingClass = JavaTemplate.builder(
                 """
                         @RequiredArgsConstructor
                         public static class Padding {
@@ -101,9 +100,9 @@ public class WriteModel extends Recipe {
                         """
         ).build();
 
-        final JavaTemplate acceptMethod = JavaTemplate.builder(this::getCursor,
+        final JavaTemplate acceptMethod = JavaTemplate.builder(
                 """
-                        @Override public <P> Toml acceptToml(TomlVisitor<P> v, P p) {
+                        @Override public <P> Ruby acceptRuby(RubyVisitor<P> v, P p) {
                           return v.visit#{}(this, p);
                         }
                         """
@@ -112,7 +111,7 @@ public class WriteModel extends Recipe {
         /**
          * The accessors in the model class that skips the padding and return the contained element.
          */
-        final JavaTemplate unwrappedPaddedGetterWither = JavaTemplate.builder(this::getCursor,
+        final JavaTemplate unwrappedPaddedGetterWither = JavaTemplate.builder(
                 """
                         public #{} get#{}() {
                             return #{}.getElement();
@@ -120,12 +119,12 @@ public class WriteModel extends Recipe {
                                                 
                         public #{} with#{}(#{} #{}) {
                             //noinspection ConstantConditions
-                            return getPadding().with#{}(Toml#{}Padded.withElement(this.#{}, #{}));
+                            return getPadding().with#{}(Ruby#{}Padded.withElement(this.#{}, #{}));
                         }
                         """
         ).javaParser(parser).build();
 
-        final JavaTemplate nullableUnwrappedPaddedGetterWither = JavaTemplate.builder(this::getCursor,
+        final JavaTemplate nullableUnwrappedPaddedGetterWither = JavaTemplate.builder(
                 """
                         @Nullable
                         public #{} get#{}() {
@@ -136,7 +135,7 @@ public class WriteModel extends Recipe {
                             if (#{} == null) {
                                 return this.#{} == null ? this : new #{}(#{});
                             }
-                            return getPadding().with#{}(Toml#{}Padded.withElement(this.#{}, #{}));
+                            return getPadding().with#{}(Ruby#{}Padded.withElement(this.#{}, #{}));
                         }
                         """
         ).javaParser(parser).build();
@@ -144,20 +143,20 @@ public class WriteModel extends Recipe {
         /**
          * The accessors in the model class that skips the padding and return the contained elements.
          */
-        final JavaTemplate unwrappedContainerGetterWither = JavaTemplate.builder(this::getCursor,
+        final JavaTemplate unwrappedContainerGetterWither = JavaTemplate.builder(
                 """
                         public List<#{}> get#{}() {
                             return #{}.getElements();
                         }
                                                 
                         public #{} with#{}(List<#{}> #{}) {
-                            return getPadding().with#{}(this.#{}.getPadding().withElements(TomlRightPadded.withElements(
+                            return getPadding().with#{}(this.#{}.getPadding().withElements(JRightPadded.withElements(
                                 this.#{}.getPadding().getElements(), #{}));
                         }
                         """
         ).javaParser(parser).build();
 
-        final JavaTemplate withGetterAnnotations = JavaTemplate.builder(this::getCursor, "@With @Getter")
+        final JavaTemplate withGetterAnnotations = JavaTemplate.builder("@With @Getter")
                 .javaParser(parser).build();
 
         @Override
@@ -170,14 +169,14 @@ public class WriteModel extends Recipe {
 
             boolean padded = c.getBody().getStatements().stream().anyMatch(this::isPadded);
 
-            if(c.getImplements() == null) {
-                c = c.withTemplate(implementsTree, c.getCoordinates().addImplementsClause());
+            if (c.getImplements() == null) {
+                c = implementsTree.apply(getCursor(), c.getCoordinates().addImplementsClause());
             }
 
-            c = c.withTemplate(markersField, c.getBody().getCoordinates().firstStatement());
-            c = c.withTemplate(prefixField, c.getBody().getCoordinates().firstStatement());
-            c = c.withTemplate(idField, c.getBody().getCoordinates().firstStatement());
-            c = c.withTemplate(acceptMethod, c.getBody().getCoordinates().lastStatement(), classDecl.getSimpleName());
+            c = markersField.apply(getCursor(), c.getBody().getCoordinates().firstStatement());
+            c = prefixField.apply(getCursor(), c.getBody().getCoordinates().firstStatement());
+            c = idField.apply(getCursor(), c.getBody().getCoordinates().firstStatement());
+            c = acceptMethod.apply(getCursor(), c.getBody().getCoordinates().lastStatement(), classDecl.getSimpleName());
 
             for (Statement statement : c.getBody().getStatements()) {
                 if (statement instanceof J.VariableDeclarations varDec) {
@@ -193,14 +192,14 @@ public class WriteModel extends Recipe {
                     if (fqn != null) {
                         if (elementType != null) {
                             c = switch (fqn.getClassName()) {
-                                case "TomlContainer" -> writeContainerGetterWithers(c, varDec, elementType);
-                                case "TomlLeftPadded" -> writePaddedGetterWithers(c, varDec, elementType, "Left");
-                                case "TomlRightPadded" -> writePaddedGetterWithers(c, varDec, elementType, "Right");
-                                default -> c.withTemplate(withGetterAnnotations, varDec.getCoordinates()
+                                case "JContainer" -> writeContainerGetterWithers(c, varDec, elementType);
+                                case "JLeftPadded" -> writePaddedGetterWithers(c, varDec, elementType, "Left");
+                                case "JRightPadded" -> writePaddedGetterWithers(c, varDec, elementType, "Right");
+                                default -> withGetterAnnotations.apply(getCursor(), varDec.getCoordinates()
                                         .addAnnotation(Comparator.comparing(J.Annotation::getSimpleName)));
                             };
                         } else if (padded) {
-                            c = c.withTemplate(withGetterAnnotations, varDec.getCoordinates()
+                            c = withGetterAnnotations.apply(getCursor(), varDec.getCoordinates()
                                     .addAnnotation(Comparator.comparing(J.Annotation::getSimpleName)));
                         }
                     }
@@ -208,12 +207,12 @@ public class WriteModel extends Recipe {
             }
 
             if (padded) {
-                c = c.withTemplate(paddedModel, c.getCoordinates().replaceAnnotations());
-                c = c.withTemplate(paddingField, c.getBody().getCoordinates().firstStatement());
-                c = c.withTemplate(getPadding, c.getBody().getCoordinates().lastStatement());
-                c = c.withTemplate(paddingClass, c.getBody().getCoordinates().lastStatement(), c.getSimpleName());
+                c = paddedModel.apply(getCursor(), c.getCoordinates().replaceAnnotations());
+                c = paddingField.apply(getCursor(), c.getBody().getCoordinates().firstStatement());
+                c = getPadding.apply(getCursor(), c.getBody().getCoordinates().lastStatement());
+                c = paddingClass.apply(getCursor(), c.getBody().getCoordinates().lastStatement(), c.getSimpleName());
             } else {
-                c = c.withTemplate(valueModel, c.getCoordinates().replaceAnnotations());
+                c = valueModel.apply(getCursor(), c.getCoordinates().replaceAnnotations());
             }
 
             List<Statement> statements = c.getBody().getStatements();
@@ -237,7 +236,7 @@ public class WriteModel extends Recipe {
             String elementTypeName = elementType.getClassName();
             String modelTypeName = c.getSimpleName();
 
-            c = c.withTemplate(unwrappedContainerGetterWither, c.getBody().getCoordinates().lastStatement(),
+            c = unwrappedContainerGetterWither.apply(getCursor(), c.getBody().getCoordinates().lastStatement(),
                     elementTypeName, capitalizedName,
                     name,
                     modelTypeName, capitalizedName, elementTypeName, name,
@@ -263,12 +262,12 @@ public class WriteModel extends Recipe {
                                 .get(0).getSimpleName());
                     }
                 }
-                c = c.withTemplate(nullableUnwrappedPaddedGetterWither, c.getBody().getCoordinates().lastStatement(),
+                c = nullableUnwrappedPaddedGetterWither.apply(getCursor(), c.getBody().getCoordinates().lastStatement(),
                         elementTypeName, capitalizedName, name, name, modelTypeName, capitalizedName,
                         elementTypeName, name, name, name, modelTypeName, newModelArguments.toString(),
                         capitalizedName, leftOrRight, name, name);
             } else {
-                c = c.withTemplate(unwrappedPaddedGetterWither, c.getBody().getCoordinates().lastStatement(),
+                c = unwrappedPaddedGetterWither.apply(getCursor(), c.getBody().getCoordinates().lastStatement(),
                         elementTypeName, capitalizedName, name,
                         modelTypeName, capitalizedName, elementTypeName, name,
                         capitalizedName, leftOrRight, name, name);
@@ -283,17 +282,17 @@ public class WriteModel extends Recipe {
             }
             JavaType.FullyQualified type = TypeUtils.asFullyQualified(((J.VariableDeclarations) statement).getType());
             assert type != null;
-            return type.getClassName().contains("Padded") || type.getClassName().equals("TomlContainer");
+            return type.getClassName().contains("Padded") || type.getClassName().equals("JContainer");
         }
     };
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<>() {
             @Override
             public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
                 Object parent = getCursor().getParentOrThrow().getValue();
-                if (!(parent instanceof J.ClassDeclaration) || !((J.ClassDeclaration) parent).getSimpleName().equals("Toml")) {
+                if (!(parent instanceof J.ClassDeclaration) || !((J.ClassDeclaration) parent).getSimpleName().equals("Ruby")) {
                     return block;
                 }
 

@@ -24,11 +24,13 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.search.FindAnnotations;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.List;
 import java.util.StringJoiner;
-import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
 
@@ -38,18 +40,23 @@ public class WriteVisitorMethods extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Write the boilerplate for `TomlVisitor` and `TomlIsoVisitor`";
+        return "Write the boilerplate for `RubyVisitor` and `RubyIsoVisitor`";
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public String getDescription() {
+        return "Write the boilerplate for `RubyVisitor` and `RubyIsoVisitor`.";
+    }
+
+    @Override
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaVisitor<>() {
             @Override
             public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 return switch (classDecl.getSimpleName()) {
-                    case "TomlVisitor" ->
+                    case "RubyVisitor" ->
                             writeVisitorMethods.visitNonNull(classDecl, ctx, getCursor().getParentOrThrow());
-                    case "TomlIsoVisitor" ->
+                    case "RubyIsoVisitor" ->
                             writeIsoVisitorMethods.visitNonNull(classDecl, ctx, getCursor().getParentOrThrow());
                     default -> classDecl;
                 };
@@ -58,13 +65,12 @@ public class WriteVisitorMethods extends Recipe {
         };
     }
 
-    Supplier<JavaParser> parser = () -> JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()).build();
-
+    JavaParser.Builder<? extends JavaParser, ?> parser = JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath());
     private final JavaVisitor<ExecutionContext> writeVisitorMethods = new JavaIsoVisitor<>() {
-        final JavaTemplate visitMethod = JavaTemplate.builder(this::getCursor,
+        final JavaTemplate visitMethod = JavaTemplate.builder(
                 """
-                        public Toml visit#{}(Toml.#{} #{}, P p) {
-                            Toml.#{} #{} = #{};
+                        public Ruby visit#{}(Ruby.#{} #{}, P p) {
+                            Ruby.#{} #{} = #{};
                             #{} = #{}.withPrefix(visitSpace(#{}.getPrefix(), p));
                             #{} = #{}.withMarkers(visitMarkers(#{}.getMarkers(), p));
                             #{}
@@ -94,7 +100,7 @@ public class WriteVisitorMethods extends Recipe {
 
                         JavaType.FullyQualified elemType = requireNonNull(TypeUtils.asFullyQualified(varDec.getType()));
                         switch (elemType.getClassName()) {
-                            case "TomlLeftPadded":
+                            case "JLeftPadded":
                                 if (nullable) {
                                     fields.add("if(" + varName + ".getPadding().get" + capitalizedName + "() != null) {");
                                 }
@@ -104,7 +110,7 @@ public class WriteVisitorMethods extends Recipe {
                                     fields.add("}");
                                 }
                                 break;
-                            case "TomlRightPadded":
+                            case "JRightPadded":
                                 if (nullable) {
                                     fields.add("if(" + varName + ".getPadding().get" + capitalizedName + "() != null) {");
                                 }
@@ -114,7 +120,7 @@ public class WriteVisitorMethods extends Recipe {
                                     fields.add("}");
                                 }
                                 break;
-                            case "TomlContainer":
+                            case "JContainer":
                                 fields.add(varName + " = " + varName + ".getPadding().with" + capitalizedName + "(visitContainer(" + varName + ".getPadding().get" + capitalizedName + "(), p));");
                                 break;
                             case "List":
@@ -126,7 +132,7 @@ public class WriteVisitorMethods extends Recipe {
                                            ") visit(t, p)));");
                                 break;
                             default:
-                                if (elemType.getClassName().startsWith("Toml")) {
+                                if (elemType.getClassName().startsWith("Ruby")) {
                                     fields.add(varName + " = " + varName + ".with" + capitalizedName + "((" +
                                                elemType.getClassName() + ") visit(" + varName + ".get" + capitalizedName + "(), p));");
                                 }
@@ -134,13 +140,14 @@ public class WriteVisitorMethods extends Recipe {
                     }
                 }
 
-                c = c.withTemplate(visitMethod, c.getBody().getCoordinates().lastStatement(),
+                c = visitMethod.apply(getCursor(), c.getBody().getCoordinates().lastStatement(),
                         modelTypeName, modelTypeName, paramName,
                         modelTypeName, varName, paramName,
                         varName, varName, varName,
                         varName, varName, varName,
                         fields,
-                        varName);
+                        varName
+                );
             }
 
             return c;
@@ -148,11 +155,11 @@ public class WriteVisitorMethods extends Recipe {
     };
 
     private final JavaVisitor<ExecutionContext> writeIsoVisitorMethods = new JavaIsoVisitor<>() {
-        final JavaTemplate isoVisitMethod = JavaTemplate.builder(this::getCursor,
+        final JavaTemplate isoVisitMethod = JavaTemplate.builder(
                 """
                         @Override
-                        public Toml.#{} visit#{}(Toml.#{} #{}, P p) {
-                            return (Toml.#{}) super.visit#{}(#{}, p);
+                        public Ruby.#{} visit#{}(Ruby.#{} #{}, P p) {
+                            return (Ruby.#{}) super.visit#{}(#{}, p);
                         }
                         """
         ).javaParser(parser).build();
@@ -165,7 +172,7 @@ public class WriteVisitorMethods extends Recipe {
                 String modelTypeName = modelClass.getSimpleName();
                 String paramName = modelTypeName.substring(0, 1).toLowerCase() + modelTypeName.substring(1);
 
-                c = c.withTemplate(isoVisitMethod, c.getBody().getCoordinates().lastStatement(),
+                c = isoVisitMethod.apply(getCursor(), c.getBody().getCoordinates().lastStatement(),
                         modelTypeName, modelTypeName, modelTypeName, paramName,
                         modelTypeName, modelTypeName, paramName);
             }

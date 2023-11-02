@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Result;
+import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.tree.J;
@@ -32,6 +33,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 
 @RequiredArgsConstructor
 public class GenerateModel {
@@ -47,17 +49,18 @@ public class GenerateModel {
     final List<J.ClassDeclaration> modelClasses;
 
     public static void main(String[] args) {
-        new GenerateModel(jp()
+        new GenerateModel(((J.CompilationUnit) jp()
                 .parse(
                         List.of(
-                                Paths.get("tools/language-parser-builder/src/model/java/model/Toml.java"),
-                                Paths.get("tools/language-parser-builder/src/model/java/model/Key.java"),
-                                Paths.get("tools/language-parser-builder/src/model/java/model/TValue.java")
+                                Paths.get("language-parser-builder/src/model/java/model/Ruby.java"),
+                                Paths.get("language-parser-builder/src/model/java/model/Key.java"),
+                                Paths.get("language-parser-builder/src/model/java/model/TValue.java")
                         ),
                         null,
                         ctx
                 )
-                .get(0)
+                .findFirst()
+                .orElseThrow())
                 .getClasses()
                 .get(0)
                 .getBody()
@@ -71,38 +74,37 @@ public class GenerateModel {
     public void generate() {
         List<Result> results = new ArrayList<>();
 
-        Path TomlTreePath = Paths.get("tools/language-parser-builder/src/main/java/org/openrewrite/toml/tree/Toml.java");
+        Path rubyTreePath = Paths.get("language-parser-builder/src/main/java/org/openrewrite/ruby/tree/Ruby.java");
 
         List<Path> deps = List.of(
-                Paths.get("tools/language-parser-builder/src/main/java/org/openrewrite/toml/TomlVisitor.java"),
-                Paths.get("tools/language-parser-builder/src/main/java/org/openrewrite/toml/TomlIsoVisitor.java"),
-                Paths.get("tools/language-parser-builder/src/main/java/org/openrewrite/toml/tree/TomlContainer.java"),
-                Paths.get("tools/language-parser-builder/src/main/java/org/openrewrite/toml/tree/TomlLeftPadded.java"),
-                Paths.get("tools/language-parser-builder/src/main/java/org/openrewrite/toml/tree/TomlRightPadded.java")
+                Paths.get("language-parser-builder/src/main/java/org/openrewrite/ruby/RubyVisitor.java"),
+                Paths.get("language-parser-builder/src/main/java/org/openrewrite/ruby/RubyIsoVisitor.java")
         );
 
-        results.addAll(new WriteModel(modelClasses).run(List.of(jp().parse(
-                ListUtils.concat(TomlTreePath, deps), null, ctx).get(0)), ctx).getResults());
-        results.addAll(new WriteVisitorMethods(modelClasses).run(jp().parse(
+        results.addAll(new WriteModel(modelClasses).run(new InMemoryLargeSourceSet(List.of(jp().parse(
+                ListUtils.concat(rubyTreePath, deps), null, ctx).findFirst().orElseThrow())), ctx).getChangeset().getAllResults());
+        results.addAll(new WriteVisitorMethods(modelClasses).run(new InMemoryLargeSourceSet(jp().parse(
                 List.of(
-                        Paths.get("tools/language-parser-builder/src/main/java/org/openrewrite/toml/TomlVisitor.java"),
-                        Paths.get("tools/language-parser-builder/src/main/java/org/openrewrite/toml/TomlIsoVisitor.java")
+                        Paths.get("language-parser-builder/src/main/java/org/openrewrite/ruby/RubyVisitor.java"),
+                        Paths.get("language-parser-builder/src/main/java/org/openrewrite/ruby/RubyIsoVisitor.java")
                 ),
                 null,
                 ctx
-        ), ctx).getResults());
-        results.addAll(new WritePrinter(modelClasses).run(jp().parse(
+        ).collect(toList())), ctx).getChangeset().getAllResults());
+
+        results.addAll(new WritePrinter(modelClasses).run(new InMemoryLargeSourceSet(jp().parse(
                 List.of(
-                        Paths.get("tools/language-parser-builder/src/main/java/org/openrewrite/toml/internal/TomlPrinter.java")
+                        Paths.get("language-parser-builder/src/main/java/org/openrewrite/ruby/internal/RubyPrinter.java")
                 ),
                 null,
                 ctx
-        ), ctx).getResults());
+        ).collect(toList())), ctx).getChangeset().getAllResults());
 
         writeResults(results);
 
         // TODO Unable to add accessors in the first phase due to some bug in JavaTemplate.
-        writeResults(new WritePaddingAccessors().run(jp().parse(List.of(TomlTreePath), null, ctx), ctx).getResults());
+        writeResults(new WritePaddingAccessors().run(new InMemoryLargeSourceSet(jp().parse(List.of(rubyTreePath),
+                null, ctx).collect(toList())), ctx).getChangeset().getAllResults());
     }
 
     private void writeResults(List<Result> results) {

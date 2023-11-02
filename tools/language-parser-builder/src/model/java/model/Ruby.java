@@ -15,39 +15,16 @@
  */
 package model;
 
-import org.openrewrite.ruby.tree.TomlContainer;
-import org.openrewrite.ruby.tree.TomlLeftPadded;
+import org.openrewrite.java.tree.JContainer;
 
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 
-public interface Toml {
+public interface Ruby {
 
-    class Document {
+    class CompilationUnit {
         Path sourcePath;
         Charset charset;
-        TomlContainer<Expression> expressions;
-    }
-
-    class KeyValue implements Expression {
-        Key key;
-        TomlLeftPadded<TValue> value;
-    }
-
-    class BareKey implements Key {
-        String value;
-    }
-
-    class DottedKey implements Key {
-        TomlContainer<Key> keys;
-    }
-
-    class LiteralString implements Key, TValue {
-        String value;
-        String valueSource;
-    }
-
-    class Array {
-        TomlContainer<TValue> values;
+        JContainer<Expression> expressions;
     }
 }

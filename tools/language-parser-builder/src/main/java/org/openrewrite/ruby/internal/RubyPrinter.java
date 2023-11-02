@@ -18,10 +18,7 @@ package org.openrewrite.ruby.internal;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.JContainer;
-import org.openrewrite.java.tree.JLeftPadded;
-import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.ruby.RubyVisitor;
@@ -59,9 +56,9 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         }
     }
 
-    protected void visitRightPadded(List<? extends JRightPadded<? extends Ruby>> nodes, String suffixBetween, PrintOutputCapture<P> p) {
+    protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, String suffixBetween, PrintOutputCapture<P> p) {
         for (int i = 0; i < nodes.size(); i++) {
-            JRightPadded<? extends Ruby> node = nodes.get(i);
+            JRightPadded<? extends J> node = nodes.get(i);
             visit(node.getElement(), p);
             visitSpace(node.getAfter(), p);
             visitMarkers(node.getMarkers(), p);
@@ -71,7 +68,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         }
     }
 
-    protected void visitContainer(String before, @Nullable JContainer<? extends Ruby> container,
+    protected void visitContainer(String before, @Nullable JContainer<? extends J> container,
                                   String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
         if (container == null) {
             return;
@@ -110,5 +107,12 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
                 p.append(suffix);
             }
         }
+    }
+
+    public Ruby visitCompilationUnit(Ruby.CompilationUnit compilationUnit, PrintOutputCapture<P> p) {
+        visitSpace(compilationUnit.getPrefix(), p);
+        visitMarkers(compilationUnit.getMarkers(), p);
+        visitContainer("", compilationUnit.getPadding().getExpressions(), "", "", p);
+        return compilationUnit;
     }
 }

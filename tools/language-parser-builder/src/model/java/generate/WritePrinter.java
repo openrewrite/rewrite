@@ -23,11 +23,13 @@ import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.List;
 import java.util.StringJoiner;
-import java.util.function.Supplier;
 
 import static java.util.Objects.requireNonNull;
 
@@ -37,7 +39,7 @@ public class WritePrinter extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Write the boilerplate for `TomlPrinter`";
+        return "Write the boilerplate for `RubyPrinter`";
     }
 
     @Override
@@ -47,10 +49,10 @@ public class WritePrinter extends Recipe {
                 "where keywords are grammatically required.";
     }
 
-    Supplier<JavaParser> parser = () -> JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()).build();
+    JavaParser.Builder<?, ?> parser = JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath());
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<>() {
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
@@ -70,13 +72,13 @@ public class WritePrinter extends Recipe {
 
                             JavaType.FullyQualified elemType = requireNonNull(TypeUtils.asFullyQualified(varDec.getType()));
                             switch (elemType.getClassName()) {
-                                case "TomlLeftPadded":
+                                case "JLeftPadded":
                                     fields.add("visitLeftPadded(\"\"," + paramName + ".getPadding().get" + capitalizedName + "(), p);");
                                     break;
-                                case "TomlRightPadded":
+                                case "JRightPadded":
                                     fields.add("visitRightPadded(" + paramName + ".getPadding().get" + capitalizedName + "(), \"\", p);");
                                     break;
-                                case "TomlContainer":
+                                case "JContainer":
                                     fields.add("visitContainer(\"\", " + paramName + ".getPadding().get" + capitalizedName + "(), \"\", \"\", p);");
                                     break;
                                 case "List":
@@ -85,7 +87,7 @@ public class WritePrinter extends Recipe {
                                         loopVar = "pp";
                                     }
                                     String typeParam = ((J.Identifier) requireNonNull(((J.ParameterizedType) varDec.getTypeExpression()).getTypeParameters()).get(0)).getSimpleName();
-                                    fields.add("for(Toml." + typeParam + " " + loopVar + " : " + paramName + ".get" + capitalizedName + "()) {\n" +
+                                    fields.add("for(Ruby." + typeParam + " " + loopVar + " : " + paramName + ".get" + capitalizedName + "()) {\n" +
                                                "    // TODO print each element\n" +
                                                "}");
                                     break;
@@ -96,7 +98,7 @@ public class WritePrinter extends Recipe {
                                     fields.add("p.append(" + paramName + ".get" + capitalizedName + "().toString());");
                                     break;
                                 default:
-                                    if (elemType.getClassName().startsWith("Toml")) {
+                                    if (elemType.getClassName().startsWith("Ruby")) {
                                         fields.add("visit(" + paramName + ".get" + capitalizedName + "(), p);");
                                     }
                             }
@@ -105,8 +107,8 @@ public class WritePrinter extends Recipe {
 
                     StringBuilder template = new StringBuilder();
 
-                    JavaTemplate visitMethod = JavaTemplate.builder(this::getCursor, "" +
-                                                                                     "public Toml visit#{}(Toml.#{} #{}, PrintOutputCapture<P> p) {" +
+                    JavaTemplate visitMethod = JavaTemplate.builder("" +
+                                                                                     "public Ruby visit#{}(Ruby.#{} #{}, PrintOutputCapture<P> p) {" +
                                                                                      "    visitSpace(#{}.getPrefix(), p);" +
                                                                                      "    visitMarkers(#{}.getMarkers(), p);" +
                                                                                      "    #{}" +
@@ -119,7 +121,7 @@ public class WritePrinter extends Recipe {
                             .build();
 
                     try {
-                        c = c.withTemplate(visitMethod, c.getBody().getCoordinates().lastStatement(),
+                        c = visitMethod.apply(getCursor(), c.getBody().getCoordinates().lastStatement(),
                                 modelTypeName, modelTypeName, paramName,
                                 paramName,
                                 paramName,

@@ -15,12 +15,21 @@
  */
 package org.openrewrite.ruby.tree;
 
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import lombok.*;
+import lombok.experimental.NonFinal;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.ruby.RubyVisitor;
+
+import java.lang.ref.WeakReference;
+import java.nio.charset.Charset;
+import java.nio.file.Path;
+import java.util.UUID;
 
 public interface Ruby extends J {
 
@@ -42,5 +51,65 @@ public interface Ruby extends J {
 
     default Space getPrefix() {
         return Space.EMPTY;
+    }
+
+    @Value
+    @With
+    class CompilationUnit implements Ruby, SourceFile {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        Space prefix;
+        Markers markers;
+        Path sourcePath;
+
+        @Nullable
+        FileAttributes fileAttributes;
+
+        Charset charset;
+        boolean charsetBomMarked;
+
+        @Nullable
+        Checksum checksum;
+
+        JContainer<Expression> expressions;
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Ruby.CompilationUnit t;
+
+            public JContainer<Expression> getExpressions() {
+                return t.expressions;
+            }
+
+            public Ruby.CompilationUnit withExpressions(JContainer<Expression> expressions) {
+                return t.expressions == expressions ? t : new Ruby.CompilationUnit(null, t.id, t.prefix, t.markers,
+                        t.sourcePath, t.fileAttributes, t.charset, t.charsetBomMarked, t.checksum, expressions);
+            }
+        }
+
+        @Override
+        public <P> boolean isAcceptable(TreeVisitor<?, P> v, P p) {
+            return false;
+        }
     }
 }

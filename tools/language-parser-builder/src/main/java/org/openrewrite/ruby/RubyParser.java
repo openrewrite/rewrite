@@ -15,29 +15,38 @@
  */
 package org.openrewrite.ruby;
 
-//public class TomlParser implements Parser<Toml.Document> {
+import org.intellij.lang.annotations.Language;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Parser;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.ruby.tree.Ruby;
+import org.openrewrite.tree.ParsingEventListener;
+import org.openrewrite.tree.ParsingExecutionContextView;
+
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Objects;
+
+import static java.util.stream.Collectors.toList;
+
+//public class RubyParser implements Parser<Ruby.CompilationUnit> {
 //    @Override
-//    public List<Toml.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
+//    public List<Ruby.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
 //        ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
 //        return acceptedInputs(sourceFiles).stream()
 //                .map(sourceFile -> {
-//                    Timer.Builder timer = Timer.builder("rewrite.parse")
-//                            .description("The time spent parsing an XML file")
-//                            .tag("file.type", "XML");
-//                    Timer.Sample sample = Timer.start();
 //                    Path path = sourceFile.getRelativePath(relativeTo);
 //                    try {
 //                        EncodingDetectingInputStream is = sourceFile.getSource(ctx);
 //                        String sourceStr = is.readFully();
 //
 //                        // FIXME implement me!
-//                        Toml.Document document = null;
-//
-//                        sample.stop(MetricsHelper.successTags(timer).register(Metrics.globalRegistry));
+//                        Ruby.CompilationUnit document = null;
 //                        parsingListener.parsed(sourceFile, document);
 //                        return document;
 //                    } catch (Throwable t) {
-//                        sample.stop(MetricsHelper.errorTags(timer, t).register(Metrics.globalRegistry));
 //                        ParsingExecutionContextView.view(ctx).parseFailure(sourceFile, relativeTo, this, t);
 //                        ctx.getOnError().accept(new IllegalStateException(path + " " + t.getMessage(), t));
 //                        return null;
@@ -48,25 +57,19 @@ package org.openrewrite.ruby;
 //    }
 //
 //    @Override
-//    public List<Toml.Document> parse(@Language("xml") String... sources) {
+//    public List<Ruby.CompilationUnit> parse(@Language("ruby") String... sources) {
 //        return parse(new InMemoryExecutionContext(), sources);
 //    }
 //
 //    @Override
 //    public boolean accept(Path path) {
 //        String p = path.toString();
-//        return p.endsWith(".xml") ||
-//               p.endsWith(".wsdl") ||
-//               p.endsWith(".xhtml") ||
-//               p.endsWith(".xsd") ||
-//               p.endsWith(".xsl") ||
-//               p.endsWith(".xslt") ||
-//               p.endsWith(".tld");
+//        return p.endsWith(".rb");
 //    }
 //
 //    @Override
 //    public Path sourcePathFromSourceText(Path prefix, String sourceCode) {
-//        return prefix.resolve("file.xml");
+//        return prefix.resolve("file.rb");
 //    }
 //
 //    public static Builder builder() {
@@ -76,17 +79,17 @@ package org.openrewrite.ruby;
 //    public static class Builder extends Parser.Builder {
 //
 //        public Builder() {
-//            super(Toml.Document.class);
+//            super(Ruby.CompilationUnit.class);
 //        }
 //
 //        @Override
-//        public TomlParser build() {
-//            return new TomlParser();
+//        public RubyParser build() {
+//            return new RubyParser();
 //        }
 //
 //        @Override
 //        public String getDslName() {
-//            return "toml";
+//            return "ruby";
 //        }
 //    }
 //}

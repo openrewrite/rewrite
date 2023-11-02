@@ -30,7 +30,6 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.StringJoiner;
-import java.util.function.Supplier;
 
 /**
  * TODO Unable to add accessors in the first phase due to some bug in JavaTemplate.
@@ -42,7 +41,12 @@ public class WritePaddingAccessors extends Recipe {
         return "Write accessors for padded parts of the model";
     }
 
-    Supplier<JavaParser> parser = () -> JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()).build();
+    @Override
+    public String getDescription() {
+        return "Write accessors.";
+    }
+
+    JavaParser.Builder parser = JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath());
 
     @RequiredArgsConstructor
     class WritePaddingAccessorsVisitor extends JavaIsoVisitor<ExecutionContext> {
@@ -51,14 +55,14 @@ public class WritePaddingAccessors extends Recipe {
         /**
          * The accessors in the Padding class that return the padding wrapped element.
          */
-        final JavaTemplate paddedGetterWither = JavaTemplate.builder(this::getCursor,
+        final JavaTemplate paddedGetterWither = JavaTemplate.builder(
                 """
                         #{}
-                        public Toml#{}<#{}> get#{}() {
+                        public Ruby#{}<#{}> get#{}() {
                             return t.#{};
                         }
 
-                        public #{} with#{}(#{}Toml#{}<#{}> #{}) {
+                        public #{} with#{}(#{}Ruby#{}<#{}> #{}) {
                             return t.#{} == #{} ? t : new #{}(#{});
                         }
                         """
@@ -82,9 +86,9 @@ public class WritePaddingAccessors extends Recipe {
 
                         if (fqn != null && elementType != null) {
                             c = switch (fqn.getClassName()) {
-                                case "TomlContainer" -> writePaddedGetterWithers(c, varDec, elementType, "Container");
-                                case "TomlLeftPadded" -> writePaddedGetterWithers(c, varDec, elementType, "LeftPadded");
-                                case "TomlRightPadded" -> writePaddedGetterWithers(c, varDec, elementType, "RightPadded");
+                                case "JContainer" -> writePaddedGetterWithers(c, varDec, elementType, "Container");
+                                case "JLeftPadded" -> writePaddedGetterWithers(c, varDec, elementType, "LeftPadded");
+                                case "JRightPadded" -> writePaddedGetterWithers(c, varDec, elementType, "RightPadded");
                                 default -> c;
                             };
                         }
@@ -113,7 +117,7 @@ public class WritePaddingAccessors extends Recipe {
                 }
             }
 
-            c = c.withTemplate(paddedGetterWither, c.getBody().getCoordinates().lastStatement(),
+            c = paddedGetterWither.apply(getCursor(), c.getBody().getCoordinates().lastStatement(),
                     nullable ? "@Nullable " : "", leftOrRight, elementTypeName, capitalizedName,
                     name, modelTypeName, capitalizedName,
                     nullable ? "@Nullable " : "", leftOrRight,
@@ -125,17 +129,17 @@ public class WritePaddingAccessors extends Recipe {
         boolean isPadded(Statement statement) {
             JavaType.FullyQualified type = TypeUtils.asFullyQualified(((J.VariableDeclarations) statement).getType());
             assert type != null;
-            return type.getClassName().contains("Padded") || type.getClassName().equals("TomlContainer");
+            return type.getClassName().contains("Padded") || type.getClassName().equals("JContainer");
         }
     }
 
     @Override
-    protected JavaVisitor<ExecutionContext> getVisitor() {
+    public JavaVisitor<ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<>() {
             @Override
             public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
                 Object parent = getCursor().getParentOrThrow().getValue();
-                if (!(parent instanceof J.ClassDeclaration) || !((J.ClassDeclaration) parent).getSimpleName().equals("Toml")) {
+                if (!(parent instanceof J.ClassDeclaration) || !((J.ClassDeclaration) parent).getSimpleName().equals("Ruby")) {
                     return block;
                 }
 

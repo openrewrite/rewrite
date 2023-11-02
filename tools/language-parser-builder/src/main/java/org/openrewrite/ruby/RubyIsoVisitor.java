@@ -15,6 +15,12 @@
  */
 package org.openrewrite.ruby;
 
+import org.openrewrite.ruby.tree.Ruby;
+
 public class RubyIsoVisitor<P> extends RubyVisitor<P> {
+    @Override
+    public Ruby.CompilationUnit visitCompilationUnit(Ruby.CompilationUnit compilationUnit, P p) {
+        return (Ruby.CompilationUnit) super.visitCompilationUnit(compilationUnit, p);
+    }
 
 }
