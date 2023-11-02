@@ -20,11 +20,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Value;
+import lombok.experimental.NonFinal;
 import org.intellij.lang.annotations.Language;
-import org.openrewrite.Contributor;
-import org.openrewrite.Maintainer;
-import org.openrewrite.Recipe;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.net.URI;
@@ -67,6 +65,11 @@ public class DeclarativeRecipe extends Recipe {
 
     private final List<Recipe> uninitializedRecipes = new ArrayList<>();
     private final List<Recipe> recipeList = new ArrayList<>();
+    private final List<Recipe> preconditions = new ArrayList<>();
+
+    public void addPrecondition(Recipe recipe) {
+        preconditions.add(recipe);
+    }
 
     @JsonIgnore
     private Validated<Object> validation = Validated.test("initialization",
@@ -111,10 +114,151 @@ public class DeclarativeRecipe extends Recipe {
         uninitializedRecipes.clear();
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = true)
+    @RequiredArgsConstructor
+    static class PreconditionBellwether extends Recipe {
+
+        @Override
+        public String getDisplayName() {
+            return "Precondition bellwether";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Evaluates a precondition and makes that result available to the preconditions of other recipes.";
+        }
+
+        TreeVisitor<?, ExecutionContext> precondition;
+
+        @NonFinal
+        transient boolean preconditionApplicable;
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return new TreeVisitor<Tree, ExecutionContext>() {
+                @Override
+                public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                    Tree t = precondition.visit(tree, ctx);
+                    preconditionApplicable = t != tree;
+                    return tree;
+                }
+            };
+        }
+    }
+
+    @EqualsAndHashCode(callSuper = true)
+    @Value
+    static class BellwetherDecoratedRecipe extends Recipe {
+
+        DeclarativeRecipe.PreconditionBellwether bellwether;
+        Recipe delegate;
+
+        @Override
+        public String getName() {
+            return delegate.getName();
+        }
+
+        @Override
+        public String getDisplayName() {
+            return delegate.getDisplayName();
+        }
+
+        @Override
+        public String getDescription() {
+            return delegate.getDescription();
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return Preconditions.check(bellwether.isPreconditionApplicable(), delegate.getVisitor());
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = true)
+    static class BellwetherDecoratedScanningRecipe<T>  extends ScanningRecipe<T> {
+
+        DeclarativeRecipe.PreconditionBellwether bellwether;
+        ScanningRecipe<T> delegate;
+
+        @Override
+        public String getName() {
+            return delegate.getName();
+        }
+
+        @Override
+        public String getDisplayName() {
+            return delegate.getDisplayName();
+        }
+
+        @Override
+        public String getDescription() {
+            return delegate.getDescription();
+        }
+
+        @Override
+        public T getInitialValue(ExecutionContext ctx) {
+            return delegate.getInitialValue(ctx);
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getScanner(T acc) {
+            return Preconditions.check(bellwether.isPreconditionApplicable(), delegate.getScanner(acc));
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor(T acc) {
+            return Preconditions.check(bellwether.isPreconditionApplicable(), delegate.getVisitor(acc));
+        }
+    }
+
+
     @Override
     public List<Recipe> getRecipeList() {
-        return recipeList;
+        if(preconditions.isEmpty()) {
+            return recipeList;
+        }
+
+        TreeVisitor<?, ExecutionContext> andPreconditions = null;
+        for (Recipe precondition : preconditions) {
+            if(isScanningRecipe(precondition)) {
+                throw new IllegalArgumentException(
+                        getName() + " declares the ScanningRecipe " + precondition.getName() + " as a precondition." +
+                        "ScanningRecipe cannot be used as Preconditions.");
+            }
+            if(andPreconditions == null) {
+                andPreconditions = precondition.getVisitor();
+            } else {
+                andPreconditions = Preconditions.and(andPreconditions, precondition.getVisitor());
+            }
+        }
+        PreconditionBellwether bellwether = new PreconditionBellwether(andPreconditions);
+        List<Recipe> recipeListWithBellwether = new ArrayList<>(recipeList.size() + 1);
+        recipeListWithBellwether.add(bellwether);
+        for (Recipe recipe : recipeList) {
+            if(recipe instanceof ScanningRecipe) {
+                recipeListWithBellwether.add(new BellwetherDecoratedScanningRecipe<>(bellwether, (ScanningRecipe<?>) recipe));
+            } else {
+                recipeListWithBellwether.add(new BellwetherDecoratedRecipe(bellwether, recipe));
+            }
+        }
+
+        return recipeListWithBellwether;
     }
+
+    private static boolean isScanningRecipe(Recipe recipe) {
+        if(recipe instanceof ScanningRecipe) {
+            return true;
+        }
+        for (Recipe r : recipe.getRecipeList()) {
+            if(isScanningRecipe(r)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 
     public void addUninitialized(Recipe recipe) {
         uninitializedRecipes.add(recipe);
