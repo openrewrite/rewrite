@@ -17,10 +17,7 @@ package org.openrewrite.ruby;
 
 import org.openrewrite.SourceFile;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JLeftPadded;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.ruby.tree.Ruby;
 import org.openrewrite.ruby.tree.RubyLeftPadded;
 import org.openrewrite.ruby.tree.RubySpace;
@@ -69,5 +66,19 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         b = b.withRight(visitAndCast(b.getRight(), p));
         b = b.withType(visitType(b.getType(), p));
         return b;
+    }
+
+    public J visitRedo(Ruby.Redo breakStatement, P p) {
+        Ruby.Redo r = breakStatement;
+        r = r.withPrefix(visitSpace(r.getPrefix(), RubySpace.Location.REDO_PREFIX, p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(r, p);
+        if (!(temp instanceof Ruby.Redo)) {
+            return temp;
+        } else {
+            r = (Ruby.Redo) temp;
+        }
+        r = r.withLabel(visitAndCast(r.getLabel(), p));
+        return r;
     }
 }

@@ -165,6 +165,15 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         return binary;
     }
 
+    @Override
+    public J visitRedo(Ruby.Redo redo, PrintOutputCapture<P> p) {
+        beforeSyntax(redo, RubySpace.Location.REDO_PREFIX, p);
+        p.append("redo");
+        visit(redo.getLabel(), p);
+        afterSyntax(redo, p);
+        return redo;
+    }
+
     protected void beforeSyntax(J j, @SuppressWarnings("unused") RubySpace.Location loc,
                                 PrintOutputCapture<P> p) {
         beforeSyntax(j.getPrefix(), j.getMarkers(), Space.Location.LANGUAGE_EXTENSION, p);

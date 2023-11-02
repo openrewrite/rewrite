@@ -428,6 +428,16 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     @Override
+    public J visitRedoNode(RedoNode node) {
+        return new Ruby.Redo(
+                randomId(),
+                sourceBefore("redo"),
+                Markers.EMPTY,
+                null
+        );
+    }
+
+    @Override
     public J visitTrueNode(TrueNode node) {
         return new J.Literal(randomId(), sourceBefore("true"), Markers.EMPTY, true, "true",
                 null, JavaType.Primitive.Boolean);
