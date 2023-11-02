@@ -23,6 +23,7 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.indexOfNextNonWhitespace;
 import static org.openrewrite.java.tree.Space.EMPTY;
@@ -141,6 +142,52 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     @Override
+    public J visitForNode(ForNode node) {
+        Markers markers = Markers.EMPTY;
+        Space prefix = sourceBefore("for");
+
+        J.Identifier variableIdentifier = (J.Identifier) node.getVarNode().accept(this);
+        JRightPadded<J.VariableDeclarations> variable = padRight(new J.VariableDeclarations(
+                randomId(),
+                variableIdentifier.getPrefix(),
+                Markers.EMPTY,
+                emptyList(),
+                emptyList(),
+                null,
+                null,
+                emptyList(),
+                singletonList(padRight(new J.VariableDeclarations.NamedVariable(
+                        randomId(),
+                        EMPTY,
+                        Markers.EMPTY,
+                        variableIdentifier.withPrefix(EMPTY),
+                        emptyList(),
+                        null,
+                        null
+                ), EMPTY))
+        ), sourceBefore("in"));
+
+        JRightPadded<Expression> iterable = padRight((Expression) node.getIterNode().accept(this), whitespace());
+        if (source.startsWith("do", cursor)) {
+            skip("do");
+            markers = markers.add(new ExplicitDo(randomId()));
+        }
+        return new J.ForEachLoop(
+                randomId(),
+                prefix,
+                markers,
+                new J.ForEachLoop.Control(
+                        randomId(),
+                        EMPTY,
+                        Markers.EMPTY,
+                        variable,
+                        iterable
+                ),
+                padRight((Statement) node.getBodyNode().accept(this), sourceBefore("end"))
+        );
+    }
+
+    @Override
     public J visitIfNode(IfNode node) {
         Markers markers = Markers.EMPTY;
         Space prefix = sourceBefore("if");
@@ -227,7 +274,11 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         } else {
             Space prefix = sourceBefore(node.getName().asJavaString());
             J.Identifier variable = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), node.getName().asJavaString(), null, null);
-            sourceBefore(variable.getSimpleName());
+
+            if (node.getValueNode() instanceof NilImplicitNode) {
+                return variable.withPrefix(prefix);
+            }
+
             return new J.Assignment(
                     randomId(),
                     prefix,

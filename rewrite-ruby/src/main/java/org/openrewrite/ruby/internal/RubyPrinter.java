@@ -294,6 +294,20 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitForEachLoop(J.ForEachLoop forEachLoop, PrintOutputCapture<P> p) {
+            beforeSyntax(forEachLoop, Space.Location.FOR_EACH_LOOP_PREFIX, p);
+            p.append("for");
+            J.ForEachLoop.Control ctrl = forEachLoop.getControl();
+            visitSpace(ctrl.getPrefix(), Space.Location.FOR_EACH_CONTROL_PREFIX, p);
+            visitRightPadded(ctrl.getPadding().getVariable(), JRightPadded.Location.FOREACH_VARIABLE, "in", p);
+            visitRightPadded(ctrl.getPadding().getIterable(), JRightPadded.Location.FOREACH_ITERABLE, "", p);
+            visitStatement(forEachLoop.getPadding().getBody(), JRightPadded.Location.FOR_BODY, p);
+            p.append("end");
+            afterSyntax(forEachLoop, p);
+            return forEachLoop;
+        }
+
+        @Override
         public J visitIf(J.If iff, PrintOutputCapture<P> p) {
             beforeSyntax(iff, Space.Location.IF_PREFIX, p);
             p.append("if");
