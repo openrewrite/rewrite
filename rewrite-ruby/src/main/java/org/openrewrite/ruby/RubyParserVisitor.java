@@ -10,7 +10,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.ruby.marker.EnglishBinaryOperator;
+import org.openrewrite.ruby.marker.EnglishOperator;
 import org.openrewrite.ruby.tree.Ruby;
 
 import java.nio.charset.Charset;
@@ -55,12 +55,12 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         Space prefix = whitespace();
         Expression left = (Expression) node.getFirstNode().accept(this);
         Space opPrefix = whitespace();
-        String op = source.substring(cursor).startsWith("&&") ? "&&" : "and";
+        String op = source.startsWith("&&", cursor) ? "&&" : "and";
         skip(op);
         return new J.Binary(
                 randomId(),
                 prefix,
-                op.equals("&&") ? Markers.EMPTY : Markers.EMPTY.add(new EnglishBinaryOperator(randomId())),
+                op.equals("&&") ? Markers.EMPTY : Markers.EMPTY.add(new EnglishOperator(randomId())),
                 left,
                 padLeft(opPrefix, J.Binary.Type.And),
                 (Expression) node.getSecondNode().accept(this),
@@ -137,6 +137,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         String op = node.getName().asJavaString();
         Markers markers = Markers.EMPTY;
         J.Binary.Type type = null;
+        J.Unary.Type unaryType = null;
         Ruby.Binary.Type rubyType = null;
         switch (op) {
             case "+":
@@ -199,6 +200,15 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
             case ">=":
                 type = J.Binary.Type.GreaterThanOrEqual;
                 break;
+            case "!":
+                unaryType = J.Unary.Type.Not;
+                if (source.startsWith("not", cursor)) {
+                    op = "not";
+                    markers = Markers.EMPTY.add(new EnglishOperator(randomId()));
+                }
+                break;
+            default:
+                throw new UnsupportedOperationException("Operator " + op + " not yet implemented");
         }
 
         if (type != null) {
@@ -211,8 +221,16 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                     (Expression) node.getArgsNode().childNodes().get(0).accept(this),
                     null
             );
+        } else if (unaryType != null) {
+            return new J.Unary(
+                    randomId(),
+                    whitespace(),
+                    markers,
+                    padLeft(sourceBefore(op), unaryType),
+                    (Expression) node.getReceiverNode().accept(this),
+                    null
+            );
         } else {
-            assert rubyType != null;
             return new Ruby.Binary(
                     randomId(),
                     whitespace(),
@@ -230,12 +248,12 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         Space prefix = whitespace();
         Expression left = (Expression) node.getFirstNode().accept(this);
         Space opPrefix = whitespace();
-        String op = source.substring(cursor).startsWith("||") ? "||" : "or";
+        String op = source.startsWith("||", cursor) ? "||" : "or";
         skip(op);
         return new J.Binary(
                 randomId(),
                 prefix,
-                op.equals("||") ? Markers.EMPTY : Markers.EMPTY.add(new EnglishBinaryOperator(randomId())),
+                op.equals("||") ? Markers.EMPTY : Markers.EMPTY.add(new EnglishOperator(randomId())),
                 left,
                 padLeft(opPrefix, J.Binary.Type.Or),
                 (Expression) node.getSecondNode().accept(this),

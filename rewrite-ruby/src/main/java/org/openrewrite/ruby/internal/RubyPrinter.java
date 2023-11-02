@@ -25,7 +25,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.ruby.RubyVisitor;
-import org.openrewrite.ruby.marker.EnglishBinaryOperator;
+import org.openrewrite.ruby.marker.EnglishOperator;
 import org.openrewrite.ruby.tree.Ruby;
 import org.openrewrite.ruby.tree.RubySpace;
 
@@ -203,13 +203,13 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
                     break;
                 case Or:
                     keyword = "||";
-                    if(binary.getMarkers().findFirst(EnglishBinaryOperator.class).isPresent()) {
+                    if (binary.getMarkers().findFirst(EnglishOperator.class).isPresent()) {
                         keyword = "or";
                     }
                     break;
                 case And:
                     keyword = "&&";
-                    if(binary.getMarkers().findFirst(EnglishBinaryOperator.class).isPresent()) {
+                    if (binary.getMarkers().findFirst(EnglishOperator.class).isPresent()) {
                         keyword = "and";
                     }
                     break;
@@ -262,6 +262,53 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
 
             afterSyntax(method, p);
             return method;
+        }
+
+        @Override
+        public J visitUnary(J.Unary unary, PrintOutputCapture<P> p) {
+            beforeSyntax(unary, Space.Location.UNARY_PREFIX, p);
+            switch (unary.getOperator()) {
+                case PreIncrement:
+                    p.append("++");
+                    visit(unary.getExpression(), p);
+                    break;
+                case PreDecrement:
+                    p.append("--");
+                    visit(unary.getExpression(), p);
+                    break;
+                case PostIncrement:
+                    visit(unary.getExpression(), p);
+                    visitSpace(unary.getPadding().getOperator().getBefore(), Space.Location.UNARY_OPERATOR, p);
+                    p.append("++");
+                    break;
+                case PostDecrement:
+                    visit(unary.getExpression(), p);
+                    visitSpace(unary.getPadding().getOperator().getBefore(), Space.Location.UNARY_OPERATOR, p);
+                    p.append("--");
+                    break;
+                case Positive:
+                    p.append('+');
+                    visit(unary.getExpression(), p);
+                    break;
+                case Negative:
+                    p.append('-');
+                    visit(unary.getExpression(), p);
+                    break;
+                case Complement:
+                    p.append('~');
+                    visit(unary.getExpression(), p);
+                    break;
+                case Not:
+                default:
+                    if (unary.getMarkers().findFirst(EnglishOperator.class).isPresent()) {
+                        p.append("not");
+                    } else {
+                        p.append('!');
+                    }
+                    visit(unary.getExpression(), p);
+            }
+            afterSyntax(unary, p);
+            return unary;
         }
     }
 }

@@ -26,6 +26,6 @@ import java.util.UUID;
  */
 @Value
 @With
-public class EnglishBinaryOperator implements Marker {
+public class EnglishOperator implements Marker {
     UUID id;
 }
