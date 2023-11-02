@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
 import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.parsing.ParseUtilsKt;
 import org.jetbrains.kotlin.psi.*;
+import org.jetbrains.kotlin.psi.psiUtil.PsiChildRange;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes;
 import org.jetbrains.kotlin.types.Variance;
@@ -2040,7 +2041,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         J.ClassDeclaration classDeclaration = new J.ClassDeclaration(
                 randomId(),
-                prefixAndInfix(klass),
+                endFixPrefixAndInfix(klass),
                 markers,
                 leadingAnnotations,
                 modifiers,
@@ -2463,7 +2464,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         J.MethodDeclaration methodDeclaration = new J.MethodDeclaration(
                 randomId(),
-                prefixAndInfix(function),
+                endFixPrefixAndInfix(function),
                 markers,
                 leadingAnnotations,
                 modifiers,
@@ -3328,6 +3329,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return pre;
     }
 
+    @Nullable
+    private PsiElement findFirstNonSpacePrevSibling(@Nullable PsiElement element) {
+        PsiElement maybeSpace = findFirstPrefixSpace(element);
+        return (maybeSpace != null) ? maybeSpace.getPrevSibling() : null;
+    }
+
     private Space suffix(@Nullable PsiElement element) {
         if (element == null) {
             return Space.EMPTY;
@@ -3362,9 +3369,30 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return Space.EMPTY;
     }
 
+    private Space endFix(@Nullable PsiElement element) {
+        return endFix(element, null);
+    }
+
+    private Space endFix(@Nullable PsiElement element, @Nullable Set<PsiElement> consumedSpaces) {
+        if (element == null) {
+            return Space.EMPTY;
+        }
+
+        PsiElement lastSpace = findLastSpaceChild(element);
+        if (consumedSpaces != null && consumedSpaces.contains(element)) {
+            return Space.EMPTY;
+        }
+        return space(lastSpace);
+    }
+
     private Space prefixAndInfix(@Nullable PsiElement element) {
         return prefixAndInfix(element, null);
     }
+
+    private Space endFixPrefixAndInfix(@Nullable PsiElement element) {
+        return merge(endFix(findFirstNonSpacePrevSibling(element)), prefixAndInfix(element, null));
+    }
+
     private Space prefixAndInfix(@Nullable PsiElement element, @Nullable Set<PsiElement> consumedSpaces) {
         if (element == null) {
             return Space.EMPTY;
@@ -3614,7 +3642,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
 
-    private Space space(PsiElement node) {
+    private Space space(@Nullable PsiElement node) {
+        if (node == null) {
+            return Space.EMPTY;
+        }
+
         Space space = null;
         PsiElement preNode = null;
 
@@ -3708,6 +3740,32 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             }
         }
         return null;
+    }
+
+    @Nullable
+    private PsiElement findLastSpaceChild(@Nullable  PsiElement parent) {
+        PsiElement ret = null;
+
+        if (parent == null) {
+            return null;
+        }
+
+        List<PsiElement> allChildren = new ArrayList<>();
+        Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(parent).iterator();
+        while (iterator.hasNext()) {
+            PsiElement it = iterator.next();
+            allChildren.add(it);
+        }
+
+        for (int i = allChildren.size() - 1; i > 0; i--) {
+            PsiElement element = allChildren.get(i);
+            if (isSpace(element.getNode())) {
+                ret = element;
+            } else {
+                break;
+            }
+        }
+        return ret;
     }
 
     @Nullable

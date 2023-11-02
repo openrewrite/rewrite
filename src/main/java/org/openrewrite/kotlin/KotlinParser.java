@@ -176,19 +176,20 @@ public class KotlinParser implements Parser {
                                     try {
                                         // Turn this flag on locally only to develop psi-based-parser
                                         boolean printTrees = false;
-                                        // debug purpose only, to be removed
-                                        if (printTrees) {
-                                            System.out.println(PsiTreePrinter.print(kotlinSource.getInput()));
-                                            System.out.println(PsiTreePrinter.print(kotlinSource.getKtFile()));
-                                            System.out.println(PsiTreePrinter.print(kotlinSource.getFirFile()));
-//                                            System.out.println(PsiTreePrinter.print(kotlinSource.getIrFile()));
-                                        }
 
                                         KotlinTypeMapping typeMapping = new KotlinTypeMapping(typeCache, firSession, kotlinSource.getFirFile());
                                         PsiElementAssociations associations = new PsiElementAssociations(typeMapping, kotlinSource.getFirFile());
                                         associations.initialize();
                                         KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, associations, styles, relativeTo, ctx);
                                         SourceFile cu = psiParser.parse();
+
+                                        // debug purpose only, to be removed
+                                        if (printTrees) {
+                                            System.out.println(PsiTreePrinter.print(kotlinSource.getInput()));
+                                            System.out.println(PsiTreePrinter.print(kotlinSource.getKtFile()));
+                                            System.out.println(PsiTreePrinter.print(kotlinSource.getFirFile()));
+                                            System.out.println(PsiTreePrinter.print(cu));
+                                        }
 
                                         parsingListener.parsed(kotlinSource.getInput(), cu);
                                         return requirePrintEqualsInput(cu, kotlinSource.getInput(), relativeTo, ctx);
