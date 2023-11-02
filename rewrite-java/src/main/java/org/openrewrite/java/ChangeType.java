@@ -181,9 +181,9 @@ public class ChangeType extends Recipe {
                         if (maybeType instanceof JavaType.FullyQualified) {
                             JavaType.FullyQualified type = (JavaType.FullyQualified) maybeType;
                             if (originalType.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visit(sf, ctx, getCursor());
+                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visit(sf, ctx, getCursor().getParentOrThrow());
                             } else if (originalType.getOwningClass() != null && originalType.getOwningClass().getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visit(sf, ctx, getCursor());
+                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visit(sf, ctx, getCursor().getParentOrThrow());
                             }
                         }
                     }
