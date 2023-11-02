@@ -265,6 +265,15 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitContinue(J.Continue continueStatement, PrintOutputCapture<P> p) {
+            beforeSyntax(continueStatement, Space.Location.CONTINUE_PREFIX, p);
+            p.append("next");
+            visit(continueStatement.getLabel(), p);
+            afterSyntax(continueStatement, p);
+            return continueStatement;
+        }
+
+        @Override
         public <T extends J> J visitControlParentheses(J.ControlParentheses<T> controlParens, PrintOutputCapture<P> p) {
             visitSpace(controlParens.getPrefix(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
             visitRightPadded(controlParens.getPadding().getTree(), JRightPadded.Location.PARENTHESES, p);

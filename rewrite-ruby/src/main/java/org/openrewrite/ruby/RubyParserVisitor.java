@@ -72,6 +72,16 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     @Override
+    public J visitBreakNode(BreakNode node) {
+        return new J.Break(
+                randomId(),
+                sourceBefore("break"),
+                Markers.EMPTY,
+                null
+        );
+    }
+
+    @Override
     public J visitDotNode(DotNode node) {
         Space prefix = whitespace();
         Expression left = (Expression) node.getBeginNode().accept(this);
@@ -294,6 +304,16 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     public J visitLocalVarNode(LocalVarNode node) {
         return new J.Identifier(randomId(), sourceBefore(node.getName().asJavaString()),
                 Markers.EMPTY, emptyList(), node.getName().asJavaString(), null, null);
+    }
+
+    @Override
+    public J visitNextNode(NextNode node) {
+        return new J.Continue(
+                randomId(),
+                sourceBefore("next"),
+                Markers.EMPTY,
+                null
+        );
     }
 
     @Override
