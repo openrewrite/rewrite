@@ -2697,7 +2697,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             throw new UnsupportedOperationException("TODO");
         }
         // FIXME: Add detection of overloads and return the appropriate trees when it is not equivalent to a J.Unary.
-        //        Returning the base type only applies when the expression is equiavalent to a J.Binary.
+        //        Returning the base type only applies when the expression is equivalent to a J.Binary.
         JavaType javaType = type(expression);
         if (javaType instanceof JavaType.Method) {
             javaType = ((JavaType.Method) javaType).getReturnType();
@@ -2717,7 +2717,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitPostfixExpression(KtPostfixExpression expression, ExecutionContext data) {
         // FIXME: Add detection of overloads and return the appropriate trees when it is not equivalent to a J.Unary.
-        //        Returning the base type only applies when the expression is equiavalent to a J.Binary.
+        //        Returning the base type only applies when the expression is equivalent to a J.Binary.
         JavaType type = type(expression);
         if (type instanceof JavaType.Method) {
             type = ((JavaType.Method) type).getReturnType();

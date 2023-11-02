@@ -23,14 +23,24 @@ import static org.openrewrite.kotlin.Assertions.kotlinScript;
 class KTSTest implements RewriteTest {
 
     @Test
-    void helloWorld() {
+    void topLevelAssignmentExpression() {
         rewriteRun(
           kotlinScript("""
-            import java.util.List
-
-            println("Hello, World!")
+            var x = 5
+            x += 1
             """)
         );
     }
 
+    @Test
+    void topLevelForLoop() {
+        rewriteRun(
+          kotlinScript("""
+            val items = listOf("foo", "bar", "buz")
+            for (item in items) {
+                println(item)
+            }
+            """)
+        );
+    }
 }
