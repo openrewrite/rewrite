@@ -55,12 +55,12 @@ public class AddBuildPlugin extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Add a Gradle build plugin";
+        return "Add Gradle plugin";
     }
 
     @Override
     public String getDescription() {
-        return "Add a Gradle build plugin to `build.gradle(.kts)`.";
+        return "Add a build plugin to a Gradle build file's `plugins` block.";
     }
 
     @Override
