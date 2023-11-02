@@ -10,6 +10,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.ruby.marker.EnglishBinaryOperator;
 import org.openrewrite.ruby.tree.Ruby;
 
 import java.nio.charset.Charset;
@@ -47,6 +48,42 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     protected J defaultVisit(Node node) {
         throw new UnsupportedOperationException(String.format("Node type %s not yet implemented",
                 node.getClass().getSimpleName()));
+    }
+
+    @Override
+    public J visitAndNode(AndNode node) {
+        Space prefix = whitespace();
+        Expression left = (Expression) node.getFirstNode().accept(this);
+        Space opPrefix = whitespace();
+        String op = source.substring(cursor).startsWith("&&") ? "&&" : "and";
+        skip(op);
+        return new J.Binary(
+                randomId(),
+                prefix,
+                op.equals("&&") ? Markers.EMPTY : Markers.EMPTY.add(new EnglishBinaryOperator(randomId())),
+                left,
+                padLeft(opPrefix, J.Binary.Type.And),
+                (Expression) node.getSecondNode().accept(this),
+                null
+        );
+    }
+
+    @Override
+    public J visitDotNode(DotNode node) {
+        Space prefix = whitespace();
+        Expression left = (Expression) node.getBeginNode().accept(this);
+        Space opPrefix = whitespace();
+        String op = source.substring(cursor).startsWith("...") ? "..." : "..";
+        skip(op);
+        return new Ruby.Binary(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                left,
+                padLeft(opPrefix, op.equals("...") ? Ruby.Binary.Type.RangeExclusive : Ruby.Binary.Type.RangeInclusive),
+                (Expression) node.getEndNode().accept(this),
+                null
+        );
     }
 
     @Override
@@ -98,6 +135,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     @Override
     public J visitOperatorCallNode(OperatorCallNode node) {
         String op = node.getName().asJavaString();
+        Markers markers = Markers.EMPTY;
         J.Binary.Type type = null;
         Ruby.Binary.Type rubyType = null;
         switch (op) {
@@ -119,13 +157,34 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
             case "**":
                 rubyType = Ruby.Binary.Type.Exponent;
                 break;
+            case ">>":
+                type = J.Binary.Type.RightShift;
+                break;
+            case "<<":
+                type = J.Binary.Type.LeftShift;
+                break;
+            case "&":
+                type = J.Binary.Type.BitAnd;
+                break;
+            case "|":
+                type = J.Binary.Type.BitOr;
+                break;
+            case "^":
+                type = J.Binary.Type.BitXor;
+                break;
+            case "~":
+                rubyType = Ruby.Binary.Type.OnesComplement;
+                break;
+            case "==":
+                type = J.Binary.Type.Equal;
+                break;
         }
 
         if (type != null) {
             return new J.Binary(
                     randomId(),
                     whitespace(),
-                    Markers.EMPTY,
+                    markers,
                     (Expression) node.getReceiverNode().accept(this),
                     padLeft(sourceBefore(op), type),
                     (Expression) node.getArgsNode().childNodes().get(0).accept(this),
@@ -136,13 +195,31 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
             return new Ruby.Binary(
                     randomId(),
                     whitespace(),
-                    Markers.EMPTY,
+                    markers,
                     (Expression) node.getReceiverNode().accept(this),
                     padLeft(sourceBefore(op), rubyType),
                     (Expression) node.getArgsNode().childNodes().get(0).accept(this),
                     null
             );
         }
+    }
+
+    @Override
+    public J visitOrNode(OrNode node) {
+        Space prefix = whitespace();
+        Expression left = (Expression) node.getFirstNode().accept(this);
+        Space opPrefix = whitespace();
+        String op = source.substring(cursor).startsWith("||") ? "||" : "or";
+        skip(op);
+        return new J.Binary(
+                randomId(),
+                prefix,
+                op.equals("||") ? Markers.EMPTY : Markers.EMPTY.add(new EnglishBinaryOperator(randomId())),
+                left,
+                padLeft(opPrefix, J.Binary.Type.Or),
+                (Expression) node.getSecondNode().accept(this),
+                null
+        );
     }
 
     @Override

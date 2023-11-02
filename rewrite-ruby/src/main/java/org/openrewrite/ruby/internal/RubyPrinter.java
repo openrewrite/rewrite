@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.ruby.RubyVisitor;
+import org.openrewrite.ruby.marker.EnglishBinaryOperator;
 import org.openrewrite.ruby.tree.Ruby;
 import org.openrewrite.ruby.tree.RubySpace;
 
@@ -61,6 +62,15 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         switch (binary.getOperator()) {
             case Exponent:
                 keyword = "**";
+                break;
+            case OnesComplement:
+                keyword = "~";
+                break;
+            case RangeInclusive:
+                keyword = "..";
+                break;
+            case RangeExclusive:
+                keyword = "...";
                 break;
         }
         beforeSyntax(binary, RubySpace.Location.BINARY_PREFIX, p);
@@ -128,6 +138,83 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
                 p.append(';');
             }
             return super.visitMarker(marker, p);
+        }
+
+        @Override
+        public J visitBinary(J.Binary binary, PrintOutputCapture<P> p) {
+            String keyword = "";
+            switch (binary.getOperator()) {
+                case Addition:
+                    keyword = "+";
+                    break;
+                case Subtraction:
+                    keyword = "-";
+                    break;
+                case Multiplication:
+                    keyword = "*";
+                    break;
+                case Division:
+                    keyword = "/";
+                    break;
+                case Modulo:
+                    keyword = "%";
+                    break;
+                case LessThan:
+                    keyword = "<";
+                    break;
+                case GreaterThan:
+                    keyword = ">";
+                    break;
+                case LessThanOrEqual:
+                    keyword = "<=";
+                    break;
+                case GreaterThanOrEqual:
+                    keyword = ">=";
+                    break;
+                case Equal:
+                    keyword = "==";
+                    break;
+                case NotEqual:
+                    keyword = "!=";
+                    break;
+                case BitAnd:
+                    keyword = "&";
+                    break;
+                case BitOr:
+                    keyword = "|";
+                    break;
+                case BitXor:
+                    keyword = "^";
+                    break;
+                case LeftShift:
+                    keyword = "<<";
+                    break;
+                case RightShift:
+                    keyword = ">>";
+                    break;
+                case UnsignedRightShift:
+                    keyword = ">>>";
+                    break;
+                case Or:
+                    keyword = "||";
+                    if(binary.getMarkers().findFirst(EnglishBinaryOperator.class).isPresent()) {
+                        keyword = "or";
+                    }
+                    break;
+                case And:
+                    keyword = "&&";
+                    if(binary.getMarkers().findFirst(EnglishBinaryOperator.class).isPresent()) {
+                        keyword = "and";
+                    }
+                    break;
+            }
+            beforeSyntax(binary, Space.Location.BINARY_PREFIX, p);
+            visit(binary.getLeft(), p);
+            visitSpace(binary.getPadding().getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p);
+            p.append(keyword);
+            visit(binary.getRight(), p);
+            afterSyntax(binary, p);
+            return binary;
         }
 
         @Override

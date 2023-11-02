@@ -142,7 +142,10 @@ public interface Ruby extends J {
         }
 
         public enum Type {
-            Exponent
+            Exponent,
+            OnesComplement,
+            RangeExclusive,
+            RangeInclusive,
         }
 
         public Padding getPadding() {

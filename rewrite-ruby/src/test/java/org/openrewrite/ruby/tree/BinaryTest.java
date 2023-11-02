@@ -19,4 +19,40 @@ public class BinaryTest implements RewriteTest {
           )
         );
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"<<", ">>", "&", "|", "^", "~"})
+    void bitwise(String op) {
+        rewriteRun(
+          ruby(
+            """
+              42 %s 1
+              """.formatted(op)
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"&&", "and", "or", "||"})
+    void logical(String op) {
+        rewriteRun(
+          ruby(
+            """
+              42 %s 1
+              """.formatted(op)
+          )
+        );
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"..", "..."})
+    void range(String op) {
+        rewriteRun(
+          ruby(
+            """
+              42 %s 1
+              """.formatted(op)
+          )
+        );
+    }
 }
