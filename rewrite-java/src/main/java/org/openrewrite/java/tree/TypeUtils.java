@@ -189,7 +189,12 @@ public class TypeUtils {
             } else if (to instanceof JavaType.Parameterized) {
                 JavaType.Parameterized toParameterized = (JavaType.Parameterized) to;
                 if (!(from instanceof JavaType.Parameterized)) {
-                    return toParameterized.getTypeParameters().stream().allMatch(p -> isAssignableTo(p, TYPE_OBJECT));
+                    return from instanceof JavaType.FullyQualified &&
+                           isAssignableTo(toParameterized.getType(), from) &&
+                           toParameterized.getTypeParameters().stream()
+                                   .allMatch(p -> (p instanceof JavaType.GenericTypeVariable &&
+                                                   ((JavaType.GenericTypeVariable) p).getName().equals("?")) ||
+                                                  isAssignableTo(p, TYPE_OBJECT));
                 }
                 JavaType.Parameterized fromParameterized = (JavaType.Parameterized) from;
                 List<JavaType> toParameters = toParameterized.getTypeParameters();
@@ -206,8 +211,13 @@ public class TypeUtils {
                 List<JavaType> toBounds = toGeneric.getBounds();
                 if (toBounds.isEmpty()) {
                     return toGeneric.getName().equals("?");
-                } else if (toBounds.size() == 1) {
-                    return isAssignableTo(toBounds.get(0), from);
+                } else if (toGeneric.getVariance() == JavaType.GenericTypeVariable.Variance.COVARIANT) {
+                    for (JavaType toBound : toBounds) {
+                        if (!isAssignableTo(toBound, from)) {
+                            return false;
+                        }
+                    }
+                    return true;
                 }
                 return false;
             } else if (to instanceof JavaType.Variable) {
@@ -239,7 +249,7 @@ public class TypeUtils {
                 }
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
                 if (fullyQualifiedNamesAreEqual(to, classFrom.getFullyQualifiedName()) ||
-                        isAssignableTo(to, classFrom.getSupertype())) {
+                    isAssignableTo(to, classFrom.getSupertype())) {
                     return true;
                 }
                 for (JavaType.FullyQualified i : classFrom.getInterfaces()) {
