@@ -220,9 +220,19 @@ public class DeclarativeRecipe extends Recipe {
             return recipeList;
         }
 
-        //noinspection unchecked
-        TreeVisitor<?, ExecutionContext> andPreconditions = Preconditions.and(
-                preconditions.stream().map(Recipe::getVisitor).toArray(TreeVisitor[]::new));
+        TreeVisitor<?, ExecutionContext> andPreconditions = null;
+        for (Recipe precondition : preconditions) {
+            if(isScanningRecipe(precondition)) {
+                throw new IllegalArgumentException(
+                        getName() + " declares the ScanningRecipe " + precondition.getName() + " as a precondition." +
+                        "ScanningRecipe cannot be used as Preconditions.");
+            }
+            if(andPreconditions == null) {
+                andPreconditions = precondition.getVisitor();
+            } else {
+                andPreconditions = Preconditions.and(andPreconditions, precondition.getVisitor());
+            }
+        }
         PreconditionBellwether bellwether = new PreconditionBellwether(andPreconditions);
         List<Recipe> recipeListWithBellwether = new ArrayList<>(recipeList.size() + 1);
         recipeListWithBellwether.add(bellwether);
@@ -236,6 +246,19 @@ public class DeclarativeRecipe extends Recipe {
 
         return recipeListWithBellwether;
     }
+
+    private static boolean isScanningRecipe(Recipe recipe) {
+        if(recipe instanceof ScanningRecipe) {
+            return true;
+        }
+        for (Recipe r : recipe.getRecipeList()) {
+            if(isScanningRecipe(r)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 
     public void addUninitialized(Recipe recipe) {
         uninitializedRecipes.add(recipe);

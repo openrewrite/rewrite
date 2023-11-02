@@ -50,12 +50,12 @@ import static org.openrewrite.internal.StringUtils.trimIndentPreserveCRLF;
 @SuppressWarnings("unused")
 public interface RewriteTest extends SourceSpecs {
     static AdHocRecipe toRecipe(Supplier<TreeVisitor<?, ExecutionContext>> visitor) {
-        return new AdHocRecipe(null, null, null, visitor, null, null, null);
+        return new AdHocRecipe(null, null, null, visitor, null, null);
     }
 
     static AdHocRecipe toRecipe() {
         return new AdHocRecipe(null, null, null,
-                TreeVisitor::noop, null, null, null);
+                TreeVisitor::noop, null, null);
     }
 
     static AdHocRecipe toRecipe(Function<Recipe, TreeVisitor<?, ExecutionContext>> visitor) {

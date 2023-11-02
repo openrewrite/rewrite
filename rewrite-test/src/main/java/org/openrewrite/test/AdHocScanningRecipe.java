@@ -30,7 +30,7 @@ import java.util.function.Supplier;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class AdHocRecipe extends Recipe {
+public class AdHocScanningRecipe extends ScanningRecipe<Void> {
     @With
     @Nullable
     @Language("markdown")
@@ -47,6 +47,10 @@ public class AdHocRecipe extends Recipe {
     @With
     Supplier<TreeVisitor<?, ExecutionContext>> getVisitor;
 
+    @Nullable
+    @With
+    Supplier<Collection<SourceFile>> generator;
+
     @With
     @Nullable
     List<Maintainer> maintainers;
@@ -54,10 +58,6 @@ public class AdHocRecipe extends Recipe {
     @With
     @Nullable
     Integer maxCycles;
-
-    public AdHocScanningRecipe withGenerator(Supplier<Collection<SourceFile>> generator) {
-        return new AdHocScanningRecipe(displayName, name, causesAnotherCycle, getVisitor, generator, maintainers, maxCycles);
-    }
 
     public String getDisplayName() {
         return StringUtils.isBlank(displayName) ? "Ad hoc recipe" : displayName;
@@ -87,7 +87,22 @@ public class AdHocRecipe extends Recipe {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
+    public Void getInitialValue(ExecutionContext ctx) {
+        return null;
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Void acc) {
+        return TreeVisitor.noop();
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(Void acc, ExecutionContext ctx) {
+        return generator == null ? Collections.emptyList() : generator.get();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Void acc) {
         return getVisitor.get();
     }
 }
