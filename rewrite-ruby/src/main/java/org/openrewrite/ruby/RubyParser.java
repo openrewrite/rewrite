@@ -16,16 +16,13 @@
 package org.openrewrite.ruby;
 
 import org.intellij.lang.annotations.Language;
-import org.jruby.ast.Node;
+import org.jruby.ast.RootNode;
 import org.jruby.javasupport.JavaEmbedUtils;
-import org.jruby.parser.StaticScope;
-import org.jruby.runtime.DynamicScope;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.ruby.tree.Ruby;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
@@ -46,10 +43,9 @@ public class RubyParser implements Parser {
             try {
                 // https://github.com/jruby/jruby/wiki/DirectJRubyEmbedding#user-content-Direct_Embedding
                 org.jruby.Ruby runtime = JavaEmbedUtils.initialize(Collections.emptyList());
-
-                StaticScope staticScope = runtime.getStaticScopeFactory().newEvalScope(null);
-                Node node = runtime.parseFile(input.getSource(ctx), path.toString(), DynamicScope.newDynamicScope(staticScope));
-                J.CompilationUnit cu = null;
+                RootNode parseResult = (RootNode) runtime.parseFile(path.toString(), input.getSource(ctx), null);
+                Ruby.CompilationUnit cu = new RubyParserVisitor(input.getPath(), input.getFileAttributes(),
+                        input.getSource(ctx)).visitRootNode(parseResult);
                 parsingListener.parsed(input, cu);
                 return requirePrintEqualsInput(cu, input, relativeTo, ctx);
             } catch (Throwable t) {
