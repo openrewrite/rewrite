@@ -178,6 +178,27 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
             case "==":
                 type = J.Binary.Type.Equal;
                 break;
+            case "===":
+                rubyType = Ruby.Binary.Type.Within;
+                break;
+            case "!=":
+                type = J.Binary.Type.NotEqual;
+                break;
+            case "<=>":
+                rubyType = Ruby.Binary.Type.Comparison;
+                break;
+            case "<":
+                type = J.Binary.Type.LessThan;
+                break;
+            case "<=":
+                type = J.Binary.Type.LessThanOrEqual;
+                break;
+            case ">":
+                type = J.Binary.Type.GreaterThan;
+                break;
+            case ">=":
+                type = J.Binary.Type.GreaterThanOrEqual;
+                break;
         }
 
         if (type != null) {

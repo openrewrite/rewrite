@@ -60,6 +60,9 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     public J visitBinary(Ruby.Binary binary, PrintOutputCapture<P> p) {
         String keyword = "";
         switch (binary.getOperator()) {
+            case Comparison:
+                keyword = "<=>";
+                break;
             case Exponent:
                 keyword = "**";
                 break;
@@ -71,6 +74,9 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
                 break;
             case RangeExclusive:
                 keyword = "...";
+                break;
+            case Within:
+                keyword = "===";
                 break;
         }
         beforeSyntax(binary, RubySpace.Location.BINARY_PREFIX, p);
