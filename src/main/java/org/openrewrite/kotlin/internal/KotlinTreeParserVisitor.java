@@ -892,10 +892,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             for (int i = 0; i < ktParameters.size(); i++) {
                 KtParameter ktParameter = ktParameters.get(i);
                 Statement statement = convertToStatement(ktParameter.accept(this, data));
-                statements.add(maybeTrailingComma(ktParameter, padRight(statement, suffix(ktParameter)), i == ktParameters.size() - 1));
+                statements.add(maybeTrailingComma(ktParameter, padRight(statement,  endFixAndSuffix(ktParameter)), i == ktParameters.size() - 1));
             }
 
-            statements = ListUtils.mapLast(statements, rp -> rp.withAfter(merge(rp.getAfter(), prefix(constructor.getValueParameterList().getRightParenthesis()))));
+            // statements = ListUtils.mapLast(statements, rp -> rp.withAfter(merge(rp.getAfter(), prefix(constructor.getValueParameterList().getRightParenthesis()))));
 
             if (ktParameters.isEmpty()) {
                 Statement param = new J.Empty(randomId(), prefix(constructor.getValueParameterList().getRightParenthesis()), Markers.EMPTY);
@@ -3342,14 +3342,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             return Space.EMPTY;
         }
 
-        PsiElement whitespace = element.getLastChild();
-        if (whitespace == null || !isSpace(whitespace.getNode())) {
-            whitespace = element.getNextSibling();
-        } else {
-            while (whitespace.getPrevSibling() != null && isSpace(whitespace.getPrevSibling().getNode())) {
-                whitespace = whitespace.getPrevSibling();
-            }
-        }
+        PsiElement whitespace = element.getNextSibling();
         if (whitespace == null || !isSpace(whitespace.getNode())) {
             return Space.EMPTY;
         }
@@ -3393,6 +3386,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     private Space endFixPrefixAndInfix(@Nullable PsiElement element) {
         return merge(endFix(findFirstNonSpacePrevSibling(element)), prefixAndInfix(element, null));
+    }
+
+    private Space endFixAndSuffix(@Nullable PsiElement element) {
+        return merge(endFix(element), suffix(element));
     }
 
     private Space prefixAndInfix(@Nullable PsiElement element, @Nullable Set<PsiElement> consumedSpaces) {

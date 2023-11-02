@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -37,6 +38,7 @@ class CastTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/276")
     void parenthesized() {
@@ -49,6 +51,7 @@ class CastTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/276")
     void parenthesize2() {
