@@ -16,8 +16,13 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlinScript;
 
 class KTSTest implements RewriteTest {
@@ -67,7 +72,15 @@ class KTSTest implements RewriteTest {
                 }
             }
             """, spec -> spec.afterRecipe(cu -> {
-              System.out.println();
+              AtomicInteger count = new AtomicInteger();
+                new KotlinIsoVisitor<AtomicInteger>() {
+                    @Override
+                    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicInteger i) {
+                        i.incrementAndGet();
+                        return super.visitMethodInvocation(method, i);
+                    }
+                }.visit(cu, count);
+                assertThat(count.get()).isEqualTo(7);
           }))
         );
     }
