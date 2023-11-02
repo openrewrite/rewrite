@@ -225,10 +225,53 @@ public class TypeUtils {
             } else if (to instanceof JavaType.Method) {
                 return isAssignableTo(((JavaType.Method) to).getReturnType(), from);
             } else if (to instanceof JavaType.Primitive) {
+                JavaType.Primitive toPrimitive = (JavaType.Primitive) to;
                 if (from instanceof JavaType.FullyQualified) {
                     // Account for auto-unboxing
-                    JavaType.FullyQualified boxed = JavaType.ShallowClass.build(((JavaType.Primitive) to).getClassName());
+                    JavaType.FullyQualified boxed = JavaType.ShallowClass.build(toPrimitive.getClassName());
                     return isAssignableTo(boxed, from);
+                } else if (from instanceof JavaType.Primitive) {
+                    JavaType.Primitive fromPrimitive = (JavaType.Primitive) from;
+                    if (fromPrimitive == JavaType.Primitive.Boolean || fromPrimitive == JavaType.Primitive.Void) {
+                        return false;
+                    } else {
+                        switch (toPrimitive) {
+                            case Char:
+                                return fromPrimitive == JavaType.Primitive.Byte;
+                            case Short:
+                                switch (fromPrimitive) {
+                                    case Byte:
+                                    case Char:
+                                        return true;
+                                }
+                                return false;
+                            case Int:
+                                switch (fromPrimitive) {
+                                    case Byte:
+                                    case Char:
+                                    case Short:
+                                        return true;
+                                }
+                                return false;
+                            case Long:
+                                switch (fromPrimitive) {
+                                    case Byte:
+                                    case Char:
+                                    case Short:
+                                    case Int:
+                                        return true;
+                                }
+                                return false;
+                            case Float:
+                                return fromPrimitive != JavaType.Primitive.Double;
+                            case Double:
+                                return true;
+                            case String:
+                                return fromPrimitive == JavaType.Primitive.Null;
+                            default:
+                                return false;
+                        }
+                    }
                 }
             } else if (to instanceof JavaType.Array && from instanceof JavaType.Array) {
                 return isAssignableTo(((JavaType.Array) to).getElemType(), ((JavaType.Array) from).getElemType());
@@ -266,49 +309,11 @@ public class TypeUtils {
                     }
                 }
             } else if (from instanceof JavaType.Primitive) {
-                JavaType.Primitive fromPrimitive = (JavaType.Primitive) from;
                 JavaType.Primitive toPrimitive = JavaType.Primitive.fromKeyword(to);
-                if (fromPrimitive == toPrimitive) {
-                    return true;
-                } else if (fromPrimitive == JavaType.Primitive.Boolean || fromPrimitive == JavaType.Primitive.Void) {
-                    return false;
-                } else if (toPrimitive != null) {
-                    switch (toPrimitive) {
-                        case Char:
-                            return fromPrimitive == JavaType.Primitive.Byte;
-                        case Short:
-                            switch (fromPrimitive) {
-                                case Byte:
-                                case Char:
-                                    return true;
-                            }
-                            return false;
-                        case Int:
-                            switch (fromPrimitive) {
-                                case Byte:
-                                case Char:
-                                case Short:
-                                    return true;
-                            }
-                            return false;
-                        case Long:
-                            switch (fromPrimitive) {
-                                case Byte:
-                                case Char:
-                                case Short:
-                                case Int:
-                                    return true;
-                            }
-                            return false;
-                        case Float:
-                            return fromPrimitive != JavaType.Primitive.Double;
-                        case Double:
-                            return true;
-                        default:
-                            return false;
-                    }
+                if (toPrimitive != null) {
+                    return isAssignableTo(toPrimitive, from);
                 } else if ("java.lang.String".equals(to)) {
-                    return fromPrimitive == JavaType.Primitive.String || fromPrimitive == JavaType.Primitive.Null;
+                    return isAssignableTo(JavaType.Primitive.String, from);
                 }
             } else if (from instanceof JavaType.Variable) {
                 return isAssignableTo(to, ((JavaType.Variable) from).getType());
