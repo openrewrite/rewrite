@@ -16,9 +16,14 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.openrewrite.Issue;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 @SuppressWarnings("UnusedReceiverParameter")
@@ -35,6 +40,25 @@ class ImportTest implements RewriteTest {
     void kotlinImport() {
         rewriteRun(
           kotlin("import kotlin.collections.List")
+        );
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+      "import kotlin.collections.List,false",
+      "import java.util.regex.Pattern.CASE_INSENSITIVE,true",
+    })
+    void staticImports(String _import, Boolean isStatic) {
+        rewriteRun(
+          kotlin("%s".formatted(_import),
+            spec -> spec.afterRecipe(cu ->
+              new KotlinIsoVisitor<Integer>() {
+                @Override
+                public J.Import visitImport(J.Import _import, Integer i) {
+                    assertThat(_import.isStatic()).isEqualTo(isStatic);
+                    return super.visitImport(_import, i);
+                }
+            }.visit(cu, 0)))
         );
     }
 

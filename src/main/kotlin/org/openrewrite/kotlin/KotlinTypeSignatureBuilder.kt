@@ -21,6 +21,7 @@ import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.impl.FirOuterClassTypeParameterRef
 import org.jetbrains.kotlin.fir.declarations.utils.classId
 import org.jetbrains.kotlin.fir.expressions.*
+import org.jetbrains.kotlin.fir.java.declarations.FirJavaField
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.toResolvedBaseSymbol
@@ -458,7 +459,6 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         sig.append(owner)
         sig.append("{name=${property.name.asString()}")
         sig.append(",type=${signature(property.returnTypeRef)}}")
-
         return sig.toString()
     }
 

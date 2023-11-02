@@ -25,6 +25,7 @@ import org.jetbrains.kotlin.com.intellij.psi.impl.source.tree.PsiErrorElementImp
 import org.jetbrains.kotlin.com.intellij.psi.tree.IElementType;
 import org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.kotlin.fir.FirElement;
+import org.jetbrains.kotlin.fir.declarations.FirResolvedImport;
 import org.jetbrains.kotlin.fir.references.FirResolvedCallableReference;
 import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol;
@@ -2345,9 +2346,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitImportDirective(KtImportDirective importDirective, ExecutionContext data) {
-        // boolean hasParentClassId = importDirective.getImportedReference() instanceof KtDotQualifiedExpression;
-        // firElement instanceof FirResolvedImport && ((FirResolvedImport) firElement).getResolvedParentClassId() != null;
-        boolean isStaticImport = false;
+        FirResolvedImport resolvedImport = getResolvedImport(importDirective);
+        boolean isStaticImport = resolvedImport instanceof FirResolvedImport && resolvedImport.getResolvedParentClassId() != null;
         JLeftPadded<Boolean> rpStatic = padLeft(Space.EMPTY, isStaticImport);
         KtImportAlias alias = importDirective.getAlias();
         String text = nodeRangeText(
@@ -2376,6 +2376,15 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 // TODO: fix NPE.
                 alias != null ? padLeft(prefix(alias), createIdentifier(requireNonNull(alias.getNameIdentifier()), null)) : null
         );
+    }
+
+    @Nullable
+    private FirResolvedImport getResolvedImport(KtImportDirective importDirective) {
+        FirElement primary = psiElementAssociations.primary(importDirective);
+        if (primary instanceof FirResolvedImport) {
+            return (FirResolvedImport) primary;
+        }
+        return null;
     }
 
     @Override
