@@ -1,5 +1,6 @@
 package org.openrewrite.ruby;
 
+import org.jetbrains.annotations.NotNull;
 import org.jruby.ast.*;
 import org.jruby.ast.visitor.AbstractNodeVisitor;
 import org.jruby.ast.visitor.OperatorCallNode;
@@ -10,9 +11,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.ruby.marker.EnglishOperator;
-import org.openrewrite.ruby.marker.ExplicitDo;
-import org.openrewrite.ruby.marker.ExplicitThen;
+import org.openrewrite.ruby.marker.*;
 import org.openrewrite.ruby.tree.Ruby;
 
 import java.nio.charset.Charset;
@@ -371,27 +370,71 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
     @Override
     public J visitWhileNode(WhileNode node) {
-        Space prefix = sourceBefore("while");
+        return whileOrUntilNode(node.getConditionNode(), node.getBodyNode());
+    }
 
-        Space conditionPrefix = whitespace();
-        Expression conditionExpr = (Expression) node.getConditionNode().accept(this);
-        boolean explicitDo = Pattern.compile("\\s+do").matcher(source).find(cursor);
-        J.ControlParentheses<Expression> condition = new J.ControlParentheses<>(
-                randomId(),
-                conditionPrefix,
-                explicitDo ?
-                        Markers.EMPTY.add(new ExplicitDo(randomId())) :
-                        Markers.EMPTY,
-                padRight(conditionExpr, explicitDo ? sourceBefore("do") : EMPTY)
-        );
+    @Override
+    public J visitUntilNode(UntilNode node) {
+        return whileOrUntilNode(node.getConditionNode(), node.getBodyNode());
+    }
 
-        return new J.WhileLoop(
-                randomId(),
-                prefix,
-                Markers.EMPTY,
-                condition,
-                padRight((Statement) node.getBodyNode().accept(this), sourceBefore("end"))
-        );
+    private J whileOrUntilNode(Node conditionNode, Node bodyNode) {
+        Space prefix = whitespace();
+
+        if (source.startsWith("while", cursor) || source.startsWith("until", cursor)) {
+            Markers markers = whileOrUntil();
+            Space conditionPrefix = whitespace();
+            Expression conditionExpr = (Expression) conditionNode.accept(this);
+            boolean explicitDo = Pattern.compile("\\s+do").matcher(source).find(cursor);
+            J.ControlParentheses<Expression> condition = new J.ControlParentheses<>(
+                    randomId(),
+                    conditionPrefix,
+                    explicitDo ?
+                            Markers.EMPTY.add(new ExplicitDo(randomId())) :
+                            Markers.EMPTY,
+                    padRight(conditionExpr, explicitDo ? sourceBefore("do") : EMPTY)
+            );
+
+            return new J.WhileLoop(
+                    randomId(),
+                    prefix,
+                    markers,
+                    condition,
+                    padRight((Statement) bodyNode.accept(this), sourceBefore("end"))
+            );
+        } else {
+            JRightPadded<Statement> body = padRight((Statement) bodyNode.accept(this), whitespace());
+            Markers markers = whileOrUntil();
+
+            Space conditionPrefix = whitespace();
+            Expression conditionExpr = (Expression) conditionNode.accept(this);
+            J.ControlParentheses<Expression> condition = new J.ControlParentheses<>(
+                    randomId(),
+                    conditionPrefix,
+                    Markers.EMPTY,
+                    padRight(conditionExpr, EMPTY)
+            );
+
+            return new J.WhileLoop(
+                    randomId(),
+                    prefix,
+                    markers.add(new WhileModifier(randomId())),
+                    condition,
+                    body
+            );
+        }
+    }
+
+    @NotNull
+    private Markers whileOrUntil() {
+        Markers markers = Markers.EMPTY;
+        if (source.startsWith("until", cursor)) {
+            markers = markers.add(new Until(randomId()));
+            skip("until");
+        } else {
+            skip("while");
+        }
+        return markers;
     }
 
     @Override

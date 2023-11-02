@@ -25,9 +25,7 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.ruby.RubyVisitor;
-import org.openrewrite.ruby.marker.EnglishOperator;
-import org.openrewrite.ruby.marker.ExplicitDo;
-import org.openrewrite.ruby.marker.ExplicitThen;
+import org.openrewrite.ruby.marker.*;
 import org.openrewrite.ruby.tree.Ruby;
 import org.openrewrite.ruby.tree.RubySpace;
 
@@ -401,10 +399,19 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitWhileLoop(J.WhileLoop whileLoop, PrintOutputCapture<P> p) {
             beforeSyntax(whileLoop, Space.Location.WHILE_PREFIX, p);
-            p.append("while");
-            visit(whileLoop.getCondition(), p);
-            visitStatement(whileLoop.getPadding().getBody(), JRightPadded.Location.WHILE_BODY, p);
-            p.append("end");
+
+            boolean until = whileLoop.getMarkers().findFirst(Until.class).isPresent();
+            if (whileLoop.getMarkers().findFirst(WhileModifier.class).isPresent()) {
+                visitStatement(whileLoop.getPadding().getBody(), JRightPadded.Location.WHILE_BODY, p);
+                p.append(until ? "until" : "while");
+                visit(whileLoop.getCondition(), p);
+            } else {
+                p.append(until ? "until" : "while");
+                visit(whileLoop.getCondition(), p);
+                visitStatement(whileLoop.getPadding().getBody(), JRightPadded.Location.WHILE_BODY, p);
+                p.append("end");
+            }
+
             afterSyntax(whileLoop, p);
             return whileLoop;
         }
