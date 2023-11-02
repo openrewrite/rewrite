@@ -308,7 +308,7 @@ public class TypeUtils {
                             return false;
                     }
                 } else if ("java.lang.String".equals(to)) {
-                    return fromPrimitive == JavaType.Primitive.String;
+                    return fromPrimitive == JavaType.Primitive.String || fromPrimitive == JavaType.Primitive.Null;
                 }
             } else if (from instanceof JavaType.Variable) {
                 return isAssignableTo(to, ((JavaType.Variable) from).getType());
