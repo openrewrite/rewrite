@@ -36,9 +36,6 @@ import org.jetbrains.kotlin.fir.expressions.impl.FirNoReceiverExpression
 import org.jetbrains.kotlin.fir.expressions.impl.FirSingleExpressionBlock
 import org.jetbrains.kotlin.fir.expressions.impl.FirUnitExpression
 import org.jetbrains.kotlin.fir.references.*
-import org.jetbrains.kotlin.fir.resolve.toFirRegularClassSymbol
-import org.jetbrains.kotlin.fir.symbols.ConeClassLikeLookupTag
-import org.jetbrains.kotlin.fir.symbols.FirBasedSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
@@ -121,7 +118,7 @@ class KotlinParserVisitor(
         charset = `is`.charset
         charsetBomMarked = `is`.isCharsetBomMarked
         this.styles = styles
-        typeMapping = KotlinTypeMapping(typeCache, firSession, kotlinSource.firFile!!.symbol)
+        typeMapping = KotlinTypeMapping(typeCache, firSession, kotlinSource.firFile!!)
         this.data = data
         this.firSession = firSession
         this.nodes = kotlinSource.nodes
@@ -129,7 +126,7 @@ class KotlinParserVisitor(
         aliasImportMap = HashMap()
     }
 
-    private fun type(obj: Any?, ownerFallBack: FirBasedSymbol<*>? = null) = typeMapping.type(obj, ownerFallBack)
+    private fun type(obj: Any?, ownerFallBack: FirElement? = null) = typeMapping.type(obj, ownerFallBack)
 
     override fun visitFile(file: FirFile, data: ExecutionContext): J {
         ownerStack.push(file)
@@ -664,14 +661,14 @@ class KotlinParserVisitor(
         if (reference.resolvedSymbol is FirNamedFunctionSymbol) {
             methodReferenceType = typeMapping.methodDeclarationType(
                     (reference.resolvedSymbol as FirNamedFunctionSymbol).fir,
-                    TypeUtils.asFullyQualified(type(callableReferenceAccess.explicitReceiver)), getCurrentFile()
+                    callableReferenceAccess.explicitReceiver
             )
         }
         var fieldReferenceType: JavaType.Variable? = null
         if (reference.resolvedSymbol is FirPropertySymbol) {
             fieldReferenceType = typeMapping.variableType(
-                    reference.resolvedSymbol as FirVariableSymbol<out FirVariable>,
-                    TypeUtils.asFullyQualified(type(callableReferenceAccess.explicitReceiver)), getCurrentFile()
+                (reference.resolvedSymbol as FirVariableSymbol<out FirVariable>).fir,
+                callableReferenceAccess.explicitReceiver
             )
         }
 
@@ -692,7 +689,7 @@ class KotlinParserVisitor(
                 paddedExpr,
                 null,
                 padLeft(whitespace(), visitElement(callableReferenceAccess.calleeReference, data) as J.Identifier),
-                type(callableReferenceAccess.calleeReference),
+                type(callableReferenceAccess),
                 methodReferenceType,
                 fieldReferenceType
         )
@@ -953,8 +950,7 @@ class KotlinParserVisitor(
         val type: JavaType.Primitive = if (constExpression.typeRef is FirResolvedTypeRef &&
                 (constExpression.typeRef as FirResolvedTypeRef).type is ConeClassLikeType
         ) {
-            val coneClassLikeType = (constExpression.typeRef as FirResolvedTypeRef).type as ConeClassLikeType
-            typeMapping.primitive(coneClassLikeType)
+            typeMapping.primitive(constExpression)
         } else {
             throw IllegalArgumentException("Unresolved primitive type.")
         }
@@ -1120,6 +1116,7 @@ class KotlinParserVisitor(
         return j
     }
 
+    @OptIn(SymbolInternals::class)
     private fun mapFunctionCall(functionCall: FirFunctionCall, isInfix: Boolean, data: ExecutionContext): J {
         val prefix = whitespace()
         val namedReference = functionCall.calleeReference
@@ -1140,17 +1137,22 @@ class KotlinParserVisitor(
             } else {
                 visitElement(namedReference, data) as J.Identifier
             }
+            val mt = typeMapping.methodInvocationType(functionCall)
+            if (mt != null) {
+                name = name.withType(mt.returnType)
+            }
             val saveCursor = cursor
             whitespace()
             if (source[cursor] == '<' && functionCall.typeArguments.isNotEmpty()) {
                 cursor(saveCursor)
+                val type = if (name.type is JavaType.Parameterized) (name.type as JavaType.Parameterized).type else name.type
                 name = J.ParameterizedType(
                         randomId(),
                         Space.EMPTY,
                         Markers.EMPTY,
-                        name,
+                        name.withType(type),
                         mapTypeArguments(functionCall.typeArguments, data),
-                        type(functionCall, getCurrentFile())
+                        name.type
                 )
             } else {
                 cursor(saveCursor)
@@ -1165,7 +1167,7 @@ class KotlinParserVisitor(
                     name,
                     args,
                     null,
-                    typeMapping.methodInvocationType(functionCall, getCurrentFile())
+                    mt
             )
         } else {
             var markers = Markers.EMPTY
@@ -1227,17 +1229,7 @@ class KotlinParserVisitor(
 
             val args = mapFunctionalCallArguments(functionCall, implicitExtensionFunction)
 
-            var owner = getCurrentFile()
-            if (namedReference is FirResolvedNamedReference) {
-                val symbol = namedReference.resolvedSymbol
-                if (symbol is FirNamedFunctionSymbol) {
-                    val lookupTag: ConeClassLikeLookupTag? = symbol.containingClassLookupTag()
-                    if (lookupTag != null) {
-                        owner = lookupTag.toFirRegularClassSymbol(firSession)
-                    }
-                }
-            }
-            val type = typeMapping.methodInvocationType(functionCall, owner)
+            val type = typeMapping.methodInvocationType(functionCall)
             J.MethodInvocation(
                     randomId(),
                     prefix,
@@ -2180,7 +2172,7 @@ class KotlinParserVisitor(
                         name,
                         emptyList(),
                         initializer,
-                        typeMapping.variableType(property.symbol, null, owner(property)?.symbol)
+                        typeMapping.variableType(property, owner(property))
                 )
         )
         variables = ArrayList(1)
@@ -2392,7 +2384,7 @@ class KotlinParserVisitor(
                     null,
                     body,
                     null,
-                    typeMapping.methodDeclarationType(propertyAccessor, null, getCurrentFile())
+                    typeMapping.methodDeclarationType(propertyAccessor, null)
             )
         }
         throw UnsupportedOperationException("Unsupported property accessor.")
@@ -2765,7 +2757,7 @@ class KotlinParserVisitor(
                 null,
                 body,
                 null,
-                typeMapping.methodDeclarationType(simpleFunction, null, getCurrentFile())
+                typeMapping.methodDeclarationType(simpleFunction, null)
         )
         return if (typeConstraints == null) methodDeclaration else K.MethodDeclaration(randomId(), Markers.EMPTY, methodDeclaration, typeConstraints)
     }
@@ -3734,7 +3726,7 @@ class KotlinParserVisitor(
                 null,
                 body,
                 null,
-                typeMapping.methodDeclarationType(constructor, null, getCurrentFile())
+                typeMapping.methodDeclarationType(constructor, null)
         )
 
         if (delegationCall != null) {
@@ -3755,7 +3747,7 @@ class KotlinParserVisitor(
         val prefix: Space
         val receiver: JRightPadded<Expression>?
         val name: J.Identifier
-        val type = typeMapping.methodInvocationType(componentCall, getCurrentFile())
+        val type = typeMapping.methodInvocationType(componentCall)
         if (synthetic) {
             prefix = Space.build(" ", emptyList())
             receiver = null
@@ -4732,7 +4724,7 @@ class KotlinParserVisitor(
     }
 
     private fun createIdentifier(name: String?, firElement: FirElement): J.Identifier {
-        val type = type(firElement, owner(firElement)?.symbol)
+        val type = type(firElement, owner(firElement))
         return createIdentifier(
                 name ?: "",
                 if (type is JavaType.Variable) type.type else type,
@@ -4745,18 +4737,6 @@ class KotlinParserVisitor(
             return ownerStack.elementAt(1)
         }
         return ownerStack.peek()
-    }
-
-    @OptIn(SymbolInternals::class)
-    private fun createIdentifier(name: String, namedReference: FirResolvedNamedReference): J.Identifier {
-        val resolvedSymbol = namedReference.resolvedSymbol
-        if (resolvedSymbol is FirVariableSymbol<*>) {
-            return createIdentifier(
-                    name, type(namedReference, getCurrentFile()),
-                    typeMapping.variableType(resolvedSymbol, null, owner(namedReference)!!.symbol)
-            )
-        }
-        return createIdentifier(name, namedReference as FirElement)
     }
 
     private fun createIdentifier(
@@ -4954,8 +4934,8 @@ class KotlinParserVisitor(
         return "dec" == name || "inc" == name || "not" == name || "unaryMinus" == name || "unaryPlus" == name
     }
 
-    private fun getCurrentFile(): FirBasedSymbol<*>? {
-        return if (ownerStack.isEmpty()) null else ownerStack.last.symbol
+    private fun getCurrentFile(): FirElement? {
+        return if (ownerStack.isEmpty()) null else ownerStack.last
     }
 
     private fun at(c: Char) = cursor < source.length && source[cursor] == c

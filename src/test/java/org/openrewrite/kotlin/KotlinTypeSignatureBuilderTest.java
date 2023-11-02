@@ -53,7 +53,7 @@ public class KotlinTypeSignatureBuilderTest {
     }
 
     public KotlinTypeSignatureBuilder signatureBuilder() {
-        return new KotlinTypeSignatureBuilder(compiledSource.getFirSession(), Objects.requireNonNull(compiledSource.getSources().iterator().next().getFirFile()).getSymbol());
+        return new KotlinTypeSignatureBuilder(compiledSource.getFirSession(), Objects.requireNonNull(compiledSource.getSources().iterator().next().getFirFile()));
     }
 
     private FirFile getCompiledSource() {
@@ -63,15 +63,14 @@ public class KotlinTypeSignatureBuilderTest {
     }
 
     public String constructorSignature() {
-        return signatureBuilder().methodDeclarationSignature(getCompiledSource().getDeclarations().stream()
+        return signatureBuilder().methodSignature(getCompiledSource().getDeclarations().stream()
                 .filter(FirRegularClass.class::isInstance)
                 .map(FirRegularClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
                 .filter(FirConstructor.class::isInstance)
                 .map(FirFunction.class::cast)
                 .findFirst()
-                .orElseThrow()
-                .getSymbol(), null);
+                .orElseThrow(), getCompiledSource());
     }
 
     public Object innerClassSignature(String innerClassSimpleName) {
@@ -83,8 +82,7 @@ public class KotlinTypeSignatureBuilderTest {
                 .map(FirRegularClass.class::cast)
                 .filter(it -> innerClassSimpleName.equals(it.getName().asString()))
                 .findFirst()
-                .orElseThrow()
-                .getSymbol());
+                .orElseThrow());
     }
 
     public String fieldSignature(String field) {
@@ -96,8 +94,7 @@ public class KotlinTypeSignatureBuilderTest {
                 .map(FirProperty.class::cast)
                 .filter(it -> field.equals(it.getName().asString()))
                 .findFirst()
-                .orElseThrow()
-                .getSymbol(), null);
+                .orElseThrow(), getCompiledSource());
     }
 
     @Nullable
@@ -118,7 +115,7 @@ public class KotlinTypeSignatureBuilderTest {
         if (property == null || property.getGetter() == null) {
             throw new UnsupportedOperationException("No filed or getter for " + field);
         }
-        return signatureBuilder().methodDeclarationSignature(property.getGetter().getSymbol(), getCompiledSource().getSymbol());
+        return signatureBuilder().methodSignature(property.getGetter(), getCompiledSource());
     }
 
     public String fieldPropertySetterSignature(String field) {
@@ -126,7 +123,7 @@ public class KotlinTypeSignatureBuilderTest {
         if (property == null || property.getSetter() == null) {
             throw new UnsupportedOperationException("No filed or setter for " + field);
         }
-        return signatureBuilder().methodDeclarationSignature(property.getSetter().getSymbol(), getCompiledSource().getSymbol());
+        return signatureBuilder().methodSignature(property.getSetter(), getCompiledSource());
     }
 
     public Object firstMethodParameterSignature(String methodName) {
@@ -155,7 +152,7 @@ public class KotlinTypeSignatureBuilderTest {
     }
 
     public String methodSignature(String methodName) {
-        return signatureBuilder().methodDeclarationSignature(getCompiledSource().getDeclarations().stream()
+        return signatureBuilder().methodSignature(getCompiledSource().getDeclarations().stream()
                 .filter(FirRegularClass.class::isInstance)
                 .map(FirRegularClass.class::cast)
                 .flatMap(it -> it.getDeclarations().stream())
@@ -163,8 +160,7 @@ public class KotlinTypeSignatureBuilderTest {
                 .map(FirSimpleFunction.class::cast)
                 .filter(it -> methodName.equals(it.getName().asString()))
                 .findFirst()
-                .orElseThrow()
-                .getSymbol(), null);
+                .orElseThrow(), getCompiledSource());
     }
 
     @Test
@@ -172,7 +168,7 @@ public class KotlinTypeSignatureBuilderTest {
         FirProperty firProperty = getCompiledSource().getDeclarations().stream()
           .filter(it -> it instanceof FirProperty && "field".equals(((FirProperty) it).getName().asString()))
           .map(it -> (FirProperty) it).findFirst().orElseThrow();
-        assertThat(signatureBuilder().variableSignature(firProperty.getSymbol(), getCompiledSource().getSymbol()))
+        assertThat(signatureBuilder().variableSignature(firProperty, getCompiledSource()))
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoatKt{name=field,type=kotlin.Int}");
     }
 
@@ -181,14 +177,14 @@ public class KotlinTypeSignatureBuilderTest {
         FirSimpleFunction function = getCompiledSource().getDeclarations().stream()
           .filter(it -> it instanceof FirSimpleFunction && "function".equals(((FirSimpleFunction) it).getName().asString()))
           .map(it -> (FirSimpleFunction) it).findFirst().orElseThrow();
-        assertThat(signatureBuilder().methodDeclarationSignature(function.getSymbol(), getCompiledSource().getSymbol()))
+        assertThat(signatureBuilder().methodSignature(function, getCompiledSource()))
           .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoatKt{name=function,return=kotlin.Unit,parameters=[org.openrewrite.kotlin.C]}");
     }
 
     @Test
     void constructor() {
         assertThat(constructorSignature())
-                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=<constructor>,return=org.openrewrite.kotlin.KotlinTypeGoat,parameters=[]}");
+                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=<constructor>,return=org.openrewrite.kotlin.KotlinTypeGoat<Generic{T}, Generic{S extends org.openrewrite.kotlin.PT<Generic{S}> & org.openrewrite.kotlin.C}>,parameters=[]}");
     }
 
     @Test
@@ -319,9 +315,9 @@ public class KotlinTypeSignatureBuilderTest {
     @Test
     void genericRecursiveInMethodDeclaration() {
         assertThat(firstMethodParameterSignature("genericRecursive"))
-                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat<Generic{? extends kotlin.Array<Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{*}>}>}, Generic{*}>");
+                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat<Generic{? extends kotlin.Array<Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{?}>}>}, Generic{?}>");
         assertThat(methodSignature("genericRecursive"))
-                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=genericRecursive,return=org.openrewrite.kotlin.KotlinTypeGoat<Generic{? extends kotlin.Array<Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{*}>}>}, Generic{*}>,parameters=[org.openrewrite.kotlin.KotlinTypeGoat<Generic{? extends kotlin.Array<Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{*}>}>}, Generic{*}>]}");
+                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=genericRecursive,return=org.openrewrite.kotlin.KotlinTypeGoat<Generic{? extends kotlin.Array<Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{?}>}>}, Generic{?}>,parameters=[org.openrewrite.kotlin.KotlinTypeGoat<Generic{? extends kotlin.Array<Generic{U extends org.openrewrite.kotlin.KotlinTypeGoat<Generic{U}, Generic{?}>}>}, Generic{?}>]}");
     }
 
     @Test

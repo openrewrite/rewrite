@@ -24,9 +24,10 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.KotlinVisitor;
 
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Set;
+
+import static java.util.Collections.emptyList;
 
 
 @Value
@@ -63,7 +64,7 @@ public class ImplicitParameterInLambda extends Recipe {
             public J visitLambda(J.Lambda lambda, ExecutionContext executionContext) {
                 lambda = (J.Lambda) super.visitLambda(lambda, executionContext);
                 if (isParameterExplicitIt(lambda)) {
-                    lambda = lambda.withParameters(lambda.getParameters().withParameters(new ArrayList<>()));
+                    lambda = lambda.withParameters(lambda.getParameters().withParameters(emptyList()));
                 }
                 return lambda;
             }

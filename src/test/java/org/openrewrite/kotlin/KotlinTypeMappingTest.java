@@ -15,8 +15,12 @@
  */
 package org.openrewrite.kotlin;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
@@ -121,14 +125,14 @@ public class KotlinTypeMappingTest {
 
         JavaType.FullyQualified declaringType = property.getGetter().getMethodType().getDeclaringType();
         assertThat(declaringType.getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
-        assertThat(property.getGetter().getMethodType().getName()).isEqualTo("accessor"); // FIXME
+        assertThat(property.getGetter().getMethodType().getName()).isEqualTo("accessor");
         assertThat(property.getGetter().getMethodType().getReturnType()).isEqualTo(id.getType());
         assertThat(property.getGetter().getName().getType()).isEqualTo(property.getGetter().getMethodType());
         assertThat(property.getGetter().getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=accessor,return=kotlin.Int,parameters=[]}");
 
         declaringType = property.getSetter().getMethodType().getDeclaringType();
         assertThat(declaringType.getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
-        assertThat(property.getSetter().getMethodType().getName()).isEqualTo("accessor"); // FIXME
+        assertThat(property.getSetter().getMethodType().getName()).isEqualTo("accessor");
         assertThat(property.getSetter().getMethodType()).isEqualTo(property.getSetter().getName().getType());
         assertThat(property.getSetter().getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=accessor,return=kotlin.Unit,parameters=[kotlin.Int]}");
     }
@@ -332,7 +336,6 @@ public class KotlinTypeMappingTest {
         assertThat(clazzMethod.getAnnotations().get(0).getClassName()).isEqualTo("AnnotationWithRuntimeRetention");
     }
 
-    @ExpectedToFail("Enable when we switch to IR parser.")
     @Test
     void receiver() {
         JavaType.Method receiverMethod = methodType("receiver");
@@ -365,7 +368,7 @@ public class KotlinTypeMappingTest {
 
     @Nested
     class ParsingTest implements RewriteTest {
-        @ExpectedToFail("Enable when we switch to IR parser.")
+
         @Test
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/303")
         void coneTypeProjection() {
@@ -382,7 +385,7 @@ public class KotlinTypeMappingTest {
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
                             if (methodMatcher.matches(method)) {
-                                assertThat(method.getMethodType().toString()).isEqualTo("kotlin.collections.MutableList{name=addAll,return=kotlin.Boolean,parameters=[kotlin.collections.List<kotlin.String>]}");
+                                assertThat(method.getMethodType().toString()).isEqualTo("kotlin.collections.MutableList<Generic{E}>{name=addAll,return=kotlin.Boolean,parameters=[kotlin.collections.List<kotlin.String>]}");
                                 found.set(true);
                             }
                             return super.visitMethodInvocation(method, found);
@@ -436,10 +439,37 @@ public class KotlinTypeMappingTest {
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
                             if (methodMatcher.matches(method)) {
                                 assertThat(method.getMethodType().toString())
-                                  .isEqualTo("kotlin.collections.CollectionsKt{name=listOf,return=kotlin.collections.List<kotlin.Pair<kotlin.String, Generic{kotlin.Comparable<Generic{*}> & java.io.Serializable}>>,parameters=[kotlin.Array<Generic{? extends Generic{T}}>]}");
+                                  .isEqualTo("kotlin.collections.CollectionsKt{name=listOf,return=kotlin.collections.List<kotlin.Pair<kotlin.String, Generic{kotlin.Comparable<Generic{?}> & java.io.Serializable}>>,parameters=[kotlin.Array<Generic{? extends kotlin.Pair<kotlin.String, Generic{kotlin.Comparable<Generic{?}> & java.io.Serializable}>}>]}");
                                 found.set(true);
                             }
                             return super.visitMethodInvocation(method, found);
+                        }
+                    }.visit(cu, found);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
+
+        @Disabled("Enable with PSI parser")
+        @Test
+        void implicitInvoke() {
+            rewriteRun(
+              kotlin(
+                """
+                  val block: Collection<Any>.() -> Unit = {}
+                  val r = listOf("descriptor").block()
+                  """, spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<AtomicBoolean>() {
+                        MethodMatcher matcher = new MethodMatcher("kotlin.Function1 invoke(..)");
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean atomicBoolean) {
+                            if (matcher.matches(method)) {
+                                assertThat(method.getMethodType().toString()).isEqualTo("kotlin.Function1<kotlin.collections.Collection<kotlin.Any>, kotlin.Unit>{name=invoke,return=kotlin.Unit,parameters=[kotlin.collections.List<kotlin.String>]}");
+                                found.set(true);
+                            }
+                            return super.visitMethodInvocation(method, atomicBoolean);
                         }
                     }.visit(cu, found);
                     assertThat(found.get()).isTrue();
@@ -462,9 +492,9 @@ public class KotlinTypeMappingTest {
                         public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, AtomicBoolean found) {
                             if ("entries".equals(fieldAccess.getSimpleName())) {
                                 assertThat(fieldAccess.getName().getType().toString())
-                                  .isEqualTo("kotlin.collections.Set<kotlin.collections.Map$Entry<Generic{*}, kotlin.Any>>");
+                                  .isEqualTo("kotlin.collections.Set<kotlin.collections.Map$Entry<Generic{?}, kotlin.Any>>");
                                 assertThat(fieldAccess.getName().getFieldType().toString())
-                                  .isEqualTo("kotlin.collections.Map<Generic{*}, kotlin.Any>{name=entries,type=kotlin.collections.Set<kotlin.collections.Map$Entry<Generic{*}, kotlin.Any>>}");
+                                  .isEqualTo("kotlin.collections.Map{name=entries,type=kotlin.collections.Set<kotlin.collections.Map$Entry<Generic{?}, kotlin.Any>>}");
                                 found.set(true);
                             }
                             return super.visitFieldAccess(fieldAccess, found);
@@ -498,13 +528,107 @@ public class KotlinTypeMappingTest {
                         @Override
                         public K.When visitWhen(K.When when, AtomicBoolean found) {
                             if (when.getType() instanceof JavaType.GenericTypeVariable) {
-                                assertThat(when.getType().toString()).isEqualTo("Generic{kotlin.Comparable<Generic{*}> & java.io.Serializable}");
+                                assertThat(when.getType().toString()).isEqualTo("Generic{kotlin.Comparable<Generic{?}> & java.io.Serializable}");
                                 found.set(true);
                             }
                             return super.visitWhen(when, found);
                         }
                     }.visit(cu, found);
                     assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
+
+        @Disabled("Enable with PSI parser")
+        @ParameterizedTest
+        @CsvSource(value = {
+          "n++~kotlin.Int",
+          "--n~kotlin.Int",
+          "n += a~kotlin.Int",
+          "n = a + b~kotlin.Int{name=plus,return=kotlin.Int,parameters=[kotlin.Int]}"
+        }, delimiter = '~')
+        void operatorOverload(String p1, String p2) {
+            rewriteRun(
+              kotlin(
+                """
+                  class Foo {
+                      fun bar(a: Int, b: Int) {
+                          var n = 0
+                          %s
+                      }
+                  }
+                  """.formatted(p1), spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<AtomicBoolean>() {
+                        @Override
+                        public J.AssignmentOperation visitAssignmentOperation(J.AssignmentOperation assignOp, AtomicBoolean atomicBoolean) {
+                            if (p2.equals(assignOp.getType().toString())) {
+                                found.set(true);
+                            }
+                            return super.visitAssignmentOperation(assignOp, atomicBoolean);
+                        }
+
+                        @Override
+                        public J.Unary visitUnary(J.Unary unary, AtomicBoolean b) {
+                            if (p2.equals(unary.getType().toString())) {
+                                found.set(true);
+                            }
+                            return super.visitUnary(unary, b);
+                        }
+
+                        @Override
+                        public J.Binary visitBinary(J.Binary binary, AtomicBoolean b) {
+                            JavaType.Method mt = (JavaType.Method) binary.getType();
+                            if (p2.equals(mt.toString())) {
+                                found.set(true);
+                            }
+                            return super.visitBinary(binary, b);
+                        }
+                    }.visit(cu, found);
+                    assertThat(found.get()).isEqualTo(true);
+                })
+              )
+            );
+        }
+
+        @Disabled("Enable with PSI parser")
+        @Test
+        void operatorOverload() {
+            rewriteRun(
+              kotlin(
+                """
+                  class Foo {
+                      operator fun contains(element: Int): Boolean {
+                          return true
+                      }
+                      val b = 1 !in listOf(2)
+                      val a = 1 !in Foo()
+                  }
+                  """, spec -> spec.afterRecipe(cu -> {
+                    MethodMatcher kotlinCollection = new MethodMatcher("kotlin.collections.List contains(..)");
+                    AtomicBoolean kotlinCollectionFound = new AtomicBoolean(false);
+                    MethodMatcher operatorOverload = new MethodMatcher("Foo contains(..)");
+                    AtomicBoolean operatorOverloadFound = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public K.Binary visitBinary(K.Binary binary, Integer integer) {
+                            JavaType.Method methodType = (JavaType.Method) binary.getType();
+                            if (kotlinCollection.matches(methodType)) {
+                                assertThat(methodType.toString())
+                                  .isEqualTo("kotlin.collections.List<kotlin.Int>{name=contains,return=kotlin.Boolean,parameters=[kotlin.Int]}");
+                                kotlinCollectionFound.set(true);
+                            }
+                            if (operatorOverload.matches(methodType)) {
+                                assertThat(methodType.toString())
+                                  .isEqualTo("Foo{name=contains,return=kotlin.Boolean,parameters=[kotlin.Int]}");
+                                operatorOverloadFound.set(true);
+                            }
+                            return binary;
+                        }
+                    }.visit(cu, 0);
+                    assertThat(kotlinCollectionFound.get()).isTrue();
+                    assertThat(operatorOverloadFound.get()).isTrue();
                 })
               )
             );
@@ -530,8 +654,8 @@ public class KotlinTypeMappingTest {
                         @Override
                         public J.NewClass visitNewClass(J.NewClass newClass, AtomicBoolean found) {
                             if ("Triple".equals(((J.Identifier) newClass.getClazz()).getSimpleName())) {
-                                assertThat(newClass.getClazz().getType().toString()).isEqualTo("kotlin.Triple<Generic{A}, Generic{B}, Generic{C}>");
-                                assertThat(newClass.getConstructorType().toString()).isEqualTo("kotlin.Triple{name=<constructor>,return=kotlin.Triple,parameters=[Generic{A},Generic{B},Generic{C}]}");
+                                assertThat(newClass.getClazz().getType().toString()).isEqualTo("kotlin.Triple<kotlin.Int, kotlin.Int, kotlin.Int>");
+                                assertThat(newClass.getConstructorType().toString()).isEqualTo("kotlin.Triple<kotlin.Int, kotlin.Int, kotlin.Int>{name=<constructor>,return=kotlin.Triple<kotlin.Int, kotlin.Int, kotlin.Int>,parameters=[kotlin.Int,kotlin.Int,kotlin.Int]}");
                             }
                             return super.visitNewClass(newClass, found);
                         }

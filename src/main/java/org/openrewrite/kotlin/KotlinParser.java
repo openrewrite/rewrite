@@ -47,6 +47,7 @@ import org.jetbrains.kotlin.diagnostics.DiagnosticReporterFactory;
 import org.jetbrains.kotlin.diagnostics.impl.BaseDiagnosticsCollector;
 import org.jetbrains.kotlin.fir.DependencyListForCliModule;
 import org.jetbrains.kotlin.fir.FirSession;
+import org.jetbrains.kotlin.fir.backend.Fir2IrComponentsStorage;
 import org.jetbrains.kotlin.fir.backend.Fir2IrConfiguration;
 import org.jetbrains.kotlin.fir.backend.Fir2IrExtensions;
 import org.jetbrains.kotlin.fir.declarations.FirFile;
@@ -102,7 +103,6 @@ import static org.jetbrains.kotlin.config.JVMConfigurationKeys.DO_NOT_CLEAR_BIND
 import static org.jetbrains.kotlin.config.JVMConfigurationKeys.LINK_VIA_SIGNATURES;
 import static org.jetbrains.kotlin.fir.pipeline.ConvertToIrKt.convertToIrAndActualizeForJvm;
 import static org.jetbrains.kotlin.incremental.IncrementalFirJvmCompilerRunnerKt.configureBaseRoots;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @RequiredArgsConstructor(access = AccessLevel.PRIVATE)
 public class KotlinParser implements Parser {
@@ -189,17 +189,20 @@ public class KotlinParser implements Parser {
 
                                         // Turn this flag on locally only to develop psi-based-parser
                                         boolean switchToPsiParser = false;
+                                        boolean printTrees = false;
                                         if (switchToPsiParser) {
                                             // debug purpose only, to be removed
-//                                            System.out.println(PsiTreePrinter.print(kotlinSource.getInput()));
-//                                            System.out.println(PsiTreePrinter.print(kotlinSource.getKtFile()));
-//                                            System.out.println(PsiTreePrinter.print(kotlinSource.getFirFile()));
-//                                            System.out.println(PsiTreePrinter.print(kotlinSource.getIrFile()));
+                                            if (printTrees) {
+                                                System.out.println(PsiTreePrinter.print(kotlinSource.getInput()));
+                                                System.out.println(PsiTreePrinter.print(kotlinSource.getKtFile()));
+                                                System.out.println(PsiTreePrinter.print(kotlinSource.getFirFile()));
+                                                System.out.println(PsiTreePrinter.print(kotlinSource.getIrFile()));
+                                            }
 
                                             // PSI based parser
                                             SourceFile kcuPsi = null;
                                             // TODO replace JavaTypeCache.
-                                            KotlinTypeMapping typeMapping = new KotlinTypeMapping(new JavaTypeCache(), firSession, kotlinSource.getFirFile().getSymbol());
+                                            KotlinTypeMapping typeMapping = new KotlinTypeMapping(new JavaTypeCache(), firSession, kotlinSource.getFirFile());
                                             PsiElementAssociations associations = new PsiElementAssociations(typeMapping, kotlinSource.getFirFile());
                                             associations.initialize();
                                             KotlinTreeParserVisitor psiParser = new KotlinTreeParserVisitor(kotlinSource, associations, styles, relativeTo, ctx);
@@ -211,19 +214,22 @@ public class KotlinParser implements Parser {
 
                                             if (kcuPsi == null) {
                                                 kcuPsi = kcuFir;
-                                                System.out.println("=========\n LST and types from FIR-based-parser");
-                                                System.out.println(PsiTreePrinter.print(kcuFir));
+                                                if (printTrees) {
+                                                    System.out.println("=========\n LST and types from FIR-based-parser");
+                                                    System.out.println(PsiTreePrinter.print(kcuFir));
+                                                }
                                             } else {
                                                 // compare kcuPsi and kcuFir LST structure and all types
-                                                String treeFir = PsiTreePrinter.print(kcuFir);
-                                                String treePsi = PsiTreePrinter.print(kcuPsi);
+                                                if (printTrees) {
+                                                    String treeFir = PsiTreePrinter.print(kcuFir);
+                                                    String treePsi = PsiTreePrinter.print(kcuPsi);
 
-                                                // Debug purpose only, to be removed
-                                                System.out.println("=========\n LST and types from FIR-based-parser");
-                                                System.out.println(treeFir);
-                                                System.out.println("=========\n LST and types from PSI-based-parser");
-                                                System.out.println(treePsi);
-
+                                                    // Debug purpose only, to be removed
+                                                    System.out.println("=========\n LST and types from FIR-based-parser");
+                                                    System.out.println(treeFir);
+                                                    System.out.println("=========\n LST and types from PSI-based-parser");
+                                                    System.out.println(treePsi);
+                                                }
                                                 // assertEquals(treeFir, treePsi);
                                             }
 
