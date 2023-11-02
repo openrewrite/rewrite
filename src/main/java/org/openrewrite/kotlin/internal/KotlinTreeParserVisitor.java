@@ -3303,8 +3303,17 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     private <J2 extends J> JRightPadded<J2> maybeSemicolon(J2 j, KtElement element) {
         PsiElement maybeSemicolon = element.getLastChild();
         boolean hasSemicolon = maybeSemicolon instanceof LeafPsiElement && ((LeafPsiElement) maybeSemicolon).getElementType() == KtTokens.SEMICOLON;
-        return hasSemicolon ? new JRightPadded<>(j, prefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())))
-                : JRightPadded.build(j);
+
+        if (hasSemicolon) {
+            return new JRightPadded<>(j, prefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
+        }
+
+        maybeSemicolon = findFirstNonSpaceNextSibling(element);
+        if (maybeSemicolon instanceof LeafPsiElement && ((LeafPsiElement) maybeSemicolon).getElementType() == KtTokens.SEMICOLON) {
+            return new JRightPadded<>(j, prefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
+        }
+
+        return JRightPadded.build(j);
     }
 
     private <T> JLeftPadded<T> padLeft(Space left, T tree) {
@@ -3381,6 +3390,18 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     private PsiElement findFirstNonSpacePrevSibling(@Nullable PsiElement element) {
         PsiElement maybeSpace = findFirstPrefixSpace(element);
         return (maybeSpace != null) ? maybeSpace.getPrevSibling() : null;
+    }
+
+    @Nullable
+    private PsiElement findFirstNonSpaceNextSibling(@Nullable PsiElement element) {
+        if (element == null) {
+            return null;
+        }
+        PsiElement next = element.getNextSibling();
+        while (next != null && isSpace(next.getNode())) {
+            next = next.getNextSibling();
+        }
+        return next;
     }
 
     private Space suffix(@Nullable PsiElement element) {

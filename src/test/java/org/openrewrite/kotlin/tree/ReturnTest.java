@@ -135,4 +135,17 @@ class ReturnTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void trailingSemiColon() {
+        rewriteRun(
+          kotlin(
+            """
+              fun id(): Int {
+                  return 42   ;
+              }
+              """
+          )
+        );
+    }
 }
