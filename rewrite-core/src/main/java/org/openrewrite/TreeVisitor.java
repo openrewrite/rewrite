@@ -309,7 +309,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 if (t != null && afterVisit != null) {
                     for (TreeVisitor<?, P> v : afterVisit) {
                         if (v != null) {
-                             v.setCursor(new Cursor(cursor, tree));
+                             v.setCursor(getCursor());
                             //noinspection unchecked
                             t = (T) v.visit(t, p);
                         }

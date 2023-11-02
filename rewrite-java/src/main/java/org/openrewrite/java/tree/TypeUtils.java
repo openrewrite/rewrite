@@ -202,9 +202,12 @@ public class TypeUtils {
                 JavaType.FullyQualified toFq = (JavaType.FullyQualified) to;
                 return isAssignableTo(toFq.getFullyQualifiedName(), from);
             } else if (to instanceof JavaType.GenericTypeVariable) {
-                JavaType.GenericTypeVariable genericTo = (JavaType.GenericTypeVariable) to;
-                if (genericTo.getBounds().isEmpty()) {
-                    return genericTo.getName().equals("?");
+                JavaType.GenericTypeVariable toGeneric = (JavaType.GenericTypeVariable) to;
+                List<JavaType> toBounds = toGeneric.getBounds();
+                if (toBounds.isEmpty()) {
+                    return toGeneric.getName().equals("?");
+                } else if (toBounds.size() == 1) {
+                    return isAssignableTo(toBounds.get(0), from);
                 }
                 return false;
             } else if (to instanceof JavaType.Variable) {
