@@ -245,4 +245,36 @@ class TypeUtilsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void isAssignableToGenericTypeVariable() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Map;
+              import java.util.function.Supplier;
+              
+              class Test {
+                  <K, V> void m(Supplier<? extends Map<K, ? extends V>> map) {
+                  }
+                  void foo() {
+                      Map<String, Integer> map = null;
+                      m(() -> map);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Object o) {
+                    JavaType paramType = method.getMethodType().getParameterTypes().get(0);
+                    assertThat(paramType).isInstanceOf(JavaType.Parameterized.class);
+                    JavaType argType = method.getArguments().get(0).getType();
+                    assertThat(argType).isInstanceOf(JavaType.Parameterized.class);
+                    assertThat(TypeUtils.isAssignableTo(paramType, argType)).isTrue();
+                    return method;
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
 }
