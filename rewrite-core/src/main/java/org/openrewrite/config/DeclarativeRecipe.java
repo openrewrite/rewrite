@@ -24,7 +24,6 @@ import lombok.experimental.NonFinal;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.SearchResult;
 
 import java.net.URI;
 import java.time.Duration;
@@ -135,22 +134,6 @@ public class DeclarativeRecipe extends Recipe {
         @NonFinal
         transient boolean preconditionApplicable;
 
-        /**
-         * Returns a visitor, suitable for being used as a precondition, that returns as its result whatever this
-         * bellwether evaluated to.
-         */
-        public TreeVisitor<?, ExecutionContext> getFollower() {
-            return new TreeVisitor<Tree, ExecutionContext>() {
-                @Override
-                public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                    if(preconditionApplicable) {
-                        return SearchResult.found(tree);
-                    }
-                    return tree;
-                }
-            };
-        }
-
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return new TreeVisitor<Tree, ExecutionContext>() {
@@ -161,6 +144,72 @@ public class DeclarativeRecipe extends Recipe {
                     return tree;
                 }
             };
+        }
+    }
+
+    @EqualsAndHashCode(callSuper = true)
+    @Value
+    static class BellwetherDecoratedRecipe extends Recipe {
+
+        DeclarativeRecipe.PreconditionBellwether bellwether;
+        Recipe delegate;
+
+        @Override
+        public String getName() {
+            return delegate.getName();
+        }
+
+        @Override
+        public String getDisplayName() {
+            return delegate.getDisplayName();
+        }
+
+        @Override
+        public String getDescription() {
+            return delegate.getDescription();
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor() {
+            return Preconditions.check(bellwether.isPreconditionApplicable(), delegate.getVisitor());
+        }
+    }
+
+    @Value
+    @EqualsAndHashCode(callSuper = true)
+    static class BellwetherDecoratedScanningRecipe<T>  extends ScanningRecipe<T> {
+
+        DeclarativeRecipe.PreconditionBellwether bellwether;
+        ScanningRecipe<T> delegate;
+
+        @Override
+        public String getName() {
+            return delegate.getName();
+        }
+
+        @Override
+        public String getDisplayName() {
+            return delegate.getDisplayName();
+        }
+
+        @Override
+        public String getDescription() {
+            return delegate.getDescription();
+        }
+
+        @Override
+        public T getInitialValue(ExecutionContext ctx) {
+            return delegate.getInitialValue(ctx);
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getScanner(T acc) {
+            return Preconditions.check(bellwether.isPreconditionApplicable(), delegate.getScanner(acc));
+        }
+
+        @Override
+        public TreeVisitor<?, ExecutionContext> getVisitor(T acc) {
+            return Preconditions.check(bellwether.isPreconditionApplicable(), delegate.getVisitor(acc));
         }
     }
 
@@ -175,14 +224,13 @@ public class DeclarativeRecipe extends Recipe {
         TreeVisitor<?, ExecutionContext> andPreconditions = Preconditions.and(
                 preconditions.stream().map(Recipe::getVisitor).toArray(TreeVisitor[]::new));
         PreconditionBellwether bellwether = new PreconditionBellwether(andPreconditions);
-        TreeVisitor<?, ExecutionContext> bellwetherFollower = bellwether.getFollower();
         List<Recipe> recipeListWithBellwether = new ArrayList<>(recipeList.size() + 1);
         recipeListWithBellwether.add(bellwether);
         for (Recipe recipe : recipeList) {
             if(recipe instanceof ScanningRecipe) {
-                recipeListWithBellwether.add(new PreconditionDecoratedScanningRecipe<>(bellwetherFollower, (ScanningRecipe<?>) recipe));
+                recipeListWithBellwether.add(new BellwetherDecoratedScanningRecipe<>(bellwether, (ScanningRecipe<?>) recipe));
             } else {
-                recipeListWithBellwether.add(new PreconditionDecoratedRecipe(bellwetherFollower, recipe));
+                recipeListWithBellwether.add(new BellwetherDecoratedRecipe(bellwether, recipe));
             }
         }
 
