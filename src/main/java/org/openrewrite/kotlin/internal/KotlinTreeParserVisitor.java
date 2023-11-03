@@ -3454,15 +3454,16 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             return Space.EMPTY;
         }
 
-        // TODO, should be optimizable
-        for (Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(element).iterator(); iterator.hasNext(); ) {
-            PsiElement it = iterator.next();
-            if (!isSpace(it.getNode())) {
-                return prefix(it, consumedSpaces);
-            }
+        PsiElement first = element.getFirstChild();
+        if (!isSpace(first.getNode())) {
+            return Space.EMPTY;
         }
 
-        return Space.EMPTY;
+        if (consumedSpaces != null && consumedSpaces.contains(first)) {
+            return Space.EMPTY;
+        }
+
+        return space(element.getFirstChild());
     }
 
     private Space endFix(@Nullable PsiElement element) {
@@ -3508,13 +3509,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 elementType == KtTokens.EOL_COMMENT ||
                 elementType == KtTokens.DOC_COMMENT ||
                 isCRLF(node);
-    }
-
-    private boolean isWhiteSpace(@Nullable PsiElement node) {
-        if (node == null) {
-            return false;
-        }
-        return node instanceof PsiWhiteSpace || isCRLF(node.getNode());
     }
 
     private boolean isCRLF(ASTNode node) {
@@ -3779,19 +3773,25 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return Space.EMPTY;
     }
 
-
     private Space kdocToSpace(KDoc kDoc) {
         StringBuilder sb = new StringBuilder();
 
         Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(kDoc).iterator();
         while (iterator.hasNext()) {
             PsiElement it = iterator.next();
-            String text;
+            String text = it.getText();;
             if (it instanceof PsiWhiteSpace) {
-                // TODO，handle CRLF
-                text = it.getText();
-            } else {
-                text = it.getText();
+                // replace `\n` to CRLF back if it's CRLF in the source
+                TextRange range = it.getTextRange();
+                int left = findFirstGreaterOrEqual(cRLFLocations, range.getStartOffset());
+                int right = left != -1 ? findFirstLessOrEqual(cRLFLocations, range.getEndOffset(), left) : -1;
+                boolean hasCRLF = left != -1 && left <= right;
+
+                if (hasCRLF) {
+                    for (int i = right; i >= left; i--) {
+                        text = replaceNewLineWithCRLF(text, cRLFLocations.get(i) - range.getStartOffset());
+                    }
+                }
             }
 
             sb.append(text);
@@ -3803,7 +3803,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         comments.add(new TextComment(true, comment, "", Markers.EMPTY));
         return Space.build("", comments);
     }
-
 
     private Space space(@Nullable PsiElement node) {
         Space space = Space.EMPTY;

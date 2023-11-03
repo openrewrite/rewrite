@@ -50,10 +50,9 @@ class CRLFTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("TODO")
     @Test
-    void kdoc() {
-        String windowsJavadoc = "" +
+    void crlfInKdoc() {
+        String windowsJavadoc =
           "/**\r\n" +
           " *\r\n" +
           " */\r\n" +
@@ -66,5 +65,4 @@ class CRLFTest implements RewriteTest {
           )
         );
     }
-
 }
