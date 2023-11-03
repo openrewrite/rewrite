@@ -29,7 +29,10 @@ import org.jetbrains.kotlin.fir.declarations.FirResolvedImport;
 import org.jetbrains.kotlin.fir.references.FirResolvedCallableReference;
 import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol;
+import org.jetbrains.kotlin.kdoc.lexer.KDocToken;
+import org.jetbrains.kotlin.kdoc.lexer.KDocTokens;
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
+import org.jetbrains.kotlin.lexer.KtToken;
 import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.parsing.ParseUtilsKt;
 import org.jetbrains.kotlin.psi.*;
@@ -3445,6 +3448,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             return Space.EMPTY;
         }
 
+        // TODO, should be optimizable
         for (Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(element).iterator(); iterator.hasNext(); ) {
             PsiElement it = iterator.next();
             if (!isSpace(it.getNode())) {
@@ -3497,6 +3501,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 elementType == KtTokens.BLOCK_COMMENT ||
                 elementType == KtTokens.EOL_COMMENT ||
                 elementType == KtTokens.DOC_COMMENT ||
+                elementType == KDocTokens.KDOC ||
                 isCRLF(node);
     }
 
@@ -3731,68 +3736,67 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return JContainer.build(prefix(argumentList), expressions, Markers.EMPTY);
     }
 
-    private Space space(@Nullable PsiElement node) {
-        if (node == null) {
+
+    private Space toSpace(@Nullable PsiElement element) {
+        if (element == null || !isSpace(element.getNode())) {
             return Space.EMPTY;
         }
 
-        Space space = null;
-        PsiElement preNode = null;
+        IElementType elementType = element.getNode().getElementType();
+        if (elementType == KtTokens.WHITE_SPACE) {
+            String whiteSpace = element.getText();
 
-        for (; node != null; node = next(node)) {
-            if (isWhiteSpace(node)) {
-                String whiteSpace = node.getText();
+            // replace `\n` to CRLF back if it's CRLF in the source
+            TextRange range = element.getTextRange();
+            int left = findFirstGreaterOrEqual(cRLFLocations, range.getStartOffset());
+            int right = left != -1 ? findFirstLessOrEqual(cRLFLocations, range.getEndOffset(), left) : -1;
+            boolean hasCRLF = left != -1 && left <= right;
 
-                // replace `\n` to CRLF back if it's CRLF in the source
-                TextRange range = node.getTextRange();
-                int left = findFirstGreaterOrEqual(cRLFLocations, range.getStartOffset());
-                int right = left != -1 ? findFirstLessOrEqual(cRLFLocations, range.getEndOffset(), left) : -1;
-                boolean hasCRLF = left != -1 && left <= right;
-
-                if (hasCRLF) {
-                    for (int i = right; i >= left; i--) {
-                        whiteSpace = replaceNewLineWithCRLF(whiteSpace, cRLFLocations.get(i) - range.getStartOffset());
-                    }
+            if (hasCRLF) {
+                for (int i = right; i >= left; i--) {
+                    whiteSpace = replaceNewLineWithCRLF(whiteSpace, cRLFLocations.get(i) - range.getStartOffset());
                 }
+            }
 
-                if (space == null) {
-                    space = Space.build(whiteSpace, emptyList());
-                } else {
-                    if (isWhiteSpace(preNode)) {
-                        // merge space
-                        space = space.withWhitespace(space.getWhitespace() + whiteSpace);
-                    } else {
-                        String finalWs = whiteSpace;
-                        space = space.withComments(ListUtils.mapLast(space.getComments(), c -> c.withSuffix(finalWs)));
-                    }
-                }
-            } else if (node instanceof PsiComment) {
-                if (space == null) {
-                    space = Space.EMPTY;
-                }
-                String nodeText = node.getText();
-                boolean isBlockComment = ((PsiComment) node).getTokenType() == KtTokens.BLOCK_COMMENT;
-                String comment = isBlockComment ? nodeText.substring(2, nodeText.length() - 2) : nodeText.substring(2);
-                space = space.withComments(ListUtils.concat(space.getComments(), new TextComment(isBlockComment, comment, "", Markers.EMPTY)));
+            return Space.build(whiteSpace, emptyList());
+        } else if (elementType == KtTokens.EOL_COMMENT ||
+                elementType == KtTokens.DOC_COMMENT ||
+                elementType == KtTokens.BLOCK_COMMENT) {
+            String nodeText = element.getText();
+            boolean isBlockComment = ((PsiComment)element).getTokenType() == KtTokens.BLOCK_COMMENT;
+            String comment = isBlockComment ? nodeText.substring(2, nodeText.length() - 2) : nodeText.substring(2);
+            List<Comment> comments = new ArrayList<>(1);
+            comments.add(new TextComment(isBlockComment, comment, "", Markers.EMPTY));
+            return Space.build("", comments);
+        } else if (elementType == KDocTokens.KDOC) {
+            throw new UnsupportedOperationException("TODO");
+        }
+
+        return Space.EMPTY;
+    }
+
+    private Space space(@Nullable PsiElement node) {
+        Space space = Space.EMPTY;
+        while (node != null) {
+            if (isSpace(node.getNode())) {
+                space = merge(space, toSpace(node)) ;
             } else {
                 break;
             }
-
-            preNode = node;
+            node = node.getNextSibling();
         }
-        return space == null ? Space.EMPTY : space;
+        return space;
     }
-
 
     @Nullable
     private PsiElement next(PsiElement node) {
         return node.getNextSibling();
     }
 
-    private Space merge(Space s1, Space s2) {
-        if (s1.isEmpty()) {
-            return s2;
-        } else if (s2.isEmpty()) {
+    private Space merge(@Nullable Space s1, @Nullable Space s2) {
+        if (s1 == null || s1.isEmpty()) {
+            return s2 != null ? s2 : Space.EMPTY;
+        } else if (s2 == null || s2.isEmpty()) {
             return s1;
         }
 

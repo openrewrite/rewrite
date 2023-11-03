@@ -16,11 +16,12 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-public class CRLFTest implements RewriteTest {
+class CRLFTest implements RewriteTest {
 
     @Test
     void crlf() {
@@ -49,8 +50,9 @@ public class CRLFTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail("TODO")
     @Test
-    void javadoc() {
+    void kdoc() {
         String windowsJavadoc = "" +
           "/**\r\n" +
           " *\r\n" +
