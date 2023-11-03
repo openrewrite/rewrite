@@ -50,7 +50,7 @@ public class ChangeParentPom extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Change Maven Parent Pom";
+        return "Change Maven parent pom";
     }
 
     @Override

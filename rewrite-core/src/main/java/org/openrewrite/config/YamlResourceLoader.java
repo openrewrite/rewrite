@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.exc.InvalidTypeIdException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import lombok.Getter;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
@@ -43,6 +44,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
@@ -73,6 +75,7 @@ public class YamlResourceLoader implements ResourceLoader {
     @Nullable
     private Map<String, List<RecipeExample>> recipeNameToExamples;
 
+    @Getter
     private enum ResourceType {
         Recipe("specs.openrewrite.org/v1beta/recipe"),
         Style("specs.openrewrite.org/v1beta/style"),
@@ -84,10 +87,6 @@ public class YamlResourceLoader implements ResourceLoader {
 
         ResourceType(String spec) {
             this.spec = spec;
-        }
-
-        public String getSpec() {
-            return spec;
         }
 
         @Nullable
@@ -244,9 +243,14 @@ public class YamlResourceLoader implements ResourceLoader {
                 throw new RecipeException("Invalid Recipe [" + name + "] recipeList is null");
             }
             for (int i = 0; i < recipeList.size(); i++) {
-                loadRecipe(name, recipe, i, recipeList.get(i));
+                loadRecipe(name, i, recipeList.get(i), recipe::addUninitialized, recipe::addUninitialized, recipe::addValidation);
             }
-
+            List<Object> preconditions = (List<Object>) r.get("preconditions");
+            if(preconditions != null) {
+                for (int i = 0; i < preconditions.size(); i++) {
+                    loadRecipe(name, i, preconditions.get(i), recipe::addUninitializedPrecondition, recipe::addUninitializedPrecondition, recipe::addValidation);
+                }
+            }
             recipe.setContributors(contributors.get(recipe.getName()));
             recipes.add(recipe);
         }
@@ -256,24 +260,27 @@ public class YamlResourceLoader implements ResourceLoader {
 
     @SuppressWarnings("unchecked")
     private void loadRecipe(@Language("markdown") String name,
-                            DeclarativeRecipe recipe,
                             int i,
-                            Object recipeData) {
+                            Object recipeData,
+                            Consumer<String> addLazyLoadRecipe,
+                            Consumer<Recipe> addRecipe,
+                            Consumer<Validated<Object>> addValidation) {
         if (recipeData instanceof String) {
             String recipeName = (String) recipeData;
             try {
+
                 // first try an explicitly-declared zero-arg constructor
-                recipe.addUninitialized((Recipe) Class.forName(recipeName, true,
+                addRecipe.accept((Recipe) Class.forName(recipeName, true,
                                 classLoader == null ? this.getClass().getClassLoader() : classLoader)
                         .getDeclaredConstructor()
                         .newInstance());
             } catch (ReflectiveOperationException reflectiveOperationException) {
                 try {
                     // then try jackson
-                    recipe.addUninitialized(instantiateRecipe(recipeName, new HashMap<>()));
+                    addRecipe.accept(instantiateRecipe(recipeName, new HashMap<>()));
                 } catch (IllegalArgumentException illegalArgumentException) {
                     // else, it's probably declarative
-                    recipe.addUninitialized(recipeName);
+                    addLazyLoadRecipe.accept(recipeName);
                 }
             }
         } else if (recipeData instanceof Map) {
@@ -281,31 +288,30 @@ public class YamlResourceLoader implements ResourceLoader {
             try {
                 if (nameAndConfig.getValue() instanceof Map) {
                     try {
-                        recipe.addUninitialized(instantiateRecipe(nameAndConfig.getKey(),
+                        addRecipe.accept(instantiateRecipe(nameAndConfig.getKey(),
                                 (Map<String, Object>) nameAndConfig.getValue()));
                     } catch (IllegalArgumentException e) {
                         if (e.getCause() instanceof InvalidTypeIdException) {
-                            recipe.addValidation(Validated.invalid(nameAndConfig.getKey(),
+                            addValidation.accept(Validated.invalid(nameAndConfig.getKey(),
                                     nameAndConfig.getValue(), "Recipe class " +
                                                               nameAndConfig.getKey() + " cannot be found"));
                         } else {
-                            recipe.addValidation(Validated.invalid(nameAndConfig.getKey(), nameAndConfig.getValue(),
+                            addValidation.accept(Validated.invalid(nameAndConfig.getKey(), nameAndConfig.getValue(),
                                     "Unable to load Recipe: " + e));
                         }
                     }
                 } else {
-                    recipe.addValidation(Validated.invalid(nameAndConfig.getKey(),
+                    addValidation.accept(Validated.invalid(nameAndConfig.getKey(),
                             nameAndConfig.getValue(),
                             "Declarative recipeList entries are expected to be strings or mappings"));
                 }
             } catch (Exception e) {
-                e.printStackTrace();
-                recipe.addValidation(Validated.invalid(nameAndConfig.getKey(), nameAndConfig.getValue(),
+                addValidation.accept(Validated.invalid(nameAndConfig.getKey(), nameAndConfig.getValue(),
                         "Unexpected declarative recipe parsing exception " +
                         e.getClass().getName()));
             }
         } else {
-            recipe.addValidation(invalid(
+            addValidation.accept(invalid(
                     name + ".recipeList[" + i + "] (in " + source + ")",
                     recipeData,
                     "is an object type that isn't recognized as a recipe.",
@@ -390,7 +396,11 @@ public class YamlResourceLoader implements ResourceLoader {
                                     Style e = mapper.convertValue(withJsonType, Style.class);
                                     styles.add(e);
                                 } catch (Exception e) {
-                                    e.printStackTrace();
+                                    namedStyles.addValidation(invalid(
+                                            name + ".styleConfigs[" + i + "] (in " + source + ")",
+                                            next,
+                                            " encountered an error being loaded as a style.",
+                                            e));
                                 }
                             } else {
                                 namedStyles.addValidation(invalid(
