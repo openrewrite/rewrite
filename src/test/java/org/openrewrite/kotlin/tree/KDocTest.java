@@ -16,14 +16,12 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class KDocTest implements RewriteTest {
 
-    @ExpectedToFail("TODO")
     @Test
     void kdoc() {
         rewriteRun(

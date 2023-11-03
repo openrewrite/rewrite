@@ -180,7 +180,7 @@ public class KotlinParser implements Parser {
                                         }
 
                                         // Turn this flag on locally only to develop psi-based-parser
-                                        boolean printTrees = false;
+                                        boolean printTrees = true;
 
                                         KotlinTypeMapping typeMapping = new KotlinTypeMapping(typeCache, firSession, kotlinSource.getFirFile());
                                         PsiElementAssociations associations = new PsiElementAssociations(typeMapping, kotlinSource.getFirFile());

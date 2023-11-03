@@ -31,6 +31,7 @@ import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol;
 import org.jetbrains.kotlin.kdoc.lexer.KDocToken;
 import org.jetbrains.kotlin.kdoc.lexer.KDocTokens;
+import org.jetbrains.kotlin.kdoc.psi.api.KDoc;
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
 import org.jetbrains.kotlin.lexer.KtToken;
 import org.jetbrains.kotlin.lexer.KtTokens;
@@ -1979,7 +1980,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         J.MethodDeclaration primaryConstructor;
         PsiElement prefixConsumed = findFirstPrefixSpace(findFirstNotSpaceChild(klass));
         Set<PsiElement> prefixConsumedSet = new HashSet<>();
-        prefixConsumedSet.add(prefixConsumed);
+        if (prefixConsumed != null) {
+            prefixConsumedSet.add(prefixConsumed);
+        }
 
         List<J.Modifier> modifiers = mapModifiers(klass.getModifierList(), leadingAnnotations, lastAnnotations, data);
 
@@ -2008,6 +2011,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     lastAnnotations,
                     classType
             );
+
+
+
         } else if (klass.getClassOrInterfaceKeyword() != null) {
             kind = new J.ClassDeclaration.Kind(
                     randomId(),
@@ -3501,7 +3507,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 elementType == KtTokens.BLOCK_COMMENT ||
                 elementType == KtTokens.EOL_COMMENT ||
                 elementType == KtTokens.DOC_COMMENT ||
-                elementType == KDocTokens.KDOC ||
                 isCRLF(node);
     }
 
@@ -3760,7 +3765,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
             return Space.build(whiteSpace, emptyList());
         } else if (elementType == KtTokens.EOL_COMMENT ||
-                elementType == KtTokens.DOC_COMMENT ||
                 elementType == KtTokens.BLOCK_COMMENT) {
             String nodeText = element.getText();
             boolean isBlockComment = ((PsiComment)element).getTokenType() == KtTokens.BLOCK_COMMENT;
@@ -3768,12 +3772,38 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             List<Comment> comments = new ArrayList<>(1);
             comments.add(new TextComment(isBlockComment, comment, "", Markers.EMPTY));
             return Space.build("", comments);
-        } else if (elementType == KDocTokens.KDOC) {
-            throw new UnsupportedOperationException("TODO");
+        } else if (elementType == KtTokens.DOC_COMMENT) {
+            return kdocToSpace((KDoc) element);
         }
 
         return Space.EMPTY;
     }
+
+
+    private Space kdocToSpace(KDoc kDoc) {
+        StringBuilder sb = new StringBuilder();
+
+        Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(kDoc).iterator();
+        while (iterator.hasNext()) {
+            PsiElement it = iterator.next();
+            String text;
+            if (it instanceof PsiWhiteSpace) {
+                // TODO，handle CRLF
+                text = it.getText();
+            } else {
+                text = it.getText();
+            }
+
+            sb.append(text);
+        }
+
+        String source = sb.toString();
+        String comment = source.substring(2, source.length() - 2);
+        List<Comment> comments = new ArrayList<>(1);
+        comments.add(new TextComment(true, comment, "", Markers.EMPTY));
+        return Space.build("", comments);
+    }
+
 
     private Space space(@Nullable PsiElement node) {
         Space space = Space.EMPTY;
@@ -3826,9 +3856,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         while (iterator.hasNext()) {
             PsiElement it = iterator.next();
             IElementType type = it.getNode().getElementType();
-            if (type != KtTokens.EOL_COMMENT &&
-                    type != KtTokens.BLOCK_COMMENT &&
-                    type != KtTokens.WHITE_SPACE) {
+            if (!isSpace(it.getNode())) {
                 return it;
             }
         }
