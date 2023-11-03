@@ -518,7 +518,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                         emptyList(),
                         node.getValue() == null ?
                                 null :
-                                padLeft(sourceBefore("="), convert(node.getValue())),
+                                padLeft(sourceBefore("="), convert(((LocalAsgnNode) node.getValue()).getValueNode())),
                         null
                 ), EMPTY))
         );
