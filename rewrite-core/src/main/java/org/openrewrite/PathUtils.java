@@ -34,7 +34,6 @@ public class PathUtils {
      * Compare two paths, returning true if they indicate the same path, regardless of separators.
      * Does not account for comparison of a relative path to an absolute path, but within the context of OpenRewrite
      * all paths should be relative anyway.
-     *
      * "foo/a.txt" is considered to be equal to "foo\a.txt"
      */
     public static boolean equalIgnoringSeparators(Path a, Path b) {
@@ -212,6 +211,7 @@ public class PathUtils {
         return isFileSeparator(false, ch);
     }
 
+    @SuppressWarnings("SameParameterValue")
     private static boolean isFileSeparator(boolean strict, char ch) {
         return strict
                 ? ch == File.separatorChar
