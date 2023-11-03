@@ -136,7 +136,7 @@ public class PathUtils {
         }
         if (pathIdxStart > pathIdxEnd) {
             // Path exhausted
-            for (int i = pattIdxStart; i < pattIdxEnd; i++) {
+            for (int i = pattIdxStart; i <= pattIdxEnd; i++) {
                 if (!pattTokens[i].equals("**")) {
                     return false;
                 }
