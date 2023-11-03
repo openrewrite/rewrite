@@ -19,6 +19,9 @@ public class RubySpace {
     public enum Location {
         BINARY_PREFIX,
         BINARY_OPERATOR,
+        DELIMITED_STRING_PREFIX,
+        DELIMITED_STRING_VALUE_PREFIX,
+        DELIMITED_STRING_VALUE_SUFFIX,
         REDO_PREFIX,
     }
 }

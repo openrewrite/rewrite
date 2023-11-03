@@ -21,7 +21,6 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.ruby.RubyVisitor;
@@ -31,6 +30,7 @@ import java.beans.Transient;
 import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.UUID;
 
 public interface Ruby extends J {
@@ -177,6 +177,63 @@ public interface Ruby extends J {
 
             public Ruby.Binary withOperator(JLeftPadded<Ruby.Binary.Type> operator) {
                 return t.operator == operator ? t : new Ruby.Binary(t.id, t.prefix, t.markers, t.left, operator, t.right, t.type);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    @With
+    final class DelimitedString implements Ruby, Statement, Expression {
+        UUID id;
+        Space prefix;
+        Markers markers;
+        String delimiter;
+        List<J> strings;
+
+        @Nullable
+        JavaType type;
+
+        @Override
+        public <P> J acceptRuby(RubyVisitor<P> v, P p) {
+            return v.visitDelimitedString(this, p);
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Data
+        @With
+        public static final class Value implements Ruby {
+            UUID id;
+            Markers markers;
+            J tree;
+            Space after;
+
+            @Override
+            public <J2 extends J> J2 withPrefix(Space space) {
+                //noinspection unchecked
+                return (J2) this;
+            }
+
+            @Override
+            public Space getPrefix() {
+                return Space.EMPTY;
+            }
+
+            public Space getAfter() {
+                return after;
+            }
+
+            @Override
+            public <P> J acceptRuby(RubyVisitor<P> v, P p) {
+                return v.visitDelimitedStringValue(this, p);
             }
         }
     }

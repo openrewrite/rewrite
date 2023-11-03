@@ -16,6 +16,7 @@
 package org.openrewrite.ruby;
 
 import org.openrewrite.SourceFile;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.ruby.tree.Ruby;
@@ -80,5 +81,28 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         }
         r = r.withLabel(visitAndCast(r.getLabel(), p));
         return r;
+    }
+
+    public J visitDelimitedString(Ruby.DelimitedString delimitedString, P p) {
+        Ruby.DelimitedString ds = delimitedString;
+        ds = ds.withPrefix(visitSpace(ds.getPrefix(), RubySpace.Location.DELIMITED_STRING_PREFIX, p));
+        ds = ds.withMarkers(visitMarkers(ds.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(ds, p);
+        if (!(temp instanceof Ruby.DelimitedString)) {
+            return temp;
+        } else {
+            ds = (Ruby.DelimitedString) temp;
+        }
+        ds = ds.withStrings(ListUtils.map(ds.getStrings(), s -> visit(s, p)));
+        ds = ds.withType(visitType(ds.getType(), p));
+        return ds;
+    }
+
+    public J visitDelimitedStringValue(Ruby.DelimitedString.Value value, P p) {
+        Ruby.DelimitedString.Value v = value;
+        v = v.withMarkers(visitMarkers(v.getMarkers(), p));
+        v = v.withTree(visit(v.getTree(), p));
+        v = v.withAfter(visitSpace(v.getAfter(), RubySpace.Location.DELIMITED_STRING_VALUE_SUFFIX, p));
+        return v;
     }
 }

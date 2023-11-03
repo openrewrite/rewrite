@@ -166,6 +166,27 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitDelimitedString(Ruby.DelimitedString dString, PrintOutputCapture<P> p) {
+        beforeSyntax(dString, RubySpace.Location.DELIMITED_STRING_VALUE_PREFIX, p);
+        p.append(dString.getDelimiter());
+        visit(dString.getStrings(), p);
+        p.append(dString.getDelimiter());
+        afterSyntax(dString, p);
+        return dString;
+    }
+
+    @Override
+    public J visitDelimitedStringValue(Ruby.DelimitedString.Value value, PrintOutputCapture<P> p) {
+        beforeSyntax(value, RubySpace.Location.DELIMITED_STRING_VALUE_PREFIX, p);
+        p.append("#{");
+        visit(value.getTree(), p);
+        visitSpace(value.getAfter(), RubySpace.Location.DELIMITED_STRING_VALUE_SUFFIX, p);
+        p.append('}');
+        afterSyntax(value, p);
+        return value;
+    }
+
+    @Override
     public J visitRedo(Ruby.Redo redo, PrintOutputCapture<P> p) {
         beforeSyntax(redo, RubySpace.Location.REDO_PREFIX, p);
         p.append("redo");
@@ -274,6 +295,15 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitBlock(J.Block block, PrintOutputCapture<P> p) {
+            beforeSyntax(block, Space.Location.BLOCK_PREFIX, p);
+            visitStatements(block.getPadding().getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
+            visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
+            afterSyntax(block, p);
+            return block;
+        }
+
+        @Override
         public J visitContinue(J.Continue continueStatement, PrintOutputCapture<P> p) {
             beforeSyntax(continueStatement, Space.Location.CONTINUE_PREFIX, p);
             p.append("next");
@@ -338,6 +368,22 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
             }
             afterSyntax(iff, p);
             return iff;
+        }
+
+        @Override
+        public J visitMethodDeclaration(J.MethodDeclaration method, PrintOutputCapture<P> p) {
+            beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
+            p.append("def");
+            visit(method.getAnnotations().getName().getAnnotations(), p);
+            visit(method.getName(), p);
+            boolean omitParentheses = method.getMarkers().findFirst(OmitParentheses.class).isPresent();
+            visitContainer(omitParentheses ? "" : "(", method.getPadding().getParameters(),
+                    JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",",
+                    omitParentheses ? "" : ")", p);
+            visit(method.getBody(), p);
+            p.append("end");
+            afterSyntax(method, p);
+            return method;
         }
 
         @Override
