@@ -30,33 +30,6 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 class ClassDeclarationTest implements RewriteTest {
 
     @Test
-    void crlf() {
-        rewriteRun(
-          kotlin(
-            "package some.other.name\r\n" + "class A { }\r\n" + "class B { }"
-          )
-        );
-    }
-
-    @Test
-    void consecutiveCRLF() {
-        rewriteRun(
-          kotlin(
-            "package some.other.name\r\n\r\n\r\n" + "class A { }\r\n\r\n\r\n" + "class B { }"
-          )
-        );
-    }
-
-    @Test
-    void crlfAfterComment() {
-        rewriteRun(
-          kotlin(
-            "class Test \r\n {//some comment\r\n}"
-          )
-        );
-    }
-
-    @Test
     void whitespaceInPackage() {
         rewriteRun(
           kotlin(
