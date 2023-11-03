@@ -94,6 +94,8 @@ class PathUtilsTest {
         assertThat(matchesGlob(path("a/b/test.txt"), "a/**/*.txt")).isTrue();
         assertThat(matchesGlob(path("a/b/test.txt"), "a/**/test.*")).isTrue();
         assertThat(matchesGlob(path("a/b/test.txt"), "a/**/*.*")).isTrue();
+        assertThat(matchesGlob(path("a-test/a-test/test.txt"), "**/*-test/*-test/test.txt")).isTrue();
+        assertThat(matchesGlob(path("a-test/test.txt"), "**/*-test/*-test/test.txt")).isFalse();
     }
 
     private static Path path(String path) {
