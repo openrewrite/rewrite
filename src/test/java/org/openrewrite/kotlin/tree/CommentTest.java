@@ -33,6 +33,8 @@ class CommentTest implements RewriteTest {
               class T {
                   val x = 1 // comment 1
                   val y = 2 // comment 2
+                  fun id() {} // comment 3
+                  fun name() {} // comment 4
               }
               """
           )

@@ -2084,7 +2084,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitClassBody(KtClassBody classBody, ExecutionContext data) {
         List<JRightPadded<Statement>> list = new ArrayList<>();
 
-        Space after = prefix(classBody.getRBrace());
+        Space after = endFixPrefixAndInfix(classBody.getRBrace());
 
         if (!classBody.getEnumEntries().isEmpty()) {
             List<JRightPadded<J.EnumValue>> enumValues = new ArrayList<>(classBody.getEnumEntries().size());
@@ -2097,9 +2097,18 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 JRightPadded<J.EnumValue> rp = padRight((J.EnumValue) ktEnumEntry.accept(this, data), Space.EMPTY);
 
                 if (i == classBody.getEnumEntries().size() - 1) {
+                    if (semicolon != null) {
+                        terminatedWithSemicolon = true;
+                    }
+
                     if (comma != null) {
                         rp = rp.withAfter(prefix(comma));
-                        Space afterComma = suffix(comma);
+                        // Space afterComma will be handled by others as a prefix or else, except there is a trailing semicolon
+                        Space afterComma = Space.EMPTY;
+                        if (semicolon != null) {
+                            afterComma = suffix(comma);
+                        }
+
                         rp = rp.withMarkers(rp.getMarkers().addIfAbsent(new TrailingComma(randomId(), afterComma)));
                     } else {
                         if (semicolon != null) {
@@ -2107,11 +2116,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         }
                     }
 
-                    if (semicolon != null) {
-                        // rp = rp.withAfter(prefix(semicolon));
-                        terminatedWithSemicolon = true;
-                        after = merge(suffix(semicolon), after);
-                    }
                 } else {
                     rp = rp.withAfter(prefix(comma));
                 }
@@ -2830,7 +2834,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
                 Tree.randomId(),
-                prefixAndInfix(property), // overlaps with right-padding of previous statement
+                endFixPrefixAndInfix(property), // overlaps with right-padding of previous statement
                 markers,
                 leadingAnnotations,
                 modifiers,
@@ -3341,7 +3345,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             return new JRightPadded<>(j, prefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
         }
 
-        return padRight(j, endFix(element));
+        return padRight(j, Space.EMPTY);
     }
 
     private <T> JLeftPadded<T> padLeft(Space left, T tree) {
@@ -3450,7 +3454,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         PsiElement first = element.getFirstChild();
-        if (!isSpace(first.getNode())) {
+        if (first == null || !isSpace(first.getNode())) {
             return Space.EMPTY;
         }
 
