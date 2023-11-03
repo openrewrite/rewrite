@@ -18,18 +18,18 @@ package org.openrewrite.java.spring;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Recipe;
-import org.openrewrite.test.AdHocRecipe;
 import org.openrewrite.test.RewriteTest;
 
 import java.util.List;
 
 import static org.openrewrite.java.Assertions.java;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 
 @SuppressWarnings({"ResultOfMethodCallIgnored", "CodeBlock2Expr", "RedundantThrows", "Convert2MethodRef", "EmptyTryBlock", "CatchMayIgnoreException", "EmptyFinallyBlock", "StringBufferReplaceableByString", "UnnecessaryLocalVariable"})
 public class RemoveMethodInvocationsVisitorTest implements RewriteTest {
 
     private Recipe createRemoveMethodsRecipe(String... methods) {
-        return new AdHocRecipe(null, null, null, () -> new RemoveMethodInvocationsVisitor(List.of(methods)), null, null, null);
+        return toRecipe(() -> new RemoveMethodInvocationsVisitor(List.of(methods)));
     }
 
     @DocumentExample
