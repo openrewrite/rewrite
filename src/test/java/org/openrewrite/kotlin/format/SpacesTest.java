@@ -1931,7 +1931,7 @@ class SpacesTest implements RewriteTest {
                       private val f: (Int) -> Int = { a: Int   ->    a * 2 }
                       """,
                     """
-                      private val f: (Int) -> Int = { a: Int-> a * 2 }
+                      private val f: (Int) -> Int = { a: Int->a * 2 }
                       """
                   )
                 );

@@ -979,7 +979,8 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         boolean lastParamHasSpace = false;
         boolean trailingComma = false;
         List<JRightPadded<J>> parameters = l.getParameters().getPadding().getParams();
-        if (!parameters.isEmpty()) {
+        boolean hasArrow = !parameters.isEmpty();
+        if (hasArrow) {
             JRightPadded<J> lastParam = parameters.get(parameters.size() - 1);
             Space after = lastParam.getAfter();
             trailingComma = lastParam.getMarkers().findFirst(TrailingComma.class).isPresent();
@@ -992,14 +993,16 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
             boolean useSpace = useSpaceBeforeLambdaArrow;
             parameters = ListUtils.mapLast(parameters, rp -> spaceAfter(rp, useSpace));
             l = l.withParameters(l.getParameters().getPadding().withParams(parameters));
-        } else if (!parameters.isEmpty()) {
+        } else if (hasArrow) {
             l = l.withArrow(updateSpace(l.getArrow(), useSpaceBeforeLambdaArrow));
         }
 
         // handle space after Lambda arrow
         // Intellij has a specific setting for Space before Lambda arrow, but no setting for space after Lambda arrow
-        // presumably handled as prefix space for body
-        l = l.withBody(spaceBefore(l.getBody(), true));
+        // presumably handled as around the Lambda arrow for the same
+        if (hasArrow) {
+            l = l.withBody(spaceBefore(l.getBody(), useSpaceBeforeLambdaArrow));
+        }
 
         if (!(l.getParameters().getParameters().isEmpty() || l.getParameters().getParameters().get(0) instanceof J.Empty)) {
             int parametersSize = l.getParameters().getParameters().size();
