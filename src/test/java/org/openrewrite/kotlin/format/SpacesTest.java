@@ -912,6 +912,20 @@ class SpacesTest implements RewriteTest {
                   }
                   return super.visitSpace(space, loc, executionContext);
               }
+
+              @Override
+              public Space visitSpace(Space space, Space.Location loc, ExecutionContext executionContext) {
+                  Space s =  super.visitSpace(space, loc, executionContext);
+
+                  if (!space.getComments().isEmpty()) {
+                      return space;
+                  }
+
+                  if (loc == Space.Location.UNARY_OPERATOR) {
+                      return space.withComments(ListUtils.concat(new TextComment(true, loc.name(), "", Markers.EMPTY), space.getComments()));
+                  }
+                  return s;
+              }
           })),
           kotlin(
             """
@@ -932,13 +946,13 @@ class SpacesTest implements RewriteTest {
           kotlin(
             """
               val a = A ( )
-              val b = a . method ( ) !!
-              val c = b !!
+              val b = a . method ( )   !!
+              val c = b   !!
               """,
             """
               val a = A ( )
-              val b = a . method ( ) /*CHECK_NOT_NULL_PREFIX*/!!
-              val c = b /*CHECK_NOT_NULL_PREFIX*/!!
+              val b = a . method ( )   /*UNARY_OPERATOR*/!!
+              val c = b   /*UNARY_OPERATOR*/!!
               """
           )
         );
