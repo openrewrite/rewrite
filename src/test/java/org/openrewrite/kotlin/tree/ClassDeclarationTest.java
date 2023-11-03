@@ -53,6 +53,20 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void annotatedConstructor() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  @Suppress("ALL") @Deprecated("",ReplaceWith("Any()")) constructor() {
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void multipleClassDeclarationsInOneCompilationUnit() {
         rewriteRun(
           kotlin(
