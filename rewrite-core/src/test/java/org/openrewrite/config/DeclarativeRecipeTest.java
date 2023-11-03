@@ -62,4 +62,25 @@ public class DeclarativeRecipeTest implements RewriteTest {
             text("2")
         );
     }
+
+    @Test
+    void yamlPrecondition() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.PreconditionTest
+            preconditions:
+              - org.openrewrite.text.Find:
+                  find: 1
+            recipeList:
+              - org.openrewrite.text.ChangeText:
+                 toText: 2
+              - org.openrewrite.text.ChangeText:
+                 toText: 3
+            """, "org.openrewrite.PreconditionTest"),
+          text("1","3"),
+          text("2")
+        );
+    }
 }

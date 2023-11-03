@@ -65,6 +65,8 @@ public class DeclarativeRecipe extends Recipe {
 
     private final List<Recipe> uninitializedRecipes = new ArrayList<>();
     private final List<Recipe> recipeList = new ArrayList<>();
+
+    private final List<Recipe> uninitializedPreconditions = new ArrayList<>();
     private final List<Recipe> preconditions = new ArrayList<>();
 
     public void addPrecondition(Recipe recipe) {
@@ -83,8 +85,13 @@ public class DeclarativeRecipe extends Recipe {
     }
 
     public void initialize(Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
-        for (int i = 0; i < uninitializedRecipes.size(); i++) {
-            Recipe recipe = uninitializedRecipes.get(i);
+        initialize(uninitializedRecipes, recipeList, availableRecipes, recipeToContributors);
+        initialize(uninitializedPreconditions, preconditions, availableRecipes, recipeToContributors);
+    }
+
+    private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+        for (int i = 0; i < uninitialized.size(); i++) {
+            Recipe recipe = uninitialized.get(i);
             if (recipe instanceof LazyLoadedRecipe) {
                 String recipeFqn = ((LazyLoadedRecipe) recipe).getRecipeFqn();
                 Optional<Recipe> next = availableRecipes.stream()
@@ -94,7 +101,7 @@ public class DeclarativeRecipe extends Recipe {
                     if (subRecipe instanceof DeclarativeRecipe) {
                         ((DeclarativeRecipe) subRecipe).initialize(availableRecipes, recipeToContributors);
                     }
-                    recipeList.add(subRecipe);
+                    initialized.add(subRecipe);
                 } else {
                     validation = validation.and(
                             invalid(name + ".recipeList" +
@@ -108,10 +115,10 @@ public class DeclarativeRecipe extends Recipe {
                 if (recipe instanceof DeclarativeRecipe) {
                     ((DeclarativeRecipe) recipe).initialize(availableRecipes, recipeToContributors);
                 }
-                recipeList.add(recipe);
+                initialized.add(recipe);
             }
         }
-        uninitializedRecipes.clear();
+        uninitialized.clear();
     }
 
     @Value
@@ -126,7 +133,8 @@ public class DeclarativeRecipe extends Recipe {
 
         @Override
         public String getDescription() {
-            return "Evaluates a precondition and makes that result available to the preconditions of other recipes.";
+            return "Evaluates a precondition and makes that result available to the preconditions of other recipes. " +
+                   "\"bellwether\", noun - One that serves as a leader or as a leading indicator of future trends. ";
         }
 
         TreeVisitor<?, ExecutionContext> precondition;
@@ -173,6 +181,11 @@ public class DeclarativeRecipe extends Recipe {
         public TreeVisitor<?, ExecutionContext> getVisitor() {
             return Preconditions.check(bellwether.isPreconditionApplicable(), delegate.getVisitor());
         }
+
+        @Override
+        public List<Recipe> getRecipeList() {
+            return decorateWithPreconditionBellwether(bellwether, delegate.getRecipeList());
+        }
     }
 
     @Value
@@ -211,6 +224,11 @@ public class DeclarativeRecipe extends Recipe {
         public TreeVisitor<?, ExecutionContext> getVisitor(T acc) {
             return Preconditions.check(bellwether.isPreconditionApplicable(), delegate.getVisitor(acc));
         }
+
+        @Override
+        public List<Recipe> getRecipeList() {
+            return decorateWithPreconditionBellwether(bellwether, delegate.getRecipeList());
+        }
     }
 
 
@@ -236,14 +254,7 @@ public class DeclarativeRecipe extends Recipe {
         PreconditionBellwether bellwether = new PreconditionBellwether(andPreconditions);
         List<Recipe> recipeListWithBellwether = new ArrayList<>(recipeList.size() + 1);
         recipeListWithBellwether.add(bellwether);
-        for (Recipe recipe : recipeList) {
-            if(recipe instanceof ScanningRecipe) {
-                recipeListWithBellwether.add(new BellwetherDecoratedScanningRecipe<>(bellwether, (ScanningRecipe<?>) recipe));
-            } else {
-                recipeListWithBellwether.add(new BellwetherDecoratedRecipe(bellwether, recipe));
-            }
-        }
-
+        recipeListWithBellwether.addAll(decorateWithPreconditionBellwether(bellwether, recipeList));
         return recipeListWithBellwether;
     }
 
@@ -259,6 +270,17 @@ public class DeclarativeRecipe extends Recipe {
         return false;
     }
 
+    private static List<Recipe> decorateWithPreconditionBellwether(PreconditionBellwether bellwether, List<Recipe> recipeList) {
+        List<Recipe> mappedRecipeList = new ArrayList<>(recipeList.size());
+        for (Recipe recipe : recipeList) {
+            if(recipe instanceof ScanningRecipe) {
+                mappedRecipeList.add(new BellwetherDecoratedScanningRecipe<>(bellwether, (ScanningRecipe<?>) recipe));
+            } else {
+                mappedRecipeList.add(new BellwetherDecoratedRecipe(bellwether, recipe));
+            }
+        }
+        return mappedRecipeList;
+    }
 
     public void addUninitialized(Recipe recipe) {
         uninitializedRecipes.add(recipe);
@@ -266,6 +288,14 @@ public class DeclarativeRecipe extends Recipe {
 
     public void addUninitialized(String recipeName) {
         uninitializedRecipes.add(new DeclarativeRecipe.LazyLoadedRecipe(recipeName));
+    }
+
+    public void addUninitializedPrecondition(Recipe recipe) {
+        uninitializedPreconditions.add(recipe);
+    }
+
+    public void addUninitializedPrecondition(String recipeName) {
+        uninitializedPreconditions.add(new DeclarativeRecipe.LazyLoadedRecipe(recipeName));
     }
 
     public void addValidation(Validated<Object> validated) {
