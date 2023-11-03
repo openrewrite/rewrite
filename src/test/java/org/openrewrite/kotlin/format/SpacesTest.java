@@ -1928,7 +1928,7 @@ class SpacesTest implements RewriteTest {
                   spaces(style -> style.withOther(style.getOther().withBeforeLambdaArrow(false))),
                   kotlin(
                     """
-                      private val f: (Int) -> Int = { a: Int -> a * 2 }
+                      private val f: (Int) -> Int = { a: Int   ->    a * 2 }
                       """,
                     """
                       private val f: (Int) -> Int = { a: Int-> a * 2 }

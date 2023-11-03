@@ -999,7 +999,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         // handle space after Lambda arrow
         // Intellij has a specific setting for Space before Lambda arrow, but no setting for space after Lambda arrow
         // presumably handled as prefix space for body
-        l = l.withBody(spaceBefore(l.getBody(), false));
+        l = l.withBody(spaceBefore(l.getBody(), true));
 
         if (!(l.getParameters().getParameters().isEmpty() || l.getParameters().getParameters().get(0) instanceof J.Empty)) {
             int parametersSize = l.getParameters().getParameters().size();
@@ -1031,10 +1031,7 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
 
             if (singleLine && !l.getParameters().getParameters().isEmpty()) {
                 // handle leading spaces
-                List<J> params = ListUtils.mapFirst(l.getParameters().getParameters(), x ->
-                        spaceBefore(x, style.getOther().getInSimpleOneLineMethods())
-                );
-                l = l.withParameters(l.getParameters().withParameters(params));
+                l = l.withParameters(spaceBefore(l.getParameters(), style.getOther().getInSimpleOneLineMethods()));
 
                 // handle trailing spaces
                 if (l.getBody() instanceof J.Block) {
