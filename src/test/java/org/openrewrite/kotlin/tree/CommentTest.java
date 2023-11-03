@@ -26,6 +26,20 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 class CommentTest implements RewriteTest {
 
     @Test
+    void propertyTrailingComments() {
+        rewriteRun(
+          kotlin(
+            """
+              class T {
+                  val x = 1 // comment 1
+                  val y = 2 // comment 2
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void backToBackMultilineComments() {
         rewriteRun(
           kotlin(

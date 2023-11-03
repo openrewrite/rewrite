@@ -3341,7 +3341,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             return new JRightPadded<>(j, prefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
         }
 
-        return JRightPadded.build(j);
+        return padRight(j, endFix(element));
     }
 
     private <T> JLeftPadded<T> padLeft(Space left, T tree) {
