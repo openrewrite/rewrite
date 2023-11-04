@@ -19,6 +19,17 @@ public class StringTest implements RewriteTest {
     }
 
     @Test
+    void singleQuoteDelimiter() {
+        rewriteRun(
+          ruby(
+            """
+              'The programming language is'
+              """
+          )
+        );
+    }
+
+    @Test
     void delimitedString() {
         rewriteRun(
           ruby(

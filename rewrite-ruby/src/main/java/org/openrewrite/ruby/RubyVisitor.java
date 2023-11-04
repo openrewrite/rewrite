@@ -17,12 +17,12 @@ package org.openrewrite.ruby;
 
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.ruby.tree.Ruby;
-import org.openrewrite.ruby.tree.RubyLeftPadded;
-import org.openrewrite.ruby.tree.RubySpace;
+import org.openrewrite.ruby.tree.*;
 
+@SuppressWarnings("unused")
 public class RubyVisitor<P> extends JavaVisitor<P> {
 
     @Override
@@ -39,8 +39,17 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         return visitSpace(space, Space.Location.LANGUAGE_EXTENSION, p);
     }
 
+    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container,
+                                                        RubyContainer.Location loc, P p) {
+        return super.visitContainer(container, JContainer.Location.LANGUAGE_EXTENSION, p);
+    }
+
     public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, RubyLeftPadded.Location loc, P p) {
         return super.visitLeftPadded(left, JLeftPadded.Location.LANGUAGE_EXTENSION, p);
+    }
+
+    public <T> JRightPadded<T> visitRightPadded(@Nullable JRightPadded<T> right, RubyRightPadded.Location loc, P p) {
+        return super.visitRightPadded(right, JRightPadded.Location.LANGUAGE_EXTENSION, p);
     }
 
     public Ruby visitCompilationUnit(Ruby.CompilationUnit compilationUnit, P p) {
@@ -104,5 +113,37 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         v = v.withTree(visit(v.getTree(), p));
         v = v.withAfter(visitSpace(v.getAfter(), RubySpace.Location.DELIMITED_STRING_VALUE_SUFFIX, p));
         return v;
+    }
+
+    public J visitKeyValue(Ruby.KeyValue keyValue, P p) {
+        Ruby.KeyValue k = keyValue;
+        k = k.withPrefix(visitSpace(k.getPrefix(), RubySpace.Location.KEY_VALUE_PREFIX, p));
+        k = k.withMarkers(visitMarkers(k.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(k, p);
+        if (!(temp instanceof Ruby.KeyValue)) {
+            return temp;
+        } else {
+            k = (Ruby.KeyValue) temp;
+        }
+        k = k.getPadding().withKey(visitRightPadded(k.getPadding().getKey(), RubyRightPadded.Location.KEY_VALUE_SUFFIX, p));
+        k = k.withValue((Expression) visit(k.getValue(), p));
+        k = k.withType(visitType(k.getType(), p));
+        return k;
+    }
+
+    public J visitHash(Ruby.Hash hash, P p) {
+        Ruby.Hash h = hash;
+        h = h.withPrefix(visitSpace(h.getPrefix(), RubySpace.Location.HASH_PREFIX, p));
+        h = h.withMarkers(visitMarkers(h.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(h, p);
+        if (!(temp instanceof Ruby.Hash)) {
+            return temp;
+        } else {
+            h = (Ruby.Hash) temp;
+        }
+        h = h.getPadding().withElements(visitContainer(h.getPadding().getElements(),
+                RubyContainer.Location.HASH_ELEMENTS, p));
+        h = h.withType(visitType(h.getType(), p));
+        return h;
     }
 }

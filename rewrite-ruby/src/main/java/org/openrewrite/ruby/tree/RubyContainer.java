@@ -15,17 +15,24 @@
  */
 package org.openrewrite.ruby.tree;
 
-public class RubySpace {
+public class RubyContainer {
     public enum Location {
-        BINARY_PREFIX,
-        BINARY_OPERATOR,
-        DELIMITED_STRING_PREFIX,
-        DELIMITED_STRING_VALUE_PREFIX,
-        DELIMITED_STRING_VALUE_SUFFIX,
-        HASH_ELEMENTS,
-        HASH_PREFIX,
-        KEY_VALUE_PREFIX,
-        KEY_VALUE_SUFFIX,
-        REDO_PREFIX,
+        HASH_ELEMENTS(RubySpace.Location.HASH_ELEMENTS, RubyRightPadded.Location.KEY_VALUE_SUFFIX);
+
+        private final RubySpace.Location beforeLocation;
+        private final RubyRightPadded.Location elementLocation;
+
+        Location(RubySpace.Location beforeLocation, RubyRightPadded.Location elementLocation) {
+            this.beforeLocation = beforeLocation;
+            this.elementLocation = elementLocation;
+        }
+
+        public RubySpace.Location getBeforeLocation() {
+            return beforeLocation;
+        }
+
+        public RubyRightPadded.Location getElementLocation() {
+            return elementLocation;
+        }
     }
 }

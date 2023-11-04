@@ -21,12 +21,15 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.ruby.RubyVisitor;
 import org.openrewrite.ruby.marker.*;
 import org.openrewrite.ruby.tree.Ruby;
+import org.openrewrite.ruby.tree.RubyContainer;
+import org.openrewrite.ruby.tree.RubyRightPadded;
 import org.openrewrite.ruby.tree.RubySpace;
 
 import java.util.List;
@@ -187,6 +190,24 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitHash(Ruby.Hash hash, PrintOutputCapture<P> p) {
+        beforeSyntax(hash, RubySpace.Location.HASH_PREFIX, p);
+        visitContainer("{", hash.getPadding().getElements(), RubyContainer.Location.HASH_ELEMENTS, ",", "}", p);
+        afterSyntax(hash, p);
+        return hash;
+    }
+
+    @Override
+    public J visitKeyValue(Ruby.KeyValue keyValue, PrintOutputCapture<P> p) {
+        beforeSyntax(keyValue, RubySpace.Location.KEY_VALUE_PREFIX, p);
+        visitRightPadded(keyValue.getPadding().getKey(), RubyRightPadded.Location.KEY_VALUE_SUFFIX, p);
+        p.append(':');
+        visit(keyValue.getValue(), p);
+        afterSyntax(keyValue, p);
+        return keyValue;
+    }
+
+    @Override
     public J visitRedo(Ruby.Redo redo, PrintOutputCapture<P> p) {
         beforeSyntax(redo, RubySpace.Location.REDO_PREFIX, p);
         p.append("redo");
@@ -232,6 +253,36 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     @Override
     public Space visitSpace(Space space, Space.Location loc, PrintOutputCapture<P> p) {
         return delegate.visitSpace(space, loc, p);
+    }
+
+    protected void visitContainer(String before, @Nullable JContainer<? extends J> container, RubyContainer.Location location,
+                                  String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
+        if (container == null) {
+            return;
+        }
+        visitSpace(container.getBefore(), location.getBeforeLocation(), p);
+        p.append(before);
+        visitRightPadded(container.getPadding().getElements(), location.getElementLocation(), suffixBetween, p);
+        p.append(after == null ? "" : after);
+    }
+
+    protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, RubyRightPadded.Location location, String suffixBetween, PrintOutputCapture<P> p) {
+        for (int i = 0; i < nodes.size(); i++) {
+            JRightPadded<? extends J> node = nodes.get(i);
+            visit(node.getElement(), p);
+            visitSpace(node.getAfter(), location.getAfterLocation(), p);
+            if (i < nodes.size() - 1) {
+                p.append(suffixBetween);
+            } else {
+                for (Marker m : node.getMarkers().getMarkers()) {
+                    if (m instanceof TrailingComma) {
+                        p.append(suffixBetween);
+                        visitSpace(((TrailingComma) m).getSuffix(), Space.Location.LANGUAGE_EXTENSION, p);
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     private class RubyJavaPrinter extends JavaPrinter<P> {
