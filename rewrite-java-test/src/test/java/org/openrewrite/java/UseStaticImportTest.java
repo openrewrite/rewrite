@@ -146,79 +146,6 @@ class UseStaticImportTest implements RewriteTest {
         );
     }
 
-    @Test
-    void methodInvocationsHavingNullSelect() {
-        rewriteRun(
-          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              @Override
-              public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
-                  return super.visitClassDeclaration(classDecl, ctx).withExtends(null);
-              }
-
-              @Override
-              public J.Import visitImport(J.Import _import, ExecutionContext executionContext) {
-                  //noinspection ConstantConditions
-                  return null;
-              }
-
-              @Override
-              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                  return super.visitMethodInvocation(method, executionContext)
-                    .withDeclaringType(JavaType.ShallowClass.build("asserts.Assert"));
-              }
-
-              @Override
-              public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-                  doAfterVisit(new UseStaticImport("asserts.Assert assert*(..)").getVisitor());
-                  return super.visitCompilationUnit(cu, executionContext);
-              }
-          })).cycles(2).expectedCyclesThatMakeChanges(2),
-          java(
-            """
-              package asserts;
-
-              public class Assert {
-                  public static void assertTrue(boolean b) {}
-                  public static void assertEquals(int m, int n) {}
-              }
-
-              public class MyAssert {
-                  public void assertTrue(boolean b) {Assert.assertTrue(b);}
-                  public void assertEquals(int m, int n) {Assert.assertEquals(m, n);}
-              }
-              """,
-            SourceSpec::skip
-          ),
-          java(
-            """
-              package test;
-
-              import asserts.MyAssert;
-
-              class Test extends MyAssert {
-                  void test() {
-                      assertTrue(true);
-                      assertEquals(1, 2);
-                  }
-              }
-              """,
-            """
-              package test;
-
-              import static asserts.Assert.assertEquals;
-              import static asserts.Assert.assertTrue;
-
-              class Test {
-                  void test() {
-                      assertTrue(true);
-                      assertEquals(1, 2);
-                  }
-              }
-              """
-          )
-        );
-    }
-
     @DocumentExample
     @Test
     void junit5Assertions() {
@@ -291,6 +218,58 @@ class UseStaticImportTest implements RewriteTest {
                 }
             }
             """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3661")
+    void staticCall() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.util.function.Predicate *(..)")),
+          //language=java
+          java(
+            """
+              import java.util.function.Predicate;
+              public class Reproducer {
+                  void reproduce() {
+                      Predicate<Object> predicate = x -> false;
+                      Predicate staticPredicate = Predicate.not(predicate);
+                  }
+              }
+              """,
+            """
+              import java.util.function.Predicate;
+
+              import static java.util.function.Predicate.not;
+
+              public class Reproducer {
+                  void reproduce() {
+                      Predicate<Object> predicate = x -> false;
+                      Predicate staticPredicate = not(predicate);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3661")
+    void nonStaticCall() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.util.function.Predicate *(..)")),
+          //language=java
+          java(
+            """
+              import java.util.function.Predicate;
+              public class Reproducer {
+                  void reproduce() {
+                      Predicate<Object> predicate = x -> false;
+                      boolean nonStatic = predicate.test(null);
+                  }
+              }
+              """
           )
         );
     }
