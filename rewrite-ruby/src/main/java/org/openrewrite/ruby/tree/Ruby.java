@@ -411,10 +411,6 @@ public interface Ruby extends J {
         @With
         Markers markers;
 
-        @With
-        @Nullable
-        J.Identifier label;
-
         @Override
         public <P> J acceptRuby(RubyVisitor<P> v, P p) {
             return v.visitRedo(this, p);
@@ -429,6 +425,77 @@ public interface Ruby extends J {
         @Override
         public String toString() {
             return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class Yield implements Ruby, Statement {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @Getter
+        @With
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        @With
+        Space prefix;
+
+        @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
+        JContainer<Statement> data;
+
+        @Override
+        public <P> J acceptRuby(RubyVisitor<P> v, P p) {
+            return v.visitYield(this, p);
+        }
+
+        @Override
+        @Transient
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+
+        @Override
+        public String toString() {
+            return withPrefix(Space.EMPTY).printTrimmed(new JavaPrinter<>());
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Ruby.Yield t;
+
+            public JContainer<Statement> getData() {
+                return t.data;
+            }
+
+            public Ruby.Yield withData(JContainer<Statement> data) {
+                return t.data == data ? t : new Ruby.Yield(t.id, t.prefix, t.markers, data);
+            }
         }
     }
 }

@@ -78,20 +78,6 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         return b;
     }
 
-    public J visitRedo(Ruby.Redo breakStatement, P p) {
-        Ruby.Redo r = breakStatement;
-        r = r.withPrefix(visitSpace(r.getPrefix(), RubySpace.Location.REDO_PREFIX, p));
-        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
-        Statement temp = (Statement) visitStatement(r, p);
-        if (!(temp instanceof Ruby.Redo)) {
-            return temp;
-        } else {
-            r = (Ruby.Redo) temp;
-        }
-        r = r.withLabel(visitAndCast(r.getLabel(), p));
-        return r;
-    }
-
     public J visitDelimitedString(Ruby.DelimitedString delimitedString, P p) {
         Ruby.DelimitedString ds = delimitedString;
         ds = ds.withPrefix(visitSpace(ds.getPrefix(), RubySpace.Location.DELIMITED_STRING_PREFIX, p));
@@ -145,5 +131,33 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
                 RubyContainer.Location.HASH_ELEMENTS, p));
         h = h.withType(visitType(h.getType(), p));
         return h;
+    }
+
+    public J visitRedo(Ruby.Redo redo, P p) {
+        Ruby.Redo r = redo;
+        r = r.withPrefix(visitSpace(r.getPrefix(), RubySpace.Location.REDO_PREFIX, p));
+        r = r.withMarkers(visitMarkers(r.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(r, p);
+        if (!(temp instanceof Ruby.Redo)) {
+            return temp;
+        } else {
+            r = (Ruby.Redo) temp;
+        }
+        return r;
+    }
+
+    public J visitYield(Ruby.Yield yield, P p) {
+        Ruby.Yield y = yield;
+        y = y.withPrefix(visitSpace(y.getPrefix(), RubySpace.Location.YIELD_PREFIX, p));
+        y = y.withMarkers(visitMarkers(y.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(y, p);
+        if (!(temp instanceof Ruby.Yield)) {
+            return temp;
+        } else {
+            y = (Ruby.Yield) temp;
+        }
+        y = y.getPadding().withData(visitContainer(y.getPadding().getData(),
+                RubyContainer.Location.YIELD_DATA, p));
+        return y;
     }
 }

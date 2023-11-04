@@ -96,12 +96,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 emptyList()
         );
 
-        JContainer<Statement> args = JContainer.build(
-                sourceBefore("("),
-                convertAll(Arrays.asList(node.getArgsNode().getArgs()), n -> sourceBefore(","),
-                        n -> sourceBefore(")")),
-                Markers.EMPTY
-        );
+        JContainer<Statement> args = convertArgs(node.getArgsNode());
 
         J body = convert(node.getBodyNode());
         if (!(body instanceof J.Block)) {
@@ -557,8 +552,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         return new Ruby.Redo(
                 randomId(),
                 sourceBefore("redo"),
-                Markers.EMPTY,
-                null
+                Markers.EMPTY
         );
     }
 
@@ -586,6 +580,16 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     @Override
     public J visitUntilNode(UntilNode node) {
         return whileOrUntilNode(node.getConditionNode(), node.getBodyNode());
+    }
+
+    @Override
+    public J visitYieldNode(YieldNode node) {
+        return new Ruby.Yield(
+                randomId(),
+                sourceBefore("yield"),
+                Markers.EMPTY,
+                convertArgs(node.getArgsNode())
+        );
     }
 
     private static J.Identifier getIdentifier(Space prefix, String node) {
@@ -735,6 +739,40 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         J2 j = convert(t);
         //noinspection ConstantConditions
         return j == null ? null : new JRightPadded<>(j, suffix.apply(t), Markers.EMPTY);
+    }
+
+    private JContainer<Statement> convertArgs(Node argsNode) {
+        Markers markers = Markers.EMPTY;
+        Space prefix = whitespace();
+        boolean omitParentheses;
+        if (source.startsWith("(", cursor)) {
+            skip("(");
+            omitParentheses = false;
+        } else {
+            markers = markers.add(new OmitParentheses(randomId()));
+            omitParentheses = true;
+        }
+
+        List<Node> args;
+        if (argsNode instanceof ListNode) {
+            args = new ArrayList<>(((ListNode) argsNode).size());
+            for (Node node : (ListNode) argsNode) {
+                if (node != null) {
+                    args.add(node);
+                }
+            }
+        } else if (argsNode instanceof ArgsNode) {
+            args = Arrays.asList(((ArgsNode) argsNode).getArgs());
+        } else {
+            throw new UnsupportedOperationException("Unexpected args node type " + argsNode.getClass().getSimpleName());
+        }
+
+        return JContainer.build(
+                prefix,
+                convertAll(args, n -> sourceBefore(","),
+                        n -> omitParentheses ? EMPTY : sourceBefore(")")),
+                markers
+        );
     }
 
     private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends Node> trees,

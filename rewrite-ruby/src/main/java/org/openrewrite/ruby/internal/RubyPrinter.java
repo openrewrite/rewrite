@@ -211,9 +211,33 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     public J visitRedo(Ruby.Redo redo, PrintOutputCapture<P> p) {
         beforeSyntax(redo, RubySpace.Location.REDO_PREFIX, p);
         p.append("redo");
-        visit(redo.getLabel(), p);
         afterSyntax(redo, p);
         return redo;
+    }
+
+    @Override
+    public J visitYield(Ruby.Yield yield, PrintOutputCapture<P> p) {
+        beforeSyntax(yield, RubySpace.Location.YIELD_PREFIX, p);
+        p.append("yield");
+        visitArgs(yield.getPadding().getData(), RubyContainer.Location.YIELD_DATA, p);
+        afterSyntax(yield, p);
+        return yield;
+    }
+
+    public void visitArgs(JContainer<? extends J> args, RubyContainer.Location loc, PrintOutputCapture<P> p) {
+        if (args.getMarkers().findFirst(OmitParentheses.class).isPresent()) {
+            visitContainer("", args, loc, ",", "", p);
+        } else {
+            visitContainer("(", args, loc, ",", ")", p);
+        }
+    }
+
+    public void visitArgs(JContainer<? extends J> args, JContainer.Location loc, PrintOutputCapture<P> p) {
+        if (args.getMarkers().findFirst(OmitParentheses.class).isPresent()) {
+            visitContainer("", args, loc, ",", "", p);
+        } else {
+            visitContainer("(", args, loc, ",", ")", p);
+        }
     }
 
     protected void beforeSyntax(J j, @SuppressWarnings("unused") RubySpace.Location loc,
@@ -266,6 +290,17 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         p.append(after == null ? "" : after);
     }
 
+    protected void visitContainer(String before, @Nullable JContainer<? extends J> container, JContainer.Location location,
+                                  String suffixBetween, @Nullable String after, PrintOutputCapture<P> p) {
+        if (container == null) {
+            return;
+        }
+        visitSpace(container.getBefore(), location.getBeforeLocation(), p);
+        p.append(before);
+        visitRightPadded(container.getPadding().getElements(), location.getElementLocation(), suffixBetween, p);
+        p.append(after == null ? "" : after);
+    }
+
     protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, RubyRightPadded.Location location, String suffixBetween, PrintOutputCapture<P> p) {
         for (int i = 0; i < nodes.size(); i++) {
             JRightPadded<? extends J> node = nodes.get(i);
@@ -278,6 +313,25 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
                     if (m instanceof TrailingComma) {
                         p.append(suffixBetween);
                         visitSpace(((TrailingComma) m).getSuffix(), Space.Location.LANGUAGE_EXTENSION, p);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, JRightPadded.Location loc, String suffixBetween, PrintOutputCapture<P> p) {
+        for (int i = 0; i < nodes.size(); i++) {
+            JRightPadded<? extends J> node = nodes.get(i);
+            visit(node.getElement(), p);
+            visitSpace(node.getAfter(), loc.getAfterLocation(), p);
+            if (i < nodes.size() - 1) {
+                p.append(suffixBetween);
+            } else {
+                for (Marker m : node.getMarkers().getMarkers()) {
+                    if (m instanceof TrailingComma) {
+                        p.append(suffixBetween);
+                        visitSpace(((TrailingComma) m).getSuffix(), loc.getAfterLocation(), p);
                         break;
                     }
                 }
@@ -443,37 +497,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
 
             visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, p);
             visit(method.getName(), p);
-            JContainer<Expression> argContainer = method.getPadding().getArguments();
-
-            visitSpace(argContainer.getBefore(), Space.Location.METHOD_INVOCATION_ARGUMENTS, p);
-            List<JRightPadded<Expression>> args = argContainer.getPadding().getElements();
-            for (int i = 0; i < args.size(); i++) {
-                JRightPadded<Expression> arg = args.get(i);
-                boolean omitParens = arg.getElement().getMarkers()
-                                             .findFirst(OmitParentheses.class)
-                                             .isPresent() ||
-                                     arg.getElement().getMarkers()
-                                             .findFirst(org.openrewrite.java.marker.OmitParentheses.class)
-                                             .isPresent();
-
-                if (i == 0 && !omitParens) {
-                    p.append('(');
-                } else if (i > 0 && omitParens && (
-                        !args.get(0).getElement().getMarkers().findFirst(OmitParentheses.class).isPresent() &&
-                        !args.get(0).getElement().getMarkers().findFirst(org.openrewrite.java.marker.OmitParentheses.class).isPresent()
-                )) {
-                    p.append(')');
-                } else if (i > 0) {
-                    p.append(',');
-                }
-
-                visitRightPadded(arg, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT, p);
-
-                if (i == args.size() - 1 && !omitParens) {
-                    p.append(')');
-                }
-            }
-
+            visitArgs(method.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, p);
             afterSyntax(method, p);
             return method;
         }

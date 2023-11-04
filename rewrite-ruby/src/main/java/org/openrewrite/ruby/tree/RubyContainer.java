@@ -17,7 +17,8 @@ package org.openrewrite.ruby.tree;
 
 public class RubyContainer {
     public enum Location {
-        HASH_ELEMENTS(RubySpace.Location.HASH_ELEMENTS, RubyRightPadded.Location.KEY_VALUE_SUFFIX);
+        HASH_ELEMENTS(RubySpace.Location.HASH_ELEMENTS, RubyRightPadded.Location.KEY_VALUE_SUFFIX),
+        YIELD_DATA(RubySpace.Location.YIELD_ELEMENTS, RubyRightPadded.Location.YIELD_DATA_SUFFIX);
 
         private final RubySpace.Location beforeLocation;
         private final RubyRightPadded.Location elementLocation;

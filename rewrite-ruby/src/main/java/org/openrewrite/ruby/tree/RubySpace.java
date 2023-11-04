@@ -27,5 +27,8 @@ public class RubySpace {
         KEY_VALUE_PREFIX,
         KEY_VALUE_SUFFIX,
         REDO_PREFIX,
+        YIELD_DATA_SUFFIX,
+        YIELD_ELEMENTS,
+        YIELD_PREFIX,
     }
 }
