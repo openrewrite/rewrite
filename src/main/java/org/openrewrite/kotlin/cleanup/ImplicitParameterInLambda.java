@@ -61,12 +61,12 @@ public class ImplicitParameterInLambda extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new KotlinVisitor<ExecutionContext>() {
             @Override
-            public J visitLambda(J.Lambda lambda, ExecutionContext executionContext) {
-                lambda = (J.Lambda) super.visitLambda(lambda, executionContext);
+            public J visitLambda(J.Lambda lambda, ExecutionContext ctx) {
+                lambda = (J.Lambda) super.visitLambda(lambda, ctx);
                 if (isParameterExplicitIt(lambda)) {
                     lambda = lambda.withParameters(lambda.getParameters().withParameters(emptyList()));
                 }
-                return lambda;
+                return autoFormat(lambda, ctx);
             }
         };
     }

@@ -987,6 +987,9 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
             lastParamHasSpace = after.getComments().isEmpty() && onlySpacesAndNotEmpty(after.getWhitespace())
                     || lastParam.getMarkers().findFirst(TrailingComma.class).map(t -> onlySpacesAndNotEmpty(t.getSuffix().getWhitespace())).orElse(false);
             useSpaceBeforeLambdaArrow &= !trailingComma;
+        } else {
+            l = l.withArrow(Space.EMPTY);
+            l = l.withParameters(l.getParameters().withPrefix(Space.EMPTY));
         }
 
         if (lastParamHasSpace) {
