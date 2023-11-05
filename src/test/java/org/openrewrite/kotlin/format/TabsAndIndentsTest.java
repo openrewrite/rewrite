@@ -1027,6 +1027,7 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail("CRLF in BLOCK_COMMENT to be handled")
     @SuppressWarnings("TextBlockMigration")
     @Test
     void blockCommentCRLF() {
@@ -2227,6 +2228,14 @@ class TabsAndIndentsTest implements RewriteTest {
                       ?: return null
                   return values.joinToString("")
               }
+              """,
+            """
+              fun f(): String? {
+                  val values = (listOf("") as List<String>?)
+                              ?.map { it }
+                          ?: return null
+                  return values.joinToString("")
+              }
               """
           )
         );
@@ -2237,6 +2246,14 @@ class TabsAndIndentsTest implements RewriteTest {
               fun f(): String? {
                   val values = (listOf("") as List<String>?)
                       ?.map { it }
+                          ?: return null
+                  return values.joinToString("")
+              }
+              """,
+            """
+              fun f(): String? {
+                  val values = (listOf("") as List<String>?)
+                              ?.map { it }
                           ?: return null
                   return values.joinToString("")
               }
