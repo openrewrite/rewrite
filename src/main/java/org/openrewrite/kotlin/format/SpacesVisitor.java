@@ -1000,8 +1000,13 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         // handle space after Lambda arrow
         // Intellij has a specific setting for Space before Lambda arrow, but no setting for space after Lambda arrow
         // presumably handled as around the Lambda arrow for the same
-        if (hasArrow) {
-            l = l.withBody(spaceBefore(l.getBody(), useSpaceBeforeLambdaArrow));
+        l = l.withBody(spaceBefore(l.getBody(), false));
+
+        if (l.getBody() instanceof J.Block ) {
+            J.Block body = (J.Block) l.getBody();
+            boolean t = useSpaceBeforeLambdaArrow;
+            body = body.withStatements(ListUtils.mapFirst(body.getStatements(), s -> spaceBefore(s, t)));
+            l = l.withBody(body);
         }
 
         if (!(l.getParameters().getParameters().isEmpty() || l.getParameters().getParameters().get(0) instanceof J.Empty)) {
