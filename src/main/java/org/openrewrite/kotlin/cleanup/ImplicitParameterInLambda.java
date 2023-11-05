@@ -65,8 +65,9 @@ public class ImplicitParameterInLambda extends Recipe {
                 lambda = (J.Lambda) super.visitLambda(lambda, ctx);
                 if (isParameterExplicitIt(lambda)) {
                     lambda = lambda.withParameters(lambda.getParameters().withParameters(emptyList()));
+                    return autoFormat(lambda, ctx);
                 }
-                return autoFormat(lambda, ctx);
+                return lambda;
             }
         };
     }

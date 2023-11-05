@@ -1807,7 +1807,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         boolean hasBraces = expression.getLBrace() != null;
-        Space end = expression.getLBrace() != null ? prefix(expression.getRBrace()) : suffix(expression);
+        Space end = hasBraces ? endFixPrefixAndInfix(expression.getRBrace()) : suffix(expression);
 
         Space prefix = prefix(expression);
         Space blockPrefix = prefix;

@@ -163,4 +163,17 @@ class CommentTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void commentAfterLambda() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method() {
+                  val d = {it: Int -> it + 42 } // comment
+              }
+              """
+          )
+        );
+    }
 }
