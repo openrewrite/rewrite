@@ -346,4 +346,21 @@ class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void trailingSemiColon() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  fun method1() {
+                  }   ;
+
+                  fun method2() {
+                  };
+              }
+              """
+          )
+        );
+    }
 }
