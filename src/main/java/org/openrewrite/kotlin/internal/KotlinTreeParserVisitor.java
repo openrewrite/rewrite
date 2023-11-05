@@ -536,8 +536,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
             J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), prefix(ktFunctionLiteral.getValueParameterList()), Markers.EMPTY, false, valueParams);
 
-            J.Block body = requireNonNull(ktFunctionLiteral.getBodyExpression()).accept(this, data)
-                    .withPrefix(prefix(ktFunctionLiteral.getBodyExpression()));
+            J.Block body = (J.Block) requireNonNull(ktFunctionLiteral.getBodyExpression()).accept(this, data);
             body = body.withEnd(prefix(ktFunctionLiteral.getRBrace()));
 
             return new J.Lambda(
@@ -1810,9 +1809,16 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         boolean hasBraces = expression.getLBrace() != null;
         Space end = expression.getLBrace() != null ? prefix(expression.getRBrace()) : suffix(expression);
 
+        Space prefix = prefix(expression);
+        Space blockPrefix = prefix;
+        if (!hasBraces && !statements.isEmpty()) {
+            statements = ListUtils.mapFirst(statements, s -> s.withElement(s.getElement().withPrefix(merge(prefix, s.getElement().getPrefix()))));
+            blockPrefix = Space.EMPTY;
+        }
+
         return new J.Block(
                 randomId(),
-                prefix(expression),
+                blockPrefix,
                 hasBraces ? Markers.EMPTY : Markers.EMPTY.addIfAbsent(new OmitBraces(randomId())),
                 JRightPadded.build(false),
                 statements,
