@@ -2145,7 +2145,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             if (d instanceof KtEnumEntry) {
                 continue;
             }
-            list.add(padRight(convertToStatement(d.accept(this, data)), Space.EMPTY));
+            Statement statement = convertToStatement(d.accept(this, data));
+            list.add(maybeFollowingSemicolon(statement, d));
         }
 
         return new J.Block(
@@ -3356,6 +3357,14 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             return new JRightPadded<>(j, prefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
         }
 
+        return padRight(j, Space.EMPTY);
+    }
+
+    private <J2 extends J> JRightPadded<J2> maybeFollowingSemicolon(J2 j, KtElement element) {
+        PsiElement maybeSemicolon = findFirstNonSpaceNextSibling(element);
+        if (maybeSemicolon instanceof LeafPsiElement && ((LeafPsiElement) maybeSemicolon).getElementType() == KtTokens.SEMICOLON) {
+            return new JRightPadded<>(j, prefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
+        }
         return padRight(j, Space.EMPTY);
     }
 
