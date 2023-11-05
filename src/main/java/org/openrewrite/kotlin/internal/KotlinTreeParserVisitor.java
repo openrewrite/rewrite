@@ -2145,7 +2145,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             if (d instanceof KtEnumEntry) {
                 continue;
             }
-            list.add(maybeSemicolon(convertToStatement(d.accept(this, data)), d));
+            list.add(padRight(convertToStatement(d.accept(this, data)), Space.EMPTY));
         }
 
         return new J.Block(

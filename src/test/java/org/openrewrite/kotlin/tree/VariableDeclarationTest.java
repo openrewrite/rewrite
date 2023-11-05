@@ -661,4 +661,19 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void trailingSemicolon() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  var t = 1;
+                  fun method() {}
+              }
+              """
+          )
+        );
+    }
+
 }
