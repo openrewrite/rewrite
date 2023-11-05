@@ -79,6 +79,22 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     @Override
+    public J visitArrayNode(ArrayNode node) {
+        Space prefix = sourceBefore("[");
+        JContainer<Expression> elements = convertArgs(node);
+        elements = elements.getPadding().withElements(ListUtils.mapLast(
+                elements.getPadding().getElements(),
+                e -> e.withAfter(sourceBefore("]"))));
+        return new Ruby.ListLiteral(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                elements,
+                null
+        );
+    }
+
+    @Override
     public J visitBreakNode(BreakNode node) {
         return new J.Break(
                 randomId(),
@@ -741,7 +757,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         return j == null ? null : new JRightPadded<>(j, suffix.apply(t), Markers.EMPTY);
     }
 
-    private JContainer<Statement> convertArgs(Node argsNode) {
+    private <J2 extends J> JContainer<J2> convertArgs(Node argsNode) {
         Markers markers = Markers.EMPTY;
         Space prefix = whitespace();
         boolean omitParentheses;

@@ -133,6 +133,21 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         return h;
     }
 
+    public J visitListLiteral(Ruby.ListLiteral listLiteral, P p) {
+        Ruby.ListLiteral l = listLiteral;
+        l = l.withPrefix(visitSpace(l.getPrefix(), RubySpace.Location.LIST_LITERAL, p));
+        l = l.withMarkers(visitMarkers(l.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(l, p);
+        if (!(temp instanceof Ruby.ListLiteral)) {
+            return temp;
+        } else {
+            l = (Ruby.ListLiteral) temp;
+        }
+        l = l.getPadding().withElements(visitContainer(l.getPadding().getElements(), RubyContainer.Location.LIST_LITERAL_ELEMENTS, p));
+        l = l.withType(visitType(l.getType(), p));
+        return l;
+    }
+
     public J visitRedo(Ruby.Redo redo, P p) {
         Ruby.Redo r = redo;
         r = r.withPrefix(visitSpace(r.getPrefix(), RubySpace.Location.REDO_PREFIX, p));
@@ -148,7 +163,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
 
     public J visitYield(Ruby.Yield yield, P p) {
         Ruby.Yield y = yield;
-        y = y.withPrefix(visitSpace(y.getPrefix(), RubySpace.Location.YIELD_PREFIX, p));
+        y = y.withPrefix(visitSpace(y.getPrefix(), RubySpace.Location.YIELD, p));
         y = y.withMarkers(visitMarkers(y.getMarkers(), p));
         Statement temp = (Statement) visitStatement(y, p);
         if (!(temp instanceof Ruby.Yield)) {

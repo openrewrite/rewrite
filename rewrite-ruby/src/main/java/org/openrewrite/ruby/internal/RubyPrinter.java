@@ -208,6 +208,15 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitListLiteral(Ruby.ListLiteral listLiteral, PrintOutputCapture<P> p) {
+        beforeSyntax(listLiteral, RubySpace.Location.LIST_LITERAL, p);
+        visitContainer("[", listLiteral.getPadding().getElements(), RubyContainer.Location.LIST_LITERAL_ELEMENTS,
+                ",", "]", p);
+        afterSyntax(listLiteral, p);
+        return listLiteral;
+    }
+
+    @Override
     public J visitRedo(Ruby.Redo redo, PrintOutputCapture<P> p) {
         beforeSyntax(redo, RubySpace.Location.REDO_PREFIX, p);
         p.append("redo");
@@ -217,7 +226,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitYield(Ruby.Yield yield, PrintOutputCapture<P> p) {
-        beforeSyntax(yield, RubySpace.Location.YIELD_PREFIX, p);
+        beforeSyntax(yield, RubySpace.Location.YIELD, p);
         p.append("yield");
         visitArgs(yield.getPadding().getData(), RubyContainer.Location.YIELD_DATA, p);
         afterSyntax(yield, p);

@@ -22,13 +22,14 @@ public class RubySpace {
         DELIMITED_STRING_PREFIX,
         DELIMITED_STRING_VALUE_PREFIX,
         DELIMITED_STRING_VALUE_SUFFIX,
-        HASH_ELEMENTS,
+        HASH,
         HASH_PREFIX,
+        LIST_LITERAL,
+        LIST_LITERAL_SUFFIX,
         KEY_VALUE_PREFIX,
         KEY_VALUE_SUFFIX,
         REDO_PREFIX,
+        YIELD,
         YIELD_DATA_SUFFIX,
-        YIELD_ELEMENTS,
-        YIELD_PREFIX,
     }
 }

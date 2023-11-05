@@ -18,6 +18,7 @@ package org.openrewrite.ruby.tree;
 public class RubyRightPadded {
     public enum Location {
         KEY_VALUE_SUFFIX(RubySpace.Location.KEY_VALUE_SUFFIX),
+        LIST_LITERAL_SUFFIX(RubySpace.Location.LIST_LITERAL_SUFFIX),
         YIELD_DATA_SUFFIX(RubySpace.Location.YIELD_DATA_SUFFIX);
 
         private final RubySpace.Location afterLocation;
