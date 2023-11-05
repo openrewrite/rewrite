@@ -2364,16 +2364,21 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         boolean isStaticImport = resolvedImport != null && resolvedImport.getResolvedParentClassId() != null;
         JLeftPadded<Boolean> rpStatic = padLeft(Space.EMPTY, isStaticImport);
         KtImportAlias alias = importDirective.getAlias();
+
+        ASTNode node = importDirective.getNode().findChildByType(KtTokens.IMPORT_KEYWORD);
+        LeafPsiElement importPsi = (LeafPsiElement) node;
+
         String text = nodeRangeText(
-                importDirective.getNode().findChildByType(KtTokens.WHITE_SPACE),
+                findFirstNonSpaceNextSibling(importPsi).getNode(),
                 importDirective.isAllUnder() ? importDirective.getNode().findChildByType(KtTokens.MUL)
                         : importDirective.getNode().findChildByType(KtNodeTypes.DOT_QUALIFIED_EXPRESSION));
         J reference = TypeTree.build(text); // FIXME: this creates a shallow class for a resolvable type.
+        reference = reference.withPrefix(suffix(importPsi));
 
         if (reference instanceof J.Identifier) {
             reference = new J.FieldAccess(
                     randomId(),
-                    Space.EMPTY,
+                    suffix(importPsi),
                     Markers.EMPTY,
                     new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY),
                     padLeft(Space.EMPTY, (J.Identifier) reference),

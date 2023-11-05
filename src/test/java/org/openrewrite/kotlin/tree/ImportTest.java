@@ -32,14 +32,14 @@ class ImportTest implements RewriteTest {
     @Test
     void jdkImport() {
         rewriteRun(
-          kotlin("import java.util.ArrayList")
+          kotlin("import   java.util.ArrayList")
         );
     }
 
     @Test
     void kotlinImport() {
         rewriteRun(
-          kotlin("import kotlin.collections.List")
+          kotlin("import   kotlin.collections.List")
         );
     }
 
@@ -96,7 +96,7 @@ class ImportTest implements RewriteTest {
     void methodName() {
         rewriteRun(
           kotlin("fun <T : Any> Class<T>.createInstance() {}"),
-          kotlin("import createInstance")
+          kotlin("import   createInstance")
         );
     }
 
