@@ -695,9 +695,9 @@ class TabsAndIndentsTest implements RewriteTest {
                   abstract fun a(f: Function<String, String>): Test
 
                   fun method(s: String) {
-                      a({ 
-                              f -> s.toLowerCase()
-                      })
+                      a({
+                          f -> s.toLowerCase()
+                          })
                   }
               }
               """
@@ -1685,10 +1685,10 @@ class TabsAndIndentsTest implements RewriteTest {
                             
                   fun method(f: Function<Test, Test>): Test {
                       return a(f)
-                          .b { 
-                                  t ->
-                              c(f)
-                          }
+                          .b {
+                              t ->
+                                  c(f)
+                              }
                   }
               }
               """

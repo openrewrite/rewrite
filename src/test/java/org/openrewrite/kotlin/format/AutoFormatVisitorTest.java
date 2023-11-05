@@ -278,7 +278,7 @@ class AutoFormatVisitorTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              val x = listOf(1).forEach { e, -> println(e) }
+              val x = listOf(1).forEach { e,->println(e) }
               """
           )
         );
