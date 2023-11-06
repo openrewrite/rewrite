@@ -366,7 +366,7 @@ class KotlinTypeMapping(
                 } else if (declaration is FirField) {
                     // TODO: ClassDeclarationTest#explicitDelegation
                 } else if (declaration !is FirRegularClass) {
-                    TODO()
+                    throw UnsupportedOperationException("Unsupported FirDeclaration: ${declaration.javaClass.name}")
                 }
             }
 
@@ -643,7 +643,7 @@ class KotlinTypeMapping(
                 is FirConstructorSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality)
                 is FirNamedFunctionSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality)
                 else -> {
-                    0 // TODO REMOVE.
+                    throw UnsupportedOperationException("Unsupported method symbol: ${sym.javaClass.name}")
                 }
             },
             null,
@@ -842,7 +842,7 @@ class KotlinTypeMapping(
 
     private fun javaClassType(type: JavaClassifier, signature: String): JavaType {
         if (type !is BinaryJavaClass) {
-            TODO()
+            throw UnsupportedOperationException("Unsupported JavaClassifier: ${type.javaClass.name}")
         }
         val fqn = type.fqName.asString()
         var clazz = typeCache.get<JavaType.Class>(fqn)
@@ -873,8 +873,6 @@ class KotlinTypeMapping(
                     } else if ("java.lang.Object" != fqn) {
                         supertype = type(classifierSupertype) as JavaType.FullyQualified
                     }
-                } else {
-                    TODO()
                 }
             }
             var owner: JavaType.FullyQualified? = null
@@ -949,7 +947,7 @@ class KotlinTypeMapping(
 
     private fun javaClassType(type: JavaClassifierType, signature: String): JavaType? {
         if (type.classifier == null) {
-            TODO()
+            throw UnsupportedOperationException("Unsupported null classifier: ${type.javaClass.name}")
         }
         var clazz = TypeUtils.asFullyQualified(type(type.classifier!!))
         if (type.typeArguments.isNotEmpty()) {

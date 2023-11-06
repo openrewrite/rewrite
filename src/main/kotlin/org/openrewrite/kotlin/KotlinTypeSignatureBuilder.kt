@@ -21,7 +21,6 @@ import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.impl.FirOuterClassTypeParameterRef
 import org.jetbrains.kotlin.fir.declarations.utils.classId
 import org.jetbrains.kotlin.fir.expressions.*
-import org.jetbrains.kotlin.fir.java.declarations.FirJavaField
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.toResolvedBaseSymbol
@@ -202,14 +201,14 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
 
             is ConeDefinitelyNotNullType -> {
                 if (type.typeArguments.isNotEmpty()) {
-                    TODO()
+                    throw UnsupportedOperationException("Unsupported ConeDefinitelyNotNullType with type arguments: ${type.javaClass.name}")
                 }
                 signature(type.original)
             }
 
             is ConeCapturedType -> {
                 if (type.typeArguments.isNotEmpty()) {
-                    TODO()
+                    throw UnsupportedOperationException("Unsupported ConeCapturedType with type arguments: ${type.javaClass.name}")
                 }
                 return "Generic{?}"
             }
