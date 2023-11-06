@@ -511,7 +511,15 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitEscapeStringTemplateEntry(KtEscapeStringTemplateEntry entry, ExecutionContext data) {
-        throw new UnsupportedOperationException("Not required");
+        return new J.Literal(
+                randomId(),
+                Space.EMPTY,
+                Markers.EMPTY,
+                entry.getText(),
+                entry.getText(),
+                null,
+                JavaType.Primitive.String
+        ).withPrefix(prefix(entry));
     }
 
     @Override

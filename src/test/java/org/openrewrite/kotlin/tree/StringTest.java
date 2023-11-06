@@ -83,4 +83,23 @@ class StringTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void escapeStringTemplateEntry() {
+        rewriteRun(
+          kotlin(
+            """
+              fun addStatement(format: String, vararg args: Any) {
+              }
+
+              fun method() {
+                  val fields = listOf(1,2,3)
+                  val field = "x"
+                  val it = "42"
+                  addStatement("return ${field}(\\n${fields.joinToString("\\n") { "  ${it} = ${it}," }}\\n)")
+              }
+              """
+          )
+        );
+    }
 }
