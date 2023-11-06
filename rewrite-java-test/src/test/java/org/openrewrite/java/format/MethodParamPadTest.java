@@ -331,9 +331,11 @@ class MethodParamPadTest implements RewriteTest {
         rewriteRun(
           version(java(
             """
+              import java.util.Objects;
+
               public record HttpClientTrafficLogData(
-                  Request request,
-                  Response response
+                  String request,
+                  String response
               )
               {
                   public HttpClientTrafficLogData

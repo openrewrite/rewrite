@@ -31,12 +31,12 @@ public class RemoveSettingsPlugin extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Remove plugin from `settings.gradle(.kts)`";
+        return "Remove Gradle settings plugin";
     }
 
     @Override
     public String getDescription() {
-        return "Remove plugin from `settings.gradle(.kts)`.";
+        return "Remove plugin from Gradle settings file `plugins` block by id.";
     }
 
     @Override

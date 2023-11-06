@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.JavaType.Parameterized;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -140,8 +141,10 @@ public class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTe
 
     @Issue("https://github.com/openrewrite/rewrite/issues/1762")
     @Test
+    @MinimumJava11
     void methodInvocationWithUnknownTypeSymbol() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().constructorInvocations(false).build()),
           java(
             """
               import java.util.ArrayList;
@@ -174,6 +177,7 @@ public class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTe
     @Test
     void methodInvocationOnUnknownType() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
           java(
             """
               import java.util.ArrayList;
@@ -237,7 +241,7 @@ public class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTe
               import java.util.List;
               import java.util.stream.Collectors;
                             
-              @SuppressWarningsWarnings("ALL")
+              @SuppressWarnings("ALL")
               class MakeEasyToFind {
                   void method(List<MultiMap> multiMaps) {
                       List<Integer> ints;
@@ -302,7 +306,7 @@ public class JavaParserTypeMappingTest implements JavaTypeMappingTest, RewriteTe
               import java.util.List;
               import java.util.stream.Collectors;
               
-              @SuppressWarningsWarnings("ALL")
+              @SuppressWarnings("ALL")
               class MakeEasyToFind {
                   void method(List<MultiMap> multiMaps) {
                       Object obj = multiMaps.stream()

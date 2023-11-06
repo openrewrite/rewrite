@@ -18,6 +18,7 @@ package org.openrewrite.java.tree;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -28,6 +29,7 @@ class MemberReferenceTest implements RewriteTest {
     @Test
     void unknownDeclaringType() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).methodInvocations(false).build()),
           java(
             """
               package com.company.pkg;
@@ -130,11 +132,13 @@ class MemberReferenceTest implements RewriteTest {
     @Test
     void constructorMethodReference() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().methodInvocations(false).build()),
           java(
             """
               import java.util.HashSet;
-import java.util.Set;
-import java.util.stream.Stream;
+              import java.util.Set;
+              import java.util.stream.Stream;
+              
               class Test {
                   Stream<Integer> n = Stream.of(1, 2);
                   Set<Integer> n2 = n.collect(HashSet < Integer > :: new, HashSet :: add);

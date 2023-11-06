@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,19 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java;
+package org.openrewrite.table;
 
-import org.junit.jupiter.api.Tag;
+import lombok.Value;
+import org.openrewrite.DataTable;
+import org.openrewrite.Recipe;
 
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
+import java.time.LocalDate;
 
-import static java.lang.annotation.ElementType.METHOD;
-import static java.lang.annotation.ElementType.TYPE;
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+public class CommitsByDay extends DataTable<CommitsByDay.Row> {
 
-@Retention(RUNTIME)
-@Target({TYPE, METHOD})
-@Tag("java11")
-public @interface MinimumJava11 {
+    public CommitsByDay(Recipe recipe) {
+        super(recipe,
+                "Commits by day",
+                "The commit activity by day by committer.");
+    }
+
+    @Value
+    public static class Row {
+        String name;
+        String email;
+        LocalDate day;
+        int commits;
+    }
 }
