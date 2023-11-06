@@ -31,14 +31,14 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaCoordinates;
-import org.openrewrite.java.tree.Space;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 
@@ -129,10 +129,8 @@ public class CreateJavaClass extends ScanningRecipe<AtomicBoolean> {
     @Override
     public @NonNull Collection<SourceFile> generate(AtomicBoolean shouldCreate, @NonNull ExecutionContext ctx) {
         if (shouldCreate.get()) {
-            String classTemplate = StringUtils.isBlank(this.classTemplate) ? NEW_CLASS_TEMPLATE : this.classTemplate;
-            return JavaParser.fromJavaVersion().build().parse(String.format(classTemplate, packageName, className))
-                    .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(getSourcePath())))
-                    .collect(Collectors.toList());
+            String classTemplateToUse = StringUtils.isBlank(this.classTemplate) ? NEW_CLASS_TEMPLATE : this.classTemplate;
+            return parseSources(classTemplateToUse).collect(Collectors.toList());
         }
         return emptyList();
     }
@@ -144,34 +142,38 @@ public class CreateJavaClass extends ScanningRecipe<AtomicBoolean> {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
                 if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.toString().equals(cu.getSourcePath().toString())) {
-                    J.CompilationUnit newCu = JavaTemplate.builder(String.format(classTemplate, packageName, className))
-                            .contextSensitive()
-                            .doBeforeParseTemplate(System.out::println)
-                            .build()
-                            .apply(getCursor(), new JavaCoordinates(cu, Space.Location.ANY, JavaCoordinates.Mode.REPLACEMENT, null))
-                            .withMarkers(cu.getMarkers())
-                            .withId(cu.getId());
+                    Optional<SourceFile> sourceFile = parseSources(classTemplate).findFirst();
 
-                    return newCu.withSourcePath(path);
+                    if (sourceFile.isPresent() && sourceFile.get() instanceof J.CompilationUnit) {
+                        J.CompilationUnit newCu = (J.CompilationUnit) sourceFile.get();
+                        return cu.withClasses(newCu.getClasses()).withSourcePath(path);
+                    }
                 }
+
                 return cu;
             }
         };
     }
 
+    private Stream<SourceFile> parseSources(String classTemplateToUse) {
+        return JavaParser.fromJavaVersion().build().parse(String.format(classTemplateToUse, packageName, className))
+                .map(brandNewFile -> brandNewFile.withSourcePath(Paths.get(getSourcePath())));
+    }
+
+    @SuppressWarnings("java:S1075")
     private @NonNull String getSourcePath() {
-        String relativePath = this.getRelativePath();
-        if (relativePath == null) {
-            relativePath = "";
+        String path = this.getRelativePath();
+        if (path == null) {
+            path = "";
         }
 
-        if (!relativePath.isEmpty() && !relativePath.endsWith("/")) {
-            relativePath = relativePath + "/";
+        if (!path.isEmpty() && !path.endsWith("/")) {
+            path = path + "/";
         }
 
         return String.format(
                 "%ssrc/%s/java/%s/%s.java",
-                relativePath,
+                path,
                 sourceRoot,
                 packageName.replace('.', '/'),
                 className
