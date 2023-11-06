@@ -30,6 +30,7 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.gradle.Assertions.buildGradle;
 import static org.openrewrite.gradle.Assertions.withToolingApi;
+import static org.openrewrite.properties.Assertions.properties;
 
 class UpgradeDependencyVersionTest implements RewriteTest {
 
@@ -444,6 +445,39 @@ class UpgradeDependencyVersionTest implements RewriteTest {
                   }
                   """.formatted(version);
             })
+          )
+        );
+    }
+
+    @Test
+    void versionInPropertiesFile() {
+        rewriteRun(
+          properties(
+            """
+              guavaVersion=29.0-jre
+              """,
+            """
+              guavaVersion=30.1.1-jre
+              """,
+            spec -> spec.path("gradle.properties")
+          ),
+          buildGradle(
+            """
+              plugins {
+                id 'java-library'
+              }
+              dependencies {
+                implementation ("com.google.guava:guava:$guavaVersion")
+              }
+              """,
+            """
+              plugins {
+                id 'java-library'
+              }
+              dependencies {
+                implementation ("com.google.guava:guava:$guavaVersion")
+              }
+              """
           )
         );
     }
