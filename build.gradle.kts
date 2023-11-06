@@ -43,6 +43,8 @@ dependencies {
     testRuntimeOnly("com.squareup.misk:misk-metrics:latest.release")
 
     testImplementation("com.github.ajalt.clikt:clikt:3.5.0")
+    testImplementation("com.squareup:javapoet:1.13.0")
+    testImplementation("com.google.testing.compile:compile-testing:0.+")
 }
 
 val compileKotlin: KotlinCompile by tasks

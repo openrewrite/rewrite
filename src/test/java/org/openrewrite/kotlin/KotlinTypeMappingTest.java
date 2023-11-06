@@ -731,5 +731,32 @@ public class KotlinTypeMappingTest {
               )
             );
         }
+
+        @Test
+        void nullJavaClassifierType() {
+            rewriteRun(
+              spec -> spec.parser(KotlinParser.builder().classpath("javapoet","compile-testing")),
+              kotlin(
+                """
+                  package org.openrewrite.kotlin
+
+                  import com.google.testing.compile.Compilation
+                  import com.google.testing.compile.CompilationSubject
+                  import com.google.testing.compile.Compiler.javac
+                  import com.squareup.javapoet.JavaFile
+
+                  class Test {
+                      fun assertCompilesJava(javaFiles: Collection<JavaFile>): Compilation {
+                          val result = javac()
+                              .withOptions("-parameters")
+                              .compile(javaFiles.map(JavaFile::toJavaFileObject))
+                          CompilationSubject.assertThat(result).succeededWithoutWarnings()
+                          return result
+                      }
+                  }
+                  """
+              )
+            );
+        }
     }
 }

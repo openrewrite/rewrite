@@ -50,8 +50,7 @@ import org.jetbrains.kotlin.types.Variance
 import org.openrewrite.java.JavaTypeMapping
 import org.openrewrite.java.internal.JavaTypeCache
 import org.openrewrite.java.tree.JavaType
-import org.openrewrite.java.tree.JavaType.GenericTypeVariable
-import org.openrewrite.java.tree.JavaType.ShallowClass
+import org.openrewrite.java.tree.JavaType.*
 import org.openrewrite.java.tree.TypeUtils
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.convertClassIdToFqn
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.convertKotlinFqToJavaFq
@@ -264,9 +263,9 @@ class KotlinTypeMapping(
     }
 
     @OptIn(SymbolInternals::class)
-    private fun classType(type: Any, parent: Any?, signature: String): JavaType.FullyQualified {
+    private fun classType(type: Any, parent: Any?, signature: String): FullyQualified {
         val fqn = signatureBuilder.classSignature(type)
-        val fq: JavaType.FullyQualified? = typeCache.get(fqn)
+        val fq: FullyQualified? = typeCache.get(fqn)
         var params: List<*>? = null
         val firClass = when (type) {
             is FirClass -> type
@@ -335,7 +334,7 @@ class KotlinTypeMapping(
                 if (superTypeRef == null || "java.lang.Object" == signature) null else TypeUtils.asFullyQualified(
                     type(superTypeRef)
                 )
-            var declaringType: JavaType.FullyQualified? = null
+            var declaringType: FullyQualified? = null
             if (!firClass.isLocal && firClass.symbol.classId.isNestedClass) {
                 val parentSymbol = firClass.symbol.classId.outerClassId!!.toSymbol(firSession)
                 if (parentSymbol != null) {
@@ -401,7 +400,7 @@ class KotlinTypeMapping(
                     methods.add(mt)
                 }
             }
-            var interfaces: MutableList<JavaType.FullyQualified>? = null
+            var interfaces: MutableList<FullyQualified>? = null
             if (!interfaceTypeRefs.isNullOrEmpty()) {
                 interfaces = ArrayList(interfaceTypeRefs.size)
                 for (iParam: FirTypeRef? in interfaceTypeRefs) {
@@ -524,7 +523,7 @@ class KotlinTypeMapping(
 
     private fun methodDeclarationType(
         javaMethod: JavaMethod,
-        declaringType: JavaType.FullyQualified?
+        declaringType: FullyQualified?
     ): JavaType.Method? {
         val signature = signatureBuilder.javaMethodSignature(javaMethod)
         val existing = typeCache.get<JavaType.Method>(signature)
@@ -536,7 +535,7 @@ class KotlinTypeMapping(
 
     private fun methodDeclarationType(
         javaMethod: JavaMethod,
-        declaringType: JavaType.FullyQualified?,
+        declaringType: FullyQualified?,
         signature: String
     ): JavaType.Method? {
         var paramNames: MutableList<String>? = null
@@ -575,7 +574,7 @@ class KotlinTypeMapping(
             defaultValues
         )
         typeCache.put(signature, method)
-        val exceptionTypes: List<JavaType.FullyQualified>? = null
+        val exceptionTypes: List<FullyQualified>? = null
         var resolvedDeclaringType = declaringType
         if (declaringType == null) {
             resolvedDeclaringType = TypeUtils.asFullyQualified(type(javaMethod.containingClass))
@@ -660,7 +659,7 @@ class KotlinTypeMapping(
             null
         )
         typeCache.put(signature, method)
-        var declaringType: JavaType.FullyQualified? = null
+        var declaringType: FullyQualified? = null
         if (function.calleeReference is FirResolvedNamedReference &&
             (function.calleeReference as FirResolvedNamedReference).resolvedSymbol is FirNamedFunctionSymbol
         ) {
@@ -717,7 +716,7 @@ class KotlinTypeMapping(
         return method
     }
 
-    private fun createShallowClass(name: String): JavaType.FullyQualified {
+    private fun createShallowClass(name: String): FullyQualified {
         val c = ShallowClass.build(name)
         typeCache.put(name, c)
         return c
@@ -852,30 +851,30 @@ class KotlinTypeMapping(
                 type.access.toLong(),
                 type.fqName.asString(),
                 when {
-                    type.isAnnotationType -> JavaType.FullyQualified.Kind.Annotation
-                    type.isEnum -> JavaType.FullyQualified.Kind.Enum
-                    type.isInterface -> JavaType.FullyQualified.Kind.Interface
-                    type.isRecord -> JavaType.FullyQualified.Kind.Record
-                    else -> JavaType.FullyQualified.Kind.Class
+                    type.isAnnotationType -> FullyQualified.Kind.Annotation
+                    type.isEnum -> FullyQualified.Kind.Enum
+                    type.isInterface -> FullyQualified.Kind.Interface
+                    type.isRecord -> FullyQualified.Kind.Record
+                    else -> FullyQualified.Kind.Class
                 },
                 null, null, null, null, null, null, null
             )
             typeCache.put(fqn, clazz)
-            var supertype: JavaType.FullyQualified? = null
-            var interfaces: MutableList<JavaType.FullyQualified>? = null
+            var supertype: FullyQualified? = null
+            var interfaces: MutableList<FullyQualified>? = null
             for (classifierSupertype: JavaClassifierType in type.supertypes) {
                 if (classifierSupertype.classifier is JavaClass) {
                     if ((classifierSupertype.classifier as JavaClass?)!!.isInterface) {
                         if (interfaces == null) {
                             interfaces = ArrayList()
                         }
-                        interfaces.add(type(classifierSupertype) as JavaType.FullyQualified)
+                        interfaces.add(type(classifierSupertype) as FullyQualified)
                     } else if ("java.lang.Object" != fqn) {
-                        supertype = type(classifierSupertype) as JavaType.FullyQualified
+                        supertype = type(classifierSupertype) as FullyQualified
                     }
                 }
             }
-            var owner: JavaType.FullyQualified? = null
+            var owner: FullyQualified? = null
             if (type.outerClass != null) {
                 owner = TypeUtils.asFullyQualified(type(type.outerClass))
             }
@@ -946,10 +945,14 @@ class KotlinTypeMapping(
     }
 
     private fun javaClassType(type: JavaClassifierType, signature: String): JavaType? {
-        if (type.classifier == null) {
-            throw UnsupportedOperationException("Unsupported null classifier: ${type.javaClass.name}")
+        var clazz : FullyQualified?
+        clazz = if (type.classifier != null) {
+            TypeUtils.asFullyQualified(type(type.classifier!!))
+        } else {
+            val fq : JavaType = buildType(type.classifierQualifiedName)
+            fq as FullyQualified
         }
-        var clazz = TypeUtils.asFullyQualified(type(type.classifier!!))
+
         if (type.typeArguments.isNotEmpty()) {
             val ptSig = signatureBuilder.signature(type)
             var pt = typeCache.get<JavaType.Parameterized>(ptSig)
@@ -972,7 +975,7 @@ class KotlinTypeMapping(
 
     private fun javaConstructorType(
         constructor: JavaConstructor,
-        declaringType: JavaType.FullyQualified?
+        declaringType: FullyQualified?
     ): JavaType.Method? {
         val signature = signatureBuilder.javaConstructorSignature(constructor)
         val existing = typeCache.get<JavaType.Method>(signature)
@@ -1008,7 +1011,7 @@ class KotlinTypeMapping(
             defaultValues
         )
         typeCache.put(signature, method)
-        val exceptionTypes: List<JavaType.FullyQualified>? = null
+        val exceptionTypes: List<FullyQualified>? = null
         var resolvedDeclaringType = declaringType
         if (declaringType == null) {
             resolvedDeclaringType = TypeUtils.asFullyQualified(type(constructor.containingClass))
@@ -1057,7 +1060,7 @@ class KotlinTypeMapping(
         var bounds: List<JavaType>? = null
         if (type.upperBounds.size == 1) {
             val mappedBound = type(type.upperBounds.toTypedArray()[0])
-            if (mappedBound !is JavaType.FullyQualified || "java.lang.Object" != mappedBound.fullyQualifiedName) {
+            if (mappedBound !is FullyQualified || "java.lang.Object" != mappedBound.fullyQualifiedName) {
                 bounds = listOf(mappedBound)
             }
         } else {
@@ -1116,8 +1119,8 @@ class KotlinTypeMapping(
     }
 
     @OptIn(SymbolInternals::class)
-    private fun listAnnotations(firAnnotations: List<FirAnnotation>): MutableList<JavaType.FullyQualified>? {
-        var annotations: MutableList<JavaType.FullyQualified>? = null
+    private fun listAnnotations(firAnnotations: List<FirAnnotation>): MutableList<FullyQualified>? {
+        var annotations: MutableList<FullyQualified>? = null
         for (firAnnotation in firAnnotations) {
             val fir = firAnnotation.typeRef.toRegularClassSymbol(firSession)?.fir
             if (fir != null && isNotSourceRetention(fir.annotations)) {
@@ -1134,8 +1137,8 @@ class KotlinTypeMapping(
     }
 
     @OptIn(SymbolInternals::class)
-    private fun listAnnotations(javaAnnotations: Collection<JavaAnnotation>): List<JavaType.FullyQualified>? {
-        var annotations: MutableList<JavaType.FullyQualified>? = null
+    private fun listAnnotations(javaAnnotations: Collection<JavaAnnotation>): List<FullyQualified>? {
+        var annotations: MutableList<FullyQualified>? = null
         for (javaAnnotation: JavaAnnotation in javaAnnotations) {
             val fir = javaAnnotation.classId?.toSymbol(firSession)?.fir
             if (fir != null && isNotSourceRetention(fir.annotations)) {
@@ -1164,14 +1167,14 @@ class KotlinTypeMapping(
         return true
     }
 
-    private fun mapKind(kind: ClassKind): JavaType.FullyQualified.Kind {
+    private fun mapKind(kind: ClassKind): FullyQualified.Kind {
         return when (kind) {
-            ClassKind.INTERFACE -> JavaType.FullyQualified.Kind.Interface
-            ClassKind.ENUM_CLASS -> JavaType.FullyQualified.Kind.Enum
+            ClassKind.INTERFACE -> FullyQualified.Kind.Interface
+            ClassKind.ENUM_CLASS -> FullyQualified.Kind.Enum
             // ClassKind.ENUM_ENTRY is compiled to a class.
-            ClassKind.ENUM_ENTRY -> JavaType.FullyQualified.Kind.Class
-            ClassKind.ANNOTATION_CLASS -> JavaType.FullyQualified.Kind.Annotation
-            else -> JavaType.FullyQualified.Kind.Class
+            ClassKind.ENUM_ENTRY -> FullyQualified.Kind.Class
+            ClassKind.ANNOTATION_CLASS -> FullyQualified.Kind.Annotation
+            else -> FullyQualified.Kind.Class
         }
     }
 
