@@ -72,9 +72,4 @@ public class AssertionsTest implements RewriteTest {
           )
         );
     }
-
-    @Test
-    void disablePublishingSnapshots() {
-        assertThat(true).isEqualTo(false);
-    }
 }
