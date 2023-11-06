@@ -209,6 +209,8 @@ public class TypeUtils {
                     JavaType.Primitive toPrimitive = JavaType.Primitive.fromClassName(toFq.getFullyQualifiedName());
                     if (toPrimitive != null) {
                         return isAssignableTo(toPrimitive, from);
+                    } else if (toFq.getFullyQualifiedName().equals("java.lang.Object")) {
+                        return true;
                     }
                 }
                 return isAssignableTo(toFq.getFullyQualifiedName(), from);
@@ -220,6 +222,13 @@ public class TypeUtils {
                 } else if (toGeneric.getVariance() == JavaType.GenericTypeVariable.Variance.COVARIANT) {
                     for (JavaType toBound : toBounds) {
                         if (!isAssignableTo(toBound, from)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                } else if (toGeneric.getVariance() == JavaType.GenericTypeVariable.Variance.CONTRAVARIANT) {
+                    for (JavaType toBound : toBounds) {
+                        if (!isAssignableTo(from, toBound)) {
                             return false;
                         }
                     }
