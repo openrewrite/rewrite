@@ -921,6 +921,33 @@ public interface JavaType {
             return null;
         }
 
+        @Nullable
+        public static Primitive fromClassName(String className) {
+            switch (className) {
+                case "java.lang.Boolean":
+                    return Boolean;
+                case "java.lang.Byte":
+                    return Byte;
+                case "java.lang.Character":
+                    return Char;
+                case "java.lang.Double":
+                    return Double;
+                case "java.lang.Float":
+                    return Float;
+                case "java.lang.Integer":
+                    return Int;
+                case "java.lang.Long":
+                    return Long;
+                case "java.lang.Short":
+                    return Short;
+                case "java.lang.Void":
+                    return Void;
+                case "java.lang.String":
+                    return String;
+            }
+            return null;
+        }
+
         public String getKeyword() {
             switch (this) {
                 case Boolean:

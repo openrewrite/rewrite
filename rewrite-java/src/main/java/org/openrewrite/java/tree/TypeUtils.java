@@ -205,6 +205,12 @@ public class TypeUtils {
                        IntStream.range(0, parameterCount).allMatch(i -> isAssignableTo(toParameters.get(i), fromParameters.get(i)));
             } else if (to instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified toFq = (JavaType.FullyQualified) to;
+                if (from instanceof JavaType.Primitive) {
+                    JavaType.Primitive toPrimitive = JavaType.Primitive.fromClassName(toFq.getFullyQualifiedName());
+                    if (toPrimitive != null) {
+                        return isAssignableTo(toPrimitive, from);
+                    }
+                }
                 return isAssignableTo(toFq.getFullyQualifiedName(), from);
             } else if (to instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable toGeneric = (JavaType.GenericTypeVariable) to;
