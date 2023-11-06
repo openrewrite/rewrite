@@ -19,6 +19,8 @@ public class RubyRightPadded {
     public enum Location {
         KEY_VALUE_SUFFIX(RubySpace.Location.KEY_VALUE_SUFFIX),
         LIST_LITERAL_SUFFIX(RubySpace.Location.LIST_LITERAL_SUFFIX),
+        MULTIPLE_ASSIGNMENT_SUFFIX(RubySpace.Location.MULTIPLE_ASSIGNMENT_SUFFIX),
+        MULTIPLE_ASSIGNMENT_INITIALIZERS_SUFFIX(RubySpace.Location.MULTIPLE_ASSIGNMENT_INITIALIZERS_SUFFIX),
         YIELD_DATA_SUFFIX(RubySpace.Location.YIELD_DATA_SUFFIX);
 
         private final RubySpace.Location afterLocation;

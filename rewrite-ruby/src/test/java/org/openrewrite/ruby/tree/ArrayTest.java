@@ -5,7 +5,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.ruby.Assertions.ruby;
 
-public class ListLiteralTest implements RewriteTest {
+public class ArrayTest implements RewriteTest {
 
     @Test
     void list() {

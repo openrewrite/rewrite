@@ -60,6 +60,15 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitArray(Ruby.Array array, PrintOutputCapture<P> p) {
+        beforeSyntax(array, RubySpace.Location.LIST_LITERAL, p);
+        visitContainer("[", array.getPadding().getElements(), RubyContainer.Location.LIST_LITERAL_ELEMENTS,
+                ",", "]", p);
+        afterSyntax(array, p);
+        return array;
+    }
+
+    @Override
     public J visitBinary(J.Binary binary, PrintOutputCapture<P> p) {
         String keyword = "";
         switch (binary.getOperator()) {
@@ -190,6 +199,15 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitExpansion(Ruby.Expansion expansion, PrintOutputCapture<P> p) {
+        beforeSyntax(expansion, RubySpace.Location.EXPANSION_PREFIX, p);
+        p.append("*");
+        visit(expansion.getTree(), p);
+        afterSyntax(expansion, p);
+        return expansion;
+    }
+
+    @Override
     public J visitHash(Ruby.Hash hash, PrintOutputCapture<P> p) {
         beforeSyntax(hash, RubySpace.Location.HASH_PREFIX, p);
         visitContainer("{", hash.getPadding().getElements(), RubyContainer.Location.HASH_ELEMENTS, ",", "}", p);
@@ -201,19 +219,21 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     public J visitKeyValue(Ruby.KeyValue keyValue, PrintOutputCapture<P> p) {
         beforeSyntax(keyValue, RubySpace.Location.KEY_VALUE_PREFIX, p);
         visitRightPadded(keyValue.getPadding().getKey(), RubyRightPadded.Location.KEY_VALUE_SUFFIX, p);
-        p.append(':');
+        p.append("=>");
         visit(keyValue.getValue(), p);
         afterSyntax(keyValue, p);
         return keyValue;
     }
 
     @Override
-    public J visitListLiteral(Ruby.ListLiteral listLiteral, PrintOutputCapture<P> p) {
-        beforeSyntax(listLiteral, RubySpace.Location.LIST_LITERAL, p);
-        visitContainer("[", listLiteral.getPadding().getElements(), RubyContainer.Location.LIST_LITERAL_ELEMENTS,
-                ",", "]", p);
-        afterSyntax(listLiteral, p);
-        return listLiteral;
+    public J visitMultipleAssignment(Ruby.MultipleAssignment multipleAssignment, PrintOutputCapture<P> p) {
+        beforeSyntax(multipleAssignment, RubySpace.Location.LIST_LITERAL, p);
+        visitContainer("", multipleAssignment.getPadding().getAssignments(), RubyContainer.Location.MULTIPLE_ASSIGNMENT_ASSIGNMENTS,
+                ",", "", p);
+        visitContainer("=", multipleAssignment.getPadding().getInitializers(), RubyContainer.Location.MULTIPLE_ASSIGNMENT_INITIALIZERS,
+                ",", "", p);
+        afterSyntax(multipleAssignment, p);
+        return multipleAssignment;
     }
 
     @Override

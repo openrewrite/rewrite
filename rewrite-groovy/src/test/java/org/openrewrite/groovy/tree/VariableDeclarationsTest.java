@@ -104,14 +104,14 @@ class VariableDeclarationsTest implements RewriteTest {
     void numericValueWithUnderscores() {
         rewriteRun(
           groovy("""
-          def l1 = 10_000L
-          def l2 = 10_000l
-          def i = 10_000
-          def d1 = 10_000d
-          def d2 = 10_000D
-          def f1 = 10_000f
-          def f2 = 10_000.0F
-          """)
+            def l1 = 10_000L
+            def l2 = 10_000l
+            def i = 10_000
+            def d1 = 10_000d
+            def d2 = 10_000D
+            def f1 = 10_000f
+            def f2 = 10_000.0F
+            """)
         );
     }
 
@@ -163,14 +163,14 @@ class VariableDeclarationsTest implements RewriteTest {
               """,
             spec -> spec.beforeRecipe(
               cu -> {
-                List<J.VariableDeclarations> variables = TreeVisitor.collect(new JavaVisitor<>() {
-                    @Override
-                    public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
-                        return SearchResult.found(multiVariable);
-                    }
-                }, cu, new ArrayList<>(), J.VariableDeclarations.class, v -> v);
-                assertThat(variables.get(0).getLeadingAnnotations()).hasSize(1);
-            })
+                  List<J.VariableDeclarations> variables = TreeVisitor.collect(new JavaVisitor<>() {
+                      @Override
+                      public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext executionContext) {
+                          return SearchResult.found(multiVariable);
+                      }
+                  }, cu, new ArrayList<>(), J.VariableDeclarations.class, v -> v);
+                  assertThat(variables.get(0).getLeadingAnnotations()).hasSize(1);
+              })
           )
         );
     }

@@ -1,6 +1,5 @@
 package org.openrewrite.ruby;
 
-import org.jetbrains.annotations.NotNull;
 import org.jruby.ast.*;
 import org.jruby.ast.visitor.AbstractNodeVisitor;
 import org.jruby.ast.visitor.OperatorCallNode;
@@ -85,7 +84,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         elements = elements.getPadding().withElements(ListUtils.mapLast(
                 elements.getPadding().getElements(),
                 e -> e.withAfter(sourceBefore("]"))));
-        return new Ruby.ListLiteral(
+        return new Ruby.Array(
                 randomId(),
                 prefix,
                 Markers.EMPTY,
@@ -294,7 +293,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                     randomId(),
                     whitespace(),
                     Markers.EMPTY,
-                    padRight(convert(kv.getKey()), sourceBefore(":")),
+                    padRight(convert(kv.getKey()), sourceBefore("=>")),
                     convert(kv.getValue()),
                     null
             ), i == nodePairs.size() - 1 ? sourceBefore("}") : sourceBefore(",")));
@@ -415,6 +414,51 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     @Override
     public J visitLocalVarNode(LocalVarNode node) {
         return getIdentifier(sourceBefore(node.getName().asJavaString()), node.getName().asJavaString());
+    }
+
+    @Override
+    public J visitMultipleAsgnNode(MultipleAsgnNode node) {
+        Space prefix = whitespace();
+        JContainer<Expression> assignments = convertArgs(node.getPre());
+        if (node.getRest() != null) {
+            assignments = assignments.getPadding().withElements(ListUtils.concat(
+                    ListUtils.mapLast(assignments.getPadding().getElements(), assign -> assign.withAfter(sourceBefore(","))),
+                    padRight(
+                            new Ruby.Expansion(
+                                    randomId(),
+                                    sourceBefore("*"),
+                                    Markers.EMPTY,
+                                    convert(node.getRest())
+                            ),
+                            EMPTY
+                    )
+            ));
+        }
+        Space initializerPrefix = sourceBefore("=");
+        Space firstArgPrefix = whitespace();
+        JContainer<Expression> initializers =
+                source.startsWith("[", cursor) ?
+                        JContainer.build(initializerPrefix, singletonList(padRight(visitArrayNode(
+                                (ArrayNode) node.getValueNode()).withPrefix(firstArgPrefix), EMPTY)), Markers.EMPTY) :
+                        JContainer.<Expression>build(
+                                prefix,
+                                ListUtils.mapFirst(
+                                        convertAll(StreamSupport.stream(((ArrayNode) node.getValueNode()).spliterator(), false)
+                                                        .filter(Objects::nonNull)
+                                                        .collect(toList()), n -> sourceBefore(","),
+                                                n -> EMPTY),
+                                        arg -> arg.withElement(arg.getElement().withPrefix(firstArgPrefix))
+                                ),
+                                Markers.EMPTY
+                        ).withBefore(initializerPrefix);
+        return new Ruby.MultipleAssignment(
+                randomId(),
+                prefix,
+                Markers.EMPTY,
+                assignments,
+                initializers,
+                null
+        );
     }
 
     @Override
@@ -660,7 +704,6 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         }
     }
 
-    @NotNull
     private Markers whileOrUntil() {
         Markers markers = Markers.EMPTY;
         if (source.startsWith("until", cursor)) {
@@ -731,14 +774,6 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         return literal;
     }
 
-    private <J2 extends J> List<J2> convertAll(List<? extends Node> trees) {
-        List<J2> converted = new ArrayList<>(trees.size());
-        for (Node tree : trees) {
-            converted.add(convert(tree));
-        }
-        return converted;
-    }
-
     private <J2 extends J> J2 convert(@Nullable Node t) {
         if (t == null) {
             //noinspection ConstantConditions
@@ -771,8 +806,9 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
         List<Node> args;
         if (argsNode instanceof ListNode) {
-            args = new ArrayList<>(((ListNode) argsNode).size());
-            for (Node node : (ListNode) argsNode) {
+            ListNode listNode = (ListNode) argsNode;
+            args = new ArrayList<>(listNode.size());
+            for (Node node : listNode.children()) {
                 if (node != null) {
                     args.add(node);
                 }

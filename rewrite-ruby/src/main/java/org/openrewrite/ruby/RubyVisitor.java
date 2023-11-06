@@ -61,6 +61,21 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         return c;
     }
 
+    public J visitArray(Ruby.Array array, P p) {
+        Ruby.Array l = array;
+        l = l.withPrefix(visitSpace(l.getPrefix(), RubySpace.Location.LIST_LITERAL, p));
+        l = l.withMarkers(visitMarkers(l.getMarkers(), p));
+        Expression temp = (Expression) visitExpression(l, p);
+        if (!(temp instanceof Ruby.Array)) {
+            return temp;
+        } else {
+            l = (Ruby.Array) temp;
+        }
+        l = l.getPadding().withElements(visitContainer(l.getPadding().getElements(), RubyContainer.Location.LIST_LITERAL_ELEMENTS, p));
+        l = l.withType(visitType(l.getType(), p));
+        return l;
+    }
+
     public J visitBinary(Ruby.Binary binary, P p) {
         Ruby.Binary b = binary;
         b = b.withPrefix(visitSpace(b.getPrefix(), RubySpace.Location.BINARY_PREFIX, p));
@@ -101,6 +116,14 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         return v;
     }
 
+    public J visitExpansion(Ruby.Expansion expansion, P p) {
+        Ruby.Expansion e = expansion;
+        e = e.withPrefix(visitSpace(e.getPrefix(), RubySpace.Location.EXPANSION_PREFIX, p));
+        e = e.withMarkers(visitMarkers(e.getMarkers(), p));
+        e = e.withTree((TypedTree) visit(e.getTree(), p));
+        return e;
+    }
+
     public J visitKeyValue(Ruby.KeyValue keyValue, P p) {
         Ruby.KeyValue k = keyValue;
         k = k.withPrefix(visitSpace(k.getPrefix(), RubySpace.Location.KEY_VALUE_PREFIX, p));
@@ -133,21 +156,6 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         return h;
     }
 
-    public J visitListLiteral(Ruby.ListLiteral listLiteral, P p) {
-        Ruby.ListLiteral l = listLiteral;
-        l = l.withPrefix(visitSpace(l.getPrefix(), RubySpace.Location.LIST_LITERAL, p));
-        l = l.withMarkers(visitMarkers(l.getMarkers(), p));
-        Expression temp = (Expression) visitExpression(l, p);
-        if (!(temp instanceof Ruby.ListLiteral)) {
-            return temp;
-        } else {
-            l = (Ruby.ListLiteral) temp;
-        }
-        l = l.getPadding().withElements(visitContainer(l.getPadding().getElements(), RubyContainer.Location.LIST_LITERAL_ELEMENTS, p));
-        l = l.withType(visitType(l.getType(), p));
-        return l;
-    }
-
     public J visitRedo(Ruby.Redo redo, P p) {
         Ruby.Redo r = redo;
         r = r.withPrefix(visitSpace(r.getPrefix(), RubySpace.Location.REDO_PREFIX, p));
@@ -174,5 +182,22 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         y = y.getPadding().withData(visitContainer(y.getPadding().getData(),
                 RubyContainer.Location.YIELD_DATA, p));
         return y;
+    }
+
+    public J visitMultipleAssignment(Ruby.MultipleAssignment multipleAssignment, P p) {
+        Ruby.MultipleAssignment m = multipleAssignment;
+        m = m.withPrefix(visitSpace(m.getPrefix(), RubySpace.Location.MULTIPLE_ASSIGNMENT, p));
+        m = m.withMarkers(visitMarkers(m.getMarkers(), p));
+        Statement temp = (Statement) visitStatement(m, p);
+        if (!(temp instanceof Ruby.MultipleAssignment)) {
+            return temp;
+        } else {
+            m = (Ruby.MultipleAssignment) temp;
+        }
+        m = m.getPadding().withAssignments(visitContainer(m.getPadding().getAssignments(),
+                RubyContainer.Location.MULTIPLE_ASSIGNMENT_ASSIGNMENTS, p));
+        m = m.getPadding().withInitializers(visitContainer(m.getPadding().getAssignments(),
+                RubyContainer.Location.MULTIPLE_ASSIGNMENT_INITIALIZERS, p));
+        return m;
     }
 }

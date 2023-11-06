@@ -12,7 +12,7 @@ public class HashTest implements RewriteTest {
         rewriteRun(
           ruby(
             """
-              {a: 1}
+              {a=>1}
               """
           )
         );

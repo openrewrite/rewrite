@@ -19,6 +19,8 @@ public class RubyContainer {
     public enum Location {
         HASH_ELEMENTS(RubySpace.Location.HASH, RubyRightPadded.Location.KEY_VALUE_SUFFIX),
         LIST_LITERAL_ELEMENTS(RubySpace.Location.LIST_LITERAL, RubyRightPadded.Location.LIST_LITERAL_SUFFIX),
+        MULTIPLE_ASSIGNMENT_ASSIGNMENTS(RubySpace.Location.MULTIPLE_ASSIGNMENT, RubyRightPadded.Location.MULTIPLE_ASSIGNMENT_SUFFIX),
+        MULTIPLE_ASSIGNMENT_INITIALIZERS(RubySpace.Location.MULTIPLE_ASSIGNMENT_INITIALIZERS, RubyRightPadded.Location.MULTIPLE_ASSIGNMENT_INITIALIZERS_SUFFIX),
         YIELD_DATA(RubySpace.Location.YIELD, RubyRightPadded.Location.YIELD_DATA_SUFFIX);
 
         private final RubySpace.Location beforeLocation;
