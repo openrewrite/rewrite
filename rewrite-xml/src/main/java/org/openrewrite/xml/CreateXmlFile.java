@@ -27,7 +27,9 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.xml.tree.Xml;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -87,5 +89,20 @@ public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
                     .collect(Collectors.toList());
         }
         return emptyList();
+    }
+
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean created) {
+        Path path = Paths.get(relativeFileName);
+        return new XmlVisitor<ExecutionContext>() {
+            @Override
+            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.toString().equals(document.getSourcePath().toString())) {
+                    return document.withProlog(null).withRoot(null);
+                }
+                return document;
+            }
+        };
     }
 }

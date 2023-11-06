@@ -27,7 +27,9 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.properties.tree.Properties;
 
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -87,5 +89,19 @@ public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
                     .collect(Collectors.toList());
         }
         return emptyList();
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean created) {
+        Path path = Paths.get(relativeFileName);
+        return new PropertiesVisitor<ExecutionContext>() {
+            @Override
+            public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
+                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.toString().equals(file.getSourcePath().toString())) {
+                    return file.withContent(emptyList());
+                }
+                return file;
+            }
+        };
     }
 }

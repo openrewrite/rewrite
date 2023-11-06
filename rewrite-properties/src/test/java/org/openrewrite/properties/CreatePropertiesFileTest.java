@@ -78,7 +78,7 @@ class CreatePropertiesFileTest implements RewriteTest {
           )),
           properties(
             "test.property=test",
-            spec -> spec.path("test/test-properties.properties")
+            spec -> spec.path("test/test.properties")
           )
         );
     }
