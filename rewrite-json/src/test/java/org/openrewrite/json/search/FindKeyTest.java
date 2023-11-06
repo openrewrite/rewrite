@@ -17,6 +17,7 @@ package org.openrewrite.json.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.json.Assertions.json;
@@ -44,6 +45,59 @@ class FindKeyTest implements RewriteTest {
                 "metadata": {
                   /*~~>*/"name": "monitoring-tools",
                   "namespace": "monitoring-tools"
+                }
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3401")
+    @Test
+    void findKeyWithMultipleBinaryExpressions() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("$.foo.bar[?(@.types == 'something' && @.group == 'group' && @.category == 'match' && @.type == 'type')].pattern")),
+          json("""
+              {
+                "foo": {
+                  "bar": [
+                    {
+                      "type": "type",
+                      "group": "group",
+                      "category": "other",
+                      "types": "something",
+                      "pattern": "p1"
+                    },
+                    {
+                      "type": "type",
+                      "group": "group",
+                      "category": "match",
+                      "types": "something",
+                      "pattern": "p2"
+                    }
+                  ]
+                }
+              }
+              """,
+            """
+              {
+                "foo": {
+                  "bar": [
+                    {
+                      "type": "type",
+                      "group": "group",
+                      "category": "other",
+                      "types": "something",
+                      "pattern": "p1"
+                    },
+                    {
+                      "type": "type",
+                      "group": "group",
+                      "category": "match",
+                      "types": "something",
+                      /*~~>*/"pattern": "p2"
+                    }
+                  ]
                 }
               }
               """

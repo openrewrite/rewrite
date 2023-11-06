@@ -659,4 +659,47 @@ class MavenSettingsTest {
               .hasFieldOrPropertyWithValue("password", null);
         }
     }
+
+    /**
+     * See the <a href="https://maven.apache.org/guides/mini/guide-http-settings.html#Taking_Control_of_Your_HTTP_Headers">Maven guide</a>
+     * on HTTP headers.
+     */
+    @Test
+    void serverHttpHeaders() {
+        var settings = MavenSettings.parse(new Parser.Input(Paths.get("settings.xml"), () -> new ByteArrayInputStream(
+          //language=xml
+          """
+            <settings>
+                <servers>
+                    <server>
+                        <id>maven-snapshots</id>
+                        <configuration>
+                            <httpHeaders>
+                                <property>
+                                    <name>X-JFrog-Art-Api</name>
+                                    <value>myApiToken</value>
+                                </property>
+                            </httpHeaders>
+                        </configuration>
+                    </server>
+                </servers>
+                <profiles>
+                    <profile>
+                        <id>my-profile</id>
+                        <repositories>
+                            <repository>
+                                <id>maven-snapshots</id>
+                                <name>Private Repo</name>
+                                <url>https://repo.company.net/maven</url>
+                            </repository>
+                        </repositories>
+                    </profile>
+                </profiles>
+            </settings>
+            """.getBytes()
+        )), new InMemoryExecutionContext());
+
+        MavenSettings.Server server = settings.getServers().getServers().get(0);
+        assertThat(server.getConfiguration().getHttpHeaders().get(0).getName()).isEqualTo("X-JFrog-Art-Api");
+    }
 }

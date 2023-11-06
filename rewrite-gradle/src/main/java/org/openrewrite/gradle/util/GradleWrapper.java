@@ -21,9 +21,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.remote.Remote;
+import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
@@ -52,34 +54,17 @@ public class GradleWrapper {
     String version;
     DistributionInfos distributionInfos;
 
-    public static Validated<GradleWrapper> validate(
-            ExecutionContext ctx,
-            String version,
-            @Nullable String distribution,
-            @Nullable String repositoryUrl
-    ) {
-        String distributionTypeName = distribution != null && !distribution.isEmpty() ? distribution : DistributionType.Bin.name().toLowerCase();
-        Validated<Object> validated =
-                Validated
-                        .testNone("distributionType", "must be a valid distribution type", distributionTypeName,
-                                dt -> Arrays.stream(DistributionType.values())
-                                        .anyMatch(type -> type.name().equalsIgnoreCase(dt)))
-                        .and(Semver.validate(version, null));
-        if (validated.isInvalid()) {
-            return validated.asInvalid();
-        }
-        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getHttpSender();
-        return Validated.lazy("", () -> create(distributionTypeName, version, repositoryUrl, httpSender));
-    }
-
-    private static GradleWrapper create(String distributionTypeName, String version, @Nullable String repositoryUrl, HttpSender httpSender) {
+    public static GradleWrapper create(@Nullable String distributionTypeName, @Nullable String version, @Nullable String repositoryUrl, ExecutionContext ctx) {
         DistributionType distributionType = Arrays.stream(DistributionType.values())
                 .filter(dt -> dt.name().equalsIgnoreCase(distributionTypeName))
                 .findAny()
-                .orElseThrow(() -> new IllegalArgumentException("Unknown distribution type " + distributionTypeName));
-        VersionComparator versionComparator = requireNonNull(Semver.validate(version, null).getValue());
+                .orElse(DistributionType.Bin);
+        VersionComparator versionComparator = StringUtils.isBlank(version) ?
+                new LatestRelease(null) :
+                requireNonNull(Semver.validate(version, null).getValue());
 
-        String gradleVersionsUrl = (repositoryUrl == null) ? "https://services.gradle.org/versions/all" : repositoryUrl;
+        HttpSender httpSender = HttpSenderExecutionContextView.view(ctx).getLargeFileHttpSender();
+        String gradleVersionsUrl = StringUtils.isBlank(repositoryUrl) ? "https://services.gradle.org/versions/all" : repositoryUrl;
         try (HttpSender.Response resp = httpSender.send(httpSender.get(gradleVersionsUrl).build())) {
             if (resp.isSuccessful()) {
                 List<GradleVersion> allVersions = new ObjectMapper()

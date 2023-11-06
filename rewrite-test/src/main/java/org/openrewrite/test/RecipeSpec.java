@@ -19,13 +19,11 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
 import org.openrewrite.config.CompositeRecipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.config.YamlResourceLoader;
-import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.ByteArrayInputStream;
@@ -82,6 +80,9 @@ public class RecipeSpec {
     @Nullable
     TypeValidation typeValidation;
 
+    @Nullable
+    TypeValidation afterTypeValidation;
+
     boolean serializationValidation = true;
 
     @Nullable
@@ -115,19 +116,41 @@ public class RecipeSpec {
     }
 
     public RecipeSpec recipe(InputStream yaml, String... activeRecipes) {
-        return recipe(Environment.builder()
-                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties()))
-                .build()
-                .activateRecipes(activeRecipes));
+        return recipe(recipeFromInputStream(yaml, activeRecipes));
     }
 
     public RecipeSpec recipeFromYaml(@Language("yaml") String yaml, String... activeRecipes) {
-        return recipe(new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)), activeRecipes);
+        return recipe(RECIPE_CACHE.computeIfAbsent(key("recipeFromYaml", yaml, key(activeRecipes)),
+                k -> recipeFromInputStream(
+                        new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)), activeRecipes)));
     }
 
     public RecipeSpec recipeFromResource(String yamlResource, String... activeRecipes) {
-        return recipe(Objects.requireNonNull(RecipeSpec.class.getResourceAsStream(yamlResource)), activeRecipes);
+        return recipe(RECIPE_CACHE.computeIfAbsent(key("recipeFromResource", yamlResource, key(activeRecipes)),
+                k -> recipeFromInputStream(
+                        Objects.requireNonNull(RecipeSpec.class.getResourceAsStream(yamlResource)), activeRecipes)));
     }
+
+    public RecipeSpec recipeFromResources(String... activeRecipes) {
+        return recipe(RECIPE_CACHE.computeIfAbsent(key("recipeFromResources", key(activeRecipes)),
+                k -> Environment.builder()
+                        .scanYamlResources()
+                        .build()
+                        .activateRecipes(activeRecipes)));
+    }
+
+    private static Recipe recipeFromInputStream(InputStream yaml, String... activeRecipes) {
+        return Environment.builder()
+                .load(new YamlResourceLoader(yaml, URI.create("rewrite.yml"), new Properties()))
+                .build()
+                .activateRecipes(activeRecipes);
+    }
+
+    private static String key(String... s) {
+        return String.join("-", s);
+    }
+
+    private static final Map<String, Recipe> RECIPE_CACHE = new HashMap<>();
 
     /**
      * @param parser The parser supplier to use when a matching source file is found.
@@ -239,6 +262,11 @@ public class RecipeSpec {
 
     public RecipeSpec typeValidationOptions(TypeValidation typeValidation) {
         this.typeValidation = typeValidation;
+        return this;
+    }
+
+    public RecipeSpec afterTypeValidationOptions(TypeValidation typeValidation) {
+        this.afterTypeValidation = typeValidation;
         return this;
     }
 

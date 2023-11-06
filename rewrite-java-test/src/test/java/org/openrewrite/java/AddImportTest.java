@@ -536,7 +536,7 @@ class AddImportTest implements RewriteTest {
             );
 
             rewriteRun(
-              spec -> spec.recipe(toRecipe(() -> new AddImport<>(pkg + ".B", null, false))),
+              spec -> spec.recipe(toRecipe(() -> new AddImport<>(pkg, "B", null, null, false))),
               sources.toArray(new SourceSpecs[0])
             );
         }
@@ -840,15 +840,15 @@ class AddImportTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                  maybeAddImport("com.fasterxml.jackson.databind.ObjectMapper");
+                  maybeAddImport("java.io.File");
                   return super.visitCompilationUnit(cu, ctx);
               }
-          })).parser(JavaParser.fromJavaVersion().classpath("jackson-databind")),
+          })),
           java(
             """
-              import com.fasterxml.jackson.databind.ObjectMapper;
+              import java.io.File;
               class Helper {
-                  static ObjectMapper OBJECT_MAPPER;
+                  static File FILE;
               }
               """
           ),
@@ -856,7 +856,7 @@ class AddImportTest implements RewriteTest {
             """
               class Test {
                   void test() {
-                      Helper.OBJECT_MAPPER.writer();
+                      Helper.FILE.exists();
                   }
               }
               """
@@ -1139,6 +1139,214 @@ class AddImportTest implements RewriteTest {
                             
               import static java.util.Collections.*;
               """
+          )
+        );
+    }
+
+    @Test
+    void crlfNewLinesWithoutPreviousImports() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+          java(
+            """
+              package a;
+              class A {}
+              """.replace("\n", "\r\n"),
+            """
+              package a;
+                            
+              import java.util.List;
+                            
+              class A {}
+              """.replace("\n", "\r\n")
+          )
+        );
+    }
+
+    @Test
+    void crlfNewLinesWithPreviousImports() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+          java(
+            """
+              package a;
+              
+              import java.util.Set;
+              
+              class A {}
+              """.replace("\n", "\r\n"),
+            """
+              package a;
+                            
+              import java.util.List;
+              import java.util.Set;
+                            
+              class A {}
+              """.replace("\n", "\r\n")
+          )
+        );
+    }
+
+    @Test
+    void crlfNewLinesWithPreviousImportsNoPackage() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+          java(
+            """
+              import java.util.Set;
+              
+              class A {}
+              """.replace("\n", "\r\n"),
+            """        
+              import java.util.List;
+              import java.util.Set;
+                            
+              class A {}
+              """.replace("\n", "\r\n")
+          )
+        );
+    }
+
+    @Test
+    void crlfNewLinesWithPreviousImportsNoClass() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+          java(
+            """
+              package a;
+              
+              import java.util.Arrays;
+              import java.util.Set;
+              """.replace("\n", "\r\n"),
+            """
+              package a;
+              
+              import java.util.Arrays;
+              import java.util.List;
+              import java.util.Set;
+              """.replace("\n", "\r\n")
+          )
+        );
+    }
+
+    @Test
+    void crlfNewLinesWithPreviousImportsNoPackageNoClass() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+          java(
+            """
+              import java.util.Arrays;
+              import java.util.Set;
+              """.replace("\n", "\r\n"),
+            """
+              import java.util.Arrays;
+              import java.util.List;
+              import java.util.Set;
+              """.replace("\n", "\r\n")
+          )
+        );
+    }
+
+    @Test
+    void crlfNewLinesInComments() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+          java(
+            """
+              /*
+               * Copyright 2023 the original author or authors.
+               * <p>
+               * Licensed under the Apache License, Version 2.0 (the "License");
+               * you may not use this file except in compliance with the License.
+               * You may obtain a copy of the License at
+               * <p>
+               * https://www.apache.org/licenses/LICENSE-2.0
+               * <p>
+               * Unless required by applicable law or agreed to in writing, software
+               * distributed under the License is distributed on an "AS IS" BASIS,
+               * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+               * See the License for the specific language governing permissions and
+               * limitations under the License.
+               */
+              """.replace("\n", "\r\n") +
+            """
+              import java.util.Arrays;
+              import java.util.Set;
+              """,
+            """
+              /*
+               * Copyright 2023 the original author or authors.
+               * <p>
+               * Licensed under the Apache License, Version 2.0 (the "License");
+               * you may not use this file except in compliance with the License.
+               * You may obtain a copy of the License at
+               * <p>
+               * https://www.apache.org/licenses/LICENSE-2.0
+               * <p>
+               * Unless required by applicable law or agreed to in writing, software
+               * distributed under the License is distributed on an "AS IS" BASIS,
+               * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+               * See the License for the specific language governing permissions and
+               * limitations under the License.
+               */
+              import java.util.Arrays;
+              import java.util.List;
+              import java.util.Set;
+              """.replace("\n", "\r\n")
+          )
+        );
+    }
+
+    @Test
+    void crlfNewLinesInJavadoc() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new AddImport<>("java.util.List", null, false))),
+          java(
+            """
+              import java.util.Arrays;
+              import java.util.Set;
+              
+              """ +
+            """
+              /**
+               * Copyright 2023 the original author or authors.
+               * <p>
+               * Licensed under the Apache License, Version 2.0 (the "License");
+               * you may not use this file except in compliance with the License.
+               * You may obtain a copy of the License at
+               * <p>
+               * https://www.apache.org/licenses/LICENSE-2.0
+               * <p>
+               * Unless required by applicable law or agreed to in writing, software
+               * distributed under the License is distributed on an "AS IS" BASIS,
+               * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+               * See the License for the specific language governing permissions and
+               * limitations under the License.
+               */
+              """.replace("\n", "\r\n") +
+            "class Foo {}",
+            """
+              import java.util.Arrays;
+              import java.util.List;
+              import java.util.Set;
+              
+              /**
+               * Copyright 2023 the original author or authors.
+               * <p>
+               * Licensed under the Apache License, Version 2.0 (the "License");
+               * you may not use this file except in compliance with the License.
+               * You may obtain a copy of the License at
+               * <p>
+               * https://www.apache.org/licenses/LICENSE-2.0
+               * <p>
+               * Unless required by applicable law or agreed to in writing, software
+               * distributed under the License is distributed on an "AS IS" BASIS,
+               * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+               * See the License for the specific language governing permissions and
+               * limitations under the License.
+               */
+              class Foo {}
+              """.replace("\n", "\r\n")
           )
         );
     }

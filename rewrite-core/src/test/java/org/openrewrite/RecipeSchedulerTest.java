@@ -15,6 +15,8 @@
  */
 package org.openrewrite;
 
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
@@ -56,6 +58,7 @@ class RecipeSchedulerTest implements RewriteTest {
     }
 }
 
+@AllArgsConstructor
 class BoomRecipe extends Recipe {
     @Override
     public String getDisplayName() {

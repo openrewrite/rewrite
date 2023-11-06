@@ -38,10 +38,14 @@ public class TypeUtils {
                );
     }
 
+    public static String toFullyQualifiedName(String fqn) {
+        return fqn.replace('$', '.');
+    }
+
     public static boolean fullyQualifiedNamesAreEqual(@Nullable String fqn1, @Nullable String fqn2) {
         if (fqn1 != null && fqn2 != null) {
             return fqn1.equals(fqn2) || fqn1.length() == fqn2.length()
-                                        && fqn1.replace("$", ".").equals(fqn2.replace("$", "."));
+                                        && toFullyQualifiedName(fqn1).equals(toFullyQualifiedName(fqn2));
         }
         return fqn1 == null && fqn2 == null;
     }
@@ -126,7 +130,7 @@ public class TypeUtils {
      */
     public static boolean isOfClassType(@Nullable JavaType type, String fqn) {
         if (type instanceof JavaType.FullyQualified) {
-            return TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) type).getFullyQualifiedName(), (fqn));
+            return TypeUtils.fullyQualifiedNamesAreEqual(((JavaType.FullyQualified) type).getFullyQualifiedName(), fqn);
         } else if (type instanceof JavaType.Variable) {
             return isOfClassType(((JavaType.Variable) type).getType(), fqn);
         } else if (type instanceof JavaType.Method) {
@@ -140,7 +144,7 @@ public class TypeUtils {
     }
 
     /**
-     * @param type The declaring type of the method invocation or constructor.
+     * @param type          The declaring type of the method invocation or constructor.
      * @param matchOverride Whether to match the {@code Object} type.
      * @return True if the declaring type matches the criteria of this matcher.
      */
@@ -150,29 +154,29 @@ public class TypeUtils {
             boolean matchOverride,
             Predicate<String> matcher
     ) {
-       if (type == null || type instanceof JavaType.Unknown) {
-           return false;
-       }
-       if (matcher.test(type.getFullyQualifiedName())) {
-           return true;
-       }
-       if (matchOverride) {
-           if (!"java.lang.Object".equals(type.getFullyQualifiedName()) &&
-               isOfTypeWithName(TYPE_OBJECT, true, matcher)) {
-               return true;
-           }
+        if (type == null || type instanceof JavaType.Unknown) {
+            return false;
+        }
+        if (matcher.test(type.getFullyQualifiedName())) {
+            return true;
+        }
+        if (matchOverride) {
+            if (!"java.lang.Object".equals(type.getFullyQualifiedName()) &&
+                isOfTypeWithName(TYPE_OBJECT, true, matcher)) {
+                return true;
+            }
 
-           if (isOfTypeWithName(type.getSupertype(), true, matcher)) {
-               return true;
-           }
+            if (isOfTypeWithName(type.getSupertype(), true, matcher)) {
+                return true;
+            }
 
-           for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
-               if (isOfTypeWithName(anInterface, true, matcher)) {
-                   return true;
-               }
-           }
-       }
-       return false;
+            for (JavaType.FullyQualified anInterface : type.getInterfaces()) {
+                if (isOfTypeWithName(anInterface, true, matcher)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {
@@ -185,7 +189,12 @@ public class TypeUtils {
             } else if (to instanceof JavaType.Parameterized) {
                 JavaType.Parameterized toParameterized = (JavaType.Parameterized) to;
                 if (!(from instanceof JavaType.Parameterized)) {
-                    return toParameterized.getTypeParameters().stream().allMatch(p -> isAssignableTo(p, TYPE_OBJECT));
+                    return from instanceof JavaType.FullyQualified &&
+                           isAssignableTo(toParameterized.getType(), from) &&
+                           toParameterized.getTypeParameters().stream()
+                                   .allMatch(p -> (p instanceof JavaType.GenericTypeVariable &&
+                                                   ((JavaType.GenericTypeVariable) p).getName().equals("?")) ||
+                                                  isAssignableTo(p, TYPE_OBJECT));
                 }
                 JavaType.Parameterized fromParameterized = (JavaType.Parameterized) from;
                 List<JavaType> toParameters = toParameterized.getTypeParameters();
@@ -198,9 +207,17 @@ public class TypeUtils {
                 JavaType.FullyQualified toFq = (JavaType.FullyQualified) to;
                 return isAssignableTo(toFq.getFullyQualifiedName(), from);
             } else if (to instanceof JavaType.GenericTypeVariable) {
-                JavaType.GenericTypeVariable genericTo = (JavaType.GenericTypeVariable) to;
-                if (genericTo.getBounds().isEmpty()) {
-                    return genericTo.getName().equals("?");
+                JavaType.GenericTypeVariable toGeneric = (JavaType.GenericTypeVariable) to;
+                List<JavaType> toBounds = toGeneric.getBounds();
+                if (!toGeneric.getName().equals("?")) {
+                    return false;
+                } else if (toGeneric.getVariance() == JavaType.GenericTypeVariable.Variance.COVARIANT) {
+                    for (JavaType toBound : toBounds) {
+                        if (!isAssignableTo(toBound, from)) {
+                            return false;
+                        }
+                    }
+                    return true;
                 }
                 return false;
             } else if (to instanceof JavaType.Variable) {
@@ -208,10 +225,53 @@ public class TypeUtils {
             } else if (to instanceof JavaType.Method) {
                 return isAssignableTo(((JavaType.Method) to).getReturnType(), from);
             } else if (to instanceof JavaType.Primitive) {
+                JavaType.Primitive toPrimitive = (JavaType.Primitive) to;
                 if (from instanceof JavaType.FullyQualified) {
                     // Account for auto-unboxing
-                    JavaType.FullyQualified boxed = JavaType.ShallowClass.build(((JavaType.Primitive) to).getClassName());
+                    JavaType.FullyQualified boxed = JavaType.ShallowClass.build(toPrimitive.getClassName());
                     return isAssignableTo(boxed, from);
+                } else if (from instanceof JavaType.Primitive) {
+                    JavaType.Primitive fromPrimitive = (JavaType.Primitive) from;
+                    if (fromPrimitive == JavaType.Primitive.Boolean || fromPrimitive == JavaType.Primitive.Void) {
+                        return false;
+                    } else {
+                        switch (toPrimitive) {
+                            case Char:
+                                return fromPrimitive == JavaType.Primitive.Byte;
+                            case Short:
+                                switch (fromPrimitive) {
+                                    case Byte:
+                                    case Char:
+                                        return true;
+                                }
+                                return false;
+                            case Int:
+                                switch (fromPrimitive) {
+                                    case Byte:
+                                    case Char:
+                                    case Short:
+                                        return true;
+                                }
+                                return false;
+                            case Long:
+                                switch (fromPrimitive) {
+                                    case Byte:
+                                    case Char:
+                                    case Short:
+                                    case Int:
+                                        return true;
+                                }
+                                return false;
+                            case Float:
+                                return fromPrimitive != JavaType.Primitive.Double;
+                            case Double:
+                                return true;
+                            case String:
+                                return fromPrimitive == JavaType.Primitive.Null;
+                            default:
+                                return false;
+                        }
+                    }
                 }
             } else if (to instanceof JavaType.Array && from instanceof JavaType.Array) {
                 return isAssignableTo(((JavaType.Array) to).getElemType(), ((JavaType.Array) from).getElemType());
@@ -231,9 +291,16 @@ public class TypeUtils {
                     }
                 }
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
-                return to.equals(classFrom.getFullyQualifiedName()) ||
-                       isAssignableTo(to, classFrom.getSupertype()) ||
-                       classFrom.getInterfaces().stream().anyMatch(i -> isAssignableTo(to, i));
+                if (fullyQualifiedNamesAreEqual(to, classFrom.getFullyQualifiedName()) ||
+                    isAssignableTo(to, classFrom.getSupertype())) {
+                    return true;
+                }
+                for (JavaType.FullyQualified i : classFrom.getInterfaces()) {
+                    if (isAssignableTo(to, i)) {
+                        return true;
+                    }
+                }
+                return false;
             } else if (from instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable genericFrom = (JavaType.GenericTypeVariable) from;
                 for (JavaType bound : genericFrom.getBounds()) {
@@ -242,49 +309,11 @@ public class TypeUtils {
                     }
                 }
             } else if (from instanceof JavaType.Primitive) {
-                JavaType.Primitive fromPrimitive = (JavaType.Primitive) from;
                 JavaType.Primitive toPrimitive = JavaType.Primitive.fromKeyword(to);
-                if (fromPrimitive == toPrimitive) {
-                    return true;
-                } else if (fromPrimitive == JavaType.Primitive.Boolean || fromPrimitive == JavaType.Primitive.Void) {
-                    return false;
-                } else if (toPrimitive != null) {
-                    switch (toPrimitive) {
-                        case Char:
-                            return fromPrimitive == JavaType.Primitive.Byte;
-                        case Short:
-                            switch (fromPrimitive) {
-                                case Byte:
-                                case Char:
-                                    return true;
-                            }
-                            return false;
-                        case Int:
-                            switch (fromPrimitive) {
-                                case Byte:
-                                case Char:
-                                case Short:
-                                    return true;
-                            }
-                            return false;
-                        case Long:
-                            switch (fromPrimitive) {
-                                case Byte:
-                                case Char:
-                                case Short:
-                                case Int:
-                                    return true;
-                            }
-                            return false;
-                        case Float:
-                            return fromPrimitive != JavaType.Primitive.Double;
-                        case Double:
-                            return true;
-                        default:
-                            return false;
-                    }
+                if (toPrimitive != null) {
+                    return isAssignableTo(toPrimitive, from);
                 } else if ("java.lang.String".equals(to)) {
-                    return fromPrimitive == JavaType.Primitive.String;
+                    return isAssignableTo(JavaType.Primitive.String, from);
                 }
             } else if (from instanceof JavaType.Variable) {
                 return isAssignableTo(to, ((JavaType.Variable) from).getType());
@@ -298,16 +327,26 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(Pattern to, @Nullable JavaType from) {
+        return isAssignableTo(type -> {
+            if (type instanceof JavaType.FullyQualified) {
+                return to.matcher(((JavaType.FullyQualified) type).getFullyQualifiedName()).matches();
+            } else if (type instanceof JavaType.Primitive) {
+                return to.matcher(((JavaType.Primitive) type).getKeyword()).matches();
+            }
+            return false;
+        }, from);
+    }
+
+    public static boolean isAssignableTo(Predicate<JavaType> predicate, @Nullable JavaType from) {
         try {
             if (from instanceof JavaType.FullyQualified) {
                 JavaType.FullyQualified classFrom = (JavaType.FullyQualified) from;
 
-                if (to.matcher(classFrom.getFullyQualifiedName()).matches() ||
-                    isAssignableTo(to, classFrom.getSupertype())) {
+                if (predicate.test(classFrom) || isAssignableTo(predicate, classFrom.getSupertype())) {
                     return true;
                 }
                 for (JavaType.FullyQualified anInterface : classFrom.getInterfaces()) {
-                    if (isAssignableTo(to, anInterface)) {
+                    if (isAssignableTo(predicate, anInterface)) {
                         return true;
                     }
                 }
@@ -315,17 +354,17 @@ public class TypeUtils {
             } else if (from instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable genericFrom = (JavaType.GenericTypeVariable) from;
                 for (JavaType bound : genericFrom.getBounds()) {
-                    if (isAssignableTo(to, bound)) {
+                    if (isAssignableTo(predicate, bound)) {
                         return true;
                     }
                 }
             } else if (from instanceof JavaType.Variable) {
-                return isAssignableTo(to, ((JavaType.Variable) from).getType());
+                return isAssignableTo(predicate, ((JavaType.Variable) from).getType());
             } else if (from instanceof JavaType.Method) {
-                return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
+                return isAssignableTo(predicate, ((JavaType.Method) from).getReturnType());
             } else if (from instanceof JavaType.Primitive) {
                 JavaType.Primitive primitive = (JavaType.Primitive) from;
-                return to.toString().equals(primitive.getKeyword());
+                return predicate.test(primitive);
             }
         } catch (Exception e) {
             return false;
@@ -360,10 +399,7 @@ public class TypeUtils {
 
     @Nullable
     public static JavaType.FullyQualified asFullyQualified(@Nullable JavaType type) {
-        if (type instanceof JavaType.FullyQualified) {
-            if (type == JavaType.Unknown.getInstance()) {
-                return null;
-            }
+        if (type instanceof JavaType.FullyQualified && !(type instanceof JavaType.Unknown)) {
             return (JavaType.FullyQualified) type;
         }
         return null;
@@ -403,7 +439,12 @@ public class TypeUtils {
                 }
             }
         }
-        return methodResult.filter(m -> !m.getFlags().contains(Flag.Private) && !m.getFlags().contains(Flag.Static));
+
+        return methodResult
+                .filter(m -> !m.getFlags().contains(Flag.Private))
+                .filter(m -> !m.getFlags().contains(Flag.Static))
+                // If access level is default then check if subclass package is the same from parent class
+                .filter(m -> m.getFlags().contains(Flag.Public) || m.getDeclaringType().getPackageName().equals(dt.getPackageName()));
     }
 
     public static Optional<JavaType.Method> findDeclaredMethod(@Nullable JavaType.FullyQualified clazz, String name, List<JavaType> argumentTypes) {

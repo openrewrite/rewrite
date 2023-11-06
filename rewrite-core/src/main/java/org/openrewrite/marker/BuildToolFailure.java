@@ -22,6 +22,10 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.util.UUID;
 
+/**
+ * @deprecated Only included for backwards compatibility with old LSTs.
+ */
+@Deprecated
 @Value
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @With

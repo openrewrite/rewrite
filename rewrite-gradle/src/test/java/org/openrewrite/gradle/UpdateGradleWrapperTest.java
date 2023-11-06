@@ -132,12 +132,11 @@ class UpdateGradleWrapperTest implements RewriteTest {
               distributionSha256Sum=29e49b10984e585d8118b7d0bc452f944e386458df27371b49b4ac1dec4b7fda
               """,
             spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
-              .afterRecipe(gradleWrapperProperties -> {
-                  assertThat(gradleWrapperProperties.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool -> {
-                      assertThat(buildTool.getType()).isEqualTo(BuildTool.Type.Gradle);
-                      assertThat(buildTool.getVersion()).isEqualTo("7.4.2");
-                  });
-              })
+              .afterRecipe(gradleWrapperProperties ->
+                assertThat(gradleWrapperProperties.getMarkers().findFirst(BuildTool.class)).hasValueSatisfying(buildTool -> {
+                    assertThat(buildTool.getType()).isEqualTo(BuildTool.Type.Gradle);
+                    assertThat(buildTool.getVersion()).isEqualTo("7.4.2");
+                }))
           ),
           gradlew,
           gradlewBat,
@@ -222,9 +221,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new UpdateGradleWrapper("7.x", null, null, Boolean.FALSE))
             .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "7.4")))
-            .afterRecipe(run -> {
-                assertThat(run.getChangeset().getAllResults()).isEmpty();
-            })
+            .afterRecipe(run -> assertThat(run.getChangeset().getAllResults()).isEmpty())
         );
     }
 
@@ -403,6 +400,7 @@ class UpdateGradleWrapperTest implements RewriteTest {
 
                 var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
                 assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
+                //noinspection OptionalGetWithoutIsPresent
                 BuildTool buildTool = gradleWrapperJar.getMarkers().findFirst(BuildTool.class).get();
                 assertThat(buildTool.getVersion()).isNotEqualTo("7.4");
                 assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-" + buildTool.getVersion() + "-bin.zip"));
@@ -457,7 +455,9 @@ class UpdateGradleWrapperTest implements RewriteTest {
     private boolean isValidWrapperJar(Remote gradleWrapperJar) {
         try {
             Path testWrapperJar = Files.createTempFile("gradle-wrapper", "jar");
-            try (InputStream is = gradleWrapperJar.getInputStream(new HttpUrlConnectionSender(Duration.ofSeconds(5), Duration.ofSeconds(5)))) {
+            ExecutionContext ctx = new InMemoryExecutionContext();
+            HttpSenderExecutionContextView.view(ctx).setHttpSender(new HttpUrlConnectionSender(Duration.ofSeconds(5), Duration.ofSeconds(5)));
+            try (InputStream is = gradleWrapperJar.getInputStream(ctx)) {
                 Files.copy(is, testWrapperJar, StandardCopyOption.REPLACE_EXISTING);
                 try (FileSystem fs = FileSystems.newFileSystem(testWrapperJar)) {
                     return Files.exists(fs.getPath("org/gradle/cli/CommandLineParser.class"));

@@ -53,7 +53,7 @@ public class DeleteProperty extends Recipe {
 
     @Option(displayName = "Use relaxed binding",
             description = "Whether to match the `propertyKey` using [relaxed binding](https://docs.spring.io/spring-boot/docs/2.5.6/reference/html/features.html#features.external-config.typesafe-configuration-properties.relaxed-binding) " +
-                    "rules. Default is `true`. Set to `false`  to use exact matching.",
+                    "rules. Defaults to `true`. If you want to use exact matching in your search, set this to `false`.",
             required = false)
     @Nullable
     Boolean relaxedBinding;

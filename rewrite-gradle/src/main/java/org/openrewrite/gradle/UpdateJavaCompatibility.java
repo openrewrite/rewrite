@@ -30,6 +30,7 @@ import org.openrewrite.marker.SearchResult;
 import java.util.Collections;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -252,8 +253,8 @@ public class UpdateJavaCompatibility extends Recipe {
                                 randomId(),
                                 literal.getPrefix(),
                                 literal.getMarkers(),
-                                new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, "JavaVersion", JavaType.ShallowClass.build("org.gradle.api.JavaVersion"), null),
-                                new JLeftPadded<>(Space.EMPTY, new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, name, null, null), Markers.EMPTY),
+                                new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "JavaVersion", JavaType.ShallowClass.build("org.gradle.api.JavaVersion"), null),
+                                new JLeftPadded<>(Space.EMPTY, new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name, null, null), Markers.EMPTY),
                                 JavaType.ShallowClass.build("org.gradle.api.JavaVersion")
                         );
                     } else if (style == DeclarationStyle.Number) {
@@ -268,16 +269,16 @@ public class UpdateJavaCompatibility extends Recipe {
                     J.FieldAccess fieldAccess = (J.FieldAccess) expression;
                     if (style == DeclarationStyle.String) {
                         String newVersion = version <= 8 ? "1." + version : String.valueOf(version);
-                        expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), newVersion, "'" + newVersion + "'", Collections.emptyList(), JavaType.Primitive.String);
+                        expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), newVersion, "'" + newVersion + "'", emptyList(), JavaType.Primitive.String);
                     } else if (style == DeclarationStyle.Enum) {
                         String name = version <= 8 ? "VERSION_1_" + version : "VERSION_" + version;
                         expression = fieldAccess.withName(fieldAccess.getName().withSimpleName(name));
                     } else if (style == DeclarationStyle.Number) {
                         if (version <= 8) {
                             double doubleValue = Double.parseDouble("1." + version);
-                            expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), doubleValue, String.valueOf(doubleValue), Collections.emptyList(), JavaType.Primitive.Double);
+                            expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), doubleValue, String.valueOf(doubleValue), emptyList(), JavaType.Primitive.Double);
                         } else {
-                            expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), version, String.valueOf(version), Collections.emptyList(), JavaType.Primitive.Int);
+                            expression = new J.Literal(randomId(), fieldAccess.getPrefix(), fieldAccess.getMarkers(), version, String.valueOf(version), emptyList(), JavaType.Primitive.Int);
                         }
                     }
                 } else if (expression instanceof J.MethodInvocation && javaVersionToVersionMatcher.matches((J.MethodInvocation) expression)) {
@@ -303,23 +304,23 @@ public class UpdateJavaCompatibility extends Recipe {
                         }));
                     } else if (style == DeclarationStyle.String) {
                         String newVersion = version <= 8 ? "1." + version : String.valueOf(version);
-                        expression = new J.Literal(randomId(), m.getPrefix(), m.getMarkers(), newVersion, "'" + newVersion + "'", Collections.emptyList(), JavaType.Primitive.String);
+                        expression = new J.Literal(randomId(), m.getPrefix(), m.getMarkers(), newVersion, "'" + newVersion + "'", emptyList(), JavaType.Primitive.String);
                     } else if (style == DeclarationStyle.Enum) {
                         String name = version <= 8 ? "VERSION_1_" + version : "VERSION_" + version;
                         expression = new J.FieldAccess(
                                 randomId(),
                                 m.getPrefix(),
                                 m.getMarkers(),
-                                new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, "JavaVersion", JavaType.ShallowClass.build("org.gradle.api.JavaVersion"), null),
-                                new JLeftPadded<>(Space.EMPTY, new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, name, null, null), Markers.EMPTY),
+                                new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), "JavaVersion", JavaType.ShallowClass.build("org.gradle.api.JavaVersion"), null),
+                                new JLeftPadded<>(Space.EMPTY, new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), name, null, null), Markers.EMPTY),
                                 JavaType.ShallowClass.build("org.gradle.api.JavaVersion")
                         );
                     } else if (style == DeclarationStyle.Number) {
                         if (version <= 8) {
                             double doubleValue = Double.parseDouble("1." + version);
-                            expression = new J.Literal(randomId(), m.getPrefix(), m.getMarkers(), doubleValue, String.valueOf(doubleValue), Collections.emptyList(), JavaType.Primitive.Double);
+                            expression = new J.Literal(randomId(), m.getPrefix(), m.getMarkers(), doubleValue, String.valueOf(doubleValue), emptyList(), JavaType.Primitive.Double);
                         } else {
-                            expression = new J.Literal(randomId(), m.getPrefix(), m.getMarkers(), version, String.valueOf(version), Collections.emptyList(), JavaType.Primitive.Int);
+                            expression = new J.Literal(randomId(), m.getPrefix(), m.getMarkers(), version, String.valueOf(version), emptyList(), JavaType.Primitive.Int);
                         }
                     }
                 }

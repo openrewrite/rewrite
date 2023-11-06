@@ -30,7 +30,7 @@ import java.util.Objects;
 @EqualsAndHashCode(callSuper = true)
 public class ChangePropertyValue extends Recipe {
     @Option(displayName = "Property key",
-            description = "The key to look for. Glob is supported.",
+            description = "The key to look for. Supports glob patterns.",
             example = "management.metrics.binders.*.enabled")
     String propertyKey;
 
@@ -45,7 +45,7 @@ public class ChangePropertyValue extends Recipe {
     String oldValue;
 
     @Option(displayName = "Regex",
-            description = "Default false. If enabled, `oldValue` will be interpreted as a Regular Expression, and capture group contents will be available in `newValue`",
+            description = "Defaults to `false`. If enabled, `oldValue` will be interpreted as a regular expression, and the capture group contents will be available in `newValue`",
             required = false)
     @Nullable
     Boolean regex;
@@ -64,8 +64,7 @@ public class ChangePropertyValue extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change a YAML property. Nested YAML mappings are interpreted as dot separated property names, i.e. " +
-                " as Spring Boot interprets `application.yml` files.";
+        return "Change a YAML property. Expects dot notation for nested YAML mappings, similar to how Spring Boot interprets `application.yml` files.";
     }
 
     @Override

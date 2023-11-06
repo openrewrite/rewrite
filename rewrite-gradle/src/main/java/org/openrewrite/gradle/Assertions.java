@@ -16,6 +16,7 @@
 package org.openrewrite.gradle;
 
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
 import org.openrewrite.SourceFile;
@@ -27,6 +28,7 @@ import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.groovy.GroovyParser;
 import org.openrewrite.groovy.tree.G;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.marker.OperatingSystemProvenance;
 import org.openrewrite.properties.tree.Properties;
 import org.openrewrite.test.SourceSpec;
@@ -88,7 +90,7 @@ public class Assertions {
                     }
 
                     if (version != null) {
-                        GradleWrapper gradleWrapper = requireNonNull(GradleWrapper.validate(new InMemoryExecutionContext(), version, distribution, null).getValue());
+                        GradleWrapper gradleWrapper = GradleWrapper.create(distribution, version, null, new InMemoryExecutionContext());
                         Files.createDirectories(projectDir.resolve("gradle/wrapper/"));
                         Files.write(projectDir.resolve(GradleWrapper.WRAPPER_PROPERTIES_LOCATION), ("distributionBase=GRADLE_USER_HOME\n" +
                                 "distributionPath=wrapper/dists\n" +
@@ -113,8 +115,9 @@ public class Assertions {
                         if (sourceFile.getSourcePath().toString().endsWith(".gradle")) {
                             if (sourceFile.getSourcePath().endsWith("settings.gradle")) {
                                 OpenRewriteModel model = OpenRewriteModelBuilder.forProjectDirectory(tempDirectory.resolve(sourceFile.getSourcePath()).getParent().toFile(), null);
-                                if (model.gradleSettings() != null) {
-                                    GradleSettings gradleSettings = GradleSettings.fromToolingModel(model.gradleSettings());
+                                org.openrewrite.gradle.toolingapi.GradleSettings rawSettings = model.gradleSettings();
+                                if (rawSettings != null) {
+                                    GradleSettings gradleSettings = GradleSettings.fromToolingModel(rawSettings);
                                     sourceFiles.set(i, sourceFile.withMarkers(sourceFile.getMarkers().add(gradleSettings)));
                                 }
                             } else {

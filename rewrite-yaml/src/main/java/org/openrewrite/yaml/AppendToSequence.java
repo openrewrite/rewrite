@@ -29,7 +29,7 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = true)
 public class AppendToSequence extends Recipe {
     @Option(displayName = "sequence path",
-            description = "A JsonPath expression to locate a YAML sequence.",
+            description = "A [JsonPath](https://github.com/json-path/JsonPath) expression to locate a YAML sequence.",
             example = "$.universe.planets")
     String sequencePath;
 
@@ -39,14 +39,14 @@ public class AppendToSequence extends Recipe {
     String value;
 
     @Option(displayName = "Optional: match existing sequence values",
-            description = "Recipe appends to sequence only when existing sequence values match",
+            description = "If specified, the item will only be appended if the existing sequence matches these values.",
             example = "existingValue1",
             required = false)
     @Nullable
     List<String> existingSequenceValues;
 
     @Option(displayName = "Optional: match existing sequence values in any order",
-            description = "match existing sequence values in any order",
+            description = "If specified in combination with the above parameter, the item will only be appended if the existing sequence has the specified values in any order.",
             example = "true",
             required = false)
     @Nullable

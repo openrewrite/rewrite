@@ -32,5 +32,9 @@ public class SourcesFiles extends DataTable<SourcesFiles.Row> {
         @Column(displayName = "Source path before the run",
                 description = "The source path of the file before the run.")
         String sourcePath;
+
+        @Column(displayName = "LST type",
+                description = "The LST model type that the file is parsed as.")
+        String type;
     }
 }

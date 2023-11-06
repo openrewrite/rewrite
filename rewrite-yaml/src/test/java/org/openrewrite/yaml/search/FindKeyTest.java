@@ -63,4 +63,45 @@ class FindKeyTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3401")
+    @Test
+    void findKeyWithMultipleBinaryExpressions() {
+        rewriteRun(
+          spec -> spec.recipe(new FindKey("$.foo.bar[?(@.types == 'something' && @.group == 'group' && @.category == 'match' && @.type == 'type')].pattern")),
+          yaml("""
+              foo:
+                bar:
+                  -
+                    type: "type"
+                    group: "group"
+                    category: "other"
+                    types: "something"
+                    pattern: "p1"
+                  -
+                    type: "type"
+                    group: "group"
+                    category: "match"
+                    types: "something"
+                    pattern: "p2"
+              """,
+            """
+              foo:
+                bar:
+                  -
+                    type: "type"
+                    group: "group"
+                    category: "other"
+                    types: "something"
+                    pattern: "p1"
+                  -
+                    type: "type"
+                    group: "group"
+                    category: "match"
+                    types: "something"
+                    ~~>pattern: "p2"
+              """
+          )
+        );
+    }
 }

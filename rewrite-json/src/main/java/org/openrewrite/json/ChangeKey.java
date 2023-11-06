@@ -40,7 +40,7 @@ public class ChangeKey extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Change a JSON mapping entry key leaving the value intact.";
+        return "Change a JSON mapping entry key, while leaving the value intact.";
     }
 
     @Override

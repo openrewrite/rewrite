@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.Setter;
 import org.intellij.lang.annotations.Language;
@@ -54,6 +55,7 @@ import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescrip
  * returns a list of {@link Result results} for each modified {@link SourceFile}
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
+@JsonPropertyOrder({"@c"}) // serialize type info first
 public abstract class Recipe implements Cloneable {
     public static final String PANIC = "__AHHH_PANIC!!!__";
 
@@ -83,11 +85,6 @@ public abstract class Recipe implements Cloneable {
         @Override
         public String getDescription() {
             return "Default no-op test, does nothing.";
-        }
-
-        @Override
-        public TreeVisitor<?, ExecutionContext> getVisitor() {
-            return TreeVisitor.noop();
         }
     }
 
@@ -320,7 +317,7 @@ public abstract class Recipe implements Cloneable {
         return validateAll(new InMemoryExecutionContext(), new ArrayList<>());
     }
 
-    private Collection<Validated<Object>> validateAll(ExecutionContext ctx, Collection<Validated<Object>> acc) {
+    public Collection<Validated<Object>> validateAll(ExecutionContext ctx, Collection<Validated<Object>> acc) {
         acc.add(validate(ctx));
         for (Recipe recipe : getRecipeList()) {
             recipe.validateAll(ctx, acc);

@@ -32,11 +32,29 @@ public interface TemplateParameterParserVisitor<T> extends ParseTreeVisitor<T> {
 	 */
 	T visitMatcherPattern(TemplateParameterParser.MatcherPatternContext ctx);
 	/**
+	 * Visit a parse tree produced by {@link TemplateParameterParser#typedPattern}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitTypedPattern(TemplateParameterParser.TypedPatternContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link TemplateParameterParser#patternType}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitPatternType(TemplateParameterParser.PatternTypeContext ctx);
+	/**
 	 * Visit a parse tree produced by {@link TemplateParameterParser#matcherParameter}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitMatcherParameter(TemplateParameterParser.MatcherParameterContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link TemplateParameterParser#parameterName}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitParameterName(TemplateParameterParser.ParameterNameContext ctx);
 	/**
 	 * Visit a parse tree produced by {@link TemplateParameterParser#matcherName}.
 	 * @param ctx the parse tree

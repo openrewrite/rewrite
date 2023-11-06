@@ -19,6 +19,8 @@ concurrency:
 jobs:
   build:
     uses: openrewrite/gh-automation/.github/workflows/ci-gradle.yml@main
+    with:
+      java_version: 21
     secrets:
       gradle_enterprise_access_key: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
       gradle_enterprise_cache_username: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
@@ -27,36 +29,3 @@ jobs:
       ossrh_token: ${{ secrets.OSSRH_TOKEN }}
       ossrh_signing_key: ${{ secrets.OSSRH_SIGNING_KEY }}
       ossrh_signing_password: ${{ secrets.OSSRH_SIGNING_PASSWORD }}
-#  test-downstream:
-#    needs: build
-#    strategy:
-#      fail-fast: false
-#      matrix:
-#        repository: [ rewrite-java-security , rewrite-spring, rewrite-migrate-java ]
-#    runs-on: ubuntu-latest
-#    steps:
-#      - name: Checkout
-#        uses: actions/checkout@v3
-#        with:
-#          path: rewrite
-#          fetch-depth: 0
-#      - name: Checkout ${{ matrix.repository }} repo
-#        uses: actions/checkout@v3
-#        with:
-#          repository: openrewrite/${{ matrix.repository }}
-#          path: ${{ matrix.repository }}
-#          fetch-depth: 0
-#      - name: Setup Java
-#        uses: actions/setup-java@v3.11.0
-#        with:
-#          distribution: temurin
-#          java-version: 17
-#      - name: Build
-#        uses: gradle/gradle-build-action@v2
-#        with:
-#          arguments: --console=plain --info --stacktrace --warning-mode=all --no-daemon --include-build ../rewrite build
-#          build-root-directory: ${{ matrix.repository }}
-#        env:
-#          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-#          GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-#          GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}

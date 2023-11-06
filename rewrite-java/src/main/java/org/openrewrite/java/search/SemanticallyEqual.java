@@ -871,11 +871,11 @@ public class SemanticallyEqual {
                     return method;
                 }
 
-                boolean static_ = method.getMethodType().hasFlags(Flag.Static);
+                boolean static_ = method.getMethodType() != null && method.getMethodType().hasFlags(Flag.Static);
                 J.MethodInvocation compareTo = (J.MethodInvocation) j;
                 if (!method.getSimpleName().equals(compareTo.getSimpleName()) ||
                     !TypeUtils.isOfType(method.getMethodType(), compareTo.getMethodType()) ||
-                    !(static_ == compareTo.getMethodType().hasFlags(Flag.Static) ||
+                    !(static_ == (compareTo.getMethodType() != null && compareTo.getMethodType().hasFlags(Flag.Static)) ||
                       !nullMissMatch(method.getSelect(), compareTo.getSelect())) ||
                     method.getArguments().size() != compareTo.getArguments().size() ||
                     nullListSizeMissMatch(method.getTypeParameters(), compareTo.getTypeParameters())) {

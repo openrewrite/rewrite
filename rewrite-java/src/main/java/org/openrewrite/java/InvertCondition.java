@@ -20,7 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.cleanup.SimplifyBooleanExpression;
+import org.openrewrite.java.cleanup.SimplifyBooleanExpressionVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -47,7 +47,7 @@ public class InvertCondition extends JavaVisitor<ExecutionContext> {
             t = super.visit(tree, ctx);
         }
 
-        return (J) new SimplifyBooleanExpression().getVisitor().visit(t, ctx, getCursor().getParentOrThrow());
+        return new SimplifyBooleanExpressionVisitor().visit(t, ctx, getCursor().getParentOrThrow());
     }
 
     @Override

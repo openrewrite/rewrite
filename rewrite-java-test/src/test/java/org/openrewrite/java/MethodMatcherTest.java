@@ -23,6 +23,7 @@ import org.openrewrite.java.search.FindMethods;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import java.util.regex.Pattern;
 
@@ -430,6 +431,7 @@ class MethodMatcherTest implements RewriteTest {
     @Test
     void matcherForUnknownType() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(
             """
               class Test {

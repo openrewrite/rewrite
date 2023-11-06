@@ -18,6 +18,7 @@ package org.openrewrite;
 import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.ipc.http.HttpSender;
+import org.openrewrite.remote.Remote;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -84,29 +85,35 @@ public class Checksum {
         }
     }
 
-    public static SourceFile md5(SourceFile sourceFile) {
-        return checksum(sourceFile, "MD5");
+    public static SourceFile md5(SourceFile sourceFile, ExecutionContext ctx) {
+        return checksum(sourceFile, "MD5", ctx);
     }
 
-    public static SourceFile sha256(SourceFile sourceFile) {
-        return checksum(sourceFile, "SHA-256");
+    public static SourceFile sha256(SourceFile sourceFile, ExecutionContext ctx) {
+        return checksum(sourceFile, "SHA-256", ctx);
     }
 
-    public static SourceFile checksum(SourceFile sourceFile, @Nullable String algorithm) {
+    public static SourceFile checksum(SourceFile sourceFile, @Nullable String algorithm, ExecutionContext ctx) {
         if(algorithm == null) {
             return sourceFile;
         }
 
         try {
             MessageDigest md = MessageDigest.getInstance(algorithm);
-            try (InputStream is = Files.newInputStream(sourceFile.getSourcePath());
-                 DigestInputStream dis = new DigestInputStream(is, md)) {
+            InputStream is;
+            if (sourceFile instanceof Remote) {
+                is = ((Remote) sourceFile).getInputStream(ctx);
+            } else {
+                is = Files.newInputStream(sourceFile.getSourcePath());
+            }
+
+            try (DigestInputStream dis = new DigestInputStream(is, md)) {
                 //noinspection StatementWithEmptyBody
                 while (dis.read() != -1) {
-                    // read decorated stream to EOF
+                    // read stream to EOF
                 }
+                return sourceFile.withChecksum(new Checksum(algorithm, md.digest()));
             }
-            return sourceFile.withChecksum(new Checksum(algorithm, md.digest()));
         } catch (NoSuchAlgorithmException | IOException e) {
             throw new IllegalArgumentException(e);
         }

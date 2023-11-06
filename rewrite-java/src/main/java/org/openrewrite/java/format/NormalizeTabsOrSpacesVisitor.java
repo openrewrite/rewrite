@@ -83,10 +83,9 @@ public class NormalizeTabsOrSpacesVisitor<P> extends JavaIsoVisitor<P> {
                 StringBuilder textBuilder = new StringBuilder();
                 int consecutiveSpaces = 0;
                 boolean inMargin = true;
-                char[] charArray = text.toCharArray();
                 outer:
-                for (int i = 0; i < charArray.length; i++) {
-                    char c = charArray[i];
+                for (int i = 0; i < text.length(); i++) {
+                    char c = text.charAt(i);
                     if (c == '\n' || c == '\r') {
                         inMargin = true;
                         consecutiveSpaces = 0;
@@ -94,10 +93,10 @@ public class NormalizeTabsOrSpacesVisitor<P> extends JavaIsoVisitor<P> {
                     } else if (!inMargin) {
                         textBuilder.append(c);
                     } else if (style.getUseTabCharacter() && c == ' ' && (!isComment ||
-                            (i + 1 < charArray.length && charArray[i + 1] != '*'))) {
+                            (i + 1 < text.length() && text.charAt(i + 1) != '*'))) {
                         int j = i + 1;
-                        for (; j < charArray.length && j < style.getTabSize(); j++) {
-                            if (charArray[j] != ' ') {
+                        for (; j < text.length() && j < style.getTabSize(); j++) {
+                            if (text.charAt(j) != ' ') {
                                 continue outer;
                             }
                         }

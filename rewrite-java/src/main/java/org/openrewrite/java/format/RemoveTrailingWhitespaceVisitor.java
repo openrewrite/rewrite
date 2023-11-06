@@ -40,7 +40,8 @@ public class RemoveTrailingWhitespaceVisitor<P> extends JavaIsoVisitor<P> {
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
         String eof = cu.getEof().getWhitespace();
         StringBuilder builder = new StringBuilder();
-        for (char c : eof.toCharArray()) {
+        for (int i = 0; i < eof.length(); i++) {
+            char c = eof.charAt(i);
             if (c == '\n' || c == '\r') {
                 builder.appendCodePoint(c);
             }
@@ -53,13 +54,13 @@ public class RemoveTrailingWhitespaceVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public Space visitSpace(Space space, Space.Location loc, P p) {
         Space s = space;
-        int lastNewline = s.getWhitespace().lastIndexOf('\n');
+        String whitespace = s.getWhitespace();
+        int lastNewline = whitespace.lastIndexOf('\n');
         // Skip import prefixes, leave those up to OrderImports which better understands that domain
         if (lastNewline > 0 && loc != Space.Location.IMPORT_PREFIX) {
             StringBuilder ws = new StringBuilder();
-            char[] charArray = s.getWhitespace().toCharArray();
-            for (int i = 0; i < charArray.length; i++) {
-                char c = charArray[i];
+            for (int i = 0; i < whitespace.length(); i++) {
+                char c = whitespace.charAt(i);
                 if (i >= lastNewline) {
                     ws.append(c);
                 } else if (c == ',' || c == '\r' || c == '\n') {

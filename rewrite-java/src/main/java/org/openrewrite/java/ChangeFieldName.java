@@ -18,9 +18,10 @@ package org.openrewrite.java;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.*;
-
-import static org.openrewrite.Tree.randomId;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JLeftPadded;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
@@ -31,14 +32,16 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, P p) {
-        J.VariableDeclarations.NamedVariable v = variable;
+        J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, p);
         J.ClassDeclaration enclosingClass = getCursor().firstEnclosing(J.ClassDeclaration.class);
-        if(enclosingClass == null) {
+        if (enclosingClass == null) {
             return v;
         }
         if (variable.isField(getCursor()) && matchesClass(enclosingClass.getType()) &&
                 variable.getSimpleName().equals(hasName)) {
-            v = v.withName(v.getName().withSimpleName(toName));
+            if (v.getVariableType() != null) {
+                v = v.withVariableType(v.getVariableType().withName(toName));
+            }
         }
         if (variable.getPadding().getInitializer() != null) {
             v = v.getPadding().withInitializer(visitLeftPadded(variable.getPadding().getInitializer(),
@@ -67,21 +70,7 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
                 if (varType.getOwner() instanceof JavaType.Method) {
                     return i;
                 }
-                i = new J.Identifier(
-                        randomId(),
-                        i.getPrefix(),
-                        i.getMarkers(),
-                        toName,
-                        i.getType(),
-                        new JavaType.Variable(
-                                null,
-                                Flag.flagsToBitMap(varType.getFlags()),
-                                toName,
-                                varType.getOwner(),
-                                varType.getType(),
-                                varType.getAnnotations()
-                        )
-                );
+                return i.withSimpleName(toName).withFieldType(varType.withName(toName));
             }
         }
 

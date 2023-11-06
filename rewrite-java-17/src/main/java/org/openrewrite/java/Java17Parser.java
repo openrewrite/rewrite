@@ -89,7 +89,7 @@ public class Java17Parser implements JavaParser {
                 parserConstructor.setAccessible(true);
 
                 JavaParser delegate = (JavaParser) parserConstructor
-                        .newInstance(logCompilationWarningsAndErrors, classpath, classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
+                        .newInstance(logCompilationWarningsAndErrors, resolvedClasspath(), classBytesClasspath, dependsOn, charset, styles, javaTypeCache);
 
                 return new Java17Parser(delegate);
             } catch (Exception e) {

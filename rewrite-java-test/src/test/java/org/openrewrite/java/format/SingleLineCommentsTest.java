@@ -47,4 +47,17 @@ class SingleLineCommentsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void emptyCommentLineDoesNotGetTrailingBlank() {
+        rewriteRun(
+          java(
+            """
+              // Copyright
+              //
+              // Some long license text
+              """
+          )
+        );
+    }
 }

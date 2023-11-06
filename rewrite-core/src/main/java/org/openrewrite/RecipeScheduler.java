@@ -141,7 +141,7 @@ public class RecipeScheduler {
         public LargeSourceSet scanSources(LargeSourceSet sourceSet, int cycle) {
             return mapForRecipeRecursively(sourceSet, (recipeStack, sourceFile) -> {
                 Recipe recipe = recipeStack.peek();
-                if (recipe.maxCycles() < cycle || !recipe.validate(ctx).isValid()) {
+                if (sourceFile == null || recipe.maxCycles() < cycle) {
                     return sourceFile;
                 }
 
@@ -175,7 +175,7 @@ public class RecipeScheduler {
             while (!allRecipesStack.isEmpty()) {
                 Stack<Recipe> recipeStack = allRecipesStack.pop();
                 Recipe recipe = recipeStack.peek();
-                if (recipe.maxCycles() < cycle || !recipe.validate(ctx).isValid()) {
+                if (recipe.maxCycles() < cycle) {
                     continue;
                 }
 
@@ -200,7 +200,7 @@ public class RecipeScheduler {
         public LargeSourceSet editSources(LargeSourceSet sourceSet, int cycle) {
             return mapForRecipeRecursively(sourceSet, (recipeStack, sourceFile) -> {
                 Recipe recipe = recipeStack.peek();
-                if (recipe.maxCycles() < cycle || !recipe.validate(ctx).isValid()) {
+                if (sourceFile == null || recipe.maxCycles() < cycle) {
                     return sourceFile;
                 }
 
@@ -241,6 +241,7 @@ public class RecipeScheduler {
                             // that later fails to apply on a freshly cloned repository
                             return sourceFile;
                         }
+                        recipeRunStats.recordSourceFileChanged(sourceFile, after);
                     }
                 } catch (Throwable t) {
                     after = handleError(recipe, sourceFile, after, t);
@@ -319,7 +320,7 @@ public class RecipeScheduler {
             return after;
         }
 
-        private LargeSourceSet mapForRecipeRecursively(LargeSourceSet sourceSet, BiFunction<Stack<Recipe>, SourceFile, SourceFile> mapFn) {
+        private LargeSourceSet mapForRecipeRecursively(LargeSourceSet sourceSet, BiFunction<Stack<Recipe>, @Nullable SourceFile, @Nullable SourceFile> mapFn) {
             return sourceSet.edit(sourceFile -> {
                 Stack<Stack<Recipe>> allRecipesStack = initRecipeStack();
 

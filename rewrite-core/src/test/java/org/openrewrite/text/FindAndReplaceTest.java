@@ -15,9 +15,15 @@
  */
 package org.openrewrite.text;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Recipe;
 import org.openrewrite.test.RewriteTest;
+
+import java.util.Arrays;
+import java.util.List;
 
 import static org.openrewrite.test.SourceSpecs.text;
 
@@ -103,4 +109,40 @@ class FindAndReplaceTest implements RewriteTest {
         );
     }
 
+    @Value
+    @EqualsAndHashCode(callSuper = true)
+    static class MultiFindAndReplace extends Recipe {
+
+        @Override
+        public String getDisplayName() {
+            return "Replaces \"one\" with \"two\" then \"three\" then \"four\"";
+        }
+
+        @Override
+        public String getDescription() {
+            return "Replaces \"one\" with \"two\" then \"three\" then \"four\".";
+        }
+
+        @Override
+        public List<Recipe> getRecipeList() {
+            return Arrays.asList(
+              new FindAndReplace("one", "two", null, null, null, null, null),
+              new FindAndReplace("two", "three", null, null, null, null, null),
+              new FindAndReplace("three", "four", null, null, null, null, null));
+        }
+    }
+    @Test
+    void successiveReplacement() {
+        rewriteRun(
+          spec -> spec.recipe(new MultiFindAndReplace()),
+          text(
+            """
+              one
+              """,
+            """
+              four
+              """
+          )
+        );
+    }
 }

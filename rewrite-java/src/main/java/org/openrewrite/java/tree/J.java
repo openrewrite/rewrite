@@ -2349,6 +2349,7 @@ public interface J extends Tree {
 
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
     @With
     class Identifier implements J, TypeTree, Expression {
         @Getter
@@ -2361,6 +2362,8 @@ public interface J extends Tree {
         @Getter
         Markers markers;
 
+        List<J.Annotation> annotations;
+
         String simpleName;
 
         @Nullable
@@ -2368,6 +2371,20 @@ public interface J extends Tree {
 
         @Nullable
         JavaType.Variable fieldType;
+
+        /**
+         * @deprecated Use {@link #Identifier(UUID, Space, Markers, List, String, JavaType, JavaType.Variable)} instead.
+         */
+        @Deprecated
+        public Identifier(UUID id, Space prefix, Markers markers, String simpleName, @Nullable JavaType type, @Nullable JavaType.Variable fieldType) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.annotations = emptyList();
+            this.simpleName = simpleName;
+            this.type = type;
+            this.fieldType = fieldType;
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -3782,6 +3799,7 @@ public interface J extends Tree {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
     @Data
     final class Modifier implements J {
         public static boolean hasModifier(Collection<Modifier> modifiers, Modifier.Type modifier) {
@@ -3798,12 +3816,33 @@ public interface J extends Tree {
         @With
         Markers markers;
 
+        /**
+         * For languages other than Java the type will be Modifier.Type.LanguageExtension and its text will be this keyword.
+         * For all keywords which appear in Java this will be null.
+         */
+        @With
+        @Nullable
+        String keyword;
+
         @With
         Type type;
 
         @With
         @Getter
         List<Annotation> annotations;
+
+        /**
+         * @deprecated Use {@link #Modifier(UUID, Space, Markers, String, Type, List)} instead.
+         */
+        @Deprecated
+        public Modifier(UUID id, Space prefix, Markers markers, Type type, List<Annotation> annotations) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.keyword = null;
+            this.type = type;
+            this.annotations = annotations;
+        }
 
         @Override
         public String toString() {
@@ -3829,7 +3868,13 @@ public interface J extends Tree {
             Synchronized,
             Native,
             Strictfp,
-            Async
+            Async,
+            Reified,
+            Inline,
+            /**
+             * For modifiers not seen in Java this is used in conjunction with "keyword"
+             */
+            LanguageExtension
         }
     }
 

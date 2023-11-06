@@ -35,7 +35,7 @@ public class LocalMavenArtifactCache implements MavenArtifactCache {
     private final Path cache;
 
     public LocalMavenArtifactCache(Path cache) {
-        if(!cache.toFile().exists() && !cache.toFile().mkdirs()) {
+        if (!cache.toFile().exists() && !cache.toFile().mkdirs()) {
             throw new IllegalStateException("Unable to find or create maven artifact cache at " + cache);
         }
         this.cache = cache;
@@ -51,15 +51,16 @@ public class LocalMavenArtifactCache implements MavenArtifactCache {
     @Override
     @Nullable
     public Path putArtifact(ResolvedDependency dependency, InputStream artifactInputStream, Consumer<Throwable> onError) {
+        if (artifactInputStream == null) {
+            return null;
+        }
         Path path = dependencyPath(dependency);
         try (InputStream is = artifactInputStream;
              OutputStream out = Files.newOutputStream(path)) {
-            if (is != null) {
-                byte[] buffer = new byte[1024];
-                int read;
-                while ((read = is.read(buffer, 0, 1024)) >= 0) {
-                    out.write(buffer, 0, read);
-                }
+            byte[] buffer = new byte[1024];
+            int read;
+            while ((read = is.read(buffer, 0, 1024)) >= 0) {
+                out.write(buffer, 0, read);
             }
         } catch (Throwable t) {
             onError.accept(t);
@@ -85,8 +86,8 @@ public class LocalMavenArtifactCache implements MavenArtifactCache {
         }
 
         return resolvedPath.resolve(dependency.getArtifactId() + "-" +
-                (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
-                (dependency.getRequested().getClassifier() == null ? "" : dependency.getRequested().getClassifier()) +
-                ".jar");
+                                    (dependency.getDatedSnapshotVersion() == null ? dependency.getVersion() : dependency.getDatedSnapshotVersion()) +
+                                    (dependency.getRequested().getClassifier() == null ? "" : dependency.getRequested().getClassifier()) +
+                                    ".jar");
     }
 }

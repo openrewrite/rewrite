@@ -15,11 +15,10 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Recipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.java.tree.JavaType;
@@ -52,8 +51,20 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
+        return getVisitor(null);
+    }
+
+    public static <J2 extends J> TreeVisitor<J, ExecutionContext> modifyOnly(J2 subtree) {
+        return getVisitor(subtree);
+    }
+
+    @NonNull
+    private static JavaVisitor<ExecutionContext> getVisitor(@Nullable J scope) {
         return new JavaVisitor<ExecutionContext>() {
             final Map<String, JavaType> usedTypes = new HashMap<>();
+            final JavaTypeSignatureBuilder signatureBuilder = new DefaultJavaTypeSignatureBuilder();
+
+            boolean modify = scope == null;
 
             private void ensureInitialized() {
                 if (!usedTypes.isEmpty()) {
@@ -96,6 +107,22 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
             }
 
             @Override
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                @SuppressWarnings("DataFlowIssue")
+                boolean subtreeRoot = !modify && (scope.equals(tree) || scope.isScope(tree));
+                if (subtreeRoot) {
+                    modify = true;
+                }
+                try {
+                    return super.visit(tree, ctx);
+                } finally {
+                    if (subtreeRoot) {
+                        modify = false;
+                    }
+                }
+            }
+
+            @Override
             public J visitImport(J.Import import_, ExecutionContext ctx) {
                 // stop recursion
                 return import_;
@@ -109,12 +136,17 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
 
             @Override
             public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+                if (!modify) {
+                    return super.visitFieldAccess(fieldAccess, ctx);
+                }
+
                 JavaType type = fieldAccess.getType();
                 if (fieldAccess.getName().getFieldType() == null && type instanceof JavaType.Class && ((JavaType.Class) type).getOwningClass() == null) {
                     ensureInitialized();
 
                     String simpleName = fieldAccess.getSimpleName();
-                    if (type.equals(usedTypes.get(simpleName))) {
+                    JavaType usedType = usedTypes.get(simpleName);
+                    if (type == usedType || signatureBuilder.signature(type).equals(signatureBuilder.signature(usedType))) {
                         return fieldAccess.getName().withPrefix(fieldAccess.getPrefix());
                     } else if (!usedTypes.containsKey(simpleName)) {
                         String fullyQualifiedName = ((JavaType.FullyQualified) type).getFullyQualifiedName();

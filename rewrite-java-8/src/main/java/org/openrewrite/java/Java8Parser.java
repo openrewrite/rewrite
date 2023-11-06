@@ -135,7 +135,7 @@ public class Java8Parser implements JavaParser {
                 delegateParserConstructor.setAccessible(true);
 
                 JavaParser delegate = (JavaParser) delegateParserConstructor
-                        .newInstance(classpath, classBytesClasspath, dependsOn, charset, logCompilationWarningsAndErrors, styles, javaTypeCache);
+                        .newInstance(resolvedClasspath(), classBytesClasspath, dependsOn, charset, logCompilationWarningsAndErrors, styles, javaTypeCache);
 
                 return new Java8Parser(delegate);
             } catch (Exception e) {

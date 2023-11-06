@@ -28,7 +28,7 @@ class FindImportsTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindImports("java.util..*"));
+        spec.recipe(new FindImports("java.util..*", null));
     }
 
     @Test
@@ -79,7 +79,7 @@ class FindImportsTest implements RewriteTest {
     @Test
     void starImportMatchesExact() {
         rewriteRun(
-          spec -> spec.recipe(new FindImports("java.util.List")),
+          spec -> spec.recipe(new FindImports("java.util.List", null)),
           java(
             """
               import java.util.*;

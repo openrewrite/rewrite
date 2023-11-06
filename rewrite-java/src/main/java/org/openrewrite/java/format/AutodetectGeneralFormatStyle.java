@@ -16,11 +16,12 @@
 package org.openrewrite.java.format;
 
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.style.GeneralFormatStyle;
 
 public class AutodetectGeneralFormatStyle extends JavaIsoVisitor<LineEndingsCount> {
+
+    AutodetectJavadocVisitor javadocVisitor = new AutodetectJavadocVisitor();
 
     /**
      * Makes a best-effort attempt to determine whether windows-style (CRLF) line endings or unix-style (LF) are
@@ -38,7 +39,18 @@ public class AutodetectGeneralFormatStyle extends JavaIsoVisitor<LineEndingsCoun
 
     @Override
     public Space visitSpace(Space space, Space.Location loc, LineEndingsCount count) {
-        String s = space.getWhitespace();
+        processString(space.getWhitespace(), count);
+        for (Comment comment : space.getComments()) {
+            if (comment instanceof TextComment) {
+                processString(((TextComment) comment).getText(), count);
+            } else if (comment instanceof Javadoc) {
+                javadocVisitor.visit((Javadoc) comment, count);
+            }
+        }
+        return space;
+    }
+
+    private static void processString(String s, LineEndingsCount count) {
         for (int i = 0; i < s.length(); i++) {
             char current = s.charAt(i);
             char next = '\0';
@@ -52,7 +64,18 @@ public class AutodetectGeneralFormatStyle extends JavaIsoVisitor<LineEndingsCoun
                 count.lf++;
             }
         }
-        return super.visitSpace(space, loc, count);
+    }
+
+    private class AutodetectJavadocVisitor extends org.openrewrite.java.JavadocVisitor<LineEndingsCount> {
+        public AutodetectJavadocVisitor() {
+            super(AutodetectGeneralFormatStyle.this);
+        }
+
+        @Override
+        public Javadoc visitLineBreak(Javadoc.LineBreak lineBreak, LineEndingsCount lineEndingsCount) {
+            processString(lineBreak.getMargin(), lineEndingsCount);
+            return lineBreak;
+        }
     }
 }
 

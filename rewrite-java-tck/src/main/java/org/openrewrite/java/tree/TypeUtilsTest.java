@@ -65,7 +65,7 @@ class TypeUtilsTest implements RewriteTest {
           java(
             """
               class Superclass {
-                  void foo();
+                  void foo() { }
               }
               """
           ),
@@ -76,6 +76,33 @@ class TypeUtilsTest implements RewriteTest {
               }
               """,
             typeIsPresent()
+          )
+        );
+    }
+
+    @Test
+    void isOverrideOnlyVisible() {
+        rewriteRun(
+          java(
+            """
+              package foo;
+              public class Superclass {
+                  void foo() { }
+              }
+              """
+          ),
+          java(
+            """
+              package bar;
+              import foo.Superclass;
+              class Clazz extends Superclass {
+                  public void foo() { }
+              }
+              """,
+            s -> s.afterRecipe(cu -> {
+                var fooMethodType = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
+                assertThat(TypeUtils.findOverriddenMethod(fooMethodType)).isEmpty();
+            })
           )
         );
     }
@@ -213,6 +240,38 @@ class TypeUtilsTest implements RewriteTest {
                       singletonList(JavaType.ShallowClass.build("java.lang.Integer")));
                     assertThat(TypeUtils.isOfType(varType, shallowParameterizedType)).isTrue();
                     return super.visitVariable(variable, o);
+                }
+            }.visit(cu, new InMemoryExecutionContext()))
+          )
+        );
+    }
+
+    @Test
+    void isAssignableToGenericTypeVariable() {
+        rewriteRun(
+          java(
+            """
+              import java.util.Map;
+              import java.util.function.Supplier;
+              
+              class Test {
+                  <K, V> void m(Supplier<? extends Map<K, ? extends V>> map) {
+                  }
+                  void foo() {
+                      Map<String, Integer> map = null;
+                      m(() -> map);
+                  }
+              }
+              """,
+            spec -> spec.afterRecipe(cu -> new JavaIsoVisitor<>() {
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Object o) {
+                    JavaType paramType = method.getMethodType().getParameterTypes().get(0);
+                    assertThat(paramType).isInstanceOf(JavaType.Parameterized.class);
+                    JavaType argType = method.getArguments().get(0).getType();
+                    assertThat(argType).isInstanceOf(JavaType.Parameterized.class);
+                    assertThat(TypeUtils.isAssignableTo(paramType, argType)).isTrue();
+                    return method;
                 }
             }.visit(cu, new InMemoryExecutionContext()))
           )

@@ -231,8 +231,22 @@ public class MavenSettings {
             return new Servers(ListUtils.map(servers.getServers(), this::interpolate));
         }
 
+        @Nullable
+        private ServerConfiguration interpolate(@Nullable ServerConfiguration configuration) {
+            if (configuration == null) {
+                return null;
+            }
+            return new ServerConfiguration(configuration.httpHeaders == null ? null :
+                    ListUtils.map(configuration.httpHeaders, this::interpolate));
+        }
+
+        private HttpHeader interpolate(HttpHeader httpHeader) {
+            return new HttpHeader(interpolate(httpHeader.getName()), interpolate(httpHeader.getValue()));
+        }
+
         private Server interpolate(Server server) {
-            return new Server(interpolate(server.id), interpolate(server.username), interpolate(server.password));
+            return new Server(interpolate(server.id), interpolate(server.username), interpolate(server.password),
+                    interpolate(server.configuration));
         }
 
         @Nullable
@@ -382,5 +396,24 @@ public class MavenSettings {
 
         String username;
         String password;
+
+        @Nullable
+        ServerConfiguration configuration;
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
+    @With
+    public static class ServerConfiguration {
+        @Nullable
+        List<HttpHeader> httpHeaders;
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
+    @With
+    public static class HttpHeader {
+        String name;
+        String value;
     }
 }

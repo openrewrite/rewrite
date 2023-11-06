@@ -64,7 +64,8 @@ public class InsertDependencyComparator implements Comparator<Content> {
 
     @Override
     public int compare(Content o1, Content o2) {
-        return positions.get(o1).compareTo(positions.get(o2));
+        Float anotherFloat = positions.get(o2);
+        return anotherFloat == null ? 0 : positions.get(o1).compareTo(anotherFloat);
     }
 
     private static final Comparator<Xml.Tag> dependencyComparator = (d1, d2) -> {

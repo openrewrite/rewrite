@@ -43,14 +43,13 @@ class SelectRecipeExamplesTest implements RewriteTest {
               import org.openrewrite.Recipe;
               import org.openrewrite.test.RecipeSpec;
               import org.openrewrite.test.RewriteTest;
-                           
+
               import static org.openrewrite.java.Assertions.java;
-                            
+
               class UnnecessaryParenthesesTest implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
-                      Recipe recipe = new UnnecessaryParentheses();
-                      spec.recipe(recipe);
+                      spec.recipe(Recipe.noop());
                   }
 
                   @Test
@@ -90,14 +89,13 @@ class SelectRecipeExamplesTest implements RewriteTest {
               import org.openrewrite.Recipe;
               import org.openrewrite.test.RecipeSpec;
               import org.openrewrite.test.RewriteTest;
-                           
+
               import static org.openrewrite.java.Assertions.java;
-                            
+
               class UnnecessaryParenthesesTest implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
-                      Recipe recipe = new UnnecessaryParentheses();
-                      spec.recipe(recipe);
+                      spec.recipe(Recipe.noop());
                   }
 
                   @DocumentExample
@@ -145,14 +143,13 @@ class SelectRecipeExamplesTest implements RewriteTest {
               import org.openrewrite.Recipe;
               import org.openrewrite.test.RecipeSpec;
               import org.openrewrite.test.RewriteTest;
-                           
+
               import static org.openrewrite.java.Assertions.java;
-                            
+
               class UnnecessaryParenthesesTest implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
-                      Recipe recipe = new UnnecessaryParentheses();
-                      spec.recipe(recipe);
+                      spec.recipe(Recipe.noop());
                   }
 
                   @Test
@@ -195,8 +192,7 @@ class SelectRecipeExamplesTest implements RewriteTest {
               class UnnecessaryParenthesesTest implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
-                      Recipe recipe = new UnnecessaryParentheses();
-                      spec.recipe(recipe);
+                      spec.recipe(Recipe.noop());
                   }
 
                   @Test
@@ -248,8 +244,7 @@ class SelectRecipeExamplesTest implements RewriteTest {
               class UnnecessaryParenthesesTest implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
-                      Recipe recipe = new UnnecessaryParentheses();
-                      spec.recipe(recipe);
+                      spec.recipe(Recipe.noop());
                   }
 
                   @Issue("https://github.com/openrewrite/rewrite/issues/x")
@@ -297,8 +292,7 @@ class SelectRecipeExamplesTest implements RewriteTest {
               class UnnecessaryParenthesesTest implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
-                      Recipe recipe = new UnnecessaryParentheses();
-                      spec.recipe(recipe);
+                      spec.recipe(Recipe.noop());
                   }
 
                   @Issue("https://github.com/openrewrite/rewrite/issues/x")
@@ -355,8 +349,7 @@ class SelectRecipeExamplesTest implements RewriteTest {
               class UnnecessaryParenthesesTest implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
-                      Recipe recipe = new UnnecessaryParentheses();
-                      spec.recipe(recipe);
+                      spec.recipe(Recipe.noop());
                   }
 
                   @Disabled("some reason")
@@ -397,8 +390,7 @@ class SelectRecipeExamplesTest implements RewriteTest {
               class UnnecessaryParenthesesTest implements RewriteTest {
                   @Override
                   public void defaults(RecipeSpec spec) {
-                      Recipe recipe = new UnnecessaryParentheses();
-                      spec.recipe(recipe);
+                      spec.recipe(Recipe.noop());
                   }
 
                   @DocumentExample

@@ -106,7 +106,16 @@ public class MavenParser implements Parser {
                 MavenResolutionResult model = new MavenResolutionResult(randomId(), null, resolvedPom, emptyList(), null, emptyMap(), sanitizedSettings, mavenCtx.getActiveProfiles())
                         .resolveDependencies(downloader, ctx);
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().compute(model, (old, n) -> n)));
-            } catch (MavenDownloadingExceptions | MavenDownloadingException e) {
+            } catch (MavenDownloadingExceptions e) {
+                ParseExceptionResult parseExceptionResult = new ParseExceptionResult(
+                        randomId(),
+                        MavenParser.class.getSimpleName(),
+                        e.getClass().getSimpleName(),
+                        e.warn(docToPom.getKey()).printAll(), // Shows any underlying MavenDownloadingException
+                        null);
+                parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(parseExceptionResult)));
+                ctx.getOnError().accept(e);
+            } catch (MavenDownloadingException e) {
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e))));
                 ctx.getOnError().accept(e);
             }
@@ -171,6 +180,7 @@ public class MavenParser implements Parser {
             return this;
         }
 
+        @SuppressWarnings("unused") // Used in `MavenMojoProjectParser.parseMaven(..)`
         public Builder mavenConfig(@Nullable Path mavenConfig) {
             if (mavenConfig != null && mavenConfig.toFile().exists()) {
                 try {

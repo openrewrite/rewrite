@@ -15,6 +15,7 @@
  */
 package org.openrewrite.gradle;
 
+import lombok.RequiredArgsConstructor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
@@ -32,30 +33,43 @@ import java.util.List;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
+@RequiredArgsConstructor
 public class GradleParser implements Parser {
-    private final GroovyParser buildParser;
-    private final GroovyParser settingsParser;
+    private final GradleParser.Builder base;
 
-    private GradleParser(Builder builder) {
-        GroovyParser.Builder base = builder.groovyParser;
-        this.buildParser = GroovyParser.builder(base)
-                .classpath(builder.buildscriptClasspath)
-                .compilerCustomizers(
-                        new DefaultImportsCustomizer(),
-                        config -> config.setScriptBaseClass("RewriteGradleProject")
-                )
-                .build();
-        this.settingsParser = GroovyParser.builder(base)
-                .classpath(builder.settingsClasspath)
-                .compilerCustomizers(
-                        new DefaultImportsCustomizer(),
-                        config -> config.setScriptBaseClass("RewriteSettings")
-                )
-                .build();
-    }
+    private Collection<Path> defaultClasspath;
+    private GroovyParser buildParser;
+    private GroovyParser settingsParser;
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
+        if (buildParser == null) {
+            if (base.buildscriptClasspath == null && defaultClasspath == null) {
+                defaultClasspath = loadDefaultClasspath();
+                base.buildscriptClasspath = defaultClasspath;
+            }
+            buildParser = GroovyParser.builder(base.groovyParser)
+                    .classpath(base.buildscriptClasspath)
+                    .compilerCustomizers(
+                            new DefaultImportsCustomizer(),
+                            config -> config.setScriptBaseClass("RewriteGradleProject")
+                    )
+                    .build();
+        }
+        if (settingsParser == null) {
+            if (base.settingsClasspath == null && defaultClasspath == null) {
+                defaultClasspath = loadDefaultClasspath();
+                base.settingsClasspath = defaultClasspath;
+            }
+            settingsParser = GroovyParser.builder(base.groovyParser)
+                    .classpath(base.settingsClasspath)
+                    .compilerCustomizers(
+                            new DefaultImportsCustomizer(),
+                            config -> config.setScriptBaseClass("RewriteSettings")
+                    )
+                    .build();
+        }
+
         return StreamSupport.stream(sources.spliterator(), false)
                 .flatMap(source -> {
                     if (source.getPath().endsWith("settings.gradle")) {
@@ -83,10 +97,10 @@ public class GradleParser implements Parser {
         protected GroovyParser.Builder groovyParser = GroovyParser.builder();
 
         @Nullable
-        private Collection<Path> buildscriptClasspath = loadDefaultClasspath();
+        private Collection<Path> buildscriptClasspath;
 
         @Nullable
-        private Collection<Path> settingsClasspath = loadDefaultClasspath();
+        private Collection<Path> settingsClasspath;
 
         public Builder() {
             super(G.CompilationUnit.class);
@@ -136,25 +150,26 @@ public class GradleParser implements Parser {
             return "gradle";
         }
 
-        private static List<Path> loadDefaultClasspath() {
-            try {
-                Class.forName("org.gradle.api.Project");
-                return JavaParser.runtimeClasspath();
-            } catch (ClassNotFoundException e) {
-                return JavaParser.dependenciesFromResources(new InMemoryExecutionContext(),
-                        "gradle-base-services",
-                        "gradle-core-api",
-                        "gradle-language-groovy",
-                        "gradle-language-java",
-                        "gradle-logging",
-                        "gradle-messaging",
-                        "gradle-native",
-                        "gradle-process-services",
-                        "gradle-resources",
-                        "gradle-testing-base",
-                        "gradle-testing-jvm",
-                        "gradle-enterprise-gradle-plugin");
-            }
+    }
+
+    private static List<Path> loadDefaultClasspath() {
+        try {
+            Class.forName("org.gradle.api.Project");
+            return JavaParser.runtimeClasspath();
+        } catch (ClassNotFoundException e) {
+            return JavaParser.dependenciesFromResources(new InMemoryExecutionContext(),
+                    "gradle-base-services",
+                    "gradle-core-api",
+                    "gradle-language-groovy",
+                    "gradle-language-java",
+                    "gradle-logging",
+                    "gradle-messaging",
+                    "gradle-native",
+                    "gradle-process-services",
+                    "gradle-resources",
+                    "gradle-testing-base",
+                    "gradle-testing-jvm",
+                    "gradle-enterprise-gradle-plugin");
         }
     }
 }
