@@ -81,6 +81,29 @@ class WhenTest implements RewriteTest {
     }
 
     @Test
+    void withContinueInALoop() {
+        rewriteRun(
+          kotlin(
+            """
+                  fun method ( ) : String {
+                  val list = listOf(1, 2, 3)
+
+                  for (num in list) {
+                      when ( num ) {
+                          1  -> return "ONE"
+                          2 -> return "TWO"
+                          3 ->   continue
+                          else -> return "42"
+                      }
+                  }
+                  return ""
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void twoIsConditions() {
         rewriteRun(
           kotlin(

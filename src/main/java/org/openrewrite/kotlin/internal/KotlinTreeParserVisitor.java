@@ -393,7 +393,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitContinueExpression(KtContinueExpression expression, ExecutionContext data) {
         return new J.Continue(
                 randomId(),
-                prefix(expression.getParent()),
+                prefix(expression),
                 Markers.EMPTY,
                 expression.getTargetLabel() != null ? createIdentifier(requireNonNull(expression.getTargetLabel().getIdentifier()), null) : null
         );
