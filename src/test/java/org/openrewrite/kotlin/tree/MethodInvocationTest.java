@@ -692,4 +692,26 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void safeQualifiedExpression() {
+        rewriteRun(
+          kotlin(
+            """
+              data class Node(val name : String) {
+                  fun findTypeDefinition(document: Any): Any? {
+                      return null
+                  }
+              }
+
+              fun method() {
+                  val node = Node("x") // END
+                  node .  findTypeDefinition(1)   ?.let    { definition ->
+                      println("Found definition: $definition")
+                  }
+              }
+              """
+          )
+        );
+    }
 }

@@ -1013,7 +1013,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             J.MethodInvocation methodInvocation = (J.MethodInvocation) selector;
             return methodInvocation.getPadding()
                     .withSelect(padRight(receiver, suffix(expression.getReceiverExpression())))
-                    .withName(methodInvocation.getName().withPrefix(prefix(expression.getSelectorExpression())));
+                    .withName(methodInvocation.getName().withPrefix(prefix(expression.getSelectorExpression())))
+                    .withPrefix(endFixPrefixAndInfix(expression));
         } else {
             J.Identifier identifier = (J.Identifier) selector;
             return new J.FieldAccess(
