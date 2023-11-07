@@ -182,7 +182,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         beforeSyntax(dString, RubySpace.Location.DELIMITED_STRING_VALUE_PREFIX, p);
         p.append(dString.getDelimiter());
         visit(dString.getStrings(), p);
-        p.append(dString.getDelimiter());
+        p.append(dString.getDelimiter().charAt(dString.getDelimiter().length() - 1));
         afterSyntax(dString, p);
         return dString;
     }

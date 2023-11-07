@@ -1,5 +1,6 @@
 package org.openrewrite.ruby;
 
+import org.jetbrains.annotations.NotNull;
 import org.jruby.ast.*;
 import org.jruby.ast.visitor.AbstractNodeVisitor;
 import org.jruby.ast.visitor.OperatorCallNode;
@@ -157,18 +158,44 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
     @Override
     public J visitDStrNode(DStrNode node) {
+        return visitDNode(node);
+    }
+
+    @Override
+    public J visitDXStrNode(DXStrNode node) {
+        return visitDNode(node);
+    }
+
+    private Ruby.DelimitedString visitDNode(DNode node) {
+        Space prefix = whitespace();
+        String delimiter = "\"";
+        if (source.charAt(cursor) == '%') {
+            switch (source.charAt(cursor + 1)) {
+                case 'Q':
+                case 'q':
+                case 'x':
+                    // ex: %Q<is a string>
+                    delimiter = source.substring(cursor, 3);
+                    break;
+                default:
+                    // ex: %<is a string>
+                    delimiter = source.substring(cursor, 2);
+                    break;
+            }
+        }
+        skip(delimiter);
         Ruby.DelimitedString dString = new Ruby.DelimitedString(
                 randomId(),
-                sourceBefore("\""),
+                prefix,
                 Markers.EMPTY,
-                "\"",
+                delimiter,
                 StreamSupport.stream(node.spliterator(), false)
                         .filter(Objects::nonNull)
                         .map(n -> (J) convert(n))
                         .collect(toList()),
                 null
         );
-        skip("\"");
+        skip(delimiter.substring(delimiter.length() - 1));
         return dString;
     }
 
@@ -752,10 +779,16 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     @Override
     public J visitStrNode(StrNode node) {
         String value = new String(node.getValue().bytes(), StandardCharsets.UTF_8);
-        boolean inDString = nodes.getParentOrThrow().getValue() instanceof DStrNode;
+        Object parentValue = nodes.getParentOrThrow().getValue();
+        boolean inDString = parentValue instanceof DStrNode || parentValue instanceof DXStrNode;
         Space prefix = inDString ? EMPTY : whitespace();
         String delimiter = "";
         if (!inDString) {
+            if (source.charAt(cursor) == '%') {
+                DStrNode dstr = new DStrNode(0, node.getValue().getEncoding());
+                dstr.add(node);
+                return convert(dstr).withPrefix(prefix);
+            }
             delimiter = source.substring(cursor, ++cursor);
         }
         skip(value);
