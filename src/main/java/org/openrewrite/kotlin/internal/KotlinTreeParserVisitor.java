@@ -3631,7 +3631,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         for (int i = 0; i < ktParameters.size(); i++) {
             KtParameter ktParameter = ktParameters.get(i);
             Statement statement = convertToStatement(ktParameter.accept(this, data));
-            statements.add(maybeTrailingComma(ktParameter, padRight(statement, suffix(ktParameter)), i == ktParameters.size() - 1));
+            statements.add(maybeTrailingComma(ktParameter, padRight(statement, endFixAndSuffix(ktParameter)), i == ktParameters.size() - 1));
         }
 
         if (ktParameters.isEmpty()) {
