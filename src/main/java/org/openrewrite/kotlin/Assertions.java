@@ -17,18 +17,29 @@ package org.openrewrite.kotlin;
 
 
 import org.intellij.lang.annotations.Language;
+import org.jetbrains.annotations.NotNull;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.SourceFile;
+import org.openrewrite.internal.ThrowingConsumer;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
-import org.openrewrite.kotlin.internal.KotlinParsingException;
+import org.openrewrite.java.tree.TextComment;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.kotlin.tree.KSpace;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.test.UncheckedConsumer;
+import org.opentest4j.AssertionFailedError;
 
+import java.util.Collections;
 import java.util.function.Consumer;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.sourceSet;
 import static org.openrewrite.test.SourceSpecs.dir;
 
@@ -146,27 +157,89 @@ public final class Assertions {
     }
 
     private static void acceptSpec(Consumer<SourceSpec<K.CompilationUnit>> spec, SourceSpec<K.CompilationUnit> kotlin) {
-        Consumer<K.CompilationUnit> userSuppliedAfterRecipe = kotlin.getAfterRecipe();
-        kotlin.afterRecipe(userSuppliedAfterRecipe::accept);
-        isFullyParsed().andThen(spec).accept(kotlin);
+//        Consumer<K.CompilationUnit> consumer = kotlin.getAfterRecipe().andThen(isFullyParsed()).andThen(spaceConscious(kotlin));
+        Consumer<K.CompilationUnit> consumer = kotlin.getAfterRecipe().andThen(isFullyParsed());
+        kotlin.afterRecipe(consumer::accept);
+        spec.accept(kotlin);
     }
 
-    public static Consumer<SourceSpec<K.CompilationUnit>> isFullyParsed() {
-        return spec -> spec.afterRecipe(cu -> {
+    public static ThrowingConsumer<K.CompilationUnit> isFullyParsed() {
+        return cu -> {
             new KotlinIsoVisitor<Integer>() {
                 @Override
                 public J visitUnknown(J.Unknown unknown, Integer integer) {
-                    throw new KotlinParsingException("Parsing error, J.Unknown detected", new RuntimeException());
+                    throw new AssertionFailedError("Parsing error, J.Unknown detected");
                 }
 
                 @Override
                 public Space visitSpace(Space space, Space.Location loc, Integer integer) {
                     if (!space.getWhitespace().trim().isEmpty()) {
-                        throw new KotlinParsingException("Parsing error detected, whitespace contains non-whitespace characters: " + space.getWhitespace(), new RuntimeException());
+                        throw new AssertionFailedError("Parsing error detected, whitespace contains non-whitespace characters: " + space.getWhitespace());
                     }
                     return super.visitSpace(space, loc, integer);
                 }
             }.visit(cu, 0);
-        });
+        };
+    }
+
+    public static UncheckedConsumer<SourceSpec<?>> spaceConscious() {
+        return source -> {
+            if (source.getSourceFileType() == K.CompilationUnit.class) {
+                SourceSpec<K.CompilationUnit> kotlinSourceSpec = (SourceSpec<K.CompilationUnit>) source;
+                kotlinSourceSpec.afterRecipe(spaceConscious(kotlinSourceSpec));
+            }
+        };
+    }
+
+    public static ThrowingConsumer<K.CompilationUnit> spaceConscious(SourceSpec<K.CompilationUnit> spec) {
+        return cu -> {
+            K.CompilationUnit visited = (K.CompilationUnit) new KotlinIsoVisitor<Integer>() {
+                int id = 0;
+
+                @Override
+                public Space visitSpace(Space space, KSpace.Location loc, Integer integer) {
+                    return next(space);
+                }
+
+                @NotNull
+                private Space next(Space space) {
+                    if (!space.getComments().isEmpty()) {
+                        return space;
+                    }
+                    return space.withComments(Collections.singletonList(new TextComment(true, Integer.toString(id++), "", Markers.EMPTY)));
+                }
+
+                @Override
+                public Space visitSpace(Space space, Space.Location loc, Integer integer) {
+                    Cursor parentCursor = getCursor().getParentOrThrow();
+                    if (loc == Space.Location.IDENTIFIER_PREFIX && parentCursor.getValue() instanceof J.Annotation) {
+                        return space;
+                    } else if (loc == Space.Location.IDENTIFIER_PREFIX && parentCursor.getValue() instanceof J.Break &&
+                            ((J.Break) parentCursor.getValue()).getLabel() == getCursor().getValue()) {
+                        return space;
+                    } else if (loc == Space.Location.IDENTIFIER_PREFIX && parentCursor.getValue() instanceof K.KReturn &&
+                            ((K.KReturn) parentCursor.getValue()).getLabel() == getCursor().getValue()) {
+                        return space;
+                    } else if (loc == Space.Location.LABEL_SUFFIX) {
+                        return space;
+                    } else if (getCursor().firstEnclosing(J.Import.class) != null) {
+                        return space;
+                    } else if (getCursor().firstEnclosing(J.Package.class) != null) {
+                        return space;
+                    }
+                    return next(space);
+                }
+            }.visit(cu, 0);
+            try {
+                String s = visited.printAll();
+                InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+                ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
+                SourceFile cu2 = spec.getParser().build().parse(ctx, s).findFirst().get();
+                String s1 = cu2.printAll();
+                assertEquals(s, s1, "Parser is not whitespace print idempotent");
+            } catch (Exception e) {
+                fail(e);
+            }
+        };
     }
 }
