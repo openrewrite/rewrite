@@ -37,7 +37,7 @@ public class FindParseFailuresTest implements RewriteTest {
 
     @Test
     void findParseFailures() {
-        ParseExceptionResult per = ParseExceptionResult.build(PlainTextParser.class, new RuntimeException("boom"));
+        ParseExceptionResult per = ParseExceptionResult.build(PlainTextParser.class, new RuntimeException("boom"), null);
         rewriteRun(
           spec -> spec.dataTable(ParseFailures.Row.class, rows -> {
               assertThat(rows).hasSize(1);
