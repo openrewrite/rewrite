@@ -440,16 +440,14 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 null,
                 null,
                 getIdentifier(EMPTY, name),
-                JContainer.<Expression>build(ListUtils.mapFirst(
-                                convertAll(
-                                        node.getArgsNode().childNodes(),
-                                        n -> sourceBefore(","),
-                                        n -> firstArgMarkers == Markers.EMPTY ?
-                                                sourceBefore(")") : EMPTY
-                                ),
-                                arg -> arg.withElement(arg.getElement().withMarkers(firstArgMarkers))
+                JContainer.<Expression>build(convertAll(
+                                node.getArgsNode().childNodes(),
+                                n -> sourceBefore(","),
+                                n -> firstArgMarkers == Markers.EMPTY ?
+                                        sourceBefore(")") : EMPTY
                         ))
-                        .withBefore(beforeArgs),
+                        .withBefore(beforeArgs)
+                        .withMarkers(firstArgMarkers),
                 null
         );
     }
@@ -1116,19 +1114,19 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 }
             } else {
                 if (source.length() - untilDelim.length() > delimIndex + 1) {
-                    switch (source.substring(delimIndex, delimIndex + 2)) {
-                        case "//":
-                            inSingleLineComment = true;
-                            delimIndex++;
-                            break;
-                        case "/*":
+                    if (source.charAt(delimIndex) == '#') {
+                        inSingleLineComment = true;
+                        delimIndex++;
+                    } else {
+                        if (source.startsWith("=begin\n", delimIndex) ||
+                            source.startsWith("=begin\r\n", delimIndex)) {
                             inMultiLineComment = true;
-                            delimIndex++;
-                            break;
-                        case "*/":
+                            delimIndex += "=begin".length();
+                        } else if (source.startsWith("=end\n", delimIndex) ||
+                                   source.startsWith("=end\r\n", delimIndex)) {
                             inMultiLineComment = false;
-                            delimIndex = delimIndex + 2;
-                            break;
+                            delimIndex += "=end".length();
+                        }
                     }
                 }
 
