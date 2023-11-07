@@ -270,6 +270,7 @@ public interface Ruby extends J {
         Markers markers;
         String delimiter;
         List<J> strings;
+        List<RegexpOptions> regexpOptions;
 
         @Nullable
         JavaType type;
@@ -302,18 +303,21 @@ public interface Ruby extends J {
             }
 
             @Override
-            public Space getPrefix() {
-                return Space.EMPTY;
-            }
-
-            public Space getAfter() {
-                return after;
-            }
-
-            @Override
             public <P> J acceptRuby(RubyVisitor<P> v, P p) {
                 return v.visitDelimitedStringValue(this, p);
             }
+        }
+
+        public enum RegexpOptions {
+            IgnoreCase,
+            Multiline,
+            Extended,
+            Java,
+            Once,
+            None,
+            EUCJPEncoding,
+            SJISEncoding,
+            UTF8Encoding
         }
     }
 

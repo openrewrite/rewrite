@@ -5,6 +5,7 @@ import org.jruby.ast.*;
 import org.jruby.ast.visitor.AbstractNodeVisitor;
 import org.jruby.ast.visitor.OperatorCallNode;
 import org.jruby.util.KeyValuePair;
+import org.jruby.util.RegexpOptions;
 import org.openrewrite.Cursor;
 import org.openrewrite.FileAttributes;
 import org.openrewrite.internal.EncodingDetectingInputStream;
@@ -157,6 +158,57 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     @Override
+    public J visitDRegxNode(DRegexpNode node) {
+        Ruby.DelimitedString dString = visitDNode(whitespace(), "/", node);
+        int optionCount = 0;
+        RegexpOptions options = node.getOptions();
+        if (options.isExtended()) {
+            optionCount++;
+        }
+        if (!options.isKcodeDefault()) {
+            optionCount++;
+        }
+        if (options.isIgnorecase()) {
+            optionCount++;
+        }
+        if (options.isJava()) {
+            optionCount++;
+        }
+        if (options.isLiteral()) {
+            optionCount++;
+        }
+        if (options.isMultiline()) {
+            optionCount++;
+        }
+        String optionsString = source.substring(cursor, cursor + optionCount);
+        skip(optionsString);
+        return dString.withRegexpOptions(optionsString.chars().mapToObj(opt -> {
+            switch (opt) {
+                case 'x':
+                    return Ruby.DelimitedString.RegexpOptions.Extended;
+                case 'i':
+                    return Ruby.DelimitedString.RegexpOptions.IgnoreCase;
+                case 'm':
+                    return Ruby.DelimitedString.RegexpOptions.Multiline;
+                case 'j':
+                    return Ruby.DelimitedString.RegexpOptions.Java;
+                case 'o':
+                    return Ruby.DelimitedString.RegexpOptions.Once;
+                case 'n':
+                    return Ruby.DelimitedString.RegexpOptions.None;
+                case 'e':
+                    return Ruby.DelimitedString.RegexpOptions.EUCJPEncoding;
+                case 's':
+                    return Ruby.DelimitedString.RegexpOptions.SJISEncoding;
+                case 'u':
+                    return Ruby.DelimitedString.RegexpOptions.UTF8Encoding;
+                default:
+                    throw new UnsupportedOperationException(String.format("Unknown regexp option %s", opt));
+            }
+        }).collect(toList()));
+    }
+
+    @Override
     public J visitDStrNode(DStrNode node) {
         return visitDNode(node);
     }
@@ -164,6 +216,13 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     @Override
     public J visitDXStrNode(DXStrNode node) {
         return visitDNode(node);
+    }
+
+    @Override
+    public J visitRegexpNode(RegexpNode node) {
+        DStrNode dstr = new DStrNode(0, node.getValue().getEncoding());
+        dstr.add(new StrNode(node.getLine(), node.getValue()));
+        return convert(dstr);
     }
 
     private Ruby.DelimitedString visitDNode(DNode node) {
@@ -174,6 +233,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 case 'Q':
                 case 'q':
                 case 'x':
+                case 'r':
                     // ex: %Q<is a string>
                     delimiter = source.substring(cursor, 3);
                     break;
@@ -183,6 +243,10 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                     break;
             }
         }
+        return visitDNode(prefix, delimiter, node);
+    }
+
+    private Ruby.DelimitedString visitDNode(Space prefix, String delimiter, DNode node) {
         skip(delimiter);
         Ruby.DelimitedString dString = new Ruby.DelimitedString(
                 randomId(),
@@ -191,8 +255,10 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 delimiter,
                 StreamSupport.stream(node.spliterator(), false)
                         .filter(Objects::nonNull)
+                        .filter(n -> !(n instanceof StrNode) || !((StrNode) n).getValue().isEmpty())
                         .map(n -> (J) convert(n))
                         .collect(toList()),
+                emptyList(),
                 null
         );
         skip(delimiter.substring(delimiter.length() - 1));
@@ -780,7 +846,8 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     public J visitStrNode(StrNode node) {
         String value = new String(node.getValue().bytes(), StandardCharsets.UTF_8);
         Object parentValue = nodes.getParentOrThrow().getValue();
-        boolean inDString = parentValue instanceof DStrNode || parentValue instanceof DXStrNode;
+        boolean inDString = parentValue instanceof DStrNode || parentValue instanceof DXStrNode ||
+                            parentValue instanceof DRegexpNode;
         Space prefix = inDString ? EMPTY : whitespace();
         String delimiter = "";
         if (!inDString) {

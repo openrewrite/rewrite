@@ -183,6 +183,39 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         p.append(dString.getDelimiter());
         visit(dString.getStrings(), p);
         p.append(dString.getDelimiter().charAt(dString.getDelimiter().length() - 1));
+        for (Ruby.DelimitedString.RegexpOptions regexpOption : dString.getRegexpOptions()) {
+            switch (regexpOption) {
+                case IgnoreCase:
+                    p.append('i');
+                    break;
+                case Java:
+                    p.append('j');
+                    break;
+                case Multiline:
+                    p.append('m');
+                    break;
+                case Extended:
+                    p.append('x');
+                    break;
+                case Once:
+                    p.append('o');
+                    break;
+                case None:
+                    p.append('n');
+                    break;
+                case EUCJPEncoding:
+                    p.append('e');
+                    break;
+                case SJISEncoding:
+                    p.append('s');
+                    break;
+                case UTF8Encoding:
+                    p.append('u');
+                    break;
+                default:
+                    throw new IllegalStateException("Unexpected regexp option " + regexpOption);
+            }
+        }
         afterSyntax(dString, p);
         return dString;
     }

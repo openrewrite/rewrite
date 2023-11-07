@@ -53,4 +53,26 @@ public class StringTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void regexRDString() {
+        rewriteRun(
+          ruby(
+            """
+              %r|^/usr/local/.*|
+              """
+          )
+        );
+    }
+
+    @Test
+    void regexSlashDelimited() {
+        rewriteRun(
+          ruby(
+            """
+              /my name is #{myname}/o
+              """
+          )
+        );
+    }
 }
