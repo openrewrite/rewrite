@@ -45,7 +45,7 @@ class MethodReferenceTest implements RewriteTest {
             """
               class Test < T: Number > ( val answer : T )
               fun method ( ) {
-                  val l = listOf ( Test ( 42 ) )
+                  val l = listOf ( Test ( 42) ) /*c*/
                   l . map {  Test <  Int   > :: answer }
               }
               """
@@ -101,7 +101,7 @@ class MethodReferenceTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              import java.util.function.Supplier
+              import java.util.function.Supplier/*c*/
               
               val s1: Supplier<List<String>> = Supplier(::emptyList)
               val s2: Supplier<List<String>> = Supplier { emptyList() }

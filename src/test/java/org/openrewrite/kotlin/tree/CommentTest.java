@@ -121,7 +121,7 @@ class CommentTest implements RewriteTest {
             "class Foo {}",
             "fun foo() {}",
             "@file:Suppress(\"PLATFORM_CLASS_MAPPED_TO_KOTLIN\", \"unused\")",
-            "package foo"
+            "package foo /*c*/"
     })
     void multilineComments(String input) {
         rewriteRun(
@@ -170,7 +170,7 @@ class CommentTest implements RewriteTest {
           kotlin(
             """
               fun method() {
-                  val d = {it: Int -> it + 42 } // comment
+                  val d = {it: Int -> it + 42  /***/ } // comment
               }
               """
           )

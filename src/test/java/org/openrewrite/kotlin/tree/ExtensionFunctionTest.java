@@ -41,7 +41,7 @@ class ExtensionFunctionTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              fun String.foo(f: String, b: (String) -> Unit) = b(this.replace("a", f))
+              fun String.foo(f: String, b: (String /*c*/ ) -> Unit) = b(this.replace("a", f))
 
               val x = "a".foo("b") { s -> println(s) }
               """
