@@ -1607,7 +1607,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitKtFile(KtFile file, ExecutionContext data) {
         List<J.Annotation> annotations = file.getFileAnnotationList() != null ? mapAnnotations(file.getAnnotationEntries(), data) : emptyList();
         Set<PsiElement> consumedSpaces = new HashSet<>();
-        Space eof = Space.EMPTY;
+        Space eof = endFixAndSuffix(file);
 
         JRightPadded<J.Package> pkg = null;
         if (!file.getPackageFqName().isRoot()) {
@@ -1634,12 +1634,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             boolean last = i == declarations.size() - 1;
             KtDeclaration declaration = declarations.get(i);
             Statement statement = convertToStatement(declaration.accept(this, data));
-            if (i == 0 && file.getImportList() != null) {
-                statement = statement.withPrefix(merge(endFix(file.getImportList().getLastChild()), statement.getPrefix()));
-            }
-            if (last) {
-                eof = endFixAndSuffix(declaration);
-            }
             statements.add(padRight(statement, Space.EMPTY));
         }
 
@@ -1653,7 +1647,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 charsetBomMarked,
                 null,
                 annotations,
-                pkg != null && imports.isEmpty() && statements.isEmpty() ? pkg.withAfter(endFix(file)) : pkg,
+                pkg,
                 imports,
                 statements,
                 eof
@@ -3494,11 +3488,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             return Space.EMPTY;
         }
 
+        Space end = endFix(element.getLastChild());
         PsiElement lastSpace = findLastSpaceChild(element);
         if (consumedSpaces != null && consumedSpaces.contains(element)) {
-            return Space.EMPTY;
+            return end;
         }
-        return space(lastSpace);
+
+        return merge(end, space(lastSpace));
     }
 
     private Space prefixAndInfix(@Nullable PsiElement element) {

@@ -49,7 +49,7 @@ class AnonymousFunctionTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              val positive = fun(i: Int) = i > 0
+              val positive = fun(i: Int) = i > 0 /* C */
               """
           )
         );
