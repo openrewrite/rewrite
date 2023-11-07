@@ -188,7 +188,7 @@ class CommentTest implements RewriteTest {
                   /**
                    * Comment
                    */
-                  companion object AssertValidQueryCompanion {
+                  companion  /*C2*/  object AssertValidQueryCompanion {
                   }
               }
               """

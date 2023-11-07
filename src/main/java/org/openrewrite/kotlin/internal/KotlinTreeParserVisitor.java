@@ -1976,11 +1976,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         JContainer<TypeTree> implementings = null;
         Markers markers = Markers.EMPTY;
         J.MethodDeclaration primaryConstructor;
-        PsiElement prefixConsumed = findFirstPrefixSpace(findFirstNotSpaceChild(klass));
         Set<PsiElement> prefixConsumedSet = new HashSet<>();
-        if (prefixConsumed != null) {
-            prefixConsumedSet.add(prefixConsumed);
-        }
+        addIfNotNull(prefixConsumedSet, getFirstSpaceChildOrNull(klass));
 
         List<J.Modifier> modifiers = mapModifiers(klass.getModifierList(), leadingAnnotations, lastAnnotations, data);
 
@@ -2420,9 +2417,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<J.Modifier> modifiers = mapModifiers(function.getModifierList(), leadingAnnotations, lastAnnotations, data);
         J.TypeParameters typeParameters = null;
         TypeTree returnTypeExpression = null;
-        PsiElement prefixConsumed = findFirstPrefixSpace(findFirstNotSpaceChild(function));
+
         Set<PsiElement> prefixConsumedSet = new HashSet<>();
-        prefixConsumedSet.add(prefixConsumed);
+        addIfNotNull(prefixConsumedSet, getFirstSpaceChildOrNull(function));
 
         if (function.getTypeParameterList() != null) {
             typeParameters = new J.TypeParameters(
@@ -2614,6 +2611,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         Markers markers = Markers.EMPTY;
         List<J.Modifier> modifiers = new ArrayList<>();
         JContainer<TypeTree> implementings = null;
+        Set<PsiElement> consumedSpaces = new HashSet<>();
 
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
         List<J.Annotation> lastAnnotations = new ArrayList<>();
@@ -2659,6 +2657,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     .withMarkers(Markers.EMPTY.addIfAbsent(new Implicit(randomId())));
         }
 
+        addIfNotNull(consumedSpaces, getFirstSpaceChildOrNull(declaration));
+
         return new J.ClassDeclaration(
                 randomId(),
                 endFixPrefixAndInfix(declaration),
@@ -2667,7 +2667,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 modifiers,
                 new J.ClassDeclaration.Kind(
                         randomId(),
-                        prefix(declaration.getObjectKeyword()),
+                        prefix(declaration.getObjectKeyword(), consumedSpaces),
                         Markers.EMPTY,
                         lastAnnotations,
                         J.ClassDeclaration.Kind.Type.Class
@@ -2763,9 +2763,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 JContainer.build(prefix(property.getTypeParameterList()), mapTypeParameters(property, data), Markers.EMPTY) : null;
         K.TypeConstraints typeConstraints = null;
         boolean isSetterFirst = false;
-        PsiElement prefixConsumed = findFirstPrefixSpace(findFirstNotSpaceChild(property));
         Set<PsiElement> prefixConsumedSet = new HashSet<>();
-        prefixConsumedSet.add(prefixConsumed);
+        addIfNotNull(prefixConsumedSet, getFirstSpaceChildOrNull(property));
 
         modifiers.add(new J.Modifier(
                 Tree.randomId(),
@@ -3433,6 +3432,22 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     @Nullable
+    private PsiElement getFirstSpaceChildOrNull(@Nullable PsiElement element) {
+        if (element == null) {
+            return null;
+        }
+
+        Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(element).iterator();
+        PsiElement first = iterator.next();
+
+        if (first != null) {
+           return isSpace(first.getNode()) ?  first : null;
+        }
+
+        return null;
+    }
+
+    @Nullable
     private PsiElement findFirstNonSpacePrevSibling(@Nullable PsiElement element) {
         PsiElement maybeSpace = findFirstPrefixSpace(element);
         return (maybeSpace != null) ? maybeSpace.getPrevSibling() : null;
@@ -3892,6 +3907,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             }
         }
         return ret;
+    }
+
+    private static <E> void addIfNotNull(Set<E> set, @Nullable E element) {
+        if (element != null) {
+            set.add(element);
+        }
     }
 
     @Nullable

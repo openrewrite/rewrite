@@ -61,7 +61,7 @@ class MethodInvocationTest implements RewriteTest {
                   fun method2(): Any = CALLEE_FIELD
               }
               
-              object Callee {
+              /*42*/ object Callee {
                   const val CALLEE_FIELD = ""
                   fun calleeMethod(): Unit = Unit
               }
