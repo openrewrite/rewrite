@@ -524,6 +524,7 @@ public class MavenPomDownloader {
 
                         //NOTE: The pom may exist without a .jar artifact if the pom packaging is "pom"
                         if (!f.exists()) {
+                            repositoryResponses.put(repo, "Local repository does not contain pom");
                             continue;
                         }
 
