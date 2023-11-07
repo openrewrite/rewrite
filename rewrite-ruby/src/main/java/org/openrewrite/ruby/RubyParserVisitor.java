@@ -111,9 +111,9 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     private J.Block visitBlock(Node node, boolean explicitEnd) {
         Space prefix = whitespace();
         List<JRightPadded<Statement>> statements = convertBlockStatements(
-                node instanceof NilNode ?
-                        singletonList(node) :
-                        Arrays.asList(((BlockNode) node).children()),
+                node instanceof ListNode ?
+                        Arrays.asList(((ListNode) node).children()) :
+                        singletonList(node),
                 n -> explicitEnd ? sourceBefore("end") : EMPTY
         );
         return new J.Block(
@@ -124,6 +124,40 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 statements,
                 EMPTY
         );
+    }
+
+    @Override
+    public J visitCallNode(CallNode node) {
+        String name = node.getName().asJavaString();
+        Space prefix = whitespace();
+        TypeTree receiver = convert(node.getReceiverNode());
+        Space beforeDot = sourceBefore(".");
+        Space beforeName = sourceBefore(name);
+        JContainer<Expression> arguments = convertArgs(node.getArgsNode());
+        if (name.equals("new")) {
+            return new J.NewClass(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    padRight(new J.Empty(randomId(), EMPTY, Markers.EMPTY), beforeDot),
+                    beforeName,
+                    receiver,
+                    arguments,
+                    null,
+                    null
+            );
+        } else {
+            return new J.MethodInvocation(
+                    randomId(),
+                    prefix,
+                    Markers.EMPTY,
+                    padRight((Expression) receiver, beforeDot),
+                    null,
+                    getIdentifier(beforeName, name),
+                    arguments.withBefore(beforeDot),
+                    null
+            );
+        }
     }
 
     private List<JRightPadded<Statement>> convertBlockStatements(List<? extends Node> trees,
@@ -1001,7 +1035,7 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         return j == null ? null : new JRightPadded<>(j, suffix.apply(t), Markers.EMPTY);
     }
 
-    private <J2 extends J> JContainer<J2> convertArgs(Node argsNode) {
+    private <J2 extends J> JContainer<J2> convertArgs(@Nullable Node argsNode) {
         Markers markers = Markers.EMPTY;
         Space prefix = whitespace();
         boolean omitParentheses;
@@ -1014,7 +1048,9 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
         }
 
         List<Node> args;
-        if (argsNode instanceof ListNode) {
+        if (argsNode == null) {
+            args = singletonList(new NilNode(0));
+        } else if (argsNode instanceof ListNode) {
             ListNode listNode = (ListNode) argsNode;
             args = new ArrayList<>(listNode.size());
             for (Node node : listNode.children()) {

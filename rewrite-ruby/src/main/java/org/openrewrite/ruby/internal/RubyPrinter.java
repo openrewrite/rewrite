@@ -35,6 +35,8 @@ import org.openrewrite.ruby.tree.RubySpace;
 import java.util.List;
 import java.util.function.UnaryOperator;
 
+import static java.util.Objects.requireNonNull;
+
 public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     private static final UnaryOperator<String> MARKER_WRAPPER =
             out -> "~~" + out + (out.isEmpty() ? "" : "~~") + ">";
@@ -569,12 +571,26 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, PrintOutputCapture<P> p) {
             beforeSyntax(method, Space.Location.METHOD_INVOCATION_PREFIX, p);
-
-            visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, p);
+            visitRightPadded(method.getPadding().getSelect(), JRightPadded.Location.METHOD_SELECT, ".", p);
             visit(method.getName(), p);
             visitArgs(method.getPadding().getArguments(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, p);
             afterSyntax(method, p);
             return method;
+        }
+
+        @Override
+        public J visitNewClass(J.NewClass newClass, PrintOutputCapture<P> p) {
+            beforeSyntax(newClass, Space.Location.NEW_CLASS_PREFIX, p);
+            visit(newClass.getClazz(), p);
+            visitSpace(requireNonNull(newClass.getPadding().getEnclosing()).getAfter(), Space.Location.NEW_CLASS_ENCLOSING_SUFFIX, p);
+            p.append('.');
+            visitSpace(newClass.getNew(), Space.Location.NEW_PREFIX, p);
+            p.append("new");
+            if (!newClass.getPadding().getArguments().getMarkers().findFirst(OmitParentheses.class).isPresent()) {
+                visitContainer("(", newClass.getPadding().getArguments(), JContainer.Location.NEW_CLASS_ARGUMENTS, ",", ")", p);
+            }
+            afterSyntax(newClass, p);
+            return newClass;
         }
 
         @Override

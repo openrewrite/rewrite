@@ -52,4 +52,27 @@ public class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void newInstanceAndCall() {
+        rewriteRun(
+          ruby(
+            """
+              class Box
+                 def initialize(w,h)
+                    @width, @height = w, h
+                 end
+                 
+                 def printArea
+                    @area = @width * @height
+                    puts "Big box area is : #{@area}"
+                 end
+              end
+              
+              box = BigBox.new(10, 20)
+              box.printArea()
+              """
+          )
+        );
+    }
 }
