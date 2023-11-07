@@ -86,25 +86,15 @@ public class ParseError implements SourceFile {
         return (R) v.adapt(ParseErrorVisitor.class).visitParseError(this, p);
     }
 
-
     public static ParseError build(Parser parser,
                                    Parser.Input input,
                                    @Nullable Path relativeTo,
                                    ExecutionContext ctx,
                                    Throwable t) {
-        return build(parser, input, relativeTo, ctx, t, null);
-    }
-
-    public static ParseError build(Parser parser,
-                                   Parser.Input input,
-                                   @Nullable Path relativeTo,
-                                   ExecutionContext ctx,
-                                   Throwable t,
-                                   @Nullable String message) {
         EncodingDetectingInputStream is = input.getSource(ctx);
         return new ParseError(
                 Tree.randomId(),
-                new Markers(Tree.randomId(), singletonList(ParseExceptionResult.build(parser, t, message))),
+                new Markers(Tree.randomId(), singletonList(ParseExceptionResult.build(parser, t))),
                 input.getRelativePath(relativeTo),
                 input.getFileAttributes(),
                 parser.getCharset(ctx).name(),
