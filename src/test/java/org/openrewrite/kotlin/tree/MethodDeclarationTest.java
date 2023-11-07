@@ -363,4 +363,28 @@ class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void argumentTrailingComma() {
+        rewriteRun(
+          kotlin(
+            """
+              inline fun <reified T, R> default(paramName: String): R? {
+                  return null
+              }
+
+              class PersonProjection {
+                  operator fun invoke() = this
+              }
+
+              public fun person(
+                  a1: String? = default<PersonProjection, String?>("a1"),
+                  a2: String,
+                  _projection: PersonProjection.() -> PersonProjection, // Trailing Comma here
+              ) {
+              }
+              """
+          )
+        );
+    }
 }

@@ -2430,7 +2430,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         Set<PsiElement> prefixConsumedSet = new HashSet<>();
         prefixConsumedSet.add(prefixConsumed);
 
-
         if (function.getTypeParameterList() != null) {
             typeParameters = new J.TypeParameters(
                     randomId(),
@@ -2474,11 +2473,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     ), Markers.EMPTY
             );
         } else {
-            List<JRightPadded<Statement>> rps = new ArrayList<>();
-            for (KtParameter param : ktParameters) {
-                rps.add(padRight(convertToStatement(param.accept(this, data)), endFixAndSuffix(param)));
-            }
-            params = JContainer.build(prefix(function.getValueParameterList()), rps, Markers.EMPTY);
+            params = JContainer.build(prefix(function.getValueParameterList()), mapParameters(function.getValueParameterList(), data), Markers.EMPTY);
         }
 
         if (function.getReceiverTypeReference() != null) {
@@ -2514,7 +2509,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             newStatements.add(JRightPadded.build(implicitParam));
             newStatements.addAll(params.getPadding().getElements());
             params = params.getPadding().withElements(newStatements);
-
         }
 
         if (function.getTypeReference() != null) {
