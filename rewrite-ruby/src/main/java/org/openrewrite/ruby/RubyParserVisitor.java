@@ -1,6 +1,5 @@
 package org.openrewrite.ruby;
 
-import org.jetbrains.annotations.NotNull;
 import org.jruby.ast.*;
 import org.jruby.ast.visitor.AbstractNodeVisitor;
 import org.jruby.ast.visitor.OperatorCallNode;
@@ -97,12 +96,22 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
     @Override
     public J visitBlockNode(BlockNode node) {
+        return visitBlock(node, false);
+    }
+
+    private J.Block visitBlock(Node node, boolean explicitEnd) {
+        Space prefix = whitespace();
+        List<JRightPadded<Statement>> statements = convertAll(
+                node instanceof NilNode ?
+                        singletonList(node) :
+                        Arrays.asList(((BlockNode) node).children()),
+                n -> EMPTY, n -> explicitEnd ? sourceBefore("end") : EMPTY);
         return new J.Block(
                 randomId(),
-                whitespace(),
+                prefix,
                 Markers.EMPTY,
                 JRightPadded.build(false),
-                convertAll(Arrays.asList(node.children()), n -> EMPTY, n -> EMPTY),
+                statements,
                 EMPTY
         );
     }
@@ -113,6 +122,35 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 randomId(),
                 sourceBefore("break"),
                 Markers.EMPTY,
+                null
+        );
+    }
+
+    @Override
+    public J visitClassNode(ClassNode node) {
+        return new J.ClassDeclaration(
+                randomId(),
+                whitespace(),
+                Markers.EMPTY,
+                emptyList(),
+                emptyList(),
+                new J.ClassDeclaration.Kind(
+                        randomId(),
+                        sourceBefore("class"),
+                        Markers.EMPTY,
+                        emptyList(),
+                        J.ClassDeclaration.Kind.Type.Class
+                ),
+                getIdentifier(
+                        sourceBefore(node.getCPath().getName().asJavaString()),
+                        node.getCPath().getName().asJavaString()
+                ),
+                null,
+                null,
+                null,
+                null,
+                null,
+                visitBlock(node.getBodyNode(), true),
                 null
         );
     }
@@ -228,6 +266,11 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     @Override
     public J visitDXStrNode(DXStrNode node) {
         return visitDNode(node);
+    }
+
+    @Override
+    public J visitNilNode(NilNode node) {
+        return new J.Empty(randomId(), EMPTY, Markers.EMPTY);
     }
 
     @Override

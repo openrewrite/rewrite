@@ -471,6 +471,17 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitClassDeclaration(J.ClassDeclaration classDecl, PrintOutputCapture<P> p) {
+            beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
+            p.append("class");
+            visit(classDecl.getName(), p);
+            visit(classDecl.getBody(), p);
+            p.append("end");
+            afterSyntax(classDecl, p);
+            return classDecl;
+        }
+
+        @Override
         public J visitContinue(J.Continue continueStatement, PrintOutputCapture<P> p) {
             beforeSyntax(continueStatement, Space.Location.CONTINUE_PREFIX, p);
             p.append("next");
