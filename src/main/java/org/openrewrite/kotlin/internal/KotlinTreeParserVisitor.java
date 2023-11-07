@@ -2861,7 +2861,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         if (getter != null || setter != null || receiver != null || typeConstraints != null) {
             return new K.Property(
                     randomId(),
-                    prefix(property),
+                    endFixPrefixAndInfix(property),
                     markers,
                     typeParameters,
                     variableDeclarations.withPrefix(Space.EMPTY),

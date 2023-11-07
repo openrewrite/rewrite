@@ -510,4 +510,26 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void commentBeforeGetter() {
+        rewriteRun(
+          kotlin(
+            """
+              public class Movie(
+                  title: () -> String? = { throw IllegalStateException("Field `title` was not requested") }
+              ) {
+                  private val _title: () -> String? = title
+
+                  /**
+                   * The original, non localized title with some specials characters : %!({[*$,.:;.
+                   */
+                  @get:JvmName("getTitle")
+                  public val title: String?
+                      get() = _title.invoke()
+              }
+              """
+          )
+        );
+    }
 }
