@@ -147,11 +147,21 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 ),
                 null,
                 null,
-                null,
+                node.getSuperNode() == null ?
+                        null :
+                        padLeft(sourceBefore("<"), convert(node.getSuperNode())),
                 null,
                 null,
                 visitBlock(node.getBodyNode(), true),
                 null
+        );
+    }
+
+    @Override
+    public J visitConstNode(ConstNode node) {
+        return getIdentifier(
+                sourceBefore(node.getName().asJavaString()),
+                node.getName().asJavaString()
         );
     }
 

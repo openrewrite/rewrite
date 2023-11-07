@@ -18,4 +18,19 @@ public class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void classExtends() {
+        rewriteRun(
+          ruby(
+            """
+              class Box
+              end
+              
+              class BigBox < Box
+              end
+              """
+          )
+        );
+    }
 }

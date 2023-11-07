@@ -475,6 +475,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
             beforeSyntax(classDecl, Space.Location.CLASS_DECLARATION_PREFIX, p);
             p.append("class");
             visit(classDecl.getName(), p);
+            visitLeftPadded("<", classDecl.getPadding().getExtends(), JLeftPadded.Location.EXTENDS, p);
             visit(classDecl.getBody(), p);
             p.append("end");
             afterSyntax(classDecl, p);
