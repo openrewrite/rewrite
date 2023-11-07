@@ -19,10 +19,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaSourceFile;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -83,6 +80,12 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
 
                         @Override
                         public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Map<String, JavaType> types) {
+                            Expression target = fieldAccess.getTarget();
+                            if (target instanceof J.Identifier) {
+                                visitIdentifier((J.Identifier) fieldAccess.getTarget(), types);
+                            } else if (target instanceof J.FieldAccess) {
+                                visitFieldAccess((J.FieldAccess) target, types);
+                            }
                             return fieldAccess;
                         }
 
