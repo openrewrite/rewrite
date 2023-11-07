@@ -28,12 +28,15 @@ import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.impl.FirOuterClassTypeParameterRef
 import org.jetbrains.kotlin.fir.declarations.utils.isLocal
 import org.jetbrains.kotlin.fir.declarations.utils.modality
+import org.jetbrains.kotlin.fir.declarations.utils.nameOrSpecialName
 import org.jetbrains.kotlin.fir.declarations.utils.visibility
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaField
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.toResolvedBaseSymbol
+import org.jetbrains.kotlin.fir.resolve.dfa.DfaInternals
+import org.jetbrains.kotlin.fir.resolve.dfa.symbol
 import org.jetbrains.kotlin.fir.resolve.providers.toSymbol
 import org.jetbrains.kotlin.fir.resolve.toFirRegularClass
 import org.jetbrains.kotlin.fir.resolve.toSymbol
@@ -611,7 +614,7 @@ class KotlinTypeMapping(
         return methodInvocationType(fir, signature)
     }
 
-    @OptIn(SymbolInternals::class)
+    @OptIn(SymbolInternals::class, DfaInternals::class)
     fun methodInvocationType(function: FirFunctionCall, signature: String): JavaType.Method? {
         val sym = function.calleeReference.toResolvedBaseSymbol() ?: return null
         val receiver = if (sym is FirFunctionSymbol<*>) sym.receiverParameter else null
@@ -703,9 +706,12 @@ class KotlinTypeMapping(
         if (function.toResolvedCallableSymbol()?.receiverParameter != null) {
             paramTypes!!.add(type(function.toResolvedCallableSymbol()?.receiverParameter!!.typeRef))
         }
-        for (param: FirExpression? in function.arguments) {
-            if (param != null) {
-                paramTypes!!.add(type(param.typeRef))
+        for ((index, p) in (function.toResolvedCallableSymbol()?.fir as FirFunction).valueParameters.withIndex()) {
+            val t = type(p.returnTypeRef)
+            if (t !is GenericTypeVariable) {
+                paramTypes!!.add(t)
+            } else {
+                paramTypes!!.add(type((function.arguments[index]).typeRef))
             }
         }
         method.unsafeSet(

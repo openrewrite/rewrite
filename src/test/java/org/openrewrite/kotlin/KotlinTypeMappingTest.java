@@ -382,7 +382,7 @@ public class KotlinTypeMappingTest {
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
                             if (methodMatcher.matches(method)) {
-                                assertThat(method.getMethodType().toString()).isEqualTo("kotlin.collections.MutableList<Generic{E}>{name=addAll,return=kotlin.Boolean,parameters=[kotlin.collections.List<kotlin.String>]}");
+                                assertThat(method.getMethodType().toString()).isEqualTo("kotlin.collections.MutableList<Generic{E}>{name=addAll,return=kotlin.Boolean,parameters=[kotlin.collections.Collection<Generic{E}>]}");
                                 found.set(true);
                             }
                             return super.visitMethodInvocation(method, found);
@@ -436,7 +436,7 @@ public class KotlinTypeMappingTest {
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
                             if (methodMatcher.matches(method)) {
                                 assertThat(method.getMethodType().toString())
-                                  .isEqualTo("kotlin.collections.CollectionsKt{name=listOf,return=kotlin.collections.List<kotlin.Pair<kotlin.String, Generic{kotlin.Comparable<Generic{?}> & java.io.Serializable}>>,parameters=[kotlin.Array<Generic{? extends kotlin.Pair<kotlin.String, Generic{kotlin.Comparable<Generic{?}> & java.io.Serializable}>}>]}");
+                                  .isEqualTo("kotlin.collections.CollectionsKt{name=listOf,return=kotlin.collections.List<kotlin.Pair<kotlin.String, Generic{kotlin.Comparable<Generic{?}> & java.io.Serializable}>>,parameters=[kotlin.Array<Generic{? extends Generic{T}}>]}");
                                 found.set(true);
                             }
                             return super.visitMethodInvocation(method, found);
@@ -462,7 +462,7 @@ public class KotlinTypeMappingTest {
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean atomicBoolean) {
                             if (matcher.matches(method)) {
-                                assertThat(method.getMethodType().toString()).isEqualTo("kotlin.Function1<kotlin.collections.Collection<kotlin.Any>, kotlin.Unit>{name=invoke,return=kotlin.Unit,parameters=[kotlin.collections.List<kotlin.String>]}");
+                                assertThat(method.getMethodType().toString()).isEqualTo("kotlin.Function1<kotlin.collections.Collection<kotlin.Any>, kotlin.Unit>{name=invoke,return=kotlin.Unit,parameters=[kotlin.collections.Collection<kotlin.Any>]}");
                                 found.set(true);
                             }
                             return super.visitMethodInvocation(method, atomicBoolean);
@@ -494,6 +494,33 @@ public class KotlinTypeMappingTest {
                                 found.set(true);
                             }
                             return super.visitFieldAccess(fieldAccess, found);
+                        }
+                    }.visit(cu, found);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
+
+        @Test
+        void println() {
+            //noinspection RemoveRedundantQualifierName
+            rewriteRun(
+              kotlin(
+                """
+                  fun method() {
+                      println("foo")
+                  }
+                  """, spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<AtomicBoolean>() {
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean atomicBoolean) {
+                            if ("println".equals(method.getSimpleName())) {
+                                assertThat(method.getMethodType().toString()).isEqualTo("kotlin.io.ConsoleKt{name=println,return=kotlin.Unit,parameters=[kotlin.Any]}");
+                                found.set(true);
+                            }
+                            return super.visitMethodInvocation(method, atomicBoolean);
                         }
                     }.visit(cu, found);
                     assertThat(found.get()).isTrue();

@@ -20,6 +20,7 @@ import org.jetbrains.kotlin.fir.*
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.impl.FirOuterClassTypeParameterRef
 import org.jetbrains.kotlin.fir.declarations.utils.classId
+import org.jetbrains.kotlin.fir.declarations.utils.nameOrSpecialName
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
@@ -366,13 +367,19 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         return sig.toString()
     }
 
+    @OptIn(SymbolInternals::class)
     private fun methodCallArgumentSignature(function: FirFunctionCall): String {
         val genericArgumentTypes = StringJoiner(",", "[", "]")
         if (function.toResolvedCallableSymbol()?.receiverParameter != null) {
             genericArgumentTypes.add(signature(function.toResolvedCallableSymbol()?.receiverParameter!!.typeRef))
         }
-        for (p in function.arguments) {
-            genericArgumentTypes.add(signature(p.typeRef, function))
+        for ((index, p) in (function.toResolvedCallableSymbol()?.fir as FirFunction).valueParameters.withIndex()) {
+            val sig = signature(p.returnTypeRef, function)
+            if (sig.startsWith("Generic{")) {
+                genericArgumentTypes.add(signature((function.arguments[index]).typeRef, function))
+            } else {
+                genericArgumentTypes.add(sig)
+            }
         }
         return genericArgumentTypes.toString()
     }
