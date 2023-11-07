@@ -464,4 +464,48 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void nestedReferenceCollision() {
+        rewriteRun(
+          java("""            
+            class List {
+                class A {
+                }
+            }
+          """),
+          java("""           
+            import java.util.ArrayList;
+            
+            class Test {
+                void test(List.A l1) {
+                    java.util.List<Integer> l2 = new ArrayList<>();
+                }
+            }
+          """)
+        );
+    }
+
+    @Test
+    void deeperNestedReferenceCollision() {
+        rewriteRun(
+          java("""            
+            class List {
+                class A {
+                    class B {
+                    }
+                }
+            }
+          """),
+          java("""           
+            import java.util.ArrayList;
+            
+            class Test {
+                void test(List.A.B l1) {
+                    java.util.List<Integer> l2 = new ArrayList<>();
+                }
+            }
+          """)
+        );
+    }
 }
