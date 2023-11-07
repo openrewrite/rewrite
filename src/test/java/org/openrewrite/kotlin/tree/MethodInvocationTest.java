@@ -53,8 +53,8 @@ class MethodInvocationTest implements RewriteTest {
             """
               package pkg
               
-              import pkg.Callee.calleeMethod
-              import pkg.Callee.CALLEE_FIELD
+              import pkg.Callee.calleeMethod  /* C1 */
+              import pkg.Callee.CALLEE_FIELD  /* C2 */
               
               class Caller {
                   fun method(): Any = calleeMethod()

@@ -1622,7 +1622,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 KtImportDirective importDirective = importDirectives.get(i);
                 J.Import anImport = (J.Import) importDirective.accept(this, data);
                 if (i == 0) {
-                    anImport = anImport.withPrefix(prefix(file.getImportList()));
+                    anImport = anImport.withPrefix(merge(prefix(file.getImportList()), anImport.getPrefix()));
                 }
                 imports.add(maybeSemicolon(anImport, importDirective));
             }
@@ -2384,7 +2384,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.Import(
                 randomId(),
-                prefix(importDirective),
+                endFixPrefixAndInfix(importDirective),
                 Markers.EMPTY,
                 rpStatic,
                 (J.FieldAccess) reference,
