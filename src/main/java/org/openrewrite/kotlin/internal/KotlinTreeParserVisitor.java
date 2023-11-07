@@ -2384,7 +2384,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     Markers.EMPTY,
                     new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY),
                     padLeft(Space.EMPTY, (J.Identifier) reference),
-                    null
+                    type(importDirective)
             );
         }
 
@@ -2395,7 +2395,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 rpStatic,
                 (J.FieldAccess) reference,
                 // TODO: fix NPE.
-                alias != null ? padLeft(prefix(alias), createIdentifier(requireNonNull(alias.getNameIdentifier()), null)) : null
+                alias != null ? padLeft(prefix(alias), createIdentifier(requireNonNull(alias.getNameIdentifier()), type(alias))) : null
         );
     }
 

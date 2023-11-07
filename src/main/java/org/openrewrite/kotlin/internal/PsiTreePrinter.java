@@ -66,7 +66,7 @@ public class PsiTreePrinter {
     private static KotlinIrTypeMapping irTypeMapping = new KotlinIrTypeMapping(new JavaTypeCache());
 
     // Set to true to print types and verify, otherwise just verify the parse to print idempotent.
-    private final static boolean printTypes = false;
+    private final static boolean printTypes = true;
 
     private final List<StringBuilder> outputLines;
 

@@ -23,7 +23,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-public class RenameTypeAliasTest implements RewriteTest {
+class RenameTypeAliasTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.recipe(new RenameTypeAlias("OldAlias", "NewAlias", "Test"));
@@ -71,10 +71,10 @@ public class RenameTypeAliasTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("FirImport does not contain type attribution.")
     @Test
-    void _import() {
+    void aliasImport() {
         rewriteRun(
+          spec -> spec.recipe(new RenameTypeAlias("OldAlias", "NewAlias", "foo.Test")),
           kotlin(
             """
               package foo
@@ -84,13 +84,13 @@ public class RenameTypeAliasTest implements RewriteTest {
           kotlin(
             """
               import foo.Test as OldAlias
-                          
+
               val a : OldAlias = OldAlias()
               """,
             """
               import foo.Test as NewAlias
-                          
-              val a : NewAlias = Test()
+
+              val a : NewAlias = NewAlias()
               """
           )
         );

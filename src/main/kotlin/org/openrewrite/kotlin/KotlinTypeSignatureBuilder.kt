@@ -39,6 +39,7 @@ import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaClass
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaTypeParameter
 import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource
 import org.jetbrains.kotlin.name.ClassId
+import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.types.Variance
 import org.openrewrite.java.JavaTypeSignatureBuilder
 import org.openrewrite.java.tree.JavaType
@@ -165,6 +166,14 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
 
             is JavaElement -> {
                 javaElement(type)
+            }
+
+            is FirResolvedImport -> {
+                signature(type.importedFqName)
+            }
+
+            is FqName -> {
+                type.asString()
             }
 
             else -> "{undefined}"
