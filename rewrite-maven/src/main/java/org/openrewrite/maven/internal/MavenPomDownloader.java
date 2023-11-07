@@ -645,7 +645,9 @@ public class MavenPomDownloader {
                                                                        @Nullable ResolvedPom containingPom,
                                                                        @Nullable String acceptsVersion) {
         Set<MavenRepository> normalizedRepositories = new LinkedHashSet<>();
-        normalizedRepositories.add(ctx.getLocalRepository());
+        if(addDefaultRepositories) {
+            normalizedRepositories.add(ctx.getLocalRepository());
+        }
 
         for (MavenRepository repo : repositories) {
             MavenRepository normalizedRepo = normalizeRepository(repo, containingPom);
