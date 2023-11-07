@@ -2294,7 +2294,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         .withName(((J.MethodInvocation) methodInvocation).getName().withPrefix(prefix(callExpression)))
                         .withPrefix(prefix(expression));
             } else if (methodInvocation instanceof J.NewClass) {
-                if (receiver instanceof J.FieldAccess) {
+                if (receiver instanceof J.FieldAccess || receiver instanceof J.Identifier) {
                     J.NewClass cur = (J.NewClass) methodInvocation;
                     if (cur.getClazz() instanceof J.ParameterizedType) {
                         cur = cur.withPrefix(prefix(expression));
