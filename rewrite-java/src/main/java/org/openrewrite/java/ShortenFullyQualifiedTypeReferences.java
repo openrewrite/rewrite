@@ -80,11 +80,10 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
 
                         @Override
                         public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Map<String, JavaType> types) {
-                            Expression target = fieldAccess.getTarget();
-                            if (target instanceof J.Identifier) {
+                            if (fieldAccess.getTarget() instanceof J.Identifier) {
                                 visitIdentifier((J.Identifier) fieldAccess.getTarget(), types);
-                            } else if (target instanceof J.FieldAccess) {
-                                visitFieldAccess((J.FieldAccess) target, types);
+                            } else if (fieldAccess.getTarget() instanceof J.FieldAccess) {
+                                visitFieldAccess((J.FieldAccess) fieldAccess.getTarget(), types);
                             }
                             return fieldAccess;
                         }
