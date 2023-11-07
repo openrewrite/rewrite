@@ -200,7 +200,7 @@ class KotlinParserVisitor(
                                 Markers.build(
                                         listOf(
                                                 ParseExceptionResult.build(
-                                                        null, e
+                                                        KotlinParser::class.java, e
                                                 )
                                                         .withTreeType(declaration.source!!.kind.toString())
                                         )
@@ -5108,7 +5108,7 @@ class KotlinParserVisitor(
                                     Markers.build(
                                             listOf(
                                                     ParseExceptionResult.build(
-                                                            null, e
+                                                        KotlinParser::class.java, e
                                                     )
                                                             .withTreeType(element.source!!.kind.toString())
                                             )
