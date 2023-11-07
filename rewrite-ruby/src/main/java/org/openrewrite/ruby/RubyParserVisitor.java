@@ -96,6 +96,18 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     @Override
+    public J visitBlockNode(BlockNode node) {
+        return new J.Block(
+                randomId(),
+                whitespace(),
+                Markers.EMPTY,
+                JRightPadded.build(false),
+                convertAll(Arrays.asList(node.children()), n -> EMPTY, n -> EMPTY),
+                EMPTY
+        );
+    }
+
+    @Override
     public J visitBreakNode(BreakNode node) {
         return new J.Break(
                 randomId(),
