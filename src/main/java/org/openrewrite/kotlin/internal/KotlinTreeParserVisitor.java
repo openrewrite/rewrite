@@ -2670,7 +2670,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.ClassDeclaration(
                 randomId(),
-                prefix(declaration),
+                endFixPrefixAndInfix(declaration),
                 markers,
                 leadingAnnotations,
                 modifiers,

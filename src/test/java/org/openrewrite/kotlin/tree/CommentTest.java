@@ -176,4 +176,23 @@ class CommentTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void commentsBeforeCompanion() {
+        rewriteRun(
+          kotlin(
+            """
+              class A {
+                  fun method(){} // END
+
+                  /**
+                   * Comment
+                   */
+                  companion object AssertValidQueryCompanion {
+                  }
+              }
+              """
+          )
+        );
+    }
 }
