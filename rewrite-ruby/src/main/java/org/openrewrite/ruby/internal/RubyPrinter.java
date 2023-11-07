@@ -555,7 +555,8 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
             p.append("def");
             visit(method.getAnnotations().getName().getAnnotations(), p);
             visit(method.getName(), p);
-            boolean omitParentheses = method.getMarkers().findFirst(OmitParentheses.class).isPresent();
+            boolean omitParentheses = method.getPadding().getParameters()
+                    .getMarkers().findFirst(OmitParentheses.class).isPresent();
             visitContainer(omitParentheses ? "" : "(", method.getPadding().getParameters(),
                     JContainer.Location.METHOD_DECLARATION_PARAMETERS, ",",
                     omitParentheses ? "" : ")", p);

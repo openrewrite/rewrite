@@ -26,8 +26,27 @@ public class ClassDeclarationTest implements RewriteTest {
             """
               class Box
               end
-              
+                            
               class BigBox < Box
+              end
+              """
+          )
+        );
+    }
+
+    @Test
+    void initializeAndInstanceMethod() {
+        rewriteRun(
+          ruby(
+            """
+              class Box
+                 def initialize(w,h)
+                    @width, @height = w, h
+                 end
+                            
+                 def getArea
+                    @width * @height
+                 end
               end
               """
           )

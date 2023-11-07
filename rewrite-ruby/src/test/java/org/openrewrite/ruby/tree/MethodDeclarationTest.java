@@ -45,4 +45,17 @@ public class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void argNoInitializer() {
+        rewriteRun(
+          ruby(
+            """
+              def sum(a1, a2)
+                  a1 + a2
+              end
+              """
+          )
+        );
+    }
 }

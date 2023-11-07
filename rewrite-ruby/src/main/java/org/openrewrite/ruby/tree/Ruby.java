@@ -321,6 +321,83 @@ public interface Ruby extends J {
         }
     }
 
+    /**
+     * Unlike Java, Ruby allows expressions to appear anywhere Statements do.
+     * Rather than re-define versions of the many J types that implement Expression to also implement Statement,
+     * just wrap such expressions.
+     * <p>
+     * Has no state or behavior of its own aside from the Expression it wraps.
+     */
+    @SuppressWarnings("unchecked")
+    @ToString
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor
+    final class ExpressionStatement implements Ruby, Expression, Statement {
+
+        @With
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Expression expression;
+
+        // For backwards compatibility with older ASTs before there was an id field
+        @SuppressWarnings("unused")
+        public ExpressionStatement(Expression expression) {
+            this.id = Tree.randomId();
+            this.expression = expression;
+        }
+
+        @Override
+        public <P> J acceptRuby(RubyVisitor<P> v, P p) {
+            J j = v.visit(getExpression(), p);
+            if(j instanceof ExpressionStatement) {
+                return j;
+            } else if (j instanceof Expression) {
+                return withExpression((Expression) j);
+            }
+            return j;
+        }
+
+        @Override
+        public <J2 extends J> J2 withPrefix(Space space) {
+            return (J2) withExpression(expression.withPrefix(space));
+        }
+
+        @Override
+        public Space getPrefix() {
+            return expression.getPrefix();
+        }
+
+        @Override
+        public <J2 extends Tree> J2 withMarkers(Markers markers) {
+            return (J2) withExpression(expression.withMarkers(markers));
+        }
+
+        @Override
+        public Markers getMarkers() {
+            return expression.getMarkers();
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return expression.getType();
+        }
+
+        @Override
+        public <T extends J> T withType(@Nullable JavaType type) {
+            return (T) withExpression(expression.withType(type));
+        }
+
+        @Transient
+        @Override
+        public CoordinateBuilder.Statement getCoordinates() {
+            return new CoordinateBuilder.Statement(this);
+        }
+    }
+
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor

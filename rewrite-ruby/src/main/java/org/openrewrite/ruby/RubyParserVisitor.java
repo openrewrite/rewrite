@@ -1,5 +1,6 @@
 package org.openrewrite.ruby;
 
+import org.jruby.RubySymbol;
 import org.jruby.ast.*;
 import org.jruby.ast.visitor.AbstractNodeVisitor;
 import org.jruby.ast.visitor.OperatorCallNode;
@@ -79,6 +80,14 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     }
 
     @Override
+    public J visitArgumentNode(ArgumentNode node) {
+        return getIdentifier(
+                sourceBefore(node.getName().asJavaString()),
+                node.getName().asJavaString()
+        );
+    }
+
+    @Override
     public J visitArrayNode(ArrayNode node) {
         Space prefix = sourceBefore("[");
         JContainer<Expression> elements = convertArgs(node);
@@ -101,11 +110,12 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
     private J.Block visitBlock(Node node, boolean explicitEnd) {
         Space prefix = whitespace();
-        List<JRightPadded<Statement>> statements = convertAll(
+        List<JRightPadded<Statement>> statements = convertBlockStatements(
                 node instanceof NilNode ?
                         singletonList(node) :
                         Arrays.asList(((BlockNode) node).children()),
-                n -> EMPTY, n -> explicitEnd ? sourceBefore("end") : EMPTY);
+                n -> explicitEnd ? sourceBefore("end") : EMPTY
+        );
         return new J.Block(
                 randomId(),
                 prefix,
@@ -114,6 +124,23 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                 statements,
                 EMPTY
         );
+    }
+
+    private List<JRightPadded<Statement>> convertBlockStatements(List<? extends Node> trees,
+                                                                 Function<Node, Space> suffix) {
+        if (trees.isEmpty()) {
+            return emptyList();
+        }
+        List<JRightPadded<Statement>> converted = new ArrayList<>(trees.size());
+        for (int i = 0; i < trees.size(); i++) {
+            JRightPadded<J> stat = convert(trees.get(i), i == trees.size() - 1 ? suffix : n -> EMPTY);
+            if (!(stat.getElement() instanceof Statement)) {
+                stat = stat.withElement((J) new Ruby.ExpressionStatement(randomId(), (Expression) stat.getElement()));
+            }
+            //noinspection ReassignedVariable,unchecked
+            converted.add((JRightPadded<Statement>) (JRightPadded<?>) stat);
+        }
+        return converted;
     }
 
     @Override
@@ -177,8 +204,11 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
         J body = convert(node.getBodyNode());
         if (!(body instanceof J.Block)) {
+            Statement bodyStatement = body instanceof Statement ?
+                    (Statement) body :
+                    new Ruby.ExpressionStatement(randomId(), (Expression) body);
             body = new J.Block(randomId(), EMPTY, Markers.EMPTY,
-                    JRightPadded.build(false), singletonList(padRight((Statement) body, EMPTY)),
+                    JRightPadded.build(false), singletonList(padRight(bodyStatement, EMPTY)),
                     sourceBefore("end"));
         }
 
@@ -276,6 +306,16 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
     @Override
     public J visitDXStrNode(DXStrNode node) {
         return visitDNode(node);
+    }
+
+    @Override
+    public J visitInstAsgnNode(InstAsgnNode node) {
+        return visitAsgnNode(node, node.getName());
+    }
+
+    @Override
+    public J visitInstVarNode(InstVarNode node) {
+        return getIdentifier(sourceBefore(node.getName().asJavaString()), node.getName().asJavaString());
     }
 
     @Override
@@ -513,6 +553,10 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
 
     @Override
     public J visitLocalAsgnNode(LocalAsgnNode node) {
+        return visitAsgnNode(node, node.getName());
+    }
+
+    private Expression visitAsgnNode(AssignableNode node, RubySymbol name) {
         if (node.getValueNode() instanceof OperatorCallNode) {
             // J.AssignmentOp
             OperatorCallNode assignOp = (OperatorCallNode) node.getValueNode();
@@ -551,8 +595,8 @@ public class RubyParserVisitor extends AbstractNodeVisitor<J> {
                     null
             );
         } else {
-            Space prefix = sourceBefore(node.getName().asJavaString());
-            J.Identifier variable = getIdentifier(EMPTY, node.getName().asJavaString());
+            Space prefix = sourceBefore(name.asJavaString());
+            J.Identifier variable = getIdentifier(EMPTY, name.asJavaString());
 
             if (node.getValueNode() instanceof NilImplicitNode) {
                 return variable.withPrefix(prefix);
