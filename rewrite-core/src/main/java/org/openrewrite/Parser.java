@@ -17,7 +17,9 @@ package org.openrewrite;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.eclipse.jgit.lib.FileMode;
 import org.openrewrite.internal.EncodingDetectingInputStream;
+import org.openrewrite.internal.InMemoryDiffEntry;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.tree.ParseError;
@@ -30,6 +32,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -43,12 +46,18 @@ public interface Parser {
     default SourceFile requirePrintEqualsInput(SourceFile sourceFile, Parser.Input input, @Nullable Path relativeTo, ExecutionContext ctx) {
         if (ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true) &&
             !sourceFile.printEqualsInput(input, ctx)) {
+            String diff = Result.diff(input.getSource(ctx).readFully(), sourceFile.printAll(), input.getPath());
+            String message = null;
+            if (diff != null) {
+                message = sourceFile.getSourcePath() + " is not print idempotent. \n" + diff;
+            }
             return ParseError.build(
                     this,
                     input,
                     relativeTo,
                     ctx,
-                    new IllegalStateException(sourceFile.getSourcePath() + " is not print idempotent.")
+                    new IllegalStateException(sourceFile.getSourcePath() + " is not print idempotent."),
+                    message
             ).withErroneous(sourceFile);
         }
         return sourceFile;
@@ -69,6 +78,7 @@ public interface Parser {
                 ctx
         );
     }
+
 
     default Stream<SourceFile> parse(String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
