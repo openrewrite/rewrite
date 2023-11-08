@@ -195,4 +195,19 @@ class CommentTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void kdocBeforeValueParameter() {
+        rewriteRun(
+          kotlin(
+            """
+              class CodeGenConfig(
+                  var kotlinAllFieldsOptional: Boolean = false,
+                  /** If enabled, the names of the classes available via the DgsConstant class will be snake cased.*/
+                  var snakeCaseConstantNames: Boolean = false
+              )
+              """
+          )
+        );
+    }
 }

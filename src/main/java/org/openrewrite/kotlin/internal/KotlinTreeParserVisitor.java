@@ -790,6 +790,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<J.Modifier> modifiers = new ArrayList<>();
         TypeTree typeExpression = null;
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>(1);
+        Set<PsiElement> consumedSpaces = preConsumedInfix(parameter);
 
         if (!parameter.getAnnotations().isEmpty()) {
             throw new UnsupportedOperationException("TODO");
@@ -801,7 +802,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         if (valOrVarOffset < modifierOffset) {
             if (parameter.getValOrVarKeyword() != null) {
-                modifiers.add(mapModifier(parameter.getValOrVarKeyword(), Collections.emptyList()));
+                modifiers.add(mapModifier(parameter.getValOrVarKeyword(), Collections.emptyList(), consumedSpaces));
             }
 
             if (parameter.getModifierList() != null) {
@@ -813,7 +814,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             }
 
             if (parameter.getValOrVarKeyword() != null) {
-                modifiers.add(mapModifier(parameter.getValOrVarKeyword(), Collections.emptyList()));
+                modifiers.add(mapModifier(parameter.getValOrVarKeyword(), Collections.emptyList(), consumedSpaces));
             }
         }
 
@@ -872,6 +873,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
         List<J.Modifier> modifiers = new ArrayList<>();
+        Set<PsiElement> consumedSpaces = preConsumedInfix(constructor);
 
         if (constructor.getModifierList() != null) {
             KtModifierList ktModifierList = constructor.getModifierList();
@@ -879,7 +881,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         if (constructor.getConstructorKeyword() != null) {
-            modifiers.add(mapModifier(constructor.getConstructorKeyword(), Collections.emptyList()));
+            modifiers.add(mapModifier(constructor.getConstructorKeyword(), Collections.emptyList(), consumedSpaces));
         }
 
         JavaType.Method type = methodDeclarationType(constructor);
@@ -1083,7 +1085,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
         List<J.Annotation> lastAnnotations = new ArrayList<>();
         List<J.Modifier> modifiers = mapModifiers(constructor.getModifierList(), leadingAnnotations, lastAnnotations, data);
-        modifiers.add(mapModifier(constructor.getConstructorKeyword(), emptyList()));
+        modifiers.add(mapModifier(constructor.getConstructorKeyword(), emptyList(), preConsumedInfix(constructor)));
 
         JavaType.Method type = methodDeclarationType(constructor);
         J.Identifier name = createIdentifier(requireNonNull(constructor.getName()), prefix(constructor.getConstructorKeyword()), type)
@@ -2905,7 +2907,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             } else if (isKeyword) {
                 isLeadingAnnotation = false;
 
-                modifiers.add(mapModifier(child, new ArrayList<>(annotations)));
+                modifiers.add(mapModifier(child, new ArrayList<>(annotations), null));
                 annotations.clear();
             }
         }
@@ -3617,8 +3619,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         );
     }
 
-    private J.Modifier mapModifier(PsiElement modifier, List<J.Annotation> annotations) {
-        Space prefix = prefix(modifier);
+    private J.Modifier mapModifier(PsiElement modifier, List<J.Annotation> annotations, @Nullable Set<PsiElement> consumedSpaces) {
+        Space prefix = prefix(modifier, consumedSpaces);
         J.Modifier.Type type;
         String keyword = null;
         switch (modifier.getText()) {
