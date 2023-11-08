@@ -1245,24 +1245,19 @@ public interface J extends Tree {
         public static final class Kind implements J {
 
             @With
-            @Getter
             @EqualsAndHashCode.Include
             UUID id;
 
             @With
-            @Getter
             Space prefix;
 
             @With
-            @Getter
             Markers markers;
 
             @With
-            @Getter
             List<Annotation> annotations;
 
             @With
-            @Getter
             Type type;
 
             public enum Type {
@@ -2368,9 +2363,9 @@ public interface J extends Tree {
         @Getter
         Markers markers;
 
-        J.Parentheses<TypeTree> parenthesizedType;
-
         List<J.Annotation> annotations;
+
+        J.Parentheses<TypeTree> parenthesizedType;
 
         @Override
         public @Nullable JavaType getType() {
@@ -3556,11 +3551,9 @@ public interface J extends Tree {
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static final class IdentifierWithAnnotations {
-            @Getter
             @With
             Identifier identifier;
 
-            @Getter
             @With
             List<Annotation> annotations;
         }
