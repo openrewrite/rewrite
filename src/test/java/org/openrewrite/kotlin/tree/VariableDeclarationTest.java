@@ -539,7 +539,7 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              val a  =   1    ;
+              val a  =   1   /*C1*/  ; /*C2*/
               val    b   =  2 ;
               """
           )
@@ -675,5 +675,4 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
-
 }

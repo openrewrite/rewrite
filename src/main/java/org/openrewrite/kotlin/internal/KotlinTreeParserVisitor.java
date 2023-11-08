@@ -2139,7 +2139,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 continue;
             }
             Statement statement = convertToStatement(d.accept(this, data));
-            list.add(maybeSemicolon(statement, d));
+            list.add(maybeFollowingSemicolon(statement, d));
         }
 
         return new J.Block(
@@ -2792,9 +2792,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         Markers rpMarker = Markers.EMPTY;
         Space maybeBeforeSemicolon = Space.EMPTY;
-        if (property.getLastChild().getNode().getElementType() == KtTokens.SEMICOLON) {
+        PsiElement lastChild = findLastNotSpaceChild(property);
+        if (lastChild != null && lastChild.getNode().getElementType() == KtTokens.SEMICOLON) {
             rpMarker = rpMarker.addIfAbsent(new Semicolon(randomId()));
-            maybeBeforeSemicolon = prefix(property.getLastChild());
+            maybeBeforeSemicolon = prefix(lastChild);
         }
 
         JavaType.Variable vt = variableType(property, owner(property));
@@ -3448,8 +3449,19 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Nullable
     private PsiElement findFirstNonSpacePrevSibling(@Nullable PsiElement element) {
-        PsiElement maybeSpace = findFirstPrefixSpace(element);
-        return (maybeSpace != null) ? maybeSpace.getPrevSibling() : null;
+        if (element == null) {
+            return null;
+        }
+
+        PsiElement pre = element.getPrevSibling();
+        while (pre != null) {
+            if (!isSpace(pre.getNode())) {
+                return pre;
+            }
+            pre = pre.getPrevSibling();
+        }
+
+        return null;
     }
 
     @Nullable
