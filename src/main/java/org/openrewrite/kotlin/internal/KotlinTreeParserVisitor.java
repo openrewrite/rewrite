@@ -2361,10 +2361,16 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         ASTNode node = importDirective.getNode().findChildByType(KtTokens.IMPORT_KEYWORD);
         LeafPsiElement importPsi = (LeafPsiElement) node;
 
-        String text = nodeRangeText(
-                findFirstNonSpaceNextSibling(importPsi).getNode(),
-                importDirective.isAllUnder() ? importDirective.getNode().findChildByType(KtTokens.MUL)
-                        : importDirective.getNode().findChildByType(KtNodeTypes.DOT_QUALIFIED_EXPRESSION));
+        PsiElement first = findFirstNonSpaceNextSibling(importPsi);
+        ASTNode last = importDirective.isAllUnder() ? importDirective.getNode().findChildByType(KtTokens.MUL)
+                : importDirective.getNode().findChildByType(KtNodeTypes.DOT_QUALIFIED_EXPRESSION);
+        if (last == null) {
+            PsiElement lastPsi = findLastNotSpaceChild(importDirective);
+            if (lastPsi != null) {
+                last = lastPsi.getNode();
+            }
+        }
+        String text = nodeRangeText(first != null ? first.getNode() : null, last);
         J reference = TypeTree.build(text); // FIXME: this creates a shallow class for a resolvable type.
         reference = reference.withPrefix(suffix(importPsi));
 

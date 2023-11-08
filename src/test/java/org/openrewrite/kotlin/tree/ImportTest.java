@@ -96,7 +96,7 @@ class ImportTest implements RewriteTest {
     void methodName() {
         rewriteRun(
           kotlin("fun <T : Any> Class<T>.createInstance() {}"),
-          kotlin("import   createInstance")
+          kotlin("import   createInstance /*C1*/")
         );
     }
 
