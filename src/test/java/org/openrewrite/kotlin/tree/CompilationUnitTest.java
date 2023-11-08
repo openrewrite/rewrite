@@ -55,12 +55,12 @@ class CompilationUnitTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              /* Comment */
+              /* C0 */
               package a
               import java.util.List
               
-              class A
-              // comment
+              class A /*C1*/
+              // C2
               """,
             SourceSpec::noTrim
           )

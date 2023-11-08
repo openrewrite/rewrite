@@ -668,7 +668,7 @@ class VariableDeclarationTest implements RewriteTest {
           kotlin(
             """
               class Test {
-                  var t = 1;
+                  var t = 1 /*C1*/  ; /*C2*/
                   fun method() {}
               }
               """

@@ -2139,7 +2139,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 continue;
             }
             Statement statement = convertToStatement(d.accept(this, data));
-            list.add(maybeFollowingSemicolon(statement, d));
+            list.add(maybeSemicolon(statement, d));
         }
 
         return new J.Block(
@@ -3337,7 +3337,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     private <J2 extends J> JRightPadded<J2> maybeSemicolon(J2 j, KtElement element) {
-        PsiElement maybeSemicolon = element.getLastChild();
+        PsiElement maybeSemicolon = findLastNotSpaceChild(element);
         boolean hasSemicolon = maybeSemicolon instanceof LeafPsiElement && ((LeafPsiElement) maybeSemicolon).getElementType() == KtTokens.SEMICOLON;
 
         if (hasSemicolon) {
@@ -3346,7 +3346,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         maybeSemicolon = findFirstNonSpaceNextSibling(element);
         if (maybeSemicolon instanceof LeafPsiElement && ((LeafPsiElement) maybeSemicolon).getElementType() == KtTokens.SEMICOLON) {
-            return new JRightPadded<>(j, prefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
+            return new JRightPadded<>(j, deepPrefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
         }
 
         return padRight(j, Space.EMPTY);
@@ -3502,7 +3502,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             return Space.EMPTY;
         }
 
-        Space end = endFix(element.getLastChild());
+        Space end = endFix(findLastNotSpaceChild(element));
         PsiElement lastSpace = findLastSpaceChild(element);
         if (consumedSpaces != null && consumedSpaces.contains(element)) {
             return end;
@@ -3898,13 +3898,26 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     @Nullable
-    private PsiElement findLastSpaceChild(@Nullable PsiElement parent) {
-        PsiElement ret = null;
-
+    private PsiElement findLastNotSpaceChild(@Nullable PsiElement parent) {
         if (parent == null) {
             return null;
         }
 
+        for (PsiElement child = parent.getLastChild(); child != null; child = child.getPrevSibling()) {
+            if (!isSpace(child.getNode())) {
+                return child;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private PsiElement findLastSpaceChild(@Nullable PsiElement parent) {
+        if (parent == null) {
+            return null;
+        }
+
+        PsiElement ret = null;
         for (PsiElement child = parent.getLastChild(); child != null; child = child.getPrevSibling()) {
             if (isSpace(child.getNode())) {
                 ret = child;
