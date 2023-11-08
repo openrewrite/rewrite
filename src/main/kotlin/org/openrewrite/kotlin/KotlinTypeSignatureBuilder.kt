@@ -20,7 +20,6 @@ import org.jetbrains.kotlin.fir.*
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.impl.FirOuterClassTypeParameterRef
 import org.jetbrains.kotlin.fir.declarations.utils.classId
-import org.jetbrains.kotlin.fir.declarations.utils.nameOrSpecialName
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
@@ -45,6 +44,7 @@ import org.openrewrite.java.JavaTypeSignatureBuilder
 import org.openrewrite.java.tree.JavaType
 import java.util.*
 
+@Suppress("DuplicatedCode")
 class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val firFile: FirFile) :
     JavaTypeSignatureBuilder {
     private var typeVariableNameStack: MutableSet<String>? = null
@@ -503,7 +503,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         return "${signature(type.componentType)}[]"
     }
 
-    fun javaClassSignature(type: BinaryJavaClass): String {
+    private fun javaClassSignature(type: BinaryJavaClass): String {
         return type.fqName.asString()
     }
 
@@ -540,7 +540,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         return genericArgumentTypes.toString()
     }
 
-    fun javaParameterizedSignature(type: BinaryJavaClass): String {
+    private fun javaParameterizedSignature(type: BinaryJavaClass): String {
         val sig = StringBuilder(type.fqName.asString())
         val joiner = StringJoiner(", ", "<", ">")
         for (tp in type.typeParameters) {
@@ -549,7 +549,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         return sig.append(joiner).toString()
     }
 
-    fun javaParameterizedSignature(type: JavaClassifierType): String {
+    private fun javaParameterizedSignature(type: JavaClassifierType): String {
         val sig = StringBuilder(type.classifierQualifiedName)
         val joiner = StringJoiner(", ", "<", ">")
         for (tp in type.typeArguments) {

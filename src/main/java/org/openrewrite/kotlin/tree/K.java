@@ -25,7 +25,6 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaTypeVisitor;
-import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
@@ -75,6 +74,7 @@ public interface K extends J {
         return getPrefix().getComments();
     }
 
+    @SuppressWarnings("DataFlowIssue")
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -553,7 +553,7 @@ public interface K extends J {
         }
     }
 
-    @SuppressWarnings("unused")
+    @SuppressWarnings({"unused", "unchecked"})
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -611,7 +611,7 @@ public interface K extends J {
         }
     }
 
-    @SuppressWarnings("unused")
+    @SuppressWarnings({"unused", "LombokGetterMayBeUsed", "unchecked"})
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     final class Constructor implements K, Statement, TypedTree {
@@ -681,7 +681,7 @@ public interface K extends J {
         }
     }
 
-    @SuppressWarnings("unused")
+    @SuppressWarnings({"unused", "unchecked"})
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
