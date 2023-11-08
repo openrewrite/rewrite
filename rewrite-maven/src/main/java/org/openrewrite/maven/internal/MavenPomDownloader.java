@@ -765,12 +765,20 @@ public class MavenPomDownloader {
                             }
                         }
                     }
+                    if(normalized == null) {
+                        if (nullReasonConsumer != null) {
+                            nullReasonConsumer.accept(t);
+                        }
+                    }
                 }
                 mavenCache.putNormalizedRepository(repository, normalized);
                 result = Optional.ofNullable(normalized);
             }
         } catch (Exception e) {
             ctx.getOnError().accept(e);
+            if (nullReasonConsumer != null) {
+                nullReasonConsumer.accept(e);
+            }
             mavenCache.putNormalizedRepository(repository, null);
         }
 
@@ -834,7 +842,7 @@ public class MavenPomDownloader {
     }
 
     @Getter
-    private static class HttpSenderResponseException extends Exception {
+    public static class HttpSenderResponseException extends Exception {
         @Nullable
         private final Integer responseCode;
 
