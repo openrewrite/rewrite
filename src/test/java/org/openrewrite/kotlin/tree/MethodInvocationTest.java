@@ -305,7 +305,7 @@ class MethodInvocationTest implements RewriteTest {
             """
               fun String.modify(block: () -> Unit) = this
               
-              val spec = "test".modify() {
+              val spec = "test".modify( /*42*/  ) {
                   println("Hello, world!")
               }
               """
@@ -592,7 +592,7 @@ class MethodInvocationTest implements RewriteTest {
           kotlin(
             """
               abstract class Test(arg: () -> Unit) {
-                  init {
+                  /*23*/ init {
                       arg()
                   }
               }
