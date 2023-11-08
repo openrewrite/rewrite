@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
@@ -71,6 +72,7 @@ class RenameTypeAliasTest implements RewriteTest {
         );
     }
 
+    @Disabled("Require rewrite release to pass")
     @Test
     void aliasImport() {
         rewriteRun(
