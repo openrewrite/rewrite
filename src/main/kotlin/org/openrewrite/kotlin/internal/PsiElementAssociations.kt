@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.internal
 
-import org.jetbrains.kotlin.KtFakeSourceElement
 import org.jetbrains.kotlin.KtRealPsiSourceElement
 import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.fir.FirElement
@@ -34,6 +33,7 @@ import org.jetbrains.kotlin.fir.symbols.impl.FirFunctionSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirVariableSymbol
 import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef
+import org.jetbrains.kotlin.fir.types.FirUserTypeRef
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor
 import org.jetbrains.kotlin.psi
 import org.jetbrains.kotlin.psi.*
@@ -70,7 +70,12 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
     }
 
     fun primary(psiElement: PsiElement) =
-        fir(psiElement) { it.source is KtRealPsiSourceElement }
+        fir(psiElement) { filterFirElement(it) }
+
+    private fun filterFirElement(firElement : FirElement) : Boolean {
+        return firElement.source is KtRealPsiSourceElement &&
+                firElement !is FirUserTypeRef
+    }
 
     fun methodDeclarationType(psi: PsiElement): JavaType.Method? {
         return when (val fir = primary(psi)) {
