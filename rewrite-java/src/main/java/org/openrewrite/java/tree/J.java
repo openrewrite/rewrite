@@ -2349,6 +2349,46 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Java does not allow for parenthesis around TypeTree in places like a type cast where a J.ControlParenthesis is
+     * used. But other languages, like Kotlin, do.
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
+    @With
+    class ParenthesizedTypeTree implements J, TypeTree, Expression {
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        Space prefix;
+
+        @Getter
+        Markers markers;
+
+        J.Parentheses<TypeTree> parenthesizedType;
+
+        List<J.Annotation> annotations;
+
+        @Override
+        public @Nullable JavaType getType() {
+            return parenthesizedType.getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public ParenthesizedTypeTree withType(@Nullable JavaType type) {
+            return withParenthesizedType(parenthesizedType.withType(type));
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
