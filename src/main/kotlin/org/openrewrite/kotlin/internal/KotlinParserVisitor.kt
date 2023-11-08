@@ -197,14 +197,15 @@ class KotlinParserVisitor(
                         J.Unknown.Source(
                                 randomId(),
                                 Space.EMPTY,
-                                Markers.build(
-                                        listOf(
-                                                ParseExceptionResult.build(
-                                                        null, e
-                                                )
-                                                        .withTreeType(declaration.source!!.kind.toString())
-                                        )
-                                ),
+                                Markers.EMPTY,
+//                                Markers.build(
+//                                        listOf(
+//                                                ParseExceptionResult.build(
+//                                                        null, e
+//                                                )
+//                                                        .withTreeType(declaration.source!!.kind.toString())
+//                                        )
+//                                ),
                                 text
                         )
                 )
@@ -5105,14 +5106,15 @@ class KotlinParserVisitor(
                             J.Unknown.Source(
                                     randomId(),
                                     Space.EMPTY,
-                                    Markers.build(
-                                            listOf(
-                                                    ParseExceptionResult.build(
-                                                        null, e
-                                                    )
-                                                            .withTreeType(element.source!!.kind.toString())
-                                            )
-                                    ),
+                                    Markers.EMPTY,
+//                                    Markers.build(
+//                                            listOf(
+//                                                    ParseExceptionResult.build(
+//                                                        null, e
+//                                                    )
+//                                                            .withTreeType(element.source!!.kind.toString())
+//                                            )
+//                                    ),
                                     text
                             )
                     ) as J2
