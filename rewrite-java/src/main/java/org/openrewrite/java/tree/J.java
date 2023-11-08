@@ -851,6 +851,8 @@ public interface J extends Tree {
                 } else if (next instanceof J.NewClass) {
                     J.NewClass newClass = (J.NewClass) next;
                     return newClass.getBody() == parentBlock;
+                } else if (next instanceof J.Lambda) {
+                    return false;
                 }
             }
             return false;
