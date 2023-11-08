@@ -32,7 +32,7 @@ class KTSTest implements RewriteTest {
         rewriteRun(
           kotlinScript("""
             var x = 5
-            x += 1
+            x += 1 /*C1*/
             """)
         );
     }

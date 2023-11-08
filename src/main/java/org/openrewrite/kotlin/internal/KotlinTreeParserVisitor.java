@@ -774,7 +774,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitNullableType(KtNullableType nullableType, ExecutionContext data) {
         J j = requireNonNull(nullableType.getInnerType()).accept(this, data);
-        return j.withMarkers(j.getMarkers().addIfAbsent(new IsNullable(randomId(), suffix(nullableType.getInnerType()))));
+        return j.withMarkers(j.getMarkers().addIfAbsent(new IsNullable(randomId(),
+                prefix((PsiElement) nullableType.getQuestionMarkNode())
+        )));
     }
 
     @Override
@@ -1803,7 +1805,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         boolean hasBraces = expression.getLBrace() != null;
-        Space end = hasBraces ? endFixPrefixAndInfix(expression.getRBrace()) : endFix(expression);
+        Space end = hasBraces ? deepPrefix(expression.getRBrace()) : Space.EMPTY;
 
         Space prefix = prefix(expression);
         Space blockPrefix = prefix;

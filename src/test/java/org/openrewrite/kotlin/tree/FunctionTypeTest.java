@@ -88,7 +88,7 @@ class FunctionTypeTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              val v: ((Any) -> Any)? = null
+              val v: (  (   Any )  -> Any) /*c1*/  ? = null
               """
           )
         );
