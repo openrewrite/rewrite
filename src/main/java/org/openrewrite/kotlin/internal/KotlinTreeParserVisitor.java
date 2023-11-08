@@ -1102,7 +1102,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         J.MethodDeclaration methodDeclaration = new J.MethodDeclaration(
                 randomId(),
-                prefix(constructor),
+                endFixPrefixAndInfix(constructor),
                 markers,
                 leadingAnnotations,
                 modifiers,
