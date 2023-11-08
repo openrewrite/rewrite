@@ -354,10 +354,10 @@ class MethodDeclarationTest implements RewriteTest {
             """
               class Test {
                   fun method1() {
-                  }   ;
+                  } /*c1*/  ;  /*c2*/
 
                   fun method2() {
-                  };
+                  }  /*c3*/   ; /*c4*/
               }
               """
           )

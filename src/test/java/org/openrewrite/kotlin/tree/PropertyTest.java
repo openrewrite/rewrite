@@ -30,7 +30,7 @@ class PropertyTest implements RewriteTest {
           kotlin(
             """
               val <T : Any> Collection<T>.nullable: Collection<T?>
-                  get() = this
+                  /*c1*/ get() = this
               """
           )
         );
@@ -44,7 +44,7 @@ class PropertyTest implements RewriteTest {
             """
               interface Test {
                   val foo: String
-                      get
+                     /*c1*/ get
                   fun bar() = 2
               }
               """

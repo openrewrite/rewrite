@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-public class ThisTest implements RewriteTest {
+class ThisTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/302")
@@ -36,7 +36,7 @@ public class ThisTest implements RewriteTest {
               
                 abstract inner class EntrySet : AbstractMutableSet<MutableEntry<K, V>>() {
                   override val size: Int
-                    get() = this@LinkedHashTreeMap.size
+                   /*C1*/ get() = this@LinkedHashTreeMap.size
               
                   override fun iterator(): MutableIterator<MutableEntry<K, V>> {
                     return null!!

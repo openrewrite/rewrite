@@ -947,9 +947,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<J.Annotation> lastAnnotations = new ArrayList<>();
         JContainer<Statement> params;
         J.Block body = null;
+        Set<PsiElement> consumedSpaces = new HashSet<>();
+        addIfNotNull(consumedSpaces, getFirstSpaceChildOrNull(accessor));
 
         JavaType.Method type = methodDeclarationType(accessor);
-        J.Identifier name = createIdentifier(accessor.getNamePlaceholder().getText(), prefix(accessor.getNamePlaceholder()), type);
+        J.Identifier name = createIdentifier(accessor.getNamePlaceholder().getText(),
+                prefix(accessor.getNamePlaceholder(), consumedSpaces),
+                type);
 
         List<KtParameter> ktParameters = accessor.getValueParameters();
         if (!ktParameters.isEmpty()) {
@@ -3348,7 +3352,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     private <J2 extends J> JRightPadded<J2> maybeFollowingSemicolon(J2 j, KtElement element) {
         PsiElement maybeSemicolon = findFirstNonSpaceNextSibling(element);
         if (maybeSemicolon instanceof LeafPsiElement && ((LeafPsiElement) maybeSemicolon).getElementType() == KtTokens.SEMICOLON) {
-            return new JRightPadded<>(j, prefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
+            return new JRightPadded<>(j, deepPrefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
         }
         return padRight(j, Space.EMPTY);
     }
