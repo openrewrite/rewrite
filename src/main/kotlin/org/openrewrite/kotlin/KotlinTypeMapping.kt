@@ -395,7 +395,7 @@ class KotlinTypeMapping(
                     fields.add(variableType(field, firClass))
                 }
             }
-            var methods: MutableList<JavaType.Method>? = null
+            var methods: MutableList<Method>? = null
             if (functions.isNotEmpty()) {
                 methods = ArrayList(functions.size)
                 for (function: FirFunction in functions) {
@@ -451,9 +451,9 @@ class KotlinTypeMapping(
         return clazz
     }
 
-    fun methodDeclarationType(function: FirFunction, parent: Any?): JavaType.Method {
+    fun methodDeclarationType(function: FirFunction, parent: Any?): Method {
         val signature = signatureBuilder.methodSignature(function, parent)
-        val existing = typeCache.get<JavaType.Method>(signature)
+        val existing = typeCache.get<Method>(signature)
         if (existing != null) {
             return existing
         }
@@ -461,7 +461,7 @@ class KotlinTypeMapping(
     }
 
     @OptIn(SymbolInternals::class)
-    private fun methodDeclarationType(function: FirFunction, parent: Any?, signature: String): JavaType.Method {
+    private fun methodDeclarationType(function: FirFunction, parent: Any?, signature: String): Method {
         var paramNames: MutableList<String>? = null
         if (function.valueParameters.isNotEmpty()) {
             paramNames = ArrayList(function.valueParameters.size)
@@ -469,7 +469,7 @@ class KotlinTypeMapping(
                 paramNames.add(p.name.asString())
             }
         }
-        val method = JavaType.Method(
+        val method = Method(
             null,
             mapToFlagsBitmap(function.visibility, function.modality),
             null,
@@ -490,7 +490,7 @@ class KotlinTypeMapping(
             parent is FirRegularClass || parent != null -> type(parent)
             else -> type(firFile)
         }
-        if (parentType is JavaType.Method) {
+        if (parentType is Method) {
             parentType = parentType.declaringType
         }
         if (parentType is JavaType.Parameterized) {
@@ -527,9 +527,9 @@ class KotlinTypeMapping(
     private fun methodDeclarationType(
         javaMethod: JavaMethod,
         declaringType: FullyQualified?
-    ): JavaType.Method? {
+    ): Method? {
         val signature = signatureBuilder.javaMethodSignature(javaMethod)
-        val existing = typeCache.get<JavaType.Method>(signature)
+        val existing = typeCache.get<Method>(signature)
         if (existing != null) {
             return existing
         }
@@ -540,7 +540,7 @@ class KotlinTypeMapping(
         javaMethod: JavaMethod,
         declaringType: FullyQualified?,
         signature: String
-    ): JavaType.Method? {
+    ): Method? {
         var paramNames: MutableList<String>? = null
         if (javaMethod.valueParameters.isNotEmpty()) {
             paramNames = ArrayList(javaMethod.valueParameters.size)
@@ -557,7 +557,7 @@ class KotlinTypeMapping(
                 defaultValues.add(javaMethod.annotationParameterDefaultValue!!.name!!.asString())
             }
         }
-        val method: JavaType.Method = JavaType.Method(
+        val method: Method = Method(
             null,
             (if (javaMethod is BinaryJavaMethod) {
                 javaMethod.access.toLong()
@@ -602,31 +602,31 @@ class KotlinTypeMapping(
         return method
     }
 
-    fun methodInvocationType(fir: FirFunctionCall): JavaType.Method? {
+    fun methodInvocationType(fir: FirFunctionCall): Method? {
         if (fir.typeRef is FirErrorTypeRef) {
             return null
         }
         val signature = signatureBuilder.methodCallSignature(fir)
-        val existing = typeCache.get<JavaType.Method>(signature)
+        val existing = typeCache.get<Method>(signature)
         if (existing != null) {
             return existing
         }
         return methodInvocationType(fir, signature)
     }
 
-    @OptIn(SymbolInternals::class, DfaInternals::class)
-    fun methodInvocationType(function: FirFunctionCall, signature: String): JavaType.Method? {
+    @OptIn(SymbolInternals::class)
+    fun methodInvocationType(function: FirFunctionCall, signature: String): Method? {
         val sym = function.calleeReference.toResolvedBaseSymbol() ?: return null
         val receiver = if (sym is FirFunctionSymbol<*>) sym.receiverParameter else null
-        var paramNames: MutableList<String>? = when {
-            sym is FirFunctionSymbol<*> && receiver != null ||
-                    function.arguments.isNotEmpty() -> {
-                ArrayList(function.arguments.size + (if (receiver != null) 1 else 0))
+        val paramNames: MutableList<String>? = when {
+            sym is FirFunctionSymbol<*> && (receiver != null ||
+                    sym.valueParameterSymbols.isNotEmpty()) -> {
+                ArrayList(sym.valueParameterSymbols.size + (if (receiver != null) 1 else 0))
             }
 
             else -> null
         }
-        val paramTypes: MutableList<JavaType>? = if (paramNames != null) ArrayList(paramNames.size) else null
+        var paramTypes: MutableList<JavaType>? = if (paramNames != null) ArrayList(paramNames.size) else null
         if (receiver != null) {
             paramNames!!.add('$' + "this" + '$')
         }
@@ -639,7 +639,7 @@ class KotlinTypeMapping(
                 }
             }
         }
-        val method = JavaType.Method(
+        val method = Method(
             null,
             when (sym) {
                 is FirConstructorSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality)
@@ -695,7 +695,7 @@ class KotlinTypeMapping(
             ) {
                 declaringType = createShallowClass("kotlin.Library")
             }
-        } else if (sym is FirFunctionSymbol<*>) {
+        } else {
             declaringType = TypeUtils.asFullyQualified(type(function.typeRef))
         }
         if (declaringType == null) {
@@ -707,11 +707,15 @@ class KotlinTypeMapping(
             paramTypes!!.add(type(function.toResolvedCallableSymbol()?.receiverParameter!!.typeRef))
         }
         for ((index, p) in (function.toResolvedCallableSymbol()?.fir as FirFunction).valueParameters.withIndex()) {
+            if (paramTypes == null) {
+                // Ideally, an ArrayList is created with the expected size based on the symbol for the function.
+                paramTypes = ArrayList()
+            }
             val t = type(p.returnTypeRef)
             if (t !is GenericTypeVariable) {
-                paramTypes!!.add(t)
+                paramTypes.add(t)
             } else {
-                paramTypes!!.add(type((function.arguments[index]).typeRef))
+                paramTypes.add(type((function.arguments[index]).typeRef))
             }
         }
         method.unsafeSet(
@@ -891,7 +895,7 @@ class KotlinTypeMapping(
                     fields.add(javaVariableType(field, clazz))
                 }
             }
-            var methods: MutableList<JavaType.Method>? = null
+            var methods: MutableList<Method>? = null
             if (type.methods.isNotEmpty()) {
                 methods = ArrayList(type.methods.size)
                 for (method: JavaMethod in type.methods) {
@@ -982,9 +986,9 @@ class KotlinTypeMapping(
     private fun javaConstructorType(
         constructor: JavaConstructor,
         declaringType: FullyQualified?
-    ): JavaType.Method? {
+    ): Method? {
         val signature = signatureBuilder.javaConstructorSignature(constructor)
-        val existing = typeCache.get<JavaType.Method>(signature)
+        val existing = typeCache.get<Method>(signature)
         if (existing != null) {
             return existing
         }
@@ -997,7 +1001,7 @@ class KotlinTypeMapping(
             }
         }
         val defaultValues: List<String>? = null
-        val method: JavaType.Method = JavaType.Method(
+        val method: Method = Method(
             null,
             (if (constructor is BinaryJavaConstructor) {
                 constructor.access.toLong()

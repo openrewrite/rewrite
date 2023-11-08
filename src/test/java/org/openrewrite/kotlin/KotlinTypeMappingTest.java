@@ -502,6 +502,21 @@ public class KotlinTypeMappingTest {
             );
         }
 
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/366")
+        @Test
+        void doesNotNpe() {
+            rewriteRun(
+              kotlin(
+                """
+                  class BuilderClass
+                  class A {
+                      val builder = BuilderClass::class.java.constructors[0].newInstance()!!
+                  }
+                  """
+              )
+            );
+        }
+
         @Test
         void println() {
             //noinspection RemoveRedundantQualifierName
