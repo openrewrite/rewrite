@@ -114,7 +114,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.Parentheses<>(
                 randomId(),
-                prefix(expression),
+                deepPrefix(expression),
                 Markers.EMPTY,
                 padRight(expression.getExpression().accept(this, data), prefix(rPar))
         );
@@ -124,7 +124,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitForExpression(KtForExpression expression, ExecutionContext data) {
         return new J.ForEachLoop(
                 randomId(),
-                prefix(expression),
+                deepPrefix(expression),
                 Markers.EMPTY,
                 new J.ForEachLoop.Control(
                         randomId(),
@@ -218,7 +218,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
             return new J.TypeCast(
                     randomId(),
-                    prefix(expression),
+                    deepPrefix(expression),
                     markers,
                     new J.ControlParentheses<>(
                             randomId(),
@@ -252,7 +252,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitBreakExpression(KtBreakExpression expression, ExecutionContext data) {
         return new J.Break(
                 randomId(),
-                prefix(expression),
+                deepPrefix(expression),
                 Markers.EMPTY,
                 expression.getTargetLabel() != null ? createIdentifier(requireNonNull(expression.getTargetLabel().getIdentifier()), null) : null
         );
@@ -286,7 +286,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.MemberReference(
                 randomId(),
-                prefix(expression),
+                deepPrefix(expression),
                 Markers.EMPTY,
                 receiver,
                 null,
@@ -303,7 +303,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         J.Block body = (J.Block) requireNonNull(catchClause.getCatchBody()).accept(this, data);
         return new J.Try.Catch(
                 randomId(),
-                prefix(catchClause),
+                deepPrefix(catchClause),
                 Markers.EMPTY,
                 new J.ControlParentheses<>(
                         randomId(),
@@ -326,7 +326,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitClassLiteralExpression(KtClassLiteralExpression expression, ExecutionContext data) {
         return new J.MemberReference(
                 randomId(),
-                prefix(expression),
+                deepPrefix(expression),
                 Markers.EMPTY,
                 padRight(convertToExpression(requireNonNull(expression.getReceiverExpression()).accept(this, data)),
                         prefix(expression.findColonColon())),
@@ -366,7 +366,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new K.ListLiteral(
                 randomId(),
-                prefix(expression),
+                deepPrefix(expression),
                 Markers.EMPTY,
                 elements,
                 type(expression)
@@ -376,7 +376,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitConstructorCalleeExpression(KtConstructorCalleeExpression constructorCalleeExpression, ExecutionContext data) {
         J j = requireNonNull(constructorCalleeExpression.getTypeReference()).accept(this, data);
-        return j.withPrefix(merge(j.getPrefix(), prefix(constructorCalleeExpression)));
+        return j.withPrefix(merge(j.getPrefix(), deepPrefix(constructorCalleeExpression)));
     }
 
     @Override
@@ -393,7 +393,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitContinueExpression(KtContinueExpression expression, ExecutionContext data) {
         return new J.Continue(
                 randomId(),
-                prefix(expression),
+                deepPrefix(expression),
                 Markers.EMPTY,
                 expression.getTargetLabel() != null ? createIdentifier(requireNonNull(expression.getTargetLabel().getIdentifier()), null) : null
         );
@@ -441,7 +441,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.DoWhileLoop(
                 randomId(),
-                prefix(expression),
+                deepPrefix(expression),
                 Markers.EMPTY,
                 body,
                 padLeft(prefix(expression.getWhileKeyword()), mapControlParentheses(requireNonNull(expression.getCondition()), data).withPrefix(prefix(expression.getLeftParenthesis())))
@@ -451,7 +451,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     private J.ControlParentheses<Expression> mapControlParentheses(KtExpression expression, ExecutionContext data) {
         return new J.ControlParentheses<>(
                 randomId(),
-                prefix(expression.getParent()),
+                deepPrefix(expression.getParent()),
                 Markers.EMPTY,
                 padRight(convertToExpression(expression.accept(this, data))
                         .withPrefix(prefix(expression.getParent())), suffix(expression.getParent())
@@ -501,7 +501,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.EnumValue(
                 randomId(),
-                prefix(enumEntry),
+                deepPrefix(enumEntry),
                 Markers.EMPTY,
                 annotations,
                 name,
@@ -519,7 +519,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 entry.getText(),
                 null,
                 JavaType.Primitive.String
-        ).withPrefix(prefix(entry));
+        ).withPrefix(deepPrefix(entry));
     }
 
     @Override
@@ -549,7 +549,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
             return new J.Lambda(
                     randomId(),
-                    prefix(expression),
+                    deepPrefix(expression),
                     markers,
                     params,
                     prefix(ktFunctionLiteral.getArrow()),
@@ -675,7 +675,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.NewClass(
                 randomId(),
-                prefix(list),
+                deepPrefix(list),
                 markers,
                 null,
                 Space.EMPTY,
@@ -705,7 +705,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.InstanceOf(
                 randomId(),
-                prefix(expression),
+                deepPrefix(expression),
                 markers,
                 padRight(element, prefix(expression.getOperationReference())),
                 clazz,
@@ -719,7 +719,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         J j = requireNonNull(expression.getBaseExpression()).accept(this, data);
         return new J.Label(
                 randomId(),
-                prefix(expression),
+                deepPrefix(expression),
                 Markers.EMPTY,
                 padRight(createIdentifier(requireNonNull(expression.getNameIdentifier()), null),
                         suffix(expression.getNameIdentifier())
@@ -843,7 +843,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.VariableDeclarations(
                 randomId(),
-                prefix(parameter),
+                deepPrefix(parameter),
                 markers,
                 leadingAnnotations,
                 modifiers,
@@ -918,7 +918,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.MethodDeclaration(
                 randomId(),
-                prefix(constructor),
+                deepPrefix(constructor),
                 Markers.build(singletonList(new PrimaryConstructor(randomId()))),
                 leadingAnnotations,
                 modifiers,
@@ -987,7 +987,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.MethodDeclaration(
                 randomId(),
-                prefix(accessor),
+                deepPrefix(accessor),
                 markers,
                 leadingAnnotations,
                 modifiers,
@@ -1019,7 +1019,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             J.Identifier identifier = (J.Identifier) selector;
             return new J.FieldAccess(
                     randomId(),
-                    prefix(expression),
+                    deepPrefix(expression),
                     Markers.EMPTY,
                     receiver,
                     padLeft(suffix(expression.getReceiverExpression()), identifier),
@@ -1043,7 +1043,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 randomId(),
                 new J.Return(
                         randomId(),
-                        prefix(expression),
+                        deepPrefix(expression),
                         Markers.EMPTY,
                         returnExpr
                 ),
@@ -1066,7 +1066,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitScriptInitializer(KtScriptInitializer initializer, ExecutionContext data) {
         J j = requireNonNull(initializer.getBody()).accept(this, data);
-        return j.withPrefix(merge(prefix(initializer), j.getPrefix()));
+        return j.withPrefix(merge(deepPrefix(initializer), j.getPrefix()));
     }
 
     @Override
@@ -1102,7 +1102,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         J.MethodDeclaration methodDeclaration = new J.MethodDeclaration(
                 randomId(),
-                endFixPrefixAndInfix(constructor),
+                deepPrefix(constructor),
                 markers,
                 leadingAnnotations,
                 modifiers,
@@ -1150,7 +1150,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitSuperTypeEntry(KtSuperTypeEntry specifier, ExecutionContext data) {
         J j = requireNonNull(specifier.getTypeReference()).accept(this, data);
-        return j.withPrefix(merge(prefix(specifier), j.getPrefix()));
+        return j.withPrefix(merge(deepPrefix(specifier), j.getPrefix()));
     }
 
     @Override
@@ -1162,7 +1162,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitThisExpression(KtThisExpression expression, ExecutionContext data) {
         return new K.KThis(
                 randomId(),
-                prefix(expression),
+                deepPrefix(expression),
                 Markers.EMPTY,
                 expression.getTargetLabel() != null ? createIdentifier(requireNonNull(expression.getTargetLabel().getIdentifier()), null) : null,
                 type(expression)
@@ -1195,7 +1195,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.Try(
                 randomId(),
-                prefix(expression),
+                deepPrefix(expression),
                 Markers.EMPTY,
                 null,
                 block,
@@ -1251,7 +1251,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.VariableDeclarations(
                 randomId(),
-                prefix(typeAlias),
+                deepPrefix(typeAlias),
                 markers,
                 leadingAnnotations,
                 modifiers,
@@ -1275,7 +1275,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.TypeParameter(
                 randomId(),
-                prefix(constraint),
+                deepPrefix(constraint),
                 Markers.EMPTY.addIfAbsent(new TypeReferencePrefix(randomId(), suffix(constraint.getSubjectTypeParameterName()))),
                 annotations,
                 typeParamName,
@@ -1299,7 +1299,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return new K.TypeConstraints(
                 randomId(),
                 Markers.EMPTY,
-                JContainer.build(prefix(list), params, Markers.EMPTY)
+                JContainer.build(deepPrefix(list), params, Markers.EMPTY)
         );
     }
 
@@ -1356,7 +1356,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.TypeParameter(
                 randomId(),
-                prefix(parameter),
+                deepPrefix(parameter),
                 markers,
                 annotations,
                 name,
@@ -1375,7 +1375,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         JContainer<Expression> typeParameters = JContainer.build(
-                prefix(list),
+                deepPrefix(list),
                 expressions,
                 Markers.EMPTY
         );
@@ -1428,7 +1428,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return name != null ? name :
                 new K.TypeParameterExpression(randomId(), new J.TypeParameter(
                         randomId(),
-                        prefix(typeProjection),
+                        deepPrefix(typeProjection),
                         markers,
                         emptyList(),
                         new J.Identifier(
@@ -1453,7 +1453,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitWhenConditionInRange(KtWhenConditionInRange condition, ExecutionContext data) {
         K.Binary.Type operator = condition.isNegated() ? K.Binary.Type.NotContains : K.Binary.Type.Contains;
         Expression left = new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY);
-        return new K.Binary(randomId(), prefix(condition), Markers.EMPTY, left,
+        return new K.Binary(randomId(),
+                deepPrefix(condition),
+                Markers.EMPTY,
+                left,
                 padLeft(Space.EMPTY, operator),
                 convertToExpression(requireNonNull(condition.getRangeExpression()).accept(this, data)),
                 Space.EMPTY,
@@ -1474,7 +1477,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.InstanceOf(
                 randomId(),
-                prefix(condition),
+                deepPrefix(condition),
                 markers,
                 expr,
                 clazz,
@@ -1485,7 +1488,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitWhenConditionWithExpression(KtWhenConditionWithExpression condition, ExecutionContext data) {
-        return requireNonNull(condition.getExpression()).accept(this, data).withPrefix(prefix(condition));
+        return requireNonNull(condition.getExpression()).accept(this, data)
+                .withPrefix(deepPrefix(condition));
     }
 
     @Override
@@ -1508,7 +1512,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new K.WhenBranch(
                 randomId(),
-                prefix(ktWhenEntry),
+                deepPrefix(ktWhenEntry),
                 Markers.EMPTY,
                 expressionContainer,
                 padRight(body, Space.EMPTY)
@@ -1560,7 +1564,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new K.When(
                 randomId(),
-                prefix(expression),
+                deepPrefix(expression),
                 Markers.EMPTY,
                 controlParentheses,
                 body,
@@ -1572,7 +1576,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitWhileExpression(KtWhileExpression expression, ExecutionContext data) {
         return new J.WhileLoop(
                 randomId(),
-                prefix(expression),
+                deepPrefix(expression),
                 Markers.EMPTY,
                 mapControlParentheses(requireNonNull(expression.getCondition()), data).withPrefix(prefix(expression.getLeftParenthesis())),
                 JRightPadded.build(requireNonNull(expression.getBody()).accept(this, data).withPrefix(prefix(expression.getBody().getParent())))
@@ -1600,9 +1604,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         // return element.accept(this, data);
     }
 
-    /*====================================================================
-     * PSI to J tree mapping methods
-     * ====================================================================*/
     @Override
     public J visitKtFile(KtFile file, ExecutionContext data) {
         List<J.Annotation> annotations = file.getFileAnnotationList() != null ? mapAnnotations(file.getAnnotationEntries(), data) : emptyList();
@@ -1678,7 +1679,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.Annotation(
                 randomId(),
-                prefix(annotationEntry),
+                deepPrefix(annotationEntry),
                 markers,
                 (NameTree) requireNonNull(annotationEntry.getCalleeExpression()).accept(this, data),
                 args
@@ -1694,7 +1695,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             Expression expr = convertToExpression(argument.getArgumentExpression().accept(this, data));
             return new J.Assignment(
                     randomId(),
-                    prefix(argument),
+                    deepPrefix(argument),
                     Markers.EMPTY,
                     name,
                     padLeft(suffix(argument.getArgumentName()), expr),
@@ -1704,13 +1705,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             Expression j = (Expression) argument.getArgumentExpression().accept(this, data);
             return new K.SpreadArgument(
                     randomId(),
-                    prefix(argument),
+                    deepPrefix(argument),
                     Markers.EMPTY,
                     j
             );
         }
 
-        J j = argument.getArgumentExpression().accept(this, data).withPrefix(prefix(argument));
+        J j = argument.getArgumentExpression().accept(this, data).withPrefix(deepPrefix(argument));
         return argument instanceof KtLambdaArgument ? j.withMarkers(j.getMarkers().addIfAbsent(new TrailingLambdaArgument(randomId()))) : j;
     }
 
@@ -1732,7 +1733,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         if (javaBinaryType != null) {
             return new J.Binary(
                     randomId(),
-                    prefix(expression),
+                    deepPrefix(expression),
                     Markers.EMPTY,
                     left,
                     padLeft(prefix(operationReference), javaBinaryType),
@@ -1742,7 +1743,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         } else if (operationReference.getOperationSignTokenType() == KtTokens.EQ) {
             return new J.Assignment(
                     randomId(),
-                    prefix(expression),
+                    deepPrefix(expression),
                     Markers.EMPTY,
                     left,
                     padLeft(suffix(expression.getLeft()), right),
@@ -1751,7 +1752,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         } else if (assignmentOperationType != null) {
             return new J.AssignmentOperation(
                     randomId(),
-                    prefix(expression),
+                    deepPrefix(expression),
                     Markers.EMPTY,
                     left,
                     padLeft(prefix(operationReference), assignmentOperationType),
@@ -1761,7 +1762,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         } else if (kotlinBinaryType != null) {
             return new K.Binary(
                     randomId(),
-                    prefix(expression),
+                    deepPrefix(expression),
                     Markers.EMPTY,
                     left,
                     padLeft(prefix(operationReference), kotlinBinaryType),
@@ -1804,7 +1805,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         boolean hasBraces = expression.getLBrace() != null;
         Space end = hasBraces ? endFixPrefixAndInfix(expression.getRBrace()) : endFix(expression);
 
-        Space prefix = prefix(expression);
+        Space prefix = deepPrefix(expression);
         Space blockPrefix = prefix;
         if (!hasBraces && !statements.isEmpty()) {
             statements = ListUtils.mapFirst(statements, s -> s.withElement(s.getElement().withPrefix(merge(prefix, s.getElement().getPrefix()))));
@@ -1862,7 +1863,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
             return new J.NewClass(
                     randomId(),
-                    prefix(expression),
+                    deepPrefix(expression),
                     Markers.EMPTY,
                     null,
                     Space.EMPTY,
@@ -1883,7 +1884,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             JavaType.Method methodType = methodInvocationType(expression);
             return new J.MethodInvocation(
                     randomId(),
-                    prefix(expression),
+                    deepPrefix(expression),
                     Markers.EMPTY,
                     null,
                     typeParams,
@@ -1897,7 +1898,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
             return new J.ParameterizedType(
                     randomId(),
-                    prefix(expression),
+                    deepPrefix(expression),
                     Markers.EMPTY,
                     typeTree,
                     typeParams,
@@ -1920,7 +1921,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             parameters.add(padRight(convertToExpression(ktTypeProjection.accept(this, data)), suffix(ktTypeProjection)));
         }
 
-        return JContainer.build(prefix(ktTypeArgumentList), parameters, Markers.EMPTY);
+        return JContainer.build(deepPrefix(ktTypeArgumentList), parameters, Markers.EMPTY);
     }
 
     @Override
@@ -1940,7 +1941,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
         return new J.Literal(
                 Tree.randomId(),
-                prefix(expression),
+                deepPrefix(expression),
                 Markers.EMPTY,
                 value,
                 expression.getText(),
@@ -2051,7 +2052,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         J.ClassDeclaration classDeclaration = new J.ClassDeclaration(
                 randomId(),
-                endFixPrefixAndInfix(klass),
+                deepPrefix(klass),
                 markers,
                 leadingAnnotations,
                 modifiers,
@@ -2134,7 +2135,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.Block(
                 randomId(),
-                prefix(classBody),
+                deepPrefix(classBody),
                 Markers.EMPTY,
                 padRight(false, Space.EMPTY),
                 list,
@@ -2233,7 +2234,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new K.DestructuringDeclaration(
                 randomId(),
-                prefix(multiDeclaration),
+                deepPrefix(multiDeclaration),
                 Markers.EMPTY,
                 variableDeclarations,
                 JContainer.build(prefix(multiDeclaration.getLPar()), vars, Markers.EMPTY)
@@ -2274,12 +2275,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             if (methodInvocation instanceof J.MethodInvocation) {
                 methodInvocation = ((J.MethodInvocation) methodInvocation).getPadding().withSelect(padRight(receiver, suffix(expression.getReceiverExpression())))
                         .withName(((J.MethodInvocation) methodInvocation).getName().withPrefix(prefix(callExpression)))
-                        .withPrefix(prefix(expression));
+                        .withPrefix(deepPrefix(expression));
             } else if (methodInvocation instanceof J.NewClass) {
                 if (receiver instanceof J.FieldAccess || receiver instanceof J.Identifier) {
                     J.NewClass cur = (J.NewClass) methodInvocation;
+                    cur = cur.withPrefix(deepPrefix(expression));
                     if (cur.getClazz() instanceof J.ParameterizedType) {
-                        cur = cur.withPrefix(prefix(expression));
                         J.ParameterizedType pt = (J.ParameterizedType) cur.getClazz();
                         if (pt != null) {
                             pt = pt.withClazz(pt.getClazz().withPrefix(prefix(callExpression)));
@@ -2296,7 +2297,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         }
                         methodInvocation = cur;
                     } else {
-                        cur = cur.withPrefix(prefix(expression));
                         J.Identifier id = (J.Identifier) cur.getClazz();
                         if (id != null) {
                             id = id.withPrefix(prefix(callExpression));
@@ -2319,7 +2319,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             // Maybe need to type check before creating a field access.
             return new J.FieldAccess(
                     randomId(),
-                    prefix(expression),
+                    deepPrefix(expression),
                     Markers.EMPTY,
                     expression.getReceiverExpression().accept(this, data).withPrefix(Space.EMPTY),
                     padLeft(suffix(expression.getReceiverExpression()), (J.Identifier) expression.getSelectorExpression().accept(this, data)),
@@ -2334,7 +2334,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitIfExpression(KtIfExpression expression, ExecutionContext data) {
         return new J.If(
                 randomId(),
-                prefix(expression),
+                deepPrefix(expression),
                 Markers.EMPTY,
                 buildIfCondition(expression),
                 buildIfThenPart(expression),
@@ -2372,7 +2372,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.Import(
                 randomId(),
-                endFixPrefixAndInfix(importDirective),
+                deepPrefix(importDirective),
                 Markers.EMPTY,
                 rpStatic,
                 (J.FieldAccess) reference,
@@ -2518,7 +2518,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         J.MethodDeclaration methodDeclaration = new J.MethodDeclaration(
                 randomId(),
-                endFixPrefixAndInfix(function),
+                deepPrefix(function),
                 markers,
                 leadingAnnotations,
                 modifiers,
@@ -2586,7 +2586,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.NewClass(
                 randomId(),
-                merge(prefix(expression), prefix(declaration)),
+                merge(deepPrefix(expression), prefix(declaration)),
                 markers,
                 null,
                 suffix(declaration.getColon()),
@@ -2652,7 +2652,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         return new J.ClassDeclaration(
                 randomId(),
-                endFixPrefixAndInfix(declaration),
+                deepPrefix(declaration),
                 markers,
                 leadingAnnotations,
                 modifiers,
@@ -2682,7 +2682,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
         return new J.Package(
                 randomId(),
-                prefix(directive),
+                deepPrefix(directive),
                 Markers.EMPTY,
                 (Expression) directive.getPackageNameExpression().accept(this, data),
                 emptyList()
@@ -2706,7 +2706,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
         return new J.Unary(
                 randomId(),
-                prefix(expression),
+                deepPrefix(expression),
                 Markers.EMPTY,
                 padLeft(prefix(expression.getOperationReference()), type),
                 expression.getBaseExpression().accept(this, data).withPrefix(suffix(expression.getOperationReference())),
@@ -2728,11 +2728,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         IElementType referencedNameElementType = expression.getOperationReference().getReferencedNameElementType();
         if (referencedNameElementType == KtTokens.EXCLEXCL) {
             // j = j.withMarkers(j.getMarkers().addIfAbsent(new CheckNotNull(randomId(), prefix(expression.getOperationReference()))));
-            j = new K.Unary(randomId(), prefix(expression), Markers.EMPTY, padLeft(prefix(expression.getOperationReference()), K.Unary.Type.NotNull), (Expression) j, type);
+            j = new K.Unary(randomId(), deepPrefix(expression), Markers.EMPTY, padLeft(prefix(expression.getOperationReference()), K.Unary.Type.NotNull), (Expression) j, type);
         } else if (referencedNameElementType == KtTokens.PLUSPLUS) {
-            j = new J.Unary(randomId(), prefix(expression), Markers.EMPTY, padLeft(prefix(expression.getOperationReference()), J.Unary.Type.PostIncrement), (Expression) j, type);
+            j = new J.Unary(randomId(), deepPrefix(expression), Markers.EMPTY, padLeft(prefix(expression.getOperationReference()), J.Unary.Type.PostIncrement), (Expression) j, type);
         } else if (referencedNameElementType == KtTokens.MINUSMINUS) {
-            j = new J.Unary(randomId(), prefix(expression), Markers.EMPTY, padLeft(prefix(expression.getOperationReference()), J.Unary.Type.PostDecrement), (Expression) j, type);
+            j = new J.Unary(randomId(), deepPrefix(expression), Markers.EMPTY, padLeft(prefix(expression.getOperationReference()), J.Unary.Type.PostDecrement), (Expression) j, type);
         } else {
             throw new UnsupportedOperationException("TODO");
         }
@@ -2845,7 +2845,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         if (getter != null || setter != null || receiver != null || typeConstraints != null) {
             return new K.Property(
                     randomId(),
-                    endFixPrefixAndInfix(property),
+                    deepPrefix(property),
                     markers,
                     typeParameters,
                     variableDeclarations.withPrefix(Space.EMPTY),
@@ -2858,7 +2858,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         } else {
             return variableDeclarations;
         }
-
     }
 
     private List<J.Modifier> mapModifiers(@Nullable KtModifierList modifierList,
@@ -2913,7 +2912,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
         // Markers initMarkers = Markers.EMPTY.addIfAbsent(new By(randomId()));
         return delegate.getExpression().accept(this, data)
-                .withPrefix(prefix(delegate));
+                .withPrefix(deepPrefix(delegate));
     }
 
     @Override
@@ -2941,7 +2940,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
             return new K.KString(
                     randomId(),
-                    prefix(expression),
+                    deepPrefix(expression),
                     Markers.EMPTY,
                     delimiter,
                     values,
@@ -2961,7 +2960,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 valueSource,
                 null,
                 JavaType.Primitive.String
-        ).withPrefix(prefix(expression));
+        ).withPrefix(deepPrefix(expression));
     }
 
     @Override
@@ -3039,7 +3038,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         J.Identifier name = (J.Identifier) requireNonNull(type.getReferenceExpression()).accept(this, data);
 
         if (type.getFirstChild() == type.getReferenceExpression()) {
-            name = name.withPrefix(merge(prefix(type), name.getPrefix()));
+            name = name.withPrefix(merge(deepPrefix(type), name.getPrefix()));
         }
 
         NameTree nameTree = name;
@@ -3509,6 +3508,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     private Space endFixPrefixAndInfix(@Nullable PsiElement element) {
         return merge(endFix(findFirstNonSpacePrevSibling(element)), prefixAndInfix(element, null));
+    }
+
+    private Space deepPrefix(@Nullable PsiElement element) {
+        return endFixPrefixAndInfix(element);
     }
 
     private Space endFixAndSuffix(@Nullable PsiElement element) {
