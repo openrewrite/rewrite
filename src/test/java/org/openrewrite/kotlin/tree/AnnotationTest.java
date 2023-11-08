@@ -29,7 +29,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-@SuppressWarnings({"RedundantSuppression", "RedundantNullableReturnType", "RedundantVisibilityModifier", "UnusedReceiverParameter", "SortModifiers"})
+@SuppressWarnings({"RedundantSuppression", "RedundantNullableReturnType", "RedundantVisibilityModifier", "UnusedReceiverParameter", "SortModifiers", "TrailingComma"})
 class AnnotationTest implements RewriteTest {
 
     @Language("kotlin")
@@ -158,8 +158,7 @@ class AnnotationTest implements RewriteTest {
           kotlin(
             """
               @java.lang.Deprecated
-              class A {
-              }
+              class A
               """
           )
         );
@@ -504,8 +503,7 @@ class AnnotationTest implements RewriteTest {
               @JsonSubTypes(value = [
                 JsonSubTypes .  Type(value = Employee::class, name = "Employee")
               ])
-              public sealed interface Person {
-              }
+              public sealed interface Person
               """
           )
         );

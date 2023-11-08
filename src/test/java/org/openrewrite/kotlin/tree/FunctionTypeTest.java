@@ -22,6 +22,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
+@SuppressWarnings("unused")
 class FunctionTypeTest implements RewriteTest {
 
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/326")
@@ -32,9 +33,8 @@ class FunctionTypeTest implements RewriteTest {
             """
               class GradleSpigotDependencyLoaderTestBuilder(
                   var init: TestInitializer.() -> Unit = {}
-              ) {
-              }
-              
+              )
+
               class TestInitializer(
                   val resourcesDir: String
               )
@@ -94,6 +94,7 @@ class FunctionTypeTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings("UNUSED_PARAMETER")
     @ExpectedToFail
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/292")

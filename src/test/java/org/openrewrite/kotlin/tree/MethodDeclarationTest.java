@@ -166,8 +166,12 @@ class MethodDeclarationTest implements RewriteTest {
     @Test
     void receiverType() {
         rewriteRun(
-          kotlin("class Test"),
-          kotlin("fun Test . method ( ) { }")
+          kotlin(
+            """
+            class Test
+            fun Test . method ( ) { }
+            """
+          )
         );
     }
 
@@ -180,10 +184,7 @@ class MethodDeclarationTest implements RewriteTest {
                   fun build ( s : ( ) -> String ) {
                   }
               }
-              """
-          ),
-          kotlin(
-            """
+
               fun Test . method ( ) = build {
                   "42"
               }
@@ -198,6 +199,7 @@ class MethodDeclarationTest implements RewriteTest {
           kotlin(
             """
               fun method ( ) : Array < Int > ? {
+                  return null
               }
               """
           )
