@@ -645,7 +645,7 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              typealias Operation =  (Int , Int )   ->    Int
+              /*C1*/ typealias Operation =  (Int , Int )   ->    Int
               """
           )
         );

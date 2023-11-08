@@ -62,7 +62,7 @@ class PropertyTest implements RewriteTest {
                   var foo: Long
                       private   set
                   var bar: Long
-                      @Suppress  get
+                      @Suppress  get /*C1*/
               
                   init {
                       foo = 1

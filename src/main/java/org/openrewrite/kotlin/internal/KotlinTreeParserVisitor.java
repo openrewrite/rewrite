@@ -317,7 +317,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitClassInitializer(KtClassInitializer initializer, ExecutionContext data) {
-        J.Block staticInit = requireNonNull(initializer.getBody()).accept(this, data).withPrefix(prefixAndInfix(initializer));
+        J.Block staticInit = requireNonNull(initializer.getBody()).accept(this, data).withPrefix(deepPrefix(initializer));
         staticInit = staticInit.getPadding().withStatic(padRight(true, prefix(initializer.getBody())));
         return staticInit;
     }
@@ -470,8 +470,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         if (!enumEntry.getAnnotationEntries().isEmpty()) {
             mapModifiers(enumEntry.getModifierList(), annotations, emptyList(), data);
         }
+
+        Set<PsiElement> consumedSpaces = preConsumedInfix(enumEntry);
+
         // TODO: in java the EnumValue has a type of JavaType.Variable with a null fieldType.
-        J.Identifier name = createIdentifier(requireNonNull(enumEntry.getNameIdentifier()), type(enumEntry));
+        J.Identifier name = createIdentifier(requireNonNull(enumEntry.getNameIdentifier()), type(enumEntry), consumedSpaces);
         J.NewClass initializer = null;
 
         if (enumEntry.getInitializerList() != null) {
@@ -947,8 +950,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<J.Annotation> lastAnnotations = new ArrayList<>();
         JContainer<Statement> params;
         J.Block body = null;
-        Set<PsiElement> consumedSpaces = new HashSet<>();
-        addIfNotNull(consumedSpaces, getFirstSpaceChildOrNull(accessor));
+        Set<PsiElement> consumedSpaces = preConsumedInfix(accessor);
 
         JavaType.Method type = methodDeclarationType(accessor);
         J.Identifier name = createIdentifier(accessor.getNamePlaceholder().getText(),
@@ -1216,7 +1218,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<J.Modifier> modifiers = new ArrayList<>();
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
         List<J.Annotation> lastAnnotations = new ArrayList<>();
-        modifiers.add(new J.Modifier(randomId(), prefix(typeAlias.getTypeAliasKeyword()), markers, "typealias", J.Modifier.Type.LanguageExtension, emptyList()));
+        Set<PsiElement> consumedSpaces = preConsumedInfix(typeAlias);
+
+        modifiers.add(new J.Modifier(randomId(), prefix(typeAlias.getTypeAliasKeyword(), consumedSpaces), markers, "typealias", J.Modifier.Type.LanguageExtension, emptyList()));
 
         mapModifiers(typeAlias.getModifierList(), leadingAnnotations, lastAnnotations, data);
 
@@ -1974,8 +1978,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         JContainer<TypeTree> implementings = null;
         Markers markers = Markers.EMPTY;
         J.MethodDeclaration primaryConstructor;
-        Set<PsiElement> prefixConsumedSet = new HashSet<>();
-        addIfNotNull(prefixConsumedSet, getFirstSpaceChildOrNull(klass));
+        Set<PsiElement> prefixConsumedSet = preConsumedInfix(klass);
 
         List<J.Modifier> modifiers = mapModifiers(klass.getModifierList(), leadingAnnotations, lastAnnotations, data);
 
@@ -2415,8 +2418,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         J.TypeParameters typeParameters = null;
         TypeTree returnTypeExpression = null;
 
-        Set<PsiElement> prefixConsumedSet = new HashSet<>();
-        addIfNotNull(prefixConsumedSet, getFirstSpaceChildOrNull(function));
+        Set<PsiElement> prefixConsumedSet = preConsumedInfix(function);
 
         if (function.getTypeParameterList() != null) {
             typeParameters = new J.TypeParameters(
@@ -2608,7 +2610,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         Markers markers = Markers.EMPTY;
         List<J.Modifier> modifiers = new ArrayList<>();
         JContainer<TypeTree> implementings = null;
-        Set<PsiElement> consumedSpaces = new HashSet<>();
+        Set<PsiElement> consumedSpaces = preConsumedInfix(declaration);
 
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
         List<J.Annotation> lastAnnotations = new ArrayList<>();
@@ -2653,8 +2655,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             name = createIdentifier(declaration.isCompanion() ? "<companion>" : "", Space.EMPTY, type(declaration))
                     .withMarkers(Markers.EMPTY.addIfAbsent(new Implicit(randomId())));
         }
-
-        addIfNotNull(consumedSpaces, getFirstSpaceChildOrNull(declaration));
 
         return new J.ClassDeclaration(
                 randomId(),
@@ -2760,8 +2760,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 JContainer.build(prefix(property.getTypeParameterList()), mapTypeParameters(property, data), Markers.EMPTY) : null;
         K.TypeConstraints typeConstraints = null;
         boolean isSetterFirst = false;
-        Set<PsiElement> prefixConsumedSet = new HashSet<>();
-        addIfNotNull(prefixConsumedSet, getFirstSpaceChildOrNull(property));
+        Set<PsiElement> prefixConsumedSet = preConsumedInfix(property);
 
         modifiers.add(new J.Modifier(
                 Tree.randomId(),
@@ -3284,7 +3283,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
      * Other helper methods
      * ====================================================================*/
     private J.Identifier createIdentifier(PsiElement name, @Nullable JavaType type) {
-        return createIdentifier(name.getNode().getText(), prefix(name), type);
+        return createIdentifier(name, type, null);
+    }
+
+    private J.Identifier createIdentifier(PsiElement name, @Nullable JavaType type, @Nullable Set<PsiElement> consumedSpaces) {
+        return createIdentifier(name.getNode().getText(), prefix(name, consumedSpaces), type);
     }
 
     private J.Identifier createIdentifier(String name, Space prefix,
@@ -3428,7 +3431,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     @Nullable
-    private PsiElement getFirstSpaceChildOrNull(@Nullable PsiElement element) {
+    private static PsiElement getFirstSpaceChildOrNull(@Nullable PsiElement element) {
         if (element == null) {
             return null;
         }
@@ -3532,7 +3535,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return merge(prefix(element, consumedSpaces), infix(element, consumedSpaces));
     }
 
-    private boolean isSpace(ASTNode node) {
+    private static boolean isSpace(ASTNode node) {
         IElementType elementType = node.getElementType();
         return elementType == KtTokens.WHITE_SPACE ||
                elementType == KtTokens.BLOCK_COMMENT ||
@@ -3541,7 +3544,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                isCRLF(node);
     }
 
-    private boolean isCRLF(ASTNode node) {
+    private static boolean isCRLF(ASTNode node) {
         return node instanceof PsiErrorElementImpl && node.getText().equals("\r");
     }
 
@@ -3916,6 +3919,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         if (element != null) {
             set.add(element);
         }
+    }
+
+    private static Set<PsiElement> preConsumedInfix(PsiElement element) {
+        Set<PsiElement> consumed = new HashSet<>();
+        addIfNotNull(consumed, getFirstSpaceChildOrNull(element));
+        return consumed;
     }
 
     @Nullable

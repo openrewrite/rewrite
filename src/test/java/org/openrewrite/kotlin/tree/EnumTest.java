@@ -36,8 +36,8 @@ class EnumTest implements RewriteTest {
           kotlin(
             """
               enum class A {
-                  B  ,   C    ,
-                  D
+                  /*C1*/ B  ,  /*C2*/ C (  )   ,
+                  /*C3*/  D
               }
               """
           )
