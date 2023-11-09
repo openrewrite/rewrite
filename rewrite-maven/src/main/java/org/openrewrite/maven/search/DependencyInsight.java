@@ -55,13 +55,15 @@ public class DependencyInsight extends Recipe {
     String artifactIdPattern;
 
     @Option(displayName = "Scope",
-            description = "Match dependencies with the specified scope",
+            description = "Match dependencies with the specified scope. All scopes are searched by default.",
             valid = {"compile", "test", "runtime", "provided"},
-            example = "compile")
+            example = "compile",
+            required = false)
+    @Nullable
     String scope;
 
     @Option(displayName = "Only direct",
-            description = "Default false. If enabled, transitive dependencies will not be considered.",
+            description = "If enabled, transitive dependencies will not be considered. All dependencies are searched by default.",
             required = false,
             example = "true")
     @Nullable
@@ -88,7 +90,7 @@ public class DependencyInsight extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        Scope aScope = Scope.fromName(scope);
+        Scope aScope = (scope == null) ? null : Scope.fromName(scope);
 
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
