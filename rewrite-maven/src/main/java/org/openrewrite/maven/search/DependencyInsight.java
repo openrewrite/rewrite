@@ -22,17 +22,17 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.JavaProject;
 import org.openrewrite.java.marker.JavaSourceSet;
+import org.openrewrite.marker.Markup;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.maven.MavenIsoVisitor;
 import org.openrewrite.maven.table.DependenciesInUse;
 import org.openrewrite.maven.tree.ResolvedDependency;
 import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
-import java.util.UUID;
-
-import static org.openrewrite.Tree.randomId;
 
 /**
  * Find direct and transitive dependencies, marking first order dependencies that
@@ -62,6 +62,15 @@ public class DependencyInsight extends Recipe {
     @Nullable
     String scope;
 
+    @Option(displayName = "Version",
+            description = "Match only dependencies with the specified version. " +
+                          "Node-style [version selectors](https://docs.openrewrite.org/reference/dependency-version-selectors) may be used." +
+                          "All versions are searched by default.",
+            example = "1.x",
+            required = false)
+    @Nullable
+    String version;
+
     @Option(displayName = "Only direct",
             description = "If enabled, transitive dependencies will not be considered. All dependencies are searched by default.",
             required = false,
@@ -69,12 +78,15 @@ public class DependencyInsight extends Recipe {
     @Nullable
     Boolean onlyDirect;
 
-    UUID searchId = randomId();
-
     @Override
     public Validated<Object> validate() {
-        return super.validate().and(Validated.test("scope", "scope is a valid Maven scope", scope,
-                s -> Scope.fromName(s) != Scope.Invalid));
+        Validated<Object> v = super.validate()
+                .and(Validated.test("scope", "scope is a valid Maven scope", scope,
+                        s -> Scope.fromName(s) != Scope.Invalid));
+        if (version != null) {
+            v = v.and(Semver.validate(version, null));
+        }
+        return v;
     }
 
     @Override
@@ -96,39 +108,51 @@ public class DependencyInsight extends Recipe {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 Xml.Tag t = super.visitTag(tag, ctx);
-
-                if (isDependencyTag()) {
-                    ResolvedDependency dependency = findDependency(t, aScope);
-                    if (dependency != null) {
-                        ResolvedDependency match = dependency.findDependency(groupIdPattern, artifactIdPattern);
-                        if (match != null) {
-                            if (match == dependency) {
-                                t = SearchResult.found(t);
-                            } else if (Boolean.TRUE.equals(onlyDirect)) {
-                                return t;
-                            } else {
-                                t = SearchResult.found(t, match.getGav().toString());
-                            }
-
-                            Optional<JavaProject> javaProject = getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
-                                    .findFirst(JavaProject.class);
-                            Optional<JavaSourceSet> javaSourceSet = getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
-                                    .findFirst(JavaSourceSet.class);
-
-                            dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
-                                    javaProject.map(JavaProject::getProjectName).orElse(""),
-                                    javaSourceSet.map(JavaSourceSet::getName).orElse("main"),
-                                    match.getGroupId(),
-                                    match.getArtifactId(),
-                                    match.getVersion(),
-                                    match.getDatedSnapshotVersion(),
-                                    StringUtils.isBlank(match.getRequested().getScope()) ? "compile" :
-                                            match.getRequested().getScope(),
-                                    match.getDepth()
-                            ));
+                if(!isDependencyTag()) {
+                    return t;
+                }
+                ResolvedDependency dependency = findDependency(t, aScope);
+                if(dependency == null) {
+                    return t;
+                }
+                ResolvedDependency match = dependency.findDependency(groupIdPattern, artifactIdPattern);
+                if(match == null) {
+                    return t;
+                }
+                if(version != null) {
+                    VersionComparator versionComparator = Semver.validate(version, null).getValue();
+                    if(versionComparator == null) {
+                        t = Markup.warn(t, new IllegalArgumentException("Could not construct a valid version comparator from " + version + "."));
+                    } else {
+                        if(!versionComparator.isValid(null, match.getVersion())) {
+                            return t;
                         }
                     }
                 }
+                if (match == dependency) {
+                    t = SearchResult.found(t);
+                } else if (Boolean.TRUE.equals(onlyDirect)) {
+                    return t;
+                } else {
+                    t = SearchResult.found(t, match.getGav().toString());
+                }
+
+                Optional<JavaProject> javaProject = getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
+                        .findFirst(JavaProject.class);
+                Optional<JavaSourceSet> javaSourceSet = getCursor().firstEnclosingOrThrow(Xml.Document.class).getMarkers()
+                        .findFirst(JavaSourceSet.class);
+
+                dependenciesInUse.insertRow(ctx, new DependenciesInUse.Row(
+                        javaProject.map(JavaProject::getProjectName).orElse(""),
+                        javaSourceSet.map(JavaSourceSet::getName).orElse("main"),
+                        match.getGroupId(),
+                        match.getArtifactId(),
+                        match.getVersion(),
+                        match.getDatedSnapshotVersion(),
+                        StringUtils.isBlank(match.getRequested().getScope()) ? "compile" :
+                                match.getRequested().getScope(),
+                        match.getDepth()
+                ));
 
                 return t;
             }
