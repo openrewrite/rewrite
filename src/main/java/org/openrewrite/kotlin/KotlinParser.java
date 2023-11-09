@@ -173,7 +173,7 @@ public class KotlinParser implements Parser {
                                         assert kotlinSource.getFirFile().getSource() != null;
                                         PsiElement psi = ((KtRealPsiSourceElement) kotlinSource.getFirFile().getSource()).getPsi();
                                         AnalyzerWithCompilerReport.SyntaxErrorReport report =
-                                                AnalyzerWithCompilerReport.Companion.reportSyntaxErrors(psi, MessageCollector.Companion.getNONE());
+                                                AnalyzerWithCompilerReport.Companion.reportSyntaxErrors(psi, new PrintingMessageCollector(System.err, PLAIN_FULL_PATHS, true));
                                         if (report.isHasErrors()) {
                                             return ParseError.build(KotlinParser.this, kotlinSource.getInput(), relativeTo, ctx, new RuntimeException());
                                         }

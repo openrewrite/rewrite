@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin;
 
+import org.jetbrains.kotlin.cli.common.messages.AnalyzerWithCompilerReport;
 import org.junit.jupiter.api.Test;
 import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.ExecutionContext;
@@ -61,11 +62,17 @@ public class AssertionsTest implements RewriteTest {
         );
     }
 
+    /**
+     * This test is expected to fail due to invalid syntax and exists to prevent a regression in the compiler configuration.
+     * {@link AnalyzerWithCompilerReport} is used to analyze the syntax in each source to produce a ParserError if a syntax
+     * error exists in the source code.
+     */
     @ExpectedToFail
     @Test
     void invalidSyntax() {
         rewriteRun(
           kotlin(
+            //language=none
             """
               a++
               """
