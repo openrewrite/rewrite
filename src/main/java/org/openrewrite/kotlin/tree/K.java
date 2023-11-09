@@ -48,6 +48,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 
@@ -74,7 +75,7 @@ public interface K extends J {
         return getPrefix().getComments();
     }
 
-    @SuppressWarnings("DataFlowIssue")
+    @SuppressWarnings({"DataFlowIssue", "DuplicatedCode"})
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -672,7 +673,7 @@ public interface K extends J {
 
         @Override
         public CoordinateBuilder.Statement getCoordinates() {
-            return null;
+            return new CoordinateBuilder.Statement(this);
         }
 
         @Override
@@ -775,7 +776,7 @@ public interface K extends J {
         }
     }
 
-    @SuppressWarnings("unused")
+    @SuppressWarnings({"unused", "unchecked"})
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -1001,6 +1002,7 @@ public interface K extends J {
         }
     }
 
+    @SuppressWarnings({"unused", "EqualsBetweenInconvertibleTypes", "DuplicatedCode"})
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -1021,7 +1023,7 @@ public interface K extends J {
 
         public FunctionType(UUID id, Space prefix, Markers markers, List<Annotation> leadingAnnotations,
                             List<Modifier> modifiers, @Nullable JRightPadded<NameTree> receiver,
-                            JContainer<TypeTree> parameters, @Nullable Space arrow, TypedTree returnType) {
+                            @Nullable JContainer<TypeTree> parameters, @Nullable Space arrow, TypedTree returnType) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;
@@ -1071,10 +1073,11 @@ public interface K extends J {
         @Getter
         JRightPadded<NameTree> receiver;
 
+        @Nullable
         JContainer<TypeTree> parameters;
 
         public List<TypeTree> getParameters() {
-            return parameters.getElements();
+            return parameters != null ? parameters.getElements() : emptyList();
         }
 
         public FunctionType withParameters(List<TypeTree> parameters) {
@@ -1113,6 +1116,7 @@ public interface K extends J {
             return v.visitFunctionType(this, p);
         }
 
+        @SuppressWarnings({"unchecked", "LombokGetterMayBeUsed"})
         @ToString
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -1199,6 +1203,7 @@ public interface K extends J {
         }
     }
 
+    @SuppressWarnings("DeprecatedIsStillUsed")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -1496,7 +1501,7 @@ public interface K extends J {
         }
     }
 
-    @SuppressWarnings("unused")
+    @SuppressWarnings({"unused", "unchecked"})
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -1646,6 +1651,7 @@ public interface K extends J {
             return withPrefix(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
         }
 
+        @SuppressWarnings("unused")
         @RequiredArgsConstructor
         public static class Padding {
             private final Property t;
@@ -1817,6 +1823,7 @@ public interface K extends J {
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2127,6 +2134,7 @@ public interface K extends J {
         }
     }
 
+    @SuppressWarnings("unused")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -2189,6 +2197,7 @@ public interface K extends J {
             return getOperator().isModifying() ? singletonList(this) : expression.getSideEffects();
         }
 
+        @SuppressWarnings("SwitchStatementWithTooFewBranches")
         public enum Type {
             NotNull;
 

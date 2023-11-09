@@ -39,6 +39,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
 
+@SuppressWarnings("SwitchStatementWithTooFewBranches")
 public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     private final KotlinJavaPrinter<P> delegate;
 
@@ -253,7 +254,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     @Override
     public J visitKReturn(K.KReturn kReturn, PrintOutputCapture<P> p) {
         // backwards compatibility: leave this in until `K.KReturn#annotations` has been deleted
-        visit(kReturn.getAnnotations(), p);
+        // visit(kReturn.getAnnotations(), p);
         J.Return return_ = kReturn.getExpression();
         if (kReturn.getLabel() != null) {
             beforeSyntax(return_, Space.Location.RETURN_PREFIX, p);
@@ -618,15 +619,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 visitModifier(m, p);
             }
 
-            String kind;
-            if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Class || classDecl.getKind() == J.ClassDeclaration.Kind.Type.Enum || classDecl.getKind() == J.ClassDeclaration.Kind.Type.Annotation) {
-                kind = "class";
-            } else if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Interface) {
-                kind = "interface";
-            } else {
-                throw new UnsupportedOperationException("Class kind is not supported: " + classDecl.getKind());
-            }
-
+            String kind = getClassKind(classDecl);
             visit(classDecl.getAnnotations().getKind().getAnnotations(), p);
             visitSpace(classDecl.getAnnotations().getKind().getPrefix(), Space.Location.CLASS_KIND, p);
 
@@ -671,7 +664,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
 
             if (classDecl.getImplements() != null) {
                 JContainer<TypeTree> container = classDecl.getPadding().getImplements();
-                beforeSyntax(container.getBefore(), container.getMarkers(), JContainer.Location.IMPLEMENTS.getBeforeLocation(), p);
+                beforeSyntax(Objects.requireNonNull(container).getBefore(), container.getMarkers(), JContainer.Location.IMPLEMENTS.getBeforeLocation(), p);
                 p.append(":");
                 List<? extends JRightPadded<? extends J>> nodes = container.getPadding().getElements();
                 for (int i = 0; i < nodes.size(); i++) {
@@ -991,11 +984,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.append(',');
                 }
 
-                SpreadArgument spread = arg.getElement().getMarkers().findFirst(SpreadArgument.class).orElse(null);
-                if (spread != null) {
-                    kotlinPrinter.visitSpace(spread.getPrefix(), KSpace.Location.SPREAD_ARGUMENT_PREFIX, p);
-                    p.append('*');
-                }
                 visitRightPadded(arg, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT, p);
             }
 
@@ -1011,13 +999,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             KObject kObject = newClass.getMarkers().findFirst(KObject.class).orElse(null);
             if (kObject != null) {
                 p.append("object");
-                kotlinPrinter.visitSpace(kObject.getPrefix(), KSpace.Location.OBJECT_PREFIX, p);
+                // kotlinPrinter.visitSpace(kObject.getPrefix(), KSpace.Location.OBJECT_PREFIX, p);
             }
 
-            TypeReferencePrefix typeReferencePrefix = newClass.getMarkers().findFirst(TypeReferencePrefix.class).orElse(null);
-            if (typeReferencePrefix != null) {
-                kotlinPrinter.visitSpace(typeReferencePrefix.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p);
-            }
+            newClass.getMarkers().findFirst(TypeReferencePrefix.class).ifPresent(typeReferencePrefix ->
+                    kotlinPrinter.visitSpace(typeReferencePrefix.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p));
 
             if (kObject != null && newClass.getClazz() != null) {
                 p.append(":");
@@ -1306,12 +1292,22 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         }
     }
 
+    @NotNull
+    private static String getClassKind(J.ClassDeclaration classDecl) {
+        String kind;
+        if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Class || classDecl.getKind() == J.ClassDeclaration.Kind.Type.Enum || classDecl.getKind() == J.ClassDeclaration.Kind.Type.Annotation) {
+            kind = "class";
+        } else if (classDecl.getKind() == J.ClassDeclaration.Kind.Type.Interface) {
+            kind = "interface";
+        } else {
+            throw new UnsupportedOperationException("Class kind is not supported: " + classDecl.getKind());
+        }
+        return kind;
+    }
+
     private void trailingMarkers(Markers markers, PrintOutputCapture<P> p) {
         for (Marker marker : markers.getMarkers()) {
-            if (marker instanceof CheckNotNull) {
-                KotlinPrinter.this.visitSpace(((CheckNotNull) marker).getPrefix(), KSpace.Location.CHECK_NOT_NULL_PREFIX, p);
-                p.append("!!");
-            } else if (marker instanceof IsNullable) {
+            if (marker instanceof IsNullable) {
                 KotlinPrinter.this.visitSpace(((IsNullable) marker).getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p);
                 p.append("?");
             }

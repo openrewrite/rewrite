@@ -53,7 +53,7 @@ import java.util.stream.Collectors;
 
 import static java.util.stream.StreamSupport.stream;
 
-@SuppressWarnings("unused")
+@SuppressWarnings({"unused", "DuplicatedCode"})
 public class PsiTreePrinter {
     private static final String TAB = "    ";
     private static final String ELEMENT_PREFIX = "\\---";
@@ -63,7 +63,7 @@ public class PsiTreePrinter {
 
     private static final String CONTINUE_PREFIX = "----";
     private static final String UNVISITED_PREFIX = "#";
-    private static KotlinIrTypeMapping irTypeMapping = new KotlinIrTypeMapping(new JavaTypeCache());
+    private static final KotlinIrTypeMapping irTypeMapping = new KotlinIrTypeMapping(new JavaTypeCache());
 
     // Set to true to print types and verify, otherwise just verify the parse to print idempotent.
     private final static boolean printTypes = true;
@@ -393,13 +393,12 @@ public class PsiTreePrinter {
     }
 
     private static String printSpace(Space space) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(" whitespace=\"")
-                .append(space.getWhitespace()).append("\"");
-        sb.append(" comments=\"")
-                .append(String.join(",", space.getComments().stream().map(c -> c.printComment(new Cursor(null, "root"))).collect(Collectors.toList())))
-                .append("\"");
-        return sb.toString().replace("\n", "\\s\n");
+        String sb = " whitespace=\"" +
+                    space.getWhitespace() + "\"" +
+                    " comments=\"" +
+                    space.getComments().stream().map(c -> c.printComment(new Cursor(null, "root"))).collect(Collectors.joining(",")) +
+                    "\"";
+        return sb.replace("\n", "\\s\n");
     }
 
     public static String printJTree(Tree tree) {
@@ -497,8 +496,8 @@ public class PsiTreePrinter {
             ConeTypeProjection[] typeArguments = coneClassLikeType.getTypeArguments();
             if (typeArguments != null && typeArguments.length > 0) {
                 sb.append(" typeArgument: ");
-                for (int i = 0; i < typeArguments.length; i++) {
-                    sb.append(printConeKotlinType(typeArguments[i]));
+                for (ConeTypeProjection typeArgument : typeArguments) {
+                    sb.append(printConeKotlinType(typeArgument));
                 }
             }
         }

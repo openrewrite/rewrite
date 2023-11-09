@@ -15,7 +15,9 @@
  */
 package org.openrewrite.kotlin.tree;
 
+@SuppressWarnings("unused")
 public class KLeftPadded {
+    @SuppressWarnings("LombokGetterMayBeUsed")
     public enum Location {
         BINARY_OPERATOR(KSpace.Location.BINARY_OPERATOR);
 

@@ -43,6 +43,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.sourceSet;
 import static org.openrewrite.test.SourceSpecs.dir;
 
+@SuppressWarnings({"unused", "unchecked", "OptionalGetWithoutIsPresent", "DataFlowIssue"})
 public final class Assertions {
 
     private Assertions() {
@@ -56,6 +57,7 @@ public final class Assertions {
 
     // A helper method to adjust white spaces in the input kotlin source to help us detect parse-to-print idempotent issues
     // Just change from `before` to `adjustSpaces(before)` below in the `kotlin()` method to test locally
+    @SuppressWarnings("IfStatementWithIdenticalBranches")
     @Nullable
     private static String adjustSpaces(@Nullable String input) {
         if (input == null) {
@@ -164,22 +166,20 @@ public final class Assertions {
     }
 
     public static ThrowingConsumer<K.CompilationUnit> isFullyParsed() {
-        return cu -> {
-            new KotlinIsoVisitor<Integer>() {
-                @Override
-                public J visitUnknown(J.Unknown unknown, Integer integer) {
-                    throw new AssertionFailedError("Parsing error, J.Unknown detected");
-                }
+        return cu -> new KotlinIsoVisitor<Integer>() {
+            @Override
+            public J visitUnknown(J.Unknown unknown, Integer integer) {
+                throw new AssertionFailedError("Parsing error, J.Unknown detected");
+            }
 
-                @Override
-                public Space visitSpace(Space space, Space.Location loc, Integer integer) {
-                    if (!space.getWhitespace().trim().isEmpty()) {
-                        throw new AssertionFailedError("Parsing error detected, whitespace contains non-whitespace characters: " + space.getWhitespace());
-                    }
-                    return super.visitSpace(space, loc, integer);
+            @Override
+            public Space visitSpace(Space space, Space.Location loc, Integer integer) {
+                if (!space.getWhitespace().trim().isEmpty()) {
+                    throw new AssertionFailedError("Parsing error detected, whitespace contains non-whitespace characters: " + space.getWhitespace());
                 }
-            }.visit(cu, 0);
-        };
+                return super.visitSpace(space, loc, integer);
+            }
+        }.visit(cu, 0);
     }
 
     public static UncheckedConsumer<SourceSpec<?>> spaceConscious() {

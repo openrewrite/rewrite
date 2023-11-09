@@ -188,7 +188,7 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
             // ImportLayoutStyle::addImport adds always `\n` as newlines. Checking if we need to fix them
             GeneralFormatStyle generalFormatStyle = Optional.ofNullable(cu.getStyle(GeneralFormatStyle.class))
               .orElse(autodetectGeneralFormatStyle(cu));
-            newImports = checkCRLF(cu, newImports, generalFormatStyle);
+            newImports = checkCRLF(newImports, generalFormatStyle);
 
             cu = cu.getPadding().withImports(newImports);
 
@@ -204,7 +204,7 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
     }
 
     // TODO refactor ImportLayoutStyle so that this method can be removed
-    private List<JRightPadded<J.Import>> checkCRLF(JavaSourceFile cu, List<JRightPadded<J.Import>> newImports, GeneralFormatStyle generalFormatStyle) {
+    private List<JRightPadded<J.Import>> checkCRLF(List<JRightPadded<J.Import>> newImports, GeneralFormatStyle generalFormatStyle) {
         if (generalFormatStyle.isUseCRLFNewLines()) {
             return ListUtils.map(newImports, rp -> rp.map(
                     i -> i.withPrefix(i.getPrefix().withWhitespace(i.getPrefix().getWhitespace()

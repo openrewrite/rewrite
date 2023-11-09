@@ -66,6 +66,7 @@ import static org.openrewrite.Tree.randomId;
 /**
  * PSI based parser
  */
+@SuppressWarnings({"DataFlowIssue", "ConstantValue"})
 public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     private final KotlinSource kotlinSource;
     private final PsiElementAssociations psiElementAssociations;
@@ -1643,9 +1644,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         List<JRightPadded<Statement>> statements = new ArrayList<>(file.getDeclarations().size());
         List<KtDeclaration> declarations = file.getDeclarations();
-        for (int i = 0; i < declarations.size(); i++) {
-            boolean last = i == declarations.size() - 1;
-            KtDeclaration declaration = declarations.get(i);
+        for (KtDeclaration declaration : declarations) {
             Statement statement = convertToStatement(declaration.accept(this, data));
             statements.add(padRight(statement, Space.EMPTY));
         }
@@ -3514,25 +3513,14 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     private Space endFix(@Nullable PsiElement element) {
-        return endFix(element, null);
-    }
-
-    private Space endFix(@Nullable PsiElement element, @Nullable Set<PsiElement> consumedSpaces) {
         if (element == null) {
             return Space.EMPTY;
         }
 
         Space end = endFix(findLastNotSpaceChild(element));
         PsiElement lastSpace = findLastSpaceChild(element);
-        if (consumedSpaces != null && consumedSpaces.contains(element)) {
-            return end;
-        }
 
         return merge(end, space(lastSpace));
-    }
-
-    private Space prefixAndInfix(@Nullable PsiElement element) {
-        return prefixAndInfix(element, null);
     }
 
     private Space endFixPrefixAndInfix(@Nullable PsiElement element) {
@@ -3872,11 +3860,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return space;
     }
 
-    @Nullable
-    private PsiElement next(PsiElement node) {
-        return node.getNextSibling();
-    }
-
     private Space merge(@Nullable Space s1, @Nullable Space s2) {
         if (s1 == null || s1.isEmpty()) {
             return s2 != null ? s2 : Space.EMPTY;
@@ -3902,19 +3885,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 J.Modifier.Type.Final,
                 emptyList()
         );
-    }
-
-    @Nullable
-    private PsiElement findFirstNotSpaceChild(PsiElement parent) {
-        Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(parent).iterator();
-        while (iterator.hasNext()) {
-            PsiElement it = iterator.next();
-            IElementType type = it.getNode().getElementType();
-            if (!isSpace(it.getNode())) {
-                return it;
-            }
-        }
-        return null;
     }
 
     @Nullable

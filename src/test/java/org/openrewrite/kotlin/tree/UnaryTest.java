@@ -22,7 +22,6 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class UnaryTest implements RewriteTest {
 
-
     @Test
     void unary() {
         rewriteRun(

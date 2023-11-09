@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 public class KRightPadded {
+    @SuppressWarnings("LombokGetterMayBeUsed")
     public enum Location {
         DESTRUCT_SUFFIX(KSpace.Location.DESTRUCT_SUFFIX),
         FUNCTION_TYPE_PARAMETER_SUFFIX(KSpace.Location.FUNCTION_TYPE_PARAMETER_SUFFIX),

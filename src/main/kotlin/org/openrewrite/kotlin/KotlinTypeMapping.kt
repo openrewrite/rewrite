@@ -28,15 +28,12 @@ import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.impl.FirOuterClassTypeParameterRef
 import org.jetbrains.kotlin.fir.declarations.utils.isLocal
 import org.jetbrains.kotlin.fir.declarations.utils.modality
-import org.jetbrains.kotlin.fir.declarations.utils.nameOrSpecialName
 import org.jetbrains.kotlin.fir.declarations.utils.visibility
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaField
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.toResolvedBaseSymbol
-import org.jetbrains.kotlin.fir.resolve.dfa.DfaInternals
-import org.jetbrains.kotlin.fir.resolve.dfa.symbol
 import org.jetbrains.kotlin.fir.resolve.providers.toSymbol
 import org.jetbrains.kotlin.fir.resolve.toFirRegularClass
 import org.jetbrains.kotlin.fir.resolve.toSymbol
@@ -59,6 +56,7 @@ import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.convertClassI
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.convertKotlinFqToJavaFq
 import kotlin.collections.ArrayList
 
+@Suppress("DuplicatedCode")
 class KotlinTypeMapping(
     private val typeCache: JavaTypeCache,
     private val firSession: FirSession,
@@ -69,7 +67,7 @@ class KotlinTypeMapping(
 
     override fun type(type: Any?): JavaType {
         if (type == null || type is FirErrorTypeRef || type is FirExpression && type.typeRef is FirErrorTypeRef) {
-            return JavaType.Unknown.getInstance()
+            return Unknown.getInstance()
         }
 
         val signature = signatureBuilder.signature(type)
@@ -78,12 +76,12 @@ class KotlinTypeMapping(
             return existing
         }
 
-        return type(type, firFile, signature) ?: JavaType.Unknown.getInstance()
+        return type(type, firFile, signature) ?: Unknown.getInstance()
     }
 
     fun type(type: Any?, parent: Any?): JavaType? {
         if (type == null || type is FirErrorTypeRef || type is FirExpression && type.typeRef is FirErrorTypeRef) {
-            return JavaType.Unknown.getInstance()
+            return Unknown.getInstance()
         }
         val signature = signatureBuilder.signature(type, parent)
         val existing = typeCache.get<JavaType>(signature)
@@ -117,11 +115,11 @@ class KotlinTypeMapping(
                 // There is an issue in the KotlinTreeParserVisitor, PsiElementVisitor,
                 // or no FIR element associated to the Kt that requested a type.
                 // Example: AssignmentOperationTest#augmentedAssignmentAnnotation
-                JavaType.Unknown.getInstance()
+                Unknown.getInstance()
             }
 
             is FirErrorNamedReference -> {
-                JavaType.Unknown.getInstance()
+                Unknown.getInstance()
             }
 
             is FirFile -> {
@@ -185,7 +183,7 @@ class KotlinTypeMapping(
             }
 
             else -> {
-                JavaType.Unknown.getInstance()
+                Unknown.getInstance()
             }
         }
     }
@@ -278,8 +276,8 @@ class KotlinTypeMapping(
                     params = type.typeArguments
                 }
                 if (ref == null) {
-                    typeCache.put(signature, JavaType.Unknown.getInstance())
-                    return JavaType.Unknown.getInstance()
+                    typeCache.put(signature, Unknown.getInstance())
+                    return Unknown.getInstance()
                 }
                 ref.fir
             }
@@ -297,17 +295,17 @@ class KotlinTypeMapping(
                     params = type.typeArguments.toList()
                 }
                 if (ref == null) {
-                    typeCache.put(signature, JavaType.Unknown.getInstance())
-                    return JavaType.Unknown.getInstance()
+                    typeCache.put(signature, Unknown.getInstance())
+                    return Unknown.getInstance()
                 }
                 ref.fir
             }
 
             else -> throw UnsupportedOperationException("Unexpected classType: ${type.javaClass}")
         }
-        var clazz: JavaType.Class? = (if (fq is JavaType.Parameterized) fq.type else fq) as JavaType.Class?
+        var clazz: Class? = (if (fq is Parameterized) fq.type else fq) as Class?
         if (clazz == null) {
-            clazz = JavaType.Class(
+            clazz = Class(
                 null,
                 mapToFlagsBitmap(firClass.visibility, firClass.modality()),
                 fqn,
@@ -372,7 +370,7 @@ class KotlinTypeMapping(
                 }
             }
 
-            var fields: MutableList<JavaType.Variable>? = null
+            var fields: MutableList<Variable>? = null
             if (enumEntries.isNotEmpty()) {
                 fields = ArrayList(properties.size + enumEntries.size)
                 for (enumEntry: FirEnumEntry in enumEntries) {
@@ -433,10 +431,10 @@ class KotlinTypeMapping(
 
         // The signature for a ConeClassLikeType may be aliases without type parameters.
         if (firClass.typeParameters.isNotEmpty() && signature.contains("<")) {
-            var pt = typeCache.get<JavaType.Parameterized>(signature)
+            var pt = typeCache.get<Parameterized>(signature)
             if (pt == null) {
                 val typeParameters: MutableList<JavaType> = ArrayList(firClass.typeParameters.size)
-                pt = JavaType.Parameterized(null, null, null)
+                pt = Parameterized(null, null, null)
                 typeCache.put(signature, pt)
                 if (params == null) {
                     params = firClass.typeParameters
@@ -493,7 +491,7 @@ class KotlinTypeMapping(
         if (parentType is Method) {
             parentType = parentType.declaringType
         }
-        if (parentType is JavaType.Parameterized) {
+        if (parentType is Parameterized) {
             parentType = parentType.type
         }
         val resolvedDeclaringType = TypeUtils.asFullyQualified(parentType)
@@ -557,7 +555,7 @@ class KotlinTypeMapping(
                 defaultValues.add(javaMethod.annotationParameterDefaultValue!!.name!!.asString())
             }
         }
-        val method: Method = Method(
+        val method = Method(
             null,
             (if (javaMethod is BinaryJavaMethod) {
                 javaMethod.access.toLong()
@@ -773,9 +771,9 @@ class KotlinTypeMapping(
         return gtv
     }
 
-    fun variableType(variable: FirVariable, parent: Any?): JavaType.Variable {
+    fun variableType(variable: FirVariable, parent: Any?): Variable {
         val signature = signatureBuilder.variableSignature(variable, parent)
-        val existing = typeCache.get<JavaType.Variable>(signature)
+        val existing = typeCache.get<Variable>(signature)
         if (existing != null) {
             return existing
         }
@@ -783,8 +781,8 @@ class KotlinTypeMapping(
     }
 
     @OptIn(SymbolInternals::class)
-    fun variableType(variable: FirVariable, parent: Any?, signature: String): JavaType.Variable {
-        val vt = JavaType.Variable(
+    fun variableType(variable: FirVariable, parent: Any?, signature: String): Variable {
+        val vt = Variable(
             null,
             mapToFlagsBitmap(variable.visibility, variable.modality),
             variable.name.asString(),
@@ -815,7 +813,7 @@ class KotlinTypeMapping(
             else -> declaringType = TypeUtils.asFullyQualified(type(firFile))
         }
 
-        if (declaringType is JavaType.Parameterized) {
+        if (declaringType is Parameterized) {
             declaringType = declaringType.type
         }
 
@@ -839,7 +837,7 @@ class KotlinTypeMapping(
     }
 
     private fun javaArrayType(type: JavaArrayType, signature: String): JavaType {
-        val arrayType = JavaType.Array(
+        val arrayType = Array(
             null,
             null
         )
@@ -854,9 +852,9 @@ class KotlinTypeMapping(
             throw UnsupportedOperationException("Unsupported JavaClassifier: ${type.javaClass.name}")
         }
         val fqn = type.fqName.asString()
-        var clazz = typeCache.get<JavaType.Class>(fqn)
+        var clazz = typeCache.get<Class>(fqn)
         if (clazz == null) {
-            clazz = JavaType.Class(
+            clazz = Class(
                 null,
                 type.access.toLong(),
                 type.fqName.asString(),
@@ -888,7 +886,7 @@ class KotlinTypeMapping(
             if (type.outerClass != null) {
                 owner = TypeUtils.asFullyQualified(type(type.outerClass))
             }
-            var fields: MutableList<JavaType.Variable>? = null
+            var fields: MutableList<Variable>? = null
             if (type.fields.isNotEmpty()) {
                 fields = ArrayList(type.fields.size)
                 for (field: JavaField in type.fields) {
@@ -939,9 +937,9 @@ class KotlinTypeMapping(
             )
         }
         if (type.typeParameters.isNotEmpty()) {
-            var pt = typeCache.get<JavaType.Parameterized>(signature)
+            var pt = typeCache.get<Parameterized>(signature)
             if (pt == null) {
-                pt = JavaType.Parameterized(null, null, null)
+                pt = Parameterized(null, null, null)
                 typeCache.put(signature, pt)
                 val typeParameters: MutableList<JavaType> = ArrayList(type.typeParameters.size)
                 for (typeArgument: JavaTypeParameter in type.typeParameters) {
@@ -965,15 +963,15 @@ class KotlinTypeMapping(
 
         if (type.typeArguments.isNotEmpty()) {
             val ptSig = signatureBuilder.signature(type)
-            var pt = typeCache.get<JavaType.Parameterized>(ptSig)
+            var pt = typeCache.get<Parameterized>(ptSig)
             if (pt == null) {
-                pt = JavaType.Parameterized(null, null, null)
+                pt = Parameterized(null, null, null)
                 typeCache.put(signature, pt)
                 val typeParameters: MutableList<JavaType> = ArrayList(type.typeArguments.size)
                 for (typeArgument: org.jetbrains.kotlin.load.java.structure.JavaType? in type.typeArguments) {
                     typeParameters.add(type(typeArgument))
                 }
-                if (clazz is JavaType.Parameterized) {
+                if (clazz is Parameterized) {
                     clazz = clazz.type
                 }
                 pt.unsafeSet(clazz, typeParameters)
@@ -1001,7 +999,7 @@ class KotlinTypeMapping(
             }
         }
         val defaultValues: List<String>? = null
-        val method: Method = Method(
+        val method = Method(
             null,
             (if (constructor is BinaryJavaConstructor) {
                 constructor.access.toLong()
@@ -1047,15 +1045,15 @@ class KotlinTypeMapping(
 
     private fun javaPrimitiveType(type: JavaPrimitiveType): JavaType {
         return when (type.type) {
-            PrimitiveType.BOOLEAN -> JavaType.Primitive.Boolean
-            PrimitiveType.BYTE -> JavaType.Primitive.Byte
-            PrimitiveType.CHAR -> JavaType.Primitive.Char
-            PrimitiveType.DOUBLE -> JavaType.Primitive.Double
-            PrimitiveType.FLOAT -> JavaType.Primitive.Float
-            PrimitiveType.INT -> JavaType.Primitive.Int
-            PrimitiveType.LONG -> JavaType.Primitive.Long
-            PrimitiveType.SHORT -> JavaType.Primitive.Short
-            null -> JavaType.Primitive.Null
+            PrimitiveType.BOOLEAN -> Primitive.Boolean
+            PrimitiveType.BYTE -> Primitive.Byte
+            PrimitiveType.CHAR -> Primitive.Char
+            PrimitiveType.DOUBLE -> Primitive.Double
+            PrimitiveType.FLOAT -> Primitive.Float
+            PrimitiveType.INT -> Primitive.Int
+            PrimitiveType.LONG -> Primitive.Long
+            PrimitiveType.SHORT -> Primitive.Short
+            null -> Primitive.Null
         }
     }
 
@@ -1106,13 +1104,13 @@ class KotlinTypeMapping(
         return gtv
     }
 
-    private fun javaVariableType(javaField: JavaField, owner: JavaType?): JavaType.Variable {
+    private fun javaVariableType(javaField: JavaField, owner: JavaType?): Variable {
         val signature = signatureBuilder.javaVariableSignature(javaField)
-        val existing = typeCache.get<JavaType.Variable>(signature)
+        val existing = typeCache.get<Variable>(signature)
         if (existing != null) {
             return existing
         }
-        val variable = JavaType.Variable(
+        val variable = Variable(
             null,
             convertToFlagsBitMap(javaField.visibility, javaField.isStatic, javaField.isFinal, javaField.isAbstract),
             javaField.name.asString(),
@@ -1235,29 +1233,29 @@ class KotlinTypeMapping(
         return bitMask
     }
 
-    fun primitive(type: FirElement): JavaType.Primitive {
+    fun primitive(type: FirElement): Primitive {
         return when (type) {
             is FirConstExpression<*> -> {
                 when (type.kind) {
-                    ConstantValueKind.Boolean -> JavaType.Primitive.Boolean
-                    ConstantValueKind.Byte, ConstantValueKind.UnsignedByte -> JavaType.Primitive.Byte
-                    ConstantValueKind.Char -> JavaType.Primitive.Char
-                    ConstantValueKind.Double -> JavaType.Primitive.Double
-                    ConstantValueKind.Float -> JavaType.Primitive.Float
+                    ConstantValueKind.Boolean -> Primitive.Boolean
+                    ConstantValueKind.Byte, ConstantValueKind.UnsignedByte -> Primitive.Byte
+                    ConstantValueKind.Char -> Primitive.Char
+                    ConstantValueKind.Double -> Primitive.Double
+                    ConstantValueKind.Float -> Primitive.Float
                     ConstantValueKind.Int, ConstantValueKind.IntegerLiteral,
-                    ConstantValueKind.UnsignedInt, ConstantValueKind.UnsignedIntegerLiteral -> JavaType.Primitive.Int
+                    ConstantValueKind.UnsignedInt, ConstantValueKind.UnsignedIntegerLiteral -> Primitive.Int
 
-                    ConstantValueKind.Long, ConstantValueKind.UnsignedLong -> JavaType.Primitive.Long
-                    ConstantValueKind.Null -> JavaType.Primitive.Null
-                    ConstantValueKind.Short, ConstantValueKind.UnsignedShort -> JavaType.Primitive.Short
-                    ConstantValueKind.String -> JavaType.Primitive.String
-                    ConstantValueKind.Error -> JavaType.Primitive.None
+                    ConstantValueKind.Long, ConstantValueKind.UnsignedLong -> Primitive.Long
+                    ConstantValueKind.Null -> Primitive.Null
+                    ConstantValueKind.Short, ConstantValueKind.UnsignedShort -> Primitive.Short
+                    ConstantValueKind.String -> Primitive.String
+                    ConstantValueKind.Error -> Primitive.None
                     else -> throw UnsupportedOperationException("Unexpected constant value kind: ${type.kind}")
                 }
             }
 
             else -> {
-                JavaType.Primitive.None
+                Primitive.None
             }
         }
     }

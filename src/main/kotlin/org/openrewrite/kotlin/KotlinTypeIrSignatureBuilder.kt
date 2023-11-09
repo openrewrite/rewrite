@@ -27,9 +27,9 @@ import org.jetbrains.kotlin.ir.util.kotlinFqName
 import org.jetbrains.kotlin.ir.util.packageFqName
 import org.jetbrains.kotlin.types.Variance
 import org.openrewrite.java.JavaTypeSignatureBuilder
-import org.openrewrite.java.tree.JavaType
 import java.util.*
 
+@Suppress("DuplicatedCode")
 class KotlinTypeIrSignatureBuilder : JavaTypeSignatureBuilder {
     private var typeVariableNameStack: MutableSet<String>? = null
 
@@ -343,13 +343,19 @@ class KotlinTypeIrSignatureBuilder : JavaTypeSignatureBuilder {
     fun methodSignature(function: IrFunctionAccessExpression): String {
         val parent = classSignature(function.symbol.owner.parent)
         val signature = StringBuilder(parent)
-        if (function is IrConstructorCall) {
-            signature.append("{name=<constructor>,return=$parent")
-        } else if (function is IrCall) {
-            signature.append("{name=").append(function.symbol.owner.name)
-            signature.append(",return=").append(signature(function.symbol.owner.returnType))
-        } else {
-            throw UnsupportedOperationException("Unsupported method signature for IrFunctionAccessExpression " + function.javaClass)
+        when (function) {
+            is IrConstructorCall -> {
+                signature.append("{name=<constructor>,return=$parent")
+            }
+
+            is IrCall -> {
+                signature.append("{name=").append(function.symbol.owner.name)
+                signature.append(",return=").append(signature(function.symbol.owner.returnType))
+            }
+
+            else -> {
+                throw UnsupportedOperationException("Unsupported method signature for IrFunctionAccessExpression " + function.javaClass)
+            }
         }
         signature.append(",parameters=").append(methodArgumentSignature(function)).append("}")
         return signature.toString()
@@ -368,6 +374,7 @@ class KotlinTypeIrSignatureBuilder : JavaTypeSignatureBuilder {
         return genericArgumentTypes.toString()
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun methodSignature(baseType: IrTypeOperatorCall): String {
         return ""
     }

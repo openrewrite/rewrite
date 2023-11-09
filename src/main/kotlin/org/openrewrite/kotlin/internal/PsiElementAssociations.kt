@@ -26,7 +26,6 @@ import org.jetbrains.kotlin.fir.expressions.impl.FirSingleExpressionBlock
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.resolved
-import org.jetbrains.kotlin.fir.resolve.dfa.DfaInternals
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
 import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirFunctionSymbol
@@ -191,7 +190,6 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
     enum class ExpressionType {
         CONSTRUCTOR,
         METHOD_INVOCATION,
-        RETURN_EXPRESSION,
         QUALIFIER
     }
 
@@ -224,17 +222,6 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         }
     }
 
-    @OptIn(DfaInternals::class)
-    fun getExpressionType(psi: KtExpression): ExpressionType? {
-        val fir = fir(psi) { it is FirExpression }
-        return if (fir is FirReturnExpression) {
-            ExpressionType.RETURN_EXPRESSION
-        } else {
-            // TODO, other expression type if needed
-            null
-        }
-    }
-
     private fun PsiElement.customToString(): String {
         return "PSI ${this.textRange} $this"
     }
@@ -264,7 +251,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
     companion object {
         fun printElement(firElement: FirElement) : String {
             if (firElement is FirSingleExpressionBlock) {
-                return PsiTreePrinter.firElementToString(firElement.statement)
+                return PsiTreePrinter.firElementToString(firElement.statement) ?: ""
             } else  if (firElement is FirElseIfTrueCondition) {
                 return "true"
             }

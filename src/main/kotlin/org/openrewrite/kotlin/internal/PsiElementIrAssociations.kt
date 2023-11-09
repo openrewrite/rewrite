@@ -32,6 +32,7 @@ import org.jetbrains.kotlin.psi.*
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.kotlin.KotlinIrTypeMapping
 
+@Suppress("unused")
 class PsiElementIrAssociations(val typeMapping: KotlinIrTypeMapping, private val psiFile: PsiFile, val file: IrFile) {
 
     private val notMapped: MutableList<IrElement> = ArrayList()
