@@ -624,7 +624,7 @@ public class ImportLayoutStyle implements KotlinStyle {
             }
         }
 
-        @SuppressWarnings("deprecation")
+        @SuppressWarnings({"deprecation", "ConstantValue"})
         class ImportPackage implements Block {
             boolean acceptAliasImport;
 
@@ -690,7 +690,10 @@ public class ImportLayoutStyle implements KotlinStyle {
                     boolean starImportExists = importGroup.stream()
                             .anyMatch(it -> it.getElement().getQualid().getSimpleName().equals("*"));
 
-                    if (importLayoutConflictDetection.isPackageFoldable(packageOrOuterClassName(toStar)) &&
+                    // Disable folding imports in Kotlin due to https://github.com/openrewrite/rewrite-kotlin/issues/370
+                    boolean disableFoldingImports = true;
+
+                    if (!disableFoldingImports && importLayoutConflictDetection.isPackageFoldable(packageOrOuterClassName(toStar)) &&
                         (isPackageAlwaysFolded(packagesToFold, toStar.getElement()) || importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1))) {
 
                         J.FieldAccess qualid = toStar.getElement().getQualid();

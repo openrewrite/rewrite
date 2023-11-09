@@ -17,6 +17,7 @@ package org.openrewrite.kotlin.format;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.AddImportTest;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
@@ -403,6 +404,29 @@ class AutoFormatVisitorTest implements RewriteTest {
               import java.util.regex.Pattern as Pat
 
               class T(s: StringJoiner, p: Pat)
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/370")
+    @Test
+    void doNotFoldImport() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.util.Calendar
+              import java.util.HashMap
+              import java.util.LinkedList
+              import java.util.Objects
+              import java.util.StringJoiner
+
+              class T(l: LinkedList<String>, h: HashMap<String, String>, c: Calendar) {
+                  fun method() {
+                      val x: Objects
+                      val y: StringJoiner
+                  }
+              }
               """
           )
         );
