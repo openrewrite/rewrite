@@ -49,6 +49,7 @@ class MethodInvocationTest implements RewriteTest {
     void unqualifiedImportedCall() {
         rewriteRun(
           kotlin(
+            //language=none
             """
               package pkg
               

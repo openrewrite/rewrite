@@ -61,7 +61,9 @@ class KTSTest implements RewriteTest {
     @Test
     void dslSample() {
         rewriteRun(
-          kotlinScript("""
+          kotlinScript(
+            //language=none
+            """
             plugins {
                 id("org.flywaydb.flyway") version "8.0.2"
             }
