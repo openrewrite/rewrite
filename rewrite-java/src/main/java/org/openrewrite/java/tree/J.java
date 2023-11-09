@@ -2379,6 +2379,11 @@ public interface J extends Tree {
         }
 
         @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitParenthesizedTypeTree(this, p);
+        }
+
+        @Override
         public CoordinateBuilder.Expression getCoordinates() {
             return new CoordinateBuilder.Expression(this);
         }
