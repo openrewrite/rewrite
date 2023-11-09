@@ -68,6 +68,27 @@ class DependencyInsightTest implements RewriteTest {
     }
 
     @Test
+    void recursive() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("doesnotexist", "doesnotexist", null)),
+          buildGradle("""
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation 'io.grpc:grpc-services:1.59.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void pattern() {
         rewriteRun(
           spec ->  spec.recipe(new DependencyInsight("*", "jackson-core", null))
@@ -107,5 +128,4 @@ class DependencyInsightTest implements RewriteTest {
           )
         );
     }
-
 }
