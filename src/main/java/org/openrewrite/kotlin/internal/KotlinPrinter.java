@@ -141,7 +141,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         J.MethodDeclaration method = constructor.getMethodDeclaration();
 
         beforeSyntax(method, Space.Location.METHOD_DECLARATION_PREFIX, p);
-        p.append("constructor");
+        for (J.Modifier m : method.getModifiers()) {
+            delegate.visitModifier(m, p);
+        }
         JContainer<Statement> params = method.getPadding().getParameters();
         beforeSyntax(params.getBefore(), params.getMarkers(), JContainer.Location.METHOD_DECLARATION_PARAMETERS.getBeforeLocation(), p);
         p.append("(");

@@ -647,6 +647,21 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void constructorWithModifier() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.lang.RuntimeException
+
+              public class MyException : RuntimeException {
+                  public constructor() : super()
+              }
+              """
+          )
+        );
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {
       "abstract",
