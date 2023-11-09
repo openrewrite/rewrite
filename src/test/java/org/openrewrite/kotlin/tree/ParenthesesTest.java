@@ -23,7 +23,6 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class ParenthesesTest implements RewriteTest {
 
-    @ExpectedToFail
     @Test
     void variableTypeInParentheses() {
         rewriteRun(

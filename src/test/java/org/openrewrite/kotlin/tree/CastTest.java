@@ -38,7 +38,6 @@ class CastTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/276")
     void parenthesized() {
@@ -51,14 +50,13 @@ class CastTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/276")
-    void parenthesize2() {
+    void nestedParenthesize() {
         rewriteRun(
           kotlin(
             """
-              val b = "s" as ( ( /*c1*/ (String?) /*c2*/ ) )
+              val b = "s" as (  (   /*c0*/    ( /*c1*/  String? /*c2*/  )   /*c3*/    )      )
               """
           )
         );

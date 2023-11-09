@@ -94,8 +94,6 @@ class FunctionTypeTest implements RewriteTest {
         );
     }
 
-    @SuppressWarnings("UNUSED_PARAMETER")
-    @ExpectedToFail
     @Test
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/292")
     void functionTypeParentheses() {

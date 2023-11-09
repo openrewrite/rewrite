@@ -331,6 +331,13 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitParenthesizedTypeTree(J.ParenthesizedTypeTree parTree, PrintOutputCapture<P> p) {
+        visitSpace(parTree.getPrefix(), Space.Location.PARENTHESES_PREFIX, p);
+        visitParentheses(parTree.getParenthesizedType(), p);
+        return parTree;
+    }
+
+    @Override
     public J visitProperty(K.Property property, PrintOutputCapture<P> p) {
         beforeSyntax(property, KSpace.Location.PROPERTY_PREFIX, p);
 

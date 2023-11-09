@@ -15,6 +15,7 @@
  */
 package org.openrewrite.kotlin.internal;
 
+import kotlin.Pair;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.KtNodeTypes;
 import org.jetbrains.kotlin.com.intellij.lang.ASTNode;
@@ -778,7 +779,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitNullableType(KtNullableType nullableType, ExecutionContext data) {
         J j = requireNonNull(nullableType.getInnerType()).accept(this, data);
-        return j.withMarkers(j.getMarkers().addIfAbsent(new IsNullable(randomId(),
+        return j.withPrefix(deepPrefix(nullableType))
+                .withMarkers(j.getMarkers().addIfAbsent(new IsNullable(randomId(),
                 prefix((PsiElement) nullableType.getQuestionMarkNode())
         )));
     }
@@ -3020,7 +3022,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         J j = requireNonNull(typeReference.getTypeElement()).accept(this, data);
-        j = j.withPrefix(merge(j.getPrefix(), prefix(typeReference, consumedSpaces)));
+        // j = j.withPrefix(merge(j.getPrefix(), prefix(typeReference, consumedSpaces)));
 
         consumedSpaces.add(findFirstPrefixSpace(typeReference.getTypeElement()));
 
@@ -3042,7 +3044,39 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         } else if (j instanceof J.Identifier) {
             j = ((J.Identifier) j).withAnnotations(leadingAnnotations);
         }
-        return j;
+
+        // Handle potential redundant nested parentheses
+        Stack<Pair<Integer, Integer>> parenPairs = new Stack<>();
+        List<PsiElement> allChildren = getAllChildren(typeReference);
+
+        int l = 0;
+        int r = allChildren.size() - 1;
+        while (l < r) {
+            l = findFirstLPAR(allChildren, l);
+            r = findLastRPAR(allChildren, r);
+            if (l * r < 0) {
+                throw new UnsupportedOperationException("Unpaired parentheses!");
+            }
+            if (l < 0 || r < 0) {
+                break;
+            }
+            parenPairs.add(new Pair<>(l++, r--));
+        }
+
+        while (!parenPairs.empty()) {
+            Pair<Integer, Integer> parenPair = parenPairs.pop();
+            PsiElement lPAR = allChildren.get(parenPair.getFirst());
+            PsiElement rPAR = allChildren.get(parenPair.getSecond());
+            TypeTree typeTree = (TypeTree) j;
+            j = new J.ParenthesizedTypeTree(randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY,
+                    emptyList(),
+                    new J.Parentheses<>(randomId(), prefix(lPAR), Markers.EMPTY, padRight(typeTree, prefix(rPAR)))
+            );
+        }
+
+        return j.withPrefix(merge(prefix(typeReference, consumedSpaces), j.getPrefix()));
     }
 
     @Override
@@ -3420,6 +3454,17 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return space(first);
     }
 
+    private static List<PsiElement> getAllChildren(PsiElement psiElement) {
+        List<PsiElement> allChildren = new ArrayList<>();
+
+        Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(psiElement).iterator();
+        while (iterator.hasNext()) {
+            PsiElement it = iterator.next();
+            allChildren.add(it);
+        }
+        return allChildren;
+    }
+
     @Nullable
     private PsiElement findFirstPrefixSpace(@Nullable PsiElement element) {
         if (element == null) {
@@ -3552,6 +3597,33 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                isCRLF(node);
     }
 
+    private static boolean isLPAR(PsiElement element) {
+        return element instanceof LeafPsiElement && ((LeafPsiElement) element).getElementType() == KtTokens.LPAR;
+    }
+    private static boolean isRPAR(PsiElement element) {
+        return element instanceof LeafPsiElement && ((LeafPsiElement) element).getElementType() == KtTokens.RPAR;
+    }
+
+    private static int findFirstLPAR(List<PsiElement> elements, int start) {
+        int ret  = -1;
+        for (int i = start; i < elements.size(); i++) {
+            if (isLPAR(elements.get(i))) {
+                return i;
+            }
+        }
+        return ret;
+    }
+
+    private static int findLastRPAR(List<PsiElement> elements, int end) {
+        int ret = -1;
+        for (int i = end; i >= 0; i--) {
+            if (isRPAR(elements.get(i))) {
+                return i;
+            }
+        }
+        return ret;
+    }
+
     private static boolean isCRLF(ASTNode node) {
         return node instanceof PsiErrorElementImpl && node.getText().equals("\r");
     }
@@ -3567,7 +3639,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
         return builder.toString();
     }
-
 
     private List<J.Annotation> mapAnnotations(List<KtAnnotationEntry> ktAnnotationEntries, ExecutionContext data) {
         return ktAnnotationEntries.stream()
