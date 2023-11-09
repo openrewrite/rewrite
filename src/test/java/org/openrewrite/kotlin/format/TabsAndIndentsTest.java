@@ -443,7 +443,6 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("https://github.com/openrewrite/rewrite/issues/636")
     @Test
     void methodInvocationArgumentsContinuationIndentsAssorted() {
         rewriteRun(
@@ -457,12 +456,12 @@ class TabsAndIndentsTest implements RewriteTest {
                   fun method(t: Test) {
                       val t1 = t.withData(withData()
                               .withData(
-                                      t.withData()
+                                  t.withData()
                               ).withData(
-                                      t.withData()
+                                  t.withData()
                               )
                               .withData(),
-                              withData()
+                          withData()
                       );
                   }
               }

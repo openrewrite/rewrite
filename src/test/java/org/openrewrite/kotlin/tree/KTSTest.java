@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
@@ -23,6 +24,7 @@ import org.openrewrite.test.RewriteTest;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.kotlin.Assertions.kotlinScript;
 
 class KTSTest implements RewriteTest {
@@ -82,6 +84,26 @@ class KTSTest implements RewriteTest {
                 }.visit(cu, count);
                 assertThat(count.get()).isEqualTo(7);
           }))
+        );
+    }
+
+    @ExpectedToFail("not yet implemented correctly")
+    @Test
+    void anonymousObject() {
+        rewriteRun(
+          kotlinScript(
+            """
+              open class Test
+              interface A
+              
+              fun test ( a : Test ) { }
+              
+              fun method ( ) {
+                  test ( object :  Test   ( ),    A {
+                  } )
+              }
+              """
+          )
         );
     }
 }

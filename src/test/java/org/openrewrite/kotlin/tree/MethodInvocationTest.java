@@ -240,26 +240,6 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
-    @ExpectedToFail("not yet implemented correctly")
-    void anonymousObject() {
-        rewriteRun(
-          kotlin(
-            """
-              open class Test
-              interface A
-              
-              fun test ( a : Test ) { }
-              
-              fun method ( ) {
-                  test ( object :  Test   ( ),    A {
-                  } )
-              }
-              """
-          )
-        );
-    }
-
-    @Test
     void lambdaArgument() {
         rewriteRun(
           kotlin(
