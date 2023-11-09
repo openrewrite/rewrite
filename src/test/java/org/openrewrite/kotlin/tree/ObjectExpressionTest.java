@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
@@ -50,6 +51,21 @@ class ObjectExpressionTest implements RewriteTest {
                       }
                   }
               }
+              """
+          )
+        );
+    }
+
+    @ExpectedToFail("not yet implemented")
+    @Test
+    void anonymousObject() {
+        rewriteRun(
+          kotlin(
+            """
+              open class A
+              interface B
+              
+              val foo: Any = object: A ( ), B { }
               """
           )
         );

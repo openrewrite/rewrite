@@ -239,6 +239,24 @@ class MethodInvocationTest implements RewriteTest {
     }
 
     @Test
+    void anonymousObject() {
+        rewriteRun(
+          kotlin(
+            """
+              open class Test
+              
+              fun test ( a : Test ) { }
+              
+              fun method ( ) {
+                  test ( object :  Test   ( ) {
+                  } )
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void lambdaArgument() {
         rewriteRun(
           kotlin(
