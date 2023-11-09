@@ -192,7 +192,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         JContainer<Expression> args = JContainer.build(Space.EMPTY, expressions, markers);
         return new J.MethodInvocation(
                 randomId(),
-                Space.EMPTY,
+                prefix(expression),
                 markers,
                 select,
                 null,

@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.marker.IndexedAccess;
@@ -688,6 +687,24 @@ class MethodInvocationTest implements RewriteTest {
                   val node = Node("x") // END
                   node .  findTypeDefinition(1)   ?.let    { definition ->
                       println("Found definition: $definition")
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void namedParameters() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  fun foo(s: String) = s
+                  fun bar(ss: Array<String>) {
+                      foo(
+                          s = ss[0]
+                      )
                   }
               }
               """
