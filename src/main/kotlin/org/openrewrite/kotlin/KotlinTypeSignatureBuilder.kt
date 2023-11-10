@@ -23,6 +23,7 @@ import org.jetbrains.kotlin.fir.declarations.utils.classId
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
+import org.jetbrains.kotlin.fir.references.FirSuperReference
 import org.jetbrains.kotlin.fir.references.toResolvedBaseSymbol
 import org.jetbrains.kotlin.fir.resolve.inference.ConeTypeParameterBasedTypeVariable
 import org.jetbrains.kotlin.fir.resolve.providers.toSymbol
@@ -88,6 +89,10 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 "{undefined}"
             }
 
+            is FirAnonymousObject -> {
+                if (type.typeParameters.isNotEmpty()) anonymousParameterizedSignature(type) else anonymousClassSignature(type)
+            }
+
             is FirClass -> {
                 if (type.typeParameters.isNotEmpty()) parameterizedSignature(type) else classSignature(type)
             }
@@ -140,6 +145,10 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 signature(type.typeRef)
             }
 
+            is FirSuperReference -> {
+                signature(type.superTypeRef)
+            }
+
             is FirTypeParameter -> {
                 typeParameterSignature(type)
             }
@@ -180,6 +189,23 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         }
     }
 
+    private fun anonymousClassSignature(type: FirAnonymousObject): String {
+        val sig = StringBuilder(type.symbol.classId.asFqNameString())
+        for (supertype in type.superTypeRefs) {
+            sig.append(signature(supertype))
+        }
+        return sig.toString()
+    }
+
+    private fun anonymousParameterizedSignature(type: FirAnonymousObject): String {
+        val sig = StringBuilder(classSignature(type))
+        val joiner = StringJoiner(", ", "<", ">")
+        for (tp in type.typeParameters) {
+            joiner.add(signature(tp, type))
+        }
+        return sig.append(joiner).toString()
+    }
+
     override fun arraySignature(type: Any): String {
         throw UnsupportedOperationException("This should never happen.")
     }
@@ -194,7 +220,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             is FirResolvedTypeRef -> classSignature(type.type)
             is FirResolvedQualifier -> convertClassIdToFqn(type.classId)
             else -> {
-                ""
+                throw UnsupportedOperationException("Unsupported class type: ${type.javaClass.name}")
             }
         }
     }
@@ -249,7 +275,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             is FirRegularClass -> parameterizedSignature(type)
             is FirResolvedQualifier -> parameterizedSignature(type)
             else -> {
-                ""
+                throw UnsupportedOperationException("Unsupported parameterized FirClass type: ${type.javaClass.name}")
             }
         }
     }
@@ -396,13 +422,15 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
     @OptIn(SymbolInternals::class)
     private fun resolvedNameReferenceSignature(type: FirResolvedNamedReference, parent: Any?): String {
         return when (val sym = type.resolvedSymbol) {
+            is FirBackingFieldSymbol -> signature(sym.fir, parent)
             is FirConstructorSymbol -> signature(sym.fir, parent)
             is FirEnumEntrySymbol -> signature(sym.fir, parent)
             is FirFieldSymbol -> signature(sym.fir, parent)
             is FirNamedFunctionSymbol -> signature(sym.fir, parent)
             is FirPropertySymbol -> signature(sym.fir, parent)
+            is FirValueParameterSymbol -> signature(sym.fir, parent)
             else -> {
-                ""
+                throw UnsupportedOperationException("Unsupported FirResolvedNamedReference type: ${type.javaClass.name}")
             }
         }
     }
@@ -445,7 +473,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 }
             }
 
-            else -> ""
+            else -> throw UnsupportedOperationException("Unsupported FirTypeProjection: ${type.javaClass.name}")
         }
     }
 
@@ -495,7 +523,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             is BinaryJavaTypeParameter -> javaTypeParameterSignature(type)
             is JavaWildcardType -> javaWildCardSignature(type)
             is JavaValueParameter -> signature(type.type)
-            else -> ""
+            else -> throw UnsupportedOperationException("Unsupported JavaElement: ${type.javaClass.name}")
         }
     }
 

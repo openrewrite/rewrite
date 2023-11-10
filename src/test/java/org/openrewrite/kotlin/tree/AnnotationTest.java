@@ -465,7 +465,7 @@ class AnnotationTest implements RewriteTest {
     }
 
     @Test
-    void AnnotationEntryTrailingComma() {
+    void annotationEntryTrailingComma() {
         rewriteRun(
           spec -> spec.parser(KotlinParser.builder().classpath("jackson-annotations")),
           kotlin(

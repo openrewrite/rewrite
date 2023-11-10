@@ -92,11 +92,11 @@ class FieldAccessTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              open class Super {
-                  val id : String = ""
+              open class A {
+                  val id : Int = 0
               }
-              class Test : Super() {
-                  fun getId ( ) : String {
+              class B : A ( ) {
+                  fun getId ( ) : Int {
                       return super . id
                   }
               }

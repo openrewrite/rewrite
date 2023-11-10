@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -28,6 +27,7 @@ class ParenthesesTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
+              @Suppress("UNUSED_PARAMETER")
               class A {
                   internal fun <T> parseMappedType(
                       mappedType: (String),

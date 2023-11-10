@@ -745,6 +745,23 @@ public class KotlinTypeMappingTest {
             );
         }
 
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/373")
+        @Test
+        void javaTypeFullyQualified() {
+            rewriteRun(
+              kotlin(
+                """
+                  @file:Suppress("UNUSED_PARAMETER")
+                  open class Object<T>
+                  class Test(name: String, any: Any)
+                  
+                  fun <T> foo(name: String) =
+                      Test(name, object : Object<T>() {})
+                  """
+              )
+            );
+        }
+
         @Test
         void variableTypes() {
             rewriteRun(

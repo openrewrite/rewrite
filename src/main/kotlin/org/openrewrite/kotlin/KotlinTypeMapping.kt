@@ -17,6 +17,8 @@ package org.openrewrite.kotlin
 
 import org.jetbrains.kotlin.KtFakeSourceElementKind
 import org.jetbrains.kotlin.builtins.PrimitiveType
+import org.jetbrains.kotlin.codegen.classId
+import org.jetbrains.kotlin.codegen.topLevelClassAsmType
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.Visibility
@@ -33,6 +35,7 @@ import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.java.declarations.FirJavaField
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
+import org.jetbrains.kotlin.fir.references.FirSuperReference
 import org.jetbrains.kotlin.fir.references.toResolvedBaseSymbol
 import org.jetbrains.kotlin.fir.resolve.providers.toSymbol
 import org.jetbrains.kotlin.fir.resolve.toFirRegularClass
@@ -122,6 +125,10 @@ class KotlinTypeMapping(
                 Unknown.getInstance()
             }
 
+            is FirSuperReference -> {
+                type(type.superTypeRef, signature)
+            }
+
             is FirFile -> {
                 fileType(signature)
             }
@@ -132,6 +139,10 @@ class KotlinTypeMapping(
 
             is FirFunctionCall -> {
                 methodInvocationType(type, signature)
+            }
+
+            is FirImport -> {
+                resolveImport(type, signature)
             }
 
             is FirJavaTypeRef -> {
@@ -186,6 +197,13 @@ class KotlinTypeMapping(
                 Unknown.getInstance()
             }
         }
+    }
+
+    @OptIn(SymbolInternals::class)
+    private fun resolveImport(type: FirImport, signature: String): JavaType? {
+        // If the symbol is not resolvable we return a NEW ShallowClass to prevent caching on a potentially resolvable class type.
+        val sym = type.importedFqName?.topLevelClassAsmType()?.classId?.toSymbol(firSession) ?: return ShallowClass.build(signature)
+        return type(sym.fir, signature)
     }
 
     private fun packageDirective(signature: String): JavaType? {
@@ -290,15 +308,22 @@ class KotlinTypeMapping(
                         signature
                     )
                 }
-                val ref = type.toRegularClassSymbol(firSession)
+                var sym: Any? = type.toRegularClassSymbol(firSession)
                 if (type.typeArguments.isNotEmpty()) {
                     params = type.typeArguments.toList()
                 }
-                if (ref == null) {
-                    typeCache.put(signature, Unknown.getInstance())
-                    return Unknown.getInstance()
+
+                if (sym is FirRegularClassSymbol) {
+                    sym.fir
+                } else {
+                    sym = type.toSymbol(firSession)
+                    if (sym is FirClassLikeSymbol<*>) {
+                        sym.fir as FirClass
+                    } else {
+                        typeCache.put(signature, Unknown.getInstance())
+                        return Unknown.getInstance()
+                    }
                 }
-                ref.fir
             }
 
             else -> throw UnsupportedOperationException("Unexpected classType: ${type.javaClass}")
@@ -957,8 +982,7 @@ class KotlinTypeMapping(
         clazz = if (type.classifier != null) {
             TypeUtils.asFullyQualified(type(type.classifier!!))
         } else {
-            val fq : JavaType = buildType(type.classifierQualifiedName)
-            fq as FullyQualified
+            createShallowClass(type.classifierQualifiedName)
         }
 
         if (type.typeArguments.isNotEmpty()) {
