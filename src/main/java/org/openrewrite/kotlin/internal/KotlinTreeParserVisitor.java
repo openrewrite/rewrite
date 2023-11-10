@@ -36,7 +36,6 @@ import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.parsing.ParseUtilsKt;
 import org.jetbrains.kotlin.psi.*;
 import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
-import org.jetbrains.kotlin.psi.stubs.elements.KtStubElementTypes;
 import org.jetbrains.kotlin.types.Variance;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
@@ -747,7 +746,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         boolean quoted = entry.getPrevSibling().getNode().getElementType() == KtTokens.OPEN_QUOTE &&
-                         entry.getNextSibling().getNode().getElementType() == KtTokens.CLOSING_QUOTE;
+                entry.getNextSibling().getNode().getElementType() == KtTokens.CLOSING_QUOTE;
 
         String valueSource = quoted ? "\"" + leaf.getText() + "\"" : leaf.getText();
         return new J.Literal(
@@ -781,8 +780,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         J j = requireNonNull(nullableType.getInnerType()).accept(this, data);
         return j.withPrefix(deepPrefix(nullableType))
                 .withMarkers(j.getMarkers().addIfAbsent(new IsNullable(randomId(),
-                prefix((PsiElement) nullableType.getQuestionMarkNode())
-        )));
+                        prefix((PsiElement) nullableType.getQuestionMarkNode())
+                )));
     }
 
     @Override
@@ -1351,7 +1350,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         Markers.EMPTY);
             }
         } else if (parameter.getVariance() == Variance.IN_VARIANCE ||
-                   parameter.getVariance() == Variance.OUT_VARIANCE) {
+                parameter.getVariance() == Variance.OUT_VARIANCE) {
             GenericType.Variance variance = parameter.getVariance() == Variance.IN_VARIANCE ?
                     GenericType.Variance.CONTRAVARIANT : GenericType.Variance.COVARIANT;
             markers = markers.addIfAbsent(new GenericType(randomId(), variance));
@@ -2900,7 +2899,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         KtStringTemplateEntry[] entries = expression.getEntries();
         boolean hasStringTemplateEntry = Arrays.stream(entries).anyMatch(x ->
                 x instanceof KtBlockStringTemplateEntry ||
-                x instanceof KtSimpleNameStringTemplateEntry);
+                        x instanceof KtSimpleNameStringTemplateEntry);
 
         if (hasStringTemplateEntry) {
             String delimiter = expression.getFirstChild().getText();
@@ -2984,8 +2983,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         consumedSpaces.add(findFirstPrefixSpace(typeReference.getTypeElement()));
 
         if (j instanceof K.FunctionType &&
-            typeReference.getModifierList() != null &&
-            typeReference.getModifierList().hasModifier(KtTokens.SUSPEND_KEYWORD)) {
+                typeReference.getModifierList() != null &&
+                typeReference.getModifierList().hasModifier(KtTokens.SUSPEND_KEYWORD)) {
             K.FunctionType functionType = (K.FunctionType) j;
             functionType = functionType.withModifiers(modifiers).withLeadingAnnotations(leadingAnnotations);
 
@@ -3450,7 +3449,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         PsiElement first = iterator.next();
 
         if (first != null) {
-           return isSpace(first.getNode()) ?  first : null;
+            return isSpace(first.getNode()) ? first : null;
         }
 
         return null;
@@ -3548,21 +3547,22 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     private static boolean isSpace(ASTNode node) {
         IElementType elementType = node.getElementType();
         return elementType == KtTokens.WHITE_SPACE ||
-               elementType == KtTokens.BLOCK_COMMENT ||
-               elementType == KtTokens.EOL_COMMENT ||
-               elementType == KtTokens.DOC_COMMENT ||
-               isCRLF(node);
+                elementType == KtTokens.BLOCK_COMMENT ||
+                elementType == KtTokens.EOL_COMMENT ||
+                elementType == KtTokens.DOC_COMMENT ||
+                isCRLF(node);
     }
 
     private static boolean isLPAR(PsiElement element) {
         return element instanceof LeafPsiElement && ((LeafPsiElement) element).getElementType() == KtTokens.LPAR;
     }
+
     private static boolean isRPAR(PsiElement element) {
         return element instanceof LeafPsiElement && ((LeafPsiElement) element).getElementType() == KtTokens.RPAR;
     }
 
     private static int findFirstLPAR(List<PsiElement> elements, int start) {
-        int ret  = -1;
+        int ret = -1;
         for (int i = start; i < elements.size(); i++) {
             if (isLPAR(elements.get(i))) {
                 return i;
@@ -3730,7 +3730,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 );
                 superTypes.add(padRight(delegationCall, suffix(superTypeCallEntry)));
             } else if (superTypeListEntry instanceof KtSuperTypeEntry ||
-                       superTypeListEntry instanceof KtDelegatedSuperTypeEntry) {
+                    superTypeListEntry instanceof KtDelegatedSuperTypeEntry) {
                 TypeTree typeTree = (TypeTree) superTypeListEntry.accept(this, data);
 
                 if (i == 0) {
@@ -3830,7 +3830,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
             return Space.build(whiteSpace, emptyList());
         } else if (elementType == KtTokens.EOL_COMMENT ||
-                   elementType == KtTokens.BLOCK_COMMENT) {
+                elementType == KtTokens.BLOCK_COMMENT) {
             String nodeText = element.getText();
             boolean isBlockComment = ((PsiComment) element).getTokenType() == KtTokens.BLOCK_COMMENT;
             String comment = isBlockComment ? nodeText.substring(2, nodeText.length() - 2) : nodeText.substring(2);
