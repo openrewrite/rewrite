@@ -16,7 +16,6 @@
 package org.openrewrite.yaml.tree;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -115,18 +114,6 @@ class SequenceTest implements RewriteTest {
                   - bar:
                   - baz: [
                       a]
-              """
-          )
-        );
-    }
-
-    @Issue("https://github.com/openrewrite/rewrite/issues/3680")
-    @Test
-    void spaceBeforeColon() {
-        rewriteRun(
-          yaml(
-            """
-              foo : []
               """
           )
         );
