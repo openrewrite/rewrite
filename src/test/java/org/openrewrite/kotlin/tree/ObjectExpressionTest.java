@@ -69,4 +69,21 @@ class ObjectExpressionTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/373")
+    @Test
+    void anonymousObject2() {
+        rewriteRun(
+          kotlin(
+            """
+              open class Object<T>
+              class Test(name: String, any: Any)
+              
+              fun <T> foo(name: String) =
+                  Test(name, object : Object<T>() {
+                  })
+              """
+          )
+        );
+    }
 }
