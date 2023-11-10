@@ -618,13 +618,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return new K.FunctionType(
                 randomId(),
                 prefix(type, consumedSpaces),
-                Markers.EMPTY, //.addIfAbsent(new IsNullable(randomId(), Space.EMPTY)), // TODO
+                Markers.EMPTY,
                 emptyList(), // TODO
                 emptyList(), // TODO
                 type.getReceiver() != null ? padRight((NameTree) requireNonNull(type.getReceiverTypeReference()).accept(this, data), suffix(type.getReceiver())) : null,
                 parameters,
                 suffix(type.getParameterList()),
-                requireNonNull(type.getReturnTypeReference()).accept(this, data).withPrefix(prefix(type.getReturnTypeReference()))
+                padRight((TypedTree) requireNonNull(type.getReturnTypeReference()).accept(this, data), suffix(type))
         );
     }
 
@@ -777,9 +777,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitNullableType(KtNullableType nullableType, ExecutionContext data) {
-        J j = requireNonNull(nullableType.getInnerType()).accept(this, data);
-        return j.withPrefix(deepPrefix(nullableType))
-                .withMarkers(j.getMarkers().addIfAbsent(new IsNullable(randomId(),
+        TypeTree typeTree = (TypeTree) requireNonNull(nullableType.getInnerType()).accept(this, data);
+        return typeTree.withPrefix(deepPrefix(nullableType))
+                .withMarkers(typeTree.getMarkers().addIfAbsent(new IsNullable(randomId(),
                         prefix((PsiElement) nullableType.getQuestionMarkNode())
                 )));
     }

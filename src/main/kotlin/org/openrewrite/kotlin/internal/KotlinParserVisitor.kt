@@ -1883,7 +1883,7 @@ class KotlinParserVisitor(
                 receiver,
                 JContainer.build(before, refParams as List<JRightPadded<TypeTree>>, Markers.EMPTY),
                 arrow,
-                returnType
+                padRight(returnType, Space.EMPTY)
         )
     }
 

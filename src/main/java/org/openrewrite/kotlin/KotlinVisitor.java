@@ -159,7 +159,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         if (f.getPadding().getParameters() != null) {
             f = f.getPadding().withParameters(this.visitContainer(f.getPadding().getParameters(), KContainer.Location.FUNCTION_TYPE_PARAMETERS, p));
         }
-        f = f.withReturnType(visitAndCast(f.getReturnType(), p));
+        f = f.withReturnType(visitRightPadded(f.getReturnType(), p));
         return f;
     }
 

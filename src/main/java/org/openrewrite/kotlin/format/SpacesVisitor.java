@@ -951,7 +951,9 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         if (kf.getArrow() != null) {
             kf = kf.withArrow(updateSpace(kf.getArrow(), style.getOther().getAroundArrowInFunctionTypes()));
         }
-        kf = kf.withReturnType(spaceBefore(kf.getReturnType(), style.getOther().getAroundArrowInFunctionTypes()));
+
+        JRightPadded<TypedTree> rpTypedTree = kf.getReturnType();
+        kf = kf.withReturnType(rpTypedTree.withElement(spaceBefore(rpTypedTree.getElement(), style.getOther().getAroundArrowInFunctionTypes())));
         return kf;
     }
 

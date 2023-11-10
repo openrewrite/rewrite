@@ -1023,7 +1023,7 @@ public interface K extends J {
 
         public FunctionType(UUID id, Space prefix, Markers markers, List<Annotation> leadingAnnotations,
                             List<Modifier> modifiers, @Nullable JRightPadded<NameTree> receiver,
-                            @Nullable JContainer<TypeTree> parameters, @Nullable Space arrow, TypedTree returnType) {
+                            @Nullable JContainer<TypeTree> parameters, @Nullable Space arrow, JRightPadded<TypedTree> returnType) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;
@@ -1036,9 +1036,8 @@ public interface K extends J {
         }
 
         public Space getPrefix() {
-            // For backwards compatibility with older LST before there was a prefix field
             //noinspection ConstantConditions
-            return prefix == null ? returnType.getPrefix() : prefix;
+            return prefix == null ? returnType.getElement().getPrefix() : prefix;
         }
 
         @With
@@ -1089,21 +1088,19 @@ public interface K extends J {
         @Getter
         Space arrow;
 
-        // backwards compatibility
-        @JsonAlias("typedTree")
         @With
         @Getter
-        TypedTree returnType;
+        JRightPadded<TypedTree> returnType;
 
         @Override
         public @Nullable JavaType getType() {
-            return returnType.getType();
+            return returnType.getElement().getType();
         }
 
         public <T extends J> T withType(@Nullable JavaType type) {
-            TypeTree newType = returnType.withType(type);
+            TypeTree newType = returnType.getElement().withType(type);
             //noinspection unchecked
-            return (T) (newType == type ? this : withReturnType(newType));
+            return (T) (newType == type ? this : withReturnType(returnType.withElement(newType)));
         }
 
         @Override

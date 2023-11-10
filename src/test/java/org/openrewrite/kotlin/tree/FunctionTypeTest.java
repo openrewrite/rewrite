@@ -88,7 +88,19 @@ class FunctionTypeTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              val v: (  (   Any )  -> Any) /*c1*/  ? = null
+              val v: (  (   Int )  -> Any) /*c1*/  ? = null
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/365")
+    void parenthesizedNullableTypeWithTrailingComment() {
+        rewriteRun(
+          kotlin(
+            """
+              val v: (  (   Int )  -> Any /*C*/)  ? = null
               """
           )
         );
