@@ -112,4 +112,17 @@ class MethodReferenceTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/376")
+    @Test
+    void memberReferenceWithParameterizedType() {
+        rewriteRun(
+          kotlin(
+            """
+              val x: MutableMap<String, String> = hashMapOf()
+              val keys = x.entries.map(MutableMap.MutableEntry<String, String>::key)
+              """
+          )
+        );
+    }
 }

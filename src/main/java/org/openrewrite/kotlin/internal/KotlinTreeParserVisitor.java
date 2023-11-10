@@ -2278,9 +2278,29 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         assert expression.getSelectorExpression() != null;
         if (expression.getSelectorExpression() instanceof KtCallExpression) {
             KtCallExpression callExpression = (KtCallExpression) expression.getSelectorExpression();
+            J j = callExpression.accept(this, data);
+            Expression receiver = convertToExpression(expression.getReceiverExpression().accept(this, data));
+
+            if (j instanceof J.ParameterizedType) {
+                J.ParameterizedType pt = (J.ParameterizedType) j;
+                if (pt != null) {
+                    pt = pt.withClazz(pt.getClazz().withPrefix(prefix(callExpression)));
+                    J.FieldAccess newName = new J.FieldAccess(
+                            randomId(),
+                            receiver.getPrefix(),
+                            Markers.EMPTY,
+                            receiver.withPrefix(Space.EMPTY),
+                            padLeft(suffix(expression.getReceiverExpression()), (J.Identifier) pt.getClazz()),
+                            pt.getType()
+                    );
+                    pt = pt.withClazz(newName);
+                }
+
+                return pt;
+            }
+
             MethodCall methodInvocation = (MethodCall) callExpression.accept(this, data);
 
-            Expression receiver = convertToExpression(expression.getReceiverExpression().accept(this, data));
             if (methodInvocation instanceof J.MethodInvocation) {
                 methodInvocation = ((J.MethodInvocation) methodInvocation).getPadding().withSelect(padRight(receiver, suffix(expression.getReceiverExpression())))
                         .withName(((J.MethodInvocation) methodInvocation).getName().withPrefix(prefix(callExpression)))
