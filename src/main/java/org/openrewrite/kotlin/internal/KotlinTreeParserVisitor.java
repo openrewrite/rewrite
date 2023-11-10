@@ -1219,12 +1219,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitTypeAlias(KtTypeAlias typeAlias, ExecutionContext data) {
         Markers markers = Markers.EMPTY;
-        List<J.Modifier> modifiers = new ArrayList<>();
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
         List<J.Annotation> lastAnnotations = new ArrayList<>();
         Set<PsiElement> consumedSpaces = preConsumedInfix(typeAlias);
 
-        modifiers.addAll(mapModifiers(typeAlias.getModifierList(), leadingAnnotations, lastAnnotations, data));
+        List<J.Modifier> modifiers = new ArrayList<>(mapModifiers(typeAlias.getModifierList(), leadingAnnotations, lastAnnotations, data));
         modifiers.add(new J.Modifier(randomId(), prefix(typeAlias.getTypeAliasKeyword(), consumedSpaces), markers, "typealias", J.Modifier.Type.LanguageExtension, emptyList()));
 
         if (typeAlias.getIdentifyingElement() == null) {
@@ -1431,10 +1430,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             }
             case STAR: {
                 return new J.Wildcard(randomId(), prefix(typeProjection), Markers.EMPTY, null, null);
-
             }
             default: {
-                name = requireNonNull(typeProjection.getTypeReference()).accept(this, data).withPrefix(prefix(typeProjection));
+                name = convertToExpression(requireNonNull(typeProjection.getTypeReference()).accept(this, data));
+                name = name.withPrefix(merge(prefix(typeProjection), name.getPrefix()));
             }
         }
 
@@ -3051,11 +3050,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         List<KtTypeProjection> typeArguments = type.getTypeArguments();
-        List<JRightPadded<Expression>> parameters = new ArrayList<>(typeArguments.size());
         if (!typeArguments.isEmpty()) {
-            for (KtTypeProjection typeProjection : typeArguments) {
-                parameters.add(padRight(convertToExpression(typeProjection.accept(this, data)), suffix(typeProjection)));
-            }
+            JContainer<Expression> args = mapTypeArguments(type.getTypeArgumentList(), data);
 
             JavaType javaType = type(type);
             if (!(javaType instanceof JavaType.Parameterized)) {
@@ -3068,7 +3064,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     Space.EMPTY,
                     Markers.EMPTY,
                     pt == null ? nameTree.withType(JavaType.Unknown.getInstance()) : nameTree.withType(pt.getType()),
-                    JContainer.build(prefix(type.getTypeArgumentList()), parameters, Markers.EMPTY),
+                    args, //JContainer.build(prefix(type.getTypeArgumentList()), parameters, Markers.EMPTY),
                     pt == null ? JavaType.Unknown.getInstance() : pt
             );
         }

@@ -530,4 +530,16 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/377")
+    @Test
+    void annotatedTypeParameter() {
+        rewriteRun(
+          kotlin(
+            """
+              val releaseDates: List<@Suppress  /*C*/ String> = emptyList()
+              """
+          )
+        );
+    }
 }
