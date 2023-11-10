@@ -1188,11 +1188,11 @@ class KotlinTypeMapping(
 
     private fun mapToFlagsBitmap(visibility: Visibility, modality: Modality?): Long {
         var bitMask: Long = 0
-        when (visibility.externalDisplayName.lowercase()) {
+        when (visibility.name.lowercase()) {
             "public" -> bitMask += 1L
-            "private" -> bitMask += 1L shl 1
-            "protected" -> bitMask += 1L shl 2
-            "internal", "package-private", "local" -> {}
+            "private", "private_to_this" -> bitMask += 1L shl 1
+            "protected", "protected_and_package" -> bitMask += 1L shl 2
+            "internal", "package", "local" -> {}
             else -> throw UnsupportedOperationException("Unsupported visibility: ${visibility.name.lowercase()}")
         }
         if (modality != null) {

@@ -81,16 +81,6 @@ public class KotlinTypeMappingTest {
         return type;
     }
 
-    public J.VariableDeclarations getField(String fieldName) {
-        return goatClassDeclaration.getClassDeclaration().getBody().getStatements().stream()
-          .filter(it -> it instanceof org.openrewrite.java.tree.J.VariableDeclarations || it instanceof K.Property)
-          .map(it -> it instanceof K.Property ? ((K.Property) it).getVariableDeclarations() : (J.VariableDeclarations) it)
-          .map(J.VariableDeclarations.class::cast)
-          .filter(mv -> mv.getVariables().stream().anyMatch(v -> v.getSimpleName().equals(fieldName)))
-          .findFirst()
-          .orElse(null);
-    }
-
     public K.Property getProperty(String fieldName) {
         return goatClassDeclaration.getClassDeclaration().getBody().getStatements().stream()
                 .filter(it -> it instanceof K.Property)
@@ -363,6 +353,7 @@ public class KotlinTypeMappingTest {
         assertThat(returnType.getType().getTypeParameters().get(0).toString()).isEqualTo("Generic{T}");
     }
 
+    @SuppressWarnings({"KotlinConstantConditions", "RedundantExplicitType"})
     @Nested
     class ParsingTest implements RewriteTest {
 
@@ -458,7 +449,7 @@ public class KotlinTypeMappingTest {
                   """, spec -> spec.afterRecipe(cu -> {
                     AtomicBoolean found = new AtomicBoolean(false);
                     new KotlinIsoVisitor<AtomicBoolean>() {
-                        MethodMatcher matcher = new MethodMatcher("kotlin.Function1 invoke(..)");
+                        final MethodMatcher matcher = new MethodMatcher("kotlin.Function1 invoke(..)");
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean atomicBoolean) {
                             if (matcher.matches(method)) {
@@ -544,16 +535,15 @@ public class KotlinTypeMappingTest {
             );
         }
 
-        @SuppressWarnings({"KotlinConstantConditions", "UnusedUnaryOperator", "RedundantExplicitType"})
         @Test
         void whenExpression() {
-            //noinspection RemoveRedundantQualifierName
             rewriteRun(
               kotlin(
                 """
+                  @Suppress("UNUSED_VARIABLE")
                   fun method() {
                       val condition: Int = 11
-                      when {
+                      val a = when {
                           condition < 20   ->    'c'
                           condition < 10   ->    -1
                           condition > 10   ->    (true)
@@ -634,6 +624,7 @@ public class KotlinTypeMappingTest {
             rewriteRun(
               kotlin(
                 """
+                  @Suppress("UNUSED_PARAMETER")
                   class Foo {
                       operator fun contains(element: Int): Boolean {
                           return true
@@ -675,6 +666,7 @@ public class KotlinTypeMappingTest {
             rewriteRun(
               kotlin(
                 """
+                  @Suppress("UNUSED_VARIABLE")
                   fun foo() {
                       val ( a , b , c ) = Triple ( 1 , 2 , 3 )
                   }
@@ -732,11 +724,33 @@ public class KotlinTypeMappingTest {
             );
         }
 
+        @SuppressWarnings("CanBePrimaryConstructorProperty")
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/374")
+        @Test
+        void privateToThisModifier() {
+            rewriteRun(
+              kotlin(
+                """
+                  @file:Suppress("UNUSED_VARIABLE")
+                  class A<in T>(t: T) {
+                      private val t: T = t // visibility for t is PRIVATE_TO_THIS
+                  
+                      fun test() {
+                          val x: T = t // correct
+                          val y: T = this.t // also correct
+                      }
+                  }
+                  """
+              )
+            );
+        }
+
         @Test
         void variableTypes() {
             rewriteRun(
               kotlin(
                 """
+                  @file:Suppress("UNUSED_VARIABLE")
                   val foo1: Int = 42
                   class Foo(val foo2: Int) {
                       val foo3: Int = 42
@@ -744,32 +758,30 @@ public class KotlinTypeMappingTest {
                           val use: Int = foo4
                       }
                   }
-                  """, spec -> spec.afterRecipe(cu -> {
-                    new KotlinIsoVisitor<Integer>() {
-                        @Override
-                        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer integer) {
-                            switch (variable.getSimpleName()) {
-                                case "foo1": {
-                                    assertThat(variable.getVariableType().toString()).isEqualTo("openRewriteFile0Kt{name=foo1,type=kotlin.Int}");
-                                    break;
-                                }
-                                case "foo2": {
-                                    assertThat(variable.getVariableType().toString()).isEqualTo("Foo{name=foo2,type=kotlin.Int}");
-                                    break;
-                                }
-                                case "foo3": {
-                                    assertThat(variable.getVariableType().toString()).isEqualTo("Foo{name=foo3,type=kotlin.Int}");
-                                    break;
-                                }
-                                case "foo4": {
-                                    assertThat(variable.getVariableType().toString()).isEqualTo("Foo{name=m,return=kotlin.Unit,parameters=[kotlin.Int]}{name=foo4,type=kotlin.Int}");
-                                    break;
-                                }
-                            }
-                            return super.visitVariable(variable, integer);
-                        }
-                    }.visit(cu, 0);
-                })
+                  """, spec -> spec.afterRecipe(cu -> new KotlinIsoVisitor<Integer>() {
+                      @Override
+                      public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer integer) {
+                          switch (variable.getSimpleName()) {
+                              case "foo1": {
+                                  assertThat(variable.getVariableType().toString()).isEqualTo("openRewriteFile0Kt{name=foo1,type=kotlin.Int}");
+                                  break;
+                              }
+                              case "foo2": {
+                                  assertThat(variable.getVariableType().toString()).isEqualTo("Foo{name=foo2,type=kotlin.Int}");
+                                  break;
+                              }
+                              case "foo3": {
+                                  assertThat(variable.getVariableType().toString()).isEqualTo("Foo{name=foo3,type=kotlin.Int}");
+                                  break;
+                              }
+                              case "foo4": {
+                                  assertThat(variable.getVariableType().toString()).isEqualTo("Foo{name=m,return=kotlin.Unit,parameters=[kotlin.Int]}{name=foo4,type=kotlin.Int}");
+                                  break;
+                              }
+                          }
+                          return super.visitVariable(variable, integer);
+                      }
+                  }.visit(cu, 0))
               )
             );
         }
@@ -779,6 +791,7 @@ public class KotlinTypeMappingTest {
             rewriteRun(
               spec -> spec.parser(KotlinParser.builder().classpath("javapoet","compile-testing")),
               kotlin(
+                //language=none  turn off language inspection, since the test does not have access to the class path.
                 """
                   package org.openrewrite.kotlin
 
