@@ -541,7 +541,11 @@ public class YamlParser implements org.openrewrite.Parser {
         private String prefix;
 
         public SequenceWithPrefix(String prefix, @Nullable String startBracketPrefix, List<Yaml.Sequence.Entry> entries, @Nullable String endBracketPrefix, @Nullable Anchor anchor) {
-            super(randomId(), Markers.EMPTY, startBracketPrefix, entries, endBracketPrefix, anchor);
+            this(randomId(), Markers.EMPTY, prefix, startBracketPrefix, entries, endBracketPrefix, anchor);
+        }
+
+        private SequenceWithPrefix(UUID id, Markers markers, String prefix, @Nullable String startBracketPrefix, List<Yaml.Sequence.Entry> entries, @Nullable String endBracketPrefix, @Nullable Anchor anchor) {
+            super(id, markers, startBracketPrefix, entries, endBracketPrefix, anchor);
             this.prefix = prefix;
         }
 
@@ -549,6 +553,14 @@ public class YamlParser implements org.openrewrite.Parser {
         public Sequence withPrefix(String prefix) {
             this.prefix = prefix;
             return this;
+        }
+
+        @Override
+        public Sequence withClosingBracketPrefix(@Nullable String closingBracketPrefix) {
+            if (Objects.equals(closingBracketPrefix, getClosingBracketPrefix())) {
+                return this;
+            }
+            return new SequenceWithPrefix(getId(), getMarkers(), prefix, getOpeningBracketPrefix(), getEntries(), closingBracketPrefix, getAnchor());
         }
     }
 
