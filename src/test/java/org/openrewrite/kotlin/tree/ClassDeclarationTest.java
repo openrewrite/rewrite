@@ -67,6 +67,20 @@ class ClassDeclarationTest implements RewriteTest {
     }
 
     @Test
+    void annotatedDelegatingConstructor() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test(i: Int) {
+                  @Suppress("ALL") // comment
+                  internal constructor() : this(0)
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void multipleClassDeclarationsInOneCompilationUnit() {
         rewriteRun(
           kotlin(
