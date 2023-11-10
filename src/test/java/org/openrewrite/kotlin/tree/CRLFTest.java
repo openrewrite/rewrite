@@ -20,13 +20,16 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
+@SuppressWarnings("All")
 class CRLFTest implements RewriteTest {
 
     @Test
     void crlf() {
         rewriteRun(
           kotlin(
-            "package some.other.name\r\n" + "class A { }\r\n" + "class B { }"
+            "package some.other.name\r\n" +
+              "class A { }\r\n" +
+              "class B { }"
           )
         );
     }
@@ -35,7 +38,9 @@ class CRLFTest implements RewriteTest {
     void consecutiveCRLF() {
         rewriteRun(
           kotlin(
-            "package some.other.name\r\n\r\n\r\n" + "class A { }\r\n\r\n\r\n" + "class B { }"
+            "package some.other.name\r\n\r\n\r\n" +
+              "class A { }\r\n\r\n\r\n" +
+              "class B { }"
           )
         );
     }
@@ -61,6 +66,19 @@ class CRLFTest implements RewriteTest {
         rewriteRun(
           kotlin(
             windowsJavadoc
+          )
+        );
+    }
+
+    @Test
+    void crlfInBlockComment() {
+        rewriteRun(
+          kotlin(
+            "public class A {\r\n" +
+              "/*a\r\n" +
+              "  b*/\r\n" +
+              "public fun method() {}\r\n" +
+              "}"
           )
         );
     }

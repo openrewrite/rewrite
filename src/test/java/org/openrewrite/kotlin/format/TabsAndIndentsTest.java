@@ -1026,7 +1026,6 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("CRLF in BLOCK_COMMENT to be handled")
     @SuppressWarnings("TextBlockMigration")
     @Test
     void blockCommentCRLF() {

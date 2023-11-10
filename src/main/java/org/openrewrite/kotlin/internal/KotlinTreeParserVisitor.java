@@ -3814,24 +3814,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         IElementType elementType = element.getNode().getElementType();
         if (elementType == KtTokens.WHITE_SPACE) {
-            String whiteSpace = element.getText();
-
-            // replace `\n` to CRLF back if it's CRLF in the source
-            TextRange range = element.getTextRange();
-            int left = findFirstGreaterOrEqual(cRLFLocations, range.getStartOffset());
-            int right = left != -1 ? findFirstLessOrEqual(cRLFLocations, range.getEndOffset(), left) : -1;
-            boolean hasCRLF = left != -1 && left <= right;
-
-            if (hasCRLF) {
-                for (int i = right; i >= left; i--) {
-                    whiteSpace = replaceNewLineWithCRLF(whiteSpace, cRLFLocations.get(i) - range.getStartOffset());
-                }
-            }
-
-            return Space.build(whiteSpace, emptyList());
+            return Space.build(maybeAdjustCRLF(element), emptyList());
         } else if (elementType == KtTokens.EOL_COMMENT ||
                 elementType == KtTokens.BLOCK_COMMENT) {
-            String nodeText = element.getText();
+            String nodeText = maybeAdjustCRLF(element);
             boolean isBlockComment = ((PsiComment) element).getTokenType() == KtTokens.BLOCK_COMMENT;
             String comment = isBlockComment ? nodeText.substring(2, nodeText.length() - 2) : nodeText.substring(2);
             List<Comment> comments = new ArrayList<>(1);
@@ -3842,6 +3828,25 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         return Space.EMPTY;
+    }
+
+    // replace `\n` to CRLF back if it's CRLF in the source
+    private String maybeAdjustCRLF(PsiElement element) {
+        String text = element.getText();
+        if (!isSpace(element.getNode())) {
+            return text;
+        }
+
+        TextRange range = element.getTextRange();
+        int left = findFirstGreaterOrEqual(cRLFLocations, range.getStartOffset());
+        int right = left != -1 ? findFirstLessOrEqual(cRLFLocations, range.getEndOffset(), left) : -1;
+        boolean hasCRLF = left != -1 && left <= right;
+        if (hasCRLF) {
+            for (int i = right; i >= left; i--) {
+                text = replaceNewLineWithCRLF(text, cRLFLocations.get(i) - range.getStartOffset());
+            }
+        }
+        return text;
     }
 
     private Space kdocToSpace(KDoc kDoc) {
