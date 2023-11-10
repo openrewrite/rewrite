@@ -879,7 +879,6 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Test
     void forLoop() {
         rewriteRun(
@@ -908,17 +907,17 @@ class TabsAndIndentsTest implements RewriteTest {
               class Test {
                   fun test() {
                       for (
-                      i in 0..5
-                      ) {
+                          i in 0..5
+                          ) {
                       }
 
                       for (j
-                      in 0..5
-                      ) {
+                          in 0..5
+                          ) {
                       }
 
                       labeled@ for (i in
-                      0..5) {
+                          0..5) {
                       }
                   }
               }

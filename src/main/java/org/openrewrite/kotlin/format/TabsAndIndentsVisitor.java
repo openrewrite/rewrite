@@ -106,6 +106,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                 tree instanceof J.If.Else ||
                 tree instanceof J.ForLoop ||
                 tree instanceof J.ForEachLoop ||
+                tree instanceof J.ForEachLoop.Control ||
                 tree instanceof J.WhileLoop ||
                 tree instanceof J.Case ||
                 tree instanceof J.EnumValueSet ||
@@ -129,18 +130,6 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
         }
 
         return tree;
-    }
-
-    @Override
-    public J.ForLoop.Control visitForControl(J.ForLoop.Control control, P p) {
-        // FIXME fix formatting of control sections
-        return control;
-    }
-
-    @Override
-    public J.ForEachLoop.Control visitForEachControl(J.ForEachLoop.Control control, P p) {
-        // FIXME fix formatting of control sections
-        return control;
     }
 
     @Override
