@@ -922,6 +922,7 @@ class BlankLinesTest implements RewriteTest {
               }
               
               val o = object {
+
                   @Suppress val i = 1
               
                   @Suppress val j = 1

@@ -2333,7 +2333,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     randomId(),
                     deepPrefix(expression),
                     Markers.EMPTY,
-                    expression.getReceiverExpression().accept(this, data).withPrefix(Space.EMPTY),
+                    convertToExpression(expression.getReceiverExpression().accept(this, data).withPrefix(Space.EMPTY)),
                     padLeft(suffix(expression.getReceiverExpression()), (J.Identifier) expression.getSelectorExpression().accept(this, data)),
                     type(expression.getSelectorExpression())
             );
@@ -2567,51 +2567,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitObjectLiteralExpression(KtObjectLiteralExpression expression, ExecutionContext data) {
-        KtObjectDeclaration declaration = expression.getObjectDeclaration();
-        TypeTree clazz = null;
-        Markers markers = Markers.EMPTY;
-        JContainer<Expression> args;
-
-        if (declaration.getSuperTypeList() == null) {
-            args = JContainer.empty();
-            args = args.withMarkers(Markers.build(singletonList(new OmitParentheses(randomId()))));
-        } else {
-            if (declaration.getSuperTypeList().getEntries().size() != 1) {
-                throw new UnsupportedOperationException("TODO");
-            }
-
-            KtValueArgumentList ktArgs = declaration.getSuperTypeList().getEntries().get(0).getStubOrPsiChild(KtStubElementTypes.VALUE_ARGUMENT_LIST);
-            if (ktArgs != null) {
-                args = mapFunctionCallArguments(ktArgs, data);
-            } else {
-                args = JContainer.empty();
-                args = args.withMarkers(Markers.EMPTY.addIfAbsent(new OmitParentheses(randomId())));
-            }
-
-            clazz = (TypeTree) declaration.getSuperTypeList().getEntries().get(0).accept(this, data);
-        }
-
-        J.Block body = null;
-        if (declaration.getBody() != null) {
-            body = (J.Block) declaration.getBody().accept(this, data);
-        }
-
-        if (declaration.getObjectKeyword() != null) {
-            markers = markers.add(new KObject(randomId(), Space.EMPTY));
-            markers = markers.add(new TypeReferencePrefix(randomId(), prefix(declaration.getColon())));
-        }
-
-        return new J.NewClass(
-                randomId(),
-                merge(deepPrefix(expression), prefix(declaration)),
-                markers,
-                null,
-                suffix(declaration.getColon()),
-                clazz,
-                args,
-                body,
-                null // FIXME
-        );
+        J j = expression.getObjectDeclaration().accept(this, data);
+        return j.withPrefix(merge(deepPrefix(expression), j.getPrefix()));
     }
 
     @Override

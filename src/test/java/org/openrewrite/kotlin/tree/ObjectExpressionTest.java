@@ -56,7 +56,6 @@ class ObjectExpressionTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail("not yet implemented")
     @Test
     void anonymousObject() {
         rewriteRun(
