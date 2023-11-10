@@ -1224,9 +1224,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<J.Annotation> lastAnnotations = new ArrayList<>();
         Set<PsiElement> consumedSpaces = preConsumedInfix(typeAlias);
 
+        modifiers.addAll(mapModifiers(typeAlias.getModifierList(), leadingAnnotations, lastAnnotations, data));
         modifiers.add(new J.Modifier(randomId(), prefix(typeAlias.getTypeAliasKeyword(), consumedSpaces), markers, "typealias", J.Modifier.Type.LanguageExtension, emptyList()));
-
-        mapModifiers(typeAlias.getModifierList(), leadingAnnotations, lastAnnotations, data);
 
         if (typeAlias.getIdentifyingElement() == null) {
             throw new UnsupportedOperationException("TODO");

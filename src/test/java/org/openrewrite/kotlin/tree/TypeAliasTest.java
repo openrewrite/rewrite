@@ -61,4 +61,16 @@ class TypeAliasTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/375")
+    @Test
+    void typeAliasWithModifier() {
+        rewriteRun(
+          kotlin(
+            """
+              internal  typealias   Action = (String) -> Unit
+              """
+          )
+        );
+    }
 }
