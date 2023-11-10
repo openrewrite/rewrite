@@ -84,13 +84,10 @@ class KotlinTypeMapping(
             return Unknown.getInstance()
         }
         val signature = signatureBuilder.signature(type, parent)
-        if (signature.isNotEmpty()) {
-            val existing = typeCache.get<JavaType>(signature)
-            if (existing != null) {
-                return existing
-            }
+        val existing = typeCache.get<JavaType>(signature)
+        if (existing != null) {
+            return existing
         }
-
         return type(type, parent, signature)
     }
 
