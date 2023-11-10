@@ -15,9 +15,7 @@
  */
 package org.openrewrite.kotlin;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
@@ -72,7 +70,6 @@ class RenameTypeAliasTest implements RewriteTest {
         );
     }
 
-    @Disabled("Require rewrite release to pass")
     @Test
     void aliasImport() {
         rewriteRun(
@@ -84,11 +81,13 @@ class RenameTypeAliasTest implements RewriteTest {
               """
           ),
           kotlin(
+            //language=none
             """
               import foo.Test as OldAlias
 
               val a : OldAlias = OldAlias()
               """,
+            //language=none
             """
               import foo.Test as NewAlias
 
@@ -121,12 +120,14 @@ class RenameTypeAliasTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
+              @file:Suppress("UNUSED_PARAMETER")
               class Test
               typealias OldAlias = Test
               fun method(a: OldAlias) {
               }
               """,
             """
+              @file:Suppress("UNUSED_PARAMETER")
               class Test
               typealias NewAlias = Test
               fun method(a: NewAlias) {
