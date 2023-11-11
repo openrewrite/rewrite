@@ -30,15 +30,6 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 class ClassDeclarationTest implements RewriteTest {
 
     @Test
-    void whitespaceInPackage() {
-        rewriteRun(
-          kotlin(
-            "package foo . bar"
-          )
-        );
-    }
-
-    @Test
     void whitespaceInImport() {
         rewriteRun(
           kotlin(

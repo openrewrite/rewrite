@@ -39,6 +39,7 @@ import org.jetbrains.kotlin.psi.psiUtil.PsiUtilsKt;
 import org.jetbrains.kotlin.types.Variance;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.FileAttributes;
+import org.openrewrite.ParseExceptionResult;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.ListUtils;
@@ -48,6 +49,7 @@ import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.marker.*;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.marker.Markers;
@@ -62,6 +64,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.java.tree.Space.EMPTY;
 
 /**
  * PSI based parser
@@ -1644,7 +1647,22 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<JRightPadded<Statement>> statements = new ArrayList<>(file.getDeclarations().size());
         List<KtDeclaration> declarations = file.getDeclarations();
         for (KtDeclaration declaration : declarations) {
-            Statement statement = convertToStatement(declaration.accept(this, data));
+            Statement statement;
+            try {
+                statement = convertToStatement(declaration.accept(this, data));
+            } catch (Exception e) {
+                statement = new J.Unknown(
+                        randomId(),
+                        deepPrefix(declaration),
+                        Markers.EMPTY,
+                        new J.Unknown.Source(
+                                randomId(),
+                                EMPTY,
+                                Markers.build(singletonList(ParseExceptionResult.build(KotlinParser.builder().build(), e)
+                                        .withTreeType(declaration.getClass().getName()))),
+                                file.getText().substring(PsiUtilsKt.getStartOffsetSkippingComments(declaration),
+                                        declaration.getTextRange().getEndOffset())));
+            }
             statements.add(padRight(statement, Space.EMPTY));
         }
 

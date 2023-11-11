@@ -24,6 +24,15 @@ import static org.openrewrite.kotlin.Assertions.kotlin;
 class PackageTest implements RewriteTest {
 
     @Test
+    void whitespaceInPackage() {
+        rewriteRun(
+          kotlin(
+            "package foo . bar"
+          )
+        );
+    }
+
+    @Test
     void regular() {
         rewriteRun(
           kotlin(
