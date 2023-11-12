@@ -18,7 +18,10 @@ package org.openrewrite.text;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
+import org.openrewrite.binary.Binary;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.quark.Quark;
+import org.openrewrite.remote.Remote;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -81,7 +84,7 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
 
     @Override
     public Collection<SourceFile> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
-        if(shouldCreate.get()) {
+        if (shouldCreate.get()) {
             return PlainTextParser.builder().build().parse(fileContents)
                     .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
                     .collect(Collectors.toList());
@@ -92,13 +95,17 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean created) {
         Path path = Paths.get(relativeFileName);
-        return new PlainTextVisitor<ExecutionContext>() {
+        return new TreeVisitor<SourceFile, ExecutionContext>() {
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.toString().equals(text.getSourcePath().toString())) {
-                    return text.withText(fileContents);
+            public @Nullable SourceFile visit(@Nullable Tree tree, ExecutionContext executionContext) {
+                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                if (sourceFile instanceof Quark || sourceFile instanceof Remote || sourceFile instanceof Binary) {
+                    return sourceFile;
                 }
-                return text;
+                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.toString().equals(sourceFile.getSourcePath().toString())) {
+                    return PlainTextParser.convert(sourceFile).withText(fileContents);
+                }
+                return sourceFile;
             }
         };
     }
