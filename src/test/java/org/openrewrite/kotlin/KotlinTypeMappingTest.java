@@ -804,6 +804,19 @@ public class KotlinTypeMappingTest {
         }
 
         @Test
+        void packageStaticModifier() {
+            rewriteRun(
+              kotlin(
+                """
+                  import java.rmi.server.RemoteStub
+                  
+                  class A : RemoteStub()
+                  """
+              )
+            );
+        }
+
+        @Test
         void nullJavaClassifierType() {
             rewriteRun(
               spec -> spec.parser(KotlinParser.builder().classpath("javapoet","compile-testing")),

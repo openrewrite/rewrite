@@ -1216,6 +1216,10 @@ class KotlinTypeMapping(
             "public" -> bitMask += 1L
             "private", "private_to_this" -> bitMask += 1L shl 1
             "protected", "protected_and_package" -> bitMask += 1L shl 2
+            "protected_static" -> {
+                bitMask += 1L shl 2
+                bitMask += 1L shl 3 // static
+            }
             "internal", "package", "local" -> {}
             else -> throw UnsupportedOperationException("Unsupported visibility: ${visibility.name.lowercase()}")
         }
