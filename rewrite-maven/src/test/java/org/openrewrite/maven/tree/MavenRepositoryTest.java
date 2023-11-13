@@ -20,13 +20,11 @@ import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-public class MavenRepositoryLocalRepoTest {
-
+class MavenRepositoryTest {
     @Test
     @DisplayName("verify URI of local Maven repository")
     void expectedLocalMavenRepository() {
         String expectedPath = "file://" + System.getProperty("user.home") + "/.m2/repository";
         assertThat(MavenRepository.MAVEN_LOCAL_DEFAULT.getUri()).isEqualTo(expectedPath);
     }
-
 }
