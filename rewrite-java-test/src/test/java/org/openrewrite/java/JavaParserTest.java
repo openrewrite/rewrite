@@ -28,6 +28,8 @@ import org.openrewrite.test.RewriteTest;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -83,6 +85,22 @@ class JavaParserTest implements RewriteTest {
               assertThat(cu.getClasses().get(0).getLeadingAnnotations()).hasSize(2))
           )
         );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3683")
+    @Test
+    void annotationAfterVariableTypePackageName() {
+        JavaParser parser = JavaParser.fromJavaVersion().build();
+        String source = """
+              public class A {
+                java.lang.@Deprecated String a;
+              }
+              """;
+
+        List<SourceFile> compilationUnits = parser.parse(new InMemoryExecutionContext(Throwable::printStackTrace), source).collect(Collectors.toList());
+        SourceFile cu = compilationUnits.get(0);
+        assertThat(cu).isInstanceOf(J.CompilationUnit.class);
+        assertThat(cu.printAll()).isEqualTo(source);
     }
 
     @Test
