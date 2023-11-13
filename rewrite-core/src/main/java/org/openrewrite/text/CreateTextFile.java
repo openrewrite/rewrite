@@ -18,10 +18,7 @@ package org.openrewrite.text;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
-import org.openrewrite.binary.Binary;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.quark.Quark;
-import org.openrewrite.remote.Remote;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -74,7 +71,7 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
-                if (path.toString().equals(sourceFile.getSourcePath().toString())) {
+                if (path.equals(sourceFile.getSourcePath())) {
                     shouldCreate.set(false);
                 }
                 return sourceFile;
@@ -97,13 +94,23 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
         Path path = Paths.get(relativeFileName);
         return new TreeVisitor<SourceFile, ExecutionContext>() {
             @Override
-            public @Nullable SourceFile visit(@Nullable Tree tree, ExecutionContext executionContext) {
+            public SourceFile visit(@Nullable Tree tree, ExecutionContext executionContext) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
-                if (sourceFile instanceof Quark || sourceFile instanceof Remote || sourceFile instanceof Binary) {
-                    return sourceFile;
-                }
-                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.toString().equals(sourceFile.getSourcePath().toString())) {
-                    return PlainTextParser.convert(sourceFile).withText(fileContents);
+                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(sourceFile.getSourcePath())) {
+                    if (sourceFile instanceof PlainText) {
+                        return ((PlainText) sourceFile).withText(fileContents);
+                    }
+                    PlainText plainText = PlainText.builder()
+                            .id(sourceFile.getId())
+                            .sourcePath(sourceFile.getSourcePath())
+                            .fileAttributes(sourceFile.getFileAttributes())
+                            .charsetBomMarked(sourceFile.isCharsetBomMarked())
+                            .text(fileContents)
+                            .build();
+                    if (sourceFile.getCharset() != null) {
+                        return plainText.withCharset(sourceFile.getCharset());
+                    }
+                    return plainText;
                 }
                 return sourceFile;
             }
