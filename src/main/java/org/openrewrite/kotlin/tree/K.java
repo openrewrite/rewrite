@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -1094,7 +1093,9 @@ public interface K extends J {
 
         @Override
         public @Nullable JavaType getType() {
-            return returnType.getElement().getType();
+            // for backwards compatibility with older LST before there was a returnType field
+            //noinspection ConstantValue
+            return returnType != null ? returnType.getElement().getType() : null;
         }
 
         public <T extends J> T withType(@Nullable JavaType type) {
