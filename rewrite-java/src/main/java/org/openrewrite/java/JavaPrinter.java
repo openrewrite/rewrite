@@ -619,8 +619,8 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitIdentifier(Identifier ident, PrintOutputCapture<P> p) {
-        visit(ident.getAnnotations(), p);
         beforeSyntax(ident, Space.Location.IDENTIFIER_PREFIX, p);
+        visit(ident.getAnnotations(), p);
         visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
         p.append(ident.getSimpleName());
         afterSyntax(ident, p);
