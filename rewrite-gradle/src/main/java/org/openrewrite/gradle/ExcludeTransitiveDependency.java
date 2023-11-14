@@ -128,7 +128,7 @@ public class ExcludeTransitiveDependency extends ScanningRecipe<ExcludeTransitiv
 
     @Override
     public String getDescription() {
-        return "TODO.";
+        return "Add a gradle dependency exclusion to a `build.gradle` file.";
     }
 
     @Override
