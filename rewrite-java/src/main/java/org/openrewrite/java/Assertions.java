@@ -52,7 +52,7 @@ public class Assertions {
         }
     }
 
-    static SourceFile validateTypes(SourceFile source, TypeValidation typeValidation) {
+    public static SourceFile validateTypes(SourceFile source, TypeValidation typeValidation) {
         if (source instanceof JavaSourceFile) {
             assertValidTypes(typeValidation, (JavaSourceFile) source);
         }
@@ -83,7 +83,7 @@ public class Assertions {
                     })
                     .collect(Collectors.toList());
             if (!missingTypeResults.isEmpty()) {
-                throw new IllegalStateException("AST contains missing or invalid type information\n" + missingTypeResults.stream().map(v -> v.getPath() + "\n" + v.getPrintedTree())
+                throw new IllegalStateException("LST contains missing or invalid type information\n" + missingTypeResults.stream().map(v -> v.getPath() + "\n" + v.getPrintedTree())
                         .collect(Collectors.joining("\n\n")));
             }
         }
