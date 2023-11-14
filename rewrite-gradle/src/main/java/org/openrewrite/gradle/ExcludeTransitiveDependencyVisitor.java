@@ -76,6 +76,9 @@ public class ExcludeTransitiveDependencyVisitor extends GroovyIsoVisitor<Executi
     @Nullable
     private String resolvedVersion;
 
+    private final String excludeGroup;
+    private final String excludeModule;
+
     @Override
     public G.CompilationUnit visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
         // TODO: update to add exclusions. Note: apply applicable changes if necessary.
@@ -239,12 +242,14 @@ public class ExcludeTransitiveDependencyVisitor extends GroovyIsoVisitor<Executi
             DependencyStyle style = autodetectDependencyStyle(body.getStatements());
             if (style == DependencyStyle.String) {
                 codeTemplate = "dependencies {\n" +
-                               escapeIfNecessary(configuration) + " \"" + groupId + ":" + artifactId + (resolvedVersion == null ? "" : ":" + resolvedVersion) + (resolvedVersion == null || classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\"" +
+                               escapeIfNecessary(configuration) + "(\"" + groupId + ":" + artifactId + (resolvedVersion == null ? "" : ":" + resolvedVersion) + (resolvedVersion == null || classifier == null ? "" : ":" + classifier) + (extension == null ? "" : "@" + extension) + "\")" +
+                               " {\n    " + "exclude group: \""  + excludeGroup + "\", module: \"" + excludeModule + "\"\n    }" +
                                "\n}";
             } else {
                 codeTemplate = "dependencies {\n" +
-                               escapeIfNecessary(configuration) + " group: \"" + groupId + "\", name: \"" + artifactId + "\"" + (resolvedVersion == null ? "" : ", version: \"" + resolvedVersion + "\"") + (classifier == null ? "" : ", classifier: \"" + classifier + "\"") + (extension == null ? "" : ", ext: \"" + extension + "\"") +
-                               "\n}";
+                        escapeIfNecessary(configuration) + "(group: \"" + groupId + "\", name: \"" + artifactId + "\"" + (resolvedVersion == null ? "" : ", version: \"" + resolvedVersion + "\"") + (classifier == null ? "" : ", classifier: \"" + classifier + "\"") + (extension == null ? "" : ", ext: \"" + extension + "\"") +
+                        ") " + " {\n    " + "exclude group: \""  + excludeGroup + "\", module: \"" + excludeModule + "\"\n    }" +
+                        "\n}";
             }
 
             ExecutionContext parseCtx = new InMemoryExecutionContext();

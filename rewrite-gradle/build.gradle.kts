@@ -68,6 +68,8 @@ dependencies {
     testRuntimeOnly("com.google.guava:guava:latest.release")
     testRuntimeOnly(project(":rewrite-java-17"))
     testRuntimeOnly("org.projectlombok:lombok:latest.release")
+
+    testRuntimeOnly("commons-beanutils:commons-beanutils:1.9.4")
 }
 
 // This seems to be the only way to get the groovy compiler to emit java-8 compatible bytecode

@@ -15,10 +15,98 @@
  */
 package org.openrewrite.gradle;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaParser;
+import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
+import static org.openrewrite.gradle.Assertions.buildGradle;
+import static org.openrewrite.gradle.Assertions.withToolingApi;
+import static org.openrewrite.java.Assertions.*;
+
+@SuppressWarnings("FieldCanBeLocal")
 class ExcludeTransitiveDependencyTest implements RewriteTest {
+
+    @Override
+    public void defaults(RecipeSpec spec) {
+        spec.beforeRecipe(withToolingApi())
+          .parser(JavaParser.fromJavaVersion().classpath("commons-beanutils"));
+    }
+
+    @Language("java")
+    private final String usingBeanutilsSetSimplePropertyOnly = """
+      import org.apache.commons.beanutils.PropertyUtils;
+
+      class Person {
+      }
+
+      public class A {
+          public static void main(String[] args) throws Exception {
+              Object person = new Person();
+              PropertyUtils.setSimpleProperty(person, "name", "Bart Simpson");
+              PropertyUtils.setSimpleProperty(person, "age", 38);
+          }
+      }
+      """;
+
+    @Test
+    void regularExclusion() {
+        ExcludeTransitiveDependency addDep = new ExcludeTransitiveDependency("commons-beanutils", "commons-beanutils", "1.9.4", null, null, "org.apache.commons.beanutils.PropertyUtils",
+          null, null, null, "commons-collections", "commons-collections");
+        rewriteRun(
+          spec -> spec.recipe(addDep)
+            .typeValidationOptions(TypeValidation.none()),
+          mavenProject("project",
+            srcTestJava(
+              java(usingBeanutilsSetSimplePropertyOnly)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                    id "com.netflix.nebula.facet" version "10.1.3"
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                facets {
+                    smokeTest {
+                        parentSourceSet = "test"
+                    }
+                }
+                """,
+              """
+                plugins {
+                    id "java-library"
+                    id "com.netflix.nebula.facet" version "10.1.3"
+                }
+                
+                repositories {
+                    mavenCentral()
+                }
+                
+                facets {
+                    smokeTest {
+                        parentSourceSet = "test"
+                    }
+                }
+                
+                dependencies {
+                    testImplementation("commons-beanutils:commons-beanutils:1.9.4") {
+                        exclude group: "commons-collections", module: "commons-collections"
+                    }
+                }
+                """
+            )
+          )
+        );
+    }
+
+
 
     // TODO: No exclusion. Assert does not add if unnecessary
 
@@ -27,4 +115,6 @@ class ExcludeTransitiveDependencyTest implements RewriteTest {
     // TODO: Adds exclusion. Assert adds dependency if the dependency matches target.
 
     // TODO: Adds exclusion to all applicable. Assert adds dependency if a different dependency adds target transitively.
+
+
 }

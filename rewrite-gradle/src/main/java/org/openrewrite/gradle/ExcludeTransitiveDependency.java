@@ -109,15 +109,13 @@ public class ExcludeTransitiveDependency extends ScanningRecipe<ExcludeTransitiv
     @Nullable
     String familyPattern;
 
-    // TODO update
     @Option(displayName = "Exclude group",
-            description = "",
+            description = "Exclude all transitive dependencies with a specific organization or project group.",
             example = "commons-collections")
     String excludeGroup;
 
-    // TODO update
     @Option(displayName = "Exclude module",
-            description = "",
+            description = "Exclude a specific transitive dependency within a group by specifying its artifact or library name.",
             example = "commons-collections")
     String excludeModule;
 
@@ -244,7 +242,7 @@ public class ExcludeTransitiveDependency extends ScanningRecipe<ExcludeTransitiv
                         G.CompilationUnit g = (G.CompilationUnit) s;
                         for (String resolvedConfiguration : resolvedConfigurations) {
                             g = (G.CompilationUnit) new ExcludeTransitiveDependencyVisitor(groupId, artifactId, version, versionPattern, resolvedConfiguration,
-                                    classifier, extension, familyPatternCompiled, metadataFailures).visitNonNull(g, ctx);
+                                    classifier, extension, familyPatternCompiled, metadataFailures, excludeGroup, excludeModule).visitNonNull(g, ctx);
                         }
 
                         return g;
