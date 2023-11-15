@@ -189,6 +189,18 @@ class IfTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/394")
+    @Test
+    void fieldAccess() {
+        rewriteRun(
+          kotlin(
+            """
+              val foo = if (true) { "" } else { null }?.plus("bar")
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/392")
     @Test
     void postfixExpression() {

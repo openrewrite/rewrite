@@ -1022,8 +1022,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitQualifiedExpression(KtQualifiedExpression expression, ExecutionContext data) {
-        Expression receiver = (Expression) expression.getReceiverExpression().accept(this, data);
-        Expression selector = (Expression) requireNonNull(expression.getSelectorExpression()).accept(this, data);
+        Expression receiver = convertToExpression(expression.getReceiverExpression().accept(this, data));
+        Expression selector = convertToExpression(requireNonNull(expression.getSelectorExpression()).accept(this, data));
         if (selector instanceof J.MethodInvocation) {
             J.MethodInvocation methodInvocation = (J.MethodInvocation) selector;
             return methodInvocation.getPadding()
