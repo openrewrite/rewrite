@@ -187,9 +187,4 @@ class ExcludeTransitiveDependencyTest implements RewriteTest {
           )
         );
     }
-
-
-    // TODO: Adds exclusion to all applicable. Assert adds dependency if a different dependency adds target transitively.
-
-
 }

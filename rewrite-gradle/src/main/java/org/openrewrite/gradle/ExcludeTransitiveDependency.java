@@ -37,6 +37,7 @@ import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 
+@SuppressWarnings("DuplicatedCode")
 @Value
 @EqualsAndHashCode(callSuper = true)
 public class ExcludeTransitiveDependency extends ScanningRecipe<ExcludeTransitiveDependency.Scanned> {
@@ -225,12 +226,9 @@ public class ExcludeTransitiveDependency extends ScanningRecipe<ExcludeTransitiv
                         for (String tmpConfiguration : tmpConfigurations) {
                             GradleDependencyConfiguration gdc = gp.getConfiguration(tmpConfiguration);
                             for (GradleDependencyConfiguration transitive : gp.configurationsExtendingFrom(gdc, true)) {
-                                // TODO: Find matching target exclusion in the group/module to remove.
-                                //       This may require updating conditions.
-                                //       IF found add exclusion.
-//                                if (resolvedConfigurations.contains(transitive.getName()) || transitive.findResolvedDependency(groupId, artifactId) != null) {
-//                                    resolvedConfigurations.remove(transitive.getName());
-//                                }
+                                if (resolvedConfigurations.contains(transitive.getName()) || transitive.findResolvedDependency(groupId, artifactId) != null) {
+                                    resolvedConfigurations.remove(transitive.getName());
+                                }
                             }
                         }
 
