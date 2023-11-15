@@ -526,11 +526,6 @@ public class MavenPomDownloader {
                         if (!f.exists()) {
                             continue;
                         }
-                        String fullDefaultMavenLocalUri = MavenRepository.MAVEN_LOCAL_USER_NEUTRAL.getUri().replace("~", System.getProperty("user.home"));
-                        if (!repo.getUri().equals(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL.getUri()) && !repo.getUri().startsWith(fullDefaultMavenLocalUri)) {
-                            // Non-default local Maven dependencies can not be shared between users, so we skip the repo
-                            continue;
-                        }
 
                         try (FileInputStream fis = new FileInputStream(f)) {
                             RawPom rawPom = RawPom.parse(fis, Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot);
@@ -544,8 +539,10 @@ public class MavenPomDownloader {
                                 }
                             }
 
-                            // so that the repository path is the same regardless of username
-                            pom = pom.withRepository(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL);
+                            if (repo.getUri().equals(MavenRepository.MAVEN_LOCAL_DEFAULT.getUri())) {
+                                // so that the repository path is the same regardless of username
+                                pom = pom.withRepository(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL);
+                            }
 
                             if (!Objects.equals(versionMaybeDatedSnapshot, pom.getVersion())) {
                                 pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
