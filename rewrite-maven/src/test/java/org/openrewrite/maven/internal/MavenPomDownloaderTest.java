@@ -32,6 +32,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
@@ -41,6 +42,7 @@ import org.openrewrite.maven.tree.MavenRepository;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
@@ -548,6 +550,38 @@ class MavenPomDownloaderTest {
         assertThrows(MavenDownloadingException.class, () ->
           new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext())
             .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
+    }
+
+    @Test
+    void doNotRenameRepoForCustomMavenLocal(@TempDir Path tempDir) throws MavenDownloadingException, IOException {
+        GroupArtifactVersion gav = createArtifact(tempDir);
+        MavenExecutionContextView.view(ctx).setLocalRepository(MavenRepository.MAVEN_LOCAL_DEFAULT.withUri(tempDir.toUri().toString()));
+        var downloader = new MavenPomDownloader(emptyMap(), ctx);
+
+        var result = downloader.download(gav, null, null, List.of());
+        assertThat(result.getRepository().getUri()).startsWith(tempDir.toUri().toString());
+    }
+
+    private static GroupArtifactVersion createArtifact(Path repository) throws IOException {
+        Path target = repository.resolve(Paths.get("org", "openrewrite", "rewrite", "1.0.0"));
+        Files.createDirectories(target);
+        Path pom = target.resolve("rewrite-1.0.0.pom");
+        Path jar = target.resolve("rewrite-1.0.0.jar");
+        Files.createDirectories(target);
+        Files.createFile(pom);
+        Files.createFile(jar);
+
+        Files.write(pom,
+          //language=xml
+          """
+            <project>
+                <groupId>org.openrewrite</groupId>
+                <artifactId>rewrite</artifactId>
+                <version>1.0.0</version>
+            </project>
+            """.getBytes());
+        Files.write(jar, "I'm a jar".getBytes()); // empty jars get ignored
+        return new GroupArtifactVersion("org.openrewrite", "rewrite", "1.0.0");
     }
 
 }

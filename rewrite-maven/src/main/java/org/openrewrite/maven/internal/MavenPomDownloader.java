@@ -539,8 +539,7 @@ public class MavenPomDownloader {
                                 }
                             }
 
-                            String fullDefaultMavenLocalUri = MavenRepository.MAVEN_LOCAL_USER_NEUTRAL.getUri().replace("~", System.getProperty("user.home"));
-                            if (repo.getUri().equals(fullDefaultMavenLocalUri)) {
+                            if (repo.getUri().equals(MavenRepository.MAVEN_LOCAL_DEFAULT.getUri())) {
                                 // so that the repository path is the same regardless of username
                                 pom = pom.withRepository(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL);
                             }
