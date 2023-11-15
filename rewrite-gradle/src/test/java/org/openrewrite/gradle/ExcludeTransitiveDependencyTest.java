@@ -71,7 +71,6 @@ class ExcludeTransitiveDependencyTest implements RewriteTest {
                 repositories {
                     mavenCentral()
                 }
-
                 """,
               """
                 plugins {
