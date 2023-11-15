@@ -2731,7 +2731,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         } else if (type instanceof JavaType.Variable) {
             type = ((JavaType.Variable) type).getType();
         }
-        J j = requireNonNull(expression.getBaseExpression()).accept(this, data);
+        J j = convertToExpression(requireNonNull(expression.getBaseExpression()).accept(this, data));
         IElementType referencedNameElementType = expression.getOperationReference().getReferencedNameElementType();
         if (referencedNameElementType == KtTokens.EXCLEXCL) {
             // j = j.withMarkers(j.getMarkers().addIfAbsent(new CheckNotNull(randomId(), prefix(expression.getOperationReference()))));

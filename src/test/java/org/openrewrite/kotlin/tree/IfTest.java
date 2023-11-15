@@ -173,4 +173,36 @@ class IfTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/390")
+    @Test
+    void typeParameter() {
+        rewriteRun(
+          kotlin(
+            """
+              val enabled = true
+              fun foo(arg: String = if (enabled) "foo" else "bar"): String {
+                return arg
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/392")
+    @Test
+    void postfixExpression() {
+        rewriteRun(
+          kotlin(
+            """
+              fun foo(arg: Boolean): String? {
+                  return if (arg) "" else null
+              }
+              fun bar(arg: Boolean) {
+                  if (arg) { foo(true) } else { foo(false) }!!
+              }
+              """
+          )
+        );
+    }
 }

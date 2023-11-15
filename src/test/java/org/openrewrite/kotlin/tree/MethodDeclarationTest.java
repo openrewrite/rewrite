@@ -366,21 +366,6 @@ class MethodDeclarationTest implements RewriteTest {
         );
     }
 
-    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/390")
-    @Test
-    void ifExpression() {
-        rewriteRun(
-          kotlin(
-            """
-              val enabled = true
-              fun foo(arg: String = if (enabled) "foo" else "bar"): String {
-                return arg
-              }
-              """
-          )
-        );
-    }
-
     @Test
     void argumentTrailingComma() {
         rewriteRun(
