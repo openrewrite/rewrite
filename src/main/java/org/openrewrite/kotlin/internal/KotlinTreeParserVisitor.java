@@ -2955,9 +2955,19 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             );
         }
 
-        String valueSource = expression.getText();
         StringBuilder valueSb = new StringBuilder();
-        Arrays.stream(entries).forEach(x -> valueSb.append(x.getText()));
+        Arrays.stream(entries).forEach(entry -> valueSb.append(maybeAdjustCRLF(entry))
+        );
+
+        PsiElement openQuote = expression.getFirstChild();
+        PsiElement closingQuota = expression.getLastChild();
+        if (openQuote == null || closingQuota == null ||
+                openQuote.getNode().getElementType() != KtTokens.OPEN_QUOTE ||
+                closingQuota.getNode().getElementType() != KtTokens.CLOSING_QUOTE) {
+            throw new UnsupportedOperationException("This should never happen");
+        }
+
+        String valueSource = openQuote.getText() + valueSb + closingQuota.getText();
 
         return new J.Literal(
                 randomId(),
@@ -3866,7 +3876,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     // replace `\n` to CRLF back if it's CRLF in the source
     private String maybeAdjustCRLF(PsiElement element) {
         String text = element.getText();
-        if (!isSpace(element.getNode())) {
+        boolean isStringTemplateEntry = element instanceof KtLiteralStringTemplateEntry;
+        if (!isSpace(element.getNode()) && !isStringTemplateEntry) {
             return text;
         }
 

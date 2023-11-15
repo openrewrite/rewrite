@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -79,6 +80,19 @@ class CRLFTest implements RewriteTest {
               "  b*/\r\n" +
               "public fun method() {}\r\n" +
               "}"
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/402")
+    @Test
+    void crlfInMultilineString() {
+        rewriteRun(
+          kotlin(
+            "val s = \"\"\"\r\n" +
+              "l1\r\n" +
+              "l2\n" +
+              "\"\"\""
           )
         );
     }
