@@ -18,6 +18,7 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -680,6 +681,16 @@ class ClassDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             "%s class Foo".formatted(input)
+          )
+        );
+    }
+
+    @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/396")
+    @Test
+    void explicitExtendsAny() {
+        rewriteRun(
+          kotlin("class Foo< out  T   :     Any >  () {}"
           )
         );
     }
