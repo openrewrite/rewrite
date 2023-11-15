@@ -517,8 +517,8 @@ public class MavenPomDownloader {
                                      gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".pom");
 
 
-                String fullDefaultMavenLocalUri = MavenRepository.MAVEN_LOCAL_USER_NEUTRAL.getUri().replace("~",System.getProperty("user.home"));
-                if ("file".equals(uri.getScheme()) && repo.getUri().startsWith(fullDefaultMavenLocalUri)) {
+
+                if ("file".equals(uri.getScheme())) {
                     Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
 
                     try {
@@ -526,6 +526,11 @@ public class MavenPomDownloader {
 
                         //NOTE: The pom may exist without a .jar artifact if the pom packaging is "pom"
                         if (!f.exists()) {
+                            continue;
+                        }
+                        String fullDefaultMavenLocalUri = MavenRepository.MAVEN_LOCAL_USER_NEUTRAL.getUri().replace("~",System.getProperty("user.home"));
+                        //not the default maven local, we're skipping this for now
+                        if (!repo.getUri().startsWith(fullDefaultMavenLocalUri)) {
                             continue;
                         }
 
