@@ -564,7 +564,6 @@ class MavenPomDownloaderTest {
 
     private static GroupArtifactVersion createArtifact(Path repository) throws IOException {
         Path target = repository.resolve(Paths.get("org", "openrewrite", "rewrite", "1.0.0"));
-        Files.createDirectories(target);
         Path pom = target.resolve("rewrite-1.0.0.pom");
         Path jar = target.resolve("rewrite-1.0.0.jar");
         Files.createDirectories(target);
