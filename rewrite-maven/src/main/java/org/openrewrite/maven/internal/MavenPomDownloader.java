@@ -526,6 +526,11 @@ public class MavenPomDownloader {
                         if (!f.exists()) {
                             continue;
                         }
+                        String fullDefaultMavenLocalUri = MavenRepository.MAVEN_LOCAL_USER_NEUTRAL.getUri().replace("~", System.getProperty("user.home"));
+                        if (!repo.getUri().equals(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL.getUri()) && !repo.getUri().startsWith(fullDefaultMavenLocalUri)) {
+                            // Non-default local Maven dependencies can not be shared between users, so we skip the repo
+                            continue;
+                        }
 
                         try (FileInputStream fis = new FileInputStream(f)) {
                             RawPom rawPom = RawPom.parse(fis, Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot);
