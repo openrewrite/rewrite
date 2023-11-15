@@ -1095,7 +1095,7 @@ public interface K extends J {
         public @Nullable JavaType getType() {
             // for backwards compatibility with older LST before there was a returnType field
             //noinspection ConstantValue
-            return returnType != null ? returnType.getElement().getType() : null;
+            return returnType != null && returnType.getElement() != null ? returnType.getElement().getType() : null;
         }
 
         public <T extends J> T withType(@Nullable JavaType type) {
