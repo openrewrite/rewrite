@@ -838,7 +838,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         JLeftPadded<Expression> initializer =
-                parameter.getDefaultValue() != null ? padLeft(prefix(parameter.getEqualsToken()), (Expression) parameter.getDefaultValue().accept(this, data)) : null;
+                parameter.getDefaultValue() != null ? padLeft(prefix(parameter.getEqualsToken()), convertToExpression(parameter.getDefaultValue().accept(this, data))) : null;
 
         J.VariableDeclarations.NamedVariable namedVariable = new J.VariableDeclarations.NamedVariable(
                 randomId(),
