@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,11 +30,11 @@ class ExcludeTransitiveDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-          .parser(JavaParser.fromJavaVersion().classpath("commons-beanutils"));
+          .parser(JavaParser.fromJavaVersion().classpath("commons-beanutils", "guava"));
     }
 
     @Test
-    void regularExclusion() {
+    void noExclusionNecessary() {
         ExcludeTransitiveDependency excludeDep = new ExcludeTransitiveDependency("commons-collections", "commons-collections", "testImplementation");
         rewriteRun(
           spec -> spec.recipe(excludeDep)
@@ -50,6 +50,97 @@ class ExcludeTransitiveDependencyTest implements RewriteTest {
               }
               
               dependencies {
+                  implementation("com.google.guava:guava:latest.release")
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void exclusionAlreadyExists() {
+        ExcludeTransitiveDependency excludeDep = new ExcludeTransitiveDependency("commons-collections", "commons-collections", null);
+        rewriteRun(
+          spec -> spec.recipe(excludeDep)
+            .typeValidationOptions(TypeValidation.none()),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("commons-beanutils:commons-beanutils:1.9.4") {
+                      exclude group: "commons-collections", module: "commons-collections"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void regularExclusion() {
+        ExcludeTransitiveDependency excludeDep = new ExcludeTransitiveDependency("commons-collections", "commons-collections", null);
+        rewriteRun(
+          spec -> spec.recipe(excludeDep)
+            .typeValidationOptions(TypeValidation.none()),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("commons-beanutils:commons-beanutils:1.9.4")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("commons-beanutils:commons-beanutils:1.9.4") {
+                      exclude group: "commons-collections", module: "commons-collections"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void appliesToConfiguration() {
+        ExcludeTransitiveDependency excludeDep = new ExcludeTransitiveDependency("commons-collections", "commons-collections", "testImplementation");
+        rewriteRun(
+          spec -> spec.recipe(excludeDep)
+            .typeValidationOptions(TypeValidation.none()),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("commons-beanutils:commons-beanutils:1.9.4")
+                  
                   testImplementation("commons-beanutils:commons-beanutils:1.9.4")
               }
               """,
@@ -63,7 +154,62 @@ class ExcludeTransitiveDependencyTest implements RewriteTest {
               }
               
               dependencies {
+                  implementation("commons-beanutils:commons-beanutils:1.9.4")
+                  
                   testImplementation("commons-beanutils:commons-beanutils:1.9.4") {
+                      exclude group: "commons-collections", module: "commons-collections"
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void excludeAllTransitiveDependencies() {
+        ExcludeTransitiveDependency excludeDep = new ExcludeTransitiveDependency("commons-collections", "commons-collections", null);
+        rewriteRun(
+          spec -> spec.recipe(excludeDep)
+            .typeValidationOptions(TypeValidation.none()),
+          buildGradle(
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("commons-beanutils:commons-beanutils:1.9.4")
+                  implementation("com.opencsv:opencsv:4.6")
+                  
+                  testImplementation("commons-beanutils:commons-beanutils:1.9.4")
+                  testImplementation("com.opencsv:opencsv:4.6")
+              }
+              """,
+            """
+              plugins {
+                  id "java-library"
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation("commons-beanutils:commons-beanutils:1.9.4") {
+                      exclude group: "commons-collections", module: "commons-collections"
+                  }
+                  implementation("com.opencsv:opencsv:4.6") {
+                      exclude group: "commons-collections", module: "commons-collections"
+                  }
+              
+                  testImplementation("commons-beanutils:commons-beanutils:1.9.4") {
+                      exclude group: "commons-collections", module: "commons-collections"
+                  }
+                  testImplementation("com.opencsv:opencsv:4.6") {
                       exclude group: "commons-collections", module: "commons-collections"
                   }
               }
