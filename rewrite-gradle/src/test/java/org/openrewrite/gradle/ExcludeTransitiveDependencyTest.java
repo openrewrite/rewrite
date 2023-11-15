@@ -43,7 +43,7 @@ class ExcludeTransitiveDependencyTest implements RewriteTest {
       }
 
       public class A {
-          public static void main(String[] args) throws Exception {
+          public static void main(String[] args) {
               Object person = new Person();
               PropertyUtils.setSimpleProperty(person, "name", "Bart Simpson");
               PropertyUtils.setSimpleProperty(person, "age", 38);
@@ -53,10 +53,10 @@ class ExcludeTransitiveDependencyTest implements RewriteTest {
 
     @Test
     void regularExclusion() {
-        ExcludeTransitiveDependency addDep = new ExcludeTransitiveDependency("commons-beanutils", "commons-beanutils", "1.9.4", null, null, "org.apache.commons.beanutils.PropertyUtils",
+        ExcludeTransitiveDependency excludeDep = new ExcludeTransitiveDependency("commons-beanutils", "commons-beanutils", "1.9.4", null, null, "org.apache.commons.beanutils.PropertyUtils",
           null, null, null, "commons-collections", "commons-collections");
         rewriteRun(
-          spec -> spec.recipe(addDep)
+          spec -> spec.recipe(excludeDep)
             .typeValidationOptions(TypeValidation.none()),
           mavenProject("project",
             srcTestJava(
@@ -66,35 +66,22 @@ class ExcludeTransitiveDependencyTest implements RewriteTest {
               """
                 plugins {
                     id "java-library"
-                    id "com.netflix.nebula.facet" version "10.1.3"
                 }
 
                 repositories {
                     mavenCentral()
                 }
 
-                facets {
-                    smokeTest {
-                        parentSourceSet = "test"
-                    }
-                }
                 """,
               """
                 plugins {
                     id "java-library"
-                    id "com.netflix.nebula.facet" version "10.1.3"
                 }
-                
+
                 repositories {
                     mavenCentral()
                 }
-                
-                facets {
-                    smokeTest {
-                        parentSourceSet = "test"
-                    }
-                }
-                
+
                 dependencies {
                     testImplementation("commons-beanutils:commons-beanutils:1.9.4") {
                         exclude group: "commons-collections", module: "commons-collections"
@@ -106,13 +93,101 @@ class ExcludeTransitiveDependencyTest implements RewriteTest {
         );
     }
 
+    @Test
+    void addDependenciesToExistingGrouping() {
+        ExcludeTransitiveDependency excludeDep = new ExcludeTransitiveDependency("commons-beanutils", "commons-beanutils", "1.9.4", null, null, "org.apache.commons.beanutils.PropertyUtils",
+          null, null, null, "commons-collections", "commons-collections");
+        rewriteRun(
+          spec -> spec.recipe(excludeDep)
+            .typeValidationOptions(TypeValidation.none()),
+          mavenProject("project",
+            srcMainJava(
+              java(usingBeanutilsSetSimplePropertyOnly)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id "java-library"
+                }
 
+                repositories {
+                    mavenCentral()
+                }
 
-    // TODO: No exclusion. Assert does not add if unnecessary
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+                }
+                """,
+              """
+                plugins {
+                    id "java-library"
+                }
 
-    // TODO: No exclusion. Assert does not add is already present
+                repositories {
+                    mavenCentral()
+                }
 
-    // TODO: Adds exclusion. Assert adds dependency if the dependency matches target.
+                dependencies {
+                    implementation "com.google.guava:guava:29.0-jre"
+                    implementation("commons-beanutils:commons-beanutils:1.9.4") {
+                        exclude group: "commons-collections", module: "commons-collections"
+                    }
+                }
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void notUsingType() {
+        ExcludeTransitiveDependency excludeDep = new ExcludeTransitiveDependency("commons-beanutils", "commons-beanutils", "1.9.4", null, null, "org.apache.commons.beanutils.PropertyUtils",
+          null, null, null, "commons-collections", "commons-collections");
+        rewriteRun(
+          spec -> spec.recipe(excludeDep)
+            .typeValidationOptions(TypeValidation.none()),
+          mavenProject("project",
+            srcTestJava(
+              java("class DoNothing {}")
+            ),
+            buildGradle(""
+            )
+          )
+        );
+    }
+
+    @Test
+    void DoNotAddWhenExistingDependency() {
+        ExcludeTransitiveDependency excludeDep = new ExcludeTransitiveDependency("commons-beanutils", "commons-beanutils", "1.9.4", null, null, "org.apache.commons.beanutils.PropertyUtils",
+          null, null, null, "commons-collections", "commons-collections");
+        rewriteRun(
+          spec -> spec.recipe(excludeDep),
+          mavenProject("project",
+            srcMainJava(
+              java(usingBeanutilsSetSimplePropertyOnly)
+            ),
+            buildGradle(
+              """
+                plugins {
+                    id 'java-library'
+                }
+
+                repositories {
+                    mavenCentral()
+                }
+
+                dependencies {
+                    implementation "com.google.guava:guava:28.0-jre"
+                    implementation("commons-beanutils:commons-beanutils:1.9.4") {
+                        exclude group: "commons-collections", module: "commons-collections"
+                    }
+                }
+                """
+            )
+          )
+        );
+    }
+
 
     // TODO: Adds exclusion to all applicable. Assert adds dependency if a different dependency adds target transitively.
 
