@@ -516,8 +516,6 @@ public class MavenPomDownloader {
                                      gav.getVersion() + '/' +
                                      gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".pom");
 
-
-
                 if ("file".equals(uri.getScheme())) {
                     Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
 
