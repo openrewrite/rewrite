@@ -527,7 +527,7 @@ public class MavenPomDownloader {
                             continue;
                         }
                         String fullDefaultMavenLocalUri = MavenRepository.MAVEN_LOCAL_USER_NEUTRAL.getUri().replace("~", System.getProperty("user.home"));
-                        if (!repo.getUri().startsWith(fullDefaultMavenLocalUri)) {
+                        if (!repo.getUri().equals(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL.getUri()) && !repo.getUri().startsWith(fullDefaultMavenLocalUri)) {
                             // Non-default local Maven dependencies can not be shared between users, so we skip the repo
                             continue;
                         }
