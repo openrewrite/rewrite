@@ -540,7 +540,7 @@ public class MavenPomDownloader {
                             }
 
                             // so that the repository path is the same regardless of username
-                            pom = pom.withRepository(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL);
+                            pom = pom.withRepository(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL.withUri());
 
                             if (!Objects.equals(versionMaybeDatedSnapshot, pom.getVersion())) {
                                 pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
