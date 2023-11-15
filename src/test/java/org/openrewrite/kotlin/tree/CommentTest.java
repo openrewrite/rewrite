@@ -210,4 +210,25 @@ class CommentTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/401")
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "var name: Boolean = true",
+      "variable: Boolean = true"
+    })
+    void kdocBeforeValueParameter(String input) {
+        rewriteRun(
+          kotlin(
+            """
+              class Test(
+                  /**
+                   *
+                   */
+                  %s
+              )
+              """.formatted(input)
+          )
+        );
+    }
 }

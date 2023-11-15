@@ -829,7 +829,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         JavaType.Variable vt = variableType(parameter, owner(parameter));
-        J.Identifier name = createIdentifier(requireNonNull(parameter.getNameIdentifier()), vt);
+        J.Identifier name = createIdentifier(requireNonNull(parameter.getNameIdentifier()), vt, consumedSpaces);
 
         if (parameter.getTypeReference() != null) {
             markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), prefix(parameter.getColon())));
@@ -903,26 +903,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         JContainer<Statement> params;
 
         if (constructor.getValueParameterList() != null) {
-            // constructor.getValueParameterList().accept(this, data);
-
-            //  todo. move to constructor.getValueParameterList().accept(this, data);
-            List<KtParameter> ktParameters = constructor.getValueParameters();
-            List<JRightPadded<Statement>> statements = new ArrayList<>(ktParameters.size());
-
-            for (int i = 0; i < ktParameters.size(); i++) {
-                KtParameter ktParameter = ktParameters.get(i);
-                Statement statement = convertToStatement(ktParameter.accept(this, data));
-                statements.add(maybeTrailingComma(ktParameter, padRight(statement, endFixAndSuffix(ktParameter)), i == ktParameters.size() - 1));
-            }
-
-            if (ktParameters.isEmpty()) {
-                Statement param = new J.Empty(randomId(), prefix(constructor.getValueParameterList().getRightParenthesis()), Markers.EMPTY);
-                statements.add(padRight(param, Space.EMPTY));
-            }
-
             params = JContainer.build(
-                    prefix(constructor.getValueParameterList()),
-                    statements,
+                    prefix(constructor.getValueParameterList(), preConsumedInfix(constructor)),
+                    mapParameters(constructor.getValueParameterList(), data),
                     Markers.EMPTY);
         } else {
             throw new UnsupportedOperationException("TODO");
