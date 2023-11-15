@@ -516,7 +516,9 @@ public class MavenPomDownloader {
                                      gav.getVersion() + '/' +
                                      gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".pom");
 
-                if ("file".equals(uri.getScheme())) {
+
+                String fullDefaultMavenLocalUri = MavenRepository.MAVEN_LOCAL_USER_NEUTRAL.getUri().replace("~",System.getProperty("user.home"));
+                if ("file".equals(uri.getScheme()) && repo.getUri().startsWith(fullDefaultMavenLocalUri)) {
                     Path inputPath = Paths.get(gav.getGroupId(), gav.getArtifactId(), gav.getVersion());
 
                     try {
@@ -540,7 +542,7 @@ public class MavenPomDownloader {
                             }
 
                             // so that the repository path is the same regardless of username
-                            pom = pom.withRepository(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL.withUri());
+                            pom = pom.withRepository(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL);
 
                             if (!Objects.equals(versionMaybeDatedSnapshot, pom.getVersion())) {
                                 pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
