@@ -33,7 +33,7 @@ import org.openrewrite.java.tree.JavaType
 import org.openrewrite.kotlin.KotlinIrTypeMapping
 
 @Suppress("unused")
-class PsiElementIrAssociations(val typeMapping: KotlinIrTypeMapping, private val psiFile: PsiFile, val file: IrFile) {
+class PsiElementIrAssociations(private val typeMapping: KotlinIrTypeMapping, private val psiFile: PsiFile, val file: IrFile) {
 
     private val notMapped: MutableList<IrElement> = ArrayList()
     private val psiMap: MutableMap<TextRange, MutableList<PsiElement>> = HashMap()
@@ -132,8 +132,7 @@ class PsiElementIrAssociations(val typeMapping: KotlinIrTypeMapping, private val
         return emptyList()
     }
 
-    fun primary(psiElement: PsiElement): IrElement? {
-        val temp = all(psiElement) // TODO: remove
+    private fun primary(psiElement: PsiElement): IrElement? {
         val f: ((IrElement) -> Boolean)? = when (psiElement) {
             is KtFile -> {
                 { it is IrFile }
@@ -201,20 +200,20 @@ class PsiElementIrAssociations(val typeMapping: KotlinIrTypeMapping, private val
 
         if (f == null) {
             // TEMP: fix KotlinTreeParserVisitor.
-            if (!(psiElement is KtNameReferenceExpression ||
-                        psiElement is KtLiteralStringTemplateEntry ||
-                        psiElement is KtUserType ||
-                        psiElement is KtBinaryExpression ||
-                        psiElement is KtDotQualifiedExpression)
-            ) {
-                // println()
-            }
+//            if (!(psiElement is KtNameReferenceExpression ||
+//                        psiElement is KtLiteralStringTemplateEntry ||
+//                        psiElement is KtUserType ||
+//                        psiElement is KtBinaryExpression ||
+//                        psiElement is KtDotQualifiedExpression)
+//            ) {
+//                // println()
+//            }
             return null
         } else {
-            val m = elementMap[psiElement]
-            if (m != null && m.stream().map { it.ir }.noneMatch(f)) {
-                // println()
-            }
+//            val m = elementMap[psiElement]
+//            if (m != null && m.stream().map { it.ir }.noneMatch(f)) {
+//                // println()
+//            }
         }
         return ir(psiElement, f)
     }
@@ -281,14 +280,14 @@ class PsiElementIrAssociations(val typeMapping: KotlinIrTypeMapping, private val
     }
 
     companion object {
-        fun printElement(firElement: FirElement): String {
+        fun printElement(firElement: FirElement): String? {
             if (firElement is FirSingleExpressionBlock) {
                 return PsiTreePrinter.firElementToString(firElement.statement)
             } else if (firElement is FirElseIfTrueCondition) {
-                return "true";
+                return "true"
             }
 
-            return "";
+            return ""
         }
     }
 }

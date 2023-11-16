@@ -41,6 +41,7 @@ import org.openrewrite.java.tree.JavaType.GenericTypeVariable
 import org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*
 import org.openrewrite.java.tree.TypeUtils
 
+@Suppress("unused", "UNUSED_PARAMETER")
 class KotlinIrTypeMapping(typeCache: JavaTypeCache) : JavaTypeMapping<Any> {
     private val signatureBuilder: KotlinTypeIrSignatureBuilder = KotlinTypeIrSignatureBuilder()
     private val typeCache: JavaTypeCache
