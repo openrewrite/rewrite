@@ -19,6 +19,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.DefaultJavaTypeSignatureBuilder;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 
 import java.time.Duration;
@@ -47,11 +48,31 @@ public class ShortenFullyQualifiedTypeReferences extends Recipe {
     }
 
     @Override
-    public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return getVisitor(null);
+    public JavaVisitor<ExecutionContext> getVisitor() {
+        // This wrapper is necessary so that the "correct" implementation is used when this recipe is used declaratively
+        return new JavaVisitor<ExecutionContext>() {
+            @Override
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
+                if (tree instanceof JavaSourceFile) {
+                    return ((JavaSourceFile) tree).service(ImportService.class).shortenFullyQualifiedTypeReferencesIn((J) tree).visit(tree, ctx);
+                }
+                return (J) tree;
+            }
+        };
     }
 
-    public static <J2 extends J> TreeVisitor<J, ExecutionContext> modifyOnly(J2 subtree) {
+    /**
+     * Returns a visitor which replaces all fully qualified references in the given subtree with simple names and adds 
+     * corresponding import statements.
+     * <p>
+     * For compatibility with other Java-based languages it is recommended to use this as a service via
+     * {@link ImportService#shortenFullyQualifiedTypeReferencesIn(J)}, as that will dispatch to the correct
+     * implementation for the language.
+     * 
+     * @see ImportService#shortenFullyQualifiedTypeReferencesIn(J)
+     * @see JavaVisitor#service(Class) 
+     */
+    public static <J2 extends J> JavaVisitor<ExecutionContext> modifyOnly(J2 subtree) {
         return getVisitor(subtree);
     }
 
