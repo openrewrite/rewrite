@@ -836,7 +836,7 @@ public interface K extends J {
         }
     }
 
-    @SuppressWarnings("unused")
+    @SuppressWarnings({"unused", "DeprecatedIsStillUsed"})
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -863,22 +863,38 @@ public interface K extends J {
         @With
         J.VariableDeclarations initializer;
 
+        @Deprecated // Use destructAssignments instead
+        @Nullable
         JContainer<J.VariableDeclarations.NamedVariable> assignments;
 
-        public DestructuringDeclaration(UUID id, Space prefix, Markers markers, VariableDeclarations initializer, JContainer<VariableDeclarations.NamedVariable> assignments) {
+        JContainer<Statement> destructAssignments;
+
+        public DestructuringDeclaration(UUID id, Space prefix, Markers markers, VariableDeclarations initializer, JContainer<Statement> destructAssignments) {
             this.id = id;
             this.prefix = prefix;
             this.markers = markers;
             this.initializer = initializer;
-            this.assignments = assignments;
+            this.assignments = null;
+            this.destructAssignments = destructAssignments;
         }
 
+        @Deprecated
+        @Nullable
         public List<J.VariableDeclarations.NamedVariable> getAssignments() {
-            return assignments.getElements();
+            return assignments != null ? assignments.getElements() : null;
         }
 
+        public List<Statement> getDestructAssignments() {
+            return destructAssignments.getElements();
+        }
+
+        @Deprecated
         public K.DestructuringDeclaration withAssignments(List<J.VariableDeclarations.NamedVariable> assignments) {
             return getPadding().withAssignments(requireNonNull(JContainer.withElementsNullable(this.assignments, assignments)));
+        }
+
+        public K.DestructuringDeclaration withDestructAssignments(List<Statement> assignments) {
+            return getPadding().withDestructAssignments(requireNonNull(JContainer.withElementsNullable(this.destructAssignments, assignments)));
         }
 
         @Override
@@ -911,12 +927,23 @@ public interface K extends J {
         public static class Padding {
             private final K.DestructuringDeclaration t;
 
+            @Deprecated
+            @Nullable
             public JContainer<J.VariableDeclarations.NamedVariable> getAssignments() {
                 return t.assignments;
             }
 
+            @Deprecated
             public DestructuringDeclaration withAssignments(JContainer<J.VariableDeclarations.NamedVariable> assignments) {
-                return t.assignments == assignments ? t : new DestructuringDeclaration(t.id, t.prefix, t.markers, t.initializer, assignments);
+                return t;
+            }
+
+            public JContainer<Statement> getDestructAssignments() {
+                return t.destructAssignments;
+            }
+
+            public DestructuringDeclaration withDestructAssignments(JContainer<Statement> assignments) {
+                return t.destructAssignments == assignments ? t : new DestructuringDeclaration(t.id, t.prefix, t.markers, t.initializer, assignments);
             }
         }
 

@@ -65,7 +65,6 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.java.tree.Space.EMPTY;
 
 /**
  * PSI based parser
@@ -1669,7 +1668,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         Markers.EMPTY,
                         new J.Unknown.Source(
                                 randomId(),
-                                EMPTY,
+                                Space.EMPTY,
                                 Markers.build(singletonList(ParseExceptionResult.build(KotlinParser.builder().build(), e)
                                         .withTreeType(declaration.getClass().getName()))),
                                 file.getText().substring(PsiUtilsKt.getStartOffsetSkippingComments(declaration),
@@ -2194,7 +2193,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitDestructuringDeclaration(KtDestructuringDeclaration multiDeclaration, ExecutionContext data) {
         List<J.Modifier> modifiers = new ArrayList<>();
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
-        List<JRightPadded<J.VariableDeclarations.NamedVariable>> vars = new ArrayList<>();
+        List<JRightPadded<Statement>> destructVars = new ArrayList<>();
+
         JLeftPadded<Expression> paddedInitializer = null;
 
         J.Modifier modifier = new J.Modifier(
@@ -2250,11 +2250,24 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     vt
             );
 
-            JavaType.Method methodType = methodInvocationType(entry);
-            J.MethodInvocation initializer = buildSyntheticDestructInitializer(i + 1)
-                    .withMethodType(methodType);
-            namedVariable = namedVariable.getPadding().withInitializer(padLeft(Space.SINGLE_SPACE, initializer));
-            vars.add(maybeTrailingComma(entry, padRight(namedVariable, suffix(entry)), i == entries.size() - 1));
+
+            TypeTree typeExpression = null;
+            if (entry.getTypeReference() != null) {
+                typeExpression  = (TypeTree) entry.getTypeReference().accept(this, data);
+            }
+
+            J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(randomId(),
+                    Space.EMPTY,
+                    Markers.EMPTY.addIfAbsent(new TypeReferencePrefix(randomId(), prefix(entry.getColon()))),
+                    emptyList(),
+                    emptyList(),
+                    typeExpression,
+                    null,
+                    emptyList(),
+                    singletonList(padRight(namedVariable, Space.EMPTY))
+            );
+
+            destructVars.add(maybeTrailingComma(entry, padRight(variableDeclarations, suffix(entry)), i == entries.size() - 1));
         }
 
         JavaType.Variable vt = variableType(multiDeclaration, owner(multiDeclaration));
@@ -2285,30 +2298,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 deepPrefix(multiDeclaration),
                 Markers.EMPTY,
                 variableDeclarations,
-                JContainer.build(prefix(multiDeclaration.getLPar()), vars, Markers.EMPTY)
-        );
-    }
-
-    private J.MethodInvocation buildSyntheticDestructInitializer(int id) {
-        J.Identifier name = new J.Identifier(
-                randomId(),
-                Space.SINGLE_SPACE,
-                Markers.EMPTY,
-                emptyList(),
-                "component" + id,
-                null,
-                null
-        );
-
-        return new J.MethodInvocation(
-                randomId(),
-                Space.EMPTY,
-                Markers.EMPTY,
-                null,
-                null,
-                name,
-                JContainer.empty(),
-                null
+                JContainer.build(prefix(multiDeclaration.getLPar()), destructVars, Markers.EMPTY)
         );
     }
 
@@ -3088,7 +3078,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             Pair<Integer, Integer> parenPair = parenPairs.pop();
             PsiElement lPAR = allChildren.get(parenPair.getFirst());
             PsiElement rPAR = allChildren.get(parenPair.getSecond());
-            TypeTree typeTree = j instanceof K.FunctionType ? ((K.FunctionType) j).withReturnType(((K.FunctionType) j).getReturnType().withAfter(EMPTY)) : (TypeTree) j;
+            TypeTree typeTree = j instanceof K.FunctionType ? ((K.FunctionType) j).withReturnType(((K.FunctionType) j).getReturnType().withAfter(Space.EMPTY)) : (TypeTree) j;
             j = new J.ParenthesizedTypeTree(randomId(),
                     Space.EMPTY,
                     Markers.EMPTY,
@@ -3711,7 +3701,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             int l = findFirstLPAR(allChildren, 0);
             int r = findLastRPAR(allChildren, allChildren.size() - 1);
             if (l >= 0 && l < r) {
-                j = new J.Parentheses<>(randomId(), Space.EMPTY, Markers.EMPTY, padRight(j, EMPTY));
+                j = new J.Parentheses<>(randomId(), Space.EMPTY, Markers.EMPTY, padRight(j, Space.EMPTY));
             }
         }
         return j;

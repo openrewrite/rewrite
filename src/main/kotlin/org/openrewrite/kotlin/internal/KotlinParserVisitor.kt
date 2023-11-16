@@ -1393,7 +1393,8 @@ class KotlinParserVisitor(
                 prefix,
                 Markers.EMPTY,
                 variableDeclarations,
-                JContainer.build(before, vars, Markers.EMPTY)
+                // JContainer.build(before, vars, Markers.EMPTY)
+                JContainer.build(before, emptyList(), Markers.EMPTY) // pass compile
         )
     }
 

@@ -692,4 +692,18 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/404")
+    @Test
+    void destructuringWithTypes() {
+        rewriteRun(
+          kotlin(
+            """
+              fun example ( ) {
+                val ( a   :  Int   , b :  String  ?   ) = Pair ( 1 , "Two" )
+              }
+              """
+          )
+        );
+    }
 }

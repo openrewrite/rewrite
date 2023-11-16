@@ -194,12 +194,13 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 p.append("val");
             }
         }
-        visitSpace(destructuringDeclaration.getPadding().getAssignments().getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
+        visitSpace(destructuringDeclaration.getPadding().getDestructAssignments().getBefore(), Space.Location.LANGUAGE_EXTENSION, p);
         p.append("(");
-        List<JRightPadded<J.VariableDeclarations.NamedVariable>> elements = destructuringDeclaration.getPadding().getAssignments().getPadding().getElements();
+
+        List<JRightPadded<Statement>> elements = destructuringDeclaration.getPadding().getDestructAssignments().getPadding().getElements();
         for (int i = 0; i < elements.size(); i++) {
-            JRightPadded<J.VariableDeclarations.NamedVariable> element = elements.get(i);
-            visit(element.getElement().getName(), p);
+            JRightPadded<Statement> element = elements.get(i);
+            visit(element.getElement(), p);
             visitSpace(element.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
             visitMarkers(element.getMarkers(), p);
             p.append(i == elements.size() - 1 ? ")" : ",");
