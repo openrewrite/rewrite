@@ -58,6 +58,7 @@ import org.openrewrite.style.NamedStyles;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -2412,15 +2413,14 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         LeafPsiElement importPsi = (LeafPsiElement) node;
 
         PsiElement first = findFirstNonSpaceNextSibling(importPsi);
-        ASTNode last = importDirective.isAllUnder() ? importDirective.getNode().findChildByType(KtTokens.MUL)
-                : importDirective.getNode().findChildByType(KtNodeTypes.DOT_QUALIFIED_EXPRESSION);
-        if (last == null) {
-            PsiElement lastPsi = findLastNotSpaceChild(importDirective);
-            if (lastPsi != null) {
-                last = lastPsi.getNode();
-            }
-        }
-        String text = nodeRangeText(first != null ? first.getNode() : null, last);
+        PsiElement last = findLastChild(importDirective, psi -> !(psi instanceof KtImportAlias) &&
+                !isSpace(psi.getNode()) &&
+                psi.getNode().getElementType() != KtTokens.SEMICOLON);
+
+        ASTNode lastNode = importDirective.isAllUnder() ? importDirective.getNode().findChildByType(KtTokens.MUL)
+                : last != null ? last.getNode() : null;
+
+        String text = nodeRangeText(first != null ? first.getNode() : null, lastNode);
         J reference = TypeTree.build(text); // FIXME: this creates a shallow class for a resolvable type.
         reference = reference.withPrefix(suffix(importPsi));
 
@@ -3993,6 +3993,21 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 return child;
             }
         }
+        return null;
+    }
+
+    @Nullable
+    private static PsiElement findLastChild(@Nullable PsiElement parent, Predicate<PsiElement> test) {
+        if (parent == null) {
+            return null;
+        }
+
+        for (PsiElement child = parent.getLastChild(); child != null; child = child.getPrevSibling()) {
+            if (test.test(child)) {
+                return child;
+            }
+        }
+
         return null;
     }
 

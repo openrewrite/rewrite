@@ -124,4 +124,33 @@ class ImportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void importWithTrailingSemiColon() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.util.List;
+              import java .  util   . Map;
+              
+              class T
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/412")
+    @Test
+    void aliasFromSamePackage() {
+        rewriteRun(
+          kotlin("class Foo"),
+          kotlin(
+            """
+              import Foo as Bar
+              
+              class Test
+              """)
+        );
+    }
+
 }
