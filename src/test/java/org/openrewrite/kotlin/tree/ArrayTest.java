@@ -157,4 +157,17 @@ class ArrayTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/410")
+    @Test
+    void mapAccessTrailingComma() {
+        rewriteRun(
+          kotlin(
+            """
+              val a = mapOf ( 1 to "one" , 2 to "two" )
+              val b = a [ 1 , ]
+              """
+          )
+        );
+    }
 }
