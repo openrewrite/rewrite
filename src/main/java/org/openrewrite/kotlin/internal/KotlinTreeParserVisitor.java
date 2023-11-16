@@ -3080,7 +3080,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             Pair<Integer, Integer> parenPair = parenPairs.pop();
             PsiElement lPAR = allChildren.get(parenPair.getFirst());
             PsiElement rPAR = allChildren.get(parenPair.getSecond());
-            TypeTree typeTree = (TypeTree) j;
+            TypeTree typeTree = j instanceof K.FunctionType ? ((K.FunctionType) j).withReturnType(((K.FunctionType) j).getReturnType().withAfter(EMPTY)) : (TypeTree) j;
             j = new J.ParenthesizedTypeTree(randomId(),
                     Space.EMPTY,
                     Markers.EMPTY,
