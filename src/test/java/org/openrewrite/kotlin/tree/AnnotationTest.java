@@ -542,4 +542,19 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/398")
+    @Test
+    void annotatedFunction() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Ann
+              class Foo(
+                private val option:  @Ann   () -> Unit
+              )
+              """
+          )
+        );
+    }
 }

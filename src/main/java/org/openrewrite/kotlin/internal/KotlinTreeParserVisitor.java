@@ -3025,13 +3025,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         J j = requireNonNull(typeReference.getTypeElement()).accept(this, data);
-        // j = j.withPrefix(merge(j.getPrefix(), prefix(typeReference, consumedSpaces)));
-
         consumedSpaces.add(findFirstPrefixSpace(typeReference.getTypeElement()));
 
-        if (j instanceof K.FunctionType &&
-                typeReference.getModifierList() != null &&
-                typeReference.getModifierList().hasModifier(KtTokens.SUSPEND_KEYWORD)) {
+        if (j instanceof K.FunctionType && typeReference.getModifierList() != null) {
             K.FunctionType functionType = (K.FunctionType) j;
             functionType = functionType.withModifiers(modifiers).withLeadingAnnotations(leadingAnnotations);
 
