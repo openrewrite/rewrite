@@ -74,9 +74,8 @@ public class DeclarativeRecipe extends Recipe {
     }
 
     @JsonIgnore
-    private Validated<Object> validation = Validated.test("initialization",
-            "initialize(..) must be called on DeclarativeRecipe prior to use.",
-            this, r -> uninitializedRecipes.isEmpty());
+    private Validated<Object> validation = Validated.invalid("initialization", this,
+            "initialize(..) must be called on DeclarativeRecipe prior to use.");
 
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
@@ -90,6 +89,8 @@ public class DeclarativeRecipe extends Recipe {
     }
 
     private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+        initialized.clear();
+        validation = Validated.none();
         for (int i = 0; i < uninitialized.size(); i++) {
             Recipe recipe = uninitialized.get(i);
             if (recipe instanceof LazyLoadedRecipe) {
@@ -118,7 +119,6 @@ public class DeclarativeRecipe extends Recipe {
                 initialized.add(recipe);
             }
         }
-        uninitialized.clear();
     }
 
     @Value
