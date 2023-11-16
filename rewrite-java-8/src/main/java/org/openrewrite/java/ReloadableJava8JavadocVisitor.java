@@ -501,6 +501,7 @@ public class ReloadableJava8JavadocVisitor extends DocTreeScanner<Tree, List<Jav
                     Space.EMPTY,
                     Markers.EMPTY,
                     emptyList(),
+                    emptyList(),
                     visitIdentifier(node.getName(), whitespaceBefore()).withPrefix(namePrefix),
                     null
             );
