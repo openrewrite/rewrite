@@ -2177,7 +2177,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         J.Modifier modifier = new J.Modifier(
                 Tree.randomId(),
-                prefix(multiDeclaration.getValOrVarKeyword()),
+                prefix(multiDeclaration.getValOrVarKeyword(), preConsumedInfix(multiDeclaration)),
                 Markers.EMPTY,
                 multiDeclaration.isVar() ? "var" : null,
                 multiDeclaration.isVar() ? J.Modifier.Type.LanguageExtension : J.Modifier.Type.Final,

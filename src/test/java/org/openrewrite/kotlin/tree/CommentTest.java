@@ -231,4 +231,19 @@ class CommentTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/415")
+    @Test
+    void kdocBeforeDestructuring() {
+        rewriteRun(
+          kotlin(
+            """
+              fun m() {
+                  /** */
+                  val (a, b) = Pair(1, 2)
+               }
+              """
+          )
+        );
+    }
 }
