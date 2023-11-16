@@ -2594,9 +2594,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<KtTypeParameter> ktTypeParameters = owner.getTypeParameters();
         List<JRightPadded<J.TypeParameter>> params = new ArrayList<>(ktTypeParameters.size());
 
-        for (KtTypeParameter ktTypeParameter : ktTypeParameters) {
+        for (int i = 0; i < ktTypeParameters.size(); i++) {
+            KtTypeParameter ktTypeParameter = ktTypeParameters.get(i);
             J.TypeParameter typeParameter = ktTypeParameter.accept(this, data).withPrefix(prefix(ktTypeParameter));
-            params.add(padRight(typeParameter, suffix(ktTypeParameter)));
+            params.add(maybeTrailingComma(ktTypeParameter, padRight(typeParameter, suffix(ktTypeParameter)), i == ktTypeParameters.size() - 1) );
         }
 
         return params;

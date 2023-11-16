@@ -694,4 +694,12 @@ class ClassDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/403")
+    @Test
+    void trailingCommaInTypeArgument() {
+        rewriteRun(
+          kotlin("open class B <  T   , > { }")
+        );
+    }
 }
