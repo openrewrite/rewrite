@@ -5258,6 +5258,10 @@ public interface J extends Tree {
         @Getter
         List<Annotation> annotations;
 
+        @With
+        @Getter
+        List<J.Modifier> modifiers;
+
         /**
          * Will be either a {@link TypeTree} or {@link Wildcard}. Wildcards aren't possible in
          * every context where type parameters may be defined (e.g. not possible on new statements).
@@ -5308,7 +5312,7 @@ public interface J extends Tree {
             }
 
             public TypeParameter withBounds(@Nullable JContainer<TypeTree> bounds) {
-                return t.bounds == bounds ? t : new TypeParameter(t.id, t.prefix, t.markers, t.annotations, t.name, bounds);
+                return t.bounds == bounds ? t : new TypeParameter(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.name, bounds);
             }
         }
     }
