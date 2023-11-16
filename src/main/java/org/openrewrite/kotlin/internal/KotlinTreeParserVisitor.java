@@ -2417,10 +2417,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 !isSpace(psi.getNode()) &&
                 psi.getNode().getElementType() != KtTokens.SEMICOLON);
 
-        ASTNode lastNode = importDirective.isAllUnder() ? importDirective.getNode().findChildByType(KtTokens.MUL)
-                : last != null ? last.getNode() : null;
-
-        String text = nodeRangeText(first != null ? first.getNode() : null, lastNode);
+        String text = nodeRangeText(getNodeOrNull(first), getNodeOrNull(last));
         J reference = TypeTree.build(text); // FIXME: this creates a shallow class for a resolvable type.
         reference = reference.withPrefix(suffix(importPsi));
 
@@ -4113,4 +4110,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return sb.toString();
     }
 
+    private static @Nullable ASTNode getNodeOrNull(@Nullable PsiElement psiElement) {
+        return psiElement != null ? psiElement.getNode() : null;
+    }
 }
