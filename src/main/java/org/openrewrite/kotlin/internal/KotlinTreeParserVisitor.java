@@ -2085,8 +2085,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             implementings = implementings != null ? implementings.withBefore(prefix(klass.getColon())) : null;
         }
 
-        if (!klass.getTypeParameters().isEmpty()) {
-            typeParams = JContainer.build(prefix(klass.getTypeParameterList()), mapTypeParameters(klass, data), Markers.EMPTY);
+        if (klass.getTypeParameterList() != null) {
+            typeParams = JContainer.build(prefix(klass.getTypeParameterList()), mapTypeParameters(klass.getTypeParameterList(), data), Markers.EMPTY);
         }
 
         K.TypeConstraints typeConstraints = null;
@@ -2487,7 +2487,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     prefix(function.getTypeParameterList()),
                     Markers.EMPTY,
                     emptyList(),
-                    mapTypeParameters(function, data)
+                    mapTypeParameters(function.getTypeParameterList(), data)
             );
         }
 
@@ -2605,8 +2605,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     @NotNull
-    private List<JRightPadded<J.TypeParameter>> mapTypeParameters(KtTypeParameterListOwner owner, ExecutionContext data) {
-        List<KtTypeParameter> ktTypeParameters = owner.getTypeParameters();
+    private List<JRightPadded<J.TypeParameter>> mapTypeParameters(KtTypeParameterList list, ExecutionContext data) {
+        List<KtTypeParameter> ktTypeParameters = list.getParameters();
         List<JRightPadded<J.TypeParameter>> params = new ArrayList<>(ktTypeParameters.size());
 
         for (int i = 0; i < ktTypeParameters.size(); i++) {
@@ -2640,7 +2640,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         modifiers.add(buildFinalModifier());
 
         JContainer<J.TypeParameter> typeParameters = declaration.getTypeParameterList() == null ? null :
-                JContainer.build(prefix(declaration.getTypeParameterList()), mapTypeParameters(declaration, data), Markers.EMPTY);
+                JContainer.build(prefix(declaration.getTypeParameterList()), mapTypeParameters(declaration.getTypeParameterList(), data), Markers.EMPTY);
 
         if (declaration.getSuperTypeList() != null) {
             implementings = mapSuperTypeList(declaration.getSuperTypeList(), data);
@@ -2776,7 +2776,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         J.MethodDeclaration setter = null;
         JRightPadded<Expression> receiver = null;
         JContainer<J.TypeParameter> typeParameters = property.getTypeParameterList() != null ?
-                JContainer.build(prefix(property.getTypeParameterList()), mapTypeParameters(property, data), Markers.EMPTY) : null;
+                JContainer.build(prefix(property.getTypeParameterList()), mapTypeParameters(property.getTypeParameterList(), data), Markers.EMPTY) : null;
         K.TypeConstraints typeConstraints = null;
         boolean isSetterFirst = false;
         Set<PsiElement> prefixConsumedSet = preConsumedInfix(property);
