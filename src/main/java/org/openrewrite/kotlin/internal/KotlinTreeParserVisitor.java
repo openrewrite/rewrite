@@ -488,22 +488,26 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         if (enumEntry.getBody() != null) {
-            Markers markers = Markers.EMPTY.addIfAbsent(new Implicit(randomId()));
-            JContainer<Expression> args = JContainer.empty();
-            args = args.withMarkers(Markers.build(singletonList(new OmitParentheses(randomId()))));
-            J.Block body = enumEntry.getBody().accept(this, data).withPrefix(Space.EMPTY);
+            J.Block body = (J.Block) enumEntry.getBody().accept(this, data);
 
-            initializer = new J.NewClass(
-                    randomId(),
-                    prefix(enumEntry.getBody()),
-                    markers,
-                    null,
-                    Space.EMPTY,
-                    null,
-                    args,
-                    body,
-                    null
-            );
+            if (initializer != null) {
+                initializer = initializer.withBody(body);
+            } else {
+                Markers markers = Markers.EMPTY.addIfAbsent(new Implicit(randomId()));
+                JContainer<Expression> args = JContainer.empty();
+                args = args.withMarkers(Markers.build(singletonList(new OmitParentheses(randomId()))));
+                initializer = new J.NewClass(
+                        randomId(),
+                        Space.EMPTY,
+                        markers,
+                        null,
+                        Space.EMPTY,
+                        null,
+                        args,
+                        body,
+                        null
+                );
+            }
         }
 
         return new J.EnumValue(

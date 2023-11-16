@@ -170,4 +170,23 @@ class EnumTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/400")
+    @Test
+    void enumClassWithParameters() {
+        rewriteRun(
+          kotlin(
+            """
+              enum class Code {
+                  YES
+              }
+              enum class Test ( val arg: Code ) {
+                  FOO ( Code.YES  ) {
+                      // Body is required to reproduce issue
+                  }
+              }
+              """
+          )
+        );
+    }
 }
