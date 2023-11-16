@@ -56,7 +56,7 @@ public class RubyVisitor<P> extends JavaVisitor<P> {
         Ruby.CompilationUnit c = compilationUnit;
         c = c.withPrefix(visitSpace(c.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p));
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
-        c = c.withBodyNode(visit(c.getBodyNode(), p));
+        c = c.withBody(visit(c.getBody(), p));
         c = c.withEof(visitSpace(c.getEof(), Space.Location.COMPILATION_UNIT_EOF, p));
         return c;
     }

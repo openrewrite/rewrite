@@ -45,7 +45,10 @@ public class CommentTest implements RewriteTest {
               This is a multiline comment and can span as many lines as you
               like. But =begin and =end should come in the first line only.\s
               =end
-              """
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                cu.printAllTrimmed();
+            })
           )
         );
     }

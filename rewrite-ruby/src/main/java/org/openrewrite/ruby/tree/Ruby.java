@@ -77,12 +77,11 @@ public interface Ruby extends J {
         @Nullable
         Checksum checksum;
 
-        J bodyNode;
+        J body;
 
         Space eof;
 
         @Override
-        @Nullable
         public <P> J acceptRuby(RubyVisitor<P> v, P p) {
             return v.visitCompilationUnit(this, p);
         }

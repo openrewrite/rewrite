@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,28 +13,46 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.tree;
+package org.openrewrite.ruby.tree;
 
 import lombok.Value;
 import lombok.With;
-import lombok.experimental.NonFinal;
 import org.openrewrite.Cursor;
 import org.openrewrite.PrintOutputCapture;
+import org.openrewrite.java.tree.Comment;
+import org.openrewrite.java.tree.TextComment;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.util.function.UnaryOperator;
 
+
+/*
+
+
+<!--CLI_VERSION-->1.6.2<!--/CLI_VERSION-->
+
+ */
+
+
 @Value
-public class TextComment implements Comment {
+public class RubyTextComment implements Comment {
+
     @With
     boolean multiline;
 
     String text;
 
-    public TextComment withText(String text) {
-        if(!text.equals(this.text)) {
-            return new TextComment(multiline, text, suffix, markers);
+    public String getText() {
+        return text
+                .replaceAll("^\\r?\\n", "")
+                .replaceAll("\\r?\\n$", "");
+    }
+
+    public RubyTextComment withText(String text) {
+        if (!text.equals(this.text)) {
+            // TODO add newlines if necessary to text
+            return new RubyTextComment(multiline, text, suffix, markers);
         }
         return this;
     }
@@ -42,9 +60,9 @@ public class TextComment implements Comment {
     String suffix;
 
     @SuppressWarnings("unchecked")
-    public TextComment withSuffix(String suffix) {
-        if(!suffix.equals(this.suffix)) {
-            return new TextComment(multiline, text, suffix, markers);
+    public RubyTextComment withSuffix(String suffix) {
+        if (!suffix.equals(this.suffix)) {
+            return new RubyTextComment(multiline, text, suffix, markers);
         }
         return this;
     }
@@ -60,7 +78,7 @@ public class TextComment implements Comment {
         for (Marker marker : markers.getMarkers()) {
             p.append(p.getMarkerPrinter().beforeSyntax(marker, new Cursor(cursor, this), JAVA_MARKER_WRAPPER));
         }
-        p.append(multiline ? "/*" + text + "*/" : "//" + text);
+        p.append(multiline ? "=begin" + text + "=end" : "//" + text);
         for (Marker marker : markers.getMarkers()) {
             p.append(p.getMarkerPrinter().afterSyntax(marker, new Cursor(cursor, this), JAVA_MARKER_WRAPPER));
         }

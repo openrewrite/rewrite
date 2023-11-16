@@ -53,6 +53,20 @@ public class FindPlugin extends Recipe {
         return ds;
     }
 
+    public static Set<Xml.Tag> findPlugin(Xml.Document maven, String groupId, String artifactId) {
+        Set<Xml.Tag> ds = new HashSet<>();
+        new MavenIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext context) {
+                if (isPluginTag(groupId, artifactId)) {
+                    ds.add(tag);
+                }
+                return super.visitTag(tag, context);
+            }
+        }.visit(maven, new InMemoryExecutionContext());
+        return ds;
+    }
+
     @Override
     public String getDisplayName() {
         return "Find Maven plugin";

@@ -56,7 +56,7 @@ public class RubyPrinter<P> extends RubyVisitor<PrintOutputCapture<P>> {
     public Ruby visitCompilationUnit(Ruby.CompilationUnit compilationUnit, PrintOutputCapture<P> p) {
         visitSpace(compilationUnit.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p);
         visitMarkers(compilationUnit.getMarkers(), p);
-        visit(compilationUnit.getBodyNode(), p);
+        visit(compilationUnit.getBody(), p);
         visitSpace(compilationUnit.getEof(), Space.Location.COMPILATION_UNIT_EOF, p);
         return compilationUnit;
     }
