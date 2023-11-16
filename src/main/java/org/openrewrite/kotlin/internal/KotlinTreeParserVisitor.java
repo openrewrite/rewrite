@@ -180,15 +180,16 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         Markers markers = Markers.EMPTY;
         Expression selectExpr = convertToExpression(requireNonNull(expression.getArrayExpression()).accept(this, data));
         JRightPadded<Expression> select = padRight(selectExpr, suffix(expression.getArrayExpression()));
-        J.Identifier name = createIdentifier("get", Space.EMPTY, methodInvocationType(expression));
+        J.Identifier name = createIdentifier("<get>", Space.EMPTY, methodInvocationType(expression));
 
         markers = markers.addIfAbsent(new IndexedAccess(randomId()));
-
         List<KtExpression> indexExpressions = expression.getIndexExpressions();
         List<JRightPadded<Expression>> expressions = new ArrayList<>();
 
-        for (KtExpression indexExp : indexExpressions) {
-            expressions.add(padRight(convertToExpression(indexExp.accept(this, data)), suffix(indexExp)));
+        for (int i = 0; i < indexExpressions.size(); i++) {
+            KtExpression indexExp = indexExpressions.get(i);
+            JRightPadded<Expression> rp = padRight(convertToExpression(indexExp.accept(this, data)), suffix(indexExp));
+            expressions.add(maybeTrailingComma(indexExp, rp, i == indexExpressions.size() - 1));
         }
 
         JContainer<Expression> args = JContainer.build(Space.EMPTY, expressions, markers);

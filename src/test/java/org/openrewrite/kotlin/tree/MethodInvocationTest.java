@@ -650,7 +650,7 @@ class MethodInvocationTest implements RewriteTest {
                             get -> {
                                 assertThat(get.getMarkers().findFirst(IndexedAccess.class)).isPresent();
                                 assertThat(((J.Identifier) get.getSelect()).getSimpleName()).isEqualTo("surface");
-                                assertThat(get.getName().getSimpleName()).isEqualTo("get");
+                                assertThat(get.getName().getSimpleName()).isEqualTo("<get>");
                                 assertThat(get.getArguments()).hasSize(2);
                             }
                         )

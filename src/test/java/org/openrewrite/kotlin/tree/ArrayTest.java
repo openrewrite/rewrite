@@ -145,4 +145,16 @@ class ArrayTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void arrayAccessTrailingComma() {
+        rewriteRun(
+          kotlin(
+            """
+              val arr = IntArray ( 1 )
+              val a = arr [ 0  ,   ]
+              """
+          )
+        );
+    }
 }
