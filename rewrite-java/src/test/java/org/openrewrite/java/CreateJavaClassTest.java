@@ -28,7 +28,7 @@ class CreateJavaClassTest implements RewriteTest {
     void hasCreatedJavaClass() {
         rewriteRun(
                 spec -> spec.recipe(new CreateJavaClass(
-                        "main",
+                        "src/main/java",
                         "org.openrewrite.example",
                         "ExampleClass",
                         "package %s;\n\npublic class %s {}",
@@ -48,7 +48,7 @@ class CreateJavaClassTest implements RewriteTest {
     void hasOverwrittenFile() {
         rewriteRun(
                 spec -> spec.recipe(new CreateJavaClass(
-                        "main",
+                        "src/main/java",
                         "org.openrewrite.example",
                         "ExampleClass",
                         "package %s;\n\npublic class %s {}",
@@ -67,7 +67,7 @@ class CreateJavaClassTest implements RewriteTest {
     void shouldNotChangeExistingFile() {
         rewriteRun(
                 spec -> spec.recipe(new CreateJavaClass(
-                        "main",
+                        "src/main/java",
                         "org.openrewrite.example",
                         "ExampleClass",
                         "package %s;\n\npublic class %s {}\n",
@@ -85,7 +85,7 @@ class CreateJavaClassTest implements RewriteTest {
     void shouldNotChangeExistingFileWhenOverwriteNull() {
         rewriteRun(
                 spec -> spec.recipe(new CreateJavaClass(
-                        "main",
+                        "src/main/java",
                         "org.openrewrite.example",
                         "ExampleClass",
                         "package %s;\n\npublic class %s {}\n",
@@ -103,7 +103,7 @@ class CreateJavaClassTest implements RewriteTest {
     void shouldAddAnotherFile() {
         rewriteRun(
                 spec -> spec.recipe(new CreateJavaClass(
-                        "main",
+                        "src/main/java",
                         "org.openrewrite.example",
                         "ExampleClass2",
                         "package %s;\n\npublic class %s {}\n",

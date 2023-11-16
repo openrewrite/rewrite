@@ -15,10 +15,10 @@
  */
 package org.openrewrite.properties;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.intellij.lang.annotations.Language;
+import org.junit.platform.commons.util.StringUtils;
 import org.openrewrite.CreateFileVisitor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
@@ -32,6 +32,7 @@ import org.openrewrite.properties.tree.Properties;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -46,29 +47,28 @@ public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
             example = "foo/bar/baz.properties")
     String relativeFileName;
 
+    @Language("properties")
+    @Option(displayName = "File contents",
+            description = "Multiline text content for the file.",
+            example = "a.property=value\nanother.property=value",
+            required = false)
+    @Nullable
+    String fileContents;
+
     @Option(displayName = "Overwrite existing file",
             description = "If there is an existing file, should it be overwritten.",
             required = false)
     @Nullable
     Boolean overwriteExisting;
 
-    @JsonCreator
-    public CreatePropertiesFile(
-            @JsonProperty("relativeFileName") String relativeFileName,
-            @JsonProperty("overwriteExisting") @Nullable Boolean overwriteExisting
-    ) {
-        this.relativeFileName = relativeFileName;
-        this.overwriteExisting = overwriteExisting;
-    }
-
     @Override
     public @NonNull String getDisplayName() {
-        return "Create YAML file";
+        return "Create Properties file";
     }
 
     @Override
     public @NonNull String getDescription() {
-        return "Create a new YAML file.";
+        return "Create a new Properties file.";
     }
 
     @Override
@@ -84,7 +84,7 @@ public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
     @Override
     public @NonNull Collection<SourceFile> generate(AtomicBoolean shouldCreate, @NonNull ExecutionContext ctx) {
         if (shouldCreate.get()) {
-            return PropertiesParser.builder().build().parse("")
+            return PropertiesParser.builder().build().parse(StringUtils.isNotBlank(fileContents) ? fileContents : "")
                     .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
                     .collect(Collectors.toList());
         }
@@ -98,7 +98,18 @@ public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
             @Override
             public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
                 if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.toString().equals(file.getSourcePath().toString())) {
-                    return file.withContent(emptyList());
+                    if (StringUtils.isBlank(fileContents)) {
+                        return file.withContent(emptyList());
+                    }
+                    Optional<SourceFile> sourceFiles = PropertiesParser.builder()
+                            .build()
+                            .parse(fileContents)
+                            .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
+                            .findFirst();
+
+                    if (sourceFiles.isPresent() && sourceFiles.get() instanceof Properties.File) {
+                        return (Properties.File) sourceFiles.get();
+                    }
                 }
                 return file;
             }

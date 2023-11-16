@@ -40,8 +40,8 @@ public abstract class JavaTemplateLanguageExtension {
     Space.Location loc;
     JavaCoordinates.Mode mode;
 
-    protected JavaTemplateLanguageExtension(JavaTemplateParser templateParser, Substitutions substitutions,
-                                            String substitutedTemplate, JavaCoordinates coordinates) {
+    public JavaTemplateLanguageExtension(JavaTemplateParser templateParser, Substitutions substitutions,
+                                         String substitutedTemplate, JavaCoordinates coordinates) {
         this.templateParser = templateParser;
         this.substitutions = substitutions;
         this.substitutedTemplate = substitutedTemplate;

@@ -15,10 +15,10 @@
  */
 package org.openrewrite.xml;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.intellij.lang.annotations.Language;
+import org.junit.platform.commons.util.StringUtils;
 import org.openrewrite.CreateFileVisitor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
@@ -32,6 +32,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
@@ -43,23 +44,25 @@ public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
 
     @Option(displayName = "Relative file path",
             description = "File path of new file.",
-            example = "foo/bar/baz.yaml")
+            example = "foo/bar/baz.xml")
     String relativeFileName;
+
+    @Language("xml")
+    @Option(displayName = "File contents",
+            description = "Multiline text content for the file.",
+            example = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                      "<root>\n" +
+                      "    <child>1</child>" +
+                      "</root>",
+            required = false)
+    @Nullable
+    String fileContents;
 
     @Option(displayName = "Overwrite existing file",
             description = "If there is an existing file, should it be overwritten.",
             required = false)
     @Nullable
     Boolean overwriteExisting;
-
-    @JsonCreator
-    public CreateXmlFile(
-            @JsonProperty("relativeFileName") String relativeFileName,
-            @JsonProperty("overwriteExisting") @Nullable Boolean overwriteExisting
-    ) {
-        this.relativeFileName = relativeFileName;
-        this.overwriteExisting = overwriteExisting;
-    }
 
     @Override
     public @NonNull String getDisplayName() {
@@ -99,7 +102,18 @@ public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
                 if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.toString().equals(document.getSourcePath().toString())) {
-                    return document.withProlog(null).withRoot(null);
+                    if (StringUtils.isBlank(fileContents)) {
+                        return document.withProlog(null).withRoot(null);
+                    }
+                    Optional<SourceFile> sourceFiles = XmlParser.builder()
+                            .build()
+                            .parse(fileContents)
+                            .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
+                            .findFirst();
+
+                    if (sourceFiles.isPresent() && sourceFiles.get() instanceof Xml.Document) {
+                        return (Xml.Document) sourceFiles.get();
+                    }
                 }
                 return document;
             }

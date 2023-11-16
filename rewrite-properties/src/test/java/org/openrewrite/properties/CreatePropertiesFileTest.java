@@ -29,11 +29,18 @@ class CreatePropertiesFileTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new CreatePropertiesFile(
             "test/test.properties",
+            """
+              # This is a comment
+              x.y=z
+              """,
             null
           )),
           properties(
             null,
-            "",
+            """
+              # This is a comment
+              x.y=z
+              """,
             spec -> spec.path("test/test.properties")
           )
         );
@@ -45,6 +52,7 @@ class CreatePropertiesFileTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new CreatePropertiesFile(
             "test/test.properties",
+            null,
             true
           )),
           properties(
@@ -60,6 +68,7 @@ class CreatePropertiesFileTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new CreatePropertiesFile(
             "test/test.properties",
+            "a.property=value",
             false
           )),
           properties(
@@ -74,6 +83,7 @@ class CreatePropertiesFileTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new CreatePropertiesFile(
             "test/test.properties",
+            null,
             null
           )),
           properties(
@@ -88,6 +98,7 @@ class CreatePropertiesFileTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new CreatePropertiesFile(
             "test/test-file-2.properties",
+            null,
             true
           )),
           properties(

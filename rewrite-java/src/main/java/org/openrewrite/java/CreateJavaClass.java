@@ -15,9 +15,7 @@
  */
 package org.openrewrite.java;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
@@ -52,8 +50,7 @@ public class CreateJavaClass extends ScanningRecipe<AtomicBoolean> {
 
     @Option(displayName = "Source root",
             description = "The source root of the new class file.",
-            valid = {"main", "test"},
-            example = "main")
+            example = "src/main/java")
     @NonNull
     String sourceRoot;
 
@@ -88,23 +85,6 @@ public class CreateJavaClass extends ScanningRecipe<AtomicBoolean> {
             example = "foo/bar")
     @Nullable
     String relativePath;
-
-    @JsonCreator
-    public CreateJavaClass(
-            @JsonProperty("sourceRoot") String sourceRoot,
-            @JsonProperty("packageName") String packageName,
-            @JsonProperty("className") String className,
-            @Language("java") @JsonProperty("classTemplate") String classTemplate,
-            @JsonProperty("overwriteExisting") @Nullable Boolean overwriteExisting,
-            @JsonProperty("relativePath") @Nullable String relativePath
-    ) {
-        this.sourceRoot = sourceRoot;
-        this.packageName = packageName;
-        this.className = className;
-        this.classTemplate = classTemplate;
-        this.overwriteExisting = overwriteExisting;
-        this.relativePath = relativePath;
-    }
 
     @Override
     public @NonNull String getDisplayName() {
@@ -172,7 +152,7 @@ public class CreateJavaClass extends ScanningRecipe<AtomicBoolean> {
         }
 
         return String.format(
-                "%ssrc/%s/java/%s/%s.java",
+                "%s%s/%s/%s.java",
                 path,
                 sourceRoot,
                 packageName.replace('.', '/'),

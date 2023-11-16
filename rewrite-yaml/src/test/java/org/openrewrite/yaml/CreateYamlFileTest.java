@@ -29,11 +29,20 @@ class CreateYamlFileTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new CreateYamlFile(
             "test/test.yaml",
+            """
+              # This is a comment
+              x:
+                y: z
+              """,
             null
           )),
           yaml(
             null,
-            "",
+            """
+              # This is a comment
+              x:
+                y: z
+              """,
             spec -> spec.path("test/test.yaml")
           )
         );
@@ -45,6 +54,7 @@ class CreateYamlFileTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new CreateYamlFile(
             "test/test.yaml",
+            null,
             true
           )),
           yaml(
@@ -60,6 +70,7 @@ class CreateYamlFileTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new CreateYamlFile(
             "test/test.yaml",
+            null,
             false
           )),
           yaml(
@@ -77,6 +88,7 @@ class CreateYamlFileTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new CreateYamlFile(
             "test/test.yaml",
+            null,
             null
           )),
           yaml(
@@ -91,6 +103,7 @@ class CreateYamlFileTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new CreateYamlFile(
             "test/test-file-2.yaml",
+            null,
             true
           )),
           yaml(
