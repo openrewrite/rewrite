@@ -27,6 +27,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 
+@SuppressWarnings("unused")
 public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @Nullable
@@ -646,6 +647,24 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return c;
     }
 
+    public J visitParenthesizedTypeTree(J.ParenthesizedTypeTree parTree, P p) {
+        J.ParenthesizedTypeTree t = parTree;
+        t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.PARENTHESES_PREFIX, p));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        if (t.getAnnotations() != null && !t.getAnnotations().isEmpty()) {
+            t = t.withAnnotations(ListUtils.map(t.getAnnotations(), a -> visitAndCast(a, p)));
+        }
+
+        J temp = visitParentheses(t.getParenthesizedType(), p);
+        if (!(temp instanceof J.Parentheses)) {
+            return temp;
+        } else {
+            //noinspection unchecked
+            t = t.withParenthesizedType((J.Parentheses<TypeTree>)temp);
+        }
+        return t;
+    }
+
     public J visitIdentifier(J.Identifier ident, P p) {
         J.Identifier i = ident;
         if (i.getAnnotations() != null && !i.getAnnotations().isEmpty()) {
@@ -695,6 +714,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
         i = i.getPadding().withStatic(visitLeftPadded(i.getPadding().getStatic(), JLeftPadded.Location.STATIC_IMPORT, p));
         i = i.withQualid(visitAndCast(i.getQualid(), p));
+        i = i.getPadding().withAlias(visitLeftPadded(i.getPadding().getAlias(), JLeftPadded.Location.IMPORT_ALIAS_PREFIX, p));
         return i;
     }
 

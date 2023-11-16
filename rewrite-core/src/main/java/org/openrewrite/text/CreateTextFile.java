@@ -70,7 +70,7 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
 
     @Override
     public Collection<SourceFile> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
-        if(shouldCreate.get()) {
+        if (shouldCreate.get()) {
             return PlainTextParser.builder().build().parse(fileContents)
                     .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
                     .collect(Collectors.toList());
@@ -81,13 +81,27 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean created) {
         Path path = Paths.get(relativeFileName);
-        return new PlainTextVisitor<ExecutionContext>() {
+        return new TreeVisitor<SourceFile, ExecutionContext>() {
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.toString().equals(text.getSourcePath().toString())) {
-                    return text.withText(fileContents);
+            public SourceFile visit(@Nullable Tree tree, ExecutionContext executionContext) {
+                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
+                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(sourceFile.getSourcePath())) {
+                    if (sourceFile instanceof PlainText) {
+                        return ((PlainText) sourceFile).withText(fileContents);
+                    }
+                    PlainText plainText = PlainText.builder()
+                            .id(sourceFile.getId())
+                            .sourcePath(sourceFile.getSourcePath())
+                            .fileAttributes(sourceFile.getFileAttributes())
+                            .charsetBomMarked(sourceFile.isCharsetBomMarked())
+                            .text(fileContents)
+                            .build();
+                    if (sourceFile.getCharset() != null) {
+                        return plainText.withCharset(sourceFile.getCharset());
+                    }
+                    return plainText;
                 }
-                return text;
+                return sourceFile;
             }
         };
     }

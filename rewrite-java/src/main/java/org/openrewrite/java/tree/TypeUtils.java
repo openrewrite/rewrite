@@ -209,9 +209,11 @@ public class TypeUtils {
                     JavaType.Primitive toPrimitive = JavaType.Primitive.fromClassName(toFq.getFullyQualifiedName());
                     if (toPrimitive != null) {
                         return isAssignableTo(toPrimitive, from);
+                    } else if (toFq.getFullyQualifiedName().equals("java.lang.Object")) {
+                        return true;
                     }
                 }
-                return isAssignableTo(toFq.getFullyQualifiedName(), from);
+                return !(from instanceof JavaType.GenericTypeVariable) && isAssignableTo(toFq.getFullyQualifiedName(), from);
             } else if (to instanceof JavaType.GenericTypeVariable) {
                 JavaType.GenericTypeVariable toGeneric = (JavaType.GenericTypeVariable) to;
                 List<JavaType> toBounds = toGeneric.getBounds();
@@ -220,6 +222,13 @@ public class TypeUtils {
                 } else if (toGeneric.getVariance() == JavaType.GenericTypeVariable.Variance.COVARIANT) {
                     for (JavaType toBound : toBounds) {
                         if (!isAssignableTo(toBound, from)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                } else if (toGeneric.getVariance() == JavaType.GenericTypeVariable.Variance.CONTRAVARIANT) {
+                    for (JavaType toBound : toBounds) {
+                        if (!isAssignableTo(from, toBound)) {
                             return false;
                         }
                     }
