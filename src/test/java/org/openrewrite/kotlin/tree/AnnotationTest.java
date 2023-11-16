@@ -538,7 +538,7 @@ class AnnotationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              val releaseDates: List<@Suppress  /*C*/ String> = emptyList()
+              val releaseDates: List< /*C0*/ @Suppress  /*C1*/ String> = emptyList()
               """
           )
         );
