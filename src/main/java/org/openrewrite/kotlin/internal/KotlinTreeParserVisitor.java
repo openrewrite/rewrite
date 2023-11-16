@@ -2972,15 +2972,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         Arrays.stream(entries).forEach(entry -> valueSb.append(maybeAdjustCRLF(entry))
         );
 
-        PsiElement openQuote = expression.getFirstChild();
-        PsiElement closingQuota = expression.getLastChild();
-        if (openQuote == null || closingQuota == null ||
-                openQuote.getNode().getElementType() != KtTokens.OPEN_QUOTE ||
-                closingQuota.getNode().getElementType() != KtTokens.CLOSING_QUOTE) {
-            throw new UnsupportedOperationException("This should never happen");
-        }
-
-        String valueSource = openQuote.getText() + valueSb + closingQuota.getText();
+        String valueSource = getString(expression, valueSb);
 
         return new J.Literal(
                 randomId(),
@@ -2991,6 +2983,19 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 null,
                 JavaType.Primitive.String
         ).withPrefix(deepPrefix(expression));
+    }
+
+    @NotNull
+    private static String getString(KtStringTemplateExpression expression, StringBuilder valueSb) {
+        PsiElement openQuote = expression.getFirstChild();
+        PsiElement closingQuota = expression.getLastChild();
+        if (openQuote == null || closingQuota == null ||
+                openQuote.getNode().getElementType() != KtTokens.OPEN_QUOTE ||
+                closingQuota.getNode().getElementType() != KtTokens.CLOSING_QUOTE) {
+            throw new UnsupportedOperationException("This should never happen");
+        }
+
+        return openQuote.getText() + valueSb + closingQuota.getText();
     }
 
     @Override
