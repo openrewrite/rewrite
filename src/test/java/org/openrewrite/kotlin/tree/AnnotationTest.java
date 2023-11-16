@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.intellij.lang.annotations.Language;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -554,6 +555,26 @@ class AnnotationTest implements RewriteTest {
                 private val option:  @Ann   () -> Unit
               )
               """
+          )
+        );
+    }
+
+    @Disabled("2nd case needs to be fixed")
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/408")
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "String",
+      "Map<*, *>"
+    })
+    void annotatedTypeParameter(String input) {
+        rewriteRun(
+          kotlin(ANNOTATION),
+          kotlin(
+            """
+              class Test(
+                val map: Map< @Ann  %s   ,    @Ann %s  > = emptyMap()
+              )
+              """.formatted(input, input)
           )
         );
     }

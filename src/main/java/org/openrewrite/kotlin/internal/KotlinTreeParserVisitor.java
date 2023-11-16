@@ -1437,7 +1437,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             }
             default: {
                 name = convertToExpression(requireNonNull(typeProjection.getTypeReference()).accept(this, data));
-                name = name.withPrefix(merge(prefix(typeProjection), name.getPrefix()));
+                Space prefix = deepPrefix(typeProjection);
+                if (name instanceof J.Identifier) {
+                    name = addPrefixInFront((J.Identifier) name, prefix);
+                } else {
+                    name = name.withPrefix(merge(prefix, name.getPrefix()));
+                }
             }
         }
 
@@ -3015,7 +3020,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitTypeReference(KtTypeReference typeReference, ExecutionContext data) {
         List<J.Annotation> leadingAnnotations = new ArrayList<>();
         List<J.Annotation> lastAnnotations = new ArrayList<>();
-        Set<PsiElement> consumedSpaces = new HashSet<>();
+        Set<PsiElement> consumedSpaces = preConsumedInfix(typeReference);
 
         List<J.Modifier> modifiers = mapModifiers(typeReference.getModifierList(), leadingAnnotations, lastAnnotations, data);
         if (!leadingAnnotations.isEmpty()) {
@@ -3111,7 +3116,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     Space.EMPTY,
                     Markers.EMPTY,
                     pt == null ? nameTree.withType(JavaType.Unknown.getInstance()) : nameTree.withType(pt.getType()),
-                    args, //JContainer.build(prefix(type.getTypeArgumentList()), parameters, Markers.EMPTY),
+                    args,
                     pt == null ? JavaType.Unknown.getInstance() : pt
             );
         }
@@ -3349,6 +3354,15 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 type,
                 fieldType
         );
+    }
+
+    private static J.Identifier addPrefixInFront(J.Identifier id, Space prefix) {
+        if (!id.getAnnotations().isEmpty()) {
+            id = id.withAnnotations(ListUtils.mapFirst(id.getAnnotations(), anno -> anno.withPrefix(merge(prefix, anno.getPrefix()))));
+        } else {
+            id = id.withPrefix(merge(prefix, id.getPrefix()));
+        }
+        return id;
     }
 
     @Nullable
@@ -3936,7 +3950,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return space;
     }
 
-    private Space merge(@Nullable Space s1, @Nullable Space s2) {
+    private static Space merge(@Nullable Space s1, @Nullable Space s2) {
         if (s1 == null || s1.isEmpty()) {
             return s2 != null ? s2 : Space.EMPTY;
         } else if (s2 == null || s2.isEmpty()) {
