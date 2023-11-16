@@ -3986,16 +3986,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Nullable
     private PsiElement findLastNotSpaceChild(@Nullable PsiElement parent) {
-        if (parent == null) {
-            return null;
-        }
-
-        for (PsiElement child = parent.getLastChild(); child != null; child = child.getPrevSibling()) {
-            if (!isSpace(child.getNode())) {
-                return child;
-            }
-        }
-        return null;
+        return findLastChild(parent, psi -> !isSpace(psi.getNode()));
     }
 
     @Nullable
