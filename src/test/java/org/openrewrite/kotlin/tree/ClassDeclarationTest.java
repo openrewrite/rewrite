@@ -685,12 +685,24 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/396")
     @Test
     void explicitExtendsAny() {
         rewriteRun(
           kotlin("class Foo< out  T   :     Any >  () {}"
+          )
+        );
+    }
+
+    @Test
+    void variantWithAnnotaton() {
+        rewriteRun(
+          kotlin(
+            """
+            @Target(AnnotationTarget.TYPE_PARAMETER)
+            annotation class Anno
+            class Foo  <   @Anno     out     T :  Any    >  () {}
+            """
           )
         );
     }
