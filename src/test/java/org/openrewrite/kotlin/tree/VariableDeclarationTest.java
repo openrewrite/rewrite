@@ -675,4 +675,21 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/416")
+    @Test
+    void trailingComma() {
+        rewriteRun(
+          kotlin(
+            """
+              fun example ( ) {
+                val (
+                  a ,
+                  b   ,
+                ) = Pair ( 1, 2 )
+              }
+              """
+          )
+        );
+    }
 }

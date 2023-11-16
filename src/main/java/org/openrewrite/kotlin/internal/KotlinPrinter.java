@@ -201,6 +201,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             JRightPadded<J.VariableDeclarations.NamedVariable> element = elements.get(i);
             visit(element.getElement().getName(), p);
             visitSpace(element.getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
+            visitMarkers(element.getMarkers(), p);
             p.append(i == elements.size() - 1 ? ")" : ",");
         }
 

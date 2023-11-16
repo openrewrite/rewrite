@@ -2246,7 +2246,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             J.MethodInvocation initializer = buildSyntheticDestructInitializer(i + 1)
                     .withMethodType(methodType);
             namedVariable = namedVariable.getPadding().withInitializer(padLeft(Space.SINGLE_SPACE, initializer));
-            vars.add(padRight(namedVariable, suffix(entry)));
+            vars.add(maybeTrailingComma(entry, padRight(namedVariable, suffix(entry)), i == entries.size() - 1));
         }
 
         JavaType.Variable vt = variableType(multiDeclaration, owner(multiDeclaration));
