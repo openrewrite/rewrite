@@ -619,6 +619,59 @@ public class KotlinTypeMappingTest {
             );
         }
 
+        @ParameterizedTest
+        @CsvSource(value = {
+          // Method type on overload with no named arguments.
+          "foo(\"\", 1, true)~openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean]}",
+          // Method type on overload with named arguments.
+          "foo(b = 1)~openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.Int,kotlin.Boolean]}",
+          // Method type when named arguments are declared out of order.
+          "foo(trailingLambda = {}, noDefault = true, c = true, b = 1)~openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean,kotlin.Boolean,kotlin.Function0<kotlin.Unit>]}",
+          // Method type with trailing lambda
+          "foo(b = 1, noDefault = true) {}~openRewriteFile0Kt{name=foo,return=kotlin.Unit,parameters=[kotlin.String,kotlin.Int,kotlin.Boolean,kotlin.Boolean,kotlin.Function0<kotlin.Unit>]}"
+        }, delimiter = '~')
+        void methodInvocationWithDefaults(String invocation, String methodType) {
+            rewriteRun(
+              kotlin(
+                """
+                  fun <T> foo(b: T, c: Boolean = true) {
+                      foo("", b, true, c) {}
+                  }
+                  fun <T> foo(a: String = "", b: T, c: Boolean = true) {
+                      foo(a, b, true, c) {}
+                  }
+                  fun <T> foo(a: String = "", b: T, noDefault: Boolean , c: Boolean = true, trailingLambda: () -> Unit) {
+                  }
+                  fun m() {
+                      %s
+                  }
+                  """.formatted(invocation), spec -> spec.afterRecipe(cu -> {
+                    MethodMatcher matcher = new MethodMatcher("* foo(..)");
+                    AtomicBoolean methodFound = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<AtomicBoolean>() {
+                        @Override
+                        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, AtomicBoolean found) {
+                            if (!"m".equals(method.getSimpleName())) {
+                                return method;
+                            }
+                            return super.visitMethodDeclaration(method, found);
+                        }
+
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean found) {
+                            if (matcher.matches(method)) {
+                                assertThat(method.getMethodType().toString()).isEqualTo(methodType);
+                                found.set(true);
+                            }
+                            return super.visitMethodInvocation(method, found);
+                        }
+                    }.visit(cu, methodFound);
+                    assertThat(methodFound.get()).isTrue();
+                })
+              )
+            );
+        }
+
         @Test
         void operatorOverload() {
             rewriteRun(

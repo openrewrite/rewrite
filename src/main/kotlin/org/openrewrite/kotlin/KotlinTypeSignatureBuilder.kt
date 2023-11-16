@@ -44,6 +44,7 @@ import org.jetbrains.kotlin.types.Variance
 import org.openrewrite.java.JavaTypeSignatureBuilder
 import org.openrewrite.java.tree.JavaType
 import java.util.*
+import kotlin.collections.HashMap
 
 @Suppress("DuplicatedCode")
 class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val firFile: FirFile) :
@@ -408,10 +409,28 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         if (function.toResolvedCallableSymbol()?.receiverParameter != null) {
             genericArgumentTypes.add(signature(function.toResolvedCallableSymbol()?.receiverParameter!!.typeRef))
         }
-        for ((index, p) in (function.toResolvedCallableSymbol()?.fir as FirFunction).valueParameters.withIndex()) {
+        val mapNames = function.arguments.any { it is FirNamedArgumentExpression }
+        var args: MutableMap<String, FirNamedArgumentExpression>? = null
+        if (mapNames) {
+            for (a in function.arguments) {
+                if (args == null) {
+                    args = HashMap(function.arguments.size)
+                }
+                if (a is FirNamedArgumentExpression) {
+                    args[a.name.asString()] = a
+                }
+            }
+        }
+
+        val valueParams = (function.toResolvedCallableSymbol()?.fir as FirFunction).valueParameters
+        for ((index, p) in valueParams.withIndex()) {
             val sig = signature(p.returnTypeRef, function)
             if (sig.startsWith("Generic{")) {
-                genericArgumentTypes.add(signature((function.arguments[index]).typeRef, function))
+                if (mapNames && args != null && args.containsKey(p.name.asString())) {
+                    genericArgumentTypes.add(signature(args[p.name.asString()]!!.typeRef, function))
+                } else if (index < valueParams.size) {
+                    genericArgumentTypes.add(signature((function.arguments[index]).typeRef, function))
+                }
             } else {
                 genericArgumentTypes.add(sig)
             }

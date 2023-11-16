@@ -729,16 +729,33 @@ class KotlinTypeMapping(
         if (function.toResolvedCallableSymbol()?.receiverParameter != null) {
             paramTypes!!.add(type(function.toResolvedCallableSymbol()?.receiverParameter!!.typeRef))
         }
-        for ((index, p) in (function.toResolvedCallableSymbol()?.fir as FirFunction).valueParameters.withIndex()) {
+        val mapNames = function.arguments.any { it is FirNamedArgumentExpression }
+        var args: MutableMap<String, FirNamedArgumentExpression>? = null
+        if (mapNames) {
+            for (a in function.arguments) {
+                if (args == null) {
+                    args = HashMap(function.arguments.size)
+                }
+                if (a is FirNamedArgumentExpression) {
+                    args[a.name.asString()] = a
+                }
+            }
+        }
+        val valueParams = (function.toResolvedCallableSymbol()?.fir as FirFunction).valueParameters
+        for ((index, p) in valueParams.withIndex()) {
             if (paramTypes == null) {
                 // Ideally, an ArrayList is created with the expected size based on the symbol for the function.
                 paramTypes = ArrayList()
             }
             val t = type(p.returnTypeRef)
-            if (t !is GenericTypeVariable) {
-                paramTypes.add(t)
+            if (t is GenericTypeVariable) {
+                if (mapNames && args != null && args.containsKey(p.name.asString())) {
+                    paramTypes.add(type(args[p.name.asString()]!!.typeRef, function)!!)
+                } else if (index < valueParams.size) {
+                    paramTypes.add(type(function.arguments[index].typeRef, function)!!)
+                }
             } else {
-                paramTypes.add(type((function.arguments[index]).typeRef))
+                paramTypes.add(t)
             }
         }
         method.unsafeSet(
