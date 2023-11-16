@@ -145,7 +145,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
             d = (K.DestructuringDeclaration) temp;
         }
         d = d.withInitializer(visitAndCast(d.getInitializer(), p));
-        d = d.getPadding().withAssignments(visitContainer(d.getPadding().getAssignments(), p));
+        d = d.getPadding().withDestructAssignments(visitContainer(d.getPadding().getDestructAssignments(), p));
         return d;
     }
 
@@ -263,6 +263,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         return n;
     }
 
+    @SuppressWarnings("DataFlowIssue")
     public J visitProperty(K.Property property, P p) {
         K.Property pr = property;
         pr = pr.withPrefix(visitSpace(pr.getPrefix(), KSpace.Location.PROPERTY_PREFIX, p));
@@ -421,21 +422,12 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         if (m instanceof AnnotationCallSite) {
             AnnotationCallSite acs = (AnnotationCallSite) marker;
             m = acs.withSuffix(visitSpace(acs.getSuffix(), KSpace.Location.ANNOTATION_CALL_SITE_PREFIX, p));
-        } else if (marker instanceof CheckNotNull) {
-            CheckNotNull cnn = (CheckNotNull) marker;
-            m = cnn.withPrefix(visitSpace(cnn.getPrefix(), KSpace.Location.CHECK_NOT_NULL_PREFIX, p));
         } else if (marker instanceof IsNullable) {
             IsNullable isn = (IsNullable) marker;
             m = isn.withPrefix(visitSpace(isn.getPrefix(), KSpace.Location.IS_NULLABLE_PREFIX, p));
         } else if (marker instanceof IsNullSafe) {
             IsNullSafe ins = (IsNullSafe) marker;
             m = ins.withPrefix(visitSpace(ins.getPrefix(), KSpace.Location.IS_NULLABLE_PREFIX, p));
-        } else if (marker instanceof KObject) {
-            KObject ko = (KObject) marker;
-            m = ko.withPrefix(visitSpace(ko.getPrefix(), KSpace.Location.OBJECT_PREFIX, p));
-        } else if (marker instanceof SpreadArgument) {
-            SpreadArgument sa = (SpreadArgument) marker;
-            m = sa.withPrefix(visitSpace(sa.getPrefix(), KSpace.Location.SPREAD_ARGUMENT_PREFIX, p));
         } else if (marker instanceof TypeReferencePrefix) {
             TypeReferencePrefix tr = (TypeReferencePrefix) marker;
             m = tr.withPrefix(visitSpace(tr.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p));
