@@ -125,4 +125,18 @@ class MethodReferenceTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/409")
+    @Test
+    void nullableMethodReference() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method ( s: List<String?> ) {
+                  s.none( CharSequence  ?   :: isNullOrBlank)
+              }
+              """
+          )
+        );
+    }
 }

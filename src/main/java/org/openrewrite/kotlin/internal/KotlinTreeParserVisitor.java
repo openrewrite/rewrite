@@ -284,8 +284,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             receiver = padRight(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY),
                     prefix(expression.findColonColon()));
         } else {
-            receiver = padRight(convertToExpression(expression.getReceiverExpression().accept(this, data)),
-                    prefix(expression.findColonColon()));
+            Expression receiverExp = convertToExpression(expression.getReceiverExpression().accept(this, data));
+            if (expression.getHasQuestionMarks()) {
+                PsiElement questionMark = PsiTreeUtil.findSiblingForward(expression.getFirstChild(), KtTokens.QUEST, null);
+                receiverExp = receiverExp.withMarkers(receiverExp.getMarkers().addIfAbsent(new IsNullable(randomId(), prefix(questionMark))));
+            }
+            receiver = padRight(receiverExp, prefix(expression.findColonColon()));
         }
 
         return new J.MemberReference(
