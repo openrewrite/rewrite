@@ -2194,6 +2194,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                             .withPrefix(prefix(multiDeclaration.getInitializer())));
         }
 
+
         List<KtDestructuringDeclarationEntry> entries = multiDeclaration.getEntries();
         for (int i = 0; i < entries.size(); i++) {
             KtDestructuringDeclarationEntry entry = entries.get(i);
@@ -2210,7 +2211,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             JavaType.Variable vt = variableType(entry, owner(entry));
 
             if (entry.getName() == null) {
-                throw new UnsupportedOperationException();
+                throw new UnsupportedOperationException("KtDestructuringDeclarationEntry has empty name, this should never happen");
             }
 
             J.Identifier nameVar = createIdentifier(requireNonNull(entry.getNameIdentifier()), vt);
