@@ -3666,7 +3666,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 .collect(Collectors.toList());
     }
 
-    private J.VariableDeclarations mapDestructuringDeclaration(KtDestructuringDeclaration ktDestructuringDeclaration, ExecutionContext data) {
+    private J mapDestructuringDeclaration(KtDestructuringDeclaration ktDestructuringDeclaration, ExecutionContext data) {
         List<KtDestructuringDeclarationEntry> entries = ktDestructuringDeclaration.getEntries();
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = new ArrayList<>(entries.size());
 
@@ -3685,7 +3685,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             variables.add(padRight(namedVariable, suffix(ktDestructuringDeclarationEntry)));
         }
 
-        return new J.VariableDeclarations(
+        J j = new J.VariableDeclarations(
                 randomId(),
                 prefix(ktDestructuringDeclaration),
                 Markers.EMPTY.addIfAbsent(new OmitEquals(randomId())),
@@ -3696,6 +3696,34 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 emptyList(),
                 variables
         );
+
+        if (entries.size() == 1) {
+            // Handle potential redundant parentheses
+            Stack<Pair<Integer, Integer>> parenPairs = new Stack<>();
+            List<PsiElement> allChildren = getAllChildren(ktDestructuringDeclaration);
+
+            int l = 0;
+            int r = allChildren.size() - 1;
+            while (l < r) {
+                l = findFirstLPAR(allChildren, l);
+                r = findLastRPAR(allChildren, r);
+                if (l * r < 0) {
+                    throw new UnsupportedOperationException("Unpaired parentheses!");
+                }
+                if (l < 0 || r < 0) {
+                    break;
+                }
+                parenPairs.add(new Pair<>(l++, r--));
+            }
+
+            while (!parenPairs.empty()) {
+                Pair<Integer, Integer> parenPair = parenPairs.pop();
+                PsiElement lPAR = allChildren.get(parenPair.getFirst());
+                PsiElement rPAR = allChildren.get(parenPair.getSecond());
+                j = new J.Parentheses<>(randomId(), Space.EMPTY, Markers.EMPTY, padRight(j, EMPTY));
+            }
+        }
+        return j;
     }
 
     private J.Modifier mapModifier(PsiElement modifier, List<J.Annotation> annotations, @Nullable Set<PsiElement> consumedSpaces) {

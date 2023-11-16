@@ -311,6 +311,28 @@ class MethodInvocationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/413")
+    @Test
+    void trailingLambdaArgumentWithParentheses1() {
+        rewriteRun(
+          kotlin(
+            """
+              @Suppress("UNUSED_PARAMETER")
+              fun String.modify(block: ( Any? ) -> Any? ) = this
+              
+              @Suppress("UNUSED_DESTRUCTURED_PARAMETER_ENTRY")
+              val spec = "test".modify {
+                  (  i   ) ->
+              }
+              
+              operator fun Any?.component1(): Any {
+                  return ""
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/78")
     @Test
     void infixTrailingLambdaDSL() {
