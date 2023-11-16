@@ -3699,27 +3699,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         if (entries.size() == 1) {
             // Handle potential redundant parentheses
-            Stack<Pair<Integer, Integer>> parenPairs = new Stack<>();
             List<PsiElement> allChildren = getAllChildren(ktDestructuringDeclaration);
-
-            int l = 0;
-            int r = allChildren.size() - 1;
-            while (l < r) {
-                l = findFirstLPAR(allChildren, l);
-                r = findLastRPAR(allChildren, r);
-                if (l * r < 0) {
-                    throw new UnsupportedOperationException("Unpaired parentheses!");
-                }
-                if (l < 0 || r < 0) {
-                    break;
-                }
-                parenPairs.add(new Pair<>(l++, r--));
-            }
-
-            while (!parenPairs.empty()) {
-                Pair<Integer, Integer> parenPair = parenPairs.pop();
-                PsiElement lPAR = allChildren.get(parenPair.getFirst());
-                PsiElement rPAR = allChildren.get(parenPair.getSecond());
+            int l = findFirstLPAR(allChildren, 0);
+            int r = findLastRPAR(allChildren, allChildren.size() - 1);
+            if (l >= 0 && l < r) {
                 j = new J.Parentheses<>(randomId(), Space.EMPTY, Markers.EMPTY, padRight(j, EMPTY));
             }
         }
