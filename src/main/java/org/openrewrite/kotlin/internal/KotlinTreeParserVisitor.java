@@ -1733,6 +1733,14 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         } else if (argument.isNamed()) {
             J.Identifier name = createIdentifier(requireNonNull(argument.getArgumentName()), type(argument.getArgumentName()));
             Expression expr = convertToExpression(argument.getArgumentExpression().accept(this, data));
+            if (argument.isSpread()) {
+                expr = new K.SpreadArgument(
+                        randomId(),
+                        prefix(argument.getArgumentExpression()),
+                        Markers.EMPTY,
+                        expr
+                );
+            }
             return new J.Assignment(
                     randomId(),
                     deepPrefix(argument),
