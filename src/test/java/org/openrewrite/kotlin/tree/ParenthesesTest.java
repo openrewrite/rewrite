@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin.tree;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -43,4 +44,18 @@ class ParenthesesTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/399")
+    @Test
+    void suspendModifier() {
+        rewriteRun(
+          kotlin(
+            """
+              @Suppress("UNUSED_PARAMETER")
+              fun <R> runAsync(
+                arg: (  suspend   ( ) -> R)? = null
+              ) {}
+              """
+          )
+        );
+    }
 }

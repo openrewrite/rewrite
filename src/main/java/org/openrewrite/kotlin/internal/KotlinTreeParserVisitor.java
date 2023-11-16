@@ -785,7 +785,21 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitNullableType(KtNullableType nullableType, ExecutionContext data) {
         TypeTree typeTree = (TypeTree) requireNonNull(nullableType.getInnerType()).accept(this, data);
-        return typeTree.withPrefix(deepPrefix(nullableType))
+
+        if (typeTree instanceof K.FunctionType && nullableType.getModifierList() != null) {
+            List<J.Annotation> leadingAnnotations = new ArrayList<>();
+            List<J.Modifier> modifiers = mapModifiers(nullableType.getModifierList(), leadingAnnotations, emptyList(), data);
+
+            if (!leadingAnnotations.isEmpty()) {
+                leadingAnnotations = ListUtils.mapFirst(leadingAnnotations, anno -> anno.withPrefix(merge(deepPrefix(nullableType.getModifierList()), anno.getPrefix())));
+            } else if (!modifiers.isEmpty()) {
+                modifiers = ListUtils.mapFirst(modifiers, mod -> mod.withPrefix(merge(deepPrefix(nullableType.getModifierList()), mod.getPrefix())));
+            }
+
+            typeTree = ((K.FunctionType)typeTree).withModifiers(modifiers).withLeadingAnnotations(leadingAnnotations);
+        }
+
+        return typeTree.withPrefix(merge(deepPrefix(nullableType), typeTree.getPrefix())  )
                 .withMarkers(typeTree.getMarkers().addIfAbsent(new IsNullable(randomId(),
                         prefix((PsiElement) nullableType.getQuestionMarkNode())
                 )));

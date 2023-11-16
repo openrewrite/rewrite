@@ -220,14 +220,15 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         boolean nullable = functionType.getMarkers().findFirst(IsNullable.class).isPresent();
 
         beforeSyntax(functionType, KSpace.Location.FUNCTION_TYPE_PREFIX, p);
+        if (nullable) {
+            p.append("(");
+        }
+
         visit(functionType.getLeadingAnnotations(), p);
         for (J.Modifier modifier : functionType.getModifiers()) {
             delegate.visitModifier(modifier, p);
         }
 
-        if (nullable) {
-            p.append("(");
-        }
         if (functionType.getReceiver() != null) {
             visitRightPadded(functionType.getReceiver(), p);
             p.append(".");
