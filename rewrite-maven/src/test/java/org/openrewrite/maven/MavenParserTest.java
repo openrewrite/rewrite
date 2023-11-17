@@ -27,6 +27,7 @@ import org.openrewrite.Parser;
 import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.tree.ParseError;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -853,7 +854,6 @@ class MavenParserTest implements RewriteTest {
         var password = "password";
         try (MockWebServer mockRepo = new MockWebServer()) {
             mockRepo.setDispatcher(new Dispatcher() {
-                @SuppressWarnings("NullableProblems")
                 @Override
                 public MockResponse dispatch(RecordedRequest request) {
                     MockResponse resp = new MockResponse();
@@ -2236,5 +2236,27 @@ class MavenParserTest implements RewriteTest {
               )
             ))
         );
+    }
+
+    @Test
+    void malformedPom() {
+        String malformedPomXml = """
+          <project>
+            <groupId>com.mycompany.app</groupId>
+            <artifactId>my-app</artifactId>
+            <version>1</version>
+                        
+            <dependencies>
+              <dependency>
+                <groupId>junit</groupId>
+                <artifactId>junit</artifactId>
+                <version>4.11</version>&gt;
+              </dependency>
+            </dependencies>
+          </project>
+          """;
+        assertThat(MavenParser.builder().build().parse(malformedPomXml))
+          .singleElement()
+          .isInstanceOf(ParseError.class);
     }
 }
