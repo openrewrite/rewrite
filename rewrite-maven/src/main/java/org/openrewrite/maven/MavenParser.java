@@ -82,12 +82,18 @@ public class MavenParser implements Parser {
                 pom.getProperties().put("project.basedir", baseDir);
                 pom.getProperties().put("basedir", baseDir);
 
-                Xml.Document xml = (Xml.Document) new MavenXmlParser()
+                SourceFile sourceFile = new MavenXmlParser()
                         .parseInputs(singletonList(source), relativeTo, ctx)
                         .iterator().next();
 
-                projectPoms.put(xml, pom);
-                projectPomsByPath.put(pomPath, pom);
+                if (sourceFile instanceof Xml.Document) {
+                    Xml.Document xml = (Xml.Document) sourceFile;
+
+                    projectPoms.put(xml, pom);
+                    projectPomsByPath.put(pomPath, pom);
+                } else {
+                    parsed.add(sourceFile);
+                }
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
                 parsed.add(ParseError.build(this, source, relativeTo, ctx, t));

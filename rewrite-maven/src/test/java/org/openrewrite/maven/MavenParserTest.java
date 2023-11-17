@@ -2237,4 +2237,28 @@ class MavenParserTest implements RewriteTest {
             ))
         );
     }
+
+    @Test
+    void malformedPom() {
+        rewriteRun(
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              
+                <dependencies>
+                  <dependency>
+                    <groupId>junit</groupId>
+                    <artifactId>junit</artifactId>
+                    <version>[4.11]</version>&gt;
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
+    }
+
 }
