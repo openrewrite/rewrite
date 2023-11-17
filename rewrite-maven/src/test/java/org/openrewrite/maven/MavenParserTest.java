@@ -853,7 +853,6 @@ class MavenParserTest implements RewriteTest {
         var password = "password";
         try (MockWebServer mockRepo = new MockWebServer()) {
             mockRepo.setDispatcher(new Dispatcher() {
-                @SuppressWarnings("NullableProblems")
                 @Override
                 public MockResponse dispatch(RecordedRequest request) {
                     MockResponse resp = new MockResponse();

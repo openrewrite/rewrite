@@ -191,7 +191,7 @@ public class MavenParser implements Parser {
             if (mavenConfig != null && mavenConfig.toFile().exists()) {
                 try {
                     String mavenConfigText = new String(Files.readAllBytes(mavenConfig));
-                    Matcher matcher = Pattern.compile("(?:$|\\s)-P\\s+([^\\s]+)").matcher(mavenConfigText);
+                    Matcher matcher = Pattern.compile("(?:$|\\s)-P\\s+(\\S+)").matcher(mavenConfigText);
                     if (matcher.find()) {
                         String[] profiles = matcher.group(1).split(",");
                         return activeProfiles(profiles);
