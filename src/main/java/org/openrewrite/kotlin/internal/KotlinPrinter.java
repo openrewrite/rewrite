@@ -486,16 +486,29 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 p.append("@");
             }
 
-            AnnotationCallSite callSite = annotation.getMarkers().findFirst(AnnotationCallSite.class).orElse(null);
-            if (callSite != null) {
-                p.append(callSite.getName());
-                kotlinPrinter.visitSpace(callSite.getSuffix(), KSpace.Location.FILE_ANNOTATION_SUFFIX, p);
-                p.append(":");
-            }
             visit(annotation.getAnnotationType(), p);
-            if (!isKModifier) {
-                visitContainer("(", annotation.getPadding().getArguments(), JContainer.Location.ANNOTATION_ARGUMENTS, ",", ")", p);
+
+            String beforeArgs = "(";
+            String afterArgs = ")";
+            String delimiter = ",";
+
+            AnnotationUseSite useSite = annotation.getMarkers().findFirst(AnnotationUseSite.class).orElse(null);
+            if (useSite != null) {
+                kotlinPrinter.visitSpace(useSite.getPrefix(), KSpace.Location.ANNOTATION_CALL_SITE_PREFIX, p);
+                p.append(":");
+
+                if (!useSite.isImplicitBracket()) {
+                    beforeArgs = "[";
+                    afterArgs = "]";
+                } else {
+                    beforeArgs = "";
+                    afterArgs = "";
+                }
+
+                delimiter = "";
             }
+
+            visitContainer(beforeArgs, annotation.getPadding().getArguments(), JContainer.Location.ANNOTATION_ARGUMENTS, delimiter, afterArgs, p);
             afterSyntax(annotation, p);
             return annotation;
         }

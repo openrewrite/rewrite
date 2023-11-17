@@ -63,7 +63,7 @@ class AnnotationTest implements RewriteTest {
           spec -> spec.parser(KotlinParser.builder().classpath()),
           kotlin(
             """
-              @file : Suppress ( "DEPRECATION_ERROR" )
+              @file : Suppress  (   "DEPRECATION_ERROR" )
 
               class A
               """
@@ -575,6 +575,59 @@ class AnnotationTest implements RewriteTest {
                 val map: Map< @Ann  %s   ,    @Ann %s  > = emptyMap()
               )
               """.formatted(input, input)
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/397")
+    @Test
+    void fieldUseSiteWithMultipleAnnotations() {
+        rewriteRun(
+          kotlin(
+            """
+              import javax.inject.Inject
+              import javax.inject.Named
+              
+              class Test {
+                  @field :  [   Inject    Named (  "numberfield "   )    ]
+                  var field: Long = 0
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/397")
+    @Test
+    void fieldUseSiteWithSingleAnnotationInBracket() {
+        rewriteRun(
+          kotlin(
+            """
+              import javax.inject.Inject
+
+              annotation class Anno
+              class A {
+                  @field: [ Inject ]
+                  var field: Long = 0
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void fieldUseSiteWithSingleAnnotationImplicitBracket() {
+        rewriteRun(
+          kotlin(
+            """
+              import javax.inject.Inject
+
+              annotation class Anno
+              class A {
+                  @field :  Inject
+                  var field: Long = 0
+              }
+              """
           )
         );
     }

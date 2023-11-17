@@ -22,17 +22,17 @@ import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
-@Deprecated
 @Value
 @With
-public class AnnotationCallSite implements Marker {
+public class AnnotationUseSite implements Marker {
     UUID id;
-    String name;
-    Space suffix;
+    // Space before colon
+    Space prefix;
+    boolean implicitBracket;
 
-    public AnnotationCallSite(UUID id, String name, Space suffix) {
+    public AnnotationUseSite(UUID id, Space prefix, boolean implicitBracket) {
         this.id = id;
-        this.name = name;
-        this.suffix = suffix;
+        this.prefix = prefix;
+        this.implicitBracket = implicitBracket;
     }
 }
