@@ -29,10 +29,10 @@ import org.openrewrite.marker.SearchResult;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Objects.requireNonNull;
+import static java.util.stream.Collectors.toList;
 
 @Value
 @EqualsAndHashCode(callSuper = true)
@@ -60,7 +60,7 @@ public class FindPlugins extends Recipe {
             public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (pluginMatcher.matches(method)) {
                     if (method.getArguments().get(0) instanceof J.Literal &&
-                        pluginId.equals(((J.Literal) method.getArguments().get(0)).getValue())) {
+                            pluginId.equals(((J.Literal) method.getArguments().get(0)).getValue())) {
                         return SearchResult.found(method);
                     }
                 }
@@ -86,7 +86,7 @@ public class FindPlugins extends Recipe {
 
         MethodMatcher idMatcher = new MethodMatcher("PluginSpec id(..)", false);
         MethodMatcher versionMatcher = new MethodMatcher("Plugin version(..)", false);
-        return plugins.stream().flatMap(plugin -> {
+        List<GradlePlugin> pluginsWithVersion = plugins.stream().flatMap(plugin -> {
             if (versionMatcher.matches(plugin) && idMatcher.matches(plugin.getSelect())) {
                 return Stream.of(new GradlePlugin(
                         plugin,
@@ -94,7 +94,12 @@ public class FindPlugins extends Recipe {
                                 .getArguments().get(0)).getValue()).toString(),
                         requireNonNull(((J.Literal) plugin.getArguments().get(0)).getValue()).toString()
                 ));
-            } else if (idMatcher.matches(plugin)) {
+            }
+            return Stream.empty();
+        }).collect(toList());
+        List<GradlePlugin> pluginsWithoutVersion = plugins.stream().flatMap(plugin -> {
+            if (idMatcher.matches(plugin) && pluginsWithVersion.stream()
+                    .noneMatch(it -> it.getPluginId().equals(plugin.getSimpleName()))) {
                 return Stream.of(new GradlePlugin(
                         plugin,
                         requireNonNull(((J.Literal) requireNonNull(plugin)
@@ -102,7 +107,12 @@ public class FindPlugins extends Recipe {
                         null
                 ));
             }
-            return Stream.<GradlePlugin>empty();
-        }).collect(Collectors.toList());
+            return Stream.empty();
+        }).collect(toList());
+
+        List<GradlePlugin> result = new ArrayList<>(pluginsWithVersion.size() + pluginsWithoutVersion.size());
+        result.addAll(pluginsWithVersion);
+        result.addAll(pluginsWithoutVersion);
+        return result;
     }
 }

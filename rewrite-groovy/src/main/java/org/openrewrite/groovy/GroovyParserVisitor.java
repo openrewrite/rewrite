@@ -2433,7 +2433,7 @@ public class GroovyParserVisitor {
                     .withAfter(EMPTY));
             bounds = JContainer.build(boundsPrefix, convertedBounds, Markers.EMPTY);
         }
-        return new J.TypeParameter(randomId(), prefix, Markers.EMPTY, emptyList(), name, bounds);
+        return new J.TypeParameter(randomId(), prefix, Markers.EMPTY, emptyList(), emptyList(), name, bounds);
     }
 
     private J.Wildcard visitWildcard(GenericsType genericType) {

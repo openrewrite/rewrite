@@ -851,6 +851,8 @@ public interface J extends Tree {
                 } else if (next instanceof J.NewClass) {
                     J.NewClass newClass = (J.NewClass) next;
                     return newClass.getBody() == parentBlock;
+                } else if (next instanceof J.Lambda) {
+                    return false;
                 }
             }
             return false;
@@ -1243,24 +1245,19 @@ public interface J extends Tree {
         public static final class Kind implements J {
 
             @With
-            @Getter
             @EqualsAndHashCode.Include
             UUID id;
 
             @With
-            @Getter
             Space prefix;
 
             @With
-            @Getter
             Markers markers;
 
             @With
-            @Getter
             List<Annotation> annotations;
 
             @With
-            @Getter
             Type type;
 
             public enum Type {
@@ -2344,6 +2341,51 @@ public interface J extends Tree {
             public ForLoop withBody(JRightPadded<Statement> body) {
                 return t.body == body ? t : new ForLoop(t.id, t.prefix, t.markers, t.control, body);
             }
+        }
+    }
+
+    /**
+     * Java does not allow for parenthesis around TypeTree in places like a type cast where a J.ControlParenthesis is
+     * used. But other languages, like Kotlin, do.
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
+    @With
+    class ParenthesizedTypeTree implements J, TypeTree, Expression {
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        Space prefix;
+
+        @Getter
+        Markers markers;
+
+        List<J.Annotation> annotations;
+
+        J.Parentheses<TypeTree> parenthesizedType;
+
+        @Override
+        public @Nullable JavaType getType() {
+            return parenthesizedType.getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public ParenthesizedTypeTree withType(@Nullable JavaType type) {
+            return withParenthesizedType(parenthesizedType.withType(type));
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitParenthesizedTypeTree(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
     }
 
@@ -3514,11 +3556,9 @@ public interface J extends Tree {
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static final class IdentifierWithAnnotations {
-            @Getter
             @With
             Identifier identifier;
 
-            @Getter
             @With
             List<Annotation> annotations;
         }
@@ -5218,6 +5258,10 @@ public interface J extends Tree {
         @Getter
         List<Annotation> annotations;
 
+        @With
+        @Getter
+        List<J.Modifier> modifiers;
+
         /**
          * Will be either a {@link TypeTree} or {@link Wildcard}. Wildcards aren't possible in
          * every context where type parameters may be defined (e.g. not possible on new statements).
@@ -5268,7 +5312,7 @@ public interface J extends Tree {
             }
 
             public TypeParameter withBounds(@Nullable JContainer<TypeTree> bounds) {
-                return t.bounds == bounds ? t : new TypeParameter(t.id, t.prefix, t.markers, t.annotations, t.name, bounds);
+                return t.bounds == bounds ? t : new TypeParameter(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.name, bounds);
             }
         }
     }
