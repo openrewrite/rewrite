@@ -100,7 +100,7 @@ class FindAndReplaceTest implements RewriteTest {
     }
 
     @Test
-    void testTemplateSyntaxInContentShouldNotFails() {
+    void dollarsignsTolerated() {
         String find = "This is text ${dynamic}.";
         String replace = "This is text ${dynamic}. Stuff";
         rewriteRun(
