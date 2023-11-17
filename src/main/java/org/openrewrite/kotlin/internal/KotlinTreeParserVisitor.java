@@ -3032,6 +3032,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             j = functionType;
         } else if (j instanceof J.Identifier) {
             j = ((J.Identifier) j).withAnnotations(leadingAnnotations);
+        } else if (j instanceof J.ParameterizedType) {
+            if (!leadingAnnotations.isEmpty()) {
+                j = new K.AnnotatedExpression(randomId(), Markers.EMPTY, leadingAnnotations, (J.ParameterizedType) j);
+            }
         }
 
         // Handle potential redundant nested parentheses
@@ -3084,8 +3088,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             nameTree = new J.FieldAccess(randomId(), Space.EMPTY, Markers.EMPTY, select, padLeft(suffix(type.getQualifier()), name), null);
         }
 
-        List<KtTypeProjection> typeArguments = type.getTypeArguments();
-        if (!typeArguments.isEmpty()) {
+        if (type.getTypeArgumentList() != null) {
             JContainer<Expression> args = mapTypeArguments(type.getTypeArgumentList(), data);
 
             JavaType javaType = type(type);

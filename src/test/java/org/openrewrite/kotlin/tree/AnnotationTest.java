@@ -559,7 +559,6 @@ class AnnotationTest implements RewriteTest {
         );
     }
 
-    @Disabled("2nd case needs to be fixed")
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/408")
     @ParameterizedTest
     @ValueSource(strings = {
@@ -568,9 +567,10 @@ class AnnotationTest implements RewriteTest {
     })
     void annotatedTypeParameter(String input) {
         rewriteRun(
-          kotlin(ANNOTATION),
           kotlin(
             """
+              @Target(AnnotationTarget.TYPE)
+              annotation class Ann
               class Test(
                 val map: Map< @Ann  %s   ,    @Ann %s  > = emptyMap()
               )
