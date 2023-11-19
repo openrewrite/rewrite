@@ -91,13 +91,31 @@ class JavaParserTest implements RewriteTest {
     @Test
     void annotationAfterVariableTypePackageName() {
         JavaParser parser = JavaParser.fromJavaVersion().build();
+        String annotationSource = """
+            package example;
+            
+            import java.lang.annotation.ElementType;
+            import java.lang.annotation.Retention;
+            import java.lang.annotation.RetentionPolicy;
+            import java.lang.annotation.Target;
+            
+            @Retention(RetentionPolicy.CLASS)
+            @Target({ TYPE_USE })
+            public @interface NonNull {
+                // marker annotation with no members
+            }
+          """;
         String source = """
+              package example;
+              
+              import example.NonNull;
+              
               public class A {
-                java.lang.@Deprecated String a;
+                java.lang.@NonNull String a;
               }
               """;
 
-        List<SourceFile> compilationUnits = parser.parse(new InMemoryExecutionContext(Throwable::printStackTrace), source).collect(Collectors.toList());
+        List<SourceFile> compilationUnits = parser.parse(new InMemoryExecutionContext(Throwable::printStackTrace), source, annotationSource).collect(Collectors.toList());
         SourceFile cu = compilationUnits.get(0);
         assertThat(cu).isInstanceOf(J.CompilationUnit.class);
         assertThat(cu.printAll()).isEqualTo(source);
