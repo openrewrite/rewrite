@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
@@ -73,6 +74,25 @@ class UseStaticImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3705")
+    @Test
+    void ignoreMethodsWithTypeParameter() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.util.Collections emptyList()")),
+          java(
+            """
+            import java.util.Collections;
+            import java.util.List;
+
+            public class Reproducer {
+                public void methodWithTypeParameter() {
+                    List<Object> list = Collections.<Object>emptyList();
+                }
+            }
+            """
+          )
+        );
+    }
     @Test
     void methodInvocationsHavingNullSelect() {
         rewriteRun(
