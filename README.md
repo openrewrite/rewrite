@@ -13,3 +13,7 @@ This project contains a series of Rewrite recipes and visitors to automatically 
 ## How to use?
 
 See the full documentation at [docs.openrewrite.org](https://docs.openrewrite.org/).
+
+## Contributing
+
+We appreciate all types of contributions. See the [contributing guide](https://github.com/openrewrite/.github/blob/main/CONTRIBUTING.md) for detailed instructions on how to get started.
