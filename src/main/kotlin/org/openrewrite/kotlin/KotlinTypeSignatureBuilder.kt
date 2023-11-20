@@ -428,7 +428,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             if (sig.startsWith("Generic{")) {
                 if (mapNames && args != null && args.containsKey(p.name.asString())) {
                     genericArgumentTypes.add(signature(args[p.name.asString()]!!.typeRef, function))
-                } else if (index < valueParams.size) {
+                } else if (index < function.arguments.size) {
                     genericArgumentTypes.add(signature((function.arguments[index]).typeRef, function))
                 }
             } else {
