@@ -3133,7 +3133,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
             JavaType javaType = type(type);
             if (!(javaType instanceof JavaType.Parameterized)) {
-                throw new UnsupportedOperationException("java type is not a Parameterized");
+                throw new UnsupportedOperationException("java type is not a Parameterized: " + type.getText());
             }
 
             JavaType.Parameterized pt = (JavaType.Parameterized) javaType;
