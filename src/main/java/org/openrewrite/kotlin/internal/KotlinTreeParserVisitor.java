@@ -3050,8 +3050,16 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             leadingAnnotations = ListUtils.mapFirst(leadingAnnotations, anno -> anno.withPrefix(prefix(typeReference)));
             consumedSpaces.add(findFirstPrefixSpace(typeReference));
         } else if (!modifiers.isEmpty()) {
-            modifiers = ListUtils.mapFirst(modifiers, mod -> mod.withPrefix(prefix(typeReference)));
-            consumedSpaces.add(findFirstPrefixSpace(typeReference));
+            PsiElement first = findFirstNonSpaceChild(typeReference);
+            if (first != null) {
+                if (first.getNode().getElementType() != KtTokens.LPAR) {
+                    modifiers = ListUtils.mapFirst(modifiers, mod -> mod.withPrefix(prefix(typeReference)));
+                    consumedSpaces.add(findFirstPrefixSpace(typeReference));
+                } else {
+                    // handle redundant parentheses
+                    modifiers = ListUtils.mapFirst(modifiers, mod -> mod.withPrefix(merge(prefix(typeReference.getModifierList()), mod.getPrefix())));
+                }
+            }
         }
 
         J j = requireNonNull(typeReference.getTypeElement()).accept(this, data);
@@ -4031,6 +4039,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         return null;
+    }
+
+    @Nullable
+    private static PsiElement findFirstNonSpaceChild(@Nullable PsiElement parent) {
+        return findFirstChild(parent, child -> !isSpace(child.getNode()));
     }
 
     @Nullable

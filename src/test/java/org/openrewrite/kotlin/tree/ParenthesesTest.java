@@ -58,4 +58,16 @@ class ParenthesesTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/441")
+    @Test
+    void parensOnType() {
+        rewriteRun(
+          kotlin(
+            """
+              val v  :   ( /*C*/ suspend ( param :   ( Int ) )  -> Unit ) = { }
+              """
+          )
+        );
+    }
 }
