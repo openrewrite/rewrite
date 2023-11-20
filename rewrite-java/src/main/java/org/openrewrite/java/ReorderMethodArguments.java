@@ -123,7 +123,6 @@ public class ReorderMethodArguments extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-
             if (methodMatcher.matches(m) && m.getMethodType() != null) {
                 @SuppressWarnings("ConstantConditions") List<String> paramNames =
                         oldParameterNames == null || oldParameterNames.length == 0 ?
@@ -133,51 +132,14 @@ public class ReorderMethodArguments extends Recipe {
                 List<JRightPadded<Expression>> originalArgs = m.getPadding().getArguments().getPadding().getElements();
                 int resolvedParamCount = m.getMethodType().getParameterTypes().size();
 
-                int i = 0;
                 List<JRightPadded<Expression>> reordered = new ArrayList<>(originalArgs.size());
                 List<String> reorderedNames = new ArrayList<>(originalArgs.size());
                 List<JavaType> reorderedTypes = new ArrayList<>(originalArgs.size());
                 List<Space> formattings = new ArrayList<>(originalArgs.size());
                 List<Space> rightFormattings = new ArrayList<>(originalArgs.size());
 
-                for (String name : newParameterNames) {
-                    int fromPos = paramNames.indexOf(name);
-                    if (originalArgs.size() > resolvedParamCount && fromPos == resolvedParamCount - 1) {
-                        // this is a varargs argument
-                        List<JRightPadded<Expression>> varargs = originalArgs.subList(fromPos, originalArgs.size());
-                        reordered.addAll(varargs);
-                        for (int j = 0; j < varargs.size(); j++) {
-                            reorderedNames.add(name + j);
-                            reorderedTypes.add(varargs.get(j).getElement().getType());
-                        }
-                        for (JRightPadded<Expression> exp : originalArgs.subList(i, (i++) + varargs.size())) {
-                            formattings.add(exp.getElement().getPrefix());
-                            rightFormattings.add(exp.getAfter());
-                        }
-                    } else if (fromPos >= 0 && originalArgs.size() > fromPos) {
-                        JRightPadded<Expression> originalArg = originalArgs.get(fromPos);
-                        reordered.add(originalArg);
-                        reorderedNames.add(name);
-                        reorderedTypes.add(originalArg.getElement().getType());
-                        formattings.add(originalArgs.get(i).getElement().getPrefix());
-                        rightFormattings.add(originalArgs.get(i++).getAfter());
-                    }
-                }
-
-                boolean changed = false;
-                i = 0;
-                for (JRightPadded<Expression> expression : reordered) {
-                    final int index = i;
-                    reordered.set(i, expression
-                            .map(e -> e.withPrefix(formattings.get(index)))
-                            .withAfter(rightFormattings.get(index)));
-                    if (reordered.get(i) != originalArgs.get(i)) {
-                        changed = true;
-                    }
-                    i++;
-                }
-
-                if (changed) {
+                reorder(paramNames, originalArgs, resolvedParamCount, reordered, reorderedNames, reorderedTypes, formattings, rightFormattings);
+                if (isChanged(originalArgs, reordered, formattings, rightFormattings)) {
                     m = m.getPadding()
                             .withArguments(m.getPadding().getArguments().getPadding().withElements(reordered))
                             .withMethodType(m.getMethodType()
@@ -187,6 +149,92 @@ public class ReorderMethodArguments extends Recipe {
                 }
             }
             return m;
+        }
+
+        @Override
+        public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+            J.NewClass n = super.visitNewClass(newClass, ctx);
+            if (methodMatcher.matches(n) && n.getMethodType() != null) {
+                @SuppressWarnings("ConstantConditions") List<String> paramNames =
+                        oldParameterNames == null || oldParameterNames.length == 0 ?
+                                n.getMethodType().getParameterNames() :
+                                asList(oldParameterNames);
+
+                List<JRightPadded<Expression>> originalArgs = n.getPadding().getArguments().getPadding().getElements();
+                int resolvedParamCount = n.getMethodType().getParameterTypes().size();
+
+                List<JRightPadded<Expression>> reordered = new ArrayList<>(originalArgs.size());
+                List<String> reorderedNames = new ArrayList<>(originalArgs.size());
+                List<JavaType> reorderedTypes = new ArrayList<>(originalArgs.size());
+                List<Space> formattings = new ArrayList<>(originalArgs.size());
+                List<Space> rightFormattings = new ArrayList<>(originalArgs.size());
+
+                reorder(paramNames, originalArgs, resolvedParamCount, reordered, reorderedNames, reorderedTypes, formattings, rightFormattings);
+                if (isChanged(originalArgs, reordered, formattings, rightFormattings)) {
+                    n = n.getPadding()
+                            .withArguments(n.getPadding().getArguments().getPadding().withElements(reordered))
+                            .withMethodType(n.getMethodType()
+                                    .withParameterNames(reorderedNames)
+                                    .withParameterTypes(reorderedTypes)
+                            );
+                }
+            }
+            return n;
+        }
+
+        private void reorder(
+                List<String> paramNames,
+                List<JRightPadded<Expression>> originalArgs,
+                int resolvedParamCount,
+                List<JRightPadded<Expression>> reordered,
+                List<String> reorderedNames,
+                List<JavaType> reorderedTypes,
+                List<Space> formattings,
+                List<Space> rightFormattings) {
+            int i = 0;
+            for (String name : newParameterNames) {
+                int fromPos = paramNames.indexOf(name);
+                if (originalArgs.size() > resolvedParamCount && fromPos == resolvedParamCount - 1) {
+                    // this is a varargs argument
+                    List<JRightPadded<Expression>> varargs = originalArgs.subList(fromPos, originalArgs.size());
+                    reordered.addAll(varargs);
+                    for (int j = 0; j < varargs.size(); j++) {
+                        reorderedNames.add(name + j);
+                        reorderedTypes.add(varargs.get(j).getElement().getType());
+                    }
+                    for (JRightPadded<Expression> exp : originalArgs.subList(i, (i++) + varargs.size())) {
+                        formattings.add(exp.getElement().getPrefix());
+                        rightFormattings.add(exp.getAfter());
+                    }
+                } else if (fromPos >= 0 && originalArgs.size() > fromPos) {
+                    JRightPadded<Expression> originalArg = originalArgs.get(fromPos);
+                    reordered.add(originalArg);
+                    reorderedNames.add(name);
+                    reorderedTypes.add(originalArg.getElement().getType());
+                    formattings.add(originalArgs.get(i).getElement().getPrefix());
+                    rightFormattings.add(originalArgs.get(i++).getAfter());
+                }
+            }
+        }
+
+        private boolean isChanged(
+                List<JRightPadded<Expression>> originalArgs,
+                List<JRightPadded<Expression>> reordered,
+                List<Space> formattings,
+                List<Space> rightFormattings) {
+            boolean changed = false;
+            int j = 0;
+            for (JRightPadded<Expression> expression : reordered) {
+                final int index = j;
+                reordered.set(j, expression
+                        .map(e -> e.withPrefix(formattings.get(index)))
+                        .withAfter(rightFormattings.get(index)));
+                if (reordered.get(j) != originalArgs.get(j)) {
+                    changed = true;
+                }
+                j++;
+            }
+            return changed;
         }
     }
 }
