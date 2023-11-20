@@ -732,4 +732,23 @@ class ClassDeclarationTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/437")
+    @Test
+    void enumClassWithParametersWithTrailingComma() {
+        rewriteRun(
+          kotlin(
+            """
+              enum class Code {
+                  YES ,
+              }
+              enum class Test ( val arg: Code , ) {
+                  FOO ( Code.YES , ) {
+                      // Body is required to reproduce issue
+                  }
+              }
+              """
+          )
+        );
+    }
+
 }

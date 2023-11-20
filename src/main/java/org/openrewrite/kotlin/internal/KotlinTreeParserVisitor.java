@@ -672,18 +672,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         JContainer<Expression> args;
 
         if (!superTypeCallEntry.getValueArguments().isEmpty()) {
-            List<JRightPadded<Expression>> expressions = new ArrayList<>(superTypeCallEntry.getValueArguments().size());
-
-            for (ValueArgument valueArgument : superTypeCallEntry.getValueArguments()) {
-                if (!(valueArgument instanceof KtValueArgument)) {
-                    throw new UnsupportedOperationException("TODO");
-                }
-
-                KtValueArgument ktValueArgument = (KtValueArgument) valueArgument;
-                expressions.add(padRight(convertToExpression(ktValueArgument.accept(this, data)), suffix(ktValueArgument)));
-            }
-
-            args = JContainer.build(prefix(superTypeCallEntry.getValueArgumentList()), expressions, Markers.EMPTY);
+            args = mapValueArguments(superTypeCallEntry.getValueArgumentList(), data);
         } else {
             KtValueArgumentList ktArgList = superTypeCallEntry.getValueArgumentList();
             args = JContainer.build(
@@ -1118,7 +1107,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 prefix(constructor.getDelegationCall()),
                 Markers.EMPTY,
                 createIdentifier(requireNonNull(constructor.getDelegationCall().getCalleeExpression()), type(constructor.getDelegationCall().getCalleeExpression())),
-                mapFunctionCallArguments(constructor.getDelegationCall().getValueArgumentList(), data)
+                mapValueArguments(constructor.getDelegationCall().getValueArgumentList(), data)
         );
 
         J.Block body = null;
@@ -1716,13 +1705,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     Space.EMPTY,
                     Markers.EMPTY.addIfAbsent(new Modifier(randomId())),
                     (NameTree) requireNonNull(annotationEntry.getCalleeExpression()).accept(this, data),
-                    annotationEntry.getValueArgumentList() != null ? mapFunctionCallArguments(annotationEntry.getValueArgumentList(), data) : null
+                    annotationEntry.getValueArgumentList() != null ? mapValueArguments(annotationEntry.getValueArgumentList(), data) : null
             );
             args = JContainer.build(Space.EMPTY, singletonList(padRight(argAnno, Space.EMPTY)), Markers.EMPTY);
         } else {
             nameTree = (NameTree) requireNonNull(annotationEntry.getCalleeExpression()).accept(this, data);
             if (annotationEntry.getValueArgumentList() != null) {
-                args = mapFunctionCallArguments(annotationEntry.getValueArgumentList(), data);
+                args = mapValueArguments(annotationEntry.getValueArgumentList(), data);
             }
         }
 
@@ -1924,7 +1913,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     null,
                     Space.EMPTY,
                     name,
-                    mapFunctionCallArguments(expression.getValueArgumentList(), expression.getValueArguments(), data),
+                    mapValueArgumentsMaybeWithTrailingLambda(expression.getValueArgumentList(), expression.getValueArguments(), data),
                     null,
                     mt
             );
@@ -1937,7 +1926,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 throw new UnsupportedOperationException(String.format("Unexpected type: %s with code %s", j.getClass().getName(), expression.getText()));
             }
             JContainer<Expression> typeParams = mapTypeArguments(expression.getTypeArgumentList(), data);
-            JContainer<Expression> args = mapFunctionCallArguments(expression.getValueArgumentList(), expression.getValueArguments(), data);
+            JContainer<Expression> args = mapValueArgumentsMaybeWithTrailingLambda(expression.getValueArgumentList(), expression.getValueArguments(), data);
 
             if (expression.getValueArgumentList() == null) {
                 args = args.withMarkers(args.getMarkers().addIfAbsent(new OmitParentheses(randomId())));
@@ -3809,7 +3798,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 JContainer<Expression> args;
 
                 if (!superTypeCallEntry.getValueArguments().isEmpty()) {
-                    args = mapFunctionCallArguments(superTypeCallEntry.getValueArgumentList(), data);
+                    args = mapValueArguments(superTypeCallEntry.getValueArgumentList(), data);
                 } else {
                     KtValueArgumentList ktArgList = superTypeCallEntry.getValueArgumentList();
                     args = JContainer.build(
@@ -3846,9 +3835,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     /**
-     * Support trailing lambda
+     * Compared to the other mapValueArguments method, this method supports trailing lambda
      */
-    private JContainer<Expression> mapFunctionCallArguments(@Nullable KtValueArgumentList valueArgumentList,
+    private JContainer<Expression> mapValueArgumentsMaybeWithTrailingLambda(@Nullable KtValueArgumentList valueArgumentList,
                                                             List<KtValueArgument> ktValueArguments,
                                                             ExecutionContext data) {
         List<JRightPadded<Expression>> expressions = new ArrayList<>(ktValueArguments.size());
@@ -3882,7 +3871,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return JContainer.build(prefix, expressions, markers);
     }
 
-    private JContainer<Expression> mapFunctionCallArguments(@Nullable KtValueArgumentList argumentList, ExecutionContext data) {
+    private JContainer<Expression> mapValueArguments(@Nullable KtValueArgumentList argumentList, ExecutionContext data) {
         if (argumentList == null) {
             return JContainer.empty();
         }
@@ -3890,20 +3879,19 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<KtValueArgument> ktValueArguments = argumentList.getArguments();
         List<JRightPadded<Expression>> expressions = new ArrayList<>(ktValueArguments.size());
 
-        for (int i = 0; i < ktValueArguments.size(); i++) {
-            KtValueArgument ktValueArgument = ktValueArguments.get(i);
-            Expression expr = convertToExpression(ktValueArgument.accept(this, data));
-            expressions.add(maybeTrailingComma(ktValueArgument, padRight(expr, suffix(ktValueArgument)), i == ktValueArguments.size() - 1));
-        }
-
         if (ktValueArguments.isEmpty()) {
             Expression arg = new J.Empty(randomId(), prefix(argumentList.getRightParenthesis()), Markers.EMPTY);
             expressions.add(padRight(arg, Space.EMPTY));
+        } else {
+            for (int i = 0; i < ktValueArguments.size(); i++) {
+                KtValueArgument ktValueArgument = ktValueArguments.get(i);
+                Expression expr = convertToExpression(ktValueArgument.accept(this, data));
+                expressions.add(maybeTrailingComma(ktValueArgument, padRight(expr, suffix(ktValueArgument)), i == ktValueArguments.size() - 1));
+            }
         }
 
         return JContainer.build(prefix(argumentList), expressions, Markers.EMPTY);
     }
-
 
     private Space toSpace(@Nullable PsiElement element) {
         if (element == null || !isSpace(element.getNode())) {
