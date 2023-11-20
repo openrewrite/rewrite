@@ -319,4 +319,21 @@ class WhenTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/436")
+    @Test
+    void trailingSemiColonOnWhenBranch() {
+        rewriteRun(
+          kotlin(
+            """
+              fun test(arg: Any) {
+                  when (arg) {
+                      is String -> "1" ;
+                      is Int -> "2"  /*C1*/ ;
+                      else -> "3"  ;
+                  }
+              }
+              """
+          )
+        );
+    }
 }

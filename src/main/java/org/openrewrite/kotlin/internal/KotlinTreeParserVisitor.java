@@ -1547,7 +1547,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         for (KtWhenEntry whenEntry : whenEntries) {
             K.WhenBranch whenBranch = (K.WhenBranch) whenEntry.accept(this, data);
-            statements.add(padRight(whenBranch, Space.EMPTY));
+            statements.add(maybeTrailingSemicolon(whenBranch, whenEntry));
         }
 
         J.Block body = new J.Block(
