@@ -1088,8 +1088,12 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         public J visitTypeParameter(J.TypeParameter typeParam, PrintOutputCapture<P> p) {
             beforeSyntax(typeParam, Space.Location.TYPE_PARAMETERS_PREFIX, p);
             visit(typeParam.getAnnotations(), p);
-            for (J.Modifier m : typeParam.getModifiers()) {
-                visitModifier(m, p);
+            //can be null for old parse results
+            //noinspection ConstantValue
+            if (typeParam.getModifiers() != null) {
+                for (J.Modifier m : typeParam.getModifiers()) {
+                    visitModifier(m, p);
+                }
             }
 
             String delimiter = "";
