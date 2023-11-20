@@ -95,7 +95,6 @@ public class XPathMatcher {
 
                 if (path.size() > blankPartIndex && path.size() >= parts.length - 1) {
                     String newExpression;
-                    /*  */
                     if (Objects.equals(path.get(blankPartIndex).getName(), parts[blankPartIndex + 1])) {
                         newExpression = String.format(
                             "%s/%s",
@@ -110,7 +109,6 @@ public class XPathMatcher {
                             expression.substring(doubleSlashIndex + 2)
                         );
                     }
-
                     return new XPathMatcher(newExpression).matches(cursor);
                 }
             }
