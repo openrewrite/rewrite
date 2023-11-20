@@ -70,7 +70,7 @@ public class DeclarativeRecipe extends Recipe {
     private final List<Recipe> preconditions = new ArrayList<>();
 
     public void addPrecondition(Recipe recipe) {
-        preconditions.add(recipe);
+        uninitializedPreconditions.add(recipe);
     }
 
     @JsonIgnore
