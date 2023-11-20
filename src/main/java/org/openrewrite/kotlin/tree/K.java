@@ -362,15 +362,24 @@ public interface K extends J {
         @Override
         @SuppressWarnings("unchecked")
         public <S> S service(Class<S> service) {
-            String serviceName =  service.getName();
-            if (ImportService.class.getName().equals(serviceName) ||
-                KotlinImportService.class.getName().equals(serviceName)) {
-                return (S) new KotlinImportService();
-            } else if (AutoFormatService.class.getName().equals(serviceName) ||
-                       KotlinAutoFormatService.class.getName().equals(serviceName)) {
-                return (S) new KotlinAutoFormatService();
+            String serviceName = service.getName();
+            try {
+                Class<S> serviceClass;
+                if (KotlinImportService.class.getName().equals(serviceName)) {
+                    serviceClass = service;
+                } else if (ImportService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(KotlinImportService.class.getName());
+                } else if (KotlinAutoFormatService.class.getName().equals(serviceName)) {
+                    serviceClass = service;
+                } else if (AutoFormatService.class.getName().equals(serviceName)) {
+                    serviceClass = (Class<S>) service.getClassLoader().loadClass(KotlinAutoFormatService.class.getName());
+                } else {
+                    return JavaSourceFile.super.service(service);
+                }
+                return serviceClass.getConstructor().newInstance();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
             }
-            return JavaSourceFile.super.service(service);
         }
     }
 
@@ -1197,6 +1206,7 @@ public interface K extends J {
                 return (T) new Parameter(id, markers, name, this.parameterType.withType(type));
             }
         }
+
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -1699,7 +1709,7 @@ public interface K extends J {
             @Nullable
             public Property withReceiver(@Nullable JRightPadded<Expression> receiver) {
                 return t.receiver == receiver ? t : new Property(t.id, t.prefix, t.markers, t.typeParameters,
-                        t.variableDeclarations,t.typeConstraints, t.getter, t.setter, t.isSetterFirst, receiver);
+                        t.variableDeclarations, t.typeConstraints, t.getter, t.setter, t.isSetterFirst, receiver);
             }
         }
     }
