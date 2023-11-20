@@ -761,7 +761,7 @@ class MethodInvocationTest implements RewriteTest {
             """
               fun format(format: String, vararg params: String) { }
               fun test() {
-                  format("f", params = * arrayOf("foo", "bar"))
+                  format("f", params = /*C0*/ *   arrayOf( "foo" , "bar"))
               }
               """
           )

@@ -1744,7 +1744,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             if (argument.isSpread()) {
                 expr = new K.SpreadArgument(
                         randomId(),
-                        prefix(argument.getArgumentExpression()),
+                        prefix(findFirstChild(argument, c -> c.getNode().getElementType() == KtTokens.MUL)),
                         Markers.EMPTY,
                         expr
                 );
