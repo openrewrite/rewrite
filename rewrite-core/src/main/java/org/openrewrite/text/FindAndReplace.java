@@ -134,7 +134,10 @@ public class FindAndReplace extends Recipe {
                 if (!matcher.find()) {
                     return sourceFile;
                 }
-                String replacement = Boolean.TRUE.equals(regex) ? replace : replace.replaceAll("\\$", "\\\\\\$");
+                String replacement = replace;
+                if (!Boolean.TRUE.equals(regex)) {
+                    replacement = replacement.replace("$", "\\$");
+                }
                 String newText = matcher.replaceAll(replacement);
                 return plainText.withText(newText)
                         .withMarkers(sourceFile.getMarkers().add(new AlreadyReplaced(randomId(), find, replace)));
