@@ -99,6 +99,16 @@ class FindAndReplaceTest implements RewriteTest {
         );
     }
 
+    @Test
+    void dollarsignsTolerated() {
+        String find = "This is text ${dynamic}.";
+        String replace = "This is text ${dynamic}. Stuff";
+        rewriteRun(
+          spec -> spec.recipe(new FindAndReplace(find, replace, null, null, null, null, null)).cycles(1),
+          text(find, replace)
+        );
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = true)
     static class MultiFindAndReplace extends Recipe {
