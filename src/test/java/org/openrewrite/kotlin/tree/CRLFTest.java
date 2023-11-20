@@ -96,4 +96,18 @@ class CRLFTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/438")
+    @Test
+    void crlfInMultilineStringWithParameters() {
+        rewriteRun(
+          kotlin(
+            "val a = \"\"\r\n" +
+            "val s = \"\"\"${a}\r\n" +
+            "l1\r\n" +
+            "l2\n" +
+            "\"\"\""
+          )
+        );
+    }
 }

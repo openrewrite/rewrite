@@ -746,21 +746,22 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitLiteralStringTemplateEntry(KtLiteralStringTemplateEntry entry, ExecutionContext data) {
-        PsiElement leaf = entry.getFirstChild();
-        if (!(leaf instanceof LeafPsiElement)) {
+        if (!(entry.getFirstChild() instanceof LeafPsiElement)) {
             throw new UnsupportedOperationException("Unsupported KtStringTemplateEntry child");
         }
 
+        String value = maybeAdjustCRLF(entry);
         boolean quoted = entry.getPrevSibling().getNode().getElementType() == KtTokens.OPEN_QUOTE &&
                 entry.getNextSibling().getNode().getElementType() == KtTokens.CLOSING_QUOTE;
 
-        String valueSource = quoted ? "\"" + leaf.getText() + "\"" : leaf.getText();
+        String valueSource = quoted ? "\"" + value + "\"" : value;
+
         return new J.Literal(
                 Tree.randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
-                leaf.getText(),
-                valueSource, // todo, support text block
+                value,
+                valueSource,
                 null,
                 JavaType.Primitive.String
         );
@@ -2959,7 +2960,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         if (hasStringTemplateEntry) {
             String delimiter = expression.getFirstChild().getText();
-            List<J> values = new ArrayList<>();
+            List<J> values = new ArrayList<>(entries.length);
 
             for (KtStringTemplateEntry entry : entries) {
                 values.add(entry.accept(this, data));
