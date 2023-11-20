@@ -19,10 +19,7 @@ package org.openrewrite.kotlin;
 import kotlin.Suppress;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.NotNull;
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.InMemoryExecutionContext;
-import org.openrewrite.SourceFile;
+import org.openrewrite.*;
 import org.openrewrite.internal.ThrowingConsumer;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
@@ -37,6 +34,7 @@ import org.openrewrite.test.UncheckedConsumer;
 import org.opentest4j.AssertionFailedError;
 
 import java.util.Collections;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -170,8 +168,14 @@ public final class Assertions {
     public static ThrowingConsumer<K.CompilationUnit> isFullyParsed() {
         return cu -> new KotlinIsoVisitor<Integer>() {
             @Override
-            public J visitUnknown(J.Unknown unknown, Integer integer) {
-                throw new AssertionFailedError("Parsing error, J.Unknown detected");
+            public J visitUnknownSource(J.Unknown.Source source, Integer integer) {
+                Optional<ParseExceptionResult> result = source.getMarkers().findFirst(ParseExceptionResult.class);
+                if (result.isPresent()) {
+                    System.out.println(result.get().getMessage());
+                    throw new AssertionFailedError("Parsing error, J.Unknown detected");
+                } else {
+                    throw new UnsupportedOperationException("A J.Unknown should always have a parse exception result.");
+                }
             }
 
             @Override
