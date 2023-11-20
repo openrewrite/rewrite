@@ -18,7 +18,6 @@ package org.openrewrite.kotlin.tree;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -714,4 +713,23 @@ class ClassDeclarationTest implements RewriteTest {
           kotlin("open class B <  T   , > { }")
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/435")
+    @ParameterizedTest
+    @ValueSource(strings = {
+      "class Test {};",
+      "class Test ();",
+      "class Test {} /*C0*/;   ",
+      "class Test {} /*C0*/;   class Next"
+    })
+    void trailingSemiColon(String input) {
+        rewriteRun(
+          kotlin(
+            """
+              %s
+              """.formatted(input)
+          )
+        );
+    }
+
 }

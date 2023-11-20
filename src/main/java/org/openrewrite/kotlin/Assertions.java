@@ -57,6 +57,7 @@ public final class Assertions {
     }
 
     // A helper method to adjust white spaces in the input kotlin source to help us detect parse-to-print idempotent issues
+    // The idea is to differentiate adjacent spaces by whitespace count so that if any adjacent spaces are swapped or unhandled well by the parser, it can be detected.
     // Just change from `before` to `adjustSpaces(before)` below in the `kotlin()` method to test locally
     @SuppressWarnings("IfStatementWithIdenticalBranches")
     @Nullable

@@ -895,7 +895,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitParameterList(KtParameterList list, ExecutionContext data) {
-        throw new UnsupportedOperationException("Unsupport, use mapParameters() instead");
+        throw new UnsupportedOperationException("Unsupported, use mapParameters() instead");
     }
 
     @Override
@@ -1609,7 +1609,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         JRightPadded<J.Package> pkg = null;
         if (!file.getPackageFqName().isRoot()) {
-            pkg = maybeSemicolon((J.Package) requireNonNull(file.getPackageDirective()).accept(this, data), file.getPackageDirective());
+            pkg = maybeTrailingSemicolon((J.Package) requireNonNull(file.getPackageDirective()).accept(this, data), file.getPackageDirective());
             consumedSpaces.add(findFirstPrefixSpace(file.getPackageDirective()));
         }
 
@@ -1622,7 +1622,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 if (i == 0) {
                     anImport = anImport.withPrefix(merge(prefix(file.getImportList()), anImport.getPrefix()));
                 }
-                imports.add(maybeSemicolon(anImport, importDirective));
+                imports.add(maybeTrailingSemicolon(anImport, importDirective));
             }
         }
 
@@ -1645,7 +1645,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                                 file.getText().substring(PsiUtilsKt.getStartOffsetSkippingComments(declaration),
                                         declaration.getTextRange().getEndOffset())));
             }
-            statements.add(padRight(statement, Space.EMPTY));
+
+            statements.add(maybeFollowingSemicolon(statement, declaration));
         }
 
         return new K.CompilationUnit(
@@ -1699,7 +1700,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitAnnotationEntry(@NotNull KtAnnotationEntry annotationEntry, ExecutionContext data) {
         Markers markers = Markers.EMPTY;
-        NameTree nameTree = null;
+        NameTree nameTree;
         JContainer<Expression> args = null;
 
         boolean isUseSite = annotationEntry.getUseSiteTarget() != null;
@@ -1853,8 +1854,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         for (KtExpression stmt : expression.getStatements()) {
             J exp = stmt.accept(this, data);
             Statement statement = convertToStatement(exp).withPrefix(endFixPrefixAndInfix(stmt));
-
-            JRightPadded<Statement> build = maybeSemicolon(statement, stmt);
+            JRightPadded<Statement> build = maybeTrailingSemicolon(statement, stmt);
             statements.add(build);
         }
 
@@ -3421,7 +3421,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         );
     }
 
-    private <J2 extends J> JRightPadded<J2> maybeSemicolon(J2 j, KtElement element) {
+    private <J2 extends J> JRightPadded<J2> maybeTrailingSemicolon(J2 j, KtElement element) {
         PsiElement maybeSemicolon = findLastNotSpaceChild(element);
         boolean hasSemicolon = maybeSemicolon instanceof LeafPsiElement && ((LeafPsiElement) maybeSemicolon).getElementType() == KtTokens.SEMICOLON;
 
