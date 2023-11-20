@@ -769,15 +769,6 @@ public class ResolvedPom {
             return d;
         }
 
-        String version = d.getVersion();
-        if (d.getVersion() == null || depth > 0) {
-            // dependency management overrides transitive dependency versions
-            version = getManagedVersion(d.getGroupId(), d.getArtifactId(), d.getType(), d.getClassifier());
-            if (version == null) {
-                version = d.getVersion();
-            }
-        }
-
         String scope;
         if (d.getScope() == null) {
             Scope parsedScope = getManagedScope(d.getGroupId(), d.getArtifactId(), d.getType(), d.getClassifier());
@@ -797,6 +788,15 @@ public class ResolvedPom {
         if (d.getType() != null) {
             d = d.withType(getValue(d.getType()));
         }
+        String version = d.getVersion();
+        if (d.getVersion() == null || depth > 0) {
+            // dependency management overrides transitive dependency versions
+            version = getManagedVersion(d.getGroupId(), d.getArtifactId(), d.getType(), d.getClassifier());
+            if (version == null) {
+                version = d.getVersion();
+            }
+        }
+
         return d
                 .withGav(d.getGav().withVersion(version))
                 .withScope(scope);

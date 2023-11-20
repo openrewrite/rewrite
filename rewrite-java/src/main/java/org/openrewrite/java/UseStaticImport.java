@@ -59,6 +59,9 @@ public class UseStaticImport extends Recipe {
             MethodMatcher methodMatcher = new MethodMatcher(methodPattern);
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if (methodMatcher.matches(m)) {
+                if (m.getTypeParameters() != null && !m.getTypeParameters().isEmpty()) {
+                    return m;
+                }
                 if (m.getMethodType() != null) {
                     JavaType.FullyQualified receiverType = m.getMethodType().getDeclaringType();
                     maybeRemoveImport(receiverType);

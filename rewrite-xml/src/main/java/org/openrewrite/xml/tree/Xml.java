@@ -597,6 +597,11 @@ public interface Xml extends Tree {
         public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
             return v.visitComment(this, p);
         }
+
+        @Override
+        public String toString() {
+            return "<!--" + text + "-->";
+        }
     }
 
     @Value
