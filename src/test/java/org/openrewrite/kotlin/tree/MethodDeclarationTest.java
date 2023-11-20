@@ -355,10 +355,12 @@ class MethodDeclarationTest implements RewriteTest {
           kotlin(
             """
               class Test {
-                  fun method1() {
+                  fun m0() {
                   } /*c1*/  ;  /*c2*/
 
-                  fun method2() {
+                  fun m1() {};
+
+                  fun m2() {
                   }  /*c3*/   ; /*c4*/
               }
               """
@@ -385,6 +387,19 @@ class MethodDeclarationTest implements RewriteTest {
                   _projection: PersonProjection.() -> PersonProjection, // Trailing Comma here
               ) {
               }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/439")
+    @Test
+    void trailingSemiColonOnAssignment() {
+        rewriteRun(
+          kotlin(
+            """
+              fun size(): Int = 42;
+              fun m2() = 1 /*C1*/  ;
               """
           )
         );

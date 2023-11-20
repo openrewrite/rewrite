@@ -1636,7 +1636,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                                         declaration.getTextRange().getEndOffset())));
             }
 
-            statements.add(maybeFollowingSemicolon(statement, declaration));
+            if (declaration instanceof KtNamedFunction) {
+                // since there is no space for the trailing semicolon in J.MethodDeclaration
+                statements.add(maybeTrailingSemicolon(statement, declaration));
+            } else {
+                statements.add(maybeFollowingSemicolon(statement, declaration));
+            }
         }
 
         return new K.CompilationUnit(
