@@ -965,7 +965,11 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 if (method.getMarkers().findFirst(IsNullSafe.class).isPresent()) {
                     p.append("?");
                 }
-                p.append(".");
+
+                if (!method.getName().getSimpleName().equals("<empty>") &&
+                    !method.getName().getMarkers().findFirst(Implicit.class).isPresent()) {
+                    p.append(".");
+                }
             }
 
             if (!indexedAccess) {

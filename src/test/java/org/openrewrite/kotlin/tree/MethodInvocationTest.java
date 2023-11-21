@@ -767,4 +767,50 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/448")
+    @Test
+    void indexAccessAsSelectOfAMethodCall() {
+        rewriteRun(
+          kotlin(
+            """
+              var l1: List<() -> Unit> = emptyList()
+              var l2: List<(Int) -> Unit> = emptyList()
+
+              fun test() {
+                  l1 [ 0  ]   (    )
+                  val x =  l2 [  1 ]   (    42 )
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/443")
+    @Test
+    void methodInvocationAsSelect() {
+        rewriteRun(
+          kotlin(
+            """
+              @Suppress("UNUSED_PARAMETER")
+              enum class Type {
+                  A, B, C;
+                  fun getType(type: Type): Type {
+                      return A
+                  }
+              }
+              fun Type.type(): Type {
+                  Type.values().forEach { type -> {
+                      val someType = getType(type)(this)
+                  }}
+                  return Type.A
+              }
+              @Suppress("UNUSED_PARAMETER")
+              operator fun Type.invoke(type: Type): Any {
+                  return Type.A
+              }
+              """
+          )
+        );
+    }
 }

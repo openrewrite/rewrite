@@ -1925,9 +1925,14 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             );
         } else if (type == null || type == PsiElementAssociations.ExpressionType.METHOD_INVOCATION) {
             J j = expression.getCalleeExpression().accept(this, data);
+            JRightPadded<Expression> select = null;
             J.Identifier name;
             if (j instanceof J.Identifier) {
                 name = (J.Identifier) j;
+            } else if (j instanceof J.MethodInvocation) {
+                select = padRight((J.MethodInvocation)j, Space.EMPTY);
+                name = createIdentifier("<empty>", Space.EMPTY, null, null)
+                        .withMarkers(Markers.EMPTY.addIfAbsent(new Implicit(randomId())));
             } else {
                 throw new UnsupportedOperationException(String.format("Unexpected type: %s with code %s", j.getClass().getName(), expression.getText()));
             }
@@ -1943,7 +1948,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     randomId(),
                     deepPrefix(expression),
                     Markers.EMPTY,
-                    null,
+                    select,
                     typeParams,
                     name.withType(methodType),
                     args,
