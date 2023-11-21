@@ -1280,7 +1280,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitTypeArgumentList(KtTypeArgumentList typeArgumentList, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        throw new UnsupportedOperationException("use mapTypeArguments instead");
     }
 
     @Override
@@ -1974,8 +1974,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         List<KtTypeProjection> ktTypeProjections = ktTypeArgumentList.getArguments();
         List<JRightPadded<Expression>> parameters = new ArrayList<>(ktTypeProjections.size());
-        for (KtTypeProjection ktTypeProjection : ktTypeProjections) {
-            parameters.add(padRight(convertToExpression(ktTypeProjection.accept(this, data)), suffix(ktTypeProjection)));
+        for (int i = 0; i < ktTypeProjections.size(); i++) {
+            KtTypeProjection ktTypeProjection = ktTypeProjections.get(i);
+            parameters.add(maybeTrailingComma(ktTypeProjection,
+                    padRight(convertToExpression(ktTypeProjection.accept(this, data)), suffix(ktTypeProjection)), i == ktTypeProjections.size() - 1));
         }
 
         return JContainer.build(deepPrefix(ktTypeArgumentList), parameters, Markers.EMPTY);

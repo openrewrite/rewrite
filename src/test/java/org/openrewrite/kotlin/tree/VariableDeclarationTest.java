@@ -719,4 +719,19 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/446")
+    @Test
+    void trailingCommaOnParameterized() {
+        rewriteRun(
+          kotlin(
+            """
+             val m: Map<
+                Int ,
+                String ,
+              > = mapOf()
+             """
+          )
+        );
+    }
 }
