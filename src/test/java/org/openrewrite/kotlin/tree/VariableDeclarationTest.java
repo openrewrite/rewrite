@@ -734,4 +734,25 @@ class VariableDeclarationTest implements RewriteTest {
           )
         );
     }
+
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/447")
+    @Test
+    void extensionProperty() {
+        rewriteRun(
+          kotlin(
+            """
+              class A {
+                  var internalProperty = "x"
+              }
+
+              var A .  property   : String
+                  get() = ""
+                  set(value) {
+                      internalProperty = value
+                  }
+              """
+          )
+        );
+    }
 }

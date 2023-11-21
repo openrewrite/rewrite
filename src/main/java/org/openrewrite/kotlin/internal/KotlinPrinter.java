@@ -365,20 +365,6 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 visitRightPadded(property.getPadding().getReceiver(), p);
                 p.append(".");
             }
-
-            if (property.getSetter() != null &&
-                    !property.getSetter().getParameters().isEmpty() &&
-                    property.getSetter().getParameters().get(0) instanceof J.VariableDeclarations) {
-                visit(((J.VariableDeclarations) property.getSetter().getParameters().get(0)).getTypeExpression(), p);
-                delegate.visitSpace(property.getSetter().getPadding().getParameters().getPadding().getElements().get(0).getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
-                p.append(".");
-            } else if (property.getGetter() != null &&
-                    !property.getGetter().getParameters().isEmpty() &&
-                    property.getGetter().getParameters().get(0) instanceof J.VariableDeclarations) {
-                visit(((J.VariableDeclarations) property.getGetter().getParameters().get(0)).getTypeExpression(), p);
-                delegate.visitSpace(property.getGetter().getPadding().getParameters().getPadding().getElements().get(0).getAfter(), Space.Location.LANGUAGE_EXTENSION, p);
-                p.append(".");
-            }
         }
 
         if (!vd.getVariables().isEmpty()) {
