@@ -3098,13 +3098,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             j = functionType;
         } else if (j instanceof J.Identifier) {
             j = ((J.Identifier) j).withAnnotations(leadingAnnotations);
-        } else if (j instanceof J.ParameterizedType) {
+        } else if (j instanceof J.ParameterizedType || j instanceof J.IntersectionType) {
             if (!leadingAnnotations.isEmpty()) {
-                j = new K.AnnotatedExpression(randomId(), Markers.EMPTY, leadingAnnotations, (J.ParameterizedType) j);
-            }
-        } else if (j instanceof J.IntersectionType) {
-            if (!leadingAnnotations.isEmpty()) {
-                j = new J.AnnotatedType(randomId(), Space.EMPTY, Markers.EMPTY, leadingAnnotations, (J.IntersectionType) j);
+                j = new J.AnnotatedType(randomId(), Space.EMPTY, Markers.EMPTY, leadingAnnotations, (TypeTree) j);
             }
         }
 
