@@ -212,6 +212,13 @@ public class TypeUtils {
                     } else if (toFq.getFullyQualifiedName().equals("java.lang.Object")) {
                         return true;
                     }
+                } else if (from instanceof JavaType.Intersection) {
+                    for (JavaType intersectionType : ((JavaType.Intersection) from).getBounds()) {
+                        if (isAssignableTo(to, intersectionType)) {
+                            return true;
+                        }
+                    }
+                    return false;
                 }
                 return !(from instanceof JavaType.GenericTypeVariable) && isAssignableTo(toFq.getFullyQualifiedName(), from);
             } else if (to instanceof JavaType.GenericTypeVariable) {
@@ -334,6 +341,12 @@ public class TypeUtils {
                 return isAssignableTo(to, ((JavaType.Variable) from).getType());
             } else if (from instanceof JavaType.Method) {
                 return isAssignableTo(to, ((JavaType.Method) from).getReturnType());
+            } else if (from instanceof JavaType.Intersection) {
+                for (JavaType bound : ((JavaType.Intersection) from).getBounds()) {
+                    if (isAssignableTo(to, bound)) {
+                        return true;
+                    }
+                }
             }
         } catch (Exception e) {
             return false;

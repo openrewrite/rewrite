@@ -722,6 +722,14 @@ public class ReloadableJava11ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     @Override
+    public J visitIntersectionType(IntersectionTypeTree node, Space fmt) {
+        JContainer<TypeTree> bounds = node.getBounds().isEmpty() ? null :
+                JContainer.build(EMPTY,
+                        convertAll(node.getBounds(), t -> sourceBefore("&"), noDelim), Markers.EMPTY);
+        return new J.IntersectionType(randomId(), fmt, Markers.EMPTY, bounds);
+    }
+
+    @Override
     public J visitLabeledStatement(LabeledStatementTree node, Space fmt) {
         skip(node.getLabel().toString());
         return new J.Label(randomId(), fmt, Markers.EMPTY,
