@@ -631,4 +631,24 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/453")
+    @Test
+    void arrayOfCallWithInAnnotation() {
+        rewriteRun(
+          kotlin(
+            """
+              annotation class Ann(
+                  val test: Test
+              )
+              annotation class Test ( val arg: Array<String> )
+              @Ann(test = Test(
+                  arg = arrayOf("")
+              ))
+              fun use() {
+              }
+              """
+          )
+        );
+    }
 }
