@@ -2927,7 +2927,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class IntersectionType implements J, TypeTree {
+    final class IntersectionType implements J, TypeTree, Expression {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -2973,6 +2973,11 @@ public interface J extends Tree {
                     .filter(Objects::nonNull)
                     .map(b -> b.getElement().getType())
                     .collect(toList()));
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
 
         public Padding getPadding() {
