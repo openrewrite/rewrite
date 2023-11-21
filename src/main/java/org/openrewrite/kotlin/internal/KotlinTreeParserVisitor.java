@@ -2564,7 +2564,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         if (function.getTypeReference() != null) {
             markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), prefix(function.getColon())));
-            returnTypeExpression = function.getTypeReference().accept(this, data).withPrefix(prefix(function.getTypeReference()));
+            returnTypeExpression = (TypeTree) function.getTypeReference().accept(this, data);
         }
 
         K.TypeConstraints typeConstraints = null;

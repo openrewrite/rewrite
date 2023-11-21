@@ -118,4 +118,16 @@ class FunctionTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/445")
+    @Test
+    void functionTypeWithModifiers() {
+        rewriteRun(
+          kotlin(
+            """
+              fun foo() :   suspend    ( param : Int )  -> Unit = { }
+              """
+          )
+        );
+    }
 }
