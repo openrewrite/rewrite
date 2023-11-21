@@ -373,4 +373,58 @@ class ChangeTypeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void changeImportSecondaryConstructor() {
+        rewriteRun(
+          kotlin(
+            """
+              package a.b
+              
+              open class Original
+              """),
+          kotlin(
+            """
+              import a.b.Original
+              
+              class A() : Original() {             
+                    constructor(s1: String): this()
+              }
+              """,
+            """
+              import x.y.Target
+              
+              class A() : Target() {             
+                    constructor(s1: String): this()
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeAnnotationImport() {
+        rewriteRun(
+          kotlin(
+            """
+              package a.b
+
+              annotation class Original
+              """),
+          kotlin(
+            """
+              import a.b.Original
+              
+              @Original
+              class A
+              """,
+            """
+              import x.y.Target
+              
+              @Target
+              class A
+              """
+          )
+        );
+    }
 }

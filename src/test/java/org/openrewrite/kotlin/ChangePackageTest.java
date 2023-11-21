@@ -166,4 +166,36 @@ class ChangePackageTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void changePackageSecondaryConstructor() {
+        rewriteRun(
+          kotlin(
+            """
+              package a.b
+              class Original
+              """,
+            """
+              package x.y
+              class Original
+              """
+          ),
+          kotlin(
+            """
+              import a.b.Original
+              
+              class A() : Original() {            
+                    constructor(s1: String): this()
+              }
+              """,
+            """
+              import x.y.Original
+              
+              class A() : Original() {            
+                    constructor(s1: String): this()
+              }
+              """
+          )
+        );
+    }
 }
