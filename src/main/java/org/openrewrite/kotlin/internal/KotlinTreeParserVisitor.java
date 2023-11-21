@@ -267,7 +267,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         FirElement firElement = psiElementAssociations.primary(expression.getCallableReference());
         FirResolvedCallableReference reference;
         if (!(firElement instanceof FirResolvedCallableReference)) {
-            throw new UnsupportedOperationException(String.format("Unsupported callable reference: %s with code: %s", expression.getClass().getName(), expression.getText()));
+            throw new UnsupportedOperationException(String.format("Unsupported callable reference: fir: %s, psi : %s with code: %s", firElement.getClass().getName(),
+                    expression.getClass().getName(), expression.getText()));
         } else {
             reference = (FirResolvedCallableReference) psiElementAssociations.primary(expression.getCallableReference());
         }
