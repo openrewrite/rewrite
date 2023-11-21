@@ -880,4 +880,39 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void stringLiteralAsSelect() {
+        rewriteRun(
+          kotlin(
+            """
+              class A
+
+              operator fun String.invoke() : A {
+                  return A()
+              }
+
+              val a = "42" ( )
+              """
+          )
+        );
+    }
+
+    @Test
+    void stringLiteralAsSelectWithLambda() {
+        rewriteRun(
+          kotlin(
+            """
+              operator fun String.invoke(action: () -> Unit)   {
+                  action()
+              }
+
+              val a = "42" {
+                  // do something
+              }
+              """
+          )
+        );
+    }
+
 }
