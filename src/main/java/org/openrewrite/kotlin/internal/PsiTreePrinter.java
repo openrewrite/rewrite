@@ -82,16 +82,19 @@ public class PsiTreePrinter {
         return printIndexedSourceCode(input.getSource(new InMemoryExecutionContext()).readFully());
     }
 
-    public static String print(FirFile file) {
-        return printFirFile(file);
-    }
-
     public static String print(@Nullable  IrFile file) {
         return printIrFile(file);
     }
 
     public static String print(Tree tree) {
         return printJTree(tree);
+    }
+
+    public static String print(@Nullable FirElement firElement) {
+        if (firElement == null) {
+            return "null";
+        }
+        return printFirTree(firElement);
     }
 
     public static String printPsiTreeSkeleton(PsiElement psiElement) {
@@ -109,8 +112,6 @@ public class PsiTreePrinter {
     public static String printPsiTree(PsiElement psiElement) {
         PsiTreePrinter treePrinter = new PsiTreePrinter();
         StringBuilder sb = new StringBuilder();
-        sb.append("------------").append("\n");
-        sb.append("PSI Tree All").append("\n");
         treePrinter.printNode(psiElement, 1);
         sb.append(String.join("\n", treePrinter.outputLines));
         return sb.toString();
@@ -153,6 +154,37 @@ public class PsiTreePrinter {
                 return null;
             }
         }.visitFile(file, context);
+        sb.append(String.join("\n", lines));
+        return sb.toString();
+    }
+
+    public static String printFirTree(FirElement firElement) {
+        StringBuilder sb = new StringBuilder();
+        List<StringBuilder> lines = new ArrayList<>();
+        TreePrinterContext context = new TreePrinterContext(lines, 1);
+        new FirDefaultVisitor<Void, TreePrinterContext>() {
+            @Override
+            public Void visitElement(@NotNull FirElement fir, TreePrinterContext ctx) {
+                StringBuilder line = new StringBuilder();
+                line.append(leftPadding(ctx.getDepth()))
+                        .append(printFirElement(fir));
+                connectToLatestSibling(ctx.getDepth(), ctx.getLines());
+                ctx.getLines().add(line);
+                ctx.setDepth(ctx.getDepth() + 1);
+                fir.acceptChildren(this, ctx);
+
+                if (fir instanceof FirResolvedTypeRef) {
+                    // not sure why this isn't taken care of by `FirResolvedTypeRefImpl#acceptChildren()`
+                    FirTypeRef firTypeRef = ((FirResolvedTypeRef) fir).getDelegatedTypeRef();
+                    if (firTypeRef != null) {
+                        firTypeRef.accept(this, ctx);
+                    }
+                }
+
+                ctx.setDepth(ctx.getDepth() - 1);
+                return null;
+            }
+        }.visitElement(firElement, context);
         sb.append(String.join("\n", lines));
         return sb.toString();
     }
