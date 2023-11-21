@@ -73,4 +73,17 @@ class TypeAliasTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/444")
+    @Test
+    void semiColonOnAlias() {
+        rewriteRun(
+          kotlin(
+            """
+              typealias A = Int ;
+              """
+          )
+        );
+    }
+
 }
