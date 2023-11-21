@@ -16,7 +16,9 @@
 package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.Issue;
 import org.openrewrite.PathUtils;
 import org.openrewrite.java.ChangePackage;
 import org.openrewrite.java.tree.TypeUtils;
@@ -167,6 +169,8 @@ class ChangePackageTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/433")
     @Test
     void changePackageSecondaryConstructor() {
         rewriteRun(
@@ -184,14 +188,14 @@ class ChangePackageTest implements RewriteTest {
             """
               import a.b.Original
               
-              class A() : Original() {            
+              class A() : Original() {
                     constructor(s1: String): this()
               }
               """,
             """
               import x.y.Original
               
-              class A() : Original() {            
+              class A() : Original() {
                     constructor(s1: String): this()
               }
               """

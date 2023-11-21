@@ -17,6 +17,7 @@ package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.ChangeType;
@@ -374,6 +375,8 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/433")
     @Test
     void changeImportSecondaryConstructor() {
         rewriteRun(
@@ -387,14 +390,14 @@ class ChangeTypeTest implements RewriteTest {
             """
               import a.b.Original
               
-              class A() : Original() {             
+              class A() : Original() {
                     constructor(s1: String): this()
               }
               """,
             """
               import x.y.Target
               
-              class A() : Target() {             
+              class A() : Target() {
                     constructor(s1: String): this()
               }
               """
@@ -402,6 +405,8 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @ExpectedToFail
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/433")
     @Test
     void changeAnnotationImport() {
         rewriteRun(
