@@ -404,4 +404,18 @@ class MethodDeclarationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/442")
+    @Test
+    void intersectionType() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.util.*
+              @Suppress("UNUSED_PARAMETER")
+              fun < T : Any ? > test( n : Optional <  T   &    Any > = Optional.empty < T > ( ) ) { }
+              """
+          )
+        );
+    }
 }

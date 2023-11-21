@@ -699,7 +699,18 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     @Override
     public J visitIntersectionType(KtIntersectionType definitelyNotNullType, ExecutionContext data) {
-        throw new UnsupportedOperationException("TODO");
+        List<JRightPadded<TypeTree>> rps = new ArrayList<>(2);
+        TypeTree left = (TypeTree) requireNonNull(definitelyNotNullType.getLeftTypeRef()).accept(this, data);
+        TypeTree right = (TypeTree) requireNonNull(definitelyNotNullType.getRightTypeRef()).accept(this, data);
+        rps.add(padRight(left, suffix(definitelyNotNullType.getLeftTypeRef())));
+        rps.add(padRight(right, Space.EMPTY));
+        JContainer<TypeTree> bounds = JContainer.build(
+                Space.EMPTY,
+                rps,
+                Markers.EMPTY
+        );
+
+        return new J.IntersectionType(randomId(), Space.EMPTY, Markers.EMPTY, bounds);
     }
 
     @Override
