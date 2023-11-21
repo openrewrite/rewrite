@@ -1470,8 +1470,7 @@ public class GroovyParserVisitor {
             ImplicitDot implicitDot = null;
             JRightPadded<Expression> select = null;
             if (!call.isImplicitThis()) {
-                Expression selectExpr = insideParentheses(call.getObjectExpression(),
-                        prefix -> this.<Expression>visit(call.getObjectExpression()).withPrefix(prefix));
+                Expression selectExpr = visit(call.getObjectExpression());
                 int saveCursor = cursor;
                 Space afterSelect = whitespace();
                 if (source.charAt(cursor) == '.' || source.charAt(cursor) == '?' || source.charAt(cursor) == '*') {
@@ -1691,10 +1690,10 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitRangeExpression(RangeExpression range) {
-            queue.add(new G.Range(randomId(), whitespace(), Markers.EMPTY,
+            queue.add(insideParentheses(range, fmt -> new G.Range(randomId(), fmt, Markers.EMPTY,
                     visit(range.getFrom()),
                     JLeftPadded.build(range.isInclusive()).withBefore(sourceBefore(range.isInclusive() ? ".." : "..>")),
-                    visit(range.getTo())));
+                    visit(range.getTo()))));
         }
 
         @Override
@@ -2314,10 +2313,11 @@ public class GroovyParserVisitor {
 
     private String name() {
         int i = cursor;
-        char c = source.charAt(i);
-        while (Character.isJavaIdentifierPart(c) || c == '.' || c == '*') {
-            i++;
-            c = source.charAt(i);
+        for (; i < source.length(); i++) {
+            char c = source.charAt(i);
+            if (!(Character.isJavaIdentifierPart(c) || c == '.' || c == '*')) {
+                break;
+            }
         }
         String result = source.substring(cursor, i);
         cursor += i - cursor;
