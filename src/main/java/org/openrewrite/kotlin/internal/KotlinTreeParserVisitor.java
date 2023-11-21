@@ -1931,7 +1931,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             if (j instanceof J.Identifier) {
                 name = (J.Identifier) j;
             } else  {
-                select = padRight(convertToExpression(j), Space.EMPTY) ;//  padRight((Expression) j, Space.EMPTY);
+                select = padRight(convertToExpression(j), Space.EMPTY);
                 name = createIdentifier("<empty>", Space.EMPTY, null, null)
                         .withMarkers(Markers.EMPTY.addIfAbsent(new Implicit(randomId())));
             }
