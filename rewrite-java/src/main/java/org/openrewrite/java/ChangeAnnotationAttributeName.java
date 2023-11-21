@@ -40,15 +40,15 @@ public class ChangeAnnotationAttributeName extends Recipe {
             example = "org.junit.Test")
     String annotationType;
 
-    @Option(displayName = "Attribute name",
-            description = "The name of attribute to change. If omitted defaults to 'value'.",
+    @Option(displayName = "Old attribute name",
+            description = "The name of attribute to change.",
             required = false,
             example = "timeout")
     String oldAttributeName;
 
-    @Option(displayName = "Attribute value",
-            description = "The value to set the attribute to. Set to `null` to remove the attribute.",
-            example = "500")
+    @Option(displayName = "New attribute name",
+            description = "The new attribute name to use.",
+            example = "waitFor")
     String newAttributeName;
 
     @Override
