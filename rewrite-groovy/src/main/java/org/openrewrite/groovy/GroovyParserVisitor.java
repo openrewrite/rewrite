@@ -1470,7 +1470,8 @@ public class GroovyParserVisitor {
             ImplicitDot implicitDot = null;
             JRightPadded<Expression> select = null;
             if (!call.isImplicitThis()) {
-                Expression selectExpr = visit(call.getObjectExpression());
+                Expression selectExpr = insideParentheses(call.getObjectExpression(),
+                        prefix -> this.<Expression>visit(call.getObjectExpression()).withPrefix(prefix));
                 int saveCursor = cursor;
                 Space afterSelect = whitespace();
                 if (source.charAt(cursor) == '.' || source.charAt(cursor) == '?' || source.charAt(cursor) == '*') {
