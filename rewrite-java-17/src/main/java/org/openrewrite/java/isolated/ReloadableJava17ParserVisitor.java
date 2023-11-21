@@ -1331,7 +1331,7 @@ public class ReloadableJava17ParserVisitor extends TreePathScanner<J, Space> {
                 JContainer.build(sourceBefore("extends"),
                         convertAll(node.getBounds(), t -> sourceBefore("&"), noDelim), Markers.EMPTY);
 
-        return new J.TypeParameter(randomId(), fmt, Markers.EMPTY, annotations, name, bounds);
+        return new J.TypeParameter(randomId(), fmt, Markers.EMPTY, annotations, emptyList(), name, bounds);
     }
 
     private <T extends TypeTree & Expression> T buildName(String fullyQualifiedName) {

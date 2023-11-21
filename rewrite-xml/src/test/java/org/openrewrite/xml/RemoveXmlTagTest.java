@@ -20,8 +20,6 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.io.File;
-import java.nio.file.Path;
 
 import static org.openrewrite.xml.Assertions.xml;
 
@@ -76,6 +74,27 @@ class RemoveXmlTagTest implements RewriteTest {
             """
               <beans>
                   <bean id='myBean.subpackage.subpackage2'/>
+                  <other id='myBean.subpackage.subpackage2'/>
+              </beans>
+              """,
+            documentSourceSpec -> documentSourceSpec.path("my/project/notBeans.xml")
+          )
+        );
+    }
+
+    @Test
+    void fileMatcherEmpty() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveXmlTag("//bean", null)),
+          xml(
+            """
+              <beans>
+                  <bean id='myBean.subpackage.subpackage2'/>
+                  <other id='myBean.subpackage.subpackage2'/>
+              </beans>
+              """,
+            """
+              <beans>
                   <other id='myBean.subpackage.subpackage2'/>
               </beans>
               """,

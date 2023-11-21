@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,54 +21,38 @@ import lombok.With;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.GitProvenance;
 
-import java.util.Collections;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.marker.OperatingSystemProvenance.hostname;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class CircleCiBuildEnvironment implements BuildEnvironment {
+public class BitbucketBuildEnvironment implements BuildEnvironment{
     @With
     UUID id;
-
-    String buildId;
-    String buildUrl;
-    String host;
-    String job;
-
+    String httpOrigin;
     String branch;
+    String sha;
 
-    String repositoryURL;
-
-    String sha1;
-
-    String tag;
-
-    public static CircleCiBuildEnvironment build(UnaryOperator<String> environment) {
-        return new CircleCiBuildEnvironment(
+    public static BitbucketBuildEnvironment build(UnaryOperator<String> environment) {
+        return new BitbucketBuildEnvironment(
                 randomId(),
-                environment.apply("CIRCLE_BUILD_NUM"),
-                environment.apply("CIRCLE_BUILD_URL"),
-                hostname(),
-                environment.apply("CIRCLE_JOB"),
-                environment.apply("CIRCLE_BRANCH"),
-                environment.apply("CIRCLE_REPOSITORY_URL"),
-                environment.apply("CIRCLE_SHA1"),
-                environment.apply("CIRCLE_TAG")
-        );
+                environment.apply("BITBUCKET_GIT_HTTP_ORIGIN"),
+                environment.apply("BITBUCKET_BRANCH"),
+                environment.apply("BITBUCKET_COMMIT"));
     }
 
     @Override
     public GitProvenance buildGitProvenance() throws IncompleteGitConfigException {
-        if (StringUtils.isBlank(repositoryURL) || StringUtils.isBlank(sha1) || (
-                StringUtils.isBlank(branch)&& StringUtils.isBlank(tag))) {
+        if (StringUtils.isBlank(httpOrigin)
+                || StringUtils.isBlank(branch)
+                || StringUtils.isBlank(sha)) {
             throw new IncompleteGitConfigException();
+        } else {
+            return new GitProvenance(UUID.randomUUID(), httpOrigin, branch, sha,
+                    null, null, emptyList());
         }
-        return new GitProvenance(UUID.randomUUID(), repositoryURL, StringUtils.isBlank(branch)? tag : branch,
-                sha1, null, null, emptyList());
     }
 }

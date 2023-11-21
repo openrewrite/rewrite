@@ -44,12 +44,15 @@ public class GradleParser implements Parser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo, ExecutionContext ctx) {
         if (buildParser == null) {
-            if (base.buildscriptClasspath == null && defaultClasspath == null) {
-                defaultClasspath = loadDefaultClasspath();
-                base.buildscriptClasspath = defaultClasspath;
+            Collection<Path> buildscriptClasspath = base.buildscriptClasspath;
+            if (buildscriptClasspath == null) {
+                if (defaultClasspath == null) {
+                    defaultClasspath = loadDefaultClasspath();
+                }
+                buildscriptClasspath = defaultClasspath;
             }
             buildParser = GroovyParser.builder(base.groovyParser)
-                    .classpath(base.buildscriptClasspath)
+                    .classpath(buildscriptClasspath)
                     .compilerCustomizers(
                             new DefaultImportsCustomizer(),
                             config -> config.setScriptBaseClass("RewriteGradleProject")
@@ -57,12 +60,15 @@ public class GradleParser implements Parser {
                     .build();
         }
         if (settingsParser == null) {
-            if (base.settingsClasspath == null && defaultClasspath == null) {
-                defaultClasspath = loadDefaultClasspath();
-                base.settingsClasspath = defaultClasspath;
+            Collection<Path> settingsClasspath = base.settingsClasspath;
+            if (settingsClasspath == null) {
+                if (defaultClasspath == null) {
+                    defaultClasspath = loadDefaultClasspath();
+                }
+                settingsClasspath = defaultClasspath;
             }
             settingsParser = GroovyParser.builder(base.groovyParser)
-                    .classpath(base.settingsClasspath)
+                    .classpath(settingsClasspath)
                     .compilerCustomizers(
                             new DefaultImportsCustomizer(),
                             config -> config.setScriptBaseClass("RewriteSettings")

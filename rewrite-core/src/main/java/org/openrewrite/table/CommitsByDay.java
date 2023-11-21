@@ -13,21 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.protobuf;
+package org.openrewrite.table;
 
-import org.junit.jupiter.api.Test;
-import org.openrewrite.SourceFile;
-import org.openrewrite.test.RewriteTest;
-import org.openrewrite.text.PlainText;
+import lombok.Value;
+import org.openrewrite.DataTable;
+import org.openrewrite.Recipe;
 
-import java.util.List;
+import java.time.LocalDate;
 
-import static org.assertj.core.api.Assertions.assertThat;
+public class CommitsByDay extends DataTable<CommitsByDay.Row> {
 
-class ProtoParserTest implements RewriteTest {
-    @Test
-    void noNullsForProto3Files() {
-        List<SourceFile> sources = ProtoParser.builder().build().parse("syntax = \"proto3\";").toList();
-        assertThat(sources).singleElement().isInstanceOf(PlainText.class);
+    public CommitsByDay(Recipe recipe) {
+        super(recipe,
+                "Commits by day",
+                "The commit activity by day by committer.");
+    }
+
+    @Value
+    public static class Row {
+        String name;
+        String email;
+        LocalDate day;
+        int commits;
     }
 }
