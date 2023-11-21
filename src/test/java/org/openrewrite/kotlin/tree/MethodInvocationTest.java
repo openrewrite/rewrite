@@ -907,7 +907,13 @@ class MethodInvocationTest implements RewriteTest {
                   action()
               }
 
-              val a = "42" {
+              val a = "42"
+
+              val b = "X" {
+                  // do something
+              }
+
+              val c = "${a}" {
                   // do something
               }
               """
