@@ -42,7 +42,6 @@ public class ChangeAnnotationAttributeName extends Recipe {
 
     @Option(displayName = "Old attribute name",
             description = "The name of attribute to change.",
-            required = false,
             example = "timeout")
     String oldAttributeName;
 
