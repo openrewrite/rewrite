@@ -710,7 +710,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 Markers.EMPTY
         );
 
-        return new J.IntersectionType(randomId(), Space.EMPTY, Markers.EMPTY, bounds);
+        return new J.IntersectionType(randomId(), prefix(definitelyNotNullType), Markers.EMPTY, bounds);
     }
 
     @Override
@@ -3101,6 +3101,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         } else if (j instanceof J.ParameterizedType) {
             if (!leadingAnnotations.isEmpty()) {
                 j = new K.AnnotatedExpression(randomId(), Markers.EMPTY, leadingAnnotations, (J.ParameterizedType) j);
+            }
+        } else if (j instanceof J.IntersectionType) {
+            if (!leadingAnnotations.isEmpty()) {
+                j = new J.AnnotatedType(randomId(), Space.EMPTY, Markers.EMPTY, leadingAnnotations, (J.IntersectionType) j);
             }
         }
 

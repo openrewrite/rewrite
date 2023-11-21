@@ -651,4 +651,20 @@ class AnnotationTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void annotatedIntersectionType() {
+        rewriteRun(
+          kotlin(
+            """
+              import java.util.*
+
+              @Target(AnnotationTarget.TYPE)
+              annotation class Anno
+
+              fun < T : Any ? > test( n : Optional < @Anno  T   &   @Anno Any > = Optional.empty < T > ( ) ) { }
+              """
+          )
+        );
+    }
 }
