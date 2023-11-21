@@ -483,13 +483,16 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 when (type.variance) {
                     Variance.INVARIANT -> signature(type.typeRef)
                     Variance.IN_VARIANCE -> {
-                        ""
+                        return "Generic{? super " + signature(type.typeRef)
                     }
 
                     Variance.OUT_VARIANCE -> {
-                        ""
+                        return "Generic{? extends " + signature(type.typeRef)
                     }
                 }
+            }
+            is FirStarProjection -> {
+                return "Generic{?}"
             }
 
             else -> throw UnsupportedOperationException("Unsupported FirTypeProjection: ${type.javaClass.name}")

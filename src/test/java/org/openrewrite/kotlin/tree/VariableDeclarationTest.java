@@ -26,10 +26,12 @@ import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.marker.Implicit;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.Objects;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-@SuppressWarnings({"UnusedReceiverParameter", "PropertyName", "RemoveCurlyBracesFromTemplate", "UnnecessaryStringEscape", "RedundantGetter", "ConstantConditionIf", "RedundantSetter"})
+@SuppressWarnings({"UnusedReceiverParameter", "PropertyName", "RemoveCurlyBracesFromTemplate", "UnnecessaryStringEscape", "RedundantGetter", "ConstantConditionIf", "RedundantSetter", "RedundantSemicolon"})
 class VariableDeclarationTest implements RewriteTest {
 
     @ParameterizedTest
@@ -243,14 +245,8 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              package org.foo
-              class Test < T >
-              """
-          ),
-          kotlin(
-            """
-              import org.foo.Test
-              val a : Test  <   *    >     = null
+              class Test<T>
+              val a : Test  <   *    >?     = null
               """
           )
         );
@@ -273,6 +269,7 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
+              @file:Suppress("UNUSED_VARIABLE")
               fun example  (   )    {
                 val   (    a     , b  ,   c    )     = Triple  (   1    ,     "Two" ,  3   )
               }
@@ -344,6 +341,7 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           spec -> spec.parser(KotlinParser.builder().classpath("clikt")),
           kotlin(
+            //language=none, disabled since Kotlin inspection does not detect the classpath
             """
               import com.github.ajalt.clikt.core.CliktCommand
               import com.github.ajalt.clikt.parameters.arguments.argument
@@ -396,6 +394,7 @@ class VariableDeclarationTest implements RewriteTest {
     void unresolvedNameFirSource() {
         rewriteRun(
           kotlin(
+            //language=none, disabled due to invalid code
             """
               val t = SomeInput . Test
               """
@@ -409,6 +408,7 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
+              @file:Suppress("UNUSED_VARIABLE")
               class StringValue {
                   val value : String = ""
               }
@@ -507,8 +507,9 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
+              @file:Suppress("UNUSED_VARIABLE")
               fun foo() {
-                  val l = listOf ( "x" )
+                  val l: List<String?> = listOf ( "x" )
                   val a = l [ 0 ] !!
               }
               """
@@ -562,6 +563,7 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
+              @file:Suppress("UNUSED_VARIABLE")
               fun getUserInfo(): Pair<String, String> {
                   return Pair("Leo", "Messi")
               }
@@ -580,6 +582,7 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
+              @file:Suppress("UNUSED_VARIABLE")
               fun getUserInfo(): Pair<String, String> {
                   return Pair("Leo", "Messi")
               }
@@ -604,14 +607,10 @@ class VariableDeclarationTest implements RewriteTest {
             spec -> spec.afterRecipe(cu ->
                 assertThat(cu.getStatements()).satisfiesExactly(
                     i1 -> assertThat(((J.VariableDeclarations) i1).getTypeExpression()).satisfies(
-                        type -> {
-                            assertThat(type).isNull();
-                        }
+                        type -> assertThat(type).isNull()
                     ),
                     i2 -> assertThat(((J.VariableDeclarations) i2).getTypeExpression()).satisfies(
-                        type -> {
-                            assertThat(type).isNull();
-                        }
+                        type -> assertThat(type).isNull()
                     ),
                     i3 -> assertThat(((J.VariableDeclarations) i3).getTypeExpression()).satisfies(
                         type -> {
@@ -619,7 +618,7 @@ class VariableDeclarationTest implements RewriteTest {
                             assertThat(((J.Identifier) type).getSimpleName()).isEqualTo("Int");
                             assertThat(type.getMarkers().findFirst(Implicit.class)).isEmpty();
                             assertThat(type.getType()).isInstanceOf(JavaType.Class.class);
-                            assertThat(((JavaType.Class) type.getType()).getFullyQualifiedName()).isEqualTo("kotlin.Int");
+                            assertThat(((JavaType.Class) Objects.requireNonNull(type.getType())).getFullyQualifiedName()).isEqualTo("kotlin.Int");
                         }
                     )
                 )
@@ -682,6 +681,7 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
+              @file:Suppress("UNUSED_VARIABLE")
               fun example ( ) {
                 val (
                   a ,
@@ -699,9 +699,22 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
+              @file:Suppress("UNUSED_VARIABLE")
               fun example ( ) {
                 val ( a   :  Int   , b :  String  ?   ) = Pair ( 1 , "Two" )
               }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/455")
+    @Test
+    void starTypeProjection() {
+        rewriteRun(
+          kotlin(
+            """
+              val f = Enum<*>::name
               """
           )
         );

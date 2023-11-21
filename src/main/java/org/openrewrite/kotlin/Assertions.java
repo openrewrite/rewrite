@@ -16,7 +16,6 @@
 package org.openrewrite.kotlin;
 
 
-import kotlin.Suppress;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
