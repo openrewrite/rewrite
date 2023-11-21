@@ -813,4 +813,18 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/449")
+    @Test
+    void thisAsSelect() {
+        rewriteRun(
+          kotlin(
+            """
+              inline fun < reified T : Enum < T >, V> ( ( T ) -> V ). find ( value : V ): T ? {
+                  return enumValues < T > ( ) . firstOrNull { this ( it )  == value }
+              }
+              """
+          )
+        );
+    }
 }

@@ -1929,13 +1929,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             J.Identifier name;
             if (j instanceof J.Identifier) {
                 name = (J.Identifier) j;
-            } else if (j instanceof J.MethodInvocation) {
-                select = padRight((J.MethodInvocation)j, Space.EMPTY);
+            } else  {
+                select = padRight(convertToExpression(j), Space.EMPTY) ;//  padRight((Expression) j, Space.EMPTY);
                 name = createIdentifier("<empty>", Space.EMPTY, null, null)
                         .withMarkers(Markers.EMPTY.addIfAbsent(new Implicit(randomId())));
-            } else {
-                throw new UnsupportedOperationException(String.format("Unexpected type: %s with code %s", j.getClass().getName(), expression.getText()));
             }
+
             JContainer<Expression> typeParams = mapTypeArguments(expression.getTypeArgumentList(), data);
             JContainer<Expression> args = mapValueArgumentsMaybeWithTrailingLambda(expression.getValueArgumentList(), expression.getValueArguments(), data);
 
