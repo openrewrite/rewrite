@@ -53,10 +53,11 @@ public class ChangeAnnotationAttributeName extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesType<>(annotationType, false), new JavaIsoVisitor<ExecutionContext>() {
+            private final AnnotationMatcher annotationMatcher = new AnnotationMatcher(annotationType);
             @Override
             public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext context) {
                 J.Annotation a = super.visitAnnotation(annotation, context);
-                if (!new AnnotationMatcher(annotationType).matches(a)) {
+                if (!annotationMatcher.matches(a)) {
                     return a;
                 }
                 return a.withArguments(ListUtils.map(a.getArguments(), arg -> {
