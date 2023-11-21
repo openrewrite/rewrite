@@ -845,4 +845,39 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/451")
+    @Test
+    void parenthesesAsSelect() {
+        rewriteRun(
+          kotlin(
+            """
+              open class A(
+                val foo : ( ( Any ) -> A) -> A
+              )
+              class B : A ( foo = { x -> ( :: A ) ( x ) } ) {
+                @Suppress("UNUSED_PARAMETER")
+                fun mRef(a: Any) {}
+              }
+              """
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/452")
+    @Test
+    void newClassAsSelect() {
+        rewriteRun(
+          kotlin(
+            """
+              class A
+              val a = A ( ) ( )
+
+              operator fun A.invoke() : A {
+                  return A()
+              }
+              """
+          )
+        );
+    }
 }
