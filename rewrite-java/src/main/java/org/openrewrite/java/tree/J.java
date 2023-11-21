@@ -5236,7 +5236,7 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    final class TypeParameter implements J {
+    final class TypeParameter implements Expression {
         @Nullable
         @NonFinal
         transient WeakReference<Padding> padding;
@@ -5300,6 +5300,22 @@ public interface J extends Tree {
                 }
             }
             return p;
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return null;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public TypeParameter withType(@Nullable JavaType type) {
+            return this;
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
         }
 
         @RequiredArgsConstructor
