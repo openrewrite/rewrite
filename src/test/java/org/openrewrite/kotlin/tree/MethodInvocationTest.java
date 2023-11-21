@@ -827,4 +827,22 @@ class MethodInvocationTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/450")
+    @Test
+    void unaryAsSelect() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test(foo: () -> Unit) {
+                private var foo: (() -> Unit)? = foo
+                fun method() {
+                  @Suppress("UNUSED_VARIABLE")
+                  val bar = foo!!()
+                }
+              }
+              """
+          )
+        );
+    }
 }
