@@ -3158,7 +3158,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             JContainer<Expression> args = mapTypeArguments(type.getTypeArgumentList(), data);
 
             JavaType javaType = type(type);
-            if (!(javaType instanceof JavaType.Parameterized)) {
+            if (javaType instanceof JavaType.Unknown) {
+                javaType = new JavaType.Parameterized(null, JavaType.Unknown.getInstance(), null);
+            } else if (!(javaType instanceof JavaType.Parameterized)) {
                 throw new UnsupportedOperationException("java type is not a Parameterized: " + type.getText());
             }
 
