@@ -656,7 +656,7 @@ public interface K extends J {
 
         @Override
         public Constructor withType(@Nullable JavaType type) {
-            throw new UnsupportedOperationException("To change the return type of this constructor, use withMethodType(..)");
+            return this; // type must be changed on method declaration
         }
 
         @Override

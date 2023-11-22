@@ -375,7 +375,6 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
-    @ExpectedToFail
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/433")
     @Test
     void changeImportSecondaryConstructor() {
