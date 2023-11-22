@@ -235,7 +235,7 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             if (method != null) {
                                 int alignTo;
                                 if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
-                                    alignTo = getLengthOfWhitespace(firstArg.getPrefix().getLastWhitespace()) - 1;
+                                    alignTo = getLengthOfWhitespace(firstArg.getPrefix().getLastWhitespace());
                                 } else {
                                     String source = method.print(getCursor());
                                     int firstArgIndex = source.indexOf(firstArg.print(getCursor()));
