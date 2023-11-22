@@ -173,6 +173,27 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void alignMethodDeclarationParamsWhenContinuationIndentUsingTabs() {
+        rewriteRun(
+          tabsAndIndents(style -> style.withUseTabCharacter(true)),
+          java(
+            """
+            import java.util.*;
+            
+            class Foo {
+            	Foo(
+            			String var1,
+            			String var2,
+            			String var3
+            	) {
+            	}
+            }
+            """
+          )
+        );
+    }
+
     // https://rules.sonarsource.com/java/tag/confusing/RSPEC-3973
     @DocumentExample
     @SuppressWarnings("SuspiciousIndentAfterControlStatement")
@@ -2384,27 +2405,6 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
-          )
-        );
-    }
-
-    @Test
-    void constructorArgumentsContinuation() {
-        rewriteRun(
-          tabsAndIndents(style -> style.withUseTabCharacter(true)),
-          java(
-            """
-            import java.util.*;
-            
-            class Foo {
-            	Foo(
-            			String var1,
-            			String var2,
-            			String var3
-            	) {
-            	}
-            }
-            """
           )
         );
     }
