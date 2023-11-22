@@ -31,7 +31,7 @@ public class RemoveApplicabilityTestFromYamlRecipeTest implements RewriteTest {
 
     @DocumentExample("Comment out applicability from yaml recipes as it's no longer supported and could require user to transform it to java.")
     @Test
-    void commentOutApplicabilityTest() {
+    void commentOutAnySourceApplicabilityTest() {
         //language=yaml
         rewriteRun(
           yaml(
@@ -45,6 +45,8 @@ public class RemoveApplicabilityTestFromYamlRecipeTest implements RewriteTest {
               applicability:
                 anySource:
                   - org.openrewrite.java.testing.mockito.UsesMockitoAll
+                singleSource:
+                  - org.openrewrite.java.testing.mockito.UsesMockitoAll
               recipeList:
                 - org.openrewrite.java.Recipe1
                 - org.openrewrite.java.Recipe2
@@ -56,20 +58,21 @@ public class RemoveApplicabilityTestFromYamlRecipeTest implements RewriteTest {
               description: x.
               tags:
                 - testing
-              # Applicability tests are no longer supported for yaml recipes, please move to using preconditions
-              # applicability:
-              #   anySource:
-              #     - org.openrewrite.java.testing.mockito.UsesMockitoAll
+              # Applicability tests are no longer supported for yaml recipes, please remove or require migrating the recipe to Java code
+                # anySource:
+                #   - org.openrewrite.java.testing.mockito.UsesMockitoAll
               recipeList:
                 - org.openrewrite.java.Recipe1
                 - org.openrewrite.java.Recipe2
+              preconditions:
+                - org.openrewrite.java.testing.mockito.UsesMockitoAll
               """
           )
         );
     }
 
     @Test
-    void commentOutSingleSourceApplicability() {
+    void migrateSingleSourceApplicability() {
         //language=yaml
         rewriteRun(
           yaml(
@@ -94,13 +97,11 @@ public class RemoveApplicabilityTestFromYamlRecipeTest implements RewriteTest {
               description: x.
               tags:
                 - testing
-              # Applicability tests are no longer supported for yaml recipes, please move to using preconditions
-              # applicability:
-              #   singleSource:
-              #     - org.openrewrite.java.testing.mockito.UsesMockitoAll
               recipeList:
                 - org.openrewrite.java.Recipe1
                 - org.openrewrite.java.Recipe2
+              preconditions:
+                - org.openrewrite.java.testing.mockito.UsesMockitoAll
               """
           )
         );
