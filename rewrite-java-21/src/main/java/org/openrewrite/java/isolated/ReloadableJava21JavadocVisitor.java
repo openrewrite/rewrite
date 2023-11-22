@@ -534,6 +534,7 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     Space.EMPTY,
                     Markers.EMPTY,
                     emptyList(),
+                    emptyList(),
                     visitIdentifier(node.getName(), whitespaceBefore()).withPrefix(namePrefix),
                     null
             );
@@ -601,7 +602,6 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             } else {
                 qualifier = null;
             }
-
         }
 
         if (ref.memberName != null) {
@@ -690,7 +690,11 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                             for (JavaType testParamType : method.getParameterTypes()) {
                                 Type paramType = attr.attribType(param, symbol);
                                 if (testParamType instanceof JavaType.GenericTypeVariable) {
-                                    for (JavaType bound : ((JavaType.GenericTypeVariable) testParamType).getBounds()) {
+                                    List<JavaType> bounds = ((JavaType.GenericTypeVariable) testParamType).getBounds();
+                                    if (bounds.isEmpty() && paramType.tsym != null && "java.lang.Object".equals(paramType.tsym.getQualifiedName().toString())) {
+                                        return method;
+                                    }
+                                    for (JavaType bound : bounds) {
                                         if (paramTypeMatches(bound, paramType)) {
                                             return method;
                                         }
@@ -791,6 +795,7 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     @Override
     public Tree visitSerialField(SerialFieldTree node, List<Javadoc> body) {
         body.addAll(sourceBefore("@serialField"));
+
         return new Javadoc.SerialField(randomId(), Markers.EMPTY,
                 visitIdentifier(node.getName(), whitespaceBefore()),
                 visitReference(node.getType(), whitespaceBefore()),
@@ -1144,7 +1149,7 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 typeIdent = ((ArrayTypeTree) typeIdent).getType();
             }
 
-            TypeTree elemType = (TypeTree) scan(typeIdent, fmt);
+            TypeTree elemType = (TypeTree) scan(typeIdent, Space.EMPTY);
 
             List<JRightPadded<Space>> dimensions = emptyList();
             if (dimCount > 0) {
@@ -1160,7 +1165,7 @@ public class ReloadableJava21JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
             return new J.ArrayType(
                     randomId(),
-                    Space.EMPTY,
+                    fmt,
                     Markers.EMPTY,
                     elemType,
                     dimensions

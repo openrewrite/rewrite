@@ -531,6 +531,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     Space.EMPTY,
                     Markers.EMPTY,
                     emptyList(),
+                    emptyList(),
                     visitIdentifier(node.getName(), whitespaceBefore()).withPrefix(namePrefix),
                     null
             );
@@ -686,7 +687,11 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                             for (JavaType testParamType : method.getParameterTypes()) {
                                 Type paramType = attr.attribType(param, symbol);
                                 if (testParamType instanceof JavaType.GenericTypeVariable) {
-                                    for (JavaType bound : ((JavaType.GenericTypeVariable) testParamType).getBounds()) {
+                                    List<JavaType> bounds = ((JavaType.GenericTypeVariable) testParamType).getBounds();
+                                    if (bounds.isEmpty() && paramType.tsym != null && "java.lang.Object".equals(paramType.tsym.getQualifiedName().toString())) {
+                                        return method;
+                                    }
+                                    for (JavaType bound : bounds) {
                                         if (paramTypeMatches(bound, paramType)) {
                                             return method;
                                         }
@@ -1076,7 +1081,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     /**
      * A {@link J} may contain new lines in each {@link Space} and each new line will have a corresponding
      * {@link org.openrewrite.java.tree.Javadoc.LineBreak}.
-     *
+     * <p>
      * This method collects the linebreaks associated to new lines in a Space, and removes the applicable linebreaks
      * from the map.
      */
@@ -1140,7 +1145,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 typeIdent = ((ArrayTypeTree) typeIdent).getType();
             }
 
-            TypeTree elemType = (TypeTree) scan(typeIdent, fmt);
+            TypeTree elemType = (TypeTree) scan(typeIdent, Space.EMPTY);
 
             List<JRightPadded<Space>> dimensions = emptyList();
             if (dimCount > 0) {
@@ -1156,7 +1161,7 @@ public class ReloadableJava11JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
             return new J.ArrayType(
                     randomId(),
-                    Space.EMPTY,
+                    fmt,
                     Markers.EMPTY,
                     elemType,
                     dimensions

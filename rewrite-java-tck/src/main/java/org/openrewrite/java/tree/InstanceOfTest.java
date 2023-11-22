@@ -31,7 +31,7 @@ class InstanceOfTest implements RewriteTest {
           java(
             """
               class Test {
-                  void test() {
+                  void test(Object o) {
                       boolean b = o instanceof String;
                   }
               }

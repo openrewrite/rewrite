@@ -366,6 +366,7 @@ public class Space {
         IMPORT_SUFFIX,
         INSTANCEOF_PREFIX,
         INSTANCEOF_SUFFIX,
+        INTERSECTION_TYPE_PREFIX,
         LABEL_PREFIX,
         LABEL_SUFFIX,
         LAMBDA_ARROW_PREFIX,
