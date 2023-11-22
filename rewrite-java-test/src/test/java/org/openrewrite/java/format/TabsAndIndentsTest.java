@@ -2387,4 +2387,25 @@ class TabsAndIndentsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void constructorArgumentsContinuation() {
+        rewriteRun(
+          tabsAndIndents(style -> style.withUseTabCharacter(true)),
+          java(
+            """
+            import java.util.*;
+            
+            class Foo {
+            	Foo(
+            			String var1,
+            			String var2,
+            			String var3
+            	) {
+            	}
+            }
+            """
+          )
+        );
+    }
 }
