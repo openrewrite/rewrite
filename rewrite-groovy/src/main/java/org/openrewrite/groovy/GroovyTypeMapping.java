@@ -319,7 +319,7 @@ class GroovyTypeMapping implements JavaTypeMapping<ASTNode> {
 
         typeCache.put(signature, variable);
 
-        variable.unsafeSet(JavaType.Unknown.getInstance(), type, null);
+        variable.unsafeSet(JavaType.Unknown.getInstance(), type, (JavaType.FullyQualified[]) null);
 
         return variable;
     }

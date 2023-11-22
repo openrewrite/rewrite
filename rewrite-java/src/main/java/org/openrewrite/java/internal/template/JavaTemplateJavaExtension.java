@@ -434,6 +434,15 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             }
 
             @Override
+            public J visitNewClass(J.NewClass newClass, Integer p) {
+                if (newClass.isScope(insertionPoint)) {
+                    // allow a `J.NewClass` to also be replaced by an expression
+                    return maybeReplaceStatement(newClass, J.class, p);
+                }
+                return super.visitNewClass(newClass, p);
+            }
+
+            @Override
             public J visitPackage(J.Package pkg, Integer integer) {
                 if (loc.equals(PACKAGE_PREFIX) && pkg.isScope(insertionPoint)) {
                     return pkg.withExpression(substitutions.unsubstitute(templateParser.parsePackage(getCursor(), substitutedTemplate)));

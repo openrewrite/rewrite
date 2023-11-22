@@ -21,9 +21,11 @@ import lombok.With;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.GitProvenance;
 
+import java.util.Collections;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.marker.OperatingSystemProvenance.hostname;
 
@@ -67,6 +69,6 @@ public class CircleCiBuildEnvironment implements BuildEnvironment {
             throw new IncompleteGitConfigException();
         }
         return new GitProvenance(UUID.randomUUID(), repositoryURL, StringUtils.isBlank(branch)? tag : branch,
-                sha1, null, null);
+                sha1, null, null, emptyList());
     }
 }

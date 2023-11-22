@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.io.*;
@@ -38,6 +39,22 @@ import java.util.stream.StreamSupport;
 import static java.util.stream.Collectors.toList;
 
 public interface Parser {
+    @Incubating(since = "8.2.0")
+    default SourceFile requirePrintEqualsInput(SourceFile sourceFile, Parser.Input input, @Nullable Path relativeTo, ExecutionContext ctx) {
+        if (ctx.getMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, true) &&
+            !sourceFile.printEqualsInput(input, ctx)) {
+            String diff = Result.diff(input.getSource(ctx).readFully(), sourceFile.printAll(), input.getPath());
+            return ParseError.build(
+                    this,
+                    input,
+                    relativeTo,
+                    ctx,
+                    new IllegalStateException(sourceFile.getSourcePath() + " is not print idempotent. \n" + diff)
+            ).withErroneous(sourceFile);
+        }
+        return sourceFile;
+    }
+
     default Stream<SourceFile> parse(Iterable<Path> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         return parseInputs(StreamSupport
                         .stream(sourceFiles.spliterator(), false)
@@ -53,6 +70,7 @@ public interface Parser {
                 ctx
         );
     }
+
 
     default Stream<SourceFile> parse(String... sources) {
         return parse(new InMemoryExecutionContext(), sources);
@@ -116,7 +134,9 @@ public interface Parser {
      * memory.
      */
     class Input {
+        @Getter
         private final boolean synthetic;
+        @Getter
         private final Path path;
         private final Supplier<InputStream> source;
 
@@ -180,20 +200,12 @@ public interface Parser {
                     .collect(toList());
         }
 
-        public Path getPath() {
-            return path;
-        }
-
         public Path getRelativePath(@Nullable Path relativeTo) {
             return relativeTo == null ? path : relativeTo.relativize(path);
         }
 
         public EncodingDetectingInputStream getSource(ExecutionContext ctx) {
             return new EncodingDetectingInputStream(source.get(), ParsingExecutionContextView.view(ctx).getCharset());
-        }
-
-        public boolean isSynthetic() {
-            return synthetic;
         }
 
         @Override
@@ -212,9 +224,9 @@ public interface Parser {
 
     Path sourcePathFromSourceText(Path prefix, String sourceCode);
 
+    @Getter
     @RequiredArgsConstructor
     abstract class Builder implements Cloneable {
-        @Getter
         private final Class<? extends SourceFile> sourceFileType;
 
         public abstract Parser build();

@@ -38,8 +38,8 @@ public class CommentOutProperty extends Recipe {
     String propertyKey;
 
     @Option(displayName = "comment text",
-        description = "comment text to be added.",
-        example = "This property is deprecated, please migrate")
+        description = "The comment text to be added before the specified key.",
+        example = "The `foo` property is deprecated, please migrate")
     String commentText;
 
     @Override

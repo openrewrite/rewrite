@@ -70,6 +70,13 @@ public class ChangePackage extends Recipe {
     }
 
     @Override
+    public Validated<Object> validate() {
+        return Validated.none()
+                .and(Validated.notBlank("oldPackageName", oldPackageName))
+                .and(Validated.required("newPackageName", newPackageName));
+    }
+
+    @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         JavaIsoVisitor<ExecutionContext> condition = new JavaIsoVisitor<ExecutionContext>() {
             @Override

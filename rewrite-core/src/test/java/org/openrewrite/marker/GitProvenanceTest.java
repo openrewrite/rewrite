@@ -41,12 +41,13 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyList;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.eclipse.jgit.lib.ConfigConstants.CONFIG_BRANCH_SECTION;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.openrewrite.Tree.randomId;
 
-@SuppressWarnings("ConstantConditions")
+@SuppressWarnings({"ConstantConditions", "HttpUrlsUsage"})
 class GitProvenanceTest {
 
     private static Stream<String> remotes() {
@@ -61,23 +62,24 @@ class GitProvenanceTest {
         );
     }
 
+    @SuppressWarnings("deprecation")
     @ParameterizedTest
     @MethodSource("remotes")
     void getOrganizationName(String remote) {
-        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null).getOrganizationName())
+        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null, emptyList()).getOrganizationName())
           .isEqualTo("openrewrite");
     }
 
     @ParameterizedTest
     @MethodSource("remotes")
     void getRepositoryName(String remote) {
-        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null).getRepositoryName())
+        assertThat(new GitProvenance(randomId(), remote, "main", "123", null, null, emptyList()).getRepositoryName())
           .isEqualTo("rewrite");
     }
 
     @Test
     void localBranchPresent(@TempDir Path projectDir) throws GitAPIException {
-        try (Git g = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()) {
+        try (Git ignored = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()) {
             GitProvenance git = GitProvenance.fromProjectDirectory(projectDir, null);
             assertThat(git).isNotNull();
             assertThat(git.getBranch()).isEqualTo("main");
@@ -85,7 +87,7 @@ class GitProvenanceTest {
     }
 
     @Test
-    void nonGitNoStacktrace(@TempDir Path projectDir) throws GitAPIException {
+    void nonGitNoStacktrace(@TempDir Path projectDir) {
         PrintStream standardErr = System.err;
         ByteArrayOutputStream captor = new ByteArrayOutputStream();
         try {
@@ -191,7 +193,8 @@ class GitProvenanceTest {
           "master",
           "1234567890abcdef1234567890abcdef12345678",
           null,
-          null);
+          null,
+          emptyList());
 
         assertThat(provenance.getOrganizationName(baseUrl)).isEqualTo("group/subgroup1/subgroup2");
         assertThat(provenance.getRepositoryName()).isEqualTo("repo");
@@ -270,8 +273,8 @@ class GitProvenanceTest {
         envVars.put("GITHUB_HEAD_REF", "");
 
         GitProvenance prov = GitProvenance.fromProjectDirectory(projectDir,
-          GithubActionsBuildEnvironment.build(var -> envVars.get(var)));
-        assertThat(prov != null);
+          GithubActionsBuildEnvironment.build(envVars::get));
+        assertThat(prov).isNotNull();
         assertThat(prov.getOrigin()).isEqualTo("https://github.com/octocat/Hello-World.git");
         assertThat(prov.getBranch()).isEqualTo("main");
         assertThat(prov.getChange()).isEqualTo("287364287357");
@@ -285,10 +288,10 @@ class GitProvenanceTest {
         envVars.put("GITHUB_REF", "refs/heads/foo");
         envVars.put("GITHUB_SHA", "287364287357");
         envVars.put("GITHUB_HEAD_REF", "");
-        try (Git g = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()) {
+        try (Git ignored = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()) {
             GitProvenance prov = GitProvenance.fromProjectDirectory(projectDir,
-              GithubActionsBuildEnvironment.build(var -> envVars.get(var)));
-            assertThat(prov != null);
+              GithubActionsBuildEnvironment.build(envVars::get));
+            assertThat(prov).isNotNull();
             assertThat(prov.getOrigin()).isNotEqualTo("https://github.com/octocat/Hello-World.git");
             assertThat(prov.getBranch()).isEqualTo("main");
             assertThat(prov.getChange()).isNotEqualTo("287364287357");
@@ -303,9 +306,9 @@ class GitProvenanceTest {
         envVars.put("CUSTOM_GIT_SHA", "287364287357");
 
         GitProvenance prov = GitProvenance.fromProjectDirectory(projectDir,
-          CustomBuildEnvironment.build(var -> envVars.get(var)));
+          CustomBuildEnvironment.build(envVars::get));
 
-        assertThat(prov != null);
+        assertThat(prov).isNotNull();
         assertThat(prov.getOrigin()).isEqualTo("https://github.com/octocat/Hello-World.git");
         assertThat(prov.getBranch()).isEqualTo("main");
         assertThat(prov.getChange()).isEqualTo("287364287357");
@@ -319,9 +322,9 @@ class GitProvenanceTest {
         envVars.put("CI_COMMIT_SHA", "287364287357");
 
         GitProvenance prov = GitProvenance.fromProjectDirectory(projectDir,
-          GitlabBuildEnvironment.build(var -> envVars.get(var)));
+          GitlabBuildEnvironment.build(envVars::get));
 
-        assertThat(prov != null);
+        assertThat(prov).isNotNull();
         assertThat(prov.getOrigin()).isEqualTo("https://github.com/octocat/Hello-World.git");
         assertThat(prov.getBranch()).isEqualTo("main");
         assertThat(prov.getChange()).isEqualTo("287364287357");
@@ -336,9 +339,9 @@ class GitProvenanceTest {
         envVars.put("DRONE_COMMIT_SHA", "287364287357");
 
         GitProvenance prov = GitProvenance.fromProjectDirectory(projectDir,
-          DroneBuildEnvironment.build(var -> envVars.get(var)));
+          DroneBuildEnvironment.build(envVars::get));
 
-        assertThat(prov != null);
+        assertThat(prov).isNotNull();
         assertThat(prov.getOrigin()).isEqualTo("https://github.com/octocat/Hello-World.git");
         assertThat(prov.getBranch()).isEqualTo("main");
         assertThat(prov.getChange()).isEqualTo("287364287357");
@@ -346,9 +349,8 @@ class GitProvenanceTest {
 
     @Test
     void supportsTravis(@TempDir Path projectDir) throws Exception {
-        try (Git g = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()) {
-            Map<String, String> envVars = new HashMap<>();
-            TravisBuildEnvironment buildEnvironment = TravisBuildEnvironment.build(var -> envVars.get(var));
+        try (Git ignored = Git.init().setDirectory(projectDir.toFile()).setInitialBranch("main").call()) {
+            TravisBuildEnvironment buildEnvironment = TravisBuildEnvironment.build(s -> null);
             GitProvenance git = GitProvenance.fromProjectDirectory(projectDir, buildEnvironment);
             assertThat(git).isNotNull();
             assertThat(git.getBranch()).isEqualTo("main");

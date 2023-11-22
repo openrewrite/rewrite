@@ -214,21 +214,13 @@ public class BlockStatementTemplateGenerator {
         if (contextSensitive) {
             contextTemplate(cursor, prior, before, after, insertionPoint, mode);
         } else {
-            contextFreeTemplate(prior, before, after);
+            contextFreeTemplate(cursor, prior, before, after, insertionPoint, mode);
         }
     }
 
-    private void contextFreeTemplate(J j, StringBuilder before, StringBuilder after) {
-        if (j instanceof J.ClassDeclaration) {
-            // While not impossible to handle, reaching this point is likely to be a mistake.
-            // Without context a class declaration can include no imports, package, or outer class.
-            // It is a rare class that is deliberately in the root package with no imports.
-            // In the more likely case omission of these things is unintentional, the resulting type metadata would be
-            // incorrect, and it would not be obvious to the recipe author why.
-            throw new IllegalArgumentException(
-                    "Templating a class declaration requires context from which package declaration and imports may be reached. " +
-                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
-        } else if (j instanceof J.Lambda) {
+    @SuppressWarnings("DataFlowIssue")
+    private void contextFreeTemplate(Cursor cursor, J j, StringBuilder before, StringBuilder after, J insertionPoint, JavaCoordinates.Mode mode) {
+        if (j instanceof J.Lambda) {
             throw new IllegalArgumentException(
                     "Templating a lambda requires a cursor so that it can be properly parsed and type-attributed. " +
                     "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
@@ -241,10 +233,25 @@ public class BlockStatementTemplateGenerator {
             before.append("Object o = ");
             after.append(";");
             after.append("\n}}");
-        } else if (!(j instanceof J.Import) && !(j instanceof J.Package)) {
+        } else if ((j instanceof J.MethodDeclaration || j instanceof J.VariableDeclarations || j instanceof J.Block || j instanceof J.ClassDeclaration)
+                   && cursor.getValue() instanceof J.Block
+                   && (cursor.getParent().getValue() instanceof J.ClassDeclaration || cursor.getParent().getValue() instanceof J.NewClass)) {
             before.insert(0, "class Template {\n");
             after.append("\n}");
+        } else if (j instanceof J.ClassDeclaration) {
+            // While not impossible to handle, reaching this point is likely to be a mistake.
+            // Without context a class declaration can include no imports, package, or outer class.
+            // It is a rare class that is deliberately in the root package with no imports.
+            // In the more likely case omission of these things is unintentional, the resulting type metadata would be
+            // incorrect, and it would not be obvious to the recipe author why.
+            throw new IllegalArgumentException(
+                    "Templating a class declaration requires context from which package declaration and imports may be reached. " +
+                    "Mark this template as context-sensitive by calling JavaTemplate.Builder#contextSensitive().");
+        } else if (j instanceof Statement && !(j instanceof J.Import) && !(j instanceof J.Package)) {
+            before.insert(0, "class Template {{\n");
+            after.append("\n}}");
         }
+
         before.insert(0, EXPR_STATEMENT_PARAM + METHOD_INVOCATION_STUBS);
         for (String anImport : imports) {
             before.insert(0, anImport);
@@ -293,17 +300,12 @@ public class BlockStatementTemplateGenerator {
                                          .withLeadingAnnotations(emptyList())
                                          .withPrefix(Space.EMPTY)
                                          .printTrimmed(cursor).trim() + '{');
-            } else if (parent instanceof J.Block || parent instanceof J.Lambda || parent instanceof J.Label || parent instanceof Loop) {
+            } else {
                 J.Block b = (J.Block) j;
 
                 // variable declarations up to the point of insertion
                 addLeadingVariableDeclarations(cursor, prior, b, before, insertionPoint);
 
-                before.insert(0, "{\n");
-                if (b.isStatic()) {
-                    before.insert(0, "static");
-                }
-            } else {
                 before.insert(0, "{\n");
             }
 
@@ -459,7 +461,13 @@ public class BlockStatementTemplateGenerator {
                 after.append(";");
             }
         } else if (j instanceof J.VariableDeclarations) {
-            before.insert(0, variable((J.VariableDeclarations) j, false, cursor) + '=');
+            if (prior instanceof J.Annotation) {
+                after.append(variable((J.VariableDeclarations) j, false, cursor))
+                        .append('=')
+                        .append(valueOfType(((J.VariableDeclarations) j).getType()));
+            } else {
+                before.insert(0, variable((J.VariableDeclarations) j, false, cursor) + '=');
+            }
             after.append(";");
         } else if (j instanceof J.MethodInvocation) {
             // If prior is an argument, wrap in __M__.any(prior)

@@ -24,6 +24,7 @@ import org.openrewrite.marker.GitProvenance;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -75,7 +76,6 @@ public class GithubActionsBuildEnvironment implements BuildEnvironment {
         }
 
         return new GitProvenance(UUID.randomUUID(), host + "/" + getRepository()
-                + ".git", gitRef, getSha(), null, null);
+                + ".git", gitRef, getSha(), null, null, emptyList());
     }
-
 }

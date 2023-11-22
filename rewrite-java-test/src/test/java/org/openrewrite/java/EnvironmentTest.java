@@ -15,10 +15,8 @@
  */
 package org.openrewrite.java;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
-import org.openrewrite.Recipe;
 import org.openrewrite.config.Environment;
 import org.openrewrite.java.style.IntelliJ;
 
@@ -50,27 +48,8 @@ class EnvironmentTest {
           .findAny()
           .orElseThrow();
         assertThat(intelliJStyle)
-          .as("Environment should be able to find and activate the IntelliJ style")
+          .as("Environment should be able to find and activate the IntelliJ IDEA style")
           .isNotNull();
     }
 }
 
-class MixedConstructorRecipe extends Recipe {
-    public MixedConstructorRecipe() {
-        this(true);
-    }
-
-    @JsonCreator
-    public MixedConstructorRecipe(boolean opt) {
-    }
-
-    @Override
-    public String getDisplayName() {
-        return "Mixed constructor";
-    }
-
-    @Override
-    public String getDescription() {
-        return "A recipe with more than one constructor, with one marked as the primary.";
-    }
-}

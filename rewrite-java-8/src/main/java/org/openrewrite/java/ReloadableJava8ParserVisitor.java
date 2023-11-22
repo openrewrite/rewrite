@@ -335,7 +335,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
         J.Identifier label = node.getLabel() == null ? null : new J.Identifier(randomId(),
                 sourceBefore(node.getLabel().toString()), Markers.EMPTY,
-                skip(node.getLabel().toString()), null, null);
+                emptyList(), skip(node.getLabel().toString()), null, null);
 
         return new J.Break(randomId(), fmt, Markers.EMPTY, label);
     }
@@ -348,7 +348,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 JContainer.build(
                         node.getExpression() == null ? EMPTY : sourceBefore("case"),
                         singletonList(node.getExpression() == null ?
-                                JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, skip("default"), null, null)) :
+                                JRightPadded.build(new J.Identifier(randomId(), Space.EMPTY, Markers.EMPTY, emptyList(), skip("default"), null, null)) :
                                 JRightPadded.build(convertOrNull(node.getExpression()))
                         ),
                         Markers.EMPTY
@@ -396,7 +396,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         J.Identifier name = new J.Identifier(randomId(), sourceBefore(node.getSimpleName().toString()),
-                Markers.EMPTY, ((JCClassDecl) node).getSimpleName().toString(), typeMapping.type(node), null);
+                Markers.EMPTY, emptyList(), ((JCClassDecl) node).getSimpleName().toString(), typeMapping.type(node), null);
 
         JContainer<J.TypeParameter> typeParams = node.getTypeParameters().isEmpty() ? null : JContainer.build(
                 sourceBefore("<"),
@@ -597,7 +597,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         Name label = node.getLabel();
         return new J.Continue(randomId(), fmt, Markers.EMPTY,
                 label == null ? null : new J.Identifier(randomId(), sourceBefore(label.toString()),
-                        Markers.EMPTY, label.toString(), null, null));
+                        Markers.EMPTY, emptyList(), label.toString(), null, null));
     }
 
     @Override
@@ -634,7 +634,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             skip(node.getName().toString());
         }
 
-        J.Identifier name = new J.Identifier(randomId(), nameSpace, Markers.EMPTY, node.getName().toString(), typeMapping.type(node), null);
+        J.Identifier name = new J.Identifier(randomId(), nameSpace, Markers.EMPTY, emptyList(), node.getName().toString(), typeMapping.type(node), null);
 
         J.NewClass initializer = null;
         if (source.charAt(endPos(node) - 1) == ')' || source.charAt(endPos(node) - 1) == '}') {
@@ -686,7 +686,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
 
         JCIdent ident = (JCIdent) node;
         JavaType type = typeMapping.type(node);
-        return new J.Identifier(randomId(), fmt, Markers.EMPTY, name, type, typeMapping.variableType(ident.sym));
+        return new J.Identifier(randomId(), fmt, Markers.EMPTY, emptyList(), name, type, typeMapping.variableType(ident.sym));
     }
 
     @Override
@@ -720,10 +720,18 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     @Override
+    public J visitIntersectionType(IntersectionTypeTree node, Space fmt) {
+        JContainer<TypeTree> bounds = node.getBounds().isEmpty() ? null :
+                JContainer.build(EMPTY,
+                        convertAll(node.getBounds(), t -> sourceBefore("&"), noDelim), Markers.EMPTY);
+        return new J.IntersectionType(randomId(), fmt, Markers.EMPTY, bounds);
+    }
+
+    @Override
     public J visitLabeledStatement(LabeledStatementTree node, Space fmt) {
         skip(node.getLabel().toString());
         return new J.Label(randomId(), fmt, Markers.EMPTY,
-                padRight(new J.Identifier(randomId(), EMPTY, Markers.EMPTY, node.getLabel().toString(), null, null), sourceBefore(":")),
+                padRight(new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), node.getLabel().toString(), null, null), sourceBefore(":")),
                 convert(node.getStatement()));
     }
 
@@ -838,6 +846,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 padLeft(whitespace(), new J.Identifier(randomId(),
                         sourceBefore(referenceName),
                         Markers.EMPTY,
+                        emptyList(),
                         referenceName,
                         null, null)),
                 typeMapping.type(node),
@@ -854,7 +863,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 convert(fieldAccess.selected),
                 padLeft(sourceBefore("."), new J.Identifier(randomId(),
                         sourceBefore(fieldAccess.name.toString()), Markers.EMPTY,
-                        fieldAccess.name.toString(), type, typeMapping.variableType(fieldAccess.sym))),
+                        emptyList(), fieldAccess.name.toString(), type, typeMapping.variableType(fieldAccess.sym))),
                 type);
     }
 
@@ -879,7 +888,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
         J.Identifier name;
         if (jcSelect instanceof JCFieldAccess) {
             String selectName = ((JCFieldAccess) jcSelect).name.toString();
-            name = new J.Identifier(randomId(), sourceBefore(selectName), Markers.EMPTY, selectName, null, null);
+            name = new J.Identifier(randomId(), sourceBefore(selectName), Markers.EMPTY, emptyList(), selectName, null, null);
         } else {
             name = convert(jcSelect);
         }
@@ -943,10 +952,11 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             } else {
                 owner = jcMethod.sym.owner.name.toString();
             }
-            name = new J.MethodDeclaration.IdentifierWithAnnotations(new J.Identifier(randomId(), sourceBefore(owner), Markers.EMPTY, owner, null, null), returnType == null ? returnTypeAnnotations : Collections.emptyList());
+            name = new J.MethodDeclaration.IdentifierWithAnnotations(new J.Identifier(randomId(), sourceBefore(owner),
+                    Markers.EMPTY, emptyList(), owner, null, null), returnType == null ? returnTypeAnnotations : emptyList());
         } else {
-            name = new J.MethodDeclaration.IdentifierWithAnnotations(new J.Identifier(randomId(), sourceBefore(node.getName().toString()), Markers.EMPTY,
-                    node.getName().toString(), null, null), returnType == null ? returnTypeAnnotations : Collections.emptyList());
+            name = new J.MethodDeclaration.IdentifierWithAnnotations(new J.Identifier(randomId(), sourceBefore(node.getName().toString(), null), Markers.EMPTY,
+                    emptyList(), node.getName().toString(), null, null), returnType == null ? returnTypeAnnotations : emptyList());
         }
 
         Space paramFmt = sourceBefore("(");
@@ -1237,7 +1247,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 JContainer.build(sourceBefore("extends"),
                         convertAll(node.getBounds(), t -> sourceBefore("&"), noDelim), Markers.EMPTY);
 
-        return new J.TypeParameter(randomId(), fmt, Markers.EMPTY, annotations, name, bounds);
+        return new J.TypeParameter(randomId(), fmt, Markers.EMPTY, annotations, emptyList(), name, bounds);
     }
 
     private <T extends TypeTree & Expression> T buildName(String fullyQualifiedName) {
@@ -1249,7 +1259,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             String part = parts[i];
             if (i == 0) {
                 fullName = part;
-                expr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, part, null, null);
+                expr = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), part, null, null);
             } else {
                 fullName += "." + part;
 
@@ -1266,7 +1276,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                         EMPTY,
                         Markers.EMPTY,
                         expr,
-                        padLeft(namePrefix, new J.Identifier(randomId(), identFmt, Markers.EMPTY, part.trim(), null, null)),
+                        padLeft(namePrefix, new J.Identifier(randomId(), identFmt, Markers.EMPTY, emptyList(), part.trim(), null, null)),
                         (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?
                                 JavaType.ShallowClass.build(fullName) :
                                 null
@@ -1396,7 +1406,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             JCVariableDecl vd = (JCVariableDecl) n;
 
             JavaType type = typeMapping.type(n);
-            J.Identifier name = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, n.getName().toString(),
+            J.Identifier name = new J.Identifier(randomId(), EMPTY, Markers.EMPTY, emptyList(), n.getName().toString(),
                     type instanceof JavaType.Variable ? ((JavaType.Variable) type).getType() : type,
                     type instanceof JavaType.Variable ? (JavaType.Variable) type : null);
             List<JLeftPadded<Space>> dimensionsAfterName = arrayDimensions();
@@ -1916,7 +1926,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
             default:
                 throw new IllegalArgumentException("Unexpected modifier " + mod);
         }
-        return new J.Modifier(randomId(), modFormat, Markers.EMPTY, type, annotations);
+        return new J.Modifier(randomId(), modFormat, Markers.EMPTY, null, type, annotations);
     }
 
     private List<J.Annotation> collectAnnotations(Map<Integer, JCAnnotation> annotationPosTable) {

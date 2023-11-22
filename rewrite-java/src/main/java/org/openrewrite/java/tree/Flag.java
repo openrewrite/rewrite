@@ -42,7 +42,9 @@ public enum Flag {
     Union(1L << 39),
     Default(1L << 43),
     SignaturePolymorphic(1L << 46),
-    PotentiallyAmbiguous(1L << 48);
+    PotentiallyAmbiguous(1L << 48),
+    Sealed(1L << 62),
+    NonSealed(1L << 63);
 
     private final long bitMask;
 

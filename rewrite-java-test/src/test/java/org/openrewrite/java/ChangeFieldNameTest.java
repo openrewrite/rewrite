@@ -187,7 +187,7 @@ class ChangeFieldNameTest implements RewriteTest {
                   List collection = null;
                   class Nested {
                       Object collection = Test.this.collection;
-                      Object collection2 = A.this.collection;
+                      Object collection2 = new A().collection;
                   }
               }
               """,
@@ -197,7 +197,7 @@ class ChangeFieldNameTest implements RewriteTest {
                   List list = null;
                   class Nested {
                       Object collection = Test.this.list;
-                      Object collection2 = A.this.collection;
+                      Object collection2 = new A().collection;
                   }
               }
               """

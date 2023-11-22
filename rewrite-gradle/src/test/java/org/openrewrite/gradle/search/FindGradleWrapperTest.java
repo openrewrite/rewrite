@@ -94,4 +94,28 @@ class FindGradleWrapperTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void findWrapperDefaults() {
+        rewriteRun(
+          spec -> spec.recipe(new FindGradleWrapper(null, null, null)),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\\\://services.gradle.org/distributions/gradle-7.4-all.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              ~~>distributionUrl=https\\\\://services.gradle.org/distributions/gradle-7.4-all.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          )
+        );
+    }
 }

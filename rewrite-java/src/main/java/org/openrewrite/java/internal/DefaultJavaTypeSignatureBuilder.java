@@ -30,7 +30,7 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
 
     @Override
     public String signature(@Nullable Object type) {
-        if (type == null || type == JavaType.Unknown.getInstance()) {
+        if (type == null || type instanceof JavaType.Unknown) {
             return "{undefined}";
         }
 

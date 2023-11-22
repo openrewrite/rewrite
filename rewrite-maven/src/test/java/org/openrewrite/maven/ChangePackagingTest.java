@@ -96,4 +96,28 @@ class ChangePackagingTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void changePackagingRemovingDefault() {
+        rewriteRun(
+          spec -> spec.recipe(new ChangePackaging("*", "*", "jar")),
+          pomXml(
+"""
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+                  <packaging>war</packaging>
+              </project>
+              """,
+            """
+              <project>
+                  <groupId>org.example</groupId>
+                  <artifactId>foo</artifactId>
+                  <version>1.0</version>
+              </project>
+              """
+          )
+        );
+    }
 }

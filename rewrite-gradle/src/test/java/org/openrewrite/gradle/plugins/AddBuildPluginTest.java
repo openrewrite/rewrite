@@ -17,11 +17,12 @@ package org.openrewrite.gradle.plugins;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.marker.BuildTool;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.gradle.Assertions.buildGradle;
-import static org.openrewrite.gradle.Assertions.withToolingApi;
+import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.gradle.Assertions.*;
 
 class AddBuildPluginTest implements RewriteTest {
     @Override
@@ -66,6 +67,26 @@ class AddBuildPluginTest implements RewriteTest {
     }
 
     @Test
+    void addThirdPartyPluginWithoutVersion() {
+        rewriteRun(
+          spec -> spec.recipe(new AddBuildPlugin("org.openrewrite.rewrite", null, null)),
+          buildGradle(
+            """
+              plugins {
+                  id "java"
+              }
+              """,
+            """
+              plugins {
+                  id "java"
+                  id "org.openrewrite.rewrite"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void addPluginWithVersionToNewBlock() {
         rewriteRun(
           spec -> spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null)),
@@ -94,6 +115,120 @@ class AddBuildPluginTest implements RewriteTest {
               plugins {
                   id "java"
                   id "com.jfrog.bintray" version "1.0"
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addPluginAfterBuildscriptBlock() {
+        rewriteRun(
+          spec -> spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null)),
+          buildGradle(
+            """
+              import java.util.List
+              
+              buildscript {
+              }
+              """,
+            """
+              import java.util.List
+              
+              buildscript {
+              }
+              
+              plugins {
+                  id 'com.jfrog.bintray' version '1.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addPluginToNewBlockWithLicenseHeader() {
+        rewriteRun(
+          spec -> {
+              spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null));
+              spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")));
+          },
+          buildGradle(
+            """
+              /*
+               * License header
+               */
+               
+              dependencies {
+              }
+              """, """
+              /*
+               * License header
+               */
+
+              plugins {
+                  id 'com.jfrog.bintray' version '1.0'
+              }
+
+              dependencies {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addPluginToNewBlockWithLicenseHeaderAndComment() {
+        rewriteRun(
+          spec -> {
+              spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null));
+              spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")));
+          },
+          buildGradle(
+            """
+              /*
+               * License header
+               */
+               
+              // Comment
+              dependencies {
+              }
+              """, """
+              /*
+               * License header
+               */
+
+              plugins {
+                  id 'com.jfrog.bintray' version '1.0'
+              }
+
+              // Comment
+              dependencies {
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void addPluginToNewBlockWithOnlyLicenseHeader() {
+        rewriteRun(
+          spec -> {
+              spec.recipe(new AddBuildPlugin("com.jfrog.bintray", "1.0", null));
+              spec.allSources(s -> s.markers(new BuildTool(randomId(), BuildTool.Type.Gradle, "7.6.1")));
+          },
+          buildGradle(
+            """
+              /*
+               * License header
+               */
+              """, """
+              /*
+               * License header
+               */
+
+              plugins {
+                  id 'com.jfrog.bintray' version '1.0'
               }
               """
           )

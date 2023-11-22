@@ -52,19 +52,14 @@ public class Assertions {
         }
     }
 
-    // validateTypes and assertValidTypes can be merged into a single function once JavaRecipeTest is removed
-    static SourceFile validateTypes(SourceFile after, RecipeSpec testMethodSpec, RecipeSpec testClassSpec) {
-        if (after instanceof JavaSourceFile) {
-            TypeValidation typeValidation = testMethodSpec.getTypeValidation() != null ? testMethodSpec.getTypeValidation() : testClassSpec.getTypeValidation();
-            if (typeValidation == null) {
-                typeValidation = new TypeValidation();
-            }
-            assertValidTypes(typeValidation, (JavaSourceFile) after);
+    public static SourceFile validateTypes(SourceFile source, TypeValidation typeValidation) {
+        if (source instanceof JavaSourceFile) {
+            assertValidTypes(typeValidation, (JavaSourceFile) source);
         }
-        return after;
+        return source;
     }
 
-    public static void assertValidTypes(TypeValidation typeValidation, J sf) {
+    private static void assertValidTypes(TypeValidation typeValidation, J sf) {
         if (typeValidation.identifiers() || typeValidation.methodInvocations() || typeValidation.methodDeclarations() || typeValidation.classDeclarations()
                 || typeValidation.constructorInvocations()) {
             List<FindMissingTypes.MissingTypeResult> missingTypeResults = FindMissingTypes.findMissingTypes(sf);
@@ -88,7 +83,7 @@ public class Assertions {
                     })
                     .collect(Collectors.toList());
             if (!missingTypeResults.isEmpty()) {
-                throw new IllegalStateException("AST contains missing or invalid type information\n" + missingTypeResults.stream().map(v -> v.getPath() + "\n" + v.getPrintedTree())
+                throw new IllegalStateException("LST contains missing or invalid type information\n" + missingTypeResults.stream().map(v -> v.getPath() + "\n" + v.getPrintedTree())
                         .collect(Collectors.joining("\n\n")));
             }
         }

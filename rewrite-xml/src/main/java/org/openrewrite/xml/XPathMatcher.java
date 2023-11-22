@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml;
 
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.Cursor;
 import org.openrewrite.xml.search.FindTags;
 import org.openrewrite.xml.tree.Xml;
@@ -23,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -37,12 +39,20 @@ import java.util.stream.Collectors;
  * As a result, '.' and '..' are not recognized.
  */
 public class XPathMatcher {
+    // Regular expression to support conditional tags like `plugin[artifactId='maven-compiler-plugin']`
+    private static final Pattern PATTERN = Pattern.compile("([-\\w]+)\\[([-\\w]+)='([-\\w]+)']");
     private final String expression;
 
     public XPathMatcher(String expression) {
         this.expression = expression;
     }
 
+    /**
+     * Checks if the given XPath expression matches the provided cursor.
+     *
+     * @param cursor the cursor representing the XML document
+     * @return true if the expression matches the cursor, false otherwise
+     */
     public boolean matches(Cursor cursor) {
         List<Xml.Tag> path = cursor.getPathAsStream()
                 .filter(p -> p instanceof Xml.Tag)
@@ -59,8 +69,8 @@ public class XPathMatcher {
                 String part = parts.get(i);
                 if (part.startsWith("@")) {
                     if (!(cursor.getValue() instanceof Xml.Attribute &&
-                            (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1))) ||
-                            "*".equals(part.substring(1)))) {
+                          (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1))) ||
+                          "*".equals(part.substring(1)))) {
                         return false;
                     }
 
@@ -78,6 +88,31 @@ public class XPathMatcher {
             Collections.reverse(path);
             String[] parts = expression.substring(1).split("/");
 
+            // Deal with the two forward slashes in the expression; works, but I'm not proud of it.
+            if (expression.contains("//") && Arrays.stream(parts).anyMatch(StringUtils::isBlank)) {
+                int blankPartIndex = Arrays.asList(parts).indexOf("");
+                int doubleSlashIndex = expression.indexOf("//");
+
+                if (path.size() > blankPartIndex && path.size() >= parts.length - 1) {
+                    String newExpression;
+                    if (Objects.equals(path.get(blankPartIndex).getName(), parts[blankPartIndex + 1])) {
+                        newExpression = String.format(
+                            "%s/%s",
+                            expression.substring(0, doubleSlashIndex),
+                            expression.substring(doubleSlashIndex + 2)
+                        );
+                    } else {
+                        newExpression = String.format(
+                            "%s/%s/%s",
+                            expression.substring(0, doubleSlashIndex),
+                            path.get(blankPartIndex).getName(),
+                            expression.substring(doubleSlashIndex + 2)
+                        );
+                    }
+                    return new XPathMatcher(newExpression).matches(cursor);
+                }
+            }
+
             if (parts.length > path.size() + 1) {
                 return false;
             }
@@ -88,10 +123,7 @@ public class XPathMatcher {
                 Xml.Tag tag = i < path.size() ? path.get(i) : null;
                 String partName;
 
-                // to support conditional tags like `plugin[artifactId='maven-compiler-plugin']`
-                String regex =  "([-\\w]+)\\[([-\\w]+)='([-\\w]+)'\\]";
-                Pattern pattern = Pattern.compile(regex);
-                Matcher matcher = pattern.matcher(part);
+                Matcher matcher = PATTERN.matcher(part);
                 if (tag != null && matcher.matches()) {
                     String name = matcher.group(1);
                     String subTag = matcher.group(2);
@@ -109,14 +141,13 @@ public class XPathMatcher {
                     partName = part;
                 }
 
-
                 if (part.startsWith("@")) {
                     return cursor.getValue() instanceof Xml.Attribute &&
-                            (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1)) ||
-                                    "*".equals(part.substring(1)));
+                           (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1)) ||
+                            "*".equals(part.substring(1)));
                 }
 
-                if (path.size() < i + 1 || (!tag.getName().equals(partName) && !"*".equals(part))) {
+                if (path.size() < i + 1 || (tag != null && !tag.getName().equals(partName) && !"*".equals(part))) {
                     return false;
                 }
             }

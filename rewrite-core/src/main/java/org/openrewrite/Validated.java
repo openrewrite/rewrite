@@ -15,17 +15,14 @@
  */
 package org.openrewrite;
 
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
 import java.util.function.Predicate;
-import java.util.function.Supplier;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-import static java.util.Objects.requireNonNull;
 import static java.util.stream.StreamSupport.stream;
 
 /**
@@ -43,15 +40,6 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         return !isValid();
     }
 
-    default <T2> Validated<T2> asInvalid() {
-        if (this.isInvalid()) {
-            //noinspection unchecked
-            return (Validated<T2>) this;
-        } else {
-            throw new IllegalStateException("Not an invalid value");
-        }
-    }
-
     default List<Invalid<T>> failures() {
         List<Invalid<T>> list = new ArrayList<>();
         for (Validated<T> v : this) {
@@ -62,6 +50,7 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         return list;
     }
 
+    @SuppressWarnings("unused")
     static Secret validSecret(String property, String value) {
         return new Secret(property, value);
     }
@@ -74,9 +63,6 @@ public interface Validated<T> extends Iterable<Validated<T>> {
         return new Valid<>(property, value);
     }
 
-    static <T> Validated<T> lazy(String property, Supplier<T> supplier) {
-        return new LazyValidated<>(property, supplier);
-    }
 
     /**
      * Validate that the Predicate will evaluate to 'true' on the supplied value.
@@ -253,59 +239,6 @@ public interface Validated<T> extends Iterable<Validated<T>> {
             return "Valid{" +
                     "property='" + property + '\'' +
                     ", value='" + value + '\'' +
-                    '}';
-        }
-    }
-
-    class LazyValidated<T> implements Validated<T> {
-        private final String property;
-        private final Supplier<T> valueSupplier;
-
-        private T value;
-        private RuntimeException exception;
-
-        public LazyValidated(String property, Supplier<T> valueSupplier) {
-            this.property = requireNonNull(property);
-            this.valueSupplier = requireNonNull(valueSupplier);
-        }
-
-        private void evaluate() {
-            try {
-                if (value == null && exception == null) {
-                    value = valueSupplier.get();
-                }
-            } catch (RuntimeException e) {
-                exception = e;
-            }
-        }
-
-        @Override
-        public boolean isValid() {
-            evaluate();
-            return value != null;
-        }
-
-        @Override
-        public @Nullable T getValue() {
-            evaluate();
-            if (value == null) {
-                throw new IllegalStateException("Value does not exist", exception);
-            }
-            return value;
-        }
-
-        @NotNull
-        @Override
-        public Iterator<Validated<T>> iterator() {
-            return Stream.of((Validated<T>) this).iterator();
-        }
-
-        @Override
-        public String toString() {
-            return "LazyValidated{" +
-                    "property='" + property + '\'' +
-                    ", value='" + (value == null ? (exception == null ? "[UNEVALUATED]" : "[EXCEPTION]") : value) + '\'' +
-                    (exception == null ? "" : ", exception=" + exception) +
                     '}';
         }
     }

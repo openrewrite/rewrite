@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java;
 
+import lombok.EqualsAndHashCode;
+import lombok.Value;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Preconditions;
 import org.openrewrite.Recipe;
@@ -26,16 +28,23 @@ import org.openrewrite.marker.Markers;
 
 import java.time.Duration;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptySet;
 import static org.openrewrite.java.style.ImportLayoutStyle.isPackageAlwaysFolded;
+import static org.openrewrite.java.tree.TypeUtils.fullyQualifiedNamesAreEqual;
+import static org.openrewrite.java.tree.TypeUtils.toFullyQualifiedName;
 
 /**
  * This recipe will remove any imports for types that are not referenced within the compilation unit. This recipe
  * is aware of the import layout style and will correctly handle unfolding of wildcard imports if the import counts
  * drop below the configured values.
  */
+@Value
+@EqualsAndHashCode(callSuper = true)
 public class RemoveUnusedImports extends Recipe {
+
     @Override
     public String getDisplayName() {
         return "Remove unused imports";
@@ -43,7 +52,9 @@ public class RemoveUnusedImports extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Remove imports for types that are not referenced.";
+        return "Remove imports for types that are not referenced. As a precaution against incorrect changes no imports " +
+               "will be removed from any source where unknown types are referenced. The most common cause of unknown " +
+               "types is the use of annotation processors not supported by OpenRewrite, such as lombok.";
     }
 
     @Override
@@ -135,7 +146,7 @@ public class RemoveUnusedImports extends Recipe {
                     // see https://github.com/openrewrite/rewrite/issues/1698 for more detail
                     String target = qualid.getTarget().toString();
                     String modifiedTarget = methodsAndFieldsByTypeName.keySet().stream()
-                            .filter(key -> key.matches(target.replaceAll("\\.", "(\\\\\\.|\\\\\\$)")))
+                            .filter((fqn) -> fullyQualifiedNamesAreEqual(target, fqn))
                             .findFirst()
                             .orElse(target);
                     SortedSet<String> targetMethodsAndFields = methodsAndFieldsByTypeName.get(modifiedTarget);
@@ -196,21 +207,24 @@ public class RemoveUnusedImports extends Recipe {
                         changed = true;
                     }
                 } else {
-                    Set<JavaType.FullyQualified> types = typesByPackage.get(elem.getPackageName());
+                    Set<JavaType.FullyQualified> types = typesByPackage.getOrDefault(elem.getPackageName(), new HashSet<>());
+                    Set<JavaType.FullyQualified> typesByFullyQualifiedClassPath = typesByPackage.getOrDefault(toFullyQualifiedName(elem.getPackageName()), new HashSet<>());
+                    Set<JavaType.FullyQualified> combinedTypes = Stream.concat(types.stream(), typesByFullyQualifiedClassPath.stream())
+                            .collect(Collectors.toSet());
                     JavaType.FullyQualified qualidType = TypeUtils.asFullyQualified(elem.getQualid().getType());
-                    if (types == null || sourcePackage.equals(elem.getPackageName()) && qualidType != null && !qualidType.getFullyQualifiedName().contains("$")) {
+                    if (combinedTypes.isEmpty() || sourcePackage.equals(elem.getPackageName()) && qualidType != null && !qualidType.getFullyQualifiedName().contains("$")) {
                         anImport.used = false;
                         changed = true;
                     } else if ("*".equals(elem.getQualid().getSimpleName())) {
                         if (isPackageAlwaysFolded(layoutStyle.getPackagesToFold(), elem)) {
                             anImport.used = true;
                             usedWildcardImports.add(elem.getPackageName());
-                        } else if (types.size() < layoutStyle.getClassCountToUseStarImport()) {
+                        } else if (combinedTypes.size() < layoutStyle.getClassCountToUseStarImport()) {
                             // replacing the star with a series of unfolded imports
                             anImport.imports.clear();
 
                             // add each unfolded import
-                            types.stream().map(JavaType.FullyQualified::getClassName).sorted().distinct().forEach(type ->
+                            combinedTypes.stream().map(JavaType.FullyQualified::getClassName).sorted().distinct().forEach(type ->
                                     anImport.imports.add(new JRightPadded<>(elem
                                             .withQualid(qualid.withName(name.withSimpleName(type)))
                                             .withPrefix(Space.format("\n")), Space.EMPTY, Markers.EMPTY))
@@ -224,11 +238,11 @@ public class RemoveUnusedImports extends Recipe {
                         } else {
                             usedWildcardImports.add(elem.getPackageName());
                         }
-                    } else if (types.stream().noneMatch(c -> {
+                    } else if (combinedTypes.stream().noneMatch(c -> {
                         if ("*".equals(elem.getQualid().getSimpleName())) {
                             return elem.getPackageName().equals(c.getPackageName());
                         }
-                        return elem.getTypeName().equals(c.getFullyQualifiedName());
+                        return fullyQualifiedNamesAreEqual(c.getFullyQualifiedName(), elem.getTypeName());
                     })) {
                         anImport.used = false;
                         changed = true;
@@ -247,7 +261,7 @@ public class RemoveUnusedImports extends Recipe {
                             changed = true;
                         }
                     } else {
-                        if (usedWildcardImports.size() == 1 && usedWildcardImports.contains(elem.getPackageName()) && !elem.getTypeName().contains("$")) {
+                        if (usedWildcardImports.size() == 1 && usedWildcardImports.contains(elem.getPackageName()) && !elem.getTypeName().contains("$") && !conflictsWithJavaLang(elem)) {
                             anImport.used = false;
                             changed = true;
                         }
@@ -283,12 +297,120 @@ public class RemoveUnusedImports extends Recipe {
 
             return cu;
         }
-    }
 
-    private static String packageKey(String packageName, String className) {
-        return className.contains(".") ?
-                packageName + "." + className.substring(0, className.lastIndexOf('.')) :
-                packageName;
+        private static final Set<String> JAVA_LANG_CLASS_NAMES = new HashSet<>(Arrays.asList(
+                "AbstractMethodError",
+                "Appendable",
+                "ArithmeticException",
+                "ArrayIndexOutOfBoundsException",
+                "ArrayStoreException",
+                "AssertionError",
+                "AutoCloseable",
+                "Boolean",
+                "BootstrapMethodError",
+                "Byte",
+                "Character",
+                "CharSequence",
+                "Class",
+                "ClassCastException",
+                "ClassCircularityError",
+                "ClassFormatError",
+                "ClassLoader",
+                "ClassNotFoundException",
+                "ClassValue",
+                "Cloneable",
+                "CloneNotSupportedException",
+                "Comparable",
+                "Deprecated",
+                "Double",
+                "Enum",
+                "EnumConstantNotPresentException",
+                "Error",
+                "Exception",
+                "ExceptionInInitializerError",
+                "Float",
+                "FunctionalInterface",
+                "IllegalAccessError",
+                "IllegalAccessException",
+                "IllegalArgumentException",
+                "IllegalCallerException",
+                "IllegalMonitorStateException",
+                "IllegalStateException",
+                "IllegalThreadStateException",
+                "IncompatibleClassChangeError",
+                "IndexOutOfBoundsException",
+                "InheritableThreadLocal",
+                "InstantiationError",
+                "InstantiationException",
+                "Integer",
+                "InternalError",
+                "InterruptedException",
+                "Iterable",
+                "LayerInstantiationException",
+                "LinkageError",
+                "Long",
+                "MatchException",
+                "Math",
+                "Module",
+                "ModuleLayer",
+                "NegativeArraySizeException",
+                "NoClassDefFoundError",
+                "NoSuchFieldError",
+                "NoSuchFieldException",
+                "NoSuchMethodError",
+                "NoSuchMethodException",
+                "NullPointerException",
+                "Number",
+                "NumberFormatException",
+                "Object",
+                "OutOfMemoryError",
+                "Override",
+                "Package",
+                "Process",
+                "ProcessBuilder",
+                "ProcessHandle",
+                "Readable",
+                "Record",
+                "ReflectiveOperationException",
+                "Runnable",
+                "Runtime",
+                "RuntimeException",
+                "RuntimePermission",
+                "SafeVarargs",
+                "ScopedValue",
+                "SecurityException",
+                "SecurityManager",
+                "Short",
+                "StackOverflowError",
+                "StackTraceElement",
+                "StackWalker",
+                "StrictMath",
+                "String",
+                "StringBuffer",
+                "StringBuilder",
+                "StringIndexOutOfBoundsException",
+                "StringTemplate",
+                "SuppressWarnings",
+                "System",
+                "Thread",
+                "ThreadDeath",
+                "ThreadGroup",
+                "ThreadLocal",
+                "Throwable",
+                "TypeNotPresentException",
+                "UnknownError",
+                "UnsatisfiedLinkError",
+                "UnsupportedClassVersionError",
+                "UnsupportedOperationException",
+                "VerifyError",
+                "VirtualMachineError",
+                "Void",
+                "WrongThreadException"
+        ));
+
+        private static boolean conflictsWithJavaLang(J.Import elem) {
+            return JAVA_LANG_CLASS_NAMES.contains(elem.getClassName());
+        }
     }
 
     private static class ImportUsage {

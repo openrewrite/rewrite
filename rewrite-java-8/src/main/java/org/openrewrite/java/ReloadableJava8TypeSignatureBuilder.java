@@ -22,6 +22,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.JavaType;
 
 import javax.lang.model.type.NullType;
+import javax.lang.model.type.TypeMirror;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.StringJoiner;
@@ -38,6 +39,13 @@ class ReloadableJava8TypeSignatureBuilder implements JavaTypeSignatureBuilder {
     private String signature(@Nullable Type type) {
         if (type == null || type instanceof Type.UnknownType || type instanceof NullType) {
             return "{undefined}";
+        } else if (type instanceof Type.IntersectionClassType) {
+            Type.IntersectionClassType intersectionClassType = (Type.IntersectionClassType) type;
+            StringJoiner joiner = new StringJoiner(" & ");
+            for (TypeMirror typeArg : intersectionClassType.getBounds()) {
+                joiner.add(signature(typeArg));
+            }
+            return joiner.toString();
         } else if (type instanceof Type.ClassType) {
             try {
                 return ((Type.ClassType) type).typarams_field != null && ((Type.ClassType) type).typarams_field.length() > 0 ? parameterizedSignature(type) : classSignature(type);

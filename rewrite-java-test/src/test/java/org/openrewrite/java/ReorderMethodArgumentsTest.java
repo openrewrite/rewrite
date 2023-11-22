@@ -16,13 +16,9 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
-import static org.openrewrite.test.RewriteTest.toRecipe;
 
 class ReorderMethodArgumentsTest implements RewriteTest {
 
@@ -31,17 +27,7 @@ class ReorderMethodArgumentsTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipes(
             new ReorderMethodArguments("a.A foo(String, Integer, Integer)",
-              new String[]{"n", "m", "s"}, null, null),
-            toRecipe(() -> new JavaVisitor<>() {
-                @Override
-                public J visitLiteral(J.Literal literal, ExecutionContext p) {
-                    if (literal.getType() == JavaType.Primitive.String) {
-                        doAfterVisit(new ChangeLiteral<>(literal, l -> "anotherstring"));
-                    }
-                    return super.visitLiteral(literal, p);
-                }
-            })
-          ).cycles(1).expectedCyclesThatMakeChanges(1),
+              new String[]{"n", "m", "s"}, null, null, null)),
           java(
             """
               package a;
@@ -73,7 +59,7 @@ class ReorderMethodArgumentsTest implements RewriteTest {
                      a.foo(
                          2,
                          1,
-                         "anotherstring"
+                         "mystring"
                      );
                  }
               }
@@ -85,9 +71,8 @@ class ReorderMethodArgumentsTest implements RewriteTest {
     @Test
     void reorderArgumentsWithNoSourceAttachment() {
         rewriteRun(
-          spec -> spec.recipe(new ReorderMethodArguments("a.A foo(..)",
-              new String[]{"s", "n"}, new String[]{"n", "s"}, null))
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+          spec -> spec.recipe(new ReorderMethodArguments("a.A foo(String,..)",
+            new String[]{"s", "n"}, new String[]{"n", "s"}, null, null)),
           java(
             """
               package a;
@@ -123,15 +108,14 @@ class ReorderMethodArgumentsTest implements RewriteTest {
     @Test
     void reorderArgumentsWhereOneOfTheOriginalArgumentsIsVararg() {
         rewriteRun(
-          spec -> spec.recipe(new ReorderMethodArguments("a.A foo(..)",
-              new String[]{"s", "o", "n"}, null, null))
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+          spec -> spec.recipe(new ReorderMethodArguments("a.A foo(String,Integer,..)",
+            new String[]{"s", "o", "n"}, null, null, null)),
           java(
             """
               package a;
               public class A {
                  public void foo(String s, Integer n, Object... o) {}
-                 public void bar(String s, Object... o) {}
+                 public void foo(String s, Object... o) {}
               }
               """
           ),
@@ -162,7 +146,7 @@ class ReorderMethodArgumentsTest implements RewriteTest {
     void reorderArgumentsWhereTheLastArgumentIsVarargAndNotPresentInInvocation() {
         rewriteRun(
           spec -> spec.recipe(new ReorderMethodArguments("a.A foo(..)",
-            new String[]{"o", "s"}, null, null)),
+            new String[]{"o", "s"}, null, null, null)),
           java(
             """
               package a;
@@ -183,4 +167,49 @@ class ReorderMethodArgumentsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void reorderArgumentsInConstructors() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ReorderMethodArguments("a.A <constructor>(String, Integer, Integer)",
+              new String[]{"n", "m", "s"}, null, null, null)),
+          java(
+            """
+              package a;
+              public class A {
+                 public A(String s, Integer m, Integer n) {}
+                 public A(Integer n, Integer m, String s) {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.*;
+              public class B {
+                 public void test() {
+                     A a = new A(
+                         "mystring",
+                         1,
+                         2
+                     );
+                 }
+              }
+              """,
+            """
+              import a.*;
+              public class B {
+                 public void test() {
+                     A a = new A(
+                         2,
+                         1,
+                         "mystring"
+                     );
+                 }
+              }
+              """
+          )
+        );
+    }
+
 }

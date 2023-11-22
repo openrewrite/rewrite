@@ -43,6 +43,11 @@ public class AutoFormatVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public boolean isAcceptable(SourceFile sourceFile, P p) {
+        return sourceFile instanceof J.CompilationUnit;
+    }
+
+    @Override
     public J visit(@Nullable Tree tree, P p, Cursor cursor) {
         JavaSourceFile cu = (tree instanceof JavaSourceFile) ?
                 (JavaSourceFile) tree :

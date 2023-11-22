@@ -21,6 +21,7 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -674,6 +675,59 @@ class JsonPathMatcherTest {
                  property: property
               """
           )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3401")
+    @Test
+    void multipleBinaryExpressions() {
+        assertMatched(
+          "$.foo.bar[?(@.types == 'something' && @.group == 'group' && @.category == 'match' && @.type == 'type')].pattern",
+          List.of(
+            """
+              foo:
+                bar:
+                  -
+                    type: "type"
+                    group: "group"
+                    category: "other"
+                    types: "something"
+                    pattern: "p1"
+                  -
+                    type: "type"
+                    group: "group"
+                    category: "match"
+                    types: "something"
+                    pattern: "p2"
+              """),
+          List.of("pattern: \"p2\""
+          )
+        );
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3401")
+    @Test
+    void noMatchWithBinaryExpressions() {
+        assertMatched(
+          "$.foo.bar[?(@.types == 'something' && @.group == 'group' && @.category == 'nomatch' && @.type == 'type')].pattern",
+          List.of(
+            """
+              foo:
+                bar:
+                  -
+                    type: "type"
+                    group: "group"
+                    category: "other"
+                    types: "something"
+                    pattern: "p1"
+                  -
+                    type: "type"
+                    group: "group"
+                    category: "match"
+                    types: "something"
+                    pattern: "p2"
+              """),
+          Collections.emptyList()
         );
     }
 

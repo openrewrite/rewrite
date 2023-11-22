@@ -69,7 +69,7 @@ public class DependencyMatcher {
             validatedVersion = Semver.validate(patternPieces[2], null);
         }
         if(validatedVersion.isInvalid()) {
-            return validatedVersion.asInvalid();
+            return Validated.invalid("pattern", null, "Unable to parse version");
         }
         return Validated.valid("pattern", new DependencyMatcher(patternPieces[0], patternPieces[1], validatedVersion.getValue()));
     }

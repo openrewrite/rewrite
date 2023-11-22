@@ -247,9 +247,16 @@ public interface G extends J {
                 List<JRightPadded<Statement>> statements = t.statements.stream()
                         .filter(s -> !(s.getElement() instanceof J.ClassDeclaration))
                         .collect(Collectors.toList());
+                int insertionIdx = 0;
+                for (JRightPadded<Statement> statement : statements) {
+                    if (!(statement.getElement() instanceof J.Import)) {
+                        break;
+                    }
+                    insertionIdx++;
+                }
 
                 //noinspection unchecked
-                statements.addAll(0, classes.stream()
+                statements.addAll(insertionIdx, classes.stream()
                         .map(i -> (JRightPadded<Statement>) (Object) i)
                         .collect(Collectors.toList()));
 
@@ -797,8 +804,7 @@ public interface G extends J {
 
         @Override
         public Range withType(@Nullable JavaType type) {
-            return new Range(null, id, prefix, markers, from.withType(type), inclusive,
-                    to.withType(type));
+            return withFrom(from.withType(type)).withTo(to.withType(type));
         }
 
         @Override

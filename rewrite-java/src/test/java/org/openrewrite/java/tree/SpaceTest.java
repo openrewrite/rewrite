@@ -49,10 +49,14 @@ class SpaceTest {
 
     @Test
     void singleLineComment() {
-        @SuppressWarnings("TextBlockMigration") var cf = Space.format("  \n" +
-                                                                      "// I'm a little // teapot\n" +
-                                                                      "// Short and stout //\n    " +
-                                                                      "// Here is my handle\n  ");
+        var cf = Space.format("""
+                 \s
+                // I'm a little // teapot
+                // Short and stout //
+                    \
+                // Here is my handle
+                  \
+                """);
 
         assertThat(cf.getComments()).hasSize(3);
 
@@ -73,12 +77,15 @@ class SpaceTest {
 
     @Test
     void multiLineComment() {
-        @SuppressWarnings("TextBlockMigration") var cf = Space.format("  \n" +
-                                                                      "/*   /*    Here is my spout     */\n" +
-                                                                      "/* When I get all steamed up */\n" +
-                                                                      "/* /*\n" +
-                                                                      "Here me shout\n" +
-                                                                      "*/\n  ");
+        var cf = Space.format("""
+                 \s
+                /*   /*    Here is my spout     */
+                /* When I get all steamed up */
+                /* /*
+                Here me shout
+                */
+                  \
+                """);
 
         assertThat(cf.getComments()).hasSize(3);
 
@@ -99,12 +106,14 @@ class SpaceTest {
 
     @Test
     void javadocComment() {
-        @SuppressWarnings("TextBlockMigration") var cf = Space.format(
-                "  \n" +
-                "/**\n" +
-                " * /** Tip me over and pour me out!\n" +
-                " * https://somewhere/over/the/rainbow.txt\n" +
-                " */\n  "
+        var cf = Space.format("""
+                 \s
+                /**
+                 * /** Tip me over and pour me out!
+                 * https://somewhere/over/the/rainbow.txt
+                 */
+                  \
+                """
         );
 
         assertThat(cf.getComments()).hasSize(1);
@@ -142,5 +151,45 @@ class SpaceTest {
                 .isEqualTo(" ");
         assertThat(Space.build("  \n   \n    ", emptyList()).getIndent())
                 .isEqualTo("    ");
+    }
+
+    @Test
+    void singleLineCommentSuffix() {
+        var s1 = Space.format("""
+
+                //comment""");
+        TextComment c1 = (TextComment) s1.getComments().get(0);
+        assertThat(c1.getSuffix()).isEqualTo("");
+
+        var s2 = Space.format("""
+
+                //comment
+                """);
+        TextComment c2 = (TextComment) s2.getComments().get(0);
+        assertThat(c2.getSuffix()).isEqualTo("\n");
+    }
+
+    @Test
+    void multiCommentsSuffix() {
+        String input = """
+
+                //c1
+                   //c2""";
+        var space = Space.format(input);
+        TextComment c1 = (TextComment) space.getComments().get(0);
+        assertThat(c1.getText()).isEqualTo("c1");
+        assertThat(c1.getSuffix()).isEqualTo("\n   ");
+
+        TextComment c2 = (TextComment) space.getComments().get(1);
+        assertThat(c2.getText()).isEqualTo("c2");
+        assertThat(c2.getSuffix()).isEqualTo("");
+    }
+
+    @Test
+    void slashInNonComment() {
+        String input = "foo/bar";
+        var space = Space.format(input);
+        assertThat(space.getComments()).isEmpty();
+        assertThat(space.getWhitespace()).isEqualTo(input);
     }
 }

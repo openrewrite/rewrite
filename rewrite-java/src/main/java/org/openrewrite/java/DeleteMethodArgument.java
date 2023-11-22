@@ -19,10 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.java.search.UsesMethod;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.MethodCall;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
@@ -104,6 +101,18 @@ public class DeleteMethodArgument extends Recipe {
                 }
 
                 m = m.withArguments(args);
+
+                JavaType.Method methodType = m.getMethodType();
+                if (methodType != null) {
+                    List<String> parameterNames = new ArrayList<>(methodType.getParameterNames());
+                    parameterNames.remove(argumentIndex);
+                    List<JavaType> parameterTypes = new ArrayList<>(methodType.getParameterTypes());
+                    parameterTypes.remove(argumentIndex);
+
+                    m = m.withMethodType(methodType
+                            .withParameterNames(parameterNames)
+                            .withParameterTypes(parameterTypes));
+                }
             }
             return m;
         }

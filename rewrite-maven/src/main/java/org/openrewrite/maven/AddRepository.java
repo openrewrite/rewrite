@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.intellij.lang.annotations.Language;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
@@ -38,42 +39,42 @@ public class AddRepository extends Recipe {
     private static final XPathMatcher REPOS_MATCHER = new XPathMatcher("/project/repositories");
 
     @Option(description = "Repository id")
-    private String id;
+    String id;
 
     @Option(description = "Repository URL")
-    private String url;
+    String url;
 
     @Option(required = false, description = "Repository name")
     @Nullable
-    private String repoName;
+    String repoName;
 
     @Option(required = false, description = "Repository layout")
     @Nullable
-    private String layout;
+    String layout;
 
     @Option(required = false, description = "Snapshots from the repository are available")
     @Nullable
-    private Boolean snapshotsEnabled;
+    Boolean snapshotsEnabled;
 
     @Option(required = false, description = "Snapshots checksum policy")
     @Nullable
-    private String snapshotsChecksumPolicy;
+    String snapshotsChecksumPolicy;
 
     @Option(required = false, description = "Snapshots update policy policy")
     @Nullable
-    private String snapshotsUpdatePolicy;
+    String snapshotsUpdatePolicy;
 
     @Option(required = false, description = "Releases from the repository are available")
     @Nullable
-    private Boolean releasesEnabled;
+    Boolean releasesEnabled;
 
     @Option(required = false, description = "Releases checksum policy")
     @Nullable
-    private String releasesChecksumPolicy;
+    String releasesChecksumPolicy;
 
     @Option(required = false, description = "Releases update policy")
     @Nullable
-    private String releasesUpdatePolicy;
+    String releasesUpdatePolicy;
 
     @Override
     public String getDisplayName() {
@@ -114,28 +115,27 @@ public class AddRepository extends Recipe {
                     if (maybeRepo.isPresent()) {
                         Xml.Tag repo = maybeRepo.get();
                         if (repoName != null && !Objects.equals(repoName, repo.getChildValue("name").orElse(null))) {
-                            if (repoName == null) {
-                                repositories = (Xml.Tag) new RemoveContentVisitor<>(repo.getChild("name").get(), true).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
-                            } else {
-                                repositories = (Xml.Tag) new ChangeTagValueVisitor<>(repo.getChild("name").get(), repoName).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
-                            }
+                            //noinspection OptionalGetWithoutIsPresent
+                            repositories = (Xml.Tag) new ChangeTagValueVisitor<>(repo.getChild("name").get(), repoName)
+                                    .visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                         }
-                        if (layout != null && !Objects.equals(layout, repo.getChildValue("layout").orElse(null))) {
-                            if (layout == null) {
-                                repositories = (Xml.Tag) new RemoveContentVisitor<>(repo.getChild("layout").get(), true).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
-                            } else {
-                                repositories = (Xml.Tag) new ChangeTagValueVisitor<>(repo.getChild("layout").get(), repoName).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
-                            }
+                        if (repoName != null && layout != null && !Objects.equals(layout, repo.getChildValue("layout").orElse(null))) {
+                            //noinspection OptionalGetWithoutIsPresent
+                            repositories = (Xml.Tag) new ChangeTagValueVisitor<>(repo.getChild("layout").get(), repoName)
+                                    .visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                             maybeUpdateModel();
                         }
                         if (!isReleasesEqual(repo)) {
                             Xml.Tag releases = repo.getChild("releases").orElse(null);
                             if (releases == null) {
-                                repositories = (Xml.Tag) new AddToTagVisitor<>(repo, Xml.Tag.build(assembleReleases())).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
+                                repositories = (Xml.Tag) new AddToTagVisitor<>(repo, Xml.Tag.build(assembleReleases()))
+                                        .visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                             } else {
-                                repositories = (Xml.Tag) new RemoveContentVisitor<>(releases, true).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
+                                repositories = (Xml.Tag) new RemoveContentVisitor<>(releases, true)
+                                        .visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                                 if (!isNoSnapshots()) {
-                                    repositories = (Xml.Tag) new AddToTagVisitor<>(repo, Xml.Tag.build(assembleReleases())).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
+                                    repositories = (Xml.Tag) new AddToTagVisitor<>(repo, Xml.Tag.build(assembleReleases()))
+                                            .visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                                 }
                             }
                             maybeUpdateModel();
@@ -153,17 +153,17 @@ public class AddRepository extends Recipe {
                             maybeUpdateModel();
                         }
                     } else {
-                        StringBuilder sb = new StringBuilder();
-                        sb.append("<repository>\n");
-                        sb.append(assembleTagWithValue("id", id));
-                        sb.append(assembleTagWithValue("url", url));
-                        sb.append(assembleTagWithValue("name", repoName));
-                        sb.append(assembleTagWithValue("layout", layout));
-                        sb.append(assembleReleases());
-                        sb.append(assembleSnapshots());
-                        sb.append("</repository>\n");
+                        @Language("xml")
+                        String sb = "<repository>\n" +
+                                    assembleTagWithValue("id", id) +
+                                    assembleTagWithValue("url", url) +
+                                    assembleTagWithValue("name", repoName) +
+                                    assembleTagWithValue("layout", layout) +
+                                    assembleReleases() +
+                                    assembleSnapshots() +
+                                    "</repository>\n";
 
-                        Xml.Tag repoTag = Xml.Tag.build(sb.toString());
+                        Xml.Tag repoTag = Xml.Tag.build(sb);
                         repositories = (Xml.Tag) new AddToTagVisitor<>(repositories, repoTag).visitNonNull(repositories, ctx, getCursor().getParentOrThrow());
                         maybeUpdateModel();
                     }
@@ -173,7 +173,7 @@ public class AddRepository extends Recipe {
         };
     }
 
-    private String assembleTagWithValue(String tag, String value) {
+    private String assembleTagWithValue(String tag, @Nullable String value) {
         StringBuilder sb = new StringBuilder();
         if (value != null) {
             sb.append("<");
