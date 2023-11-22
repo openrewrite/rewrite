@@ -21,23 +21,23 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-class CreateJavaClassTest implements RewriteTest {
+class CreateEmptyJavaClassTest implements RewriteTest {
 
     @DocumentExample
     @Test
     void hasCreatedJavaClass() {
         rewriteRun(
-                spec -> spec.recipe(new CreateJavaClass(
+                spec -> spec.recipe(new CreateEmptyJavaClass(
                         "src/main/java",
                         "org.openrewrite.example",
+                        "public",
                         "ExampleClass",
-                        "package %s;\n\npublic class %s {}",
                         null,
                         "foo/bar/"
                 )),
                 java(
                         null,
-                        "package org.openrewrite.example;\n\npublic class ExampleClass {}\n",
+                        "package org.openrewrite.example;\n\npublic class ExampleClass {\n}\n",
                         spec -> spec.path("foo/bar/src/main/java/org/openrewrite/example/ExampleClass.java")
                 )
         );
@@ -47,17 +47,17 @@ class CreateJavaClassTest implements RewriteTest {
     @Test
     void hasOverwrittenFile() {
         rewriteRun(
-                spec -> spec.recipe(new CreateJavaClass(
+                spec -> spec.recipe(new CreateEmptyJavaClass(
                         "src/main/java",
                         "org.openrewrite.example",
+                        "protected",
                         "ExampleClass",
-                        "package %s;\n\npublic class %s {}",
                         true,
                         null
                 )),
                 java(
                         "package org.openrewrite.example;\n\npublic class ExampleClass { Object o = null; }",
-                        "package org.openrewrite.example;\n\npublic class ExampleClass {}",
+                        "package org.openrewrite.example;\n\nprotected class ExampleClass {\n}",
                         spec -> spec.path("src/main/java/org/openrewrite/example/ExampleClass.java")
                 )
         );
@@ -66,11 +66,11 @@ class CreateJavaClassTest implements RewriteTest {
     @Test
     void shouldNotChangeExistingFile() {
         rewriteRun(
-                spec -> spec.recipe(new CreateJavaClass(
+                spec -> spec.recipe(new CreateEmptyJavaClass(
                         "src/main/java",
                         "org.openrewrite.example",
+                        "public",
                         "ExampleClass",
-                        "package %s;\n\npublic class %s {}\n",
                         false,
                         null
                 )),
@@ -84,11 +84,11 @@ class CreateJavaClassTest implements RewriteTest {
     @Test
     void shouldNotChangeExistingFileWhenOverwriteNull() {
         rewriteRun(
-                spec -> spec.recipe(new CreateJavaClass(
+                spec -> spec.recipe(new CreateEmptyJavaClass(
                         "src/main/java",
                         "org.openrewrite.example",
+                        "public",
                         "ExampleClass",
-                        "package %s;\n\npublic class %s {}\n",
                         null,
                         null
                 )),
@@ -102,11 +102,11 @@ class CreateJavaClassTest implements RewriteTest {
     @Test
     void shouldAddAnotherFile() {
         rewriteRun(
-                spec -> spec.recipe(new CreateJavaClass(
+                spec -> spec.recipe(new CreateEmptyJavaClass(
                         "src/main/java",
                         "org.openrewrite.example",
+                        "public",
                         "ExampleClass2",
-                        "package %s;\n\npublic class %s {}\n",
                         true,
                         null
                 )),
@@ -116,8 +116,27 @@ class CreateJavaClassTest implements RewriteTest {
                 ),
                 java(
                         null,
-                        "package org.openrewrite.example;\n\npublic class ExampleClass2 {}\n",
+                        "package org.openrewrite.example;\n\npublic class ExampleClass2 {\n}\n",
                         spec -> spec.path("src/main/java/org/openrewrite/example/ExampleClass2.java")
+                )
+        );
+    }
+
+    @Test
+    void shouldCreatePackagePrivateClass() {
+        rewriteRun(
+                spec -> spec.recipe(new CreateEmptyJavaClass(
+                        "src/main/java",
+                        "org.openrewrite.example",
+                        "package-private",
+                        "ExampleClass",
+                        null,
+                        "foo/bar"
+                )),
+                java(
+                        null,
+                        "package org.openrewrite.example;\n\nclass ExampleClass {\n}\n",
+                        spec -> spec.path("foo/bar/src/main/java/org/openrewrite/example/ExampleClass.java")
                 )
         );
     }

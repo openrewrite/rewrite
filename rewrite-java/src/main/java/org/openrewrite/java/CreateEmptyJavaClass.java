@@ -18,14 +18,12 @@ package org.openrewrite.java;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.intellij.lang.annotations.Language;
 import org.openrewrite.CreateFileVisitor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.ScanningRecipe;
 import org.openrewrite.SourceFile;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
@@ -42,11 +40,10 @@ import static java.util.Collections.emptyList;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class CreateJavaClass extends ScanningRecipe<AtomicBoolean> {
+public class CreateEmptyJavaClass extends ScanningRecipe<AtomicBoolean> {
 
     @JsonIgnore
-    @Language("java")
-    private static final String NEW_CLASS_TEMPLATE = "package %s;\n\npublic class %s {\n}";
+    private static final String NEW_CLASS_TEMPLATE = "package %s;\n\n%sclass %s {\n}";
 
     @Option(displayName = "Source root",
             description = "The source root of the new class file.",
@@ -60,18 +57,18 @@ public class CreateJavaClass extends ScanningRecipe<AtomicBoolean> {
     @NonNull
     String packageName;
 
+    @Option(displayName = "Modifier",
+            description = "The class modifier.",
+            valid = {"public", "private", "protected", "package-private"},
+            example = "public")
+    @NonNull
+    String modifier;
+
     @Option(displayName = "Class name",
             description = "File path of new file.",
             example = "ExampleClass")
     @NonNull
     String className;
-
-    @Language("java")
-    @Option(displayName = "Class template",
-            description = "The class template to be used.",
-            example = "Some text.")
-    @NonNull
-    String classTemplate;
 
     @Option(displayName = "Overwrite existing file",
             description = "If there is an existing file, should it be overwritten.",
@@ -93,7 +90,7 @@ public class CreateJavaClass extends ScanningRecipe<AtomicBoolean> {
 
     @Override
     public @NonNull String getDescription() {
-        return "Create a new Java class.";
+        return "Create a new, empty Java class.";
     }
 
     @Override
@@ -109,8 +106,7 @@ public class CreateJavaClass extends ScanningRecipe<AtomicBoolean> {
     @Override
     public @NonNull Collection<SourceFile> generate(AtomicBoolean shouldCreate, @NonNull ExecutionContext ctx) {
         if (shouldCreate.get()) {
-            String classTemplateToUse = StringUtils.isBlank(this.classTemplate) ? NEW_CLASS_TEMPLATE : this.classTemplate;
-            return parseSources(classTemplateToUse).collect(Collectors.toList());
+            return parseSources().collect(Collectors.toList());
         }
         return emptyList();
     }
@@ -122,7 +118,7 @@ public class CreateJavaClass extends ScanningRecipe<AtomicBoolean> {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
                 if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.toString().equals(cu.getSourcePath().toString())) {
-                    Optional<SourceFile> sourceFile = parseSources(classTemplate).findFirst();
+                    Optional<SourceFile> sourceFile = parseSources().findFirst();
 
                     if (sourceFile.isPresent() && sourceFile.get() instanceof J.CompilationUnit) {
                         J.CompilationUnit newCu = (J.CompilationUnit) sourceFile.get();
@@ -135,8 +131,10 @@ public class CreateJavaClass extends ScanningRecipe<AtomicBoolean> {
         };
     }
 
-    private Stream<SourceFile> parseSources(String classTemplateToUse) {
-        return JavaParser.fromJavaVersion().build().parse(String.format(classTemplateToUse, packageName, className))
+    private Stream<SourceFile> parseSources() {
+        String packageModifier = "package-private".equals(modifier) ? "" : modifier + " ";
+        return JavaParser.fromJavaVersion().build()
+                .parse(String.format(CreateEmptyJavaClass.NEW_CLASS_TEMPLATE, packageName, packageModifier, className))
                 .map(brandNewFile -> brandNewFile.withSourcePath(Paths.get(getSourcePath())));
     }
 
