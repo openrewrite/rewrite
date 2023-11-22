@@ -81,8 +81,7 @@ public class RemoveApplicabilityTestFromYamlRecipe extends Recipe {
 
                         String commentText = "Applicability tests are no longer supported for yaml recipes, please remove or require " +
                                              "migrating the recipe to Java code";
-                        return (Yaml) new CommentOutProperty("applicability.anySource",
-                                commentText).getVisitor().visit(visited, ctx);
+                        return (Yaml) new CommentOutProperty("applicability.anySource", commentText).getVisitor().visit(visited, ctx);
                     }
                 }
         );
