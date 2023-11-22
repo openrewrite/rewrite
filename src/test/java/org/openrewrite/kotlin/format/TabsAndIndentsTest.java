@@ -208,6 +208,27 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void alignMethodDeclarationParamsWhenContinuationIndentUsingTabs() {
+        rewriteRun(
+          tabsAndIndents(style -> style.withUseTabCharacter(true)),
+          kotlin(
+            """
+            import java.util.*;
+            
+            class Foo {
+            	fun f(
+            			var1: String,
+            			var2: String,
+            			var3: String
+            	) {
+            	}
+            }
+            """
+          )
+        );
+    }
+
     // https://rules.sonarsource.com/java/tag/confusing/RSPEC-3973
     @DocumentExample
     @SuppressWarnings("SuspiciousIndentAfterControlStatement")

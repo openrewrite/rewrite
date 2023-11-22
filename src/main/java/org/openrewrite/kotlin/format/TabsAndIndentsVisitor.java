@@ -300,7 +300,7 @@ public class TabsAndIndentsVisitor<P> extends KotlinIsoVisitor<P> {
                             if (method != null) {
                                 int alignTo;
                                 if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
-                                    alignTo = firstArg.getPrefix().getLastWhitespace().length() - 1;
+                                    alignTo = getLengthOfWhitespace(firstArg.getPrefix().getLastWhitespace());
                                 } else {
                                     String source = method.print(getCursor());
                                     int firstArgIndex = source.indexOf(firstArg.print(getCursor()));
