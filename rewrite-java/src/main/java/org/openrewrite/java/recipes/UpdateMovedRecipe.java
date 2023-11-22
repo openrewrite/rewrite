@@ -43,7 +43,7 @@ public class UpdateMovedRecipe extends Recipe {
 
     @Override
     public String getDescription() {
-        return "If a recipe moved between packages, update the code reference places, declarative recipes, and `activeRecipes` in ppm.xml.";
+        return "If a recipe moved between packages, update the code reference places, declarative recipes, and `activeRecipes` in pom.xml.";
     }
 
     @Override

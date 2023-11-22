@@ -1690,10 +1690,10 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitRangeExpression(RangeExpression range) {
-            queue.add(new G.Range(randomId(), whitespace(), Markers.EMPTY,
+            queue.add(insideParentheses(range, fmt -> new G.Range(randomId(), fmt, Markers.EMPTY,
                     visit(range.getFrom()),
                     JLeftPadded.build(range.isInclusive()).withBefore(sourceBefore(range.isInclusive() ? ".." : "..>")),
-                    visit(range.getTo())));
+                    visit(range.getTo()))));
         }
 
         @Override
@@ -2313,10 +2313,11 @@ public class GroovyParserVisitor {
 
     private String name() {
         int i = cursor;
-        char c = source.charAt(i);
-        while (Character.isJavaIdentifierPart(c) || c == '.' || c == '*') {
-            i++;
-            c = source.charAt(i);
+        for (; i < source.length(); i++) {
+            char c = source.charAt(i);
+            if (!(Character.isJavaIdentifierPart(c) || c == '.' || c == '*')) {
+                break;
+            }
         }
         String result = source.substring(cursor, i);
         cursor += i - cursor;
@@ -2433,7 +2434,7 @@ public class GroovyParserVisitor {
                     .withAfter(EMPTY));
             bounds = JContainer.build(boundsPrefix, convertedBounds, Markers.EMPTY);
         }
-        return new J.TypeParameter(randomId(), prefix, Markers.EMPTY, emptyList(), name, bounds);
+        return new J.TypeParameter(randomId(), prefix, Markers.EMPTY, emptyList(), emptyList(), name, bounds);
     }
 
     private J.Wildcard visitWildcard(GenericsType genericType) {

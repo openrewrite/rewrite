@@ -735,6 +735,15 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return i;
     }
 
+    public J visitIntersectionType(J.IntersectionType intersectionType, P p) {
+        J.IntersectionType i = intersectionType;
+        i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.INTERSECTION_TYPE_PREFIX, p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withBounds(visitContainer(i.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, p));
+        i = i.withType(visitType(i.getType(), p));
+        return i;
+    }
+
     public J visitLabel(J.Label label, P p) {
         J.Label l = label;
         l = l.withPrefix(visitSpace(l.getPrefix(), Space.Location.LABEL_PREFIX, p));
@@ -1191,6 +1200,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.TYPE_PARAMETERS_PREFIX, p));
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
         t = t.withAnnotations(ListUtils.map(t.getAnnotations(), a -> visitAndCast(a, p)));
+
+        if (t.getModifiers() != null && !t.getModifiers().isEmpty()) {
+            t = t.withModifiers(ListUtils.map(t.getModifiers(), m -> visitAndCast(m, p)));
+        }
+
         t = t.withName(visitAndCast(t.getName(), p));
         if (t.getName() instanceof NameTree) {
             t = t.withName((Expression) visitTypeName((NameTree) t.getName(), p));

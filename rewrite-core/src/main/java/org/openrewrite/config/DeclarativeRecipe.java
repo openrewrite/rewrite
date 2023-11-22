@@ -70,13 +70,13 @@ public class DeclarativeRecipe extends Recipe {
     private final List<Recipe> preconditions = new ArrayList<>();
 
     public void addPrecondition(Recipe recipe) {
-        preconditions.add(recipe);
+        uninitializedPreconditions.add(recipe);
     }
 
     @JsonIgnore
-    private Validated<Object> validation = Validated.test("initialization",
-            "initialize(..) must be called on DeclarativeRecipe prior to use.",
-            this, r -> uninitializedRecipes.isEmpty());
+    private Validated<Object> validation = Validated.none();
+    @JsonIgnore
+    private Validated<Object> initValidation = null;
 
     @Override
     public Duration getEstimatedEffortPerOccurrence() {
@@ -85,11 +85,13 @@ public class DeclarativeRecipe extends Recipe {
     }
 
     public void initialize(Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+        initValidation = Validated.none();
         initialize(uninitializedRecipes, recipeList, availableRecipes, recipeToContributors);
         initialize(uninitializedPreconditions, preconditions, availableRecipes, recipeToContributors);
     }
 
     private void initialize(List<Recipe> uninitialized, List<Recipe> initialized, Collection<Recipe> availableRecipes, Map<String, List<Contributor>> recipeToContributors) {
+        initialized.clear();
         for (int i = 0; i < uninitialized.size(); i++) {
             Recipe recipe = uninitialized.get(i);
             if (recipe instanceof LazyLoadedRecipe) {
@@ -103,7 +105,7 @@ public class DeclarativeRecipe extends Recipe {
                     }
                     initialized.add(subRecipe);
                 } else {
-                    validation = validation.and(
+                    initValidation = initValidation.and(
                             invalid(name + ".recipeList" +
                                     "[" + i + "] (in " + source + ")",
                                     recipeFqn,
@@ -118,7 +120,6 @@ public class DeclarativeRecipe extends Recipe {
                 initialized.add(recipe);
             }
         }
-        uninitialized.clear();
     }
 
     @Value
@@ -304,7 +305,11 @@ public class DeclarativeRecipe extends Recipe {
 
     @Override
     public Validated<Object> validate() {
-        return validation;
+        return Validated.<Object>test("initialization",
+                "initialize(..) must be called on DeclarativeRecipe prior to use.",
+                this, r -> initValidation != null)
+                .and(validation)
+                .and(initValidation);
     }
 
     @Value

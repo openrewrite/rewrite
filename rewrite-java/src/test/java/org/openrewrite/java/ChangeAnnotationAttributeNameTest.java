@@ -13,37 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.groovy.tree;
+package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.groovy.Assertions.groovy;
+import static org.openrewrite.java.Assertions.java;
 
-class RangeTest implements RewriteTest {
-
+class ChangeAnnotationAttributeNameTest implements RewriteTest {
     @Test
-    void rangeExpression() {
+    void renameAttributeName() {
         rewriteRun(
-          groovy(
-            """
-              def a = []
-              println(a[0..-2])
-              """
-          )
-        );
-    }
-
-    @Test
-    void parenthesized() {
-        rewriteRun(
-          groovy(
-            """
-              ( 8..19 ).each { majorVersion ->
-                if (majorVersion == 9) return
-              }
-              """
-          )
+            spec -> spec.recipe(new ChangeAnnotationAttributeName("java.lang.Deprecated", "since", "asOf")),
+            //language=java
+            java(
+                """
+                @Deprecated(since = "1.0")
+                class A {}
+                """,
+                """
+                @Deprecated(asOf = "1.0")
+                class A {}
+                """
+            )
         );
     }
 }
