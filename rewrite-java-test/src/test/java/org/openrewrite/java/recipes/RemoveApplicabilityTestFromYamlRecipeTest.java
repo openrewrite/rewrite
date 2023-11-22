@@ -56,7 +56,7 @@ public class RemoveApplicabilityTestFromYamlRecipeTest implements RewriteTest {
               description: x.
               tags:
                 - testing
-              # Applicability tests are no longer supported for yaml recipes, please remove or require migrating the recipe to Java code
+              # Applicability tests are no longer supported for yaml recipes, please move to using preconditions
               # applicability:
               #   anySource:
               #     - org.openrewrite.java.testing.mockito.UsesMockitoAll
@@ -94,7 +94,7 @@ public class RemoveApplicabilityTestFromYamlRecipeTest implements RewriteTest {
               description: x.
               tags:
                 - testing
-              # Applicability tests are no longer supported for yaml recipes, please remove or require migrating the recipe to Java code
+              # Applicability tests are no longer supported for yaml recipes, please move to using preconditions
               # applicability:
               #   singleSource:
               #     - org.openrewrite.java.testing.mockito.UsesMockitoAll

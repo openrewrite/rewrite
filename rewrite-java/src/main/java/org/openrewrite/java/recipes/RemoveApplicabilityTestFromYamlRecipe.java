@@ -38,8 +38,8 @@ public class RemoveApplicabilityTestFromYamlRecipe extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Remove the applicability test from the YAML recipe when migrating from Rewrite 7 to 8, as it is no " +
-               "longer supported and may require migrating the recipe to Java code.";
+        return "Remove the applicability test from the YAML recipe when migrating from Rewrite 7 to 8, " +
+               "as these have been replaced by preconditions.";
     }
 
     @Override
@@ -68,8 +68,7 @@ public class RemoveApplicabilityTestFromYamlRecipe extends Recipe {
             }
         };
 
-        String commentText = "Applicability tests are no longer supported for yaml recipes, please remove or require " +
-                             "migrating the recipe to Java code";
+        String commentText = "Applicability tests are no longer supported for yaml recipes, please move to using preconditions";
         return Preconditions.check(yamlRecipeCheckVisitor, new CommentOutProperty("applicability",
             commentText).getVisitor());
     }
