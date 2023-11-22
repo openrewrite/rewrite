@@ -93,6 +93,29 @@ class UseStaticImportTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void sameMethodLocallyNoStaticImport() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.util.Collections emptyList()")),
+          java(
+            """
+            import java.util.Collections;
+            import java.util.List;
+
+            public class SameMethodNameLocally {
+                public void avoidCollision() {
+                    List<Object> list = Collections.emptyList();
+                }
+                
+                private int emptyList(String canHaveDifferentArguments) {
+                }
+            }
+            """
+          )
+        );
+    }
+
     @Test
     void methodInvocationsHavingNullSelect() {
         rewriteRun(
