@@ -20,6 +20,7 @@ import org.jetbrains.kotlin.com.intellij.psi.PsiElement
 import org.jetbrains.kotlin.fir.FirElement
 import org.jetbrains.kotlin.fir.FirPackageDirective
 import org.jetbrains.kotlin.fir.declarations.*
+import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertySetter
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.impl.FirElseIfTrueCondition
 import org.jetbrains.kotlin.fir.expressions.impl.FirSingleExpressionBlock
@@ -55,8 +56,11 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 depth++
                 element.acceptChildren(this, data)
                 if (element is FirResolvedTypeRef) {
-                    // not sure why this isn't taken care of by `FirResolvedTypeRefImpl#acceptChildren()`
-                    element.delegatedTypeRef?.accept(this, data)
+                    // Do not visit FirUserTypeRef, since it's not mappable to a type.
+                    if (element.delegatedTypeRef != null && element.delegatedTypeRef !is FirUserTypeRef) {
+                        // not sure why this isn't taken care of by `FirResolvedTypeRefImpl#acceptChildren()`
+                        element.delegatedTypeRef?.accept(this, data)
+                    }
                 }
                 depth--
             }
@@ -69,12 +73,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
     }
 
     fun primary(psiElement: PsiElement) =
-        fir(psiElement) { filterFirElement(it) }
-
-    private fun filterFirElement(firElement : FirElement) : Boolean {
-        return firElement.source is KtRealPsiSourceElement &&
-                firElement !is FirUserTypeRef
-    }
+        fir(psiElement) { it.source is KtRealPsiSourceElement }
 
     fun methodDeclarationType(psi: PsiElement): JavaType.Method? {
         return when (val fir = primary(psi)) {
@@ -173,7 +172,43 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         val directFirInfos = allFirInfos.filter { filter.invoke(it.fir) }
         return if (directFirInfos.isNotEmpty())
             // It might be more reliable to have explicit mappings in case something changes.
-            directFirInfos[0].fir
+            return when {
+                directFirInfos.size == 1 -> directFirInfos[0].fir
+                else -> {
+                    return when (p) {
+                        is KtConstantExpression -> {
+                            directFirInfos.firstOrNull { it.fir is FirConstExpression<*> }?.fir
+                        }
+                        is KtImportDirective -> {
+                            directFirInfos.firstOrNull { it.fir is FirImport && it.fir !is FirErrorImport }?.fir
+                        }
+                        is KtNamedFunction -> {
+                            val found = directFirInfos.firstOrNull { it.fir is FirFunction }?.fir
+//                            if (found == null) {
+//                                // Review how to expose unmatched types without causing an error.
+//                            }
+                            found
+                        }
+                        is KtNameReferenceExpression, is KtTypeReference -> {
+                            val found = directFirInfos.firstOrNull { it.fir is FirResolvedTypeRef || it.fir is FirResolvedNamedReference }?.fir
+//                            if (found == null) {
+//                                // Review how to expose unmatched types without causing an error.
+//                            }
+                            found
+                        }
+                        is KtPropertyAccessor -> {
+                            val found = directFirInfos.firstOrNull { it.fir is FirDefaultPropertySetter }?.fir
+//                            if (found == null) {
+//                                // Review how to expose unmatched types without causing an error.
+//                            }
+                            found
+                        }
+                        else -> {
+                            directFirInfos[0].fir
+                        }
+                    }
+                }
+            }
         else if (allFirInfos.isNotEmpty()) {
             return when {
                 allFirInfos.size == 1 -> allFirInfos[0].fir

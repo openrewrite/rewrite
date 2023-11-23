@@ -1303,6 +1303,8 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     public J visitTypeConstraint(KtTypeConstraint constraint, ExecutionContext data) {
         List<J.Annotation> annotations = new ArrayList<>();
         J.Identifier typeParamName = (J.Identifier) requireNonNull(constraint.getSubjectTypeParameterName()).accept(this, data);
+        PsiElement ref = PsiTreeUtil.getChildOfType(constraint, KtTypeReference.class);
+        typeParamName = typeParamName.withType(psiElementAssociations.type(ref, owner(constraint)));
         TypeTree typeTree = (TypeTree) requireNonNull(constraint.getBoundTypeReference()).accept(this, data);
 
         return new J.TypeParameter(

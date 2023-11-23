@@ -40,6 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.in;
 import static org.openrewrite.ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -859,6 +860,53 @@ public class KotlinTypeMappingTest {
                   
                   class A : RemoteStub()
                   """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/461")
+        @Test
+        void multipleBounds() {
+            rewriteRun(
+              kotlin(
+                """
+                  interface A
+                  interface B
+                  interface C
+                  interface D
+                  
+                  class KotlinTypeGoat<T, S>  where   S : A, T : D, S : B, T : C
+                  """, spec -> spec.afterRecipe(cu -> {
+                      AtomicBoolean found = new AtomicBoolean(false);
+                      new KotlinIsoVisitor<AtomicBoolean>() {
+                          @Override
+                          public K.ClassDeclaration visitClassDeclaration(K.ClassDeclaration classDeclaration, AtomicBoolean atomicBoolean) {
+                              if ("KotlinTypeGoat".equals(classDeclaration.getClassDeclaration().getSimpleName())) {
+                                  List<J.TypeParameter> constraints = classDeclaration.getTypeConstraints().getConstraints();
+                                  for (int i = 0; i < constraints.size(); i++) {
+                                      J.TypeParameter p = constraints.get(i);
+                                      switch (i) {
+                                          case 0:
+                                              assertThat(p.getName().getType().toString()).isEqualTo("A");
+                                              break;
+                                          case 1:
+                                              assertThat(p.getName().getType().toString()).isEqualTo("D");
+                                              break;
+                                          case 2:
+                                              assertThat(p.getName().getType().toString()).isEqualTo("B");
+                                              break;
+                                          case 3:
+                                              assertThat(p.getName().getType().toString()).isEqualTo("C");
+                                              found.set(true);
+                                              break;
+                                      }
+                                  }
+                              }
+                              return super.visitClassDeclaration(classDeclaration, atomicBoolean);
+                          }
+                    }.visit(cu, found);
+                    assertThat(found.get()).isTrue();
+                })
               )
             );
         }
