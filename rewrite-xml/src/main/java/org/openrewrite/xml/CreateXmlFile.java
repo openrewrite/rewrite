@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,35 +13,44 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.text;
+package org.openrewrite.xml;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.intellij.lang.annotations.Language;
+import org.junit.platform.commons.util.StringUtils;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
-import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
-
-    @Option(displayName = "File contents",
-            description = "Multiline text content for the file.",
-            example = "Some text.")
-    String fileContents;
+public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
 
     @Option(displayName = "Relative file path",
             description = "File path of new file.",
-            example = "foo/bar/baz.txt")
+            example = "foo/bar/baz.xml")
     String relativeFileName;
+
+    @Language("xml")
+    @Option(displayName = "File contents",
+            description = "Multiline text content for the file.",
+            example = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n" +
+                      "<root>\n" +
+                      "    <child>1</child>" +
+                      "</root>",
+            required = false)
+    @Nullable
+    String fileContents;
 
     @Option(displayName = "Overwrite existing file",
             description = "If there is an existing file, should it be overwritten.",
@@ -51,12 +60,12 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
 
     @Override
     public String getDisplayName() {
-        return "Create text file";
+        return "Create XML file";
     }
 
     @Override
     public String getDescription() {
-        return "Creates a new plain text file.";
+        return "Create a new XML file.";
     }
 
     @Override
@@ -72,37 +81,38 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
     @Override
     public Collection<SourceFile> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
         if (shouldCreate.get()) {
-            return PlainTextParser.builder().build().parse(fileContents)
+            return XmlParser.builder().build().parse("")
                     .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
                     .collect(Collectors.toList());
         }
         return emptyList();
     }
 
+
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean created) {
         Path path = Paths.get(relativeFileName);
-        return new TreeVisitor<SourceFile, ExecutionContext>() {
+        return new XmlVisitor<ExecutionContext>() {
             @Override
-            public SourceFile visit(@Nullable Tree tree, ExecutionContext executionContext) {
-                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
-                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(sourceFile.getSourcePath())) {
-                    if (sourceFile instanceof PlainText) {
-                        return ((PlainText) sourceFile).withText(fileContents);
+            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(document.getSourcePath())) {
+                    if (StringUtils.isBlank(fileContents)) {
+                        return document.withProlog(null).withRoot(null);
                     }
-                    PlainText plainText = PlainText.builder()
-                            .id(sourceFile.getId())
-                            .sourcePath(sourceFile.getSourcePath())
-                            .fileAttributes(sourceFile.getFileAttributes())
-                            .charsetBomMarked(sourceFile.isCharsetBomMarked())
-                            .text(fileContents)
-                            .build();
-                    if (sourceFile.getCharset() != null) {
-                        return plainText.withCharset(sourceFile.getCharset());
+                    Optional<SourceFile> sourceFiles = XmlParser.builder().build()
+                            .parse(fileContents)
+                            .findFirst();
+                    if (sourceFiles.isPresent()) {
+                        SourceFile sourceFile = sourceFiles.get();
+                        if (sourceFile instanceof Xml.Document) {
+                            Xml.Document newXmlDocument = (Xml.Document) sourceFile;
+                            return document
+                                    .withProlog(newXmlDocument.getProlog())
+                                    .withRoot(newXmlDocument.getRoot());
+                        }
                     }
-                    return plainText;
                 }
-                return sourceFile;
+                return document;
             }
         };
     }

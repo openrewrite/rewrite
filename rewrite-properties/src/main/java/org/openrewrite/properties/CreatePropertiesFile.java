@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,35 +13,41 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.text;
+package org.openrewrite.properties;
 
 import lombok.EqualsAndHashCode;
 import lombok.Value;
+import org.intellij.lang.annotations.Language;
+import org.junit.platform.commons.util.StringUtils;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.properties.tree.Properties;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
-import static java.util.Objects.requireNonNull;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
-
-    @Option(displayName = "File contents",
-            description = "Multiline text content for the file.",
-            example = "Some text.")
-    String fileContents;
+public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
 
     @Option(displayName = "Relative file path",
             description = "File path of new file.",
-            example = "foo/bar/baz.txt")
+            example = "foo/bar/baz.properties")
     String relativeFileName;
+
+    @Language("properties")
+    @Option(displayName = "File contents",
+            description = "Multiline text content for the file.",
+            example = "a.property=value\nanother.property=value",
+            required = false)
+    @Nullable
+    String fileContents;
 
     @Option(displayName = "Overwrite existing file",
             description = "If there is an existing file, should it be overwritten.",
@@ -51,12 +57,12 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
 
     @Override
     public String getDisplayName() {
-        return "Create text file";
+        return "Create Properties file";
     }
 
     @Override
     public String getDescription() {
-        return "Creates a new plain text file.";
+        return "Create a new Properties file.";
     }
 
     @Override
@@ -72,7 +78,7 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
     @Override
     public Collection<SourceFile> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
         if (shouldCreate.get()) {
-            return PlainTextParser.builder().build().parse(fileContents)
+            return PropertiesParser.builder().build().parse(StringUtils.isNotBlank(fileContents) ? fileContents : "")
                     .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
                     .collect(Collectors.toList());
         }
@@ -82,27 +88,24 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean created) {
         Path path = Paths.get(relativeFileName);
-        return new TreeVisitor<SourceFile, ExecutionContext>() {
+        return new PropertiesVisitor<ExecutionContext>() {
             @Override
-            public SourceFile visit(@Nullable Tree tree, ExecutionContext executionContext) {
-                SourceFile sourceFile = (SourceFile) requireNonNull(tree);
-                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(sourceFile.getSourcePath())) {
-                    if (sourceFile instanceof PlainText) {
-                        return ((PlainText) sourceFile).withText(fileContents);
+            public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
+                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(file.getSourcePath())) {
+                    if (StringUtils.isBlank(fileContents)) {
+                        return file.withContent(emptyList());
                     }
-                    PlainText plainText = PlainText.builder()
-                            .id(sourceFile.getId())
-                            .sourcePath(sourceFile.getSourcePath())
-                            .fileAttributes(sourceFile.getFileAttributes())
-                            .charsetBomMarked(sourceFile.isCharsetBomMarked())
-                            .text(fileContents)
-                            .build();
-                    if (sourceFile.getCharset() != null) {
-                        return plainText.withCharset(sourceFile.getCharset());
+                    Optional<SourceFile> sourceFiles = PropertiesParser.builder().build()
+                            .parse(fileContents)
+                            .findFirst();
+                    if (sourceFiles.isPresent()) {
+                        SourceFile sourceFile = sourceFiles.get();
+                        if (sourceFile instanceof Properties.File) {
+                            return file.withContent(((Properties.File) sourceFile).getContent());
+                        }
                     }
-                    return plainText;
                 }
-                return sourceFile;
+                return file;
             }
         };
     }
