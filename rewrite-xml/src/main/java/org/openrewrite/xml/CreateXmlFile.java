@@ -99,15 +99,16 @@ public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
                     if (StringUtils.isBlank(fileContents)) {
                         return document.withProlog(null).withRoot(null);
                     }
-                    Optional<SourceFile> sourceFiles = XmlParser.builder()
-                            .build()
+                    Optional<SourceFile> sourceFiles = XmlParser.builder().build()
                             .parse(fileContents)
-                            .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
                             .findFirst();
                     if (sourceFiles.isPresent()) {
                         SourceFile sourceFile = sourceFiles.get();
                         if (sourceFile instanceof Xml.Document) {
-                            return document.withRoot(((Xml.Document) sourceFile).getRoot());
+                            Xml.Document newXmlDocument = (Xml.Document) sourceFile;
+                            return document
+                                    .withProlog(newXmlDocument.getProlog())
+                                    .withRoot(newXmlDocument.getRoot());
                         }
                     }
                 }

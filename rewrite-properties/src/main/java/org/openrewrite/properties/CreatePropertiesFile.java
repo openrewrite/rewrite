@@ -95,12 +95,9 @@ public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
                     if (StringUtils.isBlank(fileContents)) {
                         return file.withContent(emptyList());
                     }
-                    Optional<SourceFile> sourceFiles = PropertiesParser.builder()
-                            .build()
+                    Optional<SourceFile> sourceFiles = PropertiesParser.builder().build()
                             .parse(fileContents)
-                            .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
                             .findFirst();
-
                     if (sourceFiles.isPresent()) {
                         SourceFile sourceFile = sourceFiles.get();
                         if (sourceFile instanceof Properties.File) {
