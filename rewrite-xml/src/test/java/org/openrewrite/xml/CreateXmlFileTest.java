@@ -58,18 +58,22 @@ class CreateXmlFileTest implements RewriteTest {
     @DocumentExample
     @Test
     void hasOverwrittenFile() {
+        String fileContents = """
+          <?xml version="1.0" encoding="UTF-8"?>
+          <after/>
+          """;
         rewriteRun(
           spec -> spec.recipe(new CreateXmlFile(
             "test/test.xml",
-            null,
+            fileContents,
             true
           )),
           xml(
             """
               <?xml version="1.0" encoding="UTF-8"?>
-              <test/>
+              <before/>
               """,
-            "",
+            fileContents,
             spec -> spec.path("test/test.xml")
           )
         );

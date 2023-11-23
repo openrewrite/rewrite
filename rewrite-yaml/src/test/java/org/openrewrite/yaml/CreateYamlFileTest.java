@@ -51,12 +51,12 @@ class CreateYamlFileTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new CreateYamlFile(
             "test/test.yaml",
-            null,
+            "after: true",
             true
           )),
           yaml(
-            "",
-            "",
+            "before: true",
+            "after: true",
             spec -> spec.path("test/test.yaml")
           )
         );

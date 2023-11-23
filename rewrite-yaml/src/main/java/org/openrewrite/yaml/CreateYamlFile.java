@@ -102,8 +102,11 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
                             .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
                             .findFirst();
 
-                    if (sourceFiles.isPresent() && sourceFiles.get() instanceof Yaml.Documents) {
-                        return (Yaml.Documents) sourceFiles.get();
+                    if (sourceFiles.isPresent()) {
+                        SourceFile sourceFile = sourceFiles.get();
+                        if (sourceFile instanceof Yaml.Documents) {
+                            return documents.withDocuments(((Yaml.Documents) sourceFile).getDocuments());
+                        }
                     }
                 }
                 return documents;

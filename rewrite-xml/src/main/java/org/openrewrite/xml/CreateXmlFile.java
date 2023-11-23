@@ -104,9 +104,11 @@ public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
                             .parse(fileContents)
                             .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))
                             .findFirst();
-
-                    if (sourceFiles.isPresent() && sourceFiles.get() instanceof Xml.Document) {
-                        return (Xml.Document) sourceFiles.get();
+                    if (sourceFiles.isPresent()) {
+                        SourceFile sourceFile = sourceFiles.get();
+                        if (sourceFile instanceof Xml.Document) {
+                            return document.withRoot(((Xml.Document) sourceFile).getRoot());
+                        }
                     }
                 }
                 return document;

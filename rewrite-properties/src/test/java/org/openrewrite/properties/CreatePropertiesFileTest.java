@@ -52,12 +52,12 @@ class CreatePropertiesFileTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new CreatePropertiesFile(
             "test/test.properties",
-            null,
+            "after=true",
             true
           )),
           properties(
             "test.property=test",
-            "",
+            "after=true",
             spec -> spec.path("test/test.properties")
           )
         );
