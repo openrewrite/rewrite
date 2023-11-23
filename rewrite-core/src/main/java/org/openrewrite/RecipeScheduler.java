@@ -83,7 +83,7 @@ public class RecipeScheduler {
                 }
 
                 if (i >= minCycles &&
-                    ((cycle.madeChangesInThisCycle.isEmpty() && !ctxWithWatch.hasNewMessages()) &&
+                    ((cycle.madeChangesInThisCycle.isEmpty() && !ctxWithWatch.hasNewMessages()) ||
                      !anyRecipeCausingAnotherCycle)) {
                     after.afterCycle(true);
                     break;
@@ -136,7 +136,7 @@ public class RecipeScheduler {
 
         long cycleStartTime = System.nanoTime();
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean();
-        List<Recipe> madeChangesInThisCycle = new ArrayList<>();
+        Set<Recipe> madeChangesInThisCycle = Collections.newSetFromMap(new IdentityHashMap<>());
 
         public LargeSourceSet scanSources(LargeSourceSet sourceSet, int cycle) {
             return mapForRecipeRecursively(sourceSet, (recipeStack, sourceFile) -> {
