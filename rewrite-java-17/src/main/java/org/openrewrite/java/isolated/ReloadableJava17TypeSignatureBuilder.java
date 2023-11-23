@@ -41,12 +41,7 @@ class ReloadableJava17TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         if (type == null || type instanceof Type.UnknownType || type instanceof NullType) {
             return "{undefined}";
         } else if (type instanceof Type.IntersectionClassType) {
-            Type.IntersectionClassType intersectionClassType = (Type.IntersectionClassType) type;
-            StringJoiner joiner = new StringJoiner(" & ");
-            for (TypeMirror typeArg : intersectionClassType.getBounds()) {
-                joiner.add(signature(typeArg));
-            }
-            return joiner.toString();
+            return intersectionSignature(type);
         } else if (type instanceof Type.ClassType) {
             try {
                 return ((Type.ClassType) type).typarams_field != null && ((Type.ClassType) type).typarams_field.length() > 0 ? parameterizedSignature(type) : classSignature(type);
@@ -148,6 +143,15 @@ class ReloadableJava17TypeSignatureBuilder implements JavaTypeSignatureBuilder {
         typeVariableNameStack.remove(name);
 
         return s.append("}").toString();
+    }
+
+    private String intersectionSignature(Object type) {
+        Type.IntersectionClassType intersectionClassType = (Type.IntersectionClassType) type;
+        StringJoiner joiner = new StringJoiner(" & ");
+        for (TypeMirror typeArg : intersectionClassType.getBounds()) {
+            joiner.add(signature(typeArg));
+        }
+        return joiner.toString();
     }
 
     @Override
