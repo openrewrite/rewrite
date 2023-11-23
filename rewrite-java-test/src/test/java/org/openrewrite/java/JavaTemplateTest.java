@@ -1045,16 +1045,16 @@ class JavaTemplateTest implements RewriteTest {
     }
 
 	@Test
-//	@SuppressWarnings("ArraysAsListWithZeroOrOneArgument")
-	void replaceAnonymousClassObject1() {
+	void replaceMethodCallWithGenericParameterWithUnknowType() {
 		rewriteRun(
-		  spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+		  spec -> spec.parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
+			.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
 			  private JavaParser.Builder<?, ?> assertionsParser;
 
-			  private JavaParser.Builder<?, ?> assertionsParser(ExecutionContext ctx) {
+			  private JavaParser.Builder<?, ?> assertionsParser() {
 				  if (assertionsParser == null) {
 					  assertionsParser = JavaParser.fromJavaVersion()
-						.classpathFromResources(ctx, "assertj-core-3.24");
+						.classpath( "assertj-core");
 				  }
 				  return assertionsParser;
 			  }
@@ -1078,89 +1078,95 @@ class JavaTemplateTest implements RewriteTest {
 				  if (args.size() == 2) {
 					  return JavaTemplate.builder("assertThat(#{any()}).isEqualTo(#{any()});")
 						.staticImports("org.assertj.core.api.Assertions.assertThat")
-						.javaParser(assertionsParser(ctx))
+						.javaParser(assertionsParser())
 						.build()
 						.apply(getCursor(), method.getCoordinates().replace(), actual, expected);
-				  } else if (args.size() == 3 && !isFloatingPointType(args.get(2))) {
-					  Expression message = args.get(2);
-					  JavaTemplate.Builder template = TypeUtils.isString(message.getType()) ?
-						JavaTemplate.builder("assertThat(#{any()}).as(#{any(String)}).isEqualTo(#{any()});") :
-						JavaTemplate.builder("assertThat(#{any()}).as(#{any(java.util.function.Supplier)}).isEqualTo(#{any()});");
-					  return template
-						.staticImports("org.assertj.core.api.Assertions.assertThat")
-						.imports("java.util.function.Supplier")
-						.javaParser(assertionsParser(ctx))
-						.build()
-						.apply(
-						  getCursor(),
-						  method.getCoordinates().replace(),
-						  actual,
-						  message,
-						  expected
-						);
-				  } else if (args.size() == 3) {
-					  maybeAddImport("org.assertj.core.api.Assertions", "within");
-					  return JavaTemplate.builder("assertThat(#{any()}).isCloseTo(#{any()}, within(#{any()}));")
-						.staticImports("org.assertj.core.api.Assertions.assertThat", "org.assertj.core.api.Assertions.within")
-						.javaParser(assertionsParser(ctx))
-						.build()
-						.apply(getCursor(), method.getCoordinates().replace(), actual, expected, args.get(2));
-
+				  } else {
+					  return super.visitMethodInvocation(method, ctx);
 				  }
-
-				  // The assertEquals is using a floating point with a delta argument and a message.
-				  Expression message = args.get(3);
-
-				  maybeAddImport("org.assertj.core.api.Assertions", "within");
-				  JavaTemplate.Builder template = TypeUtils.isString(message.getType()) ?
-					JavaTemplate.builder("assertThat(#{any()}).as(#{any(String)}).isCloseTo(#{any()}, within(#{any()}));") :
-					JavaTemplate.builder("assertThat(#{any()}).as(#{any(java.util.function.Supplier)}).isCloseTo(#{any()}, within(#{any()}));");
-				  return template
-					.staticImports("org.assertj.core.api.Assertions.assertThat", "org.assertj.core.api.Assertions.within")
-					.imports("java.util.function.Supplier")
-					.javaParser(assertionsParser(ctx))
-					.build()
-					.apply(
-					  getCursor(),
-					  method.getCoordinates().replace(),
-					  actual,
-					  message,
-					  expected,
-					  args.get(2)
-					);
-			  }
-
-			  private static boolean isFloatingPointType(Expression expression) {
-
-				  JavaType.FullyQualified fullyQualified = TypeUtils.asFullyQualified(expression.getType());
-				  if (fullyQualified != null) {
-					  String typeName = fullyQualified.getFullyQualifiedName();
-					  return "java.lang.Double".equals(typeName) || "java.lang.Float".equals(typeName);
-				  }
-
-				  JavaType.Primitive parameterType = TypeUtils.asPrimitive(expression.getType());
-				  return parameterType == JavaType.Primitive.Double || parameterType == JavaType.Primitive.Float;
 			  }
 		  })),
 		  java(
 			"""
-			import org.junit.jupiter.api.Assertions;
+            import java.util.Map;
+            import org.junit.jupiter.api.Assertions;
+			
+            class T {
+                void m(String one, Map<String, ?> map) {
+                    Assertions.assertEquals(one, map.get("one"));
+                }
+            }
+            """,
+			"""
+        import java.util.Map;
+   			
+        import static org.assertj.core.api.Assertions.assertThat;
+  
+        class T {
+            void m(String one, Map<String, ?> map) {
+                assertThat(map.get("one")).isEqualTo(one);
+            }
+        }
+            """
+		  )
+		);
+	}
+
+	@Test
+	void replaceCallWithUnknownGenericReturnValue() {
+		rewriteRun(
+		  spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+			  private static final MethodMatcher OBJECTS_EQUALS = new MethodMatcher("java.util.Objects" + " equals(..)");
+
+			  @Override
+			  public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+				  if (!OBJECTS_EQUALS.matches(method)) {
+					  return method;
+				  }
+
+				  List<Expression> args = method.getArguments();
+				  Expression expected = args.get(0);
+				  Expression actual = args.get(1);
+
+				  maybeAddImport("java.util.Objects", "requireNonNull");
+
+				  if (args.size() == 2) {
+					  return JavaTemplate.builder("requireNonNull(#{any()}).equals(#{any()});")
+						.staticImports("java.util.Objects.requireNonNull")
+						.javaParser(JavaParser.fromJavaVersion())
+						.build()
+						.apply(getCursor(), method.getCoordinates().replace(), actual, expected);
+				  } else {
+					  return super.visitMethodInvocation(method, ctx);
+				  }
+			  }
+		  })),
+		  java(
+			"""
+			import java.util.Objects;
+			import java.util.Map;
+			import java.util.HashMap;
 			
 			class T {
-				void m(String one, String two) {
-					Assertions.assertEquals(one, two);
+				void m() {
+					Map<String, ?> map = new HashMap<>();
+					Objects.equals("", map.get("one"));
 				}
 			}
 			""",
 			"""
-			import org.assertj.core.api.Assertions;
-			import static org.assertj.core.api.Assertions.assertThat;
-						  
-			class T {
-				void m(String one, String two) {
-					assertThat(one).isEqualTo(two);
-				}
+		import java.util.Objects;
+		import java.util.Map;
+                        
+		import static java.util.Objects.requireNonNull;
+		import java.util.HashMap;
+  
+		class T {
+			void m() {
+				Map<String, ?> map = new HashMap<>();
+		        requireNonNull(map.get("one")).equals("");
 			}
+		}
 			"""
 		  )
 		);

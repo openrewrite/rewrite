@@ -424,4 +424,41 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
           )
         );
     }
+
+	@Test
+	void testAnyIsGenericWithUnknownType() {
+		rewriteRun(
+		  spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+			  @Override
+			  public J visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
+				  if (method.getSimpleName().equals("test")) {
+					  var s = method.getBody().getStatements().get(0);
+					  return JavaTemplate.builder("System.out.println(#{any()})")
+						.contextSensitive()
+						.build()
+						.apply(getCursor(), s.getCoordinates().replace(), s);
+				  }
+				  return method;
+			  }
+		  })).cycles(1).expectedCyclesThatMakeChanges(1),
+		  java(
+			"""
+			  import java.util.Map;
+			  class Test {
+				  void test(Map<String, ?> map) {
+					  map.get("test");
+				  }
+			  }
+			  """,
+			"""
+			  import java.util.Map;
+			  class Test {
+				  void test(Map<String, ?> map) {
+					     System.out.println(map.get("test"));
+				  }
+			  }
+			  """
+		  )
+		);
+	}
 }
