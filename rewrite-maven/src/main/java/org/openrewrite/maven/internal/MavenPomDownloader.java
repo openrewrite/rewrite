@@ -466,8 +466,8 @@ public class MavenPomDownloader {
         // The requested gav might itself have an unresolved placeholder in the version, so also check raw values
         for (Pom projectPom : projectPoms.values()) {
             if (gav.getGroupId().equals(projectPom.getGroupId()) &&
-                    gav.getArtifactId().equals(projectPom.getArtifactId()) &&
-                    (gav.getVersion().equals(projectPom.getVersion()) || projectPom.getVersion().equals(projectPom.getValue(gav.getVersion())))) {
+                gav.getArtifactId().equals(projectPom.getArtifactId()) &&
+                (gav.getVersion().equals(projectPom.getVersion()) || projectPom.getVersion().equals(projectPom.getValue(gav.getVersion())))) {
                 return projectPom;
             }
         }
@@ -647,7 +647,7 @@ public class MavenPomDownloader {
                                                                        @Nullable ResolvedPom containingPom,
                                                                        @Nullable String acceptsVersion) {
         Set<MavenRepository> normalizedRepositories = new LinkedHashSet<>();
-        if(addDefaultRepositories) {
+        if (addDefaultRepositories) {
             normalizedRepositories.add(ctx.getLocalRepository());
         }
 
@@ -665,8 +665,11 @@ public class MavenPomDownloader {
                 normalizedRepositories.add(normalizedRepo);
             }
         }
-        if(addDefaultRepositories) {
-            normalizedRepositories.add(normalizeRepository(MavenRepository.MAVEN_CENTRAL, containingPom));
+        if (addDefaultRepositories) {
+            MavenRepository normalizedRepo = normalizeRepository(MavenRepository.MAVEN_CENTRAL, containingPom);
+            if (normalizedRepo != null) {
+                normalizedRepositories.add(normalizedRepo);
+            }
         }
         return normalizedRepositories;
     }
@@ -762,12 +765,12 @@ public class MavenPomDownloader {
                             } catch (Throwable e) {
                                 // ok to fall through here and cache a null
                                 if (nullReasonConsumer != null) {
-                                    nullReasonConsumer.accept(t);
+                                    nullReasonConsumer.accept(e);
                                 }
                             }
                         }
                     }
-                    if(normalized == null) {
+                    if (normalized == null) {
                         if (nullReasonConsumer != null) {
                             nullReasonConsumer.accept(t);
                         }

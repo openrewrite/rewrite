@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
+import org.openrewrite.java.search.DeclaresMethod;
 import org.openrewrite.java.search.UsesMethod;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -50,7 +51,10 @@ public class UseStaticImport extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(new UsesMethod<>(methodPattern), new UseStaticImportVisitor());
+        int indexSpace = methodPattern.indexOf(' ');
+        int indexBrace = methodPattern.indexOf('(', indexSpace);
+        String identicalMethodName = "* " + methodPattern.substring(indexSpace, indexBrace) + "(..)";
+        return Preconditions.check(Preconditions.and(new UsesMethod<>(methodPattern), Preconditions.not(new DeclaresMethod<>(identicalMethodName))), new UseStaticImportVisitor());
     }
 
     private class UseStaticImportVisitor extends JavaIsoVisitor<ExecutionContext> {

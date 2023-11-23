@@ -195,6 +195,11 @@ public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     }
 
     @Override
+    public J.IntersectionType visitIntersectionType(J.IntersectionType intersectionType, P p) {
+        return (J.IntersectionType) super.visitIntersectionType(intersectionType, p);
+    }
+
+    @Override
     public J.Label visitLabel(J.Label label, P p) {
         return (J.Label) super.visitLabel(label, p);
     }
