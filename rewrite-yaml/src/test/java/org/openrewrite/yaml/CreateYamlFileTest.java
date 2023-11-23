@@ -26,23 +26,20 @@ class CreateYamlFileTest implements RewriteTest {
     @DocumentExample
     @Test
     void hasCreatedFile() {
+        String fileContents = """
+          # This is a comment
+          x:
+            y: z
+          """;
         rewriteRun(
           spec -> spec.recipe(new CreateYamlFile(
             "test/test.yaml",
-            """
-              # This is a comment
-              x:
-                y: z
-              """,
+            fileContents,
             null
           )),
           yaml(
             null,
-            """
-              # This is a comment
-              x:
-                y: z
-              """,
+            fileContents,
             spec -> spec.path("test/test.yaml")
           )
         );
@@ -75,8 +72,7 @@ class CreateYamlFileTest implements RewriteTest {
           )),
           yaml(
             """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <test/>
+              foo: bar
               """,
             spec -> spec.path("test/test.yaml")
           )

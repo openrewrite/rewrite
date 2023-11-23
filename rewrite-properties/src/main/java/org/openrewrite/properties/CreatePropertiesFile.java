@@ -19,12 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.junit.platform.commons.util.StringUtils;
-import org.openrewrite.CreateFileVisitor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.ScanningRecipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
@@ -62,27 +57,27 @@ public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
     Boolean overwriteExisting;
 
     @Override
-    public @NonNull String getDisplayName() {
+    public String getDisplayName() {
         return "Create Properties file";
     }
 
     @Override
-    public @NonNull String getDescription() {
+    public String getDescription() {
         return "Create a new Properties file.";
     }
 
     @Override
-    public @NonNull AtomicBoolean getInitialValue(@NonNull ExecutionContext ctx) {
+    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
         return new AtomicBoolean(true);
     }
 
     @Override
-    public @NonNull TreeVisitor<?, ExecutionContext> getScanner(@NonNull AtomicBoolean shouldCreate) {
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean shouldCreate) {
         return new CreateFileVisitor(relativeFileName, shouldCreate);
     }
 
     @Override
-    public @NonNull Collection<SourceFile> generate(AtomicBoolean shouldCreate, @NonNull ExecutionContext ctx) {
+    public Collection<SourceFile> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
         if (shouldCreate.get()) {
             return PropertiesParser.builder().build().parse(StringUtils.isNotBlank(fileContents) ? fileContents : "")
                     .map(brandNewFile -> (SourceFile) brandNewFile.withSourcePath(Paths.get(relativeFileName)))

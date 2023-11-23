@@ -18,12 +18,7 @@ package org.openrewrite.java;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
-import org.openrewrite.CreateFileVisitor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
-import org.openrewrite.ScanningRecipe;
-import org.openrewrite.SourceFile;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
@@ -84,27 +79,27 @@ public class CreateEmptyJavaClass extends ScanningRecipe<AtomicBoolean> {
     String relativePath;
 
     @Override
-    public @NonNull String getDisplayName() {
+    public String getDisplayName() {
         return "Create Java class";
     }
 
     @Override
-    public @NonNull String getDescription() {
+    public String getDescription() {
         return "Create a new, empty Java class.";
     }
 
     @Override
-    public @NonNull AtomicBoolean getInitialValue(@NonNull ExecutionContext ctx) {
+    public AtomicBoolean getInitialValue(ExecutionContext ctx) {
         return new AtomicBoolean(true);
     }
 
     @Override
-    public @NonNull TreeVisitor<?, ExecutionContext> getScanner(@NonNull AtomicBoolean shouldCreate) {
+    public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean shouldCreate) {
         return new CreateFileVisitor(getSourcePath(), shouldCreate);
     }
 
     @Override
-    public @NonNull Collection<SourceFile> generate(AtomicBoolean shouldCreate, @NonNull ExecutionContext ctx) {
+    public Collection<SourceFile> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
         if (shouldCreate.get()) {
             return parseSources().collect(Collectors.toList());
         }
@@ -139,7 +134,7 @@ public class CreateEmptyJavaClass extends ScanningRecipe<AtomicBoolean> {
     }
 
     @SuppressWarnings("java:S1075")
-    private @NonNull String getSourcePath() {
+    private String getSourcePath() {
         String path = this.getRelativePath();
         if (path == null) {
             path = "";

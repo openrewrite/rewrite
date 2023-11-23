@@ -26,43 +26,30 @@ class CreateXmlFileTest implements RewriteTest {
     @DocumentExample
     @Test
     void hasCreatedFile() {
+        String fileContents = """
+          <?xml version="1.0" encoding="UTF-8"?>
+          <library>
+              <book id="1">
+                  <title>The Great Gatsby</title>
+                  <author>F. Scott Fitzgerald</author>
+                  <year>1925</year>
+              </book>
+              <book id="2">
+                  <title>To Kill a Mockingbird</title>
+                  <author>Harper Lee</author>
+                  <year>1960</year>
+              </book>
+          </library>
+          """;
         rewriteRun(
           spec -> spec.recipe(new CreateXmlFile(
             "test/test.xml",
-            """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <library>
-                  <book id="1">
-                      <title>The Great Gatsby</title>
-                      <author>F. Scott Fitzgerald</author>
-                      <year>1925</year>
-                  </book>
-                  <book id="2">
-                      <title>To Kill a Mockingbird</title>
-                      <author>Harper Lee</author>
-                      <year>1960</year>
-                  </book>
-              </library>
-              """,
+            fileContents,
             null
           )),
           xml(
             null,
-            """
-              <?xml version="1.0" encoding="UTF-8"?>
-              <library>
-                  <book id="1">
-                      <title>The Great Gatsby</title>
-                      <author>F. Scott Fitzgerald</author>
-                      <year>1925</year>
-                  </book>
-                  <book id="2">
-                      <title>To Kill a Mockingbird</title>
-                      <author>Harper Lee</author>
-                      <year>1960</year>
-                  </book>
-              </library>
-              """,
+            fileContents,
             spec -> spec.path("test/test.xml")
           )
         );
