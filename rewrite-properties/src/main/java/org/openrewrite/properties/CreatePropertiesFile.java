@@ -20,7 +20,6 @@ import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.junit.platform.commons.util.StringUtils;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
@@ -73,7 +72,7 @@ public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean shouldCreate) {
-        return new CreateFileVisitor(relativeFileName, shouldCreate);
+        return new CreateFileVisitor(Paths.get(relativeFileName), shouldCreate);
     }
 
     @Override
@@ -92,7 +91,7 @@ public class CreatePropertiesFile extends ScanningRecipe<AtomicBoolean> {
         return new PropertiesVisitor<ExecutionContext>() {
             @Override
             public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
-                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.toString().equals(file.getSourcePath().toString())) {
+                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(file.getSourcePath())) {
                     if (StringUtils.isBlank(fileContents)) {
                         return file.withContent(emptyList());
                     }

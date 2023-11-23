@@ -66,7 +66,7 @@ public class CreateTextFile extends ScanningRecipe<AtomicBoolean> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean shouldCreate) {
-        return new CreateFileVisitor(relativeFileName, shouldCreate);
+        return new CreateFileVisitor(Paths.get(relativeFileName), shouldCreate);
     }
 
     @Override

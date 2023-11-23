@@ -101,20 +101,19 @@ public class CreateEmptyJavaClass extends ScanningRecipe<AtomicBoolean> {
     @Override
     public Collection<SourceFile> generate(AtomicBoolean shouldCreate, ExecutionContext ctx) {
         if (shouldCreate.get()) {
-            return parseSources().collect(Collectors.toList());
+            return createEmptyClass().collect(Collectors.toList());
         }
         return emptyList();
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean created) {
-        Path path = Paths.get(getSourcePath());
+        Path path = getSourcePath();
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.toString().equals(cu.getSourcePath().toString())) {
-                    Optional<SourceFile> sourceFile = parseSources().findFirst();
-
+                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(cu.getSourcePath())) {
+                    Optional<SourceFile> sourceFile = createEmptyClass().findFirst();
                     if (sourceFile.isPresent() && sourceFile.get() instanceof J.CompilationUnit) {
                         J.CompilationUnit newCu = (J.CompilationUnit) sourceFile.get();
                         return cu.withClasses(newCu.getClasses()).withSourcePath(path);
@@ -126,16 +125,16 @@ public class CreateEmptyJavaClass extends ScanningRecipe<AtomicBoolean> {
         };
     }
 
-    private Stream<SourceFile> parseSources() {
+    private Stream<SourceFile> createEmptyClass() {
         String packageModifier = "package-private".equals(modifier) ? "" : modifier + " ";
         return JavaParser.fromJavaVersion().build()
                 .parse(String.format(CreateEmptyJavaClass.NEW_CLASS_TEMPLATE, packageName, packageModifier, className))
-                .map(brandNewFile -> brandNewFile.withSourcePath(Paths.get(getSourcePath())));
+                .map(brandNewFile -> brandNewFile.withSourcePath(getSourcePath()));
     }
 
     @SuppressWarnings("java:S1075")
-    private String getSourcePath() {
-        String path = this.getRelativePath();
+    private Path getSourcePath() {
+        String path = relativePath;
         if (path == null) {
             path = "";
         }
@@ -144,12 +143,11 @@ public class CreateEmptyJavaClass extends ScanningRecipe<AtomicBoolean> {
             path = path + "/";
         }
 
-        return String.format(
+        return Paths.get(String.format(
                 "%s%s/%s/%s.java",
                 path,
                 sourceRoot,
                 packageName.replace('.', '/'),
-                className
-        );
+                className));
     }
 }

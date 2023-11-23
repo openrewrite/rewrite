@@ -20,7 +20,6 @@ import lombok.Value;
 import org.intellij.lang.annotations.Language;
 import org.junit.platform.commons.util.StringUtils;
 import org.openrewrite.*;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -73,7 +72,7 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean shouldCreate) {
-        return new CreateFileVisitor(relativeFileName, shouldCreate);
+        return new CreateFileVisitor(Paths.get(relativeFileName), shouldCreate);
     }
 
     @Override
@@ -93,7 +92,7 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
         return new YamlVisitor<ExecutionContext>() {
             @Override
             public Yaml visitDocuments(Yaml.Documents documents, ExecutionContext executionContext) {
-                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.toString().equals(documents.getSourcePath().toString())) {
+                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(documents.getSourcePath())) {
                     if (StringUtils.isBlank(fileContents)) {
                         return documents.withDocuments(emptyList());
                     }

@@ -75,7 +75,7 @@ public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(AtomicBoolean shouldCreate) {
-        return new CreateFileVisitor(relativeFileName, shouldCreate);
+        return new CreateFileVisitor(Paths.get(relativeFileName), shouldCreate);
     }
 
     @Override
@@ -95,7 +95,7 @@ public class CreateXmlFile extends ScanningRecipe<AtomicBoolean> {
         return new XmlVisitor<ExecutionContext>() {
             @Override
             public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.toString().equals(document.getSourcePath().toString())) {
+                if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(document.getSourcePath())) {
                     if (StringUtils.isBlank(fileContents)) {
                         return document.withProlog(null).withRoot(null);
                     }

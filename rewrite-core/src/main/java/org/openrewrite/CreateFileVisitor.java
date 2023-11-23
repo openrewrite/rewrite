@@ -21,7 +21,6 @@ import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Objects.requireNonNull;
@@ -30,15 +29,14 @@ import static java.util.Objects.requireNonNull;
 @EqualsAndHashCode(callSuper = false)
 public class CreateFileVisitor extends TreeVisitor<Tree, ExecutionContext> {
 
-    @NonNull String relativeFileName;
+    @NonNull Path relativeFileName;
 
     @NonNull AtomicBoolean shouldCreate;
 
     @Override
     public Tree visit(@Nullable Tree tree, @NonNull ExecutionContext ctx) {
-        Path path = Paths.get(relativeFileName);
         SourceFile sourceFile = (SourceFile) requireNonNull(tree);
-        if (path.toString().equals(sourceFile.getSourcePath().toString())) {
+        if (relativeFileName.equals(sourceFile.getSourcePath())) {
             shouldCreate.set(false);
         }
         return sourceFile;
