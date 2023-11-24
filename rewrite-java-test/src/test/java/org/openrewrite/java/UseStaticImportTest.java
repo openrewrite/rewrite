@@ -117,6 +117,36 @@ class UseStaticImportTest implements RewriteTest {
     }
 
     @Test
+    void doReplaceWhenWildcard() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.util.Collections *()")),
+          java(
+            """
+            import java.util.Collections;
+            import java.util.List;
+
+            class SameMethodNameLocally {
+                void avoidCollision() {
+                    List<Object> list = Collections.emptyList();
+                }
+            }
+            """,
+            """
+            import java.util.List;
+            
+            import static java.util.Collections.emptyList;
+
+            class SameMethodNameLocally {
+                void avoidCollision() {
+                    List<Object> list = emptyList();
+                }
+            }
+            """
+          )
+        );
+    }
+
+    @Test
     void methodInvocationsHavingNullSelect() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
