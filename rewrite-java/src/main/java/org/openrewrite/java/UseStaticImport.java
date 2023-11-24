@@ -51,10 +51,15 @@ public class UseStaticImport extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        int indexSpace = methodPattern.indexOf(' ');
-        int indexBrace = methodPattern.indexOf('(', indexSpace);
-        String identicalMethodName = "* " + methodPattern.substring(indexSpace, indexBrace) + "(..)";
-        return Preconditions.check(Preconditions.and(new UsesMethod<>(methodPattern), Preconditions.not(new DeclaresMethod<>(identicalMethodName))), new UseStaticImportVisitor());
+        TreeVisitor<?, ExecutionContext> preconditions = new UsesMethod<>(methodPattern);
+        if (!methodPattern.contains(" *(")) {
+            int indexSpace = methodPattern.indexOf(' ');
+            int indexBrace = methodPattern.indexOf('(', indexSpace);
+            String methodNameMatcher = methodPattern.substring(indexSpace, indexBrace);
+            preconditions = Preconditions.and(preconditions,
+                    Preconditions.not(new DeclaresMethod<>("* " + methodNameMatcher + "(..)")));
+        }
+        return Preconditions.check(preconditions, new UseStaticImportVisitor());
     }
 
     private class UseStaticImportVisitor extends JavaIsoVisitor<ExecutionContext> {
