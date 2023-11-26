@@ -57,4 +57,33 @@ public class ShortenFullyQualifiedTypeReferencesAdaptabilityTest implements Rewr
           )
         );
     }
+
+    @Test
+    void importWithLeadingComment() {
+        rewriteRun(
+          groovy(
+            """
+              package foo
+              
+              /* comment */
+              import java.util.List
+              
+              class Test {
+                  List<String> l = new java.util.ArrayList<>()
+              }
+              """,
+            """
+              package foo
+              
+              /* comment */
+              import java.util.ArrayList
+              import java.util.List
+              
+              class Test {
+                  List<String> l = new ArrayList<>()
+              }
+              """
+          )
+        );
+    }
 }

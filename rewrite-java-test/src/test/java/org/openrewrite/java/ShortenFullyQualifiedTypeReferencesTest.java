@@ -509,4 +509,33 @@ public class ShortenFullyQualifiedTypeReferencesTest implements RewriteTest {
           """)
         );
     }
+
+    @Test
+    void importWithLeadingComment() {
+        rewriteRun(
+          java(
+            """
+              package foo;
+              
+              /* comment */
+              import java.util.List;
+              
+              class Test {
+                  List<String> l = new java.util.ArrayList<>();
+              }
+              """,
+            """
+              package foo;
+              
+              /* comment */
+              import java.util.ArrayList;
+              import java.util.List;
+              
+              class Test {
+                  List<String> l = new ArrayList<>();
+              }
+              """
+          )
+        );
+    }
 }
