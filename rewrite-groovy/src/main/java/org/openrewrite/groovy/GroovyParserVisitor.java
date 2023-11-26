@@ -109,11 +109,12 @@ public class GroovyParserVisitor {
             shebang = source.substring(0, i);
             cursor += i;
         }
+        Space prefix = EMPTY;
         JRightPadded<J.Package> pkg = null;
         if (ast.getPackage() != null) {
-            Space prefix = whitespace();
+            prefix = whitespace();
             cursor += "package".length();
-            pkg = JRightPadded.build(new J.Package(randomId(), prefix, Markers.EMPTY,
+            pkg = JRightPadded.build(new J.Package(randomId(), EMPTY, Markers.EMPTY,
                     typeTree(null), emptyList()));
         }
 
@@ -156,7 +157,12 @@ public class GroovyParserVisitor {
                         // Inner classes will be visited as part of visiting their containing class
                         continue;
                     }
-                    statements.add(convertTopLevelStatement(unit, value));
+                    JRightPadded<Statement> statement = convertTopLevelStatement(unit, value);
+                    if (statements.isEmpty() && pkg == null && statement.getElement() instanceof J.Import) {
+                        prefix = statement.getElement().getPrefix();
+                        statement = statement.withElement(statement.getElement().withPrefix(EMPTY));
+                    }
+                    statements.add(statement);
                 }
             } catch (Throwable t) {
                 if (t instanceof StringIndexOutOfBoundsException) {
@@ -172,7 +178,7 @@ public class GroovyParserVisitor {
         return new G.CompilationUnit(
                 randomId(),
                 shebang,
-                Space.EMPTY,
+                prefix,
                 Markers.EMPTY,
                 sourcePath,
                 fileAttributes,
