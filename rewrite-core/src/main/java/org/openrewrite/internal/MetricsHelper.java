@@ -22,8 +22,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 public class MetricsHelper {
-    public static Timer UUID_TIMER = Metrics.timer("rewrite.id.generate");
-
     public static void record(String timerName, Consumer<Timer.Builder> f) {
         Timer.Builder timer = Timer.builder(timerName);
         Timer.Sample sample = Timer.start();

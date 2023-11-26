@@ -36,7 +36,7 @@ class UpdateStaticAnalysisPackageTest implements RewriteTest {
                 .build()
                 .activateRecipes("org.openrewrite.java.upgrade.UpdateStaticAnalysisPackage")
             )
-            .typeValidationOptions(TypeValidation.none());
+            .afterTypeValidationOptions(TypeValidation.none());
     }
 
     @SuppressWarnings("all")
@@ -44,6 +44,7 @@ class UpdateStaticAnalysisPackageTest implements RewriteTest {
     @Test
     void changeCleanUpToStaticanalysisForSpecificClassOnly() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(
             """
               package org.openrewrite.java.migrate;

@@ -22,14 +22,23 @@ import static org.openrewrite.groovy.Assertions.groovy;
 
 class TernaryTest implements RewriteTest {
 
+    @SuppressWarnings("GroovyConstantConditional")
+    @Test
+    void insideParentheses() {
+        rewriteRun(
+          groovy("(true ? 1 : 2)"),
+          groovy("((true ? 1 : 2))"),
+
+          // NOT inside parentheses, but verifies the parser's
+          // test for "inside parentheses" condition
+          groovy("(true) ? 1 : 2")
+        );
+    }
+
     @Test
     void ternary() {
         rewriteRun(
-          groovy(
-            """
-              1 == 2 ? /no it isn't/ : /yes it is/
-              """
-          )
+          groovy("1 == 2 ? /no it isn't/ : /yes it is/")
         );
     }
 

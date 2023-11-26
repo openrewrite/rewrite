@@ -720,6 +720,14 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     @Override
+    public J visitIntersectionType(IntersectionTypeTree node, Space fmt) {
+        JContainer<TypeTree> bounds = node.getBounds().isEmpty() ? null :
+                JContainer.build(EMPTY,
+                        convertAll(node.getBounds(), t -> sourceBefore("&"), noDelim), Markers.EMPTY);
+        return new J.IntersectionType(randomId(), fmt, Markers.EMPTY, bounds);
+    }
+
+    @Override
     public J visitLabeledStatement(LabeledStatementTree node, Space fmt) {
         skip(node.getLabel().toString());
         return new J.Label(randomId(), fmt, Markers.EMPTY,
@@ -1239,7 +1247,7 @@ public class ReloadableJava8ParserVisitor extends TreePathScanner<J, Space> {
                 JContainer.build(sourceBefore("extends"),
                         convertAll(node.getBounds(), t -> sourceBefore("&"), noDelim), Markers.EMPTY);
 
-        return new J.TypeParameter(randomId(), fmt, Markers.EMPTY, annotations, name, bounds);
+        return new J.TypeParameter(randomId(), fmt, Markers.EMPTY, annotations, emptyList(), name, bounds);
     }
 
     private <T extends TypeTree & Expression> T buildName(String fullyQualifiedName) {

@@ -23,7 +23,7 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.Serializable;
-import java.util.List;
+import java.util.*;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.StringUtils.matchesGlob;
@@ -49,6 +49,7 @@ public class ResolvedDependency implements Serializable {
      * Direct dependencies only that survived conflict resolution and exclusion.
      */
     @NonFinal
+    @EqualsAndHashCode.Exclude
     List<ResolvedDependency> dependencies;
 
     List<License> licenses;
@@ -120,12 +121,19 @@ public class ResolvedDependency implements Serializable {
 
     @Nullable
     public ResolvedDependency findDependency(String groupId, String artifactId) {
+        return findDependency0(groupId, artifactId, Collections.newSetFromMap(new IdentityHashMap<>()));
+    }
+
+    @Nullable
+    private ResolvedDependency findDependency0(String groupId, String artifactId, Set<ResolvedDependency> visited) {
         if (matchesGlob(getGroupId(), groupId) && matchesGlob(getArtifactId(), artifactId)) {
             return this;
+        } else if (!visited.add(this)) {
+            return null;
         }
         outer:
         for (ResolvedDependency dependency : dependencies) {
-            ResolvedDependency found = dependency.findDependency(groupId, artifactId);
+            ResolvedDependency found = dependency.findDependency0(groupId, artifactId, visited);
             if (found != null) {
                 if (getRequested().getExclusions() != null) {
                     for (GroupArtifact exclusion : getRequested().getExclusions()) {

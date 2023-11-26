@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
 
+import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.UnaryOperator;
@@ -74,4 +75,12 @@ public interface LargeSourceSet {
      * to the initial state.
      */
     Changeset getChangeset();
+
+    /**
+     * Get the original source file, before any edits. Returns null if it is not present.
+     * @param sourcePath The path of the source file to retrieve.
+     * @return The original source file. Null if not present.
+     */
+    @Nullable
+    SourceFile getBefore(Path sourcePath);
 }

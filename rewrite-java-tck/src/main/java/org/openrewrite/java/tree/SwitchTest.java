@@ -37,11 +37,12 @@ class SwitchTest implements RewriteTest {
                      }
                  }
               }
-               """
+              """
           )
         );
     }
 
+    /** @noinspection SwitchStatementWithTooFewBranches*/
     @Test
     void defaultCase() {
         rewriteRun(
@@ -55,7 +56,7 @@ class SwitchTest implements RewriteTest {
                      }
                  }
               }
-               """
+              """
           )
         );
     }
@@ -71,7 +72,7 @@ class SwitchTest implements RewriteTest {
                      switch(n) {}
                  }
               }
-               """
+              """
           )
         );
     }
@@ -95,7 +96,7 @@ class SwitchTest implements RewriteTest {
                      }
                  }
               }
-               """
+              """
           )
         );
     }

@@ -26,6 +26,7 @@ import org.openrewrite.json.internal.grammar.JSON5Parser;
 import org.openrewrite.json.tree.*;
 import org.openrewrite.marker.Markers;
 
+import java.math.BigInteger;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -47,6 +48,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
     private final FileAttributes fileAttributes;
 
     private int cursor = 0;
+    private int codePointCursor = 0;
 
     public JsonParserVisitor(Path path, @Nullable FileAttributes fileAttributes, EncodingDetectingInputStream source) {
         this.path = path;
@@ -211,13 +213,17 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
             source.append(text);
             if (text.startsWith("0x")) {
                 value = Long.decode(text) * sign.get();
-            } else if (text.contains(".") || text.contains("e")) {
+            } else if (text.contains(".") || text.contains("e") || text.contains("E")) {
                 value = Double.parseDouble(text) * sign.get();
             } else {
                 try {
                     value = Integer.parseInt(text) * sign.get();
                 } catch (NumberFormatException e) {
-                    value = Long.parseLong(text) * sign.get();
+                    try {
+                        value = Long.parseLong(text) * sign.get();
+                    } catch (NumberFormatException e1) {
+                        value = sign.get() == 1 ? new BigInteger(text, 10) : new BigInteger("-" + text, 10);
+                    }
                 }
             }
         }
@@ -260,12 +266,18 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
 
     private Space prefix(Token token) {
         int start = token.getStartIndex();
-        if (start < cursor) {
+        if (start < codePointCursor) {
             return Space.EMPTY;
         }
-        String prefix = source.substring(cursor, start);
-        cursor = start;
+        String prefix = source.substring(cursor, advanceCursor(start));
         return Space.format(prefix);
+    }
+
+    public int advanceCursor(int newCodePointIndex) {
+        for (; codePointCursor < newCodePointIndex; codePointCursor++) {
+            cursor = source.offsetByCodePoints(cursor, 1);
+        }
+        return cursor;
     }
 
     @Nullable
@@ -276,7 +288,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
 
         T t = conversion.apply(ctx, prefix(ctx));
         if (ctx.getStop() != null) {
-            cursor = ctx.getStop().getStopIndex() + (Character.isWhitespace(source.charAt(ctx.getStop().getStopIndex())) ? 0 : 1);
+            advanceCursor(ctx.getStop().getStopIndex() + 1);
         }
 
         return t;
@@ -284,12 +296,12 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
 
     private <T> T convert(TerminalNode node, BiFunction<TerminalNode, Space, T> conversion) {
         T t = conversion.apply(node, prefix(node));
-        cursor = node.getSymbol().getStopIndex() + 1;
+        advanceCursor(node.getSymbol().getStopIndex() + 1);
         return t;
     }
 
     private void skip(TerminalNode node) {
-        cursor = node.getSymbol().getStopIndex() + 1;
+        advanceCursor(node.getSymbol().getStopIndex() + 1);
     }
 
     /**
@@ -304,7 +316,7 @@ public class JsonParserVisitor extends JSON5BaseVisitor<Json> {
         }
 
         String prefix = source.substring(cursor, delimIndex);
-        cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
+        advanceCursor(codePointCursor + Character.codePointCount(prefix, 0, prefix.length()) + untilDelim.length());
         return Space.format(prefix);
     }
 

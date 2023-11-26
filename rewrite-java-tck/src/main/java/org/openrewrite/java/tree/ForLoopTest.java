@@ -110,7 +110,7 @@ class ForLoopTest implements RewriteTest {
           java(
             """
               class Test {
-                  void test() {
+                  void test(int i) {
                       for ( ; i < 10 ; i++ ) {}
                   }
               }

@@ -55,6 +55,35 @@ class UnnecessaryParenthesesTest implements RewriteTest {
         );
     }
 
+    @SuppressWarnings({"EmptyTryBlock", "CaughtExceptionImmediatelyRethrown"})
+    @Test
+    void minimumSpaceThrow() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  int test() {
+                      try {
+                      } catch(Exception e) {
+                          throw(e);
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  int test() {
+                      try {
+                      } catch(Exception e) {
+                          throw e;
+                      }
+                  }
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2170")
     @Test
     void minimumSpace() {
@@ -892,6 +921,44 @@ class UnnecessaryParenthesesTest implements RewriteTest {
                       for (int i = 0; i < 10; i++) {
                           System.out.println(i);
                       }
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @SuppressWarnings("SimplifiableConditionalExpression")
+    void ternaryCondition() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  boolean test(String s) {
+                      return (s == null) ? true : false;
+                  }
+              }
+              """,
+            """
+              class Test {
+                  boolean test(String s) {
+                      return s == null ? true : false;
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void requiredCast() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  int test(Object o) {
+                      return ((int[]) o).length;
                   }
               }
               """

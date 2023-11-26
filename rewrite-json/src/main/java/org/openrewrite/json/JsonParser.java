@@ -36,24 +36,25 @@ public class JsonParser implements Parser {
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        return acceptedInputs(sourceFiles).map(sourceFile -> {
-            try (InputStream sourceStream = sourceFile.getSource(ctx)) {
+        return acceptedInputs(sourceFiles).map(input -> {
+            parsingListener.startedParsing(input);
+            try (InputStream sourceStream = input.getSource(ctx)) {
                 JSON5Parser parser = new JSON5Parser(new CommonTokenStream(new JSON5Lexer(
                         CharStreams.fromStream(sourceStream))));
 
                 parser.removeErrorListeners();
-                parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
+                parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
                 Json.Document document = new JsonParserVisitor(
-                        sourceFile.getRelativePath(relativeTo),
-                        sourceFile.getFileAttributes(),
-                        sourceFile.getSource(ctx)
+                        input.getRelativePath(relativeTo),
+                        input.getFileAttributes(),
+                        input.getSource(ctx)
                 ).visitJson5(parser.json5());
-                parsingListener.parsed(sourceFile, document);
-                return document;
+                parsingListener.parsed(input, document);
+                return requirePrintEqualsInput(document, input, relativeTo, ctx);
             } catch (Throwable t) {
                 ctx.getOnError().accept(t);
-                return ParseError.build(this, sourceFile, relativeTo, ctx, t);
+                return ParseError.build(this, input, relativeTo, ctx, t);
             }
         });
     }

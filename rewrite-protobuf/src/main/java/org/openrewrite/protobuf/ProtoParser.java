@@ -17,58 +17,73 @@ package org.openrewrite.protobuf;
 
 import org.antlr.v4.runtime.*;
 import org.intellij.lang.annotations.Language;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Parser;
-import org.openrewrite.*;
+import org.openrewrite.SourceFile;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.protobuf.internal.ProtoParserVisitor;
 import org.openrewrite.protobuf.internal.grammar.Protobuf2Lexer;
 import org.openrewrite.protobuf.internal.grammar.Protobuf2Parser;
 import org.openrewrite.protobuf.tree.Proto;
+import org.openrewrite.text.PlainText;
 import org.openrewrite.tree.ParseError;
 import org.openrewrite.tree.ParsingEventListener;
 import org.openrewrite.tree.ParsingExecutionContextView;
 
 import java.nio.file.Path;
-import java.util.Objects;
 import java.util.stream.Stream;
+
+import static org.openrewrite.Tree.randomId;
 
 public class ProtoParser implements Parser {
 
     @Override
     public Stream<SourceFile> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo, ExecutionContext ctx) {
         ParsingEventListener parsingListener = ParsingExecutionContextView.view(ctx).getParsingListener();
-        return acceptedInputs(sourceFiles).map(sourceFile -> {
-                    Path path = sourceFile.getRelativePath(relativeTo);
+        return acceptedInputs(sourceFiles).map(input -> {
+                    parsingListener.startedParsing(input);
+                    Path path = input.getRelativePath(relativeTo);
                     try {
-                        EncodingDetectingInputStream is = sourceFile.getSource(ctx);
+                        EncodingDetectingInputStream is = input.getSource(ctx);
                         String sourceStr = is.readFully();
                         Protobuf2Parser parser = new Protobuf2Parser(new CommonTokenStream(new Protobuf2Lexer(
                                 CharStreams.fromString(sourceStr))));
 
                         parser.removeErrorListeners();
-                        parser.addErrorListener(new ForwardingErrorListener(sourceFile.getPath(), ctx));
+                        parser.addErrorListener(new ForwardingErrorListener(input.getPath(), ctx));
 
                         if (sourceStr.contains("proto3")) {
-                            return null;
+                            // Pending Proto3 support, the best we can do is plain text & not skip files
+                            return new PlainText(
+                                    randomId(),
+                                    path,
+                                    Markers.EMPTY,
+                                    is.getCharset().name(),
+                                    is.isCharsetBomMarked(),
+                                    input.getFileAttributes(),
+                                    null,
+                                    sourceStr,
+                                    null
+                            );
                         }
 
                         Proto.Document document = new ProtoParserVisitor(
                                 path,
-                                sourceFile.getFileAttributes(),
+                                input.getFileAttributes(),
                                 sourceStr,
                                 is.getCharset(),
                                 is.isCharsetBomMarked()
                         ).visitProto(parser.proto());
-                        parsingListener.parsed(sourceFile, document);
-                        return document;
+                        parsingListener.parsed(input, document);
+                        return requirePrintEqualsInput(document, input, relativeTo, ctx);
                     } catch (Throwable t) {
                         ctx.getOnError().accept(t);
-                        return ParseError.build(this, sourceFile, relativeTo, ctx, t);
+                        return ParseError.build(this, input, relativeTo, ctx, t);
                     }
-                })
-                // filter out the nulls produced for `proto3` sources
-                .filter(Objects::nonNull);
+                });
     }
 
     @Override

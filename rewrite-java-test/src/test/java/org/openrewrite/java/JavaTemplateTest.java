@@ -16,13 +16,11 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
+import org.openrewrite.Cursor;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Issue;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RewriteTest;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -986,6 +984,58 @@ class JavaTemplateTest implements RewriteTest {
               class T {
                   String s = "s";
                   String x = s;
+              }
+              """
+          )
+        );
+    }
+
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    @Test
+    void addStatementInIfBlock() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              final MethodMatcher lowerCaseMatcher = new MethodMatcher("java.lang.String toLowerCase()");              @Override
+              public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
+                  J.Block newBlock = super.visitBlock(block, ctx);
+                  if (newBlock.getStatements().stream().noneMatch(J.VariableDeclarations.class::isInstance)) {
+                      return newBlock;
+                  }
+                  for (Statement statement : newBlock.getStatements()) {
+                      if (statement instanceof J.MethodInvocation && lowerCaseMatcher.matches((J.MethodInvocation) statement)) {
+                          return newBlock;
+                      }
+                  }
+                  Statement lastStatement = newBlock.getStatements().get(newBlock.getStatements().size() - 1);
+                  String code = "s.toLowerCase();";
+                  return JavaTemplate
+                    .builder(code)
+                    .contextSensitive()
+                    .javaParser(JavaParser.fromJavaVersion())
+                    .build()
+                    .apply(new Cursor(getCursor().getParent(), newBlock), lastStatement.getCoordinates().before());
+              }
+          })),
+          java(
+            """
+              class Test {
+                  void test() {
+                      if (true) {
+                          String s = "Hello world!";
+                          System.out.println(s);
+                      }
+                  }
+              }
+              """,
+            """
+              class Test {
+                  void test() {
+                      if (true) {
+                          String s = "Hello world!";
+                          s.toLowerCase();
+                          System.out.println(s);
+                      }
+                  }
               }
               """
           )

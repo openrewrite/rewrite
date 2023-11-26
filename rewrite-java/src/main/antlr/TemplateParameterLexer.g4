@@ -2,12 +2,9 @@ lexer grammar TemplateParameterLexer;
 
 LPAREN          : '(';
 RPAREN          : ')';
-LBRACK          : '[';
-RBRACK          : ']';
 DOT             : '.';
-
+COLON           : ':';
 COMMA           : ',';
-SPACE           : ' ';
 
 FullyQualifiedName
     :   'boolean'
@@ -52,3 +49,5 @@ JavaLetterOrDigit
         [\uD800-\uDBFF] [\uDC00-\uDFFF]
         {Character.isJavaIdentifierPart(Character.toCodePoint((char)_input.LA(-2), (char)_input.LA(-1)))}?
     ;
+
+S   :  [ \t\r\n] -> skip ;

@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import lombok.Setter;
 import org.intellij.lang.annotations.Language;
@@ -54,6 +55,7 @@ import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescrip
  * returns a list of {@link Result results} for each modified {@link SourceFile}
  */
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
+@JsonPropertyOrder({"@c"}) // serialize type info first
 public abstract class Recipe implements Cloneable {
     public static final String PANIC = "__AHHH_PANIC!!!__";
 

@@ -82,7 +82,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Option(displayName = "Only if using",
             description = "Used to determine if the dependency will be added and in which scope it should be placed.",
-            example = "org.junit.jupiter.api.*")
+            example = "org.junit.jupiter.api.*",
+            required = false)
+    @Nullable
     String onlyIfUsing;
 
     @Option(displayName = "Classifier",
@@ -135,7 +137,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
         return validated;
     }
 
-    static class Scanned {
+    public static class Scanned {
         boolean usingType;
         Map<JavaProject, Set<String>> configurationsByProject = new HashMap<>();
     }
@@ -149,14 +151,23 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
     public TreeVisitor<?, ExecutionContext> getScanner(Scanned acc) {
         return new TreeVisitor<Tree, ExecutionContext>() {
 
-            final UsesType<ExecutionContext> usesType = new UsesType<>(onlyIfUsing, true);
+            UsesType<ExecutionContext> usesType;
+            private boolean usesType(SourceFile sourceFile, ExecutionContext ctx) {
+                if(onlyIfUsing == null) {
+                    return true;
+                }
+                if(usesType == null) {
+                    usesType = new UsesType<>(onlyIfUsing, true);
+                }
+                return usesType.isAcceptable(sourceFile, ctx) && usesType.visit(sourceFile, ctx) != sourceFile;
+            }
 
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
                         sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {
-                            if (usesType.isAcceptable(sourceFile, ctx) && usesType.visit(sourceFile, ctx) != sourceFile) {
+                            if (usesType(sourceFile, ctx)) {
                                 acc.usingType = true;
                                 Set<String> configurations = acc.configurationsByProject.computeIfAbsent(javaProject, ignored -> new HashSet<>());
                                 configurations.add("main".equals(sourceSet.getName()) ? "implementation" : sourceSet.getName() + "Implementation");

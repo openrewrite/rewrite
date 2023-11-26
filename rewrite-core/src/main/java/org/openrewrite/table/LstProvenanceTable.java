@@ -20,6 +20,7 @@ import lombok.Value;
 import org.openrewrite.Column;
 import org.openrewrite.DataTable;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.LstProvenance;
 
 @JsonIgnoreType
@@ -27,7 +28,7 @@ public class LstProvenanceTable extends DataTable<LstProvenanceTable.Row> {
 
     public LstProvenanceTable(Recipe recipe) {
         super(recipe,
-                "LST Provenance",
+                "LST provenance",
                 "Table showing which tools were used to produce LSTs.");
     }
 
@@ -44,5 +45,15 @@ public class LstProvenanceTable extends DataTable<LstProvenanceTable.Row> {
         @Column(displayName = "LST serializer version",
                 description = "The version of LST serializer which produced the LST.")
         String lstSerializerVersion;
+
+        @Column(displayName = "Timestamp (epoch millis)",
+                description = "UTC timestamp describing when the LST was produced, in milliseconds since the unix epoch.")
+        @Nullable
+        Long timestampEpochMillis;
+
+        @Column(displayName = "Timestamp",
+                description = "UTC timestamp describing when the LST was produced, in ISO-8601 format. e.g.: \"2023‐08‐07T22:24:06+00:00 UTC+00:00\"")
+        @Nullable
+        String timestampUtc;
     }
 }

@@ -95,7 +95,7 @@ class LambdaTest implements RewriteTest {
         rewriteRun(
           java(
             """
-              import java.util.function.BiFunction;
+              import java.util.function.BiConsumer;
               class Test {
                   void test() {
                       BiConsumer<String, String> a = (s1, s2) -> { };

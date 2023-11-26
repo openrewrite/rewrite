@@ -17,6 +17,7 @@ package org.openrewrite.java.search;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.DocumentExample;
+import org.openrewrite.java.table.MethodCalls;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -203,6 +204,43 @@ class FindMethodsTest implements RewriteTest {
                  public static class C {
                      public void foo() {}
                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void datatableFormat() {
+        rewriteRun(
+          spec -> spec.dataTableAsCsv(MethodCalls.class.getName(),
+            """
+              sourceFile,method,className,methodName,argumentTypes
+              A.java,"new B.C().foo(bar, 123)","B$C",foo,"java.lang.String, int"
+              """
+          ).recipe(new FindMethods("B.C foo(..)", false)),
+          java(
+            """
+              public class B {
+                 public static class C {
+                     public void foo(String bar, int baz) {}
+                 }
+              }
+              """
+          ),
+          java(
+            """
+              public class A {
+                   void test(String bar) {
+                       new B.C().foo(bar, 123);
+                   }
+              }
+              """,
+            """
+              public class A {
+                   void test(String bar) {
+                       /*~~>*/new B.C().foo(bar, 123);
+                   }
               }
               """
           )

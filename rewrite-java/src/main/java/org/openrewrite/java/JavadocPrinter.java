@@ -35,7 +35,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     public Javadoc visitAttribute(Javadoc.Attribute attribute, PrintOutputCapture<P> p) {
         beforeSyntax(attribute, p);
         p.append(attribute.getName());
-        if (attribute.getSpaceBeforeEqual() != null) {
+        if (attribute.getSpaceBeforeEqual() != null && !attribute.getSpaceBeforeEqual().isEmpty()) {
             visit(attribute.getSpaceBeforeEqual(), p);
             if (attribute.getValue() != null) {
                 p.append('=');
@@ -145,7 +145,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         beforeSyntax(value, p);
         p.append("{@value");
         visit(value.getSpaceBeforeTree(), p);
-        javaVisitor.visit(value.getTree(), p);
+        javaVisitorVisit(value.getTree(), p);
         visit(value.getEndBrace(), p);
         afterSyntax(value, p);
         return value;
@@ -197,7 +197,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         beforeSyntax(provides, p);
         p.append("@provides");
         visit(provides.getSpaceBeforeServiceType(), p);
-        javaVisitor.visit(provides.getServiceType(), p);
+        javaVisitorVisit(provides.getServiceType(), p);
         visit(provides.getDescription(), p);
         afterSyntax(provides, p);
         return provides;
@@ -245,8 +245,8 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     public Javadoc visitSerialField(Javadoc.SerialField serialField, PrintOutputCapture<P> p) {
         beforeSyntax(serialField, p);
         p.append("@serialField");
-        javaVisitor.visit(serialField.getName(), p);
-        javaVisitor.visit(serialField.getType(), p);
+        javaVisitorVisit(serialField.getName(), p);
+        javaVisitorVisit(serialField.getType(), p);
         visit(serialField.getDescription(), p);
         afterSyntax(serialField, p);
         return serialField;
@@ -298,7 +298,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         beforeSyntax(aThrows, p);
         p.append(aThrows.isThrowsKeyword() ? "@throws" : "@exception");
         visit(aThrows.getSpaceBeforeExceptionName(), p);
-        javaVisitor.visit(aThrows.getExceptionName(), p);
+        javaVisitorVisit(aThrows.getExceptionName(), p);
         visit(aThrows.getDescription(), p);
         afterSyntax(aThrows, p);
         return aThrows;
@@ -328,7 +328,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         beforeSyntax(uses, p);
         p.append("@uses");
         visit(uses.getBeforeServiceType(), p);
-        javaVisitor.visit(uses.getServiceType(), p);
+        javaVisitorVisit(uses.getServiceType(), p);
         visit(uses.getDescription(), p);
         afterSyntax(uses, p);
         return uses;
@@ -355,7 +355,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     public Javadoc visitReference(Javadoc.Reference reference, PrintOutputCapture<P> p) {
         getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "JAVADOC_LINE_BREAKS", reference.getLineBreaks());
         getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "JAVADOC_LINE_BREAK_INDEX", 0);
-        javaVisitor.visit(reference.getTree(), p, getCursor());
+        javaVisitorVisit(reference.getTree(), p);
         afterSyntax(reference, p);
         return reference;
     }
@@ -401,6 +401,20 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
         }
 
         @Override
+        public J visitArrayType(J.ArrayType arrayType, PrintOutputCapture<P> p) {
+            beforeSyntax(arrayType, Space.Location.ARRAY_TYPE_PREFIX, p);
+            visit(arrayType.getElementType(), p);
+            for (JRightPadded<Space> d : arrayType.getDimensions()) {
+                visitSpace(d.getElement(), Space.Location.DIMENSION, p);
+                p.append('[');
+                visitSpace(d.getAfter(), Space.Location.DIMENSION_SUFFIX, p);
+                p.append(']');
+            }
+            afterSyntax(arrayType, p);
+            return arrayType;
+        }
+
+        @Override
         public J visitParameterizedType(J.ParameterizedType type, PrintOutputCapture<P> p) {
             beforeSyntax(type, Space.Location.IDENTIFIER_PREFIX, p);
             visit(type.getClazz(), p);
@@ -424,8 +438,10 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
             List<Javadoc.LineBreak> lineBreaks = getCursor().getNearestMessage("JAVADOC_LINE_BREAKS");
             Integer index = getCursor().getNearestMessage("JAVADOC_LINE_BREAK_INDEX");
 
-            if (lineBreaks != null && !lineBreaks.isEmpty() && index != null && space.getWhitespace().contains("\n")) {
-                for (char c : space.getWhitespace().toCharArray()) {
+            String whitespace = space.getWhitespace();
+            if (lineBreaks != null && !lineBreaks.isEmpty() && index != null && whitespace.contains("\n")) {
+                for (int i = 0; i < whitespace.length(); i++) {
+                    char c = whitespace.charAt(i);
                     // The Space from a JavaDoc will not contain a CR because the JavaDoc parser
                     // filters out other new line characters. CRLF is detected through the source
                     // and only exists through LineBreaks.
@@ -438,7 +454,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
                 }
                 getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "JAVADOC_LINE_BREAK_INDEX", index);
             } else {
-                p.append(space.getWhitespace());
+                p.append(whitespace);
             }
             return space;
         }

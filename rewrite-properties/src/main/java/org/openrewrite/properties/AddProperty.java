@@ -59,6 +59,13 @@ public class AddProperty extends Recipe {
     }
 
     @Override
+    public Validated<Object> validate() {
+        return Validated.none()
+                .and(Validated.required("property", property))
+                .and(Validated.required("value", value));
+    }
+
+    @Override
     public PropertiesIsoVisitor<ExecutionContext> getVisitor() {
         return new PropertiesIsoVisitor<ExecutionContext>() {
             @Override
