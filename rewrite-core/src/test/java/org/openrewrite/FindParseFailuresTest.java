@@ -32,12 +32,12 @@ public class FindParseFailuresTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindParseFailures(5));
+        spec.recipe(new FindParseFailures(5, null, null));
     }
 
     @Test
     void findParseFailures() {
-        ParseExceptionResult per = ParseExceptionResult.build(PlainTextParser.class, new RuntimeException("boom"));
+        ParseExceptionResult per = ParseExceptionResult.build(PlainTextParser.class, new RuntimeException("boom"), null);
         rewriteRun(
           spec -> spec.dataTable(ParseFailures.Row.class, rows -> {
               assertThat(rows).hasSize(1);

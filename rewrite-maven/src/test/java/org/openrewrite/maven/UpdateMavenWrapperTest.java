@@ -38,6 +38,8 @@ import java.time.Duration;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.UnaryOperator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -383,6 +385,75 @@ class UpdateMavenWrapperTest implements RewriteTest {
             null,
             spec -> spec.path(".mvn/wrapper/MavenWrapperDownloader.java")
           )
+        );
+    }
+
+    @Test
+    void defaultsToLatestRelease() {
+        rewriteRun(
+          spec -> spec.recipe(new UpdateMavenWrapper(null, null, null, null, null))
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Maven, "3.8.0")))
+            .afterRecipe(run -> {
+                var mvnw = result(run, PlainText.class, "mvnw");
+                assertThat(mvnw.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
+                assertThat(mvnw.getText()).isNotBlank();
+                assertThat(mvnw.getFileAttributes()).isNotNull();
+                assertThat(mvnw.getFileAttributes().isReadable()).isTrue();
+                assertThat(mvnw.getFileAttributes().isWritable()).isTrue();
+
+                var mvnwCmd = result(run, PlainText.class, "mvnw.cmd");
+                assertThat(mvnwCmd.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
+                assertThat(mvnwCmd.getText()).isNotBlank();
+
+                var mavenWrapperJar = result(run, Remote.class, "maven-wrapper.jar");
+                assertThat(mavenWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
+                Matcher wrapperVersionMatcher = Pattern.compile("maven-wrapper-(.*?)\\.jar").matcher(mavenWrapperJar.getUri().toString());
+                assertThat(wrapperVersionMatcher.find()).isTrue();
+                String wrapperVersion = wrapperVersionMatcher.group(1);
+                assertThat(wrapperVersion).isNotEqualTo("3.1.1");
+                assertThat(mavenWrapperJar.getUri()).isEqualTo(URI.create("https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/" + wrapperVersion + "/maven-wrapper-" + wrapperVersion + ".jar"));
+                assertThat(isValidWrapperJar(mavenWrapperJar)).as("Wrapper jar is not valid").isTrue();
+            }),
+          properties(
+            withLicenseHeader("""
+              distributionUrl=https\\://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/3.8.0/apache-maven-3.8.0-bin.zip
+              wrapperUrl=https\\://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.1.1/maven-wrapper-3.1.1.jar
+              distributionSha256Sum=2e181515ce8ae14b7a904c40bb4794831f5fd1d9641107a13b916af15af4001a
+              wrapperSha256Sum=ff7f21f2ef81723377e3d42d06661c4e3af60cf4bdfb7579ac8f22051399942d
+              """),
+            spec -> spec.path(".mvn/wrapper/maven-wrapper.properties")
+              .after(after -> {
+                  Matcher distributionVersionMatcher = Pattern.compile("apache-maven-(.*?)-bin\\.zip").matcher(after);
+                  assertThat(distributionVersionMatcher.find()).isTrue();
+                  String mavenDistributionVersion = distributionVersionMatcher.group(1);
+                  assertThat(mavenDistributionVersion).isNotEqualTo("3.8.0");
+
+                  Matcher distributionChecksumMatcher = Pattern.compile("distributionSha256Sum=(.*)").matcher(after);
+                  assertThat(distributionChecksumMatcher.find()).isTrue();
+                  String distributionChecksum = distributionChecksumMatcher.group(1);
+                  assertThat(distributionChecksum).isNotBlank();
+
+                  Matcher wrapperVersionMatcher = Pattern.compile("maven-wrapper-(.*?)\\.jar").matcher(after);
+                  assertThat(wrapperVersionMatcher.find()).isTrue();
+                  String wrapperVersion = wrapperVersionMatcher.group(1);
+                  assertThat(wrapperVersion).isNotEqualTo("3.1.1");
+
+                  Matcher wrapperChecksumMatcher = Pattern.compile("wrapperSha256Sum=(.*)").matcher(after);
+                  assertThat(wrapperChecksumMatcher.find()).isTrue();
+                  String wrapperChecksum = wrapperChecksumMatcher.group(1);
+                  assertThat(wrapperChecksum).isNotBlank();
+
+                  return withLicenseHeader("""
+                    distributionUrl=https\\://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/%s/apache-maven-%s-bin.zip
+                    wrapperUrl=https\\://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/%s/maven-wrapper-%s.jar
+                    distributionSha256Sum=%s
+                    wrapperSha256Sum=%s
+                    """.formatted(mavenDistributionVersion, mavenDistributionVersion, wrapperVersion, wrapperVersion, distributionChecksum, wrapperChecksum));
+              })
+          ),
+          mvnw,
+          mvnwCmd,
+          mvnWrapperJarQuark
         );
     }
 

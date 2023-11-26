@@ -22,11 +22,11 @@ import org.openrewrite.HttpSenderExecutionContextView;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.test.MockHttpSender;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.file.Paths;
+import java.util.concurrent.*;
 
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -48,15 +48,50 @@ class RemoteArchiveTest {
           )
           .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
 
-        byte[] actual = readAll(remoteArchive.getInputStream(ctx));
-        assertThat(actual).hasSizeGreaterThan(50_000);
+        long actual = getInputStreamSize(remoteArchive.getInputStream(ctx));
+        assertThat(actual).isGreaterThan(50_000);
     }
 
-    private byte[] readAll(InputStream is) {
+    @ParameterizedTest
+    @ValueSource(strings = {"7.4.2", "7.5-rc-1", "7.6"})
+    void gradleWrapperConcurrent(String version) throws Exception {
+        int executionCount = 5;
+        ExecutorService executorService = Executors.newFixedThreadPool(executionCount);
+        CompletionService<Long> completionService = new ExecutorCompletionService<>(executorService);
+
+        for (int i = 0; i < executionCount; i++) {
+            completionService.submit(() -> {
+                URL distributionUrl = requireNonNull(RemoteArchiveTest.class.getClassLoader()
+                  .getResource("gradle-" + version + "-bin.zip"));
+
+                ExecutionContext ctx = new InMemoryExecutionContext();
+                HttpSenderExecutionContextView.view(ctx)
+                  .setLargeFileHttpSender(new MockHttpSender(distributionUrl::openStream));
+
+                RemoteArchive remoteArchive = Remote
+                  .builder(
+                    Paths.get("gradle/wrapper/gradle-wrapper.jar"),
+                    distributionUrl.toURI()
+                  )
+                  .build("gradle-[^\\/]+\\/(?:.*\\/)+gradle-wrapper-(?!shared).*\\.jar");
+
+                return getInputStreamSize(remoteArchive.getInputStream(ctx));
+            });
+        }
+
+        for (int i = 0; i < executionCount; i++) {
+            Future<Long> result = completionService.take();
+            Long actual = result.get();
+            assertThat(actual).isGreaterThan(50_000);
+        }
+
+        executorService.shutdown();
+    }
+
+    private Long getInputStreamSize(InputStream is) {
+        BlackHoleOutputStream out = new BlackHoleOutputStream();
         try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            is.transferTo(baos);
-            return baos.toByteArray();
+            return is.transferTo(out);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }

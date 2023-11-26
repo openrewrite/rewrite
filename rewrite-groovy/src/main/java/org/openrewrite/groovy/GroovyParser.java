@@ -127,6 +127,7 @@ public class GroovyParser implements Parser {
                                 errorCollector
                         );
 
+                        pctx.getParsingListener().startedParsing(input);
                         CompilationUnit compUnit = new CompilationUnit(configuration, null, classLoader, classLoader);
                         compUnit.addSource(unit);
                         compUnit.compile(Phases.CANONICALIZATION);
@@ -159,7 +160,7 @@ public class GroovyParser implements Parser {
                             gcu = gcu.withMarkers(m);
                         }
                         pctx.getParsingListener().parsed(compiled.getInput(), gcu);
-                        return gcu;
+                        return requirePrintEqualsInput(gcu, input, relativeTo, ctx);
                     } catch (Throwable t) {
                         ctx.getOnError().accept(t);
                         return ParseError.build(this, input, relativeTo, ctx, t);
@@ -179,7 +180,8 @@ public class GroovyParser implements Parser {
 
     @Override
     public boolean accept(Path path) {
-        return path.toString().endsWith(".groovy");
+        return path.toString().endsWith(".groovy") ||
+               path.toFile().getName().startsWith("Jenkinsfile");
     }
 
     @Override
@@ -204,7 +206,9 @@ public class GroovyParser implements Parser {
     @SuppressWarnings("unused")
     public static class Builder extends Parser.Builder {
         @Nullable
-        private Collection<Path> classpath = JavaParser.runtimeClasspath();
+        private Collection<Path> classpath = Collections.emptyList();
+        @Nullable
+        protected Collection<String> artifactNames = Collections.emptyList();
 
         private JavaTypeCache typeCache = new JavaTypeCache();
         private boolean logCompilationWarningsAndErrors = false;
@@ -218,6 +222,7 @@ public class GroovyParser implements Parser {
         public Builder(Builder base) {
             super(G.CompilationUnit.class);
             this.classpath = base.classpath;
+            this.artifactNames = base.artifactNames;
             this.typeCache = base.typeCache;
             this.logCompilationWarningsAndErrors = base.logCompilationWarningsAndErrors;
             this.styles.addAll(base.styles);
@@ -230,16 +235,19 @@ public class GroovyParser implements Parser {
         }
 
         public Builder classpath(@Nullable Collection<Path> classpath) {
+            this.artifactNames = null;
             this.classpath = classpath;
             return this;
         }
 
-        public Builder classpath(@Nullable String... classpath) {
-            this.classpath = JavaParser.dependenciesFromClasspath(classpath);
+        public Builder classpath(@Nullable String... artifactNames) {
+            this.artifactNames = Arrays.asList(artifactNames);
+            this.classpath = null;
             return this;
         }
 
         public Builder classpathFromResource(ExecutionContext ctx, String... artifactNamesWithVersions) {
+            this.artifactNames = null;
             this.classpath = JavaParser.dependenciesFromResources(ctx, artifactNamesWithVersions);
             return this;
         }
@@ -269,8 +277,17 @@ public class GroovyParser implements Parser {
             return this;
         }
 
+        @Nullable
+        private Collection<Path> resolvedClasspath() {
+            if (artifactNames != null && !artifactNames.isEmpty()) {
+                classpath = JavaParser.dependenciesFromClasspath(artifactNames.toArray(new String[0]));
+                artifactNames = null;
+            }
+            return classpath;
+        }
+
         public GroovyParser build() {
-            return new GroovyParser(classpath, styles, logCompilationWarningsAndErrors, typeCache, compilerCustomizers);
+            return new GroovyParser(resolvedClasspath(), styles, logCompilationWarningsAndErrors, typeCache, compilerCustomizers);
         }
 
         @Override

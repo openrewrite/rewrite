@@ -22,7 +22,6 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.maven.Assertions.pomXml;
 
 class ManagedDependencyRequiresVersionTest implements RewriteTest {
-
     @Issue("https://github.com/openrewrite/rewrite/issues/1084")
     @Test
     void dependencyManagementDependencyRequiresVersion() {

@@ -6,6 +6,7 @@ plugins {
 }
 
 dependencies {
+    // Pin to 5.x for Java 8, as 6.x requires Java 11
     compileOnly("org.eclipse.jgit:org.eclipse.jgit:5.13.+")
 
     implementation("org.openrewrite.tools:java-object-diff:latest.release")

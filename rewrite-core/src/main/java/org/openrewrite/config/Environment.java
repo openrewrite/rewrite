@@ -43,8 +43,8 @@ public class Environment {
         Map<String, List<RecipeExample>> recipeExamples = new HashMap<>();
         for (ResourceLoader r : resourceLoaders) {
             if (r instanceof YamlResourceLoader) {
-                recipeExamples.putAll(((YamlResourceLoader) r).listRecipeExamples());
-                recipeToContributors.putAll(((YamlResourceLoader) r).listContributors());
+                recipeExamples.putAll(r.listRecipeExamples());
+                recipeToContributors.putAll(r.listContributors());
             }
         }
 
@@ -85,8 +85,8 @@ public class Environment {
         Map<String, List<RecipeExample>> recipeToExamples = new HashMap<>();
         for (ResourceLoader r : resourceLoaders) {
             if (r instanceof YamlResourceLoader) {
-                recipeToContributors.putAll(((YamlResourceLoader) r).listContributors());
-                recipeToExamples.putAll(((YamlResourceLoader) r).listRecipeExamples());
+                recipeToContributors.putAll(r.listContributors());
+                recipeToExamples.putAll(r.listRecipeExamples());
             } else if (r instanceof ClasspathScanningLoader) {
                 ClasspathScanningLoader classpathScanningLoader = (ClasspathScanningLoader) r;
 
@@ -160,6 +160,7 @@ public class Environment {
         return activateRecipes(Arrays.asList(activeRecipes));
     }
 
+    //TODO: Nothing uses this and in most cases it would be a bad idea anyway, should consider removing
     public Recipe activateAll() {
         return new CompositeRecipe(listRecipes());
     }
@@ -186,6 +187,7 @@ public class Environment {
         return activated;
     }
 
+    @SuppressWarnings("unused")
     public List<NamedStyles> activateStyles(String... activeStyles) {
         return activateStyles(Arrays.asList(activeStyles));
     }
@@ -222,8 +224,13 @@ public class Environment {
             return load(new ClasspathScanningLoader(properties, acceptPackages));
         }
 
+        @SuppressWarnings("unused")
         public Builder scanClassLoader(ClassLoader classLoader) {
             return load(new ClasspathScanningLoader(properties, classLoader));
+        }
+
+        public Builder scanYamlResources() {
+            return load(ClasspathScanningLoader.onlyYaml(properties));
         }
 
         /**
@@ -231,6 +238,7 @@ public class Environment {
          * @param classLoader A classloader that is populated with the transitive dependencies of the jar.
          * @return This builder.
          */
+        @SuppressWarnings("unused")
         public Builder scanJar(Path jar, Collection<Path> dependencies, ClassLoader classLoader) {
             List<ClasspathScanningLoader> list = new ArrayList<>();
             for (Path dep : dependencies) {
@@ -240,6 +248,7 @@ public class Environment {
             return load(new ClasspathScanningLoader(jar, properties, list, classLoader), list);
         }
 
+        @SuppressWarnings("unused")
         public Builder scanUserHome() {
             File userHomeRewriteConfig = new File(System.getProperty("user.home") + "/.rewrite/rewrite.yml");
             if (userHomeRewriteConfig.exists()) {

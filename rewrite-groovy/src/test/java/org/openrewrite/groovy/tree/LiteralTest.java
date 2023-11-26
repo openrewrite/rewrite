@@ -30,6 +30,15 @@ import static org.openrewrite.groovy.Assertions.groovy;
 @SuppressWarnings("GroovyUnusedAssignment")
 class LiteralTest implements RewriteTest {
 
+    @SuppressWarnings("GroovyConstantConditional")
+    @Test
+    void insideParentheses() {
+        rewriteRun(
+          groovy("(1)"),
+          groovy("((1))")
+        );
+    }
+
     @Test
     void string() {
         rewriteRun(

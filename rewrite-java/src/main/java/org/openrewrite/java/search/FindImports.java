@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.TypeMatcher;
 import org.openrewrite.java.tree.J;
@@ -35,6 +36,12 @@ public class FindImports extends Recipe {
             required = false)
     String typePattern;
 
+    @Option(displayName = "Match inherited",
+            description = "When enabled, find types that inherit from a deprecated type.",
+            required = false)
+    @Nullable
+    Boolean matchInherited;
+
     @Override
     public String getDisplayName() {
         return "Find source files with imports";
@@ -48,7 +55,7 @@ public class FindImports extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        TypeMatcher typeMatcher = new TypeMatcher(typePattern);
+        TypeMatcher typeMatcher = new TypeMatcher(typePattern, Boolean.TRUE.equals(matchInherited));
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.Import visitImport(J.Import anImport, ExecutionContext executionContext) {

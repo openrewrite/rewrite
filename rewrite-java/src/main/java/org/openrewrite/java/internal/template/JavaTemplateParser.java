@@ -240,11 +240,15 @@ public class JavaTemplateParser {
     private JavaSourceFile compileTemplate(@Language("java") String stub) {
         ExecutionContext ctx = new InMemoryExecutionContext();
         ctx.putMessage(JavaParser.SKIP_SOURCE_SET_TYPE_GENERATION, true);
+        ctx.putMessage(ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT, false);
         JavaParser jp = parser.clone().build();
-        return (JavaSourceFile) (stub.contains("@SubAnnotation") ?
+        return (stub.contains("@SubAnnotation") ?
                 jp.reset().parse(ctx, stub, SUBSTITUTED_ANNOTATION) :
-                jp.reset().parse(ctx, stub)
-        ).findFirst().orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
+                jp.reset().parse(ctx, stub))
+                .findFirst()
+                .filter(JavaSourceFile.class::isInstance) // Filters out ParseErrors
+                .map(JavaSourceFile.class::cast)
+                .orElseThrow(() -> new IllegalArgumentException("Could not parse as Java"));
     }
 
     /**

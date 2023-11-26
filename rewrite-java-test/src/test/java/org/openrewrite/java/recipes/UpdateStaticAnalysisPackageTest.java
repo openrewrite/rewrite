@@ -36,7 +36,7 @@ class UpdateStaticAnalysisPackageTest implements RewriteTest {
                 .build()
                 .activateRecipes("org.openrewrite.java.upgrade.UpdateStaticAnalysisPackage")
             )
-            .typeValidationOptions(TypeValidation.none());
+            .afterTypeValidationOptions(TypeValidation.none());
     }
 
     @SuppressWarnings("all")
@@ -44,6 +44,7 @@ class UpdateStaticAnalysisPackageTest implements RewriteTest {
     @Test
     void changeCleanUpToStaticanalysisForSpecificClassOnly() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(
             """
               package org.openrewrite.java.migrate;
@@ -52,7 +53,6 @@ class UpdateStaticAnalysisPackageTest implements RewriteTest {
               import org.openrewrite.Recipe;
               import org.openrewrite.TreeVisitor;
               import org.openrewrite.java.JavaVisitor;
-              import org.openrewrite.java.cleanup.SimplifyBooleanExpression;
               import org.openrewrite.java.cleanup.UnnecessaryCatch;
               import org.openrewrite.java.tree.J;
 
@@ -73,11 +73,7 @@ class UpdateStaticAnalysisPackageTest implements RewriteTest {
 
                               // expect to change
                               doAfterVisit(new UnnecessaryCatch(false).getVisitor());
-                              org.openrewrite.java.cleanup.UnnecessaryCatch v1 = new org.openrewrite.java.cleanup.UnnecessaryCatch(true);
-
-                              // expect no change
-                              doAfterVisit(new SimplifyBooleanExpression().getVisitor());
-                              org.openrewrite.java.cleanup.SimplifyBooleanExpression v2 = new org.openrewrite.java.cleanup.SimplifyBooleanExpression();
+                              var v1 = new org.openrewrite.java.cleanup.UnnecessaryCatch(true);
                               return m;
                           }
                       };
@@ -91,7 +87,6 @@ class UpdateStaticAnalysisPackageTest implements RewriteTest {
               import org.openrewrite.Recipe;
               import org.openrewrite.TreeVisitor;
               import org.openrewrite.java.JavaVisitor;
-              import org.openrewrite.java.cleanup.SimplifyBooleanExpression;
               import org.openrewrite.java.tree.J;
               import org.openrewrite.staticanalysis.UnnecessaryCatch;
 
@@ -112,11 +107,7 @@ class UpdateStaticAnalysisPackageTest implements RewriteTest {
 
                               // expect to change
                               doAfterVisit(new UnnecessaryCatch(false).getVisitor());
-                              org.openrewrite.staticanalysis.UnnecessaryCatch v1 = new org.openrewrite.staticanalysis.UnnecessaryCatch(true);
-
-                              // expect no change
-                              doAfterVisit(new SimplifyBooleanExpression().getVisitor());
-                              org.openrewrite.java.cleanup.SimplifyBooleanExpression v2 = new org.openrewrite.java.cleanup.SimplifyBooleanExpression();
+                              var v1 = new org.openrewrite.staticanalysis.UnnecessaryCatch(true);
                               return m;
                           }
                       };

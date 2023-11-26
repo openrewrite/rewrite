@@ -91,7 +91,9 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
 
     @Option(displayName = "Only if using",
             description = "Used to determine if the dependency will be added and in which scope it should be placed.",
-            example = "org.junit.jupiter.api.*")
+            example = "org.junit.jupiter.api.*",
+            required = false)
+    @Nullable
     String onlyIfUsing;
 
     @Option(displayName = "Type",
@@ -154,7 +156,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
         return "Add a Maven dependency to a `pom.xml` file in the correct scope based on where it is used.";
     }
 
-    static class Scanned {
+    public static class Scanned {
         boolean usingType;
         Map<JavaProject, String> scopeByProject = new HashMap<>();
     }
@@ -171,7 +173,7 @@ public class AddDependency extends ScanningRecipe<AddDependency.Scanned> {
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 SourceFile sourceFile = (SourceFile) requireNonNull(tree);
                 if (tree instanceof JavaSourceFile) {
-                    boolean sourceFileUsesType = sourceFile != new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx);
+                    boolean sourceFileUsesType = onlyIfUsing == null || sourceFile != new UsesType<>(onlyIfUsing, true).visit(sourceFile, ctx);
                     acc.usingType |= sourceFileUsesType;
                     sourceFile.getMarkers().findFirst(JavaProject.class).ifPresent(javaProject ->
                             sourceFile.getMarkers().findFirst(JavaSourceSet.class).ifPresent(sourceSet -> {

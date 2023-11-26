@@ -57,60 +57,73 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
 
         private final String existingOwningType;
         private final String constantName;
-        private final String owningType;
+        private final JavaType.FullyQualified newOwningType;
         private final String newConstantName;
 
         public ReplaceConstantWithAnotherConstantVisitor(String existingFullyQualifiedConstantName, String fullyQualifiedConstantName) {
             this.existingOwningType = existingFullyQualifiedConstantName.substring(0, existingFullyQualifiedConstantName.lastIndexOf('.'));
             this.constantName = existingFullyQualifiedConstantName.substring(existingFullyQualifiedConstantName.lastIndexOf('.') + 1);
-            this.owningType = fullyQualifiedConstantName.substring(0, fullyQualifiedConstantName.lastIndexOf('.'));
+            this.newOwningType = JavaType.ShallowClass.build(fullyQualifiedConstantName.substring(0, fullyQualifiedConstantName.lastIndexOf('.')));
             this.newConstantName = fullyQualifiedConstantName.substring(fullyQualifiedConstantName.lastIndexOf('.') + 1);
         }
 
         @Override
-        public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext executionContext) {
+        public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             JavaType.Variable fieldType = fieldAccess.getName().getFieldType();
             if (isConstant(fieldType)) {
                 return replaceFieldAccess(fieldAccess, fieldType);
             }
-            return super.visitFieldAccess(fieldAccess, executionContext);
+            return super.visitFieldAccess(fieldAccess, ctx);
         }
 
         @Override
-        public J visitIdentifier(J.Identifier ident, ExecutionContext executionContext) {
+        public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
             JavaType.Variable fieldType = ident.getFieldType();
             if (isConstant(fieldType) && !isVariableDeclaration()) {
                 return replaceFieldAccess(ident, fieldType);
             }
-            return super.visitIdentifier(ident, executionContext);
+            return super.visitIdentifier(ident, ctx);
         }
 
-        private J replaceFieldAccess(Expression fieldAccess, JavaType.Variable fieldType) {
+        private J replaceFieldAccess(Expression expression, JavaType.Variable fieldType) {
             JavaType owner = fieldType.getOwner();
             while (owner instanceof JavaType.FullyQualified) {
                 maybeRemoveImport(((JavaType.FullyQualified) owner).getFullyQualifiedName());
                 owner = ((JavaType.FullyQualified) owner).getOwningClass();
             }
 
-            JavaTemplate.Builder templateBuilder;
-            if (fieldAccess instanceof J.Identifier) {
-                maybeAddImport(owningType, newConstantName, false);
-                templateBuilder = JavaTemplate.builder(newConstantName)
-                        .staticImports(owningType + '.' + newConstantName);
-            } else {
-                maybeAddImport(owningType, false);
-                templateBuilder = JavaTemplate.builder(owningType.substring(owningType.lastIndexOf('.') + 1) + '.' + newConstantName)
-                        .imports(owningType);
+            if (expression instanceof J.Identifier) {
+                maybeAddImport(newOwningType.getFullyQualifiedName(), newConstantName, false);
+                J.Identifier identifier = (J.Identifier) expression;
+                return identifier
+                        .withSimpleName(newConstantName)
+                        .withFieldType(fieldType.withOwner(newOwningType).withName(newConstantName));
+            } else if (expression instanceof J.FieldAccess) {
+                maybeAddImport(newOwningType.getFullyQualifiedName(), false);
+                J.FieldAccess fieldAccess = (J.FieldAccess) expression;
+                Expression target = fieldAccess.getTarget();
+                J.Identifier name = fieldAccess.getName();
+                if (target instanceof J.Identifier) {
+                    target = ((J.Identifier) target).withType(newOwningType).withSimpleName(newOwningType.getClassName());
+                    name = name
+                            .withFieldType(fieldType.withOwner(newOwningType).withName(newConstantName))
+                            .withSimpleName(newConstantName);
+                } else {
+                    target = (((J.FieldAccess) target).getName()).withType(newOwningType).withSimpleName(newOwningType.getClassName());
+                    name = name
+                            .withFieldType(fieldType.withOwner(newOwningType).withName(newConstantName))
+                            .withSimpleName(newConstantName);
+                }
+                return fieldAccess
+                        .withTarget(target)
+                        .withName(name);
             }
-
-            return templateBuilder.contextSensitive().build()
-                    .apply(getCursor(), fieldAccess.getCoordinates().replace())
-                    .withPrefix(fieldAccess.getPrefix());
+            return expression;
         }
 
         private boolean isConstant(@Nullable JavaType.Variable varType) {
             return varType != null && TypeUtils.isOfClassType(varType.getOwner(), existingOwningType) &&
-                   varType.getName().equals(constantName);
+                    varType.getName().equals(constantName);
         }
 
         private boolean isVariableDeclaration() {
@@ -129,7 +142,7 @@ public class ReplaceConstantWithAnotherConstant extends Recipe {
             }
 
             return constantName.equals(((J.VariableDeclarations) maybeVariable.getValue()).getVariables().get(0).getSimpleName()) &&
-                   existingOwningType.equals(ownerFqn.getFullyQualifiedName());
+                    existingOwningType.equals(ownerFqn.getFullyQualifiedName());
         }
     }
 }

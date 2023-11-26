@@ -15,10 +15,14 @@
  */
 package org.openrewrite.java.tree;
 
+import org.openrewrite.Incubating;
 import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.TypesInUse;
+import org.openrewrite.java.service.AutoFormatService;
+import org.openrewrite.java.service.ImportService;
 
+import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -50,6 +54,22 @@ public interface JavaSourceFile extends J {
     Path getSourcePath();
 
     SourceFile withSourcePath(Path path);
+
+    @Incubating(since = "8.2.0")
+    default <S> S service(Class<S> service) {
+        try {
+            // use name indirection due to possibility of multiple class loaders being used
+            if (ImportService.class.getName().equals(service.getName())) {
+                return service.getConstructor().newInstance();
+            } else if (AutoFormatService.class.getName().equals(service.getName())) {
+                return service.getConstructor().newInstance();
+            } else {
+                throw new UnsupportedOperationException("Service " + service + " not supported");
+            }
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     interface Padding {
         List<JRightPadded<Import>> getImports();

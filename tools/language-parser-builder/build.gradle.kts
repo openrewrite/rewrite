@@ -19,7 +19,7 @@ configurations["modelRuntimeOnly"].extendsFrom(configurations.runtimeOnly.get())
 dependencies {
     compileOnly("org.projectlombok:lombok:latest.release")
     compileOnly("org.openrewrite:rewrite-test")
-    implementation("org.openrewrite:rewrite-java-17")
+    implementation("org.openrewrite:rewrite-java-21")
 
     implementation(platform("org.openrewrite.recipe:rewrite-recipe-bom:latest.release"))
     modelAnnotationProcessor("org.projectlombok:lombok:latest.release")

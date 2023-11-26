@@ -36,6 +36,7 @@ public class MavenTagInsertionComparator implements Comparator<Content> {
             "groupId",
             "artifactId",
             "version",
+            "relativePath",
             "packaging",
             "name",
             "description",
@@ -58,6 +59,7 @@ public class MavenTagInsertionComparator implements Comparator<Content> {
             "repositories",
             "pluginRepositories",
             "build",
+            "configuration",
             "reports",
             "reporting",
             "profiles"

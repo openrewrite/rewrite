@@ -41,7 +41,7 @@ public class Assertions {
 
     public static SourceSpecs pomXml(@Language("xml") @Nullable String before, Consumer<SourceSpec<Xml.Document>> spec) {
         SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", MavenParser.builder(), before,
-                SourceSpec.EachResult.noop, Assertions::customizeExecutionContext);
+                SourceSpec.ValidateSource.noop, Assertions::customizeExecutionContext);
         maven.path("pom.xml");
         spec.accept(maven);
         return maven;
@@ -55,7 +55,7 @@ public class Assertions {
     public static SourceSpecs pomXml(@Language("xml") @Nullable String before, @Language("xml") @Nullable String after,
                                Consumer<SourceSpec<Xml.Document>> spec) {
         SourceSpec<Xml.Document> maven = new SourceSpec<>(Xml.Document.class, "maven", MavenParser.builder(), before,
-                SourceSpec.EachResult.noop, Assertions::customizeExecutionContext).after(s -> after);
+                SourceSpec.ValidateSource.noop, Assertions::customizeExecutionContext).after(s -> after);
         maven.path("pom.xml");
         spec.accept(maven);
         return maven;

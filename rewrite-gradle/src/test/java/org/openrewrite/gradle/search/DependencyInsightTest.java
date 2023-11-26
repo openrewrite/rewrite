@@ -30,7 +30,7 @@ class DependencyInsightTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
         spec.beforeRecipe(withToolingApi())
-          .recipe(new DependencyInsight("com.google.guava", "failureaccess", null));
+          .recipe(new DependencyInsight("com.google.guava", "failureaccess", null,null));
     }
 
     @DocumentExample
@@ -68,9 +68,30 @@ class DependencyInsightTest implements RewriteTest {
     }
 
     @Test
+    void recursive() {
+        rewriteRun(
+          spec -> spec.recipe(new DependencyInsight("doesnotexist", "doesnotexist", null, null)),
+          buildGradle("""
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation 'io.grpc:grpc-services:1.59.0'
+              }
+              """
+          )
+        );
+    }
+
+    @Test
     void pattern() {
         rewriteRun(
-          spec ->  spec.recipe(new DependencyInsight("*", "jackson-core", null))
+          spec ->  spec.recipe(new DependencyInsight("*", "jackson-core", null, null))
             .dataTable(DependenciesInUse.Row.class, rows -> {
                 assertThat(rows).isNotEmpty();
                 DependenciesInUse.Row row = rows.get(0);
@@ -108,4 +129,39 @@ class DependencyInsightTest implements RewriteTest {
         );
     }
 
+    @Test
+    void versionSearch() {
+        rewriteRun(
+          spec ->  spec.recipe(new DependencyInsight("org.openrewrite", "*", "7.0.0", null)),
+          buildGradle("""
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  implementation 'org.openrewrite:rewrite-yaml:7.0.0'
+                  implementation 'org.openrewrite:rewrite-java:8.0.0'
+              }
+              """,
+            """
+              plugins {
+                  id 'java-library'
+              }
+              
+              repositories {
+                  mavenCentral()
+              }
+              
+              dependencies {
+                  /*~~(org.openrewrite:rewrite-yaml:7.0.0)~~>*/implementation 'org.openrewrite:rewrite-yaml:7.0.0'
+                  implementation 'org.openrewrite:rewrite-java:8.0.0'
+              }
+              """
+          )
+        );
+    }
 }

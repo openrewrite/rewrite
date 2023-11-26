@@ -43,7 +43,7 @@ class XPathMatcherTest {
         """
     ).toList().get(0);
 
-    private final SourceFile pomXml = new XmlParser().parse(
+    private final SourceFile pomXml1 = new XmlParser().parse(
       """
         <project>
           <groupId>com.mycompany.app</groupId>
@@ -66,6 +66,30 @@ class XPathMatcherTest {
         """
     ).toList().get(0);
 
+    private final SourceFile pomXml2 = new XmlParser().parse(
+      """
+        <project>
+          <groupId>com.mycompany.app</groupId>
+          <artifactId>my-app</artifactId>
+          <version>1</version>
+          <build>
+            <pluginManagement>
+              <plugins>
+                <plugin>
+                  <groupId>org.apache.maven.plugins</groupId>
+                  <artifactId>maven-compiler-plugin</artifactId>
+                  <version>3.8.0</version>
+                  <configuration>
+                    <source>1.8</source>
+                    <target>1.8</target>
+                  </configuration>
+                </plugin>
+              </plugins>
+            </pluginManagement>
+          </build>
+        </project>
+        """
+    ).toList().get(0);
 
     @Test
     void matchAbsolute() {
@@ -102,11 +126,15 @@ class XPathMatcherTest {
     @Test
     void matchPom() {
         assertThat(match("/project/build/plugins/plugin/configuration/source",
-          pomXml)).isTrue();
+          pomXml1)).isTrue();
         assertThat(match("/project/build/plugins/plugin[artifactId='maven-compiler-plugin']/configuration/source",
-          pomXml)).isTrue();
+          pomXml1)).isTrue();
         assertThat(match("/project/build/plugins/plugin[artifactId='somethingElse']/configuration/source",
-          pomXml)).isFalse();
+          pomXml1)).isFalse();
+        assertThat(match("/project/build//plugins/plugin/configuration/source",
+          pomXml1)).isTrue();
+        assertThat(match("/project/build//plugins/plugin/configuration/source",
+          pomXml2)).isTrue();
     }
 
     private boolean match(String xpath, SourceFile x) {

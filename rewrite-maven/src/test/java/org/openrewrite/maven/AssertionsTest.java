@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -94,6 +95,7 @@ class AssertionsTest implements RewriteTest {
         assertThat(xmlCount.get()).isEqualTo(2);
     }
 
+    @AllArgsConstructor
     private static class MavenOnlyRecipe extends Recipe {
         @Override
         public String getDisplayName() {

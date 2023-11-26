@@ -131,14 +131,23 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             return space;
         }
 
+        if (loc == Space.Location.METHOD_SELECT_SUFFIX) {
+            Integer chainedIndent = getCursor().getParentTreeCursor().getMessage("chainedIndent");
+            if (chainedIndent != null) {
+                getCursor().getParentTreeCursor().putMessage("lastIndent", chainedIndent);
+                return indentTo(space, chainedIndent, loc);
+            }
+        }
+
         int indent = getCursor().getNearestMessage("lastIndent", 0);
 
         IndentType indentType = getCursor().getParentOrThrow().getNearestMessage("indentType", IndentType.ALIGN);
 
         // block spaces are always aligned to their parent
+        Object value = getCursor().getValue();
         boolean alignBlockPrefixToParent = loc.equals(Space.Location.BLOCK_PREFIX) && space.getWhitespace().contains("\n") &&
                 // ignore init blocks.
-                (getCursor().getValue() instanceof J.Block && !(getCursor().getParentTreeCursor().getValue() instanceof J.Block));
+                (value instanceof J.Block && !(getCursor().getParentTreeCursor().getValue() instanceof J.Block));
 
         boolean alignBlockToParent = loc.equals(Space.Location.BLOCK_END) ||
                 loc.equals(Space.Location.NEW_ARRAY_INITIALIZER_SUFFIX) ||
@@ -167,8 +176,10 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         Space s = indentTo(space, indent, loc);
-        if (!(getCursor().getValue() instanceof JLeftPadded) && !(getCursor().getValue() instanceof J.EnumValueSet)) {
+        if (value instanceof J && !(value instanceof J.EnumValueSet)) {
             getCursor().putMessage("lastIndent", indent);
+        } else if (loc == Space.Location.METHOD_SELECT_SUFFIX) {
+            getCursor().getParentTreeCursor().putMessage("lastIndent", indent);
         }
 
         return s;
@@ -210,27 +221,37 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     }
                     case METHOD_DECLARATION_PARAMETER:
                     case RECORD_STATE_VECTOR: {
+                        if (elem instanceof J.Empty) {
+                            elem = elem.withPrefix(indentTo(elem.getPrefix(), indent, loc.getAfterLocation()));
+                            after = right.getAfter();
+                            break;
+                        }
                         JContainer<J> container = getCursor().getParentOrThrow().getValue();
-                        J firstArg = container.getElements().iterator().next();
+                        List<J> elements = container.getElements();
+                        J firstArg = elements.iterator().next();
+                        J lastArg = elements.get(elements.size() - 1);
                         if (style.getMethodDeclarationParameters().getAlignWhenMultiple()) {
                             J.MethodDeclaration method = getCursor().firstEnclosing(J.MethodDeclaration.class);
                             if (method != null) {
                                 int alignTo;
                                 if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
-                                    alignTo = firstArg.getPrefix().getLastWhitespace().length() - 1;
+                                    alignTo = getLengthOfWhitespace(firstArg.getPrefix().getLastWhitespace());
                                 } else {
                                     String source = method.print(getCursor());
-                                    alignTo = source.indexOf(firstArg.print(getCursor())) - 1;
+                                    int firstArgIndex = source.indexOf(firstArg.print(getCursor()));
+                                    int lineBreakIndex = source.lastIndexOf('\n', firstArgIndex);
+                                    alignTo = (firstArgIndex - (lineBreakIndex == -1 ? 0 : lineBreakIndex)) - 1;
                                 }
                                 getCursor().getParentOrThrow().putMessage("lastIndent", alignTo - style.getContinuationIndent());
                                 elem = visitAndCast(elem, p);
-                                after = indentTo(right.getAfter(), alignTo, loc.getAfterLocation());
+                                getCursor().getParentOrThrow().putMessage("lastIndent", indent);
+                                after = indentTo(right.getAfter(), t == lastArg ? indent : alignTo, loc.getAfterLocation());
                             } else {
                                 after = right.getAfter();
                             }
                         } else {
                             elem = visitAndCast(elem, p);
-                            after = indentTo(right.getAfter(), style.getContinuationIndent(), loc.getAfterLocation());
+                            after = indentTo(right.getAfter(), t == lastArg ? indent : style.getContinuationIndent(), loc.getAfterLocation());
                         }
                         break;
                     }
@@ -247,6 +268,15 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         }
                         elem = visitAndCast(elem, p);
                         after = indentTo(right.getAfter(), indent, loc.getAfterLocation());
+                        if (!after.getComments().isEmpty() || after.getLastWhitespace().contains("\n")) {
+                            Cursor parent = getCursor().getParentTreeCursor();
+                            Cursor grandparent = parent.getParentTreeCursor();
+                            // propagate indentation up in the method chain hierarchy
+                            if (grandparent.getValue() instanceof J.MethodInvocation && ((J.MethodInvocation) grandparent.getValue()).getSelect() == parent.getValue()) {
+                                grandparent.putMessage("lastIndent", indent);
+                                grandparent.putMessage("chainedIndent", indent);
+                            }
+                        }
                         break;
                     case NEW_CLASS_ARGUMENTS:
                     case ARRAY_INDEX:
@@ -254,26 +284,6 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     case TYPE_PARAMETER: {
                         elem = visitAndCast(elem, p);
                         after = indentTo(right.getAfter(), indent, loc.getAfterLocation());
-                        break;
-                    }
-                    case METHOD_SELECT: {
-                        for (Cursor cursor = getCursor(); ; cursor = cursor.getParentOrThrow()) {
-                            if (cursor.getValue() instanceof JRightPadded) {
-                                cursor = cursor.getParentOrThrow();
-                            }
-                            if (!(cursor.getValue() instanceof J.MethodInvocation)) {
-                                break;
-                            }
-                            Integer methodIndent = cursor.getNearestMessage("lastIndent");
-                            if (methodIndent != null) {
-                                indent = methodIndent;
-                            }
-                        }
-
-                        getCursor().getParentOrThrow().putMessage("lastIndent", indent);
-                        elem = visitAndCast(elem, p);
-                        after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
-                        getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
                         break;
                     }
                     case ANNOTATION_ARGUMENT:
@@ -467,7 +477,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     private Comment indentComment(Comment comment, String priorSuffix, int column) {
         if (comment instanceof TextComment) {
             TextComment textComment = (TextComment) comment;
-            if (!textComment.getText().contains("\n")) {
+            String text = textComment.getText();
+            if (!text.contains("\n")) {
                 return comment;
             }
 
@@ -481,9 +492,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 String newMargin = indent(margin, shift);
                 if (textComment.isMultiline()) {
                     StringBuilder multiline = new StringBuilder();
-                    char[] chars = textComment.getText().toCharArray();
-                    for (int i = 0; i < chars.length; i++) {
-                        char c = chars[i];
+                    for (int i = 0; i < text.length(); i++) {
+                        char c = text.charAt(i);
                         if (c == '\n') {
                             multiline.append(c).append(newMargin);
                             i += margin.length();
@@ -496,12 +506,11 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             } else if (shift < 0) {
                 if (textComment.isMultiline()) {
                     StringBuilder multiline = new StringBuilder();
-                    char[] chars = textComment.getText().toCharArray();
-                    for (int i = 0; i < chars.length; i++) {
-                        char c = chars[i];
+                    for (int i = 0; i < text.length(); i++) {
+                        char c = text.charAt(i);
                         if (c == '\n') {
                             multiline.append(c);
-                            for (int j = 0; j < Math.abs(shift) && i+j+1 < chars.length && (chars[j + i + 1] == ' ' || chars[j + i + 1] == '\t'); j++) {
+                            for (int j = 0; j < Math.abs(shift) && i+j+1 < text.length() && (text.charAt(j + i + 1) == ' ' || text.charAt(j + i + 1) == '\t'); j++) {
                                 i++;
                             }
                         } else {
@@ -577,7 +586,8 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         int size = 0;
-        for (char c : whitespace.toCharArray()) {
+        for (int i = 0; i < whitespace.length(); i++) {
+            char c = whitespace.charAt(i);
             size += c == '\t' ? style.getTabSize() : 1;
             if (c == '\n' || c == '\r') {
                 size = 0;
@@ -596,7 +606,9 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
         int column = 0;
         boolean afterInitStart = false;
-        for (char c : alignTo.print(getCursor()).toCharArray()) {
+        String print = alignTo.print(getCursor());
+        for (int i = 0; i < print.length(); i++) {
+            char c = print.charAt(i);
             if (c == '(') {
                 afterInitStart = true;
             } else if (afterInitStart && !Character.isWhitespace(c)) {

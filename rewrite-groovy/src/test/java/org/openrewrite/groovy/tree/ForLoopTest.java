@@ -194,4 +194,26 @@ class ForLoopTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void forWithContinue() {
+        rewriteRun(
+          groovy(
+            """
+              for(int i in [1, 2, 3]) {continue}
+              """
+          )
+        );
+    }
+
+    @Test
+    void forWithLabeledContinue() {
+        rewriteRun(
+          groovy(
+            """
+              f: for(int i in [1, 2, 3]) {continue f}
+              """
+          )
+        );
+    }
 }

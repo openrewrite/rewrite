@@ -60,7 +60,9 @@ public class OrderImports extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Group and order imports.";
+        return "Groups and orders import statements. If a [style has been defined](https://docs.openrewrite.org/concepts-explanations/styles), this recipe will order the imports " +
+                "according to that style. If no style is detected, this recipe will default to ordering imports in " +
+                "the same way that IntelliJ IDEA does.";
     }
 
     @Override

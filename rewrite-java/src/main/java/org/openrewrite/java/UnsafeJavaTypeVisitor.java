@@ -59,6 +59,11 @@ public class UnsafeJavaTypeVisitor<P> extends JavaTypeVisitor<P> {
     }
 
     @Override
+    public JavaType visitIntersection(Intersection intersection, P p) {
+        return intersection.unsafeSet(mapInPlace(intersection.getBounds().toArray(EMPTY_JAVA_TYPE_ARRAY), t -> visit(t, p)));
+    }
+
+    @Override
     public JavaType visitMethod(JavaType.Method method, P p) {
         return method.unsafeSet(
                 (JavaType.FullyQualified) visit(method.getDeclaringType(), p),
@@ -70,17 +75,17 @@ public class UnsafeJavaTypeVisitor<P> extends JavaTypeVisitor<P> {
     }
 
     @Override
+    public JavaType visitMultiCatch(JavaType.MultiCatch multiCatch, P p) {
+        return multiCatch.unsafeSet(mapInPlace(multiCatch.getThrowableTypes().toArray(EMPTY_JAVA_TYPE_ARRAY), t -> visit(t, p)));
+    }
+
+    @Override
     public JavaType visitVariable(JavaType.Variable variable, P p) {
         return variable.unsafeSet(
                 visit(variable.getOwner(), p),
                 visit(variable.getType(), p),
                 mapInPlace(variable.getAnnotations().toArray(EMPTY_FULLY_QUALIFIED_ARRAY), a -> (JavaType.FullyQualified) visit(a, p))
         );
-    }
-
-    @Override
-    public JavaType visitMultiCatch(JavaType.MultiCatch multiCatch, P p) {
-        return multiCatch.unsafeSet(mapInPlace(multiCatch.getThrowableTypes().toArray(EMPTY_JAVA_TYPE_ARRAY), t -> visit(t, p)));
     }
 
     private static <T extends JavaType> T[] mapInPlace(T[] ls, UnaryOperator<T> map) {

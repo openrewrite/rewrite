@@ -38,7 +38,7 @@ public interface Tree {
 
     static UUID randomId() {
         //noinspection ConstantConditions
-        return MetricsHelper.UUID_TIMER.record(UUID::randomUUID);
+        return UUID.randomUUID();
     }
 
     /**

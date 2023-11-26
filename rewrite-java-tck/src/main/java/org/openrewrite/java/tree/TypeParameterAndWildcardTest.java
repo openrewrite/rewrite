@@ -17,6 +17,7 @@ package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -25,6 +26,7 @@ class TypeParameterAndWildcardTest implements RewriteTest {
     @Test
     void annotatedTypeParametersOnWildcardBounds() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
           java(
             """
               import java.util.List;
@@ -40,6 +42,7 @@ class TypeParameterAndWildcardTest implements RewriteTest {
     @Test
     void annotatedTypeParametersOnReturnTypeExpression() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
           java(
             """
               import java.util.List;

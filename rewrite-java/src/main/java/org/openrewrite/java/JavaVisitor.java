@@ -15,13 +15,11 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.format.AutoFormatVisitor;
+import org.openrewrite.java.service.AutoFormatService;
+import org.openrewrite.java.service.ImportService;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -29,6 +27,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 
+@SuppressWarnings("unused")
 public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @Nullable
@@ -91,7 +90,8 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @SuppressWarnings({"ConstantConditions", "unchecked"})
     public <J2 extends J> J2 autoFormat(J2 j, @Nullable J stopAfter, P p, Cursor cursor) {
-        return (J2) new AutoFormatVisitor<>(stopAfter).visit(j, p, cursor);
+        AutoFormatService service = getCursor().firstEnclosingOrThrow(JavaSourceFile.class).service(AutoFormatService.class);
+        return (J2) service.autoFormatVisitor(stopAfter).visit(j, p, cursor);
     }
 
     /**
@@ -111,21 +111,33 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
      * is idempotent and calling this method multiple times with the same arguments will only add an import once.
      *
      * @param fullyQualifiedName Fully-qualified name of the class.
-     * @param statik             The static method or field to be imported. A wildcard "*" may also be used to statically import all methods/fields.
+     * @param member             The static method or field to be imported. A wildcard "*" may also be used to statically import all methods/fields.
      */
-    public void maybeAddImport(String fullyQualifiedName, String statik) {
-        maybeAddImport(fullyQualifiedName, statik, true);
+    public void maybeAddImport(String fullyQualifiedName, String member) {
+        maybeAddImport(fullyQualifiedName, member, true);
     }
 
     public void maybeAddImport(String fullyQualifiedName, boolean onlyIfReferenced) {
         maybeAddImport(fullyQualifiedName, null, onlyIfReferenced);
     }
 
-    public void maybeAddImport(String fullyQualifiedName, @Nullable String statik, boolean onlyIfReferenced) {
-        AddImport<P> op = new AddImport<>(fullyQualifiedName, statik, onlyIfReferenced);
-        if (!getAfterVisit().contains(op)) {
-            doAfterVisit(op);
+    public void maybeAddImport(String fullyQualifiedName, @Nullable String member, boolean onlyIfReferenced) {
+        int lastDotIdx = fullyQualifiedName.lastIndexOf('.');
+        String packageName = lastDotIdx != -1 ? fullyQualifiedName.substring(0, lastDotIdx) : null;
+        String typeName = lastDotIdx != -1 ? fullyQualifiedName.substring(lastDotIdx + 1) : fullyQualifiedName;
+        maybeAddImport(packageName, typeName, member, null, onlyIfReferenced);
+    }
+
+    public void maybeAddImport(@Nullable String packageName, String typeName, @Nullable String member, @Nullable String alias, boolean onlyIfReferenced) {
+        JavaVisitor<P> visitor = service(ImportService.class).addImportVisitor(packageName, typeName, member, alias, onlyIfReferenced);
+        if (!getAfterVisit().contains(visitor)) {
+            doAfterVisit(visitor);
         }
+    }
+
+    @Incubating(since = "8.2.0")
+    public <S> S service(Class<S> service) {
+        return getCursor().firstEnclosingOrThrow(JavaSourceFile.class).service(service);
     }
 
     public void maybeRemoveImport(@Nullable JavaType.FullyQualified clazz) {
@@ -151,16 +163,24 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @SuppressWarnings("unused")
     public Space visitSpace(Space space, Space.Location loc, P p) {
-        return space == Space.EMPTY || space == Space.SINGLE_SPACE ? space :
-                space.withComments(ListUtils.map(space.getComments(), comment -> {
-                    if (comment instanceof Javadoc) {
-                        if (javadocVisitor == null) {
-                            javadocVisitor = getJavadocVisitor();
-                        }
-                        return (Comment) javadocVisitor.visit((Javadoc) comment, p);
-                    }
-                    return comment;
-                }));
+        //noinspection ConstantValue
+        if (space == Space.EMPTY || space == Space.SINGLE_SPACE || space == null) {
+            return space;
+        } else if (space.getComments().isEmpty()) {
+            return space;
+        }
+        return space.withComments(ListUtils.map(space.getComments(), comment -> {
+            if (comment instanceof Javadoc) {
+                if (javadocVisitor == null) {
+                    javadocVisitor = getJavadocVisitor();
+                }
+                Cursor previous = javadocVisitor.getCursor();
+                Comment c = (Comment) javadocVisitor.visit((Javadoc) comment, p, getCursor());
+                javadocVisitor.setCursor(previous);
+                return c;
+            }
+            return comment;
+        }));
     }
 
     @Nullable
@@ -627,8 +647,30 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return c;
     }
 
+    public J visitParenthesizedTypeTree(J.ParenthesizedTypeTree parTree, P p) {
+        J.ParenthesizedTypeTree t = parTree;
+        t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.PARENTHESES_PREFIX, p));
+        t = t.withMarkers(visitMarkers(t.getMarkers(), p));
+        if (t.getAnnotations() != null && !t.getAnnotations().isEmpty()) {
+            t = t.withAnnotations(ListUtils.map(t.getAnnotations(), a -> visitAndCast(a, p)));
+        }
+
+        J temp = visitParentheses(t.getParenthesizedType(), p);
+        if (!(temp instanceof J.Parentheses)) {
+            return temp;
+        } else {
+            //noinspection unchecked
+            t = t.withParenthesizedType((J.Parentheses<TypeTree>)temp);
+        }
+        return t;
+    }
+
     public J visitIdentifier(J.Identifier ident, P p) {
         J.Identifier i = ident;
+        if (i.getAnnotations() != null && !i.getAnnotations().isEmpty()) {
+            // performance optimization
+            i = i.withAnnotations(ListUtils.map(i.getAnnotations(), a -> visitAndCast(a, p)));
+        }
         i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.IDENTIFIER_PREFIX, p));
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
         Expression temp = (Expression) visitExpression(i, p);
@@ -672,6 +714,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         i = i.withMarkers(visitMarkers(i.getMarkers(), p));
         i = i.getPadding().withStatic(visitLeftPadded(i.getPadding().getStatic(), JLeftPadded.Location.STATIC_IMPORT, p));
         i = i.withQualid(visitAndCast(i.getQualid(), p));
+        i = i.getPadding().withAlias(visitLeftPadded(i.getPadding().getAlias(), JLeftPadded.Location.IMPORT_ALIAS_PREFIX, p));
         return i;
     }
 
@@ -688,6 +731,15 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         i = i.getPadding().withExpr(visitRightPadded(i.getPadding().getExpr(), JRightPadded.Location.INSTANCEOF, p));
         i = i.withClazz(visitAndCast(i.getClazz(), p));
         i = i.withPattern(visitAndCast(i.getPattern(), p));
+        i = i.withType(visitType(i.getType(), p));
+        return i;
+    }
+
+    public J visitIntersectionType(J.IntersectionType intersectionType, P p) {
+        J.IntersectionType i = intersectionType;
+        i = i.withPrefix(visitSpace(i.getPrefix(), Space.Location.INTERSECTION_TYPE_PREFIX, p));
+        i = i.withMarkers(visitMarkers(i.getMarkers(), p));
+        i = i.getPadding().withBounds(visitContainer(i.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, p));
         i = i.withType(visitType(i.getType(), p));
         return i;
     }
@@ -1148,6 +1200,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         t = t.withPrefix(visitSpace(t.getPrefix(), Space.Location.TYPE_PARAMETERS_PREFIX, p));
         t = t.withMarkers(visitMarkers(t.getMarkers(), p));
         t = t.withAnnotations(ListUtils.map(t.getAnnotations(), a -> visitAndCast(a, p)));
+
+        if (t.getModifiers() != null && !t.getModifiers().isEmpty()) {
+            t = t.withModifiers(ListUtils.map(t.getModifiers(), m -> visitAndCast(m, p)));
+        }
+
         t = t.withName(visitAndCast(t.getName(), p));
         if (t.getName() instanceof NameTree) {
             t = t.withName((Expression) visitTypeName((NameTree) t.getName(), p));

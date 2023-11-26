@@ -46,6 +46,9 @@ public class RewriteRecipeSource extends DataTable<RewriteRecipeSource.Row> {
 
         @Column(displayName = "Recipe source code", description = "The full source code of the recipe.")
         String sourceCode;
+
+        @Column(displayName = "Recipe options", description = "JSON format of recipe options.")
+        String options;
     }
 
     public enum RecipeType {

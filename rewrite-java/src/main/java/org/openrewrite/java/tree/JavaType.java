@@ -31,7 +31,8 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.*;
-import static org.openrewrite.internal.ListUtils.*;
+import static org.openrewrite.internal.ListUtils.arrayOrNullIfEmpty;
+import static org.openrewrite.internal.ListUtils.nullIfEmpty;
 import static org.openrewrite.java.tree.TypeUtils.unknownIfNull;
 
 @SuppressWarnings("unused")
@@ -51,6 +52,7 @@ public interface JavaType {
         return getClass().getName();
     }
 
+    // TODO: To be removed with OpenRewrite 9
     @Nullable
     default Integer getManagedReference() {
         return null;
@@ -107,9 +109,12 @@ public interface JavaType {
             this.throwableTypes = arrayOrNullIfEmpty(throwableTypes, EMPTY_JAVA_TYPE_ARRAY);
         }
 
-        @JsonCreator
         MultiCatch(@Nullable JavaType[] throwableTypes) {
             this.throwableTypes = nullIfEmpty(throwableTypes);
+        }
+
+        @JsonCreator
+        MultiCatch() {
         }
 
         private JavaType[] throwableTypes;
@@ -136,6 +141,47 @@ public interface JavaType {
 
         public MultiCatch unsafeSet(JavaType[] throwableTypes) {
             this.throwableTypes = ListUtils.nullIfEmpty(throwableTypes);
+            return this;
+        }
+    }
+
+    class Intersection implements JavaType {
+        public Intersection(@Nullable List<JavaType> bounds) {
+            this.bounds = arrayOrNullIfEmpty(bounds, EMPTY_JAVA_TYPE_ARRAY);
+        }
+
+        Intersection(@Nullable JavaType[] throwableTypes) {
+            this.bounds = nullIfEmpty(throwableTypes);
+        }
+
+        @JsonCreator
+        Intersection() {
+        }
+
+        private JavaType[] bounds;
+
+        public List<JavaType> getBounds() {
+            if (bounds == null) {
+                return Collections.emptyList();
+            }
+            return Arrays.asList(bounds);
+        }
+
+        public Intersection withBounds(@Nullable List<JavaType> bounds) {
+            JavaType[] boundsArray = arrayOrNullIfEmpty(bounds, EMPTY_JAVA_TYPE_ARRAY);
+            if (Arrays.equals(boundsArray, this.bounds)) {
+                return this;
+            }
+            return new Intersection(boundsArray);
+        }
+
+        public Intersection unsafeSet(List<JavaType> bounds) {
+            this.bounds = arrayOrNullIfEmpty(bounds, EMPTY_JAVA_TYPE_ARRAY);
+            return this;
+        }
+
+        public Intersection unsafeSet(JavaType[] bounds) {
+            this.bounds = ListUtils.nullIfEmpty(bounds);
             return this;
         }
     }
@@ -272,7 +318,7 @@ public interface JavaType {
         public String getClassName() {
             String fqn = getFullyQualifiedName();
             String className = fqn.substring(fqn.lastIndexOf('.') + 1);
-            return className.replace('$', '.');
+            return TypeUtils.toFullyQualifiedName(className);
         }
 
         public String getPackageName() {
@@ -322,12 +368,15 @@ public interface JavaType {
         Integer managedReference;
 
         @With(AccessLevel.NONE)
+        @NonFinal
         long flagsBitMap;
 
         @With
+        @NonFinal
         String fullyQualifiedName;
 
         @With
+        @NonFinal
         Kind kind;
 
         @NonFinal
@@ -367,7 +416,6 @@ public interface JavaType {
             );
         }
 
-        @JsonCreator
         Class(@Nullable Integer managedReference, long flagsBitMap, String fullyQualifiedName,
               Kind kind, @Nullable JavaType[] typeParameters, @Nullable FullyQualified supertype, @Nullable FullyQualified owningClass,
               @Nullable FullyQualified[] annotations, @Nullable FullyQualified[] interfaces,
@@ -384,6 +432,10 @@ public interface JavaType {
             this.interfaces = nullIfEmpty(interfaces);
             this.members = nullIfEmpty(members);
             this.methods = nullIfEmpty(methods);
+        }
+
+        @JsonCreator
+        Class() {
         }
 
         public List<FullyQualified> getAnnotations() {
@@ -543,6 +595,10 @@ public interface JavaType {
             super(managedReference, flagsBitMap, fullyQualifiedName, kind, (List<JavaType>) null, null, owningClass, null, null, null, null);
         }
 
+        @JsonCreator
+        ShallowClass() {
+        }
+
         /**
          * Build a class type only from the class' fully qualified name.
          *
@@ -601,12 +657,15 @@ public interface JavaType {
             );
         }
 
-        @JsonCreator
         Parameterized(@Nullable Integer managedReference, @Nullable FullyQualified type,
                              @Nullable JavaType[] typeParameters) {
             this.managedReference = managedReference;
             this.type = unknownIfNull(type);
             this.typeParameters = nullIfEmpty(typeParameters);
+        }
+
+        @JsonCreator
+        Parameterized() {
         }
 
         public FullyQualified getType() {
@@ -745,12 +804,15 @@ public interface JavaType {
             );
         }
 
-        @JsonCreator
         GenericTypeVariable(@Nullable Integer managedReference, String name, Variance variance, @Nullable JavaType[] bounds) {
             this.managedReference = managedReference;
             this.name = name;
             this.variance = variance;
             this.bounds = nullIfEmpty(bounds);
+        }
+
+        @JsonCreator
+        GenericTypeVariable() {
         }
 
         public List<JavaType> getBounds() {
@@ -820,6 +882,10 @@ public interface JavaType {
         public Array(@Nullable Integer managedReference, @Nullable JavaType elemType) {
             this.managedReference = managedReference;
             this.elemType = unknownIfNull(elemType);
+        }
+
+        @JsonCreator
+        Array() {
         }
 
         public JavaType getElemType() {
@@ -892,6 +958,33 @@ public interface JavaType {
                     return Null;
                 case "":
                     return None;
+            }
+            return null;
+        }
+
+        @Nullable
+        public static Primitive fromClassName(String className) {
+            switch (className) {
+                case "java.lang.Boolean":
+                    return Boolean;
+                case "java.lang.Byte":
+                    return Byte;
+                case "java.lang.Character":
+                    return Char;
+                case "java.lang.Double":
+                    return Double;
+                case "java.lang.Float":
+                    return Float;
+                case "java.lang.Integer":
+                    return Int;
+                case "java.lang.Long":
+                    return Long;
+                case "java.lang.Short":
+                    return Short;
+                case "java.lang.Void":
+                    return Void;
+                case "java.lang.String":
+                    return String;
             }
             return null;
         }
@@ -975,6 +1068,7 @@ public interface JavaType {
         Integer managedReference;
 
         @With(AccessLevel.PRIVATE)
+        @NonFinal
         long flagsBitMap;
 
         @With
@@ -982,6 +1076,7 @@ public interface JavaType {
         FullyQualified declaringType;
 
         @With
+        @NonFinal
         String name;
 
         @With
@@ -989,6 +1084,7 @@ public interface JavaType {
         JavaType returnType;
 
         @Nullable
+        @NonFinal
         String[] parameterNames;
 
         @NonFinal
@@ -1005,6 +1101,7 @@ public interface JavaType {
 
         @Incubating(since = "7.34.0")
         @Nullable
+        @NonFinal
         List<String> defaultValue;
 
         public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
@@ -1033,7 +1130,6 @@ public interface JavaType {
             );
         }
 
-        @JsonCreator
         public Method(@Nullable Integer managedReference, long flagsBitMap, @Nullable FullyQualified declaringType, String name,
                @Nullable JavaType returnType, @Nullable String[] parameterNames,
                @Nullable JavaType[] parameterTypes, @Nullable FullyQualified[] thrownExceptions,
@@ -1048,6 +1144,10 @@ public interface JavaType {
             this.thrownExceptions = nullIfEmpty(thrownExceptions);
             this.annotations = nullIfEmpty(annotations);
             this.defaultValue = nullIfEmpty(defaultValue);
+        }
+
+        @JsonCreator
+        Method() {
         }
 
         @Override
@@ -1247,9 +1347,11 @@ public interface JavaType {
         Integer managedReference;
 
         @With(AccessLevel.PRIVATE)
+        @NonFinal
         long flagsBitMap;
 
         @With
+        @NonFinal
         String name;
 
         @With
@@ -1277,7 +1379,6 @@ public interface JavaType {
             );
         }
 
-        @JsonCreator
         Variable(@Nullable Integer managedReference, long flagsBitMap, String name, @Nullable JavaType owner,
                         @Nullable JavaType type, @Nullable FullyQualified[] annotations) {
             this.managedReference = managedReference;
@@ -1286,6 +1387,10 @@ public interface JavaType {
             this.owner = owner;
             this.type = unknownIfNull(type);
             this.annotations = nullIfEmpty(annotations);
+        }
+
+        @JsonCreator
+        Variable() {
         }
 
         @Nullable

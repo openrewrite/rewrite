@@ -3,7 +3,7 @@ parser grammar AnnotationSignatureParser;
 options { tokenVocab=AnnotationSignatureLexer; }
 
 annotation
-    :	AT annotationName ( LPAREN ( elementValuePairs | elementValue )? RPAREN )?
+    :	AT? annotationName ( LPAREN ( elementValuePairs | elementValue )? RPAREN )?
     ;
 
 annotationName

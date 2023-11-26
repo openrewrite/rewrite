@@ -54,7 +54,8 @@ public class FindSourceFiles extends Recipe {
                     SourceFile sourceFile = (SourceFile) tree;
                     Path sourcePath = sourceFile.getSourcePath();
                     if (PathUtils.matchesGlob(sourcePath, normalize(filePattern))) {
-                        results.insertRow(ctx, new SourcesFiles.Row(sourcePath.toString()));
+                        results.insertRow(ctx, new SourcesFiles.Row(sourcePath.toString(),
+                                tree.getClass().getSimpleName()));
                         return SearchResult.found(sourceFile);
                     }
                 }
