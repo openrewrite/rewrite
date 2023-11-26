@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 
-public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
+class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
 
     @Test
     void replaceConstantInAnnotation() {
@@ -56,6 +56,33 @@ public class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
                   void foo() {
                       System.out.println("Annotation");
                   }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/3448")
+    void replaceConstantInCurlyBracesInAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator"))
+            .parser(JavaParser.fromJavaVersion().classpath("guava")),
+          java(
+            """
+              import java.io.File;
+              
+              class Test {
+                  @SuppressWarnings({File.pathSeparator})
+                  private String bar;
+              }
+              """,
+            """
+              import java.io.File;
+              
+              class Test {
+                  @SuppressWarnings({File.separator})
+                  private String bar;
               }
               """
           )
