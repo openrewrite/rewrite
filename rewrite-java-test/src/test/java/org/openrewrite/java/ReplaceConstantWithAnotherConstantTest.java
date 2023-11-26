@@ -16,7 +16,7 @@
 package org.openrewrite.java;
 
 import org.junit.jupiter.api.Test;
-import org.openrewrite.test.RecipeSpec;
+import org.openrewrite.Issue;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
@@ -66,21 +66,22 @@ class ReplaceConstantWithAnotherConstantTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/pull/3448")
     void replaceConstantInCurlyBracesInAnnotation() {
         rewriteRun(
-          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("com.google.common.base.Charsets.UTF_8", "com.google.common.base.Charsets.UTF_16")),
+          spec -> spec.recipe(new ReplaceConstantWithAnotherConstant("java.io.File.pathSeparator", "java.io.File.separator"))
+            .parser(JavaParser.fromJavaVersion().classpath("guava")),
           java(
             """
-              import com.google.common.base.Charsets;
+              import java.io.File;
               
               class Test {
-                  @SuppressWarnings({Charsets.UTF_8})
+                  @SuppressWarnings({File.pathSeparator})
                   private String bar;
               }
               """,
             """
-              import com.google.common.base.Charsets;
+              import java.io.File;
               
               class Test {
-                  @SuppressWarnings({Charsets.UTF_16})
+                  @SuppressWarnings({File.separator})
                   private String bar;
               }
               """
