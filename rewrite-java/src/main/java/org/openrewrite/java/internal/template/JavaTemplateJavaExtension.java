@@ -474,7 +474,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             }
                             throw new IllegalArgumentException("Expected a template that would generate exactly one " +
                                                                "statement to replace one statement, but generated " + gen.size() +
-                                                               ". Template:\n" + substitutedTemplate);
+                                                               ". Template:\n" + substitutedTemplate + "\nSubstitutions:\n" + substitutions +
+                                                               "\nStatement:\n" + statement);
                         }
 
                         return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p);
