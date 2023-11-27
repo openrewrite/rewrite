@@ -67,12 +67,12 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         }.visitFile(file, elementMap)
     }
 
-    fun type(psiElement: PsiElement, owner: FirElement?): JavaType? {
+    fun type(psiElement: PsiElement?, owner: FirElement?): JavaType? {
         val fir = primary(psiElement)
         return if (fir != null) typeMapping.type(fir, owner) else null
     }
 
-    fun primary(psiElement: PsiElement) =
+    fun primary(psiElement: PsiElement?) =
         fir(psiElement) { it.source is KtRealPsiSourceElement }
 
     fun methodDeclarationType(psi: PsiElement): JavaType.Method? {
@@ -171,7 +171,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         val allFirInfos = elementMap[p]!!
         val directFirInfos = allFirInfos.filter { filter.invoke(it.fir) }
         return if (directFirInfos.isNotEmpty())
-            // It might be more reliable to have explicit mappings in case something changes.
+        // It might be more reliable to have explicit mappings in case something changes.
             return when {
                 directFirInfos.size == 1 -> directFirInfos[0].fir
                 else -> {
