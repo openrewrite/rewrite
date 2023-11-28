@@ -377,33 +377,32 @@ public class PsiTreePrinter {
 
     private static String printTreeElement(Tree tree) {
         // skip some specific types printed in the output to make the output looks clean
-        if (tree instanceof J.CompilationUnit
-                || tree instanceof J.ClassDeclaration
-                || tree instanceof J.Block
-                || tree instanceof J.Empty
-                || tree instanceof J.Try
-                || tree instanceof J.Try.Catch
-                || tree instanceof J.ForLoop
-                || tree instanceof J.WhileLoop
-                || tree instanceof J.DoWhileLoop
-                || tree instanceof J.Lambda
-                || tree instanceof J.Lambda.Parameters
-                || tree instanceof J.If
-                || tree instanceof J.If.Else
-                || tree instanceof J.EnumValueSet
-                || tree instanceof J.TypeParameter
-                || tree instanceof K.ClassDeclaration
-                || tree instanceof K.CompilationUnit
-                || tree instanceof K.SpreadArgument
-                || tree instanceof K.StatementExpression
-                || tree instanceof K.KString
-                || tree instanceof K.KString.Value
-                || tree instanceof K.ExpressionStatement
-                || tree instanceof K.FunctionType
-                || tree instanceof K.ListLiteral
-                || tree instanceof K.When
-                || tree instanceof J.Package
-                || tree instanceof J.ForEachLoop
+        if (tree instanceof J.CompilationUnit ||
+                tree instanceof J.ClassDeclaration ||
+                tree instanceof J.Block ||
+                tree instanceof J.Empty||
+                tree instanceof J.Try ||
+                tree instanceof J.Try.Catch ||
+                tree instanceof J.ForLoop ||
+                tree instanceof J.WhileLoop ||
+                tree instanceof J.DoWhileLoop ||
+                tree instanceof J.Lambda ||
+                tree instanceof J.Lambda.Parameters ||
+                tree instanceof J.If ||
+                tree instanceof J.If.Else ||
+                tree instanceof J.EnumValueSet ||
+                tree instanceof J.TypeParameter ||
+                tree instanceof K.ClassDeclaration ||
+                tree instanceof K.CompilationUnit ||
+                tree instanceof K.SpreadArgument ||
+                tree instanceof K.StatementExpression ||
+                tree instanceof K.KString ||
+                tree instanceof K.KString.Value ||
+                tree instanceof K.ExpressionStatement ||
+                tree instanceof K.FunctionType ||
+                tree instanceof K.ListLiteral ||
+                tree instanceof K.When || tree instanceof J.Package ||
+                tree instanceof J.ForEachLoop
         ) {
             return "";
         }
