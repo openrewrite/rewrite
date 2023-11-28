@@ -1165,4 +1165,34 @@ class JavaTemplateTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void changeFieldToMethod() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  J.VariableDeclarations vd = (J.VariableDeclarations) super.visitVariableDeclarations(multiVariable, ctx);
+                  if (vd.getVariables().size() == 1 || vd.getVariables().get(0).getSimpleName().equals("a")) {
+                      return JavaTemplate.apply("String a();", getCursor(), vd.getCoordinates().replace());
+                  }
+                  return vd;
+              }
+          })),
+          java(
+            """
+              interface Test {
+              
+                  String a;
+              }
+              """,
+            """
+              interface Test {
+              
+                  String a();
+              }
+              """
+          )
+        );
+    }
 }
