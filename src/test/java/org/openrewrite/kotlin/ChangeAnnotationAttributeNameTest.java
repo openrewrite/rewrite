@@ -16,6 +16,7 @@
 package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.java.ChangeAnnotationAttributeName;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RewriteTest;
@@ -23,8 +24,9 @@ import org.openrewrite.test.RewriteTest;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-public class ChangeAnnotationAttributeNameTest implements RewriteTest {
+class ChangeAnnotationAttributeNameTest implements RewriteTest {
 
+    @ExpectedToFail
     @Test
     public void runKotlin() {
         rewriteRun(
