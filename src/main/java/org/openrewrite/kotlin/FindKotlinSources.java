@@ -30,6 +30,12 @@ import org.openrewrite.text.PlainText;
 public class FindKotlinSources extends Recipe {
     transient KotlinSourceFile kotlinSourceFile = new KotlinSourceFile(this);
 
+    @Option(displayName = "Find Kotlin compilation units",
+            description = "Limit the search results to Kotlin CompilationUnits.",
+            required = false)
+    @Nullable
+    Boolean markCompilationUnits;
+
     @Override
     public String getDisplayName() {
         return "Find Kotlin sources and collect data metrics";
@@ -45,7 +51,10 @@ public class FindKotlinSources extends Recipe {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
             public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
-                if(tree instanceof SourceFile) {
+                if (tree instanceof SourceFile) {
+                    if (Boolean.TRUE.equals(markCompilationUnits) && !(tree instanceof K.CompilationUnit)) {
+                        return tree;
+                    }
                     SourceFile sourceFile = (SourceFile) tree;
                     if (sourceFile.getSourcePath().toString().endsWith(".kt")) {
                         KotlinSourceFile.SourceFileType sourceFileType = getSourceFileType(sourceFile);
