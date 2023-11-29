@@ -53,6 +53,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 
@@ -87,6 +88,8 @@ public class MavenPomDownloader {
 
     private final CheckedFunction1<HttpSender.Request, byte[]> sendRequest;
 
+    private boolean addDefaultRepositories = true;
+
     /**
      * @param projectPoms    Other POMs in this project.
      * @param ctx            The execution context, which potentially contain Maven settings customization
@@ -105,8 +108,20 @@ public class MavenPomDownloader {
     }
 
     /**
+     * A MavenPomDownloader for non-maven contexts where there are no project poms or assumption that maven central
+     * is implicitly added as a repository. In a Maven contexts, a non-empty projectPoms should be specified to
+     * {@link #MavenPomDownloader(Map, ExecutionContext)} for accurate results.
+     *
+     * @param ctx The execution context, which potentially contain Maven settings customization and {@link HttpSender} customization.
+     */
+    public MavenPomDownloader(ExecutionContext ctx) {
+        this(emptyMap(), HttpSenderExecutionContextView.view(ctx).getHttpSender(), ctx);
+        this.addDefaultRepositories = false;
+    }
+
+    /**
      * @param projectPoms Other POMs in this project.
-     * @param ctx         The execution context, which potentially contain Maven settings customization and
+     * @param ctx         The execution context, which potentially contain Maven settings customization
      *                    and {@link HttpSender} customization.
      */
     public MavenPomDownloader(Map<Path, Pom> projectPoms, ExecutionContext ctx) {
@@ -451,8 +466,8 @@ public class MavenPomDownloader {
         // The requested gav might itself have an unresolved placeholder in the version, so also check raw values
         for (Pom projectPom : projectPoms.values()) {
             if (gav.getGroupId().equals(projectPom.getGroupId()) &&
-                    gav.getArtifactId().equals(projectPom.getArtifactId()) &&
-                    (gav.getVersion().equals(projectPom.getVersion()) || projectPom.getVersion().equals(projectPom.getValue(gav.getVersion())))) {
+                gav.getArtifactId().equals(projectPom.getArtifactId()) &&
+                (gav.getVersion().equals(projectPom.getVersion()) || projectPom.getVersion().equals(projectPom.getValue(gav.getVersion())))) {
                 return projectPom;
             }
         }
@@ -516,8 +531,18 @@ public class MavenPomDownloader {
                             RawPom rawPom = RawPom.parse(fis, Objects.equals(versionMaybeDatedSnapshot, gav.getVersion()) ? null : versionMaybeDatedSnapshot);
                             Pom pom = rawPom.toPom(inputPath, repo).withGav(resolvedGav);
 
-                            // so that the repository path is the same regardless of username
-                            pom = pom.withRepository(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL);
+                            if (pom.getPackaging() == null || "jar".equals(pom.getPackaging())) {
+                                File jar = f.toPath().resolveSibling(gav.getArtifactId() + '-' + versionMaybeDatedSnapshot + ".jar").toFile();
+                                if (!jar.exists() || jar.length() == 0) {
+                                    // The jar has not been downloaded, making this dependency unusable.
+                                    continue;
+                                }
+                            }
+
+                            if (repo.getUri().equals(MavenRepository.MAVEN_LOCAL_DEFAULT.getUri())) {
+                                // so that the repository path is the same regardless of username
+                                pom = pom.withRepository(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL);
+                            }
 
                             if (!Objects.equals(versionMaybeDatedSnapshot, pom.getVersion())) {
                                 pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
@@ -622,7 +647,9 @@ public class MavenPomDownloader {
                                                                        @Nullable ResolvedPom containingPom,
                                                                        @Nullable String acceptsVersion) {
         Set<MavenRepository> normalizedRepositories = new LinkedHashSet<>();
-        normalizedRepositories.add(ctx.getLocalRepository());
+        if (addDefaultRepositories) {
+            normalizedRepositories.add(ctx.getLocalRepository());
+        }
 
         for (MavenRepository repo : repositories) {
             MavenRepository normalizedRepo = normalizeRepository(repo, containingPom);
@@ -638,8 +665,12 @@ public class MavenPomDownloader {
                 normalizedRepositories.add(normalizedRepo);
             }
         }
-
-        normalizedRepositories.add(normalizeRepository(MavenRepository.MAVEN_CENTRAL, containingPom));
+        if (addDefaultRepositories) {
+            MavenRepository normalizedRepo = normalizeRepository(MavenRepository.MAVEN_CENTRAL, containingPom);
+            if (normalizedRepo != null) {
+                normalizedRepositories.add(normalizedRepo);
+            }
+        }
         return normalizedRepositories;
     }
 
@@ -734,9 +765,14 @@ public class MavenPomDownloader {
                             } catch (Throwable e) {
                                 // ok to fall through here and cache a null
                                 if (nullReasonConsumer != null) {
-                                    nullReasonConsumer.accept(t);
+                                    nullReasonConsumer.accept(e);
                                 }
                             }
+                        }
+                    }
+                    if (normalized == null) {
+                        if (nullReasonConsumer != null) {
+                            nullReasonConsumer.accept(t);
                         }
                     }
                 }
@@ -745,6 +781,9 @@ public class MavenPomDownloader {
             }
         } catch (Exception e) {
             ctx.getOnError().accept(e);
+            if (nullReasonConsumer != null) {
+                nullReasonConsumer.accept(e);
+            }
             mavenCache.putNormalizedRepository(repository, null);
         }
 
@@ -808,7 +847,7 @@ public class MavenPomDownloader {
     }
 
     @Getter
-    private static class HttpSenderResponseException extends Exception {
+    public static class HttpSenderResponseException extends Exception {
         @Nullable
         private final Integer responseCode;
 

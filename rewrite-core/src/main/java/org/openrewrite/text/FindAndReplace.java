@@ -134,7 +134,11 @@ public class FindAndReplace extends Recipe {
                 if (!matcher.find()) {
                     return sourceFile;
                 }
-                String newText = matcher.replaceAll(replace);
+                String replacement = replace;
+                if (!Boolean.TRUE.equals(regex)) {
+                    replacement = replacement.replace("$", "\\$");
+                }
+                String newText = matcher.replaceAll(replacement);
                 return plainText.withText(newText)
                         .withMarkers(sourceFile.getMarkers().add(new AlreadyReplaced(randomId(), find, replace)));
             }
@@ -150,4 +154,5 @@ public class FindAndReplace extends Recipe {
         }
         return visitor;
     }
+
 }

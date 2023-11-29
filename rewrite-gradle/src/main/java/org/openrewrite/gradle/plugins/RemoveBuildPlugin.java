@@ -31,12 +31,12 @@ public class RemoveBuildPlugin extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Remove plugin from `build.gradle(.kts)`";
+        return "Remove Gradle plugin";
     }
 
     @Override
     public String getDescription() {
-        return "Remove plugin from `build.gradle(.kts)`.";
+        return "Remove plugin from Gradle `plugins` block by its id. Does not remove plugins from the `buildscript` block.";
     }
 
     @Override

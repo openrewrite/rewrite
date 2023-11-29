@@ -17,6 +17,7 @@ package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.java.MinimumJava17;
 import org.openrewrite.test.RewriteTest;
 
@@ -59,6 +60,7 @@ class VariableDeclarationsTest implements RewriteTest {
     }
 
     @Test
+    @MinimumJava11
     void finalVar() {
         rewriteRun(
           java(

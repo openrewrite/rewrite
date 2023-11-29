@@ -42,7 +42,7 @@ public class MavenRepositoryMirror {
      * repo,repo1 = repo or repo1
      * !repo1 = everything except repo1
      * <p>
-     * See: https://maven.apache.org/guides/mini/guide-mirror-settings.html#advanced-mirror-specification
+     * See: <a href="https://maven.apache.org/guides/mini/guide-mirror-settings.html#advanced-mirror-specification">Maven's Mirrors documentation</a>
      */
     @Nullable
     String mirrorOf;
@@ -107,10 +107,13 @@ public class MavenRepositoryMirror {
         if (repo.getUri().equals(url) && Objects.equals(id, repo.getId()) || !matches(repo)) {
             return repo;
         } else {
-            return repo.withUri(url)
+            MavenRepository repoWithMirror = repo.withUri(url)
                     .withId(id)
                     .withReleases(!Boolean.FALSE.equals(releases) ? "true" : "false")
                     .withSnapshots(!Boolean.FALSE.equals(snapshots) ? "true" : "false");
+            // Since the URL has likely changed we cannot assume that the new repository is known to exist
+            repoWithMirror.setKnownToExist(false);
+            return repoWithMirror;
         }
     }
 

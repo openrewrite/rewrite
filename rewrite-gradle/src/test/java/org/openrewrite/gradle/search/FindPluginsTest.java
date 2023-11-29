@@ -36,11 +36,13 @@ class FindPluginsTest implements RewriteTest {
           buildGradle(
             """
               plugins {
+                  id 'com.jfrog.bintray'
                   id 'com.jfrog.bintray' version '1.8.5'
               }
               """,
             """
               plugins {
+                  /*~~>*/id 'com.jfrog.bintray'
                   /*~~>*/id 'com.jfrog.bintray' version '1.8.5'
               }
               """,

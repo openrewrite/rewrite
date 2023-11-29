@@ -36,7 +36,7 @@ public class TreeVisitorTest {
             @Override
             public @Nullable Tree visit(@Nullable Tree tree, Integer i) {
                 assertThat(tree).isSameAs(quark);
-                assertThat((Tree)getCursor().getValue()).isSameAs(quark);
+                assertThat(getCursor()).isSameAs(getCursor().getRoot());
                 visited.incrementAndGet();
                 return tree;
             }

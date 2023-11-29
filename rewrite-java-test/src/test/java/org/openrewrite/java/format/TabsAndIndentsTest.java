@@ -173,6 +173,27 @@ class TabsAndIndentsTest implements RewriteTest {
         );
     }
 
+    @Test
+    void alignMethodDeclarationParamsWhenContinuationIndentUsingTabs() {
+        rewriteRun(
+          tabsAndIndents(style -> style.withUseTabCharacter(true)),
+          java(
+            """
+            import java.util.*;
+            
+            class Foo {
+            	Foo(
+            			String var1,
+            			String var2,
+            			String var3
+            	) {
+            	}
+            }
+            """
+          )
+        );
+    }
+
     // https://rules.sonarsource.com/java/tag/confusing/RSPEC-3973
     @DocumentExample
     @SuppressWarnings("SuspiciousIndentAfterControlStatement")
@@ -945,7 +966,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void moreAnnotations() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
           java(
             """
               import lombok.EqualsAndHashCode;
@@ -1678,6 +1699,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void failure1() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(
             """
               public class Test {
@@ -2302,6 +2324,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void recordComponents() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(
             """
               public record RenameRequest(
@@ -2320,7 +2343,7 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               public enum WorkflowStatus {
-                  @Nullable
+                  @SuppressWarnings("ALL")
                   VALUE1
               }
               """

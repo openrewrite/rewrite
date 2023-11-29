@@ -28,7 +28,7 @@ class TaskTest implements RewriteTest {
     @Test
     void declareTaskOldStyle() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
           buildGradle(
             """
               task(testWithCloud, type: Test) {
@@ -44,7 +44,7 @@ class TaskTest implements RewriteTest {
     @Test
     void testDsl() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
           buildGradle(
             """
               plugins {

@@ -662,6 +662,14 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitIntersectionType(IntersectionType intersectionType, PrintOutputCapture<P> p) {
+        beforeSyntax(intersectionType, Space.Location.INTERSECTION_TYPE_PREFIX, p);
+        visitContainer("", intersectionType.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, "&", "", p);
+        afterSyntax(intersectionType, p);
+        return intersectionType;
+    }
+
+    @Override
     public J visitLabel(Label label, PrintOutputCapture<P> p) {
         beforeSyntax(label, Space.Location.LABEL_PREFIX, p);
         visitRightPadded(label.getPadding().getLabel(), JRightPadded.Location.LABEL, ":", p);

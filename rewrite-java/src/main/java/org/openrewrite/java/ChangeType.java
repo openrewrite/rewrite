@@ -181,9 +181,9 @@ public class ChangeType extends Recipe {
                         if (maybeType instanceof JavaType.FullyQualified) {
                             JavaType.FullyQualified type = (JavaType.FullyQualified) maybeType;
                             if (originalType.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visit(sf, ctx, getCursor());
+                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getFullyQualifiedName()).visit(sf, ctx, getCursor().getParentOrThrow());
                             } else if (originalType.getOwningClass() != null && originalType.getOwningClass().getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visit(sf, ctx, getCursor());
+                                sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(originalType.getOwningClass().getFullyQualifiedName()).visit(sf, ctx, getCursor().getParentOrThrow());
                             }
                         }
                     }
@@ -192,7 +192,7 @@ public class ChangeType extends Recipe {
                 JavaType.FullyQualified fullyQualifiedTarget = TypeUtils.asFullyQualified(targetType);
                 if (fullyQualifiedTarget != null) {
                     JavaType.FullyQualified owningClass = fullyQualifiedTarget.getOwningClass();
-                    if (!(owningClass != null && topLevelClassnames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName()))) {
+                    if (!topLevelClassnames.contains(getTopLevelClassName(fullyQualifiedTarget).getFullyQualifiedName())) {
                         if (owningClass != null && !"java.lang".equals(fullyQualifiedTarget.getPackageName())) {
                             addImport(owningClass);
                         }
@@ -259,6 +259,11 @@ public class ChangeType extends Recipe {
 
         @Override
         public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
+            // Do not modify the identifier if it's on a inner class definition.
+            if (Boolean.TRUE.equals(ignoreDefinition) && getCursor().getParent() != null &&
+                getCursor().getParent().getValue() instanceof J.ClassDeclaration) {
+                return super.visitIdentifier(ident, ctx);
+            }
             // if the ident's type is equal to the type we're looking for, and the classname of the type we're looking for is equal to the ident's string representation
             // Then transform it, otherwise leave it alone
             if (TypeUtils.isOfClassType(ident.getType(), originalType.getFullyQualifiedName())) {

@@ -69,10 +69,6 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
         PATCH
     }
 
-    private static final Pattern SEMVER_PATTERN = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)\\.?(\\d+)?(-.+)?$");
-    private static final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
-    private static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
-
     @Override
     public Map<GroupArtifact, String> getInitialValue(ExecutionContext ctx) {
         return new HashMap<>();
@@ -80,6 +76,9 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
 
     @Override
     public TreeVisitor<?, ExecutionContext> getScanner(Map<GroupArtifact, String> acc) {
+        final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
+        final Pattern SEMVER_PATTERN = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)\\.?(\\d+)?(-.+)?$");
+
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
@@ -111,12 +110,51 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
                         newVersion);
                 return t;
             }
+
+            private String incrementSemverDigit(String oldVersion) {
+                Matcher m = SEMVER_PATTERN.matcher(oldVersion);
+                if(!m.matches()) {
+                    return oldVersion;
+                }
+                String major = m.group(1);
+                String minor = m.group(2);
+                String patch = m.group(3);
+                // Semver does not have a concept of a fourth number, but it is common enough to support
+                String fourth = m.group(4);
+                String extra = m.group(5);
+                switch (digit) {
+                    case MAJOR:
+                        major = String.valueOf(Integer.parseInt(major) + 1);
+                        minor = "0";
+                        patch = "0";
+                        break;
+                    case MINOR:
+                        minor = String.valueOf(Integer.parseInt(minor) + 1);
+                        patch = "0";
+                        break;
+                    case PATCH:
+                        patch = String.valueOf(Integer.parseInt(patch) + 1);
+                        break;
+                }
+                if(fourth == null) {
+                    fourth = "";
+                } else {
+                    fourth = ".0";
+                }
+                if(extra == null) {
+                    extra = "";
+                }
+                return major + "." + minor + "." + patch + fourth + extra;
+            }
         };
+
     }
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(Map<GroupArtifact, String> acc) {
         return new MavenIsoVisitor<ExecutionContext>() {
+            final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
+            final XPathMatcher PROJECT_MATCHER = new XPathMatcher("/project");
 
             @Override
             public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
@@ -136,41 +174,5 @@ public class IncrementProjectVersion extends ScanningRecipe<Map<GroupArtifact, S
                         .visitNonNull(t, ctx);
             }
         };
-    }
-
-    private String incrementSemverDigit(String oldVersion) {
-        Matcher m = SEMVER_PATTERN.matcher(oldVersion);
-        if(!m.matches()) {
-            return oldVersion;
-        }
-        String major = m.group(1);
-        String minor = m.group(2);
-        String patch = m.group(3);
-        // Semver does not have a concept of a fourth number, but it is common enough to support
-        String fourth = m.group(4);
-        String extra = m.group(5);
-        switch (digit) {
-            case MAJOR:
-                major = String.valueOf(Integer.parseInt(major) + 1);
-                minor = "0";
-                patch = "0";
-                break;
-            case MINOR:
-                minor = String.valueOf(Integer.parseInt(minor) + 1);
-                patch = "0";
-                break;
-            case PATCH:
-                patch = String.valueOf(Integer.parseInt(patch) + 1);
-                break;
-        }
-        if(fourth == null) {
-            fourth = "";
-        } else {
-            fourth = ".0";
-        }
-        if(extra == null) {
-            extra = "";
-        }
-        return major + "." + minor + "." + patch + fourth + extra;
     }
 }
