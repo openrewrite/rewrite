@@ -1689,7 +1689,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         for (KtAnnotationEntry ktAnnotationEntry : annotationEntries) {
             J.Annotation anno = (J.Annotation) ktAnnotationEntry.accept(this, data);
-            anno = anno.withMarkers(anno.getMarkers().addIfAbsent(new Modifier(randomId())));
+            anno = anno.withMarkers(anno.getMarkers().addIfAbsent(new AnnotationConstructor(randomId())));
             rpAnnotations.add(padRight(anno, Space.EMPTY));
         }
 
@@ -1727,7 +1727,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             J.Annotation argAnno = new J.Annotation(
                     randomId(),
                     Space.EMPTY,
-                    Markers.EMPTY.addIfAbsent(new Modifier(randomId())),
+                    Markers.EMPTY.addIfAbsent(new AnnotationConstructor(randomId())),
                     (NameTree) requireNonNull(annotationEntry.getCalleeExpression()).accept(this, data),
                     annotationEntry.getValueArgumentList() != null ? mapValueArguments(annotationEntry.getValueArgumentList(), data) : null
             );
@@ -1899,6 +1899,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         PsiElementAssociations.ExpressionType type = psiElementAssociations.getCallType(expression);
         if (type == PsiElementAssociations.ExpressionType.CONSTRUCTOR) {
             JavaType.Method mt = methodInvocationType(expression);
+
             TypeTree name = (J.Identifier) expression.getCalleeExpression().accept(this, data);
             name = name.withType(mt != null ? mt.getReturnType() : JavaType.Unknown.getInstance());
             if (!expression.getTypeArguments().isEmpty()) {
@@ -1930,17 +1931,25 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 );
             }
 
-            return new J.NewClass(
-                    randomId(),
-                    deepPrefix(expression),
-                    Markers.EMPTY,
-                    null,
-                    Space.EMPTY,
-                    name,
-                    mapValueArgumentsMaybeWithTrailingLambda(expression.getValueArgumentList(), expression.getValueArguments(), data),
-                    null,
-                    mt
-            );
+            return isAnnotationConstructor(mt) ?
+                    new J.Annotation(
+                            randomId(),
+                            deepPrefix(expression),
+                            Markers.EMPTY.addIfAbsent(new AnnotationConstructor(randomId())),
+                            name,
+                            mapValueArgumentsMaybeWithTrailingLambda(expression.getValueArgumentList(), expression.getValueArguments(), data)
+                    ) :
+                    new J.NewClass(
+                            randomId(),
+                            deepPrefix(expression),
+                            Markers.EMPTY,
+                            null,
+                            Space.EMPTY,
+                            name,
+                            mapValueArgumentsMaybeWithTrailingLambda(expression.getValueArgumentList(), expression.getValueArguments(), data),
+                            null,
+                            mt
+                    );
         } else if (type == null || type == PsiElementAssociations.ExpressionType.METHOD_INVOCATION) {
             J j = expression.getCalleeExpression().accept(this, data);
             JRightPadded<Expression> select = null;
@@ -1986,6 +1995,19 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         } else {
             throw new UnsupportedOperationException("ExpressionType not found: " + expression.getCalleeExpression().getText());
         }
+    }
+
+    private boolean isAnnotationConstructor(@Nullable JavaType type) {
+        if (type instanceof JavaType.Method && !(((JavaType.Method) type).getDeclaringType() instanceof JavaType.Unknown)) {
+            return isAnnotationConstructor(((JavaType.Method) type).getDeclaringType());
+        }
+        if (type instanceof JavaType.Parameterized) {
+            return isAnnotationConstructor(((JavaType.Parameterized) type).getType());
+        }
+        if (type instanceof JavaType.Class) {
+            return ((JavaType.Class) type).getKind() == JavaType.FullyQualified.Kind.Annotation;
+        }
+        return false;
     }
 
     @Nullable
@@ -2339,43 +2361,50 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitDotQualifiedExpression(KtDotQualifiedExpression expression, ExecutionContext data) {
         assert expression.getSelectorExpression() != null;
+        Space prefix = deepPrefix(expression);
         if (expression.getSelectorExpression() instanceof KtCallExpression) {
             KtCallExpression callExpression = (KtCallExpression) expression.getSelectorExpression();
-            J j = callExpression.accept(this, data);
+            Space callExpressionPrefix = prefix(callExpression);
             Expression receiver = convertToExpression(expression.getReceiverExpression().accept(this, data));
 
-            if (j instanceof J.ParameterizedType) {
+            J j = callExpression.accept(this, data);
+            if (j instanceof J.Annotation) {
+                J.Annotation a = (J.Annotation) j;
+                a = a.withAnnotationType(a.getAnnotationType().withPrefix(callExpressionPrefix));
+                J.FieldAccess newName = new J.FieldAccess(
+                        randomId(),
+                        receiver.getPrefix(),
+                        Markers.EMPTY,
+                        receiver.withPrefix(Space.EMPTY),
+                        padLeft(suffix(expression.getReceiverExpression()), (J.Identifier) a.getAnnotationType()),
+                        a.getType()
+                );
+                return a.withAnnotationType(newName).withPrefix(prefix);
+            } else if (j instanceof J.ParameterizedType) {
                 J.ParameterizedType pt = (J.ParameterizedType) j;
-                if (pt != null) {
-                    pt = pt.withClazz(pt.getClazz().withPrefix(prefix(callExpression)));
-                    J.FieldAccess newName = new J.FieldAccess(
-                            randomId(),
-                            receiver.getPrefix(),
-                            Markers.EMPTY,
-                            receiver.withPrefix(Space.EMPTY),
-                            padLeft(suffix(expression.getReceiverExpression()), (J.Identifier) pt.getClazz()),
-                            pt.getType()
-                    );
-                    pt = pt.withClazz(newName);
-                }
-
-                return pt;
-            }
-
-            MethodCall methodInvocation = (MethodCall) callExpression.accept(this, data);
-
-            if (methodInvocation instanceof J.MethodInvocation) {
-                methodInvocation = ((J.MethodInvocation) methodInvocation).getPadding().withSelect(padRight(receiver, suffix(expression.getReceiverExpression())))
-                        .withName(((J.MethodInvocation) methodInvocation).getName().withPrefix(prefix(callExpression)))
-                        .withPrefix(deepPrefix(expression));
-            } else if (methodInvocation instanceof J.NewClass) {
+                pt = pt.withClazz(pt.getClazz().withPrefix(callExpressionPrefix));
+                J.FieldAccess newName = new J.FieldAccess(
+                        randomId(),
+                        receiver.getPrefix(),
+                        Markers.EMPTY,
+                        receiver.withPrefix(Space.EMPTY),
+                        padLeft(suffix(expression.getReceiverExpression()), (J.Identifier) pt.getClazz()),
+                        pt.getType()
+                );
+                return pt.withClazz(newName).withPrefix(prefix);
+            } else if (j instanceof J.MethodInvocation) {
+                J.MethodInvocation m = (J.MethodInvocation) j;
+                return m.getPadding().withSelect(padRight(receiver, suffix(expression.getReceiverExpression())))
+                        .withName(m.getName().withPrefix(callExpressionPrefix))
+                        .withPrefix(prefix);
+            } else if (j instanceof J.NewClass) {
+                J.NewClass n = (J.NewClass) j;
                 if (receiver instanceof J.FieldAccess || receiver instanceof J.Identifier) {
-                    J.NewClass cur = (J.NewClass) methodInvocation;
-                    cur = cur.withPrefix(deepPrefix(expression));
-                    if (cur.getClazz() instanceof J.ParameterizedType) {
-                        J.ParameterizedType pt = (J.ParameterizedType) cur.getClazz();
+                    n = n.withPrefix(prefix);
+                    if (n.getClazz() instanceof J.ParameterizedType) {
+                        J.ParameterizedType pt = (J.ParameterizedType) n.getClazz();
                         if (pt != null) {
-                            pt = pt.withClazz(pt.getClazz().withPrefix(prefix(callExpression)));
+                            pt = pt.withClazz(pt.getClazz().withPrefix(callExpressionPrefix));
                             J.FieldAccess newName = new J.FieldAccess(
                                     randomId(),
                                     receiver.getPrefix(),
@@ -2385,13 +2414,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                                     pt.getType()
                             );
                             pt = pt.withClazz(newName);
-                            cur = cur.withClazz(pt);
+                            n = n.withClazz(pt);
                         }
-                        methodInvocation = cur;
                     } else {
-                        J.Identifier id = (J.Identifier) cur.getClazz();
+                        J.Identifier id = (J.Identifier) n.getClazz();
                         if (id != null) {
-                            id = id.withPrefix(prefix(callExpression));
+                            id = id.withPrefix(callExpressionPrefix);
                             J.FieldAccess newName = new J.FieldAccess(
                                     randomId(),
                                     receiver.getPrefix(),
@@ -2400,18 +2428,18 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                                     padLeft(suffix(expression.getReceiverExpression()), id),
                                     id.getType()
                             );
-                            methodInvocation = cur.withClazz(newName);
+                            n = n.withClazz(newName).withPrefix(prefix);
                         }
                     }
                 }
+                return n;
             }
-
-            return methodInvocation;
+            throw new UnsupportedOperationException("Unsupported call expression " + j.getClass().getName());
         } else if (expression.getSelectorExpression() instanceof KtNameReferenceExpression) {
             // Maybe need to type check before creating a field access.
             return new J.FieldAccess(
                     randomId(),
-                    deepPrefix(expression),
+                    prefix,
                     Markers.EMPTY,
                     convertToExpression(expression.getReceiverExpression().accept(this, data).withPrefix(Space.EMPTY)),
                     padLeft(suffix(expression.getReceiverExpression()), (J.Identifier) expression.getSelectorExpression().accept(this, data)),

@@ -16,19 +16,15 @@
 package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
-import org.junitpioneer.jupiter.ExpectedToFail;
 import org.openrewrite.java.ChangeAnnotationAttributeName;
-import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RewriteTest;
 
-import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
 class ChangeAnnotationAttributeNameTest implements RewriteTest {
 
-    @ExpectedToFail
     @Test
-    public void runKotlin() {
+    public void changeAnnotationAttributes() {
         rewriteRun(
           spec -> spec.recipe(new ChangeAnnotationAttributeName(
               "org.junit.jupiter.api.Tag",
@@ -39,12 +35,12 @@ class ChangeAnnotationAttributeNameTest implements RewriteTest {
           kotlin(
             """
               package sample
-               
+              
               import org.junit.jupiter.api.Tag
               import org.junit.jupiter.api.Tags
-               
+              
               class SampleTest {
-               
+              
                   @Tags(
                       value = [
                           Tag(value = "Sample01"),
@@ -57,12 +53,12 @@ class ChangeAnnotationAttributeNameTest implements RewriteTest {
               """,
             """
               package sample
-               
+              
               import org.junit.jupiter.api.Tag
-               import org.junit.jupiter.api.Tags
-               
+              import org.junit.jupiter.api.Tags
+              
               class SampleTest {
-               
+              
                   @Tags(
                       value = [
                           Tag(newValue = "Sample01"),
@@ -73,47 +69,6 @@ class ChangeAnnotationAttributeNameTest implements RewriteTest {
                   }
               }
               """
-          )
-        );
-    }
-
-    // working well
-    @Test
-    public void runJava() {
-        rewriteRun(
-          spec -> spec.recipe(new ChangeAnnotationAttributeName(
-              "org.junit.jupiter.api.Tag",
-              "value",
-              "newValue"
-            ))
-            .parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api")),
-          java(
-            """
-                    package sample;
-                                                    
-                    import org.junit.jupiter.api.Tag;
-                    import org.junit.jupiter.api.Tags;
-                                                    
-                    public class SampleJavaTest {
-                                                    
-                        @Tags(value = {@Tag(value = "Sample"), @Tag(value = "Sample03")})
-                        public void runTest() {
-                        }
-                    }
-                    """,
-            """
-                    package sample;
-                                                    
-                    import org.junit.jupiter.api.Tag;
-                    import org.junit.jupiter.api.Tags;
-                                                    
-                    public class SampleJavaTest {
-                                                    
-                        @Tags(value = {@Tag(newValue = "Sample"), @Tag(newValue = "Sample03")})
-                        public void runTest() {
-                        }
-                    }
-                    """
           )
         );
     }

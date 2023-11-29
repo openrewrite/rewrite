@@ -467,7 +467,8 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         @Override
         public J visitAnnotation(J.Annotation annotation, PrintOutputCapture<P> p) {
             beforeSyntax(annotation, Space.Location.ANNOTATION_PREFIX, p);
-            boolean isKModifier = annotation.getMarkers().findFirst(Modifier.class).isPresent();
+            // Modifier is used for backwards compatibility.
+            boolean isKModifier = annotation.getMarkers().findFirst(Modifier.class).isPresent() || annotation.getMarkers().findFirst(AnnotationConstructor.class).isPresent();
             if (!isKModifier) {
                 p.append("@");
             }

@@ -21,13 +21,23 @@ import org.openrewrite.marker.Marker;
 
 import java.util.UUID;
 
-@Deprecated
+/**
+ * The construction of new annotations does not require the `@` character.
+ * Example:
+ *  @Tags(
+ *      value = [
+ *          Tag(value = "Sample01"),
+ *          Tag(value = "Sample02"),
+ *      ]
+ *  )
+ */
+@SuppressWarnings("JavadocDeclaration")
 @Value
 @With
-public class Modifier implements Marker {
+public class AnnotationConstructor implements Marker {
     UUID id;
 
-    public Modifier(UUID id) {
+    public AnnotationConstructor(UUID id) {
         this.id = id;
     }
 }
