@@ -22,11 +22,11 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-public class FindKotlinSourcesTest implements RewriteTest {
+class FindKotlinSourcesTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(new FindKotlinSources());
+        spec.recipe(new FindKotlinSources(false));
     }
 
     @DocumentExample
