@@ -71,8 +71,14 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 data: MutableMap<PsiElement, MutableList<FirInfo>>
             ) {
                 super.visitResolvedTypeRef(resolvedTypeRef, data)
-                if (resolvedTypeRef.type is ConeClassLikeType && resolvedTypeRef.type.typeArguments.isNotEmpty() && resolvedTypeRef.psi is KtTypeReference) {
-                    visitType(resolvedTypeRef.type, resolvedTypeRef.psi as KtTypeReference)
+                if (resolvedTypeRef.psi is KtTypeReference) {
+                    if (resolvedTypeRef.type is ConeClassLikeType) {
+                        if (resolvedTypeRef.type.typeArguments.isNotEmpty() && resolvedTypeRef.psi is KtTypeReference) {
+                            visitType(resolvedTypeRef.type, resolvedTypeRef.psi as KtTypeReference)
+                        }
+                    } else if (resolvedTypeRef.type is ConeTypeParameterType) {
+                        visitType(resolvedTypeRef.type, resolvedTypeRef.psi as KtTypeReference)
+                    }
                 }
             }
 
@@ -80,23 +86,28 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 if (firType is ConeClassLikeType) {
                     val psiTypeArguments = psiType.typeElement!!.typeArgumentsAsTypes
                     if (psiTypeArguments.size != firType.typeArguments.size) {
-                        // TODO check why this is happening
                         return
                     }
+
                     for ((index, typeArgument) in firType.typeArguments.withIndex()) {
                         val psiTypeArgument = psiTypeArguments[index] ?: continue
                         visitType(typeArgument, psiTypeArgument)
                         typeMap[psiTypeArgument] = typeArgument
                     }
+                } else {
+                    typeMap[psiType] = firType
                 }
             }
         }.visitFile(file, elementMap)
     }
 
-    fun type(psiElement: PsiElement, owner: FirElement?): JavaType? {
-        if (typeMap.isNotEmpty() && psiElement is KtNameReferenceExpression) {
-            // TODO can / should we make this more generic?
-            val type = typeMap[psiElement.parent.parent]
+    fun type(psiElement: PsiElement?, owner: FirElement?): JavaType? {
+        if (psiElement != null && !elementMap.containsKey(psiElement) &&
+            typeMap.isNotEmpty() && psiElement is KtNameReferenceExpression) {
+            val type = typeMap[when (val parent = psiElement.parent.parent) {
+                is KtNullableType -> parent.parent
+                else -> parent
+            }]
             if (type != null) {
                 return typeMapping.type(type, owner)
             }
@@ -105,7 +116,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         return if (fir != null) typeMapping.type(fir, owner) else null
     }
 
-    fun primary(psiElement: PsiElement) =
+    fun primary(psiElement: PsiElement?) =
         fir(psiElement) { it.source is KtRealPsiSourceElement }
 
     fun methodDeclarationType(psi: PsiElement): JavaType.Method? {

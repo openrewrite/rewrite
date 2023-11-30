@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.Parser;
@@ -955,6 +956,38 @@ public class KotlinTypeMappingTest {
                       }
                   }
                   """
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/473")
+        @ParameterizedTest
+        @ValueSource(strings = {
+          // Multiple levels of parameterized types
+          "val map: Map<Map<Int, Int>, Map<Int?, Int?>> = mapOf()",
+          // ConeTypeParameterType
+          "val <T : Any> Collection<T>.nullable: Collection<T?>"
+        })
+        void typeParameters(String value) {
+            rewriteRun(
+              kotlin("%s".formatted(value),
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
+                            if ("Int".equals(identifier.getSimpleName())) {
+                                assertThat(identifier.getType().toString()).isEqualTo("kotlin.Int");
+                                found.set(true);
+                            } else if ("T".equals(identifier.getSimpleName())) {
+                                assertThat(identifier.getType().toString()).isEqualTo("Generic{T extends kotlin.Any}");
+                                found.set(true);
+                            }
+                            return super.visitIdentifier(identifier, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isTrue();
+                })
               )
             );
         }
