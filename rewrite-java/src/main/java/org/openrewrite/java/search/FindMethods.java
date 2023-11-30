@@ -61,7 +61,7 @@ public class FindMethods extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Find method usages by pattern.";
+        return "Find method calls by pattern.";
     }
 
     @Override
