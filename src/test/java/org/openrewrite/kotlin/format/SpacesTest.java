@@ -159,12 +159,14 @@ class SpacesTest implements RewriteTest {
                       foo ()
                       val test = Test ()
                   }
+                  class Test
                   """,
                 """
                   fun foo() {
                       foo()
                       val test = Test()
                   }
+                  class Test
                   """
               )
             );
