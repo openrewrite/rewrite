@@ -234,7 +234,7 @@ public class DeclarativeRecipe extends Recipe {
     }
 
     @Override
-    public List<Recipe> getRecipeList() {
+    public final List<Recipe> getRecipeList() {
         if(preconditions.isEmpty()) {
             return recipeList;
         }
