@@ -863,6 +863,27 @@ public class KotlinTypeMappingTest {
             );
         }
 
+        @Test
+        void unknownIdentifier() {
+            rewriteRun(
+              kotlin(
+                //language=none
+                "class A : RemoteStub",
+                    spec -> spec.afterRecipe(cu -> {
+                        new KotlinIsoVisitor<Integer>() {
+                            @Override
+                            public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
+                                if ("RemoteStub".equals(identifier.getSimpleName())) {
+                                    assertThat(identifier.getType()).isNull();
+                                }
+                                return super.visitIdentifier(identifier, integer);
+                            }
+                        }.visit(cu, 0);
+                })
+              )
+            );
+        }
+
         @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/461")
         @Test
         void multipleBounds() {

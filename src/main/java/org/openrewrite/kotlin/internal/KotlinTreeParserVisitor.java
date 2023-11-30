@@ -3430,7 +3430,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 Markers.EMPTY,
                 emptyList(),
                 name,
-                type,
+                type instanceof JavaType.Unknown ? null : type,
                 fieldType
         );
     }
