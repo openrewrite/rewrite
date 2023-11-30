@@ -79,9 +79,14 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             private fun visitType(firType: ConeTypeProjection, psiType: KtTypeReference) {
                 if (firType is ConeClassLikeType) {
                     val psiTypeArguments = psiType.typeElement!!.typeArgumentsAsTypes
+                    if (psiTypeArguments.size != firType.typeArguments.size) {
+                        // TODO check why this is happening
+                        return
+                    }
                     for ((index, typeArgument) in firType.typeArguments.withIndex()) {
-                        visitType(typeArgument, psiTypeArguments[index])
-                        typeMap[psiTypeArguments[index]] = typeArgument
+                        val psiTypeArgument = psiTypeArguments[index] ?: continue
+                        visitType(typeArgument, psiTypeArgument)
+                        typeMap[psiTypeArgument] = typeArgument
                     }
                 }
             }
