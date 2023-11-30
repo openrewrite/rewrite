@@ -24,6 +24,7 @@ import org.jetbrains.kotlin.fir.declarations.impl.FirDefaultPropertySetter
 import org.jetbrains.kotlin.fir.expressions.*
 import org.jetbrains.kotlin.fir.expressions.impl.FirElseIfTrueCondition
 import org.jetbrains.kotlin.fir.expressions.impl.FirSingleExpressionBlock
+import org.jetbrains.kotlin.fir.psi
 import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.resolved
@@ -32,8 +33,7 @@ import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirFunctionSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirVariableSymbol
-import org.jetbrains.kotlin.fir.types.FirResolvedTypeRef
-import org.jetbrains.kotlin.fir.types.FirUserTypeRef
+import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor
 import org.jetbrains.kotlin.psi
 import org.jetbrains.kotlin.psi.*
@@ -43,6 +43,7 @@ import org.openrewrite.kotlin.KotlinTypeMapping
 class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFile) {
 
     private val elementMap: MutableMap<PsiElement, MutableList<FirInfo>> = HashMap()
+    private val typeMap: MutableMap<PsiElement, ConeTypeProjection> = HashMap()
 
     fun initialize() {
         var depth = 0
@@ -64,15 +65,42 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 }
                 depth--
             }
+
+            override fun visitResolvedTypeRef(
+                resolvedTypeRef: FirResolvedTypeRef,
+                data: MutableMap<PsiElement, MutableList<FirInfo>>
+            ) {
+                super.visitResolvedTypeRef(resolvedTypeRef, data)
+                if (resolvedTypeRef.type is ConeClassLikeType && resolvedTypeRef.type.typeArguments.isNotEmpty() && resolvedTypeRef.psi is KtTypeReference) {
+                    visitType(resolvedTypeRef.type, resolvedTypeRef.psi as KtTypeReference)
+                }
+            }
+
+            private fun visitType(firType: ConeTypeProjection, psiType: KtTypeReference) {
+                if (firType is ConeClassLikeType) {
+                    val psiTypeArguments = psiType.typeElement!!.typeArgumentsAsTypes
+                    for ((index, typeArgument) in firType.typeArguments.withIndex()) {
+                        visitType(typeArgument, psiTypeArguments[index])
+                        typeMap[psiTypeArguments[index]] = typeArgument
+                    }
+                }
+            }
         }.visitFile(file, elementMap)
     }
 
-    fun type(psiElement: PsiElement?, owner: FirElement?): JavaType? {
+    fun type(psiElement: PsiElement, owner: FirElement?): JavaType? {
+        if (typeMap.isNotEmpty() && psiElement is KtNameReferenceExpression) {
+            // TODO can / should we make this more generic?
+            val type = typeMap[psiElement.parent.parent]
+            if (type != null) {
+                return typeMapping.type(type, owner)
+            }
+        }
         val fir = primary(psiElement)
         return if (fir != null) typeMapping.type(fir, owner) else null
     }
 
-    fun primary(psiElement: PsiElement?) =
+    fun primary(psiElement: PsiElement) =
         fir(psiElement) { it.source is KtRealPsiSourceElement }
 
     fun methodDeclarationType(psi: PsiElement): JavaType.Method? {
@@ -171,7 +199,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
         val allFirInfos = elementMap[p]!!
         val directFirInfos = allFirInfos.filter { filter.invoke(it.fir) }
         return if (directFirInfos.isNotEmpty())
-        // It might be more reliable to have explicit mappings in case something changes.
+            // It might be more reliable to have explicit mappings in case something changes.
             return when {
                 directFirInfos.size == 1 -> directFirInfos[0].fir
                 else -> {
