@@ -40,6 +40,7 @@ import org.jetbrains.kotlin.load.java.structure.impl.classFiles.BinaryJavaTypePa
 import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.resolve.jvm.JvmClassName
 import org.jetbrains.kotlin.types.Variance
 import org.openrewrite.java.JavaTypeSignatureBuilder
 import org.openrewrite.java.tree.JavaType
@@ -369,9 +370,9 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                     val source: JvmPackagePartSource? = resolvedSymbol.fir.containerSource as JvmPackagePartSource?
                     if (source != null) {
                         declaringSig = if (source.facadeClassName != null) {
-                            convertKotlinFqToJavaFq(source.facadeClassName.toString())
+                            (source.facadeClassName as JvmClassName).fqNameForTopLevelClassMaybeWithDollars.asString()
                         } else {
-                            convertKotlinFqToJavaFq(source.className.toString())
+                            source.className.fqNameForTopLevelClassMaybeWithDollars.asString()
                         }
                     }
                 }
@@ -684,7 +685,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 .replace(".", "$")
                 .replace("/", ".")
                 .replace("?", "")
-            return if (cleanedFqn.startsWith(".")) cleanedFqn.replaceFirst(".".toRegex(), "") else cleanedFqn
+            return if (cleanedFqn.startsWith(".")) cleanedFqn.substring(1) else cleanedFqn
         }
     }
 }

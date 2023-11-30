@@ -48,6 +48,7 @@ import org.jetbrains.kotlin.fir.types.jvm.FirJavaTypeRef
 import org.jetbrains.kotlin.load.java.structure.*
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.*
 import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource
+import org.jetbrains.kotlin.resolve.jvm.JvmClassName
 import org.jetbrains.kotlin.types.ConstantValueKind
 import org.jetbrains.kotlin.types.Variance
 import org.openrewrite.java.JavaTypeMapping
@@ -56,7 +57,6 @@ import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.JavaType.*
 import org.openrewrite.java.tree.TypeUtils
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.convertClassIdToFqn
-import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.convertKotlinFqToJavaFq
 import kotlin.collections.ArrayList
 
 @Suppress("DuplicatedCode")
@@ -706,9 +706,9 @@ class KotlinTypeMapping(
                     val source: JvmPackagePartSource? = resolvedSymbol.fir.containerSource as JvmPackagePartSource?
                     if (source != null) {
                         declaringType = if (source.facadeClassName != null) {
-                            createShallowClass(convertKotlinFqToJavaFq(source.facadeClassName.toString()))
+                            createShallowClass((source.facadeClassName as JvmClassName).fqNameForTopLevelClassMaybeWithDollars.asString())
                         } else {
-                            createShallowClass(convertKotlinFqToJavaFq(source.className.toString()))
+                            createShallowClass(source.className.fqNameForTopLevelClassMaybeWithDollars.asString())
                         }
                     }
                 }

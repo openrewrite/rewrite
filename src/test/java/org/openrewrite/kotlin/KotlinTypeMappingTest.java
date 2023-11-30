@@ -40,7 +40,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.in;
 import static org.openrewrite.ExecutionContext.REQUIRE_PRINT_EQUALS_INPUT;
 import static org.openrewrite.java.tree.JavaType.GenericTypeVariable.Variance.*;
 import static org.openrewrite.kotlin.Assertions.kotlin;
