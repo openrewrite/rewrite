@@ -90,7 +90,7 @@ class HasSourcePathTest implements RewriteTest {
 
         @Override
         public TreeVisitor<?, ExecutionContext> getVisitor() {
-            return Preconditions.check(new HasSourcePath<>(syntax, filePattern),
+            return Preconditions.check(new HasSourcePath(syntax, filePattern),
               new ChangeText(toText).getVisitor());
         }
     }
