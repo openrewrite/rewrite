@@ -991,5 +991,30 @@ public class KotlinTypeMappingTest {
               )
             );
         }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/479")
+        @Test
+        void quotedIdentifier() {
+            //noinspection RemoveRedundantBackticks,RemoveRedundantQualifierName
+            rewriteRun(
+              kotlin(
+                "val n = java.lang.Integer.`MAX_VALUE`",
+                spec -> spec.afterRecipe(cu -> {
+                      AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
+                            if ("MAX_VALUE".equals(identifier.getSimpleName())) {
+                                assertThat(identifier.getFieldType().getName()).isEqualTo("MAX_VALUE");
+                                found.set(true);
+                            }
+                            return super.visitIdentifier(identifier, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
     }
 }

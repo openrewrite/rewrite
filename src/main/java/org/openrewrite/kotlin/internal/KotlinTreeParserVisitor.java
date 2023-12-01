@@ -46,6 +46,7 @@ import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.marker.Quoted;
 import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinParser;
@@ -3451,12 +3452,18 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     private J.Identifier createIdentifier(String name, Space prefix,
                                           @Nullable JavaType type,
                                           @Nullable JavaType.Variable fieldType) {
+        Markers markers = Markers.EMPTY;
+        String updated = name;
+        if (name.startsWith("`")) {
+            updated = updated.substring(1, updated.length() - 1);
+            markers = markers.addIfAbsent(new Quoted(randomId()));
+        }
         return new J.Identifier(
                 randomId(),
                 prefix,
-                Markers.EMPTY,
+                markers,
                 emptyList(),
-                name,
+                updated,
                 type instanceof JavaType.Unknown ? null : type,
                 fieldType
         );

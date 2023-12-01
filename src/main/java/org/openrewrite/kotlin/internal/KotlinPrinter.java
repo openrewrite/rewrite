@@ -23,6 +23,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.marker.ImplicitReturn;
 import org.openrewrite.java.marker.OmitParentheses;
+import org.openrewrite.java.marker.Quoted;
 import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
@@ -751,7 +752,14 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             visit(ident.getAnnotations(), p);
             beforeSyntax(ident, Space.Location.IDENTIFIER_PREFIX, p);
             visitSpace(Space.EMPTY, Space.Location.ANNOTATIONS, p);
+            boolean isQuoted = ident.getMarkers().findFirst(Quoted.class).isPresent();
+            if (isQuoted) {
+                p.append("`");
+            }
             p.append(ident.getSimpleName());
+            if (isQuoted) {
+                p.append("`");
+            }
             afterSyntax(ident, p);
             return ident;
         }
