@@ -52,7 +52,7 @@ class AnonymousFunctionTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              val filter = null?.let { _ ->
+              val filter = null   ?. let { _ ->
                   { false
                   }
               }

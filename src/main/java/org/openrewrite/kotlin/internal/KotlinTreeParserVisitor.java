@@ -1086,8 +1086,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     @Override
     public J visitSafeQualifiedExpression(KtSafeQualifiedExpression expression, ExecutionContext data) {
         J j = visitQualifiedExpression(expression, data);
-        ASTNode safeAccess = expression.getNode().findChildByType(KtTokens.SAFE_ACCESS);
-        return j.withMarkers(j.getMarkers().addIfAbsent(new IsNullSafe(randomId(), safeAccess != null ? prefix(safeAccess.getPsi()) : Space.EMPTY)));
+        return j.withMarkers(j.getMarkers().addIfAbsent(new IsNullSafe(randomId(), Space.EMPTY)));
     }
 
     @Override

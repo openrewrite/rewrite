@@ -425,9 +425,6 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         } else if (marker instanceof IsNullable) {
             IsNullable isn = (IsNullable) marker;
             m = isn.withPrefix(visitSpace(isn.getPrefix(), KSpace.Location.IS_NULLABLE_PREFIX, p));
-        } else if (marker instanceof IsNullSafe) {
-            IsNullSafe ins = (IsNullSafe) marker;
-            m = ins.withPrefix(visitSpace(ins.getPrefix(), KSpace.Location.IS_NULLABLE_PREFIX, p));
         } else if (marker instanceof TypeReferencePrefix) {
             TypeReferencePrefix tr = (TypeReferencePrefix) marker;
             m = tr.withPrefix(visitSpace(tr.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p));

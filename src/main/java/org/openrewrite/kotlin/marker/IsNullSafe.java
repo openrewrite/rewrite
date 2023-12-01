@@ -26,10 +26,12 @@ import java.util.UUID;
 @With
 public class IsNullSafe implements Marker {
     UUID id;
+
+    @Deprecated
     Space prefix;
 
     public IsNullSafe(UUID id, Space prefix) {
         this.id = id;
-        this.prefix = prefix;
+        this.prefix = Space.EMPTY;
     }
 }
