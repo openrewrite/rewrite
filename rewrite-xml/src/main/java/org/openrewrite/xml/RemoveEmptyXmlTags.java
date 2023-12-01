@@ -28,7 +28,7 @@ public class RemoveEmptyXmlTags extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Removes XML tags that do not have attributes or children.";
+        return "Removes XML tags that do not have attributes or children, including self closing tags.";
     }
 
     @Override
