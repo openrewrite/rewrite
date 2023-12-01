@@ -22,14 +22,11 @@ public class RemoveEmptyTagsVisitor<P> extends XmlVisitor<P> {
     public Xml visitTag(Xml.Tag tag, P p) {
         Xml.Tag t = (Xml.Tag) super.visitTag(tag, p);
 
-        if (isEmptyTag(t) || (t.getClosing() != null && t.getClosing().isSelfClosing(t))) {
+        if (t != null
+            && (t.getContent() == null || t.getContent().isEmpty())
+            && t.getAttributes().isEmpty()) {
             return null; // Remove tags that are either empty or self-closing.
         }
-
         return t;
-    }
-
-    private boolean isEmptyTag(Xml.Tag tag) {
-        return tag != null && (tag.getContent() == null || tag.getContent().isEmpty()) && tag.getAttributes().isEmpty();
     }
 }
