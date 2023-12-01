@@ -56,7 +56,7 @@ public class HasSourcePath extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Matches a source file based on its path, for use as preconditions. " +
+        return "Matches a source file based on its path, for use as precondition. " +
                "The path can be matched using either glob or regex syntax. " +
                "If no syntax is specified, glob syntax is used by default. " +
                "If no file pattern is specified, all source files are matched. " +
