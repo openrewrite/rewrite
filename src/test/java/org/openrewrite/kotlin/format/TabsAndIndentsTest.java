@@ -2250,13 +2250,17 @@ class TabsAndIndentsTest implements RewriteTest {
             """
               fun f(): String? {
                   val values = (listOf("") as List<String>?)
-                              ?.map { it }
+                      ?.map { it }
                           ?: return null
                   return values.joinToString("")
               }
               """
           )
         );
+    }
+
+    @Test
+    void ternaryIndentation2() {
         rewriteRun(
           wrappingAndBraces(style -> style.withElvisExpressions(style.getElvisExpressions().withUseContinuationIndent(true))),
           kotlin(
@@ -2264,14 +2268,14 @@ class TabsAndIndentsTest implements RewriteTest {
               fun f(): String? {
                   val values = (listOf("") as List<String>?)
                       ?.map { it }
-                          ?: return null
+                      ?: return null
                   return values.joinToString("")
               }
               """,
             """
               fun f(): String? {
                   val values = (listOf("") as List<String>?)
-                              ?.map { it }
+                      ?.map { it }
                           ?: return null
                   return values.joinToString("")
               }
