@@ -61,6 +61,32 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Test
+    void changeEscapedType() {
+        rewriteRun(
+          kotlin(
+            """
+              package a.b
+              class Original
+              """),
+          kotlin(
+            """
+              import a.b.Original
+              
+              class A {
+                  val type : `Original` = Original()
+              }
+              """,
+            """
+              import x.y.Target
+              
+              class A {
+                  val type : `Target` = Target()
+              }
+              """
+          )
+        );
+    }
 
     @Test
     void changeImportAlias() {
