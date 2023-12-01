@@ -22,7 +22,6 @@ import org.openrewrite.Option;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 
-import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Set;
 
@@ -31,12 +30,6 @@ import static java.util.Collections.emptyList;
 @Value
 @EqualsAndHashCode(callSuper = false)
 public class ChangeText extends Recipe {
-    @Option(displayName = "Relative File Name",
-            description = "File name, using a relative path. If a non-plaintext file already exists at this location, then this recipe will do nothing.",
-            example = "foo/bar/baz.txt",
-            required = false)
-    String relativeFileName;
-
     @Option(displayName = "Text after change",
             description = "The text file will have only this text after the change.",
             example = "Some text.")
@@ -54,7 +47,8 @@ public class ChangeText extends Recipe {
 
     @Override
     public String getDescription() {
-        return "Completely replaces the contents of the text file with other text.";
+        return "Completely replaces the contents of the text file with other text. " +
+               "Usually used together with preconditions to limit which files are changed.";
     }
 
     @Override
@@ -62,12 +56,9 @@ public class ChangeText extends Recipe {
         return new PlainTextVisitor<ExecutionContext>() {
             @Override
             public PlainText visitText(PlainText text, ExecutionContext ctx) {
-                if (relativeFileName == null || text.getSourcePath().equals(Paths.get(relativeFileName))) {
-                    return text
-                            .withSnippets(emptyList())
-                            .withText(toText);
-                }
-                return super.visitText(text, ctx);
+                return text
+                        .withSnippets(emptyList())
+                        .withText(toText);
             }
         };
     }
