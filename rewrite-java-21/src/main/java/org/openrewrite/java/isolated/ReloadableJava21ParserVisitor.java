@@ -1636,12 +1636,13 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     private <J2 extends J> List<JRightPadded<J2>> convertAll(List<? extends Tree> trees,
                                                              Function<Tree, Space> innerSuffix,
                                                              Function<Tree, Space> suffix) {
-        if (trees.isEmpty()) {
+        int size = trees.size();
+        if (size == 0) {
             return emptyList();
         }
-        List<JRightPadded<J2>> converted = new ArrayList<>(trees.size());
-        for (int i = 0; i < trees.size(); i++) {
-            converted.add(convert(trees.get(i), i == trees.size() - 1 ? suffix : innerSuffix));
+        List<JRightPadded<J2>> converted = new ArrayList<>(size);
+        for (int i = 0; i < size; i++) {
+            converted.add(convert(trees.get(i), i == size - 1 ? suffix : innerSuffix));
         }
         return converted;
     }
