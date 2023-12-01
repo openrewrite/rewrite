@@ -16,10 +16,7 @@
 package org.openrewrite.config;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.RequiredArgsConstructor;
-import lombok.Value;
+import lombok.*;
 import lombok.experimental.NonFinal;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.*;
@@ -64,10 +61,14 @@ public class DeclarativeRecipe extends Recipe {
     private final List<Maintainer> maintainers;
 
     private final List<Recipe> uninitializedRecipes = new ArrayList<>();
-    private final List<Recipe> recipeList = new ArrayList<>();
+
+    @Setter
+    private List<Recipe> recipeList = new ArrayList<>();
 
     private final List<Recipe> uninitializedPreconditions = new ArrayList<>();
-    private final List<Recipe> preconditions = new ArrayList<>();
+
+    @Setter
+    private List<Recipe> preconditions = new ArrayList<>();
 
     public void addPrecondition(Recipe recipe) {
         uninitializedPreconditions.add(recipe);
@@ -232,9 +233,8 @@ public class DeclarativeRecipe extends Recipe {
         }
     }
 
-
     @Override
-    public List<Recipe> getRecipeList() {
+    public final List<Recipe> getRecipeList() {
         if(preconditions.isEmpty()) {
             return recipeList;
         }
