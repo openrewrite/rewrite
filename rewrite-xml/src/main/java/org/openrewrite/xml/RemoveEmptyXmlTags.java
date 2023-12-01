@@ -33,6 +33,15 @@ public class RemoveEmptyXmlTags extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new RemoveEmptyTagsVisitor<>();
+        return new XmlIsoVisitor<ExecutionContext>() {
+            @Override
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
+                if (t != null && (t.getContent() == null || t.getContent().isEmpty()) && t.getAttributes().isEmpty()) {
+                    doAfterVisit(new RemoveContentVisitor<>(t, true));
+                }
+                return t;
+            }
+        };
     }
 }
