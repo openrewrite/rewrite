@@ -37,8 +37,7 @@ class DeleteMethodArgumentTest implements RewriteTest {
     @Test
     void deleteMiddleArgumentDeclarative() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteMethodArgument("B foo(int, int, int)", 1))
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+          spec -> spec.recipes(new DeleteMethodArgument("B foo(int, int, int)", 1)),
           java(b),
           java(
             "public class A {{ B.foo(0, 1, 2); }}",
@@ -50,8 +49,7 @@ class DeleteMethodArgumentTest implements RewriteTest {
     @Test
     void deleteMiddleArgument() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteMethodArgument("B foo(int, int, int)", 1))
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+          spec -> spec.recipe(new DeleteMethodArgument("B foo(int, int, int)", 1)),
           java(b),
           java(
             "public class A {{ B.foo(0, 1, 2); }}",
@@ -65,7 +63,7 @@ class DeleteMethodArgumentTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipes(
             new DeleteMethodArgument("B foo(int, int, int)", 1),
-            new DeleteMethodArgument("B foo(int, int, int)", 1)
+            new DeleteMethodArgument("B foo(int, int)", 1)
           ),
           java(b),
           java("public class A {{ B.foo(0, 1, 2); }}",
@@ -98,8 +96,7 @@ class DeleteMethodArgumentTest implements RewriteTest {
     @Test
     void deleteConstructorArgument() {
         rewriteRun(
-          spec -> spec.recipe(new DeleteMethodArgument("B <constructor>(int)", 0))
-            .cycles(1).expectedCyclesThatMakeChanges(1),
+          spec -> spec.recipe(new DeleteMethodArgument("B <constructor>(int)", 0)),
           java(b),
           java(
             "public class A { B b = new B(0); }",

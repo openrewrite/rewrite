@@ -63,41 +63,41 @@ public class FindEmptyMethods extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 if (classDecl.hasModifier(J.Modifier.Type.Abstract)) {
                     return classDecl;
                 }
 
                 if (hasSinglePublicNoArgsConstructor(classDecl.getBody().getStatements())) {
-                    executionContext.putMessage("CHECK_CONSTRUCTOR", true);
+                    getCursor().putMessage("CHECK_CONSTRUCTOR", true);
                 }
 
-                return super.visitClassDeclaration(classDecl, executionContext);
+                return super.visitClassDeclaration(classDecl, ctx);
             }
 
             @Override
-            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
                 Boolean checkConstructor = null;
                 if (method.isConstructor()) {
-                    checkConstructor = executionContext.getMessage("CHECK_CONSTRUCTOR") != null;
+                    checkConstructor = getCursor().getNearestMessage("CHECK_CONSTRUCTOR") != null;
                 }
                 if (checkConstructor != null && checkConstructor || isEmptyMethod(method)) {
                     method = SearchResult.found(method);
                 }
-                return super.visitMethodDeclaration(method, executionContext);
+                return super.visitMethodDeclaration(method, ctx);
             }
 
             private boolean isEmptyMethod(J.MethodDeclaration method) {
                 return !method.isConstructor() && !isInterfaceMethod(method) &&
-                        (matchOverrides == null || !matchOverrides && !TypeUtils.isOverride(method.getMethodType()) || matchOverrides) &&
-                        (method.getBody() == null || method.getBody().getStatements().isEmpty() && method.getBody().getEnd().getComments().isEmpty());
+                       (matchOverrides == null || !matchOverrides && !TypeUtils.isOverride(method.getMethodType()) || matchOverrides) &&
+                       (method.getBody() == null || method.getBody().getStatements().isEmpty() && method.getBody().getEnd().getComments().isEmpty());
             }
 
             private boolean isInterfaceMethod(J.MethodDeclaration method) {
                 //noinspection ConstantConditions
                 return method.getMethodType().getDeclaringType() != null
-                        && method.getMethodType().getDeclaringType().getKind() == JavaType.FullyQualified.Kind.Interface
-                        && !method.hasModifier(J.Modifier.Type.Default);
+                       && method.getMethodType().getDeclaringType().getKind() == JavaType.FullyQualified.Kind.Interface
+                       && !method.hasModifier(J.Modifier.Type.Default);
             }
 
             private boolean hasSinglePublicNoArgsConstructor(List<Statement> classStatements) {
@@ -107,9 +107,9 @@ public class FindEmptyMethods extends Recipe {
                         .filter(J.MethodDeclaration::isConstructor)
                         .collect(Collectors.toList());
                 return constructors.size() == 1 &&
-                        constructors.get(0).hasModifier(J.Modifier.Type.Public) &&
-                        constructors.get(0).getParameters().size() == 1 &&
-                        constructors.get(0).getParameters().get(0) instanceof J.Empty;
+                       constructors.get(0).hasModifier(J.Modifier.Type.Public) &&
+                       constructors.get(0).getParameters().size() == 1 &&
+                       constructors.get(0).getParameters().get(0) instanceof J.Empty;
             }
         };
     }

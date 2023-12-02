@@ -131,14 +131,23 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             return space;
         }
 
+        if (loc == Space.Location.METHOD_SELECT_SUFFIX) {
+            Integer chainedIndent = getCursor().getParentTreeCursor().getMessage("chainedIndent");
+            if (chainedIndent != null) {
+                getCursor().getParentTreeCursor().putMessage("lastIndent", chainedIndent);
+                return indentTo(space, chainedIndent, loc);
+            }
+        }
+
         int indent = getCursor().getNearestMessage("lastIndent", 0);
 
         IndentType indentType = getCursor().getParentOrThrow().getNearestMessage("indentType", IndentType.ALIGN);
 
         // block spaces are always aligned to their parent
+        Object value = getCursor().getValue();
         boolean alignBlockPrefixToParent = loc.equals(Space.Location.BLOCK_PREFIX) && space.getWhitespace().contains("\n") &&
                 // ignore init blocks.
-                (getCursor().getValue() instanceof J.Block && !(getCursor().getParentTreeCursor().getValue() instanceof J.Block));
+                (value instanceof J.Block && !(getCursor().getParentTreeCursor().getValue() instanceof J.Block));
 
         boolean alignBlockToParent = loc.equals(Space.Location.BLOCK_END) ||
                 loc.equals(Space.Location.NEW_ARRAY_INITIALIZER_SUFFIX) ||
@@ -167,8 +176,10 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         Space s = indentTo(space, indent, loc);
-        if (!(getCursor().getValue() instanceof JLeftPadded) && !(getCursor().getValue() instanceof J.EnumValueSet)) {
+        if (value instanceof J && !(value instanceof J.EnumValueSet)) {
             getCursor().putMessage("lastIndent", indent);
+        } else if (loc == Space.Location.METHOD_SELECT_SUFFIX) {
+            getCursor().getParentTreeCursor().putMessage("lastIndent", indent);
         }
 
         return s;
@@ -224,10 +235,12 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             if (method != null) {
                                 int alignTo;
                                 if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
-                                    alignTo = firstArg.getPrefix().getLastWhitespace().length() - 1;
+                                    alignTo = getLengthOfWhitespace(firstArg.getPrefix().getLastWhitespace());
                                 } else {
                                     String source = method.print(getCursor());
-                                    alignTo = source.indexOf(firstArg.print(getCursor())) - 1;
+                                    int firstArgIndex = source.indexOf(firstArg.print(getCursor()));
+                                    int lineBreakIndex = source.lastIndexOf('\n', firstArgIndex);
+                                    alignTo = (firstArgIndex - (lineBreakIndex == -1 ? 0 : lineBreakIndex)) - 1;
                                 }
                                 getCursor().getParentOrThrow().putMessage("lastIndent", alignTo - style.getContinuationIndent());
                                 elem = visitAndCast(elem, p);
@@ -255,6 +268,15 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         }
                         elem = visitAndCast(elem, p);
                         after = indentTo(right.getAfter(), indent, loc.getAfterLocation());
+                        if (!after.getComments().isEmpty() || after.getLastWhitespace().contains("\n")) {
+                            Cursor parent = getCursor().getParentTreeCursor();
+                            Cursor grandparent = parent.getParentTreeCursor();
+                            // propagate indentation up in the method chain hierarchy
+                            if (grandparent.getValue() instanceof J.MethodInvocation && ((J.MethodInvocation) grandparent.getValue()).getSelect() == parent.getValue()) {
+                                grandparent.putMessage("lastIndent", indent);
+                                grandparent.putMessage("chainedIndent", indent);
+                            }
+                        }
                         break;
                     case NEW_CLASS_ARGUMENTS:
                     case ARRAY_INDEX:
@@ -262,26 +284,6 @@ public class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     case TYPE_PARAMETER: {
                         elem = visitAndCast(elem, p);
                         after = indentTo(right.getAfter(), indent, loc.getAfterLocation());
-                        break;
-                    }
-                    case METHOD_SELECT: {
-                        for (Cursor cursor = getCursor(); ; cursor = cursor.getParentOrThrow()) {
-                            if (cursor.getValue() instanceof JRightPadded) {
-                                cursor = cursor.getParentOrThrow();
-                            }
-                            if (!(cursor.getValue() instanceof J.MethodInvocation)) {
-                                break;
-                            }
-                            Integer methodIndent = cursor.getNearestMessage("lastIndent");
-                            if (methodIndent != null) {
-                                indent = methodIndent;
-                            }
-                        }
-
-                        getCursor().getParentOrThrow().putMessage("lastIndent", indent);
-                        elem = visitAndCast(elem, p);
-                        after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
-                        getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
                         break;
                     }
                     case ANNOTATION_ARGUMENT:

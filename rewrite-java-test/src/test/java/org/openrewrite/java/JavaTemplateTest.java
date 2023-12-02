@@ -22,6 +22,8 @@ import org.openrewrite.internal.InMemoryLargeSourceSet;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -994,7 +996,9 @@ class JavaTemplateTest implements RewriteTest {
     void addStatementInIfBlock() {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
-              final MethodMatcher lowerCaseMatcher = new MethodMatcher("java.lang.String toLowerCase()");              @Override
+              final MethodMatcher lowerCaseMatcher = new MethodMatcher("java.lang.String toLowerCase()");
+
+              @Override
               public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
                   J.Block newBlock = super.visitBlock(block, ctx);
                   if (newBlock.getStatements().stream().noneMatch(J.VariableDeclarations.class::isInstance)) {
@@ -1080,4 +1084,153 @@ class JavaTemplateTest implements RewriteTest {
         assertThat(classBefore.getId()).isNotEqualTo( classAfter.getId());
     }
 
+    @Test
+    void replaceMethodCallWithGenericParameterWithUnknownType() {
+        rewriteRun(
+          spec -> spec.parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
+            .recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+                private final JavaParser.Builder<?, ?> assertionsParser = JavaParser.fromJavaVersion()
+                  .classpath("assertj-core");
+
+                private static final MethodMatcher JUNIT_ASSERT_EQUALS = new MethodMatcher("org.junit.jupiter.api.Assertions assertEquals(..)");
+
+                @Override
+                public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    if (!JUNIT_ASSERT_EQUALS.matches(method)) {
+                        return method;
+                    }
+
+                    List<Expression> args = method.getArguments();
+                    Expression expected = args.get(0);
+                    Expression actual = args.get(1);
+
+                    maybeAddImport("org.assertj.core.api.Assertions", "assertThat");
+                    maybeRemoveImport("org.junit.jupiter.api.Assertions");
+
+                    if (args.size() == 2) {
+                        return JavaTemplate.builder("assertThat(#{any()}).isEqualTo(#{any()});")
+                          .staticImports("org.assertj.core.api.Assertions.assertThat")
+                          .javaParser(assertionsParser)
+                          .build()
+                          .apply(getCursor(), method.getCoordinates().replace(), actual, expected);
+                    } else {
+                        return super.visitMethodInvocation(method, ctx);
+                    }
+                }
+            })),
+          java(
+            """
+              import java.util.Map;
+              import org.junit.jupiter.api.Assertions;
+              
+              class T {
+                  void m(String one, Map<String, ?> map) {
+                      Assertions.assertEquals(one, map.get("one"));
+                  }
+              }
+              """,
+            """
+              import java.util.Map;
+              
+              import static org.assertj.core.api.Assertions.assertThat;
+              
+              class T {
+                  void m(String one, Map<String, ?> map) {
+                      assertThat(map.get("one")).isEqualTo(one);
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void replaceCallWithUnknownGenericReturnValue() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
+              private static final MethodMatcher OBJECTS_EQUALS = new MethodMatcher("java.util.Objects equals(..)");
+
+              @Override
+              public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                  if (!OBJECTS_EQUALS.matches(method)) {
+                      return method;
+                  }
+
+                  List<Expression> args = method.getArguments();
+                  Expression expected = args.get(0);
+                  Expression actual = args.get(1);
+
+                  maybeAddImport("java.util.Objects", "requireNonNull");
+
+                  if (args.size() == 2) {
+                      return JavaTemplate.builder("requireNonNull(#{any()}).equals(#{any()});")
+                        .staticImports("java.util.Objects.requireNonNull")
+                        .javaParser(JavaParser.fromJavaVersion())
+                        .build()
+                        .apply(getCursor(), method.getCoordinates().replace(), actual, expected);
+                  } else {
+                      return super.visitMethodInvocation(method, ctx);
+                  }
+              }
+          })),
+          java(
+            """
+              import java.util.Objects;
+              import java.util.Map;
+              import java.util.HashMap;
+              
+              class T {
+              	void m() {
+              		Map<String, ?> map = new HashMap<>();
+              		Objects.equals("", map.get("one"));
+              	}
+              }
+              """,
+            """
+              import java.util.Objects;
+              import java.util.Map;
+              
+              import static java.util.Objects.requireNonNull;
+              import java.util.HashMap;
+              
+              class T {
+              	void m() {
+              		Map<String, ?> map = new HashMap<>();
+                      requireNonNull(map.get("one")).equals("");
+              	}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void changeFieldToMethod() {
+        rewriteRun(
+          spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
+              @Override
+              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
+                  J.VariableDeclarations vd = (J.VariableDeclarations) super.visitVariableDeclarations(multiVariable, ctx);
+                  if (vd.getVariables().size() == 1 || vd.getVariables().get(0).getSimpleName().equals("a")) {
+                      return JavaTemplate.apply("String a();", getCursor(), vd.getCoordinates().replace());
+                  }
+                  return vd;
+              }
+          })),
+          java(
+            """
+              interface Test {
+              
+                  String a;
+              }
+              """,
+            """
+              interface Test {
+              
+                  String a();
+              }
+              """
+          )
+        );
+    }
 }

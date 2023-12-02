@@ -309,7 +309,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
                 if (t != null && afterVisit != null) {
                     for (TreeVisitor<?, P> v : afterVisit) {
                         if (v != null) {
-                             v.setCursor(new Cursor(cursor, tree));
+                             v.setCursor(getCursor());
                             //noinspection unchecked
                             t = (T) v.visit(t, p);
                         }
@@ -362,9 +362,13 @@ public abstract class TreeVisitor<T extends Tree, P> {
     }
 
     public Markers visitMarkers(@Nullable Markers markers, P p) {
-        return markers == null || markers == Markers.EMPTY ?
-                Markers.EMPTY :
-                markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> this.visitMarker(marker, p)));
+        if (markers == null || markers == Markers.EMPTY) {
+            return Markers.EMPTY;
+        } else if (markers.getMarkers().isEmpty()) {
+            // avoid unnecessary method handle allocation
+            return markers;
+        }
+        return markers.withMarkers(ListUtils.map(markers.getMarkers(), marker -> this.visitMarker(marker, p)));
     }
 
     public <M extends Marker> M visitMarker(Marker marker, P p) {

@@ -27,6 +27,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
 import javax.lang.model.type.NullType;
+import javax.lang.model.type.TypeMirror;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
@@ -59,7 +60,9 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
             return existing;
         }
 
-        if (type instanceof Type.ClassType) {
+        if (type instanceof Type.IntersectionClassType) {
+            return intersectionType((Type.IntersectionClassType) type, signature);
+        } else if (type instanceof Type.ClassType) {
             return classType((Type.ClassType) type, signature);
         } else if (type instanceof Type.TypeVar) {
             return generic((Type.TypeVar) type, signature);
@@ -76,6 +79,19 @@ class ReloadableJava11TypeMapping implements JavaTypeMapping<Tree> {
         }
 
         throw new UnsupportedOperationException("Unknown type " + type.getClass().getName());
+    }
+
+    private JavaType intersectionType(Type.IntersectionClassType type, String signature) {
+        JavaType.Intersection intersection = new JavaType.Intersection(null);
+        typeCache.put(signature, intersection);
+        JavaType[] types = new JavaType[type.getBounds().size()];
+        List<? extends TypeMirror> bounds = type.getBounds();
+        for (int i = 0; i < bounds.size(); i++) {
+            TypeMirror bound = bounds.get(i);
+            types[i] = type((Type) bound);
+        }
+        intersection.unsafeSet(types);
+        return intersection;
     }
 
     private JavaType array(Type type, String signature) {

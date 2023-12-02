@@ -16,27 +16,16 @@
 package org.openrewrite;
 
 import lombok.Getter;
-import org.eclipse.jgit.diff.DiffEntry;
-import org.eclipse.jgit.diff.DiffFormatter;
-import org.eclipse.jgit.diff.RawTextComparator;
-import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
-import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
 import org.eclipse.jgit.lib.*;
 import org.openrewrite.config.RecipeDescriptor;
 import org.openrewrite.internal.InMemoryDiffEntry;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.RecipesThatMadeChanges;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.stream.Collectors;
 
 public class Result {
     /**
@@ -180,6 +169,25 @@ public class Result {
         )) {
             return diffEntry.getDiff(ignoreAllWhitespace);
         }
+    }
+
+    @Nullable
+    public static String diff(String before, String after, Path path) {
+        String diff = null;
+        try (InMemoryDiffEntry diffEntry = new InMemoryDiffEntry(
+                path,
+                path,
+                null,
+                before,
+                after,
+                Collections.emptySet(),
+                FileMode.REGULAR_FILE,
+                FileMode.REGULAR_FILE
+        )) {
+            diff = diffEntry.getDiff(Boolean.FALSE);
+        } catch (Exception ignored) {
+        }
+        return diff;
     }
 
     @Override

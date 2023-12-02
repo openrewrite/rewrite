@@ -64,7 +64,8 @@ public class FindDeprecatedClasses extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        TypeMatcher typeMatcher = typePattern == null ? null : new TypeMatcher(typePattern);
+        TypeMatcher typeMatcher = typePattern == null ? null : new TypeMatcher(typePattern,
+                Boolean.TRUE.equals(matchInherited));
 
         return Preconditions.check(new JavaIsoVisitor<ExecutionContext>() {
             @Override

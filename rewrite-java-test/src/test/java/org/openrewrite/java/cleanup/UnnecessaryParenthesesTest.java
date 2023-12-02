@@ -950,4 +950,19 @@ class UnnecessaryParenthesesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void requiredCast() {
+        rewriteRun(
+          java(
+            """
+              class Test {
+                  int test(Object o) {
+                      return ((int[]) o).length;
+                  }
+              }
+              """
+          )
+        );
+    }
 }

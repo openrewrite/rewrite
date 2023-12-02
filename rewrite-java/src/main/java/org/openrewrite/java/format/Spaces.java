@@ -46,6 +46,11 @@ public class Spaces extends Recipe {
 
     private static class SpacesFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
+        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+            return sourceFile instanceof J.CompilationUnit;
+        }
+
+        @Override
         public J visit(@Nullable Tree tree, ExecutionContext ctx) {
             if (tree instanceof JavaSourceFile) {
                 JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);

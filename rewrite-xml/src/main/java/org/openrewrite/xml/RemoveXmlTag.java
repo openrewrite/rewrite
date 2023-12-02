@@ -48,7 +48,7 @@ public class RemoveXmlTag extends Recipe {
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return Preconditions.check(fileMatcher != null ? new HasSourcePath<>(fileMatcher) : TreeVisitor.noop(), new XmlIsoVisitor<ExecutionContext>() {
+        return Preconditions.check(fileMatcher != null ? new HasSourcePath(fileMatcher) : new HasSourcePath(""), new XmlIsoVisitor<ExecutionContext>() {
             private final XPathMatcher xPathMatcher = new XPathMatcher(xPath);
 
             @Override

@@ -589,7 +589,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
                   @Override
                   protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
                       if (fileMatcher != null) {
-                          return new HasSourcePath<>(fileMatcher);
+                          return new HasSourcePath(fileMatcher).getVisitor();
                       } else {
                           return null;
                       }
@@ -633,7 +633,7 @@ class MigrateRecipeToRewrite8Test implements RewriteTest {
                   @Override
                   protected TreeVisitor<?, ExecutionContext> getSingleSourceApplicableTest() {
                       if (fileMatcher != null) {
-                          return new HasSourcePath<>(fileMatcher);
+                          return new HasSourcePath(fileMatcher).getVisitor();
                       } else {
                           return null;
                       }

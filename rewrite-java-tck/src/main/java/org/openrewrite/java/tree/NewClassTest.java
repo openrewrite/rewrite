@@ -84,6 +84,9 @@ class NewClassTest implements RewriteTest {
         rewriteRun(
           java(
             """
+              import java.util.ArrayList;
+              import java.util.List;
+              
               class Test {
                   List<Integer> l = new ArrayList<Integer>() {
                       /** Javadoc */

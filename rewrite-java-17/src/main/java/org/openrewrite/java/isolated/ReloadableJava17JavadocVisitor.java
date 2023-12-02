@@ -15,12 +15,14 @@
  */
 package org.openrewrite.java.isolated;
 
+import com.sun.source.doctree.ErroneousTree;
+import com.sun.source.doctree.LiteralTree;
+import com.sun.source.doctree.ProvidesTree;
+import com.sun.source.doctree.ReturnTree;
+import com.sun.source.doctree.UsesTree;
 import com.sun.source.doctree.*;
 import com.sun.source.tree.IdentifierTree;
-import com.sun.source.tree.ArrayTypeTree;
-import com.sun.source.tree.MemberSelectTree;
-import com.sun.source.tree.ParameterizedTypeTree;
-import com.sun.source.tree.PrimitiveTypeTree;
+import com.sun.source.tree.*;
 import com.sun.source.util.DocTreeScanner;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
@@ -337,7 +339,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         }
 
         // The javadoc ends with trailing whitespace.
-        if (cursor < source.length() && source.substring(cursor).contains(" ")) {
+        if (cursor < source.length()) {
             String trailingWhitespace = source.substring(cursor);
             if (trailingWhitespace.contains("\n")) {
                 // 1 or more newlines.
@@ -532,6 +534,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     Space.EMPTY,
                     Markers.EMPTY,
                     emptyList(),
+                    emptyList(),
                     visitIdentifier(node.getName(), whitespaceBefore()).withPrefix(namePrefix),
                     null
             );
@@ -578,14 +581,14 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         if (ref.qualifierExpression != null) {
             try {
                 attr.attribType(ref.qualifierExpression, symbol);
-            } catch(NullPointerException ignored) {
+            } catch (NullPointerException ignored) {
                 // best effort, can result in:
                 // java.lang.NullPointerException: Cannot read field "info" because "env" is null
                 //   at com.sun.tools.javac.comp.Attr.attribType(Attr.java:404)
             }
         }
 
-        if(ref.qualifierExpression != null) {
+        if (ref.qualifierExpression != null) {
             qualifier = (TypedTree) javaVisitor.scan(ref.qualifierExpression, Space.EMPTY);
             qualifierType = qualifier.getType();
             if (ref.memberName != null) {
@@ -599,7 +602,6 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             } else {
                 qualifier = null;
             }
-
         }
 
         if (ref.memberName != null) {
@@ -677,7 +679,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     @Nullable
     private JavaType.Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
-        if (type instanceof  JavaType.Class) {
+        if (type instanceof JavaType.Class) {
             JavaType.Class classType = (JavaType.Class) type;
 
             nextMethod:
@@ -688,7 +690,11 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                             for (JavaType testParamType : method.getParameterTypes()) {
                                 Type paramType = attr.attribType(param, symbol);
                                 if (testParamType instanceof JavaType.GenericTypeVariable) {
-                                    for (JavaType bound : ((JavaType.GenericTypeVariable) testParamType).getBounds()) {
+                                    List<JavaType> bounds = ((JavaType.GenericTypeVariable) testParamType).getBounds();
+                                    if (bounds.isEmpty() && paramType.tsym != null && "java.lang.Object".equals(paramType.tsym.getQualifiedName().toString())) {
+                                        return method;
+                                    }
+                                    for (JavaType bound : bounds) {
                                         if (paramTypeMatches(bound, paramType)) {
                                             return method;
                                         }
@@ -789,6 +795,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     @Override
     public Tree visitSerialField(SerialFieldTree node, List<Javadoc> body) {
         body.addAll(sourceBefore("@serialField"));
+
         return new Javadoc.SerialField(randomId(), Markers.EMPTY,
                 visitIdentifier(node.getName(), whitespaceBefore()),
                 visitReference(node.getType(), whitespaceBefore()),
@@ -1077,7 +1084,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     /**
      * A {@link J} may contain new lines in each {@link Space} and each new line will have a corresponding
      * {@link org.openrewrite.java.tree.Javadoc.LineBreak}.
-     *
+     * <p>
      * This method collects the linebreaks associated to new lines in a Space, and removes the applicable linebreaks
      * from the map.
      */
@@ -1142,19 +1149,23 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 typeIdent = ((ArrayTypeTree) typeIdent).getType();
             }
 
-            TypeTree elemType = (TypeTree) scan(typeIdent, fmt);
+            TypeTree elemType = (TypeTree) scan(typeIdent, Space.EMPTY);
 
             List<JRightPadded<Space>> dimensions = emptyList();
             if (dimCount > 0) {
                 dimensions = new ArrayList<>(dimCount);
                 for (int n = 0; n < dimCount; n++) {
-                    dimensions.add(padRight(Space.build(sourceBeforeAsString("["), emptyList()), Space.build(sourceBeforeAsString("]"), emptyList())));
+                    if (!source.substring(cursor).startsWith("...")) {
+                        dimensions.add(padRight(
+                                Space.build(sourceBeforeAsString("["), emptyList()),
+                                Space.build(sourceBeforeAsString("]"), emptyList())));
+                    }
                 }
             }
 
             return new J.ArrayType(
                     randomId(),
-                    Space.EMPTY,
+                    fmt,
                     Markers.EMPTY,
                     elemType,
                     dimensions

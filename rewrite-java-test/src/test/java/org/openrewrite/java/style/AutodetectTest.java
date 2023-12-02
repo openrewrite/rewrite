@@ -427,20 +427,20 @@ class AutodetectTest implements RewriteTest {
     void rewriteImportLayout() {
         var cus = jp().parse(
           """
-                import com.fasterxml.jackson.annotation.JsonCreator;
-                
-                import org.openrewrite.internal.StringUtils;
-                import org.openrewrite.internal.ListUtils;
-                import org.openrewrite.internal.lang.Nullable;
-                
-                import java.util.*;
-                import java.util.stream.Collectors;
-                
-                import static java.util.Collections.*;
-                import static java.util.function.Function.identity;
-                
-                public class Test {
-                }
+            import com.fasterxml.jackson.annotation.JsonCreator;
+            
+            import org.openrewrite.internal.StringUtils;
+            import org.openrewrite.internal.ListUtils;
+            import org.openrewrite.internal.lang.Nullable;
+            
+            import java.util.*;
+            import java.util.stream.Collectors;
+            
+            import static java.util.Collections.*;
+            import static java.util.function.Function.identity;
+            
+            public class Test {
+            }
             """
         );
 
@@ -530,16 +530,16 @@ class AutodetectTest implements RewriteTest {
     void detectStarImport() {
         var cus = jp().parse(
           """
-                import java.util.*;
-                
-                public class Test {
-                    List<Integer> l;
-                    Set<Integer> s;
-                    Map<Integer, Integer> m;
-                    Collection<Integer> c;
-                    LinkedHashMap<Integer, Integer> lhm;
-                    HashSet<Integer> integer;
-                }
+            import java.util.*;
+            
+            public class Test {
+                List<Integer> l;
+                Set<Integer> s;
+                Map<Integer, Integer> m;
+                Collection<Integer> c;
+                LinkedHashMap<Integer, Integer> lhm;
+                HashSet<Integer> integer;
+            }
             """
         );
 
@@ -555,28 +555,28 @@ class AutodetectTest implements RewriteTest {
     void detectImportCounts() {
         var cus = jp().parse(
           """
-                import java.util.ArrayList;
-                import java.util.Collections;
-                import java.util.HashSet;
-                import java.util.List;
-                import java.util.Set;
-                
-                import javax.persistence.Entity;
-                import javax.persistence.FetchType;
-                import javax.persistence.JoinColumn;
-                import javax.persistence.JoinTable;
-                import javax.persistence.ManyToMany;
-                import javax.persistence.Table;
-                import javax.xml.bind.annotation.XmlElement;
-                
-                public class Test {
-                    List<Integer> l;
-                    Set<Integer> s;
-                    Map<Integer, Integer> m;
-                    Collection<Integer> c;
-                    LinkedHashMap<Integer, Integer> lhm;
-                    HashSet<Integer> integer;
-                }
+            import java.util.ArrayList;
+            import java.util.Collections;
+            import java.util.HashSet;
+            import java.util.List;
+            import java.util.Set;
+            
+            import javax.persistence.Entity;
+            import javax.persistence.FetchType;
+            import javax.persistence.JoinColumn;
+            import javax.persistence.JoinTable;
+            import javax.persistence.ManyToMany;
+            import javax.persistence.Table;
+            import javax.xml.bind.annotation.XmlElement;
+            
+            public class Test {
+                List<Integer> l;
+                Set<Integer> s;
+                Map<Integer, Integer> m;
+                Collection<Integer> c;
+                LinkedHashMap<Integer, Integer> lhm;
+                HashSet<Integer> integer;
+            }
             """
         );
 
@@ -593,11 +593,11 @@ class AutodetectTest implements RewriteTest {
     void detectMethodArgs() {
         var cus = jp().parse(
           """
-                class Test {
-                    void i() {
-                        a("a" ,"b" ,"c" ,"d");
-                    }
+            class Test {
+                void i() {
+                    a("a" ,"b" ,"c" ,"d");
                 }
+            }
             """
         );
 
@@ -614,11 +614,11 @@ class AutodetectTest implements RewriteTest {
     void detectMethodArgAfterComma() {
         var cus = jp().parse(
           """
-                class Test {
-                    void i() {
-                        a("a", "b");
-                    }
+            class Test {
+                void i() {
+                    a("a", "b");
                 }
+            }
             """
         );
 
@@ -636,11 +636,11 @@ class AutodetectTest implements RewriteTest {
     void detectColonInForEachLoop() {
         var cus = jp().parse(
           """
-                class Test {
-                    void i() {
-                        for (int i : new int[]{}) {}
-                    }
+            class Test {
+                void i() {
+                    for (int i : new int[]{}) {}
                 }
+            }
             """
         );
 
@@ -656,11 +656,11 @@ class AutodetectTest implements RewriteTest {
     void detectAfterTypeCast() {
         var cus = jp().parse(
           """
-                class T {
-                    {
-                        String s = (String) getString();
-                    }
+            class T {
+                {
+                    String s = (String) getString();
                 }
+            }
             """
         );
 
@@ -698,11 +698,11 @@ class AutodetectTest implements RewriteTest {
     void detectMethodArgsNoArgs() {
         var cus = jp().parse(
           """
-                class Test {
-                    void i() {
-                        a();
-                    }
+            class Test {
+                void i() {
+                    a();
                 }
+            }
             """
         );
 
@@ -719,11 +719,11 @@ class AutodetectTest implements RewriteTest {
     void detectMethodArgsNoSpaceForComma() {
         var cus = jp().parse(
           """
-                class Test {
-                    void i() {
-                        a("a","b","c");
-                    }
+            class Test {
+                void i() {
+                    a("a","b","c");
                 }
+            }
             """
         );
 
@@ -740,11 +740,11 @@ class AutodetectTest implements RewriteTest {
     void detectMethodArgsSpaceForComma() {
         var cus = jp().parse(
           """
-                class Test {
-                    void i() {
-                        a("a" , "b" , "c");
-                    }
+            class Test {
+                void i() {
+                    a("a" , "b" , "c");
                 }
+            }
             """
         );
 
@@ -761,11 +761,11 @@ class AutodetectTest implements RewriteTest {
     void detectAfterCommaInNewArray() {
         var cus = jp().parse(
           """
-                class T {
-                    static {
-                        int[] i = new int[]{1, 2, 3, 4};
-                    }
+            class T {
+                static {
+                    int[] i = new int[]{1, 2, 3, 4};
                 }
+            }
             """
         );
 
@@ -783,14 +783,14 @@ class AutodetectTest implements RewriteTest {
     void detectAfterCommaShouldIgnoreFirstElement() {
         var cus = jp().parse(
           """
-                class T {
-                    static {
-                        int[] i0 = new int[]{1, 2};
-                        int[] i1 = new int[]{2, 3};
-                        int[] i2 = new int[]{3, 4};
-                        int[] i3 = new int[]{4,5};
-                    }
+            class T {
+                static {
+                    int[] i0 = new int[]{1, 2};
+                    int[] i1 = new int[]{2, 3};
+                    int[] i2 = new int[]{3, 4};
+                    int[] i3 = new int[]{4,5};
                 }
+            }
             """
         );
 
@@ -808,18 +808,18 @@ class AutodetectTest implements RewriteTest {
     void detectAfterCommaBasedOnLambdas() {
         var cus = jp().parse(
           """
-                import java.util.function.BiConsumer;
-                
-                class T {
-                    static {
-                        int[] i0 = new int[]{1,2};
-                        int[] i1 = new int[]{2,3};
-
-                        BiConsumer<?, ?> c0 = (a, b) -> {};
-                        BiConsumer<?, ?> c1 = (a, b) -> {};
-                        BiConsumer<?, ?> c2 = (a, b) -> {};
-                    }
+            import java.util.function.BiConsumer;
+            
+            class T {
+                static {
+                    int[] i0 = new int[]{1,2};
+                    int[] i1 = new int[]{2,3};
+            
+                    BiConsumer<?, ?> c0 = (a, b) -> {};
+                    BiConsumer<?, ?> c1 = (a, b) -> {};
+                    BiConsumer<?, ?> c2 = (a, b) -> {};
                 }
+            }
             """
         );
 
@@ -837,13 +837,13 @@ class AutodetectTest implements RewriteTest {
     void detectNoSpacesWithinMethodCall() {
         var cus = jp().parse(
           """
-                class Test {
-                    void a(String a, String b, String c) {
-                    }
-                    void i() {
-                        a("a","b","c");
-                    }
+            class Test {
+                void a(String a, String b, String c) {
                 }
+                void i() {
+                    a("a","b","c");
+                }
+            }
             """
         );
 
@@ -860,11 +860,11 @@ class AutodetectTest implements RewriteTest {
     void detectSpacesWithinMethodCall() {
         var cus = jp().parse(
           """
-                class Test {
-                    void i() {
-                        a( "a","b","c" );
-                    }
+            class Test {
+                void i() {
+                    a( "a","b","c" );
                 }
+            }
             """
         );
 
@@ -881,14 +881,14 @@ class AutodetectTest implements RewriteTest {
     void detectElseWithNoNewLine() {
         var cus = jp().parse(
           """
-                class Test {
-                    void method(int n) {
-                        if (n == 0) {
-                        } else if (n == 1) {
-                        } else {
-                        }
+            class Test {
+                void method(int n) {
+                    if (n == 0) {
+                    } else if (n == 1) {
+                    } else {
                     }
                 }
+            }
             """
         );
 
@@ -905,16 +905,16 @@ class AutodetectTest implements RewriteTest {
     void detectElseOnNewLine() {
         var cus = jp().parse(
           """
-                class Test {
-                    void method(int n) {
-                        if (n == 0) {
-                        }
-                        else if (n == 1) {
-                        }
-                        else {
-                        }
+            class Test {
+                void method(int n) {
+                    if (n == 0) {
+                    }
+                    else if (n == 1) {
+                    }
+                    else {
                     }
                 }
+            }
             """
         );
 

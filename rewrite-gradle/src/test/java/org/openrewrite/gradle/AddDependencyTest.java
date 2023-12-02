@@ -26,6 +26,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import java.util.Optional;
 
@@ -36,6 +37,7 @@ import static org.openrewrite.groovy.Assertions.srcMainGroovy;
 import static org.openrewrite.java.Assertions.*;
 import static org.openrewrite.properties.Assertions.properties;
 
+@SuppressWarnings("GroovyUnusedAssignment")
 class AddDependencyTest implements RewriteTest {
     @Override
     public void defaults(RecipeSpec spec) {
@@ -188,7 +190,8 @@ class AddDependencyTest implements RewriteTest {
     @ValueSource(strings = {"com.google.common.math.*", "com.google.common.math.IntMath"})
     void onlyIfUsingMultipleScopes(String onlyIfUsing) {
         rewriteRun(
-          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing)),
+          spec -> spec.recipe(addDependency("com.google.guava:guava:29.0-jre", onlyIfUsing))
+            .typeValidationOptions(TypeValidation.none()),
           mavenProject("project",
             srcMainJava(
               java(usingGuavaIntMath)
@@ -229,7 +232,8 @@ class AddDependencyTest implements RewriteTest {
     void usedInMultipleSourceSetsUsingExplicitSourceSet(String onlyIfUsing) {
         AddDependency addDep = new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, onlyIfUsing, null, null, null, Boolean.TRUE);
         rewriteRun(
-          spec -> spec.recipe(addDep),
+          spec -> spec.recipe(addDep)
+            .typeValidationOptions(TypeValidation.none()),
           mavenProject("project",
             srcMainJava(
               java(usingGuavaIntMath)
@@ -286,7 +290,8 @@ class AddDependencyTest implements RewriteTest {
     void usedInTransitiveSourceSet() {
         AddDependency addDep = new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, "com.google.common.math.IntMath", null, null, null, Boolean.TRUE);
         rewriteRun(
-          spec -> spec.recipe(addDep),
+          spec -> spec.recipe(addDep)
+            .typeValidationOptions(TypeValidation.none()),
           mavenProject("project",
             srcSmokeTestJava(
               java(usingGuavaIntMath)
@@ -340,7 +345,8 @@ class AddDependencyTest implements RewriteTest {
     void addDependencyIfNotUsedInATransitive() {
         AddDependency addDep = new AddDependency("com.google.guava", "guava", "29.0-jre", null, null, "com.google.common.math.IntMath", null, null, null, Boolean.TRUE);
         rewriteRun(
-          spec -> spec.recipe(addDep),
+          spec -> spec.recipe(addDep)
+            .typeValidationOptions(TypeValidation.none()),
           mavenProject("project",
             srcSmokeTestJava(
               java(usingGuavaIntMath)
@@ -1117,12 +1123,12 @@ class AddDependencyTest implements RewriteTest {
             srcMainGroovy(
               groovy(
                 """
-                  import java.util.*;
-
+                  import java.util.*
+                  
                   class MyClass {
                       static void main(String[] args) {
-                          Date date = new Date();
-                          System.out.println("Hello world");
+                          Date date = new Date()
+                          System.out.println("Hello world")
                       }
                   }
                   """

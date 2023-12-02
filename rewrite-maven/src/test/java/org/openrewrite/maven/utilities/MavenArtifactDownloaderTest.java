@@ -32,6 +32,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class MavenArtifactDownloaderTest {
 
@@ -70,9 +71,16 @@ class MavenArtifactDownloaderTest {
         MavenResolutionResult mavenModel = parsed.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow();
         assertThat(mavenModel.getDependencies()).isNotEmpty();
 
-        List<ResolvedDependency> runtimeDependencies = mavenModel.getDependencies().get(Scope.Runtime);
-        for (ResolvedDependency runtimeDependency : runtimeDependencies) {
-            assertThat(downloader.downloadArtifact(runtimeDependency)).isNotNull();
-        }
+    List<ResolvedDependency> runtimeDependencies = mavenModel.getDependencies().get(Scope.Runtime);
+    for (ResolvedDependency runtimeDependency : runtimeDependencies) {
+      assertNotNull(
+          downloader.downloadArtifact(runtimeDependency),
+          String.format(
+              "%s:%s:%s:%s failed to download",
+              runtimeDependency.getGroupId(),
+              runtimeDependency.getArtifactId(),
+              runtimeDependency.getVersion(),
+              runtimeDependency.getType()));
     }
+  }
 }

@@ -109,11 +109,12 @@ public class GroovyParserVisitor {
             shebang = source.substring(0, i);
             cursor += i;
         }
+        Space prefix = EMPTY;
         JRightPadded<J.Package> pkg = null;
         if (ast.getPackage() != null) {
-            Space prefix = whitespace();
+            prefix = whitespace();
             cursor += "package".length();
-            pkg = JRightPadded.build(new J.Package(randomId(), prefix, Markers.EMPTY,
+            pkg = JRightPadded.build(new J.Package(randomId(), EMPTY, Markers.EMPTY,
                     typeTree(null), emptyList()));
         }
 
@@ -156,7 +157,12 @@ public class GroovyParserVisitor {
                         // Inner classes will be visited as part of visiting their containing class
                         continue;
                     }
-                    statements.add(convertTopLevelStatement(unit, value));
+                    JRightPadded<Statement> statement = convertTopLevelStatement(unit, value);
+                    if (statements.isEmpty() && pkg == null && statement.getElement() instanceof J.Import) {
+                        prefix = statement.getElement().getPrefix();
+                        statement = statement.withElement(statement.getElement().withPrefix(EMPTY));
+                    }
+                    statements.add(statement);
                 }
             } catch (Throwable t) {
                 if (t instanceof StringIndexOutOfBoundsException) {
@@ -172,7 +178,7 @@ public class GroovyParserVisitor {
         return new G.CompilationUnit(
                 randomId(),
                 shebang,
-                Space.EMPTY,
+                prefix,
                 Markers.EMPTY,
                 sourcePath,
                 fileAttributes,
@@ -700,6 +706,20 @@ public class GroovyParserVisitor {
         }
 
         @Override
+        public void visitAssertStatement(AssertStatement statement) {
+            Space prefix = whitespace();
+            skip("assert");
+            Expression condition = visit(statement.getBooleanExpression());
+            JLeftPadded<Expression> message = null;
+            if (!(statement.getMessageExpression() instanceof ConstantExpression) || !((ConstantExpression) statement.getMessageExpression()).isNullExpression()) {
+                Space messagePrefix = whitespace();
+                skip(":");
+                message = padLeft(messagePrefix, visit(statement.getMessageExpression()));
+            }
+            queue.add(new J.Assert(randomId(), prefix, Markers.EMPTY, condition, message));
+        }
+
+        @Override
         public void visitBinaryExpression(BinaryExpression binary) {
             queue.add(insideParentheses(binary, fmt -> {
                 Expression left = visit(binary.getLeftExpression());
@@ -1145,7 +1165,7 @@ public class GroovyParserVisitor {
                     throw new IllegalStateException("Unexpected constant type " + type);
                 }
 
-                if (source.charAt(cursor) == '+' && !text.startsWith("+")) {
+                if (cursor < source.length() && source.charAt(cursor) == '+' && !text.startsWith("+")) {
                     // A unaryPlus operator is implied on numerics and needs to be manually detected / added via the source.
                     text = "+" + text;
                 }
@@ -1185,10 +1205,12 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitNotExpression(NotExpression expression) {
-            Space fmt = sourceBefore("!");
-            JLeftPadded<J.Unary.Type> op = padLeft(EMPTY, J.Unary.Type.Not);
-            Expression expr = visit(expression.getExpression());
-            queue.add(new J.Unary(randomId(), fmt, Markers.EMPTY, op, expr, typeMapping.type(expression.getType())));
+            queue.add(insideParentheses(expression, fmt -> {
+                skip("!");
+                JLeftPadded<J.Unary.Type> op = padLeft(EMPTY, J.Unary.Type.Not);
+                Expression expr = visit(expression.getExpression());
+                return new J.Unary(randomId(), fmt, Markers.EMPTY, op, expr, typeMapping.type(expression.getType()));
+            }));
         }
 
         @Override
@@ -1674,10 +1696,10 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitRangeExpression(RangeExpression range) {
-            queue.add(new G.Range(randomId(), whitespace(), Markers.EMPTY,
+            queue.add(insideParentheses(range, fmt -> new G.Range(randomId(), fmt, Markers.EMPTY,
                     visit(range.getFrom()),
                     JLeftPadded.build(range.isInclusive()).withBefore(sourceBefore(range.isInclusive() ? ".." : "..>")),
-                    visit(range.getTo())));
+                    visit(range.getTo()))));
         }
 
         @Override
@@ -2297,10 +2319,11 @@ public class GroovyParserVisitor {
 
     private String name() {
         int i = cursor;
-        char c = source.charAt(i);
-        while (Character.isJavaIdentifierPart(c) || c == '.' || c == '*') {
-            i++;
-            c = source.charAt(i);
+        for (; i < source.length(); i++) {
+            char c = source.charAt(i);
+            if (!(Character.isJavaIdentifierPart(c) || c == '.' || c == '*')) {
+                break;
+            }
         }
         String result = source.substring(cursor, i);
         cursor += i - cursor;
@@ -2417,7 +2440,7 @@ public class GroovyParserVisitor {
                     .withAfter(EMPTY));
             bounds = JContainer.build(boundsPrefix, convertedBounds, Markers.EMPTY);
         }
-        return new J.TypeParameter(randomId(), prefix, Markers.EMPTY, emptyList(), name, bounds);
+        return new J.TypeParameter(randomId(), prefix, Markers.EMPTY, emptyList(), emptyList(), name, bounds);
     }
 
     private J.Wildcard visitWildcard(GenericsType genericType) {

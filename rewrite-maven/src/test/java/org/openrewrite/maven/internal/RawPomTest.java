@@ -32,7 +32,11 @@ class RawPomTest {
     @Test
     void profileActivationByJdk() {
         String javaVersion = System.getProperty("java.version");
-        int runtimeVersion = Integer.parseInt(javaVersion.substring(0, javaVersion.indexOf('.')));
+        int dotIndex = javaVersion.indexOf('.');
+        if (dotIndex > 0) {
+            javaVersion = javaVersion.substring(0, dotIndex);
+        }
+        int runtimeVersion = Integer.parseInt(javaVersion);
         assertThat(new ProfileActivation(false, Integer.toString(runtimeVersion), null).isActive()).isTrue();
         assertThat(new ProfileActivation(false, "[," + (runtimeVersion + 1) + ")", null).isActive()).isTrue();
         assertThat(new ProfileActivation(false, "[," + runtimeVersion + "]", null).isActive()).isFalse();
