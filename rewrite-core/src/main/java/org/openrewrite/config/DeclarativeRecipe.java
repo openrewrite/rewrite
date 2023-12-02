@@ -98,7 +98,7 @@ public class DeclarativeRecipe extends Recipe {
             if (recipe instanceof LazyLoadedRecipe) {
                 String recipeFqn = ((LazyLoadedRecipe) recipe).getRecipeFqn();
                 Optional<Recipe> next = availableRecipes.stream()
-                        .filter(r -> r.getName().equals(recipeFqn)).findAny();
+                        .filter(r -> recipeFqn.equals(r.getName())).findAny();
                 if (next.isPresent()) {
                     Recipe subRecipe = next.get();
                     if (subRecipe instanceof DeclarativeRecipe) {
