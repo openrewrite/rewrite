@@ -30,7 +30,7 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
 
     @Override
     public String signature(@Nullable Object type) {
-        if (type == null || type == JavaType.Unknown.getInstance()) {
+        if (type == null || type instanceof JavaType.Unknown) {
             return "{undefined}";
         }
 
@@ -44,10 +44,12 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
             return genericSignature(type);
         } else if (type instanceof JavaType.Primitive) {
             return primitiveSignature(type);
-        } else if(type instanceof JavaType.Method) {
+        } else if (type instanceof JavaType.Method) {
             return methodSignature((JavaType.Method) type);
-        } else if(type instanceof JavaType.Variable) {
+        } else if (type instanceof JavaType.Variable) {
             return variableSignature((JavaType.Variable) type);
+        } else if (type instanceof JavaType.Intersection) {
+            return intersectionSignature(type);
         }
 
         throw new UnsupportedOperationException("Unexpected type " + type.getClass().getName());
@@ -92,7 +94,7 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
 
         StringJoiner bounds = new StringJoiner(" & ");
         for (JavaType bound : gtv.getBounds()) {
-            if(parameterizedStack == null || !parameterizedStack.contains(bound)) {
+            if (parameterizedStack == null || !parameterizedStack.contains(bound)) {
                 bounds.add(signature(bound));
             }
         }
@@ -103,11 +105,20 @@ public class DefaultJavaTypeSignatureBuilder implements JavaTypeSignatureBuilder
         return s.toString();
     }
 
+    private String intersectionSignature(Object type) {
+        JavaType.Intersection it = (JavaType.Intersection) type;
+        StringJoiner bounds = new StringJoiner(" & ");
+        for (JavaType bound : it.getBounds()) {
+            bounds.add(signature(bound));
+        }
+        return bounds.toString();
+    }
+
     @Override
     public String parameterizedSignature(Object type) {
         JavaType.Parameterized pt = (JavaType.Parameterized) type;
 
-        if(parameterizedStack == null) {
+        if (parameterizedStack == null) {
             parameterizedStack = Collections.newSetFromMap(new IdentityHashMap<>());
         }
         parameterizedStack.add(pt);

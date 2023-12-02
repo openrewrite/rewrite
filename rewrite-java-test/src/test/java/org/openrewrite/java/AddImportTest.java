@@ -840,15 +840,15 @@ class AddImportTest implements RewriteTest {
           spec -> spec.recipe(toRecipe(() -> new JavaIsoVisitor<>() {
               @Override
               public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-                  maybeAddImport("com.fasterxml.jackson.databind.ObjectMapper");
+                  maybeAddImport("java.io.File");
                   return super.visitCompilationUnit(cu, ctx);
               }
-          })).parser(JavaParser.fromJavaVersion().classpath("jackson-databind")),
+          })),
           java(
             """
-              import com.fasterxml.jackson.databind.ObjectMapper;
+              import java.io.File;
               class Helper {
-                  static ObjectMapper OBJECT_MAPPER;
+                  static File FILE;
               }
               """
           ),
@@ -856,7 +856,7 @@ class AddImportTest implements RewriteTest {
             """
               class Test {
                   void test() {
-                      Helper.OBJECT_MAPPER.writer();
+                      Helper.FILE.exists();
                   }
               }
               """

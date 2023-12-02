@@ -40,18 +40,24 @@ public class ParseExceptionResult implements Marker {
     @Nullable
     String treeType;
 
-    public static ParseExceptionResult build(Class<? extends Parser> parserClass, Throwable t) {
+    public static ParseExceptionResult build(Class<? extends Parser> parserClass,
+                                             Throwable t,
+                                             @Nullable String message) {
         String simpleName = t.getClass().getSimpleName();
         return new ParseExceptionResult(
                 randomId(),
                 parserClass.getSimpleName(),
                 !StringUtils.isBlank(simpleName) ? simpleName : t.getClass().getName(),
-                ExceptionUtils.sanitizeStackTrace(t, parserClass),
+                (message != null ? message : "") + ExceptionUtils.sanitizeStackTrace(t, parserClass),
                 null
         );
     }
 
+    public static ParseExceptionResult build(Parser parser, Throwable t, @Nullable String message) {
+        return build(parser.getClass(), t, message);
+    }
+
     public static ParseExceptionResult build(Parser parser, Throwable t) {
-        return build(parser.getClass(), t);
+        return build(parser.getClass(), t, null);
     }
 }

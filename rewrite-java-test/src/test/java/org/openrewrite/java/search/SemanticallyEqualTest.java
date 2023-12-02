@@ -22,28 +22,49 @@ import org.openrewrite.java.tree.J;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class SemanticallyEqualTest  {
+public class SemanticallyEqualTest {
 
     private final JavaParser javaParser = JavaParser.fromJavaVersion().build();
 
     @Test
     void compareAbstractMethods() {
-        assertEqualToSelf("""
-          abstract class A {
-              abstract void m();
-          }
-          """);
+        assertEqualToSelf(
+          """
+            abstract class A {
+                abstract void m();
+            }
+            """
+        );
     }
 
     @Test
     void compareClassModifierLists() {
-        assertEqual("""
-          public abstract class A {
-          }
-          """, """
-          abstract public class A {
-          }
-          """);
+        assertEqual(
+          """
+            public abstract class A {
+            }
+            """,
+          """
+            abstract public class A {
+            }
+            """
+        );
+    }
+
+    @Test
+    void compareLiterals() {
+        assertEqual(
+          """
+            class A {
+                int n = 1;
+            }
+            """,
+          """
+            class A {
+                int n = 1;
+            }
+            """
+        );
     }
 
     private void assertEqualToSelf(@Language("java") String a) {

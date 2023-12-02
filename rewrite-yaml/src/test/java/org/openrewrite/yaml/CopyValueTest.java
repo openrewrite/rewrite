@@ -89,7 +89,7 @@ class CopyValueTest implements RewriteTest {
     void changeOnlyMatchingFile() {
         rewriteRun(
           spec -> spec.recipe(
-            toRecipe(() -> Preconditions.check(new HasSourcePath<>("**/a.yml"), new YamlIsoVisitor<>() {
+            toRecipe(() -> Preconditions.check(new HasSourcePath("**/a.yml"), new YamlIsoVisitor<>() {
                 @Override
                 public Yaml.Documents visitDocuments(Yaml.Documents documents, ExecutionContext executionContext) {
                     doAfterVisit(new CopyValue(".source", ".destination").getVisitor());

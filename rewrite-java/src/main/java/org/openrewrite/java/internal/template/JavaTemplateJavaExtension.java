@@ -235,14 +235,14 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
             public J visitFieldAccess(J.FieldAccess fa, Integer p) {
                 if (loc.equals(FIELD_ACCESS_PREFIX) && fa.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
-                                    new Cursor(getCursor(), insertionPoint),
+                                    getCursor(),
                                     substitutedTemplate,
                                     loc))
                             .withPrefix(fa.getPrefix()), p);
                 } else if (loc.equals(STATEMENT_PREFIX) && fa.isScope(insertionPoint)) {
                     // NOTE: while `J.FieldAccess` inherits from `Statement` they can only ever be used as expressions
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
-                                    new Cursor(getCursor(), insertionPoint),
+                                    getCursor(),
                                     substitutedTemplate,
                                     loc))
                             .withPrefix(fa.getPrefix()), p);
@@ -255,7 +255,7 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                 // ONLY for backwards compatibility, otherwise the same as expression replacement
                 if (loc.equals(IDENTIFIER_PREFIX) && ident.isScope(insertionPoint)) {
                     return autoFormat(substitutions.unsubstitute(templateParser.parseExpression(
-                                    new Cursor(getCursor(), insertionPoint),
+                                    getCursor(),
                                     substitutedTemplate,
                                     loc))
                             .withPrefix(ident.getPrefix()), p);
@@ -474,7 +474,8 @@ public class JavaTemplateJavaExtension extends JavaTemplateLanguageExtension {
                             }
                             throw new IllegalArgumentException("Expected a template that would generate exactly one " +
                                                                "statement to replace one statement, but generated " + gen.size() +
-                                                               ". Template:\n" + substitutedTemplate);
+                                                               ". Template:\n" + substitutedTemplate + "\nSubstitutions:\n" + substitutions +
+                                                               "\nStatement:\n" + statement);
                         }
 
                         return autoFormat(gen.get(0).withPrefix(statement.getPrefix()), p);

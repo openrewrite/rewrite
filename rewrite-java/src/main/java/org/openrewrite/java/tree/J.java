@@ -851,6 +851,8 @@ public interface J extends Tree {
                 } else if (next instanceof J.NewClass) {
                     J.NewClass newClass = (J.NewClass) next;
                     return newClass.getBody() == parentBlock;
+                } else if (next instanceof J.Lambda) {
+                    return false;
                 }
             }
             return false;
@@ -1243,24 +1245,19 @@ public interface J extends Tree {
         public static final class Kind implements J {
 
             @With
-            @Getter
             @EqualsAndHashCode.Include
             UUID id;
 
             @With
-            @Getter
             Space prefix;
 
             @With
-            @Getter
             Markers markers;
 
             @With
-            @Getter
             List<Annotation> annotations;
 
             @With
-            @Getter
             Type type;
 
             public enum Type {
@@ -2347,6 +2344,51 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Java does not allow for parenthesis around TypeTree in places like a type cast where a J.ControlParenthesis is
+     * used. But other languages, like Kotlin, do.
+     */
+    @Value
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
+    @With
+    class ParenthesizedTypeTree implements J, TypeTree, Expression {
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        Space prefix;
+
+        @Getter
+        Markers markers;
+
+        List<J.Annotation> annotations;
+
+        J.Parentheses<TypeTree> parenthesizedType;
+
+        @Override
+        public @Nullable JavaType getType() {
+            return parenthesizedType.getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public ParenthesizedTypeTree withType(@Nullable JavaType type) {
+            return withParenthesizedType(parenthesizedType.withType(type));
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitParenthesizedTypeTree(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )
@@ -2877,6 +2919,93 @@ public interface J extends Tree {
 
             public InstanceOf withExpr(JRightPadded<Expression> expression) {
                 return t.expression == expression ? t : new InstanceOf(t.id, t.prefix, t.markers, expression, t.clazz, t.pattern, t.type);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class IntersectionType implements J, TypeTree, Expression {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JContainer<TypeTree> bounds;
+
+        public List<TypeTree> getBounds() {
+            return bounds.getElements();
+        }
+
+        public IntersectionType withBounds(List<TypeTree> bounds) {
+            return getPadding().withBounds(JContainer.withElementsNullable(this.bounds, bounds));
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitIntersectionType(this, p);
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public IntersectionType withType(@Nullable JavaType type) {
+            // cannot overwrite type directly, perform this operation on each bound separately
+            return this;
+        }
+
+        @Override
+        public JavaType getType() {
+            return new JavaType.Intersection(bounds.getPadding().getElements().stream()
+                    .filter(Objects::nonNull)
+                    .map(b -> b.getElement().getType())
+                    .collect(toList()));
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final IntersectionType t;
+
+            @Nullable
+            public JContainer<TypeTree> getBounds() {
+                return t.bounds;
+            }
+
+            public IntersectionType withBounds(@Nullable JContainer<TypeTree> bounds) {
+                return t.bounds == bounds ? t : new IntersectionType(t.id, t.prefix, t.markers, bounds);
             }
         }
     }
@@ -3514,11 +3643,9 @@ public interface J extends Tree {
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static final class IdentifierWithAnnotations {
-            @Getter
             @With
             Identifier identifier;
 
-            @Getter
             @With
             List<Annotation> annotations;
         }
@@ -5218,6 +5345,10 @@ public interface J extends Tree {
         @Getter
         List<Annotation> annotations;
 
+        @With
+        @Getter
+        List<J.Modifier> modifiers;
+
         /**
          * Will be either a {@link TypeTree} or {@link Wildcard}. Wildcards aren't possible in
          * every context where type parameters may be defined (e.g. not possible on new statements).
@@ -5268,7 +5399,7 @@ public interface J extends Tree {
             }
 
             public TypeParameter withBounds(@Nullable JContainer<TypeTree> bounds) {
-                return t.bounds == bounds ? t : new TypeParameter(t.id, t.prefix, t.markers, t.annotations, t.name, bounds);
+                return t.bounds == bounds ? t : new TypeParameter(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.name, bounds);
             }
         }
     }

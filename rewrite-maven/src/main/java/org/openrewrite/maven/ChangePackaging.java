@@ -73,7 +73,7 @@ public class ChangePackaging extends Recipe {
                     return document;
                 }
                 document = document.withMarkers(document.getMarkers().withMarkers(ListUtils.map(document.getMarkers().getMarkers(), m -> {
-                    if(m instanceof MavenResolutionResult) {
+                    if (m instanceof MavenResolutionResult) {
                         return getResolutionResult().withPom(pom.withRequested(pom.getRequested().withPackaging(packaging)));
                     }
                     return m;
@@ -85,7 +85,7 @@ public class ChangePackaging extends Recipe {
             public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
                 Xml.Tag t = (Xml.Tag) super.visitTag(tag, context);
                 if (PROJECT_MATCHER.matches(getCursor())) {
-                    if (packaging == null) {
+                    if (packaging == null || "jar".equals(packaging)) {
                         t = filterTagChildren(t, it -> !"packaging".equals(it.getName()));
                     } else {
                         t = addOrUpdateChild(t, Xml.Tag.build("\n<packaging>" + packaging + "</packaging>"), getCursor().getParentOrThrow());

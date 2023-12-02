@@ -15,17 +15,18 @@
  */
 package org.openrewrite.java.recipes;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Preconditions;
-import org.openrewrite.Recipe;
-import org.openrewrite.TreeVisitor;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.yaml.ChangePropertyKey;
 import org.openrewrite.yaml.CommentOutProperty;
 import org.openrewrite.yaml.YamlIsoVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 import org.openrewrite.yaml.tree.YamlKey;
 
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 
@@ -33,13 +34,13 @@ public class RemoveApplicabilityTestFromYamlRecipe extends Recipe {
 
     @Override
     public String getDisplayName() {
-        return "Remove applicability test from Yaml recipe";
+        return "Remove any-source applicability and migrate single-source applicability tests in YAML recipe";
     }
 
     @Override
     public String getDescription() {
-        return "Remove the applicability test from the YAML recipe when migrating from Rewrite 7 to 8, as it is no " +
-               "longer supported and may require migrating the recipe to Java code.";
+        return "Removes any-source applicability tests from YAML recipes, as the are no " +
+               "longer supported in Rewrite 8 and migrates single-source applicability tests to preconditions.";
     }
 
     @Override
@@ -53,24 +54,36 @@ public class RemoveApplicabilityTestFromYamlRecipe extends Recipe {
             @Override
             public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                 List<String> keys = getCursor().getPathAsStream()
-                    .filter(Yaml.Mapping.Entry.class::isInstance)
-                    .map(Yaml.Mapping.Entry.class::cast)
-                    .map(Yaml.Mapping.Entry::getKey)
-                    .map(YamlKey::getValue)
-                    .collect(Collectors.toList());
+                        .filter(Yaml.Mapping.Entry.class::isInstance)
+                        .map(Yaml.Mapping.Entry.class::cast)
+                        .map(Yaml.Mapping.Entry::getKey)
+                        .map(YamlKey::getValue)
+                        .collect(Collectors.toList());
                 Collections.reverse(keys);
                 String prop = String.join(".", keys);
 
-                if (prop.equals("applicability.singleSource") || (prop.equals("applicability.anySource"))) {
+                if (prop.equals("applicability.anySource") || prop.equals("applicability.singleSource")) {
                     return SearchResult.found(entry);
                 }
                 return super.visitMappingEntry(entry, ctx);
             }
         };
 
-        String commentText = "Applicability tests are no longer supported for yaml recipes, please remove or require " +
-                             "migrating the recipe to Java code";
-        return Preconditions.check(yamlRecipeCheckVisitor, new CommentOutProperty("applicability",
-            commentText).getVisitor());
+        return Preconditions.check(yamlRecipeCheckVisitor, new YamlIsoVisitor<ExecutionContext>() {
+                    @Override
+                    public Yaml visit(@Nullable Tree tree, ExecutionContext ctx) {
+                        Tree visited = new ChangePropertyKey(
+                                "applicability.singleSource",
+                                "preconditions",
+                                false,
+                                null
+                        ).getVisitor().visit(tree, ctx);
+
+                        String commentText = "Applicability tests are no longer supported for yaml recipes, please remove or require " +
+                                             "migrating the recipe to Java code";
+                        return (Yaml) new CommentOutProperty("applicability.anySource", commentText).getVisitor().visit(visited, ctx);
+                    }
+                }
+        );
     }
 }

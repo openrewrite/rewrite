@@ -103,9 +103,10 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               class Test {
+                  @SuppressWarnings
                   private void firstArgNoPrefix(String first,
-                                                int times,
-                                                String third
+                          int times,
+                          String third
                        ) {
                   }
                   private void firstArgOnNewLine(
@@ -118,6 +119,7 @@ class TabsAndIndentsTest implements RewriteTest {
               """,
             """
               class Test {
+                  @SuppressWarnings
                   private void firstArgNoPrefix(String first,
                                                 int times,
                                                 String third
@@ -167,6 +169,27 @@ class TabsAndIndentsTest implements RewriteTest {
                   }
               }
               """
+          )
+        );
+    }
+
+    @Test
+    void alignMethodDeclarationParamsWhenContinuationIndentUsingTabs() {
+        rewriteRun(
+          tabsAndIndents(style -> style.withUseTabCharacter(true)),
+          java(
+            """
+            import java.util.*;
+            
+            class Foo {
+            	Foo(
+            			String var1,
+            			String var2,
+            			String var3
+            	) {
+            	}
+            }
+            """
           )
         );
     }
@@ -337,7 +360,7 @@ class TabsAndIndentsTest implements RewriteTest {
                   Test withData(Object... arg0) {
                       return this;
                   }
-
+              
                   void method(Test t) {
                       t = t.withData(withData()
                               .withData(t
@@ -483,7 +506,7 @@ class TabsAndIndentsTest implements RewriteTest {
                                   return 0;
                               })
                       )
-                              .collect(Collectors.toList());
+                      .collect(Collectors.toList());
                   }
               }
               """
@@ -505,7 +528,7 @@ class TabsAndIndentsTest implements RewriteTest {
                                       0
                               )
                       )
-                              .collect(Collectors.toList());
+                      .collect(Collectors.toList());
                   }
               }
               """
@@ -943,7 +966,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void moreAnnotations() {
         rewriteRun(
-          spec -> spec.typeValidationOptions(TypeValidation.none()),
+          spec -> spec.afterTypeValidationOptions(TypeValidation.none()),
           java(
             """
               import lombok.EqualsAndHashCode;
@@ -1676,6 +1699,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void failure1() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(
             """
               public class Test {
@@ -2300,6 +2324,7 @@ class TabsAndIndentsTest implements RewriteTest {
     @Test
     void recordComponents() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
           java(
             """
               public record RenameRequest(
@@ -2318,14 +2343,66 @@ class TabsAndIndentsTest implements RewriteTest {
           java(
             """
               public enum WorkflowStatus {
-                  @SuppressWarnings("value1")
-                  VALUE1,
-                  @SuppressWarnings("value2")
-                  VALUE2,
-                  @SuppressWarnings("value3")
-                  VALUE3,
-                  @SuppressWarnings("value4")
-                  VALUE4
+                  @SuppressWarnings("ALL")
+                  VALUE1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void longMethodChainWithMultiLineParameters_Correct() {
+        rewriteRun(
+          java(
+            """
+              class Foo {
+                  String test() {
+                      return "foobar"
+                              .substring(
+                                      1
+                              ).substring(
+                                      2
+                              ).substring(
+                                      3
+                              );
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void longMethodChainWithMultiLineParameters_Incorrect() {
+        rewriteRun(
+          java(
+            """
+              class Foo {
+              String test() {
+              return "foobar"
+              .substring(
+              1
+              ).substring(
+              2
+              ).substring(
+              3
+              );
+              }
+              }
+              """,
+            """
+              class Foo {
+                  String test() {
+                      return "foobar"
+                              .substring(
+                                      1
+                              ).substring(
+                                      2
+                              ).substring(
+                                      3
+                              );
+                  }
               }
               """
           )

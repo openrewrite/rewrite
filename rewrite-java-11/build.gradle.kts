@@ -3,6 +3,9 @@ plugins {
     id("jvm-test-suite")
 }
 
+val javaTck = configurations.create("javaTck") {
+    isTransitive = false
+}
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
@@ -14,6 +17,7 @@ dependencies {
     implementation("org.ow2.asm:asm:latest.release")
 
     testImplementation(project(":rewrite-test"))
+    "javaTck"(project(":rewrite-java-tck"))
 }
 
 java {
@@ -58,15 +62,19 @@ testing {
         register("compatibilityTest", JvmTestSuite::class) {
             dependencies {
                 implementation(project())
+                implementation(project(":rewrite-test"))
                 implementation(project(":rewrite-java-tck"))
+                implementation(project(":rewrite-java-test"))
+                implementation("org.assertj:assertj-core:latest.release")
             }
 
             targets {
                 all {
                     testTask.configure {
                         useJUnitPlatform {
-                            excludeTags("java11", "java17")
+                            excludeTags("java17", "java21")
                         }
+                        testClassesDirs += files(javaTck.files.map { zipTree(it) })
                         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
                         shouldRunAfter(test)
                     }

@@ -875,7 +875,7 @@ public class SemanticallyEqual {
                 J.MethodInvocation compareTo = (J.MethodInvocation) j;
                 if (!method.getSimpleName().equals(compareTo.getSimpleName()) ||
                     !TypeUtils.isOfType(method.getMethodType(), compareTo.getMethodType()) ||
-                    !(static_ == compareTo.getMethodType().hasFlags(Flag.Static) ||
+                    !(static_ == (compareTo.getMethodType() != null && compareTo.getMethodType().hasFlags(Flag.Static)) ||
                       !nullMissMatch(method.getSelect(), compareTo.getSelect())) ||
                     method.getArguments().size() != compareTo.getArguments().size() ||
                     nullListSizeMissMatch(method.getTypeParameters(), compareTo.getTypeParameters())) {

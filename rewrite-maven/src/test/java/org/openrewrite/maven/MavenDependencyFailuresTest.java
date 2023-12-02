@@ -139,6 +139,8 @@ class MavenDependencyFailuresTest implements RewriteTest {
              </project>
             """
         );
+        Path localJar = localRepository.resolve("com/bad/bad-artifact/1/bad-artifact-1.jar");
+        Files.writeString(localJar, "dummy");
 
         MavenRepository mavenLocal = MavenRepository.builder().id("local").uri(localRepository.toUri().toString())
           .snapshots(false).knownToExist(true).build();
