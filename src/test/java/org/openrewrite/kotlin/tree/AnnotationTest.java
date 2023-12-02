@@ -449,8 +449,8 @@ class AnnotationTest implements RewriteTest {
 
     @ParameterizedTest
     @ValueSource(strings = {
-      "@A @B object A",
-      "@A internal @B object A"
+      "@A @B object C",
+      "@A internal @B object C"
     })
     void objectDeclaration(String input) {
         rewriteRun(
@@ -505,6 +505,7 @@ class AnnotationTest implements RewriteTest {
                 JsonSubTypes .  Type(value = Employee::class, name = "Employee")
               ])
               public sealed interface Person
+              class Employee
               """
           )
         );
