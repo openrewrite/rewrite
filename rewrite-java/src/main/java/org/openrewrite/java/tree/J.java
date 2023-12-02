@@ -2389,6 +2389,109 @@ public interface J extends Tree {
         }
     }
 
+    /**
+     * Languages like Kotlin support a unary type modifier such as `?` after the type, indicating nullable.
+     */
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @With
+    class UnaryTypeTree implements J, TypeTree, Expression {
+        @Nullable
+        @NonFinal
+        transient WeakReference<J.UnaryTypeTree.Padding> padding;
+
+        @Getter
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @Getter
+        Space prefix;
+
+        @Getter
+        Markers markers;
+
+        @Getter
+        List<J.Annotation> annotations;
+
+        JLeftPadded<Type> operator;
+
+        @Getter
+        TypeTree typeTree;
+
+        public Type getOperator() {
+            return operator.getElement();
+        }
+
+        @Override
+        public @Nullable JavaType getType() {
+            return typeTree.getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public UnaryTypeTree withType(@Nullable JavaType type) {
+            return withTypeTree(typeTree.withType(type));
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitUnaryTypeTree(this, p);
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        @SuppressWarnings("SwitchStatementWithTooFewBranches")
+        public enum Type {
+            IsNullable;
+
+            public boolean isModifying() {
+                switch (this) {
+                    case IsNullable:
+                    default:
+                        return false;
+                }
+            }
+        }
+
+        public J.UnaryTypeTree.Padding getPadding() {
+            J.UnaryTypeTree.Padding p;
+            if (this.padding == null) {
+                p = new J.UnaryTypeTree.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new J.UnaryTypeTree.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final J.UnaryTypeTree t;
+
+            public JLeftPadded<J.UnaryTypeTree.Type> getOperator() {
+                return t.operator;
+            }
+
+            public J.UnaryTypeTree withOperator(JLeftPadded<J.UnaryTypeTree.Type> operator) {
+                return t.operator == operator ? t : new J.UnaryTypeTree(t.id,
+                        t.prefix,
+                        t.markers,
+                        t.annotations,
+                        operator,
+                        t.typeTree);
+            }
+        }
+    }
+
     @Value
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(onConstructor_ = {@JsonCreator(mode = JsonCreator.Mode.PROPERTIES)} )

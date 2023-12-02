@@ -665,6 +665,23 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return t;
     }
 
+    public J visitUnaryTypeTree(J.UnaryTypeTree utt, P p) {
+        J.UnaryTypeTree u = utt;
+        u = u.withPrefix(visitSpace(u.getPrefix(), Space.Location.UNARY_PREFIX, p));
+        u = u.withMarkers(visitMarkers(u.getMarkers(), p));
+
+        Expression temp = (Expression) visitExpression(u, p);
+        if (!(temp instanceof J.UnaryTypeTree)) {
+            return temp;
+        } else {
+            u = (J.UnaryTypeTree) temp;
+        }
+        u = u.getPadding().withOperator(visitLeftPadded(u.getPadding().getOperator(), JLeftPadded.Location.UNARY_OPERATOR, p));
+        u = u.withTypeTree(visitAndCast(u.getTypeTree(), p));
+        u = u.withType(visitType(u.getType(), p));
+        return u;
+    }
+
     public J visitIdentifier(J.Identifier ident, P p) {
         J.Identifier i = ident;
         if (i.getAnnotations() != null && !i.getAnnotations().isEmpty()) {
