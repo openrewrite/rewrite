@@ -256,4 +256,42 @@ class UseStaticImportTest implements RewriteTest {
           )
         );
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3663")
+    @Test
+    void javadocLinkUnchanged() {
+        rewriteRun(
+          spec -> spec.recipe(new UseStaticImport("java.util.Collections emptyList()")),
+          java(
+            """
+            import java.util.Collections;
+            import java.util.List;
+
+            public class WithJavadoc {
+                /**
+                 * This method uses {@link Collections#emptyList()}.
+                 */
+                public void mustNotChangeTheJavadocAbove() {
+                    List<Object> list = Collections.emptyList();
+                }
+            }
+            """,
+            """
+            import java.util.Collections;
+            import java.util.List;
+
+            import static java.util.Collections.emptyList;
+
+            public class WithJavadoc {
+                /**
+                 * This method uses {@link Collections#emptyList()}.
+                 */
+                public void mustNotChangeTheJavadocAbove() {
+                    List<Object> list = emptyList();
+                }
+            }
+            """
+          )
+        );
+    }
 }
