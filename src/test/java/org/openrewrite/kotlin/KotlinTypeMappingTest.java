@@ -1016,5 +1016,30 @@ public class KotlinTypeMappingTest {
               )
             );
         }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/483")
+        @Test
+        void unusedVar() {
+            //noinspection RemoveRedundantBackticks,RemoveRedundantQualifierName
+            rewriteRun(
+              kotlin(
+                "val unused: (Int, Int) -> Int = { _, y -> y }",
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
+                            if ("_".equals(identifier.getSimpleName())) {
+                                assertThat(identifier.getFieldType().getName()).isEqualTo("_");
+                                found.set(true);
+                            }
+                            return super.visitIdentifier(identifier, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
     }
 }

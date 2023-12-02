@@ -523,7 +523,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             else -> fileSignature(firFile)
         }
         sig.append(owner)
-        sig.append("{name=${property.name.asString()}")
+        sig.append("{name=${variableName(property.name.asString())}")
         sig.append(",type=${signature(property.returnTypeRef)}}")
         return sig.toString()
     }
@@ -661,7 +661,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             owner = owner.substring(0, owner.indexOf('<'))
         }
         sig.append(owner)
-        sig.append("{name=${javaField.name.asString()}")
+        sig.append("{name=${variableName(javaField.name.asString())}")
         sig.append(",type=${signature(javaField.type)}}")
         return sig.toString()
     }
@@ -686,6 +686,13 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 .replace("/", ".")
                 .replace("?", "")
             return if (cleanedFqn.startsWith(".")) cleanedFqn.substring(1) else cleanedFqn
+        }
+
+        fun variableName(name: String): String {
+            return when (name) {
+                "<unused var>" -> "_"
+                else -> name
+            }
         }
     }
 }

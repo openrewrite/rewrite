@@ -57,6 +57,7 @@ import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.JavaType.*
 import org.openrewrite.java.tree.TypeUtils
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.convertClassIdToFqn
+import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.variableName
 import kotlin.collections.ArrayList
 
 @Suppress("DuplicatedCode")
@@ -827,7 +828,7 @@ class KotlinTypeMapping(
         val vt = Variable(
             null,
             mapToFlagsBitmap(variable.visibility, variable.modality),
-            variable.name.asString(),
+            variableName(variable.name.asString()),
             null, null, null
         )
         typeCache.put(signature, vt)
@@ -1154,7 +1155,7 @@ class KotlinTypeMapping(
         val variable = Variable(
             null,
             convertToFlagsBitMap(javaField.visibility, javaField.isStatic, javaField.isFinal, javaField.isAbstract),
-            javaField.name.asString(),
+            variableName(javaField.name.asString()),
             null, null, null
         )
         typeCache.put(signature, variable)
