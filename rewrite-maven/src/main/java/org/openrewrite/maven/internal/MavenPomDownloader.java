@@ -832,6 +832,15 @@ public class MavenPomDownloader {
      * Returns a request builder with Authorization header set if the provided repository specifies credentials
      */
     private HttpSender.Request.Builder applyAuthenticationToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
+        if(ctx.getSettings() != null && ctx.getSettings().getServers() != null) {
+            for (MavenSettings.Server server : ctx.getSettings().getServers().getServers()) {
+                if(server.getId().equals(repository.getId()) && server.getConfiguration() != null && server.getConfiguration().getHttpHeaders() != null) {
+                    for (MavenSettings.HttpHeader header : server.getConfiguration().getHttpHeaders()) {
+                        request.withHeader(header.getName(), header.getValue());
+                    }
+                }
+            }
+        }
         if (hasCredentials(repository)) {
             return request.withBasicAuthentication(repository.getUsername(), repository.getPassword());
         }
