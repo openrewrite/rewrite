@@ -120,4 +120,21 @@ class FindSourceFilesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void eitherOr() {
+        rewriteRun(
+          spec -> spec.recipe(new FindSourceFiles("**/*.{md,txt}")),
+          text(
+            "hello world!",
+            "~~>hello world!",
+            spec -> spec.path("a/b/hello.md")
+          ),
+          text(
+            "hello world!",
+            "~~>hello world!",
+            spec -> spec.path("a/c/hello.txt")
+          )
+        );
+    }
 }
