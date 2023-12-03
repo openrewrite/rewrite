@@ -970,17 +970,16 @@ public class GroovyParserVisitor {
 
         @Override
         public void visitCaseStatement(CaseStatement statement) {
-            queue.add(
-                    new J.Case(randomId(),
-                            sourceBefore("case"),
-                            Markers.EMPTY,
-                            J.Case.Type.Statement,
-                            null,
-                            JContainer.build(singletonList(JRightPadded.build(visit(statement.getExpression())))),
-                            JContainer.build(sourceBefore(":"),
-                                    convertStatements(((BlockStatement) statement.getCode()).getStatements(), t -> Space.EMPTY), Markers.EMPTY),
-                            null
-                    )
+            queue.add(new J.Case(randomId(),
+                    sourceBefore("case"),
+                    Markers.EMPTY,
+                    J.Case.Type.Statement,
+                    null,
+                    JContainer.build(singletonList(JRightPadded.build(visit(statement.getExpression())))),
+                    statement.getCode() instanceof EmptyStatement
+                            ? JContainer.build(sourceBefore(":"), convertStatements(emptyList(), t -> Space.EMPTY), Markers.EMPTY)
+                            : JContainer.build(sourceBefore(":"), convertStatements(((BlockStatement) statement.getCode()).getStatements(), t -> Space.EMPTY), Markers.EMPTY)
+                    , null)
             );
         }
 
