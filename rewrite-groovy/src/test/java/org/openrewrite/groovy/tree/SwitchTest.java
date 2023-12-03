@@ -147,7 +147,9 @@ class SwitchTest implements RewriteTest {
             """
               switch("foo") {
                   case "foo":
-                  case "bar": {
+                  case "bar":
+                    // fallthrough
+                  case "quz": {
                      break
                   }
               }
