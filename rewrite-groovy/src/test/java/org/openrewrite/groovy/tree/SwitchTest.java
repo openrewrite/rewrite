@@ -139,4 +139,20 @@ class SwitchTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void fallthroughCase() {
+        rewriteRun(
+          groovy(
+            """
+              switch("foo") {
+                  case "foo":
+                  case "bar": {
+                     break
+                  }
+              }
+              """
+          )
+        );
+    }
 }
