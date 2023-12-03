@@ -98,6 +98,16 @@ class PathUtilsTest {
         assertThat(matchesGlob(path("a-test/test.txt"), "**/*-test/*-test/test.txt")).isFalse();
     }
 
+    @Test
+    void eitherOr() {
+        // matches with {}'s, used in for instance `"**/{application,application-*,bootstrap,bootstrap-*}.{yml,yaml}"`
+        assertThat(matchesGlob(path("test/"), "test/{foo,bar}")).isFalse();
+        assertThat(matchesGlob(path("test/quz"), "test/{foo,bar}")).isFalse();
+        assertThat(matchesGlob(path("test/foo"), "test/{foo,bar}")).isTrue();
+        assertThat(matchesGlob(path("test/foo"), "test/{f*,bar}")).isTrue();
+        assertThat(matchesGlob(path("test/bar"), "test/{foo,bar}")).isTrue();
+    }
+
     private static Path path(String path) {
         return Paths.get(path);
     }
