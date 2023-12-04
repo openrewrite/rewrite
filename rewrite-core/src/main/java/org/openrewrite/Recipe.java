@@ -18,6 +18,7 @@ package org.openrewrite;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import lombok.Setter;
 import org.intellij.lang.annotations.Language;
 import org.openrewrite.config.DataTableDescriptor;
@@ -134,7 +135,12 @@ public abstract class Recipe implements Cloneable {
             return getDisplayName() + " " + suffix;
         }
 
-        List<OptionDescriptor> options = new ArrayList<>(getOptionDescriptors(getClass()));
+        List<OptionDescriptor> options = getOptionDescriptors(
+                getClass(),
+                this,
+                "",
+                ""
+        );
         options.removeIf(opt -> !opt.isRequired());
         if (options.isEmpty()) {
             return getDisplayName();
@@ -212,7 +218,7 @@ public abstract class Recipe implements Cloneable {
     }
 
     protected RecipeDescriptor createRecipeDescriptor() {
-        List<OptionDescriptor> options = getOptionDescriptors(this.getClass());
+        List<OptionDescriptor> options = getOptionDescriptors(this.getClass(), this, "", "");
         List<RecipeDescriptor> recipeList1 = new ArrayList<>();
         for (Recipe next : getRecipeList()) {
             recipeList1.add(next.getDescriptor());
@@ -229,20 +235,26 @@ public abstract class Recipe implements Cloneable {
                 getMaintainers(), getContributors(), getExamples(), recipeSource);
     }
 
-    private List<OptionDescriptor> getOptionDescriptors(Class<?> recipeClass) {
+    private static List<OptionDescriptor> getOptionDescriptors(
+            Class<?> recipeClass,
+            Object self,
+            String namePrefix,
+            String nameSuffix
+    ) {
         List<OptionDescriptor> options = new ArrayList<>();
 
         for (Field field : recipeClass.getDeclaredFields()) {
             Object value;
             try {
                 field.setAccessible(true);
-                value = field.get(this);
+                value = field.get(self);
             } catch (IllegalAccessException e) {
                 value = null;
             }
             Option option = field.getAnnotation(Option.class);
             if (option != null) {
-                options.add(new OptionDescriptor(field.getName(),
+                options.add(new OptionDescriptor(
+                        namePrefix + field.getName() + nameSuffix,
                         field.getType().getSimpleName(),
                         option.displayName(),
                         option.description(),
@@ -250,6 +262,22 @@ public abstract class Recipe implements Cloneable {
                         option.valid().length == 1 && option.valid()[0].isEmpty() ? null : Arrays.asList(option.valid()),
                         option.required(),
                         value));
+            }
+            OptionGroup optionGroup = field.getAnnotation(OptionGroup.class);
+            if (optionGroup != null) {
+                String prefix = "";
+                String suffix = "";
+                JsonUnwrapped jsonUnwrapped = field.getAnnotation(JsonUnwrapped.class);
+                if (jsonUnwrapped != null) {
+                    prefix = jsonUnwrapped.prefix();
+                    suffix = jsonUnwrapped.suffix();
+                }
+                if (value == null) {
+                    throw new IllegalStateException(
+                            "@NestedOption value " + field.getName() + " is null"
+                    );
+                }
+                options.addAll(getOptionDescriptors(field.getType(), value, prefix, suffix));
             }
         }
         return options;
