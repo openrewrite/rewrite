@@ -17,14 +17,19 @@ package org.openrewrite.kotlin;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Issue;
 import org.openrewrite.Recipe;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.style.ImportLayoutStyle;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.test.RewriteTest;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.kotlin.Assertions.kotlin;
 import static org.openrewrite.test.RewriteTest.toRecipe;
@@ -336,6 +341,44 @@ public class AddImportTest implements RewriteTest {
               
               class Foo
               """
+          )
+        );
+    }
+
+    @SuppressWarnings("RemoveRedundantBackticks")
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/493")
+    @Test
+    void addEscapedImport() {
+        rewriteRun(
+          spec -> spec.recipe(importTypeRecipe("`java`.`util`.`List`")),
+          kotlin(
+            """
+              class A
+              """,
+            """
+              import `java`.`util`.`List`
+              
+              class A
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                AtomicBoolean found = new AtomicBoolean(false);
+                new KotlinIsoVisitor<Integer>() {
+                    @Override
+                    public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
+                        assertThat(identifier.getSimpleName().startsWith("`")).isFalse();
+                        return super.visitIdentifier(identifier, integer);
+                    }
+
+                    @Override
+                    public J.Import visitImport(J.Import _import, Integer integer) {
+                        assertThat(_import.getQualid().getType()).isNotNull();
+                        assertThat(_import.getQualid().getType().toString()).isEqualTo("java.util.List");
+                        found.set(true);
+                        return super.visitImport(_import, integer);
+                    }
+                }.visit(cu, 0);
+                assertThat(found.get()).isTrue();
+            })
           )
         );
     }

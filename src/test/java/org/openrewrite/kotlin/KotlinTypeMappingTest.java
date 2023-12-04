@@ -1107,5 +1107,37 @@ public class KotlinTypeMappingTest {
               )
             );
         }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/493")
+        @Test
+        void escapedImport() {
+            //noinspection RemoveRedundantBackticks
+            rewriteRun(
+              kotlin(
+                """
+                  @file:Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+                  import `java`.`util`.`List`
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
+                            assertThat(identifier.getSimpleName().startsWith("`")).isFalse();
+                            return super.visitIdentifier(identifier, integer);
+                        }
+
+                        @Override
+                        public J.Import visitImport(J.Import _import, Integer integer) {
+                            assertThat(_import.getQualid().getType().toString()).isEqualTo("java.util.List");
+                            found.set(true);
+                            return super.visitImport(_import, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
     }
 }

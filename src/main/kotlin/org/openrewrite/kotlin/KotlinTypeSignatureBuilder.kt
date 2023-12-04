@@ -180,7 +180,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             }
 
             is FirResolvedImport -> {
-                signature(type.importedFqName)
+                resolveImport(type)
             }
 
             is FqName -> {
@@ -437,6 +437,10 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             }
         }
         return genericArgumentTypes.toString()
+    }
+
+    private fun resolveImport(type: FirResolvedImport): String {
+        return signature(type.importedFqName) + (if (type.isAllUnder) ".*" else "")
     }
 
     @OptIn(SymbolInternals::class)

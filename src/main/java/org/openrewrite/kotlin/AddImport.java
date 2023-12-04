@@ -143,7 +143,7 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
                     Markers.EMPTY,
                     new JLeftPadded<>(Space.EMPTY, member != null, Markers.EMPTY),
                     TypeTree.build(fullyQualifiedName +
-                                   (member == null ? "" : "." + member)).withPrefix(Space.SINGLE_SPACE),
+                                   (member == null ? "" : "." + member), '`').withPrefix(Space.SINGLE_SPACE),
                     alias != null ? new JLeftPadded<>(
                             Space.SINGLE_SPACE,
                             new J.Identifier(

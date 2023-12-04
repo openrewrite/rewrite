@@ -49,6 +49,7 @@ import org.jetbrains.kotlin.fir.types.jvm.FirJavaTypeRef
 import org.jetbrains.kotlin.load.java.structure.*
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.*
 import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource
+import org.jetbrains.kotlin.name.isOneSegmentFQN
 import org.jetbrains.kotlin.resolve.jvm.JvmClassName
 import org.jetbrains.kotlin.types.ConstantValueKind
 import org.jetbrains.kotlin.types.Variance
@@ -204,8 +205,12 @@ class KotlinTypeMapping(
 
     @OptIn(SymbolInternals::class)
     private fun resolveImport(type: FirImport, signature: String): JavaType? {
+        if (type.importedFqName == null || type.importedFqName!!.isOneSegmentFQN()) {
+            return null
+        }
+
         // If the symbol is not resolvable we return a NEW ShallowClass to prevent caching on a potentially resolvable class type.
-        val sym = type.importedFqName?.topLevelClassAsmType()?.classId?.toSymbol(firSession) ?: return ShallowClass.build(signature)
+        val sym = type.importedFqName!!.topLevelClassAsmType().classId.toSymbol(firSession) ?: return ShallowClass.build(signature)
         return type(sym.fir, signature)
     }
 

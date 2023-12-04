@@ -2478,9 +2478,16 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                                                                 psi.getNode().getElementType() != KtTokens.SEMICOLON);
 
         String text = nodeRangeText(getNodeOrNull(first), getNodeOrNull(last));
-        J reference = TypeTree.build(text); // FIXME: this creates a shallow class for a resolvable type.
+        TypeTree reference = TypeTree.build(text, '`');
         reference = reference.withPrefix(suffix(importPsi));
 
+        JavaType jt = type(importDirective);
+        if (jt instanceof JavaType.Parameterized) {
+            jt = ((JavaType.Parameterized) jt).getType();
+        }
+        if (jt != null) {
+            reference = reference.withType(jt);
+        }
         if (reference instanceof J.Identifier) {
             reference = new J.FieldAccess(
                     randomId(),
@@ -2488,7 +2495,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     Markers.EMPTY,
                     new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY),
                     padLeft(Space.EMPTY, (J.Identifier) reference),
-                    type(importDirective)
+                    jt
             );
         }
 
@@ -2499,7 +2506,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 rpStatic,
                 (J.FieldAccess) reference,
                 // Aliases contain Kotlin `Name` and do not resolve to a type. The aliases type is the import directive, so we set the type to match the import.
-                alias != null ? padLeft(prefix(alias), createIdentifier(requireNonNull(alias.getNameIdentifier()), type(importDirective))) : null
+                alias != null ? padLeft(prefix(alias), createIdentifier(requireNonNull(alias.getNameIdentifier()), jt)) : null
         );
     }
 
