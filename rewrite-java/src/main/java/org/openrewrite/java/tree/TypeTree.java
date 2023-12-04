@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.tree;
 
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.Quoted;
 import org.openrewrite.marker.Markers;
 
 import java.util.Scanner;
@@ -29,6 +31,10 @@ import static org.openrewrite.Tree.randomId;
 public interface TypeTree extends NameTree {
 
     static <T extends TypeTree & Expression> T build(String fullyQualifiedName) {
+        return TypeTree.build(fullyQualifiedName, null);
+    }
+
+    static <T extends TypeTree & Expression> T build(String fullyQualifiedName, @Nullable Character escape) {
         Scanner scanner = new Scanner(fullyQualifiedName);
         scanner.useDelimiter("[.$]");
 
@@ -59,10 +65,18 @@ public interface TypeTree extends NameTree {
 
             assert partBuilder != null;
             String part = partBuilder.toString();
+            Markers markers = Markers.EMPTY;
+            if (escape != null) {
+                String esc = String.valueOf(escape);
+                if (!esc.isEmpty() && part.startsWith(esc) && part.endsWith(esc)) {
+                    part = part.substring(1, part.length() - 1);
+                    markers = markers.addIfAbsent(new Quoted(randomId()));
+                }
+            }
 
             if (i == 0) {
                 fullName.append(part);
-                expr = new Identifier(randomId(), Space.format(whitespaceBefore.toString()), Markers.EMPTY, emptyList(), part, null, null);
+                expr = new Identifier(randomId(), Space.format(whitespaceBefore.toString()), markers, emptyList(), part, null, null);
             } else {
                 fullName.append('.').append(part);
                 expr = new J.FieldAccess(
@@ -75,7 +89,7 @@ public interface TypeTree extends NameTree {
                                 new Identifier(
                                         randomId(),
                                         Space.format(whitespaceBefore.toString()),
-                                        Markers.EMPTY,
+                                        markers,
                                         emptyList(),
                                         part,
                                         null,
