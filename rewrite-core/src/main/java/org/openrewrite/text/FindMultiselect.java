@@ -69,7 +69,7 @@ public class FindMultiselect extends Recipe {
                           "* Dot all - Allows `.` to match line terminators.",
             valid = {"Case-sensitive", "Multiline", "Dot all"},
             required = false)
-            @Nullable
+    @Nullable
     Set<String> regexOptions;
 
     @Option(displayName = "File pattern",
@@ -86,7 +86,7 @@ public class FindMultiselect extends Recipe {
         Boolean caseSensitive;
         Boolean multiline;
         Boolean dotAll;
-        if(regexOptions != null) {
+        if (regexOptions != null) {
             Set<String> lowerCaseOptions = regexOptions.stream()
                     .map(String::toLowerCase)
                     .collect(toSet());
@@ -112,13 +112,13 @@ public class FindMultiselect extends Recipe {
                     searchStr = Pattern.quote(searchStr);
                 }
                 int patternOptions = 0;
-                if(!Boolean.TRUE.equals(caseSensitive)) {
+                if (!Boolean.TRUE.equals(caseSensitive)) {
                     patternOptions |= Pattern.CASE_INSENSITIVE;
                 }
-                if(Boolean.TRUE.equals(multiline)) {
+                if (Boolean.TRUE.equals(multiline)) {
                     patternOptions |= Pattern.MULTILINE;
                 }
-                if(Boolean.TRUE.equals(dotAll)) {
+                if (Boolean.TRUE.equals(dotAll)) {
                     patternOptions |= Pattern.DOTALL;
                 }
                 Pattern pattern = Pattern.compile(searchStr, patternOptions);
@@ -141,10 +141,11 @@ public class FindMultiselect extends Recipe {
             }
         };
         //noinspection DuplicatedCode
-        if(filePattern != null) {
+        if (filePattern != null) {
             //noinspection unchecked
             TreeVisitor<?, ExecutionContext> check = Preconditions.or(Arrays.stream(filePattern.split(";"))
-                    .map(HasSourcePath<ExecutionContext>::new)
+                    .map(FindSourceFiles::new)
+                    .map(Recipe::getVisitor)
                     .toArray(TreeVisitor[]::new));
 
             visitor = Preconditions.check(check, visitor);

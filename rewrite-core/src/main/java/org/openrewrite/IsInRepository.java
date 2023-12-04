@@ -35,7 +35,7 @@ public class IsInRepository extends Recipe {
     @Override
     public String getDescription() {
         return "A search recipe which marks files that are in a repository with one of the supplied names. " +
-               "Intended for use as a precondition for other recipes being run over many different repositories";
+               "Intended for use as a precondition for other recipes being run over many different repositories.";
     }
 
     @Option(displayName = "Allowed repositories",

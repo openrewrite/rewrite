@@ -167,4 +167,49 @@ class ReorderMethodArgumentsTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void reorderArgumentsInConstructors() {
+        rewriteRun(
+          spec -> spec.recipes(
+            new ReorderMethodArguments("a.A <constructor>(String, Integer, Integer)",
+              new String[]{"n", "m", "s"}, null, null, null)),
+          java(
+            """
+              package a;
+              public class A {
+                 public A(String s, Integer m, Integer n) {}
+                 public A(Integer n, Integer m, String s) {}
+              }
+              """
+          ),
+          java(
+            """
+              import a.*;
+              public class B {
+                 public void test() {
+                     A a = new A(
+                         "mystring",
+                         1,
+                         2
+                     );
+                 }
+              }
+              """,
+            """
+              import a.*;
+              public class B {
+                 public void test() {
+                     A a = new A(
+                         2,
+                         1,
+                         "mystring"
+                     );
+                 }
+              }
+              """
+          )
+        );
+    }
+
 }

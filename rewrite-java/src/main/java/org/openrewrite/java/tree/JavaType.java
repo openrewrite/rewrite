@@ -145,6 +145,47 @@ public interface JavaType {
         }
     }
 
+    class Intersection implements JavaType {
+        public Intersection(@Nullable List<JavaType> bounds) {
+            this.bounds = arrayOrNullIfEmpty(bounds, EMPTY_JAVA_TYPE_ARRAY);
+        }
+
+        Intersection(@Nullable JavaType[] throwableTypes) {
+            this.bounds = nullIfEmpty(throwableTypes);
+        }
+
+        @JsonCreator
+        Intersection() {
+        }
+
+        private JavaType[] bounds;
+
+        public List<JavaType> getBounds() {
+            if (bounds == null) {
+                return Collections.emptyList();
+            }
+            return Arrays.asList(bounds);
+        }
+
+        public Intersection withBounds(@Nullable List<JavaType> bounds) {
+            JavaType[] boundsArray = arrayOrNullIfEmpty(bounds, EMPTY_JAVA_TYPE_ARRAY);
+            if (Arrays.equals(boundsArray, this.bounds)) {
+                return this;
+            }
+            return new Intersection(boundsArray);
+        }
+
+        public Intersection unsafeSet(List<JavaType> bounds) {
+            this.bounds = arrayOrNullIfEmpty(bounds, EMPTY_JAVA_TYPE_ARRAY);
+            return this;
+        }
+
+        public Intersection unsafeSet(JavaType[] bounds) {
+            this.bounds = ListUtils.nullIfEmpty(bounds);
+            return this;
+        }
+    }
+
     abstract class FullyQualified implements JavaType {
         public abstract String getFullyQualifiedName();
 

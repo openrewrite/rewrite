@@ -129,7 +129,10 @@ public class UsesType<P> extends JavaIsoVisitor<P> {
     }
 
     private static Predicate<JavaType> packagePattern(String name) {
-        return type -> type instanceof JavaType.FullyQualified && ((JavaType.FullyQualified) type).getPackageName().equals(name);
+        return type -> type instanceof JavaType.FullyQualified &&
+                       // optimization to avoid unnecessary memory allocations
+                       ((JavaType.FullyQualified) type).getFullyQualifiedName().startsWith(name) &&
+                       ((JavaType.FullyQualified) type).getPackageName().equals(name);
     }
 
     private static Predicate<JavaType> packagePrefixPattern(String prefix) {

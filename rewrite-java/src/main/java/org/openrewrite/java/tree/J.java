@@ -2927,6 +2927,93 @@ public interface J extends Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    final class IntersectionType implements J, TypeTree, Expression {
+        @Nullable
+        @NonFinal
+        transient WeakReference<Padding> padding;
+
+        @With
+        @EqualsAndHashCode.Include
+        @Getter
+        UUID id;
+
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        JContainer<TypeTree> bounds;
+
+        public List<TypeTree> getBounds() {
+            return bounds.getElements();
+        }
+
+        public IntersectionType withBounds(List<TypeTree> bounds) {
+            return getPadding().withBounds(JContainer.withElementsNullable(this.bounds, bounds));
+        }
+
+        @Override
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
+            return v.visitIntersectionType(this, p);
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public IntersectionType withType(@Nullable JavaType type) {
+            // cannot overwrite type directly, perform this operation on each bound separately
+            return this;
+        }
+
+        @Override
+        public JavaType getType() {
+            return new JavaType.Intersection(bounds.getPadding().getElements().stream()
+                    .filter(Objects::nonNull)
+                    .map(b -> b.getElement().getType())
+                    .collect(toList()));
+        }
+
+        @Override
+        public CoordinateBuilder.Expression getCoordinates() {
+            return new CoordinateBuilder.Expression(this);
+        }
+
+        public Padding getPadding() {
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final IntersectionType t;
+
+            @Nullable
+            public JContainer<TypeTree> getBounds() {
+                return t.bounds;
+            }
+
+            public IntersectionType withBounds(@Nullable JContainer<TypeTree> bounds) {
+                return t.bounds == bounds ? t : new IntersectionType(t.id, t.prefix, t.markers, bounds);
+            }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class Label implements J, Statement {
         @Nullable
         @NonFinal
@@ -5258,6 +5345,10 @@ public interface J extends Tree {
         @Getter
         List<Annotation> annotations;
 
+        @With
+        @Getter
+        List<J.Modifier> modifiers;
+
         /**
          * Will be either a {@link TypeTree} or {@link Wildcard}. Wildcards aren't possible in
          * every context where type parameters may be defined (e.g. not possible on new statements).
@@ -5308,7 +5399,7 @@ public interface J extends Tree {
             }
 
             public TypeParameter withBounds(@Nullable JContainer<TypeTree> bounds) {
-                return t.bounds == bounds ? t : new TypeParameter(t.id, t.prefix, t.markers, t.annotations, t.name, bounds);
+                return t.bounds == bounds ? t : new TypeParameter(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.name, bounds);
             }
         }
     }

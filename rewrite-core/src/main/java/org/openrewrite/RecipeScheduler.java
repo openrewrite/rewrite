@@ -83,8 +83,7 @@ public class RecipeScheduler {
                 }
 
                 if (i >= minCycles &&
-                    ((cycle.madeChangesInThisCycle.isEmpty() && !ctxWithWatch.hasNewMessages()) &&
-                     !anyRecipeCausingAnotherCycle)) {
+                    (cycle.madeChangesInThisCycle.isEmpty() || !anyRecipeCausingAnotherCycle)) {
                     after.afterCycle(true);
                     break;
                 }
@@ -128,7 +127,7 @@ public class RecipeScheduler {
         Recipe recipe;
         int cycle;
         Cursor rootCursor;
-        ExecutionContext ctx;
+        WatchableExecutionContext ctx;
         RecipeRunStats recipeRunStats;
         SourcesFileResults sourcesFileResults;
         SourcesFileErrors errorsTable;
@@ -136,7 +135,7 @@ public class RecipeScheduler {
 
         long cycleStartTime = System.nanoTime();
         AtomicBoolean thrownErrorOnTimeout = new AtomicBoolean();
-        List<Recipe> madeChangesInThisCycle = new ArrayList<>();
+        Set<Recipe> madeChangesInThisCycle = Collections.newSetFromMap(new IdentityHashMap<>());
 
         public LargeSourceSet scanSources(LargeSourceSet sourceSet, int cycle) {
             return mapForRecipeRecursively(sourceSet, (recipeStack, sourceFile) -> {
@@ -242,6 +241,10 @@ public class RecipeScheduler {
                             return sourceFile;
                         }
                         recipeRunStats.recordSourceFileChanged(sourceFile, after);
+                    } else if (ctx.hasNewMessages()) {
+                        // consider any recipes adding new messages as a changing recipe (which can request another cycle)
+                        madeChangesInThisCycle.add(recipeStack.peek());
+                        ctx.resetHasNewMessages();
                     }
                 } catch (Throwable t) {
                     after = handleError(recipe, sourceFile, after, t);

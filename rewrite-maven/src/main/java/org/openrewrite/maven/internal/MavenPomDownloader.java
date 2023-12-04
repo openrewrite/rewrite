@@ -466,8 +466,8 @@ public class MavenPomDownloader {
         // The requested gav might itself have an unresolved placeholder in the version, so also check raw values
         for (Pom projectPom : projectPoms.values()) {
             if (gav.getGroupId().equals(projectPom.getGroupId()) &&
-                    gav.getArtifactId().equals(projectPom.getArtifactId()) &&
-                    (gav.getVersion().equals(projectPom.getVersion()) || projectPom.getVersion().equals(projectPom.getValue(gav.getVersion())))) {
+                gav.getArtifactId().equals(projectPom.getArtifactId()) &&
+                (gav.getVersion().equals(projectPom.getVersion()) || projectPom.getVersion().equals(projectPom.getValue(gav.getVersion())))) {
                 return projectPom;
             }
         }
@@ -539,8 +539,10 @@ public class MavenPomDownloader {
                                 }
                             }
 
-                            // so that the repository path is the same regardless of username
-                            pom = pom.withRepository(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL);
+                            if (repo.getUri().equals(MavenRepository.MAVEN_LOCAL_DEFAULT.getUri())) {
+                                // so that the repository path is the same regardless of username
+                                pom = pom.withRepository(MavenRepository.MAVEN_LOCAL_USER_NEUTRAL);
+                            }
 
                             if (!Objects.equals(versionMaybeDatedSnapshot, pom.getVersion())) {
                                 pom = pom.withGav(pom.getGav().withDatedSnapshotVersion(versionMaybeDatedSnapshot));
@@ -645,7 +647,7 @@ public class MavenPomDownloader {
                                                                        @Nullable ResolvedPom containingPom,
                                                                        @Nullable String acceptsVersion) {
         Set<MavenRepository> normalizedRepositories = new LinkedHashSet<>();
-        if(addDefaultRepositories) {
+        if (addDefaultRepositories) {
             normalizedRepositories.add(ctx.getLocalRepository());
         }
 
@@ -663,8 +665,11 @@ public class MavenPomDownloader {
                 normalizedRepositories.add(normalizedRepo);
             }
         }
-        if(addDefaultRepositories) {
-            normalizedRepositories.add(normalizeRepository(MavenRepository.MAVEN_CENTRAL, containingPom));
+        if (addDefaultRepositories) {
+            MavenRepository normalizedRepo = normalizeRepository(MavenRepository.MAVEN_CENTRAL, containingPom);
+            if (normalizedRepo != null) {
+                normalizedRepositories.add(normalizedRepo);
+            }
         }
         return normalizedRepositories;
     }
@@ -760,12 +765,12 @@ public class MavenPomDownloader {
                             } catch (Throwable e) {
                                 // ok to fall through here and cache a null
                                 if (nullReasonConsumer != null) {
-                                    nullReasonConsumer.accept(t);
+                                    nullReasonConsumer.accept(e);
                                 }
                             }
                         }
                     }
-                    if(normalized == null) {
+                    if (normalized == null) {
                         if (nullReasonConsumer != null) {
                             nullReasonConsumer.accept(t);
                         }
@@ -827,6 +832,15 @@ public class MavenPomDownloader {
      * Returns a request builder with Authorization header set if the provided repository specifies credentials
      */
     private HttpSender.Request.Builder applyAuthenticationToRequest(MavenRepository repository, HttpSender.Request.Builder request) {
+        if(ctx.getSettings() != null && ctx.getSettings().getServers() != null) {
+            for (MavenSettings.Server server : ctx.getSettings().getServers().getServers()) {
+                if(server.getId().equals(repository.getId()) && server.getConfiguration() != null && server.getConfiguration().getHttpHeaders() != null) {
+                    for (MavenSettings.HttpHeader header : server.getConfiguration().getHttpHeaders()) {
+                        request.withHeader(header.getName(), header.getValue());
+                    }
+                }
+            }
+        }
         if (hasCredentials(repository)) {
             return request.withBasicAuthentication(repository.getUsername(), repository.getPassword());
         }

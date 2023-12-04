@@ -66,7 +66,7 @@ public class AddProperty extends ScanningRecipe<AddProperty.NeedsProperty> {
         return "Add a property to the `gradle.properties` file.";
     }
 
-    static class NeedsProperty {
+    public static class NeedsProperty {
         boolean isGradleProject;
         boolean hasGradleProperties;
     }

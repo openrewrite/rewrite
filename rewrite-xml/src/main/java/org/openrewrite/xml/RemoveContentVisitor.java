@@ -41,7 +41,7 @@ public class RemoveContentVisitor<P> extends XmlVisitor<P> {
                     List<Content> contents = new ArrayList<>(t.getContent());
                     contents.remove(content);
 
-                    if (removeEmptyAncestors && contents.isEmpty()) {
+                    if (removeEmptyAncestors && contents.isEmpty() && t.getAttributes().isEmpty()) {
                         if (getCursor().getParentOrThrow().getValue() instanceof Xml.Document) {
                             return t.withContent(null).withClosing(null);
                         } else {

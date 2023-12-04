@@ -1,5 +1,5 @@
 /*
- * Copyright 2022 the original author or authors.
+ * Copyright 2023 the original author or authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,41 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.config;
+package org.openrewrite.xml;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Option;
 import org.openrewrite.Recipe;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.text.PlainText;
-import org.openrewrite.text.PlainTextVisitor;
+import org.openrewrite.xml.tree.Xml;
 
-@SuppressWarnings("unused") // Used in a yaml recipe
-public class ChangeTextToSam extends Recipe {
-
+public class RemoveEmptyXmlTags extends Recipe {
     @Override
     public String getDisplayName() {
-        return "Change text to Sam";
+        return "Remove empty XML Tag";
     }
 
     @Override
     public String getDescription() {
-        return "Does the text file say Sam? It will after you run this recipe.";
+        return "Removes XML tags that do not have attributes or children, including self closing tags.";
     }
-
-    @Option(displayName = "bool",
-            description = "Exists to test that optional configuration may be omitted",
-            required = false)
-    @Nullable
-    Boolean bool;
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new PlainTextVisitor<>() {
+        return new XmlIsoVisitor<ExecutionContext>() {
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
-                return text.withText("Sam");
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = super.visitTag(tag, ctx);
+                if (t != null && (t.getContent() == null || t.getContent().isEmpty()) && t.getAttributes().isEmpty()) {
+                    doAfterVisit(new RemoveContentVisitor<>(t, true));
+                }
+                return t;
             }
         };
     }

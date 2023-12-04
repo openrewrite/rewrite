@@ -134,7 +134,11 @@ public class FindAndReplace extends Recipe {
                 if (!matcher.find()) {
                     return sourceFile;
                 }
-                String newText = matcher.replaceAll(replace);
+                String replacement = replace;
+                if (!Boolean.TRUE.equals(regex)) {
+                    replacement = replacement.replace("$", "\\$");
+                }
+                String newText = matcher.replaceAll(replacement);
                 return plainText.withText(newText)
                         .withMarkers(sourceFile.getMarkers().add(new AlreadyReplaced(randomId(), find, replace)));
             }
@@ -143,11 +147,13 @@ public class FindAndReplace extends Recipe {
         if(filePattern != null) {
             //noinspection unchecked
             TreeVisitor<?, ExecutionContext> check = Preconditions.or(Arrays.stream(filePattern.split(";"))
-                    .map(HasSourcePath<ExecutionContext>::new)
+                    .map(FindSourceFiles::new)
+                    .map(Recipe::getVisitor)
                     .toArray(TreeVisitor[]::new));
 
             visitor = Preconditions.check(check, visitor);
         }
         return visitor;
     }
+
 }
