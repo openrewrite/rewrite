@@ -29,6 +29,7 @@ import org.jetbrains.kotlin.fir.analysis.checkers.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.impl.FirOuterClassTypeParameterRef
 import org.jetbrains.kotlin.fir.declarations.utils.isLocal
+import org.jetbrains.kotlin.fir.declarations.utils.isStatic
 import org.jetbrains.kotlin.fir.declarations.utils.modality
 import org.jetbrains.kotlin.fir.declarations.utils.visibility
 import org.jetbrains.kotlin.fir.expressions.*
@@ -334,7 +335,7 @@ class KotlinTypeMapping(
         if (clazz == null) {
             clazz = Class(
                 null,
-                mapToFlagsBitmap(firClass.visibility, firClass.modality()),
+                mapToFlagsBitmap(firClass.visibility, firClass.modality(), firClass.isStatic),
                 fqn,
                 mapKind(firClass.classKind),
                 null, null, null, null, null, null, null
@@ -496,7 +497,7 @@ class KotlinTypeMapping(
         }
         val method = Method(
             null,
-            mapToFlagsBitmap(function.visibility, function.modality),
+            mapToFlagsBitmap(function.visibility, function.modality, function.isStatic),
             null,
             if (function.symbol is FirConstructorSymbol) "<constructor>" else methodName(function),
             null,
@@ -667,8 +668,8 @@ class KotlinTypeMapping(
         val method = Method(
             null,
             when (sym) {
-                is FirConstructorSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality)
-                is FirNamedFunctionSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality)
+                is FirConstructorSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality, sym.isStatic)
+                is FirNamedFunctionSymbol -> mapToFlagsBitmap(sym.visibility, sym.modality, sym.isStatic)
                 else -> {
                     throw UnsupportedOperationException("Unsupported method symbol: ${sym.javaClass.name}")
                 }
@@ -828,7 +829,7 @@ class KotlinTypeMapping(
     fun variableType(variable: FirVariable, parent: Any?, signature: String): Variable {
         val vt = Variable(
             null,
-            mapToFlagsBitmap(variable.visibility, variable.modality),
+            mapToFlagsBitmap(variable.visibility, variable.modality, variable.isStatic),
             variableName(variable.name.asString()),
             null, null, null
         )
@@ -1229,7 +1230,7 @@ class KotlinTypeMapping(
         }
     }
 
-    private fun mapToFlagsBitmap(visibility: Visibility, modality: Modality?): Long {
+    private fun mapToFlagsBitmap(visibility: Visibility, modality: Modality?, isStatic: Boolean): Long {
         var bitMask: Long = 0
         when (visibility.name.lowercase()) {
             "public" -> bitMask += 1L
@@ -1250,6 +1251,9 @@ class KotlinTypeMapping(
                 "open" -> 0
                 else -> throw UnsupportedOperationException("Unsupported modality: ${modality.name.lowercase()}")
             }
+        }
+        if (isStatic) {
+            bitMask += 1L shl 3
         }
         return bitMask
     }

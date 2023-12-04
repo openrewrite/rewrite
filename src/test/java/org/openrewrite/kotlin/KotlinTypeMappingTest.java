@@ -1080,5 +1080,32 @@ public class KotlinTypeMappingTest {
               )
             );
         }
+
+        @SuppressWarnings("HasPlatformType")
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/483")
+        @Test
+        void isStaticFlag() {
+            //noinspection RemoveRedundantBackticks,RemoveRedundantQualifierName
+            rewriteRun(
+              kotlin(
+                "val i = Integer.valueOf(1)",
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    MethodMatcher matcher = new MethodMatcher("java.lang.Integer valueOf(..)");
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+                            if (matcher.matches(method)) {
+                                assertThat(Flag.hasFlags(method.getMethodType().getFlagsBitMap(), Flag.Static)).isTrue();
+                                found.set(true);
+                            }
+                            return super.visitMethodInvocation(method, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
     }
 }
