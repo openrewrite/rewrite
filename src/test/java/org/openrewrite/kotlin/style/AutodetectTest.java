@@ -248,7 +248,7 @@ class AutodetectTest implements RewriteTest {
                     var i = visitIdentifier(ident, ctx)
 
                     if (true
-                            && true)) {
+                            && true) {
                         i = visitIdentifier(ident, ctx)
                                 .visitIdentifier(ident, ctx)
                     }
@@ -368,7 +368,7 @@ class AutodetectTest implements RewriteTest {
              *
              */
             class Test {
-            	private final publisher: String = "A"
+            	private val publisher: String = "A"
                 public fun method() {
             	    val value = 0;
             	    val value1 = 1;
@@ -425,7 +425,7 @@ class AutodetectTest implements RewriteTest {
              *
              */
             public class Test {
-                private final publisher: String = "A"
+                private val publisher: String = "A"
                 public fun method() {
             	     var value = 0
             	   var value1 = 1
@@ -655,12 +655,12 @@ class AutodetectTest implements RewriteTest {
                 import javax.xml.bind.annotation.XmlElement;
 
                 public class Test {
-                    List<Integer> l;
-                    Set<Integer> s;
-                    Map<Integer, Integer> m;
-                    Collection<Integer> c;
-                    LinkedHashMap<Integer, Integer> lhm;
-                    HashSet<Integer> integer;
+                    var l : List<Integer>? = null
+                    var s : Set<Integer>? = null
+                    var m : Map<Integer, Integer>? = null
+                    var c : Collection<Integer>? = null
+                    var lhm : LinkedHashMap<Integer, Integer>? = null
+                    var hs : HashSet<Integer>? = null
                 }
             """
         );
@@ -721,7 +721,7 @@ class AutodetectTest implements RewriteTest {
         var cus = kp().parse(
           """
             class Test {
-                void i() {
+                fun i() {
                     a();
                 }
             }
