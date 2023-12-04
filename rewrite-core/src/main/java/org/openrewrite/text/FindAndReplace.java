@@ -147,7 +147,7 @@ public class FindAndReplace extends Recipe {
         if(filePattern != null) {
             //noinspection unchecked
             TreeVisitor<?, ExecutionContext> check = Preconditions.or(Arrays.stream(filePattern.split(";"))
-                    .map(HasSourcePath::new)
+                    .map(FindSourceFiles::new)
                     .map(Recipe::getVisitor)
                     .toArray(TreeVisitor[]::new));
 
