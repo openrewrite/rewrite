@@ -140,10 +140,11 @@ class JavaTemplateTest5Test implements RewriteTest {
               @Override
               public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                   if (method.getArguments().size() == 1) {
-                      return JavaTemplate.builder("m, Integer.valueOf(n), \"foo\"")
+                      method = JavaTemplate.builder("m, Integer.valueOf(n), \"foo\"")
                         .contextSensitive()
                         .build()
                         .apply(getCursor(), method.getCoordinates().replaceArguments());
+                      method = method.withName(method.getName().withType(method.getMethodType()));
                   }
                   return method;
               }
