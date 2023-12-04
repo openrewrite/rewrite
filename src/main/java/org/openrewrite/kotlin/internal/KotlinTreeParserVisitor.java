@@ -2716,7 +2716,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         if (declaration.getObjectKeyword() != null) {
             markers = markers.add(new KObject(randomId(), Space.EMPTY));
-            markers = markers.add(new TypeReferencePrefix(randomId(), prefix(declaration.getColon())));
         }
 
         J.Identifier name;
