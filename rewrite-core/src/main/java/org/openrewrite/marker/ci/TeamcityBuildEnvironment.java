@@ -18,42 +18,36 @@ package org.openrewrite.marker.ci;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import lombok.With;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.marker.GitProvenance;
 
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
-import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class CustomBuildEnvironment implements BuildEnvironment {
+public class TeamcityBuildEnvironment implements BuildEnvironment {
     @With
     UUID id;
-    String cloneURL;
-    String ref;
-    String sha;
+    String projectName;
+    String buildNumber;
+    String buildUrl;
+    String version;
 
-    public static CustomBuildEnvironment build(UnaryOperator<String> environment) {
-        return new CustomBuildEnvironment(
+    public static TeamcityBuildEnvironment build(UnaryOperator<String> environment) {
+        return new TeamcityBuildEnvironment(
                 randomId(),
-                environment.apply("CUSTOM_GIT_CLONE_URL"),
-                environment.apply("CUSTOM_GIT_REF"),
-                environment.apply("CUSTOM_GIT_SHA"));
+                environment.apply("TEAMCITY_PROJECT_NAME"),
+                environment.apply("BUILD_NUMBER"),
+                environment.apply("BUILD_URL"),
+                environment.apply("TEAMCITY_VERSION"));
     }
 
     @Override
     public GitProvenance buildGitProvenance() throws IncompleteGitConfigException {
-        if (StringUtils.isBlank(cloneURL)
-            || StringUtils.isBlank(ref)
-            || StringUtils.isBlank(sha)) {
-            throw new IncompleteGitConfigException();
-        } else {
-            return new GitProvenance(UUID.randomUUID(), cloneURL, ref, sha,
-                    null, null, emptyList());
-        }
+        // Not enough information to build GitProvenance
+        // https://www.jetbrains.com/help/teamcity/predefined-build-parameters.html#Predefined+Server+Build+Parameters
+        throw new IncompleteGitConfigException();
     }
-
 }
