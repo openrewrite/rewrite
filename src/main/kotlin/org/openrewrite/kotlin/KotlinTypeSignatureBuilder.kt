@@ -333,7 +333,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
         val sig = StringBuilder(clazz)
         when {
             function.symbol is FirConstructorSymbol -> sig.append("{name=<constructor>,return=${signature(function.returnTypeRef)}")
-            else -> sig.append("{name=${function.symbol.name.asString()},return=${signature(function.returnTypeRef)}")
+            else -> sig.append("{name=${methodName(function)},return=${signature(function.returnTypeRef)}")
         }
         sig.append(",parameters=${methodArgumentSignature(function)}}")
         return sig.toString()
@@ -686,6 +686,17 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                 .replace("/", ".")
                 .replace("?", "")
             return if (cleanedFqn.startsWith(".")) cleanedFqn.substring(1) else cleanedFqn
+        }
+
+        fun methodName(function: FirFunction): String {
+            return when (function) {
+                is FirPropertyAccessor -> when {
+                    function.isGetter -> "get"
+                    function.isSetter -> "set"
+                    else -> function.symbol.name.asString()
+                }
+                else -> function.symbol.name.asString()
+            }
         }
 
         fun variableName(name: String): String {

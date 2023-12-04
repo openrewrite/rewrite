@@ -113,16 +113,16 @@ public class KotlinTypeMappingTest {
 
         JavaType.FullyQualified declaringType = property.getGetter().getMethodType().getDeclaringType();
         assertThat(declaringType.getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
-        assertThat(property.getGetter().getMethodType().getName()).isEqualTo("accessor");
+        assertThat(property.getGetter().getMethodType().getName()).isEqualTo("get");
         assertThat(property.getGetter().getMethodType().getReturnType()).isEqualTo(id.getType());
         assertThat(property.getGetter().getName().getType()).isEqualTo(property.getGetter().getMethodType());
-        assertThat(property.getGetter().getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=accessor,return=kotlin.Int,parameters=[]}");
+        assertThat(property.getGetter().getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=get,return=kotlin.Int,parameters=[]}");
 
         declaringType = property.getSetter().getMethodType().getDeclaringType();
         assertThat(declaringType.getFullyQualifiedName()).isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat");
-        assertThat(property.getSetter().getMethodType().getName()).isEqualTo("accessor");
+        assertThat(property.getSetter().getMethodType().getName()).isEqualTo("set");
         assertThat(property.getSetter().getMethodType()).isEqualTo(property.getSetter().getName().getType());
-        assertThat(property.getSetter().getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=accessor,return=kotlin.Unit,parameters=[kotlin.Int]}");
+        assertThat(property.getSetter().getMethodType().toString().substring(declaringType.toString().length())).isEqualTo("{name=set,return=kotlin.Unit,parameters=[kotlin.Int]}");
     }
 
     @Test
@@ -1037,6 +1037,45 @@ public class KotlinTypeMappingTest {
                         }
                     }.visit(cu, 0);
                     assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/481")
+        @Test
+        void getAndSetMethodNames() {
+            //noinspection RemoveRedundantBackticks,RemoveRedundantQualifierName
+            rewriteRun(
+              kotlin(
+                """
+                  class Test {
+                      var stringRepresentation : String = ""
+                          get ( ) = field
+                          set ( value ) {
+                              field = value
+                          }
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    MethodMatcher getMatcher = new MethodMatcher("Test get(..)");
+                    AtomicBoolean foundGet = new AtomicBoolean(false);
+
+                    MethodMatcher setMatcher = new MethodMatcher("Test set(..)");
+                    AtomicBoolean foundSet = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, Integer integer) {
+                            if (getMatcher.matches(method.getMethodType())) {
+                                foundGet.set(true);
+                            } else if (setMatcher.matches(method.getMethodType())) {
+                                foundSet.set(true);
+                            }
+                            return super.visitMethodDeclaration(method, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(foundGet.get()).isTrue();
+                    assertThat(foundSet.get()).isTrue();
                 })
               )
             );

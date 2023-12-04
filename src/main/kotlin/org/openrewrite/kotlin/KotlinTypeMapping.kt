@@ -57,6 +57,7 @@ import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.JavaType.*
 import org.openrewrite.java.tree.TypeUtils
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.convertClassIdToFqn
+import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.methodName
 import org.openrewrite.kotlin.KotlinTypeSignatureBuilder.Companion.variableName
 import kotlin.collections.ArrayList
 
@@ -497,7 +498,7 @@ class KotlinTypeMapping(
             null,
             mapToFlagsBitmap(function.visibility, function.modality),
             null,
-            if (function.symbol is FirConstructorSymbol) "<constructor>" else function.symbol.name.asString(),
+            if (function.symbol is FirConstructorSymbol) "<constructor>" else methodName(function),
             null,
             paramNames,
             null, null, null,

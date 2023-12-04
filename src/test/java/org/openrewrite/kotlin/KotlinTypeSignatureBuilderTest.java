@@ -202,13 +202,13 @@ public class KotlinTypeSignatureBuilderTest {
     @Test
     void gettableField() {
         assertThat(fieldPropertyGetterSignature("field"))
-                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=accessor,return=kotlin.Int,parameters=[]}");
+                .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=get,return=kotlin.Int,parameters=[]}");
     }
 
     @Test
     void settableField() {
         assertThat(fieldPropertySetterSignature("field"))
-          .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=accessor,return=kotlin.Unit,parameters=[kotlin.Int]}");
+          .isEqualTo("org.openrewrite.kotlin.KotlinTypeGoat{name=set,return=kotlin.Unit,parameters=[kotlin.Int]}");
     }
 
     @Test
