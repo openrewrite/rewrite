@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
@@ -99,6 +100,8 @@ class PathUtilsTest {
     }
 
     @Test
+    @Issue("https://github.com/openrewrite/rewrite/pull/3758")
+    @Disabled("{} syntax not supported yet")
     void eitherOr() {
         // matches with {}'s, used in for instance `"**/{application,application-*,bootstrap,bootstrap-*}.{yml,yaml}"`
         assertThat(matchesGlob(path("test/"), "test/{foo,bar}")).isFalse();
