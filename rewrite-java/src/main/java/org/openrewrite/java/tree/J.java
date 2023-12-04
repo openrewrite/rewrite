@@ -2447,15 +2447,7 @@ public interface J extends Tree {
 
         @SuppressWarnings("SwitchStatementWithTooFewBranches")
         public enum Type {
-            IsNullable;
-
-            public boolean isModifying() {
-                switch (this) {
-                    case IsNullable:
-                    default:
-                        return false;
-                }
-            }
+            IsNullable,
         }
 
         public J.UnaryTypeTree.Padding getPadding() {
