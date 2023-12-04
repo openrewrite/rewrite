@@ -198,10 +198,12 @@ public class ChangePackage extends Recipe {
             J j = super.postVisit(tree, executionContext);
             if (j instanceof J.MethodDeclaration) {
                 J.MethodDeclaration m = (J.MethodDeclaration) j;
-                return m.withMethodType(updateType(m.getMethodType()));
+                JavaType.Method mt = updateType(m.getMethodType());
+                return m.withMethodType(mt).withName(m.getName().withType(mt));
             } else if (j instanceof J.MethodInvocation) {
                 J.MethodInvocation m = (J.MethodInvocation) j;
-                return m.withMethodType(updateType(m.getMethodType()));
+                JavaType.Method mt = updateType(m.getMethodType());
+                return m.withMethodType(mt).withName(m.getName().withType(mt));
             } else if (j instanceof J.NewClass) {
                 J.NewClass n = (J.NewClass) j;
                 return n.withConstructorType(updateType(n.getConstructorType()));
