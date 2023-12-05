@@ -144,6 +144,11 @@ class JavaTemplateSemanticallyEqual extends SemanticallyEqual {
     }
 
     private static TemplateMatchResult matchTemplate(J templateTree, Cursor cursor) {
+        if (templateTree == cursor.getValue()) {
+            // When `JavaTemplate#apply()` returns the input itself, it could not be matched
+            return new TemplateMatchResult(false, Collections.emptyList());
+        }
+
         JavaTemplateSemanticallyEqualVisitor semanticallyEqualVisitor = new JavaTemplateSemanticallyEqualVisitor();
         semanticallyEqualVisitor.visit(templateTree, cursor.getValue(), cursor.getParentOrThrow());
         return new TemplateMatchResult(semanticallyEqualVisitor.isEqual(), new ArrayList<>(
