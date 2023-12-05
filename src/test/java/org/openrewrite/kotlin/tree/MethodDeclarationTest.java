@@ -39,7 +39,7 @@ class MethodDeclarationTest implements RewriteTest {
     @Test
     void parameters() {
         rewriteRun(
-          kotlin("fun method ( i : Int ) { }")
+          kotlin("fun method ( i : Int, x : Int ) { }")
         );
     }
 

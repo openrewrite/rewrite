@@ -771,9 +771,10 @@ public class SpacesVisitor<P> extends KotlinIsoVisitor<P> {
         J.VariableDeclarations mv = super.visitVariableDeclarations(multiVariable, p);
         mv = mv.withMarkers(spaceBeforeColonAfterDeclarationName(mv.getMarkers()));
 
-        if (multiVariable.getMarkers().findFirst(TypeReferencePrefix.class).orElse(null) != null &&
-                mv.getTypeExpression() != null) {
+        if (mv.getTypeExpression() != null) {
             mv = mv.withTypeExpression(spaceBefore(mv.getTypeExpression(), style.getOther().getAfterColonBeforeDeclarationType()));
+            mv = mv.getPadding().withVariables(ListUtils.mapLast(mv.getPadding().getVariables(),
+                    x -> spaceAfter(x, style.getOther().getBeforeColonAfterDeclarationName())));
         }
         return mv;
     }

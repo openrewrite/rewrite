@@ -120,7 +120,7 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              val isEmpty : Boolean
+              val isEmpty   : Boolean
                   get ( ) : Boolean = 1 == 1
               """
           )
@@ -644,7 +644,7 @@ class VariableDeclarationTest implements RewriteTest {
         rewriteRun(
           kotlin(
             """
-              /*C1*/ typealias Operation =  (Int , Int )   ->    Int
+              /*C1*/ typealias   Operation =  (Int , Int )   ->    Int
               """
           )
         );
@@ -667,7 +667,7 @@ class VariableDeclarationTest implements RewriteTest {
           kotlin(
             """
               class Test {
-                  var t = 1 /*C1*/  ; /*C2*/
+                  var t /*C0*/ : /*C1*/ Int = 1 /*C2*/  ; /*C3*/
                   fun method() {}
               }
               """
@@ -751,6 +751,46 @@ class VariableDeclarationTest implements RewriteTest {
                   set(value) {
                       internalProperty = value
                   }
+              """
+          )
+        );
+    }
+
+    @Test
+    void case1_VariableDeclarations() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  var t /*C1*/ : Int = 1 /*C2*/  ; /*C3*/
+                  fun method() {}
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void case2_MethodParameter() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method ( input /*C0*/ : Any = 1 /*C2*/ , x : Int )  : /*C3*/ Int {
+                 return 1
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void case3_MethodReturnType() {
+        rewriteRun(
+          kotlin(
+            """
+              fun method () /*C3*/ :  Int {
+                 return 1
+              }
               """
           )
         );

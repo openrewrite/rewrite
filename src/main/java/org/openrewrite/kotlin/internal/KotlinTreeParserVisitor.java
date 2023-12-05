@@ -885,7 +885,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 vt
         );
 
-        vars.add(padRight(namedVariable, Space.EMPTY));
+        vars.add(padRight(namedVariable, prefix(parameter.getColon())));
 
         return new J.VariableDeclarations(
                 randomId(),
@@ -1251,15 +1251,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         J.Identifier name = createIdentifier(typeAlias.getIdentifyingElement(), type(typeAlias.getTypeReference()));
-        TypeTree typeExpression = name;
+        TypeTree typeExpression = null;
 
         if (typeAlias.getTypeParameterList() != null) {
             typeExpression = (TypeTree) typeAlias.getTypeParameterList().accept(this, data);
-
-            if (typeExpression instanceof J.ParameterizedType) {
-                Space prefix = name.getPrefix();
-                typeExpression = ((J.ParameterizedType) typeExpression).withClazz(name.withPrefix(Space.EMPTY).withPrefix(prefix));
-            }
         }
 
         Expression expr = convertToExpression(typeAlias.getTypeReference().accept(this, data));
@@ -1271,8 +1266,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         randomId(),
                         Space.EMPTY,
                         Markers.EMPTY,
-                        // typealias does not have a name.
-                        createIdentifier("", Space.EMPTY, null, null),
+                        name,
                         emptyList(),
                         padLeft(prefix, expr),
                         null
@@ -2306,7 +2300,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     vt
             );
 
-
             TypeTree typeExpression = null;
             if (entry.getTypeReference() != null) {
                 typeExpression = (TypeTree) entry.getTypeReference().accept(this, data);
@@ -2314,13 +2307,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
             J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(randomId(),
                     Space.EMPTY,
-                    Markers.EMPTY.addIfAbsent(new TypeReferencePrefix(randomId(), prefix(entry.getColon()))),
+                    Markers.EMPTY,
                     emptyList(),
                     emptyList(),
                     typeExpression,
                     null,
                     emptyList(),
-                    singletonList(padRight(namedVariable, Space.EMPTY))
+                    singletonList(padRight(namedVariable, prefix(entry.getColon())))
             );
 
             destructVars.add(maybeTrailingComma(entry, padRight(variableDeclarations, suffix(entry)), i == entries.size() - 1));
@@ -2861,13 +2854,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         Markers rpMarker = Markers.EMPTY;
-        Space maybeBeforeSemicolon = Space.EMPTY;
-        PsiElement lastChild = findLastNotSpaceChild(property);
-        if (lastChild != null && lastChild.getNode().getElementType() == KtTokens.SEMICOLON) {
-            rpMarker = rpMarker.addIfAbsent(new Semicolon(randomId()));
-            maybeBeforeSemicolon = prefix(lastChild);
-        }
-
         JavaType.Variable vt = variableType(property, owner(property));
         J.VariableDeclarations.NamedVariable namedVariable =
                 new J.VariableDeclarations.NamedVariable(
@@ -2880,10 +2866,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         vt
                 );
 
-        variables.add(padRight(namedVariable, maybeBeforeSemicolon).withMarkers(rpMarker));
+        variables.add(padRight(namedVariable, prefix(property.getColon())).withMarkers(rpMarker));
 
         if (property.getColon() != null) {
-            markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), prefix(property.getColon())));
             typeExpression = (TypeTree) requireNonNull(property.getTypeReference()).accept(this, data);
         }
 
@@ -3520,10 +3505,23 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     private <J2 extends J> JRightPadded<J2> maybeFollowingSemicolon(J2 j, KtElement element) {
         PsiElement maybeSemicolon = findFirstNonSpaceNextSibling(element);
-        if (maybeSemicolon instanceof LeafPsiElement && ((LeafPsiElement) maybeSemicolon).getElementType() == KtTokens.SEMICOLON) {
+        if (isSemicolon(maybeSemicolon)) {
             return new JRightPadded<>(j, deepPrefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
         }
+
+        PsiElement endSemicolon = findLastChild(element, this::isSemicolon, c -> !isSpace(c.getNode()));
+        if (endSemicolon != null) {
+            return new JRightPadded<>(j, prefix(endSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
+        }
+
         return padRight(j, Space.EMPTY);
+    }
+
+    private boolean isSemicolon(@Nullable PsiElement element) {
+        if (element == null) {
+            return false;
+        }
+        return element instanceof LeafPsiElement && ((LeafPsiElement) element).getElementType() == KtTokens.SEMICOLON;
     }
 
     private <T> JLeftPadded<T> padLeft(Space left, T tree) {
@@ -4133,6 +4131,26 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         for (PsiElement child = parent.getLastChild(); child != null; child = child.getPrevSibling()) {
             if (condition.test(child)) {
                 return child;
+            }
+        }
+
+        return null;
+    }
+
+    // Search for the last child that satisfies a given condition. If at any point, a child meets a break condition before the condition is satisfied, the function should return null.
+    @Nullable
+    private static PsiElement findLastChild(@Nullable PsiElement parent, Predicate<PsiElement> condition,  Predicate<PsiElement> breakCondition) {
+        if (parent == null) {
+            return null;
+        }
+
+        for (PsiElement child = parent.getLastChild(); child != null; child = child.getPrevSibling()) {
+            if (condition.test(child)) {
+                return child;
+            }
+
+            if (breakCondition.test(child)) {
+                return null;
             }
         }
 

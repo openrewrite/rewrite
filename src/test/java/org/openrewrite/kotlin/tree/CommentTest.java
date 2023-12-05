@@ -170,7 +170,7 @@ class CommentTest implements RewriteTest {
           kotlin(
             """
               fun method() {
-                  val d = {it: Int ->  /*c1*/   it + 42  /***/ } // comment
+                  val d = {it   : Int ->  /*c1*/   it + 42  /***/ } // comment
               }
               """
           )

@@ -368,10 +368,14 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             }
         }
 
-        if (!vd.getVariables().isEmpty()) {
-            J.VariableDeclarations.NamedVariable nv = vd.getVariables().get(0);
+        List<JRightPadded<J.VariableDeclarations.NamedVariable>> rpvs =  vd.getPadding().getVariables();
+        if (!rpvs.isEmpty()) {
+            JRightPadded<J.VariableDeclarations.NamedVariable> rpv = vd.getPadding().getVariables().get(0);
+            J.VariableDeclarations.NamedVariable nv = rpv.getElement();
             beforeSyntax(nv, Space.Location.VARIABLE_PREFIX, p);
             visit(nv.getName(), p);
+            visitSpace(rpv.getAfter(), Space.Location.TYPE_PARAMETERS, p);
+
             if (vd.getTypeExpression() != null) {
                 vd.getMarkers().findFirst(TypeReferencePrefix.class).ifPresent(tref -> visitSpace(tref.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p));
                 p.append(":");
@@ -1151,10 +1155,15 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             beforeSyntax(multiVariable, Space.Location.VARIABLE_DECLARATIONS_PREFIX, p);
 
             visit(multiVariable.getLeadingAnnotations(), p);
+            boolean isTypeAlias = false;
             for (J.Modifier m : multiVariable.getModifiers()) {
                 visitModifier(m, p);
                 if (m.getType() == J.Modifier.Type.Final) {
                     p.append("val");
+                }
+
+                if (m.getType() == J.Modifier.Type.LanguageExtension && m.getKeyword().equals("typealias")) {
+                    isTypeAlias = true;
                 }
             }
 
@@ -1169,11 +1178,10 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 }
 
                 visit(variable.getElement().getName(), p);
+                visitSpace(variable.getAfter(), Space.Location.VARIABLE_INITIALIZER, p);
 
                 if (multiVariable.getTypeExpression() != null) {
-                    TypeReferencePrefix typeReferencePrefix = multiVariable.getMarkers().findFirst(TypeReferencePrefix.class).orElse(null);
-                    if (typeReferencePrefix != null) {
-                        kotlinPrinter.visitSpace(typeReferencePrefix.getPrefix(), KSpace.Location.TYPE_REFERENCE_PREFIX, p);
+                    if (!isTypeAlias) {
                         p.append(":");
                     }
                     visit(multiVariable.getTypeExpression(), p);
@@ -1189,13 +1197,13 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                 }
 
                 visit(variable.getElement().getInitializer(), p);
-                visitSpace(variable.getAfter(), Space.Location.VARIABLE_INITIALIZER, p);
 
                 if (i < variables.size() - 1) {
                     p.append(",");
                 } else if (variables.size() > 1 && !containsTypeReceiver) {
                     p.append(")");
                 }
+
 
                 variable.getMarkers().findFirst(Semicolon.class).ifPresent(m -> visitMarker(m, p));
             }
