@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml;
 
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -779,5 +780,58 @@ class ChangePropertyKeyTest implements RewriteTest {
               """
           )
         );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3270")
+    void ensureCorrectSequence() {
+        @Language("yaml")
+        String yamlRecipe = """
+          ---
+          type: specs.openrewrite.org/v1beta/recipe
+          name: org.openrewrite.ChangePropertyKeySequentialityTest
+          displayName: Test ChangePropertyKey sequentiality
+          recipeList:
+              - org.openrewrite.yaml.ChangePropertyKey:
+                  oldPropertyKey: "common.tracing"
+                  newPropertyKey: "common.execution.context"
+              - org.openrewrite.yaml.DeleteProperty:
+                  propertyKey: "common.sleuth.send"
+              - org.openrewrite.yaml.ChangePropertyKey:
+                  oldPropertyKey: "common.sleuth"
+                  newPropertyKey: "common.tracing"
+          """;
+
+        rewriteRun(
+                spec -> spec.recipeFromYaml(yamlRecipe, "org.openrewrite.ChangePropertyKeySequentialityTest"),
+                yaml("""
+              common:
+                cache:
+                  enabled: true
+                sleuth:
+                  send: true
+                  sender:
+                    http:
+                      username: user
+                      password: pwd
+                      connectionRequestTimeout: 5000
+                      timeout: 3000
+                      readTimeout: 3000
+                blockhound.enabled: true
+              """,
+                        """
+                          common:
+                            cache:
+                              enabled: true
+                            tracing:
+                              sender:
+                                http:
+                                  username: user
+                                  password: pwd
+                                  connectionRequestTimeout: 5000
+                                  timeout: 3000
+                                  readTimeout: 3000
+                            blockhound.enabled: true
+                                  """));
     }
 }
