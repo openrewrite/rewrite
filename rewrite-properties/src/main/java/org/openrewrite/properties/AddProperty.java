@@ -15,7 +15,6 @@
  */
 package org.openrewrite.properties;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
