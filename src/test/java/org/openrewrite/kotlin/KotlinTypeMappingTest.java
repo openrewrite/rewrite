@@ -1169,5 +1169,32 @@ public class KotlinTypeMappingTest {
               )
             );
         }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/485")
+        @ParameterizedTest
+        @CsvSource(value = {
+          "fun foo(l: MutableList<String>) { @Suppress l += \"x\" }~kotlin.Suppress",
+          "val releaseDates: List< @Suppress String > = emptyList()~kotlin.Suppress"
+        }, delimiter = '~')
+        void annotationOnKotlinConeType(String input, String type) {
+            //noinspection RemoveRedundantBackticks
+            rewriteRun(
+              kotlin(
+                String.format("%s", input),
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.Annotation visitAnnotation(J.Annotation annotation, Integer integer) {
+                            assertThat(String.valueOf(annotation.getType().toString())).isEqualTo(type);
+                            found.set(true);
+                            return super.visitAnnotation(annotation, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
     }
 }

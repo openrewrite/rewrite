@@ -74,16 +74,24 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
                 if (resolvedTypeRef.psi is KtTypeReference) {
                     if (resolvedTypeRef.type is ConeClassLikeType) {
                         if (resolvedTypeRef.type.typeArguments.isNotEmpty() && resolvedTypeRef.psi is KtTypeReference) {
-                            visitType(resolvedTypeRef.type, resolvedTypeRef.psi as KtTypeReference)
+                            visitType(resolvedTypeRef.type, resolvedTypeRef.psi as KtTypeReference, data)
                         }
                     } else if (resolvedTypeRef.type is ConeTypeParameterType) {
-                        visitType(resolvedTypeRef.type, resolvedTypeRef.psi as KtTypeReference)
+                        visitType(resolvedTypeRef.type, resolvedTypeRef.psi as KtTypeReference, data)
                     }
                 }
             }
 
-            private fun visitType(firType: ConeTypeProjection, psiType: KtTypeReference) {
+            private fun visitType(firType: ConeTypeProjection, psiType: KtTypeReference,
+                                  data: MutableMap<PsiElement, MutableList<FirInfo>>) {
                 if (firType is ConeClassLikeType) {
+                    for (s in firType.attributes) {
+                        if (s is CustomAnnotationTypeAttribute && s.annotations.isNotEmpty()) {
+                            for (ann in s.annotations) {
+                                ann.accept(this, data)
+                            }
+                        }
+                    }
                     val psiTypeArguments = psiType.typeElement!!.typeArgumentsAsTypes
                     if (psiTypeArguments.size != firType.typeArguments.size) {
                         return
@@ -91,7 +99,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
 
                     for ((index, typeArgument) in firType.typeArguments.withIndex()) {
                         val psiTypeArgument = psiTypeArguments[index] ?: continue
-                        visitType(typeArgument, psiTypeArgument)
+                        visitType(typeArgument, psiTypeArgument, data)
                         typeMap[psiTypeArgument] = typeArgument
                     }
                 } else {
