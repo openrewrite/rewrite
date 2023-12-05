@@ -19,6 +19,8 @@ import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
+import org.intellij.lang.annotations.Language;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
@@ -855,7 +857,7 @@ class MavenParserTest implements RewriteTest {
         try (MockWebServer mockRepo = new MockWebServer()) {
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
-                public MockResponse dispatch(RecordedRequest request) {
+                public @NotNull MockResponse dispatch(RecordedRequest request) {
                     MockResponse resp = new MockResponse();
                     if (StreamSupport.stream(request.getHeaders().spliterator(), false)
                       .noneMatch(it -> it.getFirst().equals("Authorization") &&
@@ -2240,6 +2242,7 @@ class MavenParserTest implements RewriteTest {
 
     @Test
     void malformedPom() {
+        @Language("xml")
         String malformedPomXml = """
           <project>
             <groupId>com.mycompany.app</groupId>
@@ -2259,4 +2262,175 @@ class MavenParserTest implements RewriteTest {
           .singleElement()
           .isInstanceOf(ParseError.class);
     }
+
+    @Test
+    void plugins() {
+        rewriteRun(
+          pomXml(
+              """
+                    <project>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>a</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+    
+                        <build>
+                            <plugins>
+                                <plugin>
+                                    <artifactId>maven-compiler-plugin</artifactId>
+                                    <version>3.11.0</version>
+                                    <configuration>
+                                        <release>11</release>
+                                    </configuration>
+                                </plugin>
+                            </plugins>
+                        </build>
+                    </project>
+                """,
+              spec -> spec.afterRecipe(pomXml ->
+                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins()
+                  .get(0).getArtifactId())
+                  .isEqualTo("maven-compiler-plugin")
+              )
+          )
+        );
+    }
+
+    @Test
+    void pluginsFromParent() {
+        rewriteRun(
+          mavenProject("a",
+            pomXml(
+              """
+                  <project>
+                      <parent>
+                          <groupId>org.openrewrite.maven</groupId>
+                          <artifactId>b</artifactId>
+                          <version>0.1.0-SNAPSHOT</version>
+                          <relativePath />
+                      </parent>
+                      <artifactId>a</artifactId>
+                  </project>
+                """,
+              spec -> spec.afterRecipe(pomXml ->
+                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPlugins()
+                  .get(0).getArtifactId())
+                  .isEqualTo("maven-compiler-plugin")
+              )
+            )
+          ),
+          mavenProject("b",
+            pomXml(
+              """
+                    <project>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>b</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+
+                        <packaging>pom</packaging>
+                        
+                        <build>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <version>3.11.0</version>
+                                  <configuration>
+                                      <release>11</release>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                      </build>
+                    </project>
+                """
+            )
+          )
+        );
+    }
+
+    @Test
+    void pluginManagement() {
+        rewriteRun(
+          pomXml(
+            """
+                  <project>
+                      <groupId>org.openrewrite.maven</groupId>
+                      <artifactId>a</artifactId>
+                      <version>0.1.0-SNAPSHOT</version>
+  
+                      <build>
+                        <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <version>3.11.0</version>
+                                  <configuration>
+                                      <release>11</release>
+                                  </configuration>
+                              </plugin>
+                          </plugins>
+                         </pluginManagement>
+                      </build>
+                  </project>
+              """,
+            spec -> spec.afterRecipe(pomXml ->
+              assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPluginManagement()
+                .get(0).getArtifactId())
+                .isEqualTo("maven-compiler-plugin")
+            )
+          )
+        );
+    }
+
+    @Test
+    void pluginManagementFromParent() {
+        rewriteRun(
+          mavenProject("a",
+            pomXml(
+              """
+                  <project>
+                      <parent>
+                          <groupId>org.openrewrite.maven</groupId>
+                          <artifactId>b</artifactId>
+                          <version>0.1.0-SNAPSHOT</version>
+                          <relativePath />
+                      </parent>
+                      <artifactId>a</artifactId>
+                  </project>
+                """,
+              spec -> spec.afterRecipe(pomXml ->
+                assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getPom().getPluginManagement()
+                  .get(0).getArtifactId())
+                  .isEqualTo("maven-compiler-plugin")
+              )
+            )
+          ),
+          mavenProject("b",
+            pomXml(
+              """
+                    <project>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>b</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+
+                        <packaging>pom</packaging>
+                        
+                        <build>
+                        <pluginManagement>
+                            <plugins>
+                                <plugin>
+                                    <artifactId>maven-compiler-plugin</artifactId>
+                                    <version>3.11.0</version>
+                                    <configuration>
+                                        <release>11</release>
+                                    </configuration>
+                                </plugin>
+                            </plugins>
+                        </pluginManagement>
+                      </build>
+                    </project>
+                """
+            )
+          )
+        );
+    }
+
 }
