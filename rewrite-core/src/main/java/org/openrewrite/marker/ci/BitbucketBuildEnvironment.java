@@ -29,7 +29,7 @@ import static org.openrewrite.Tree.randomId;
 
 @Value
 @EqualsAndHashCode(callSuper = false)
-public class BitbucketBuildEnvironment implements BuildEnvironment{
+public class BitbucketBuildEnvironment implements BuildEnvironment {
     @With
     UUID id;
     String httpOrigin;
@@ -47,8 +47,8 @@ public class BitbucketBuildEnvironment implements BuildEnvironment{
     @Override
     public GitProvenance buildGitProvenance() throws IncompleteGitConfigException {
         if (StringUtils.isBlank(httpOrigin)
-                || StringUtils.isBlank(branch)
-                || StringUtils.isBlank(sha)) {
+            || StringUtils.isBlank(branch)
+            || StringUtils.isBlank(sha)) {
             throw new IncompleteGitConfigException();
         } else {
             return new GitProvenance(UUID.randomUUID(), httpOrigin, branch, sha,
