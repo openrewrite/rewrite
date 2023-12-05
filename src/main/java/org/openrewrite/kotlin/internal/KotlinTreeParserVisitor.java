@@ -311,7 +311,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 receiver,
                 null,
                 padLeft(prefix(expression.getLastChild()), expression.getCallableReference().accept(this, data).withPrefix(Space.EMPTY)),
-                type(expression.getCallableReference()),
+                type(expression),
                 methodReferenceType,
                 fieldReferenceType
         );

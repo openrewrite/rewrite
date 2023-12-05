@@ -1139,5 +1139,35 @@ public class KotlinTypeMappingTest {
               )
             );
         }
+
+        @SuppressWarnings("SuspiciousCallableReferenceInLambda")
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/485")
+        @Test
+        void memberReference() {
+            //noinspection RemoveRedundantBackticks
+            rewriteRun(
+              kotlin(
+                """
+                  class Test ( val answer : Int )
+                  fun method ( ) {
+                      val l = listOf ( Test ( 42 ) )
+                      l . map { Test :: answer }
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.MemberReference visitMemberReference(J.MemberReference memberRef, Integer integer) {
+                            assertThat(memberRef.getType().toString()).isEqualTo("kotlin.reflect.KProperty1<Test, kotlin.Int>");
+                            found.set(true);
+                            return super.visitMemberReference(memberRef, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
     }
 }
