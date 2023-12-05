@@ -757,7 +757,7 @@ class VariableDeclarationTest implements RewriteTest {
     }
 
     @Test
-    void case1_VariableDeclarations() {
+    void typeReferencePrefix_1_VariableDeclarations() {
         rewriteRun(
           kotlin(
             """
@@ -771,12 +771,11 @@ class VariableDeclarationTest implements RewriteTest {
     }
 
     @Test
-    void case2_MethodParameter() {
+    void typeReferencePrefix_2_MethodParameter() {
         rewriteRun(
           kotlin(
             """
-              fun method ( input /*C0*/ : Any = 1 /*C2*/ , x : Int )  : /*C3*/ Int {
-                 return 1
+              fun method ( input /*C0*/ : Any = 1 /*C2*/ , x : Int ) {
               }
               """
           )
@@ -784,7 +783,7 @@ class VariableDeclarationTest implements RewriteTest {
     }
 
     @Test
-    void case3_MethodReturnType() {
+    void typeReferencePrefix_3_MethodReturnType() {
         rewriteRun(
           kotlin(
             """
