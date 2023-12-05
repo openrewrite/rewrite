@@ -283,7 +283,7 @@ class RenameVariableTest implements RewriteTest {
             """
               package org.openrewrite;
 
-              /** @noinspection ReassignedVariable*/ public class A {
+              public class A {
                   int fooA() {
                       // refers to class declaration scope.
                       for (v = 0; v < 10; ++v) {
