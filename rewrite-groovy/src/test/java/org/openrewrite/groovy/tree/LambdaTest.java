@@ -24,14 +24,67 @@ import static org.openrewrite.groovy.Assertions.groovy;
 @SuppressWarnings("GroovyUnusedAssignment")
 class LambdaTest implements RewriteTest {
 
+    @Test
+    void lambdaExpressionNoParens() {
+        rewriteRun(
+          groovy("""
+            def lambda = a -> a
+            """)
+        );
+    }
+
+    @Test
+    void lambdaExpressionNoArguments() {
+        rewriteRun(
+          groovy("""
+            ( ) -> arg
+            """)
+        );
+    }
+    @Test
+    void lambdaExpressionWithArgument() {
+        rewriteRun(
+          groovy("""
+            ( String arg ) -> arg
+            """)
+        );
+    }
+
+    @Test
+    void closureReturningLambda() {
+        rewriteRun(
+          groovy("""
+            def foo(Closure cl) {}
+            foo { String a ->
+                ( _ ) -> a
+            }
+            """)
+        );
+    }
+
+    @Test
+    void closureParameterWithType() {
+        rewriteRun(
+          groovy("""
+            class A {}
+            def foo(Closure cl) {}
+            foo { A a ->
+                a
+                a
+            }
+            """)
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite/issues/2168")
     @Test
-    void lambdaWithNoArguments() {
+    void closureNoArguments() {
         rewriteRun(
           groovy(
             """
               def f1 = { -> 1 }
               def f2 = { 1 }
+              def f3 = { -> }
               """
           )
         );

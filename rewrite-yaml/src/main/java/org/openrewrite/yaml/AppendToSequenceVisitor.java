@@ -19,6 +19,7 @@ package org.openrewrite.yaml;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.AlreadyReplaced;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -29,7 +30,7 @@ import java.util.stream.Collectors;
 
 import static org.openrewrite.Tree.randomId;
 
-public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.ExecutionContext> {
+public class AppendToSequenceVisitor extends YamlIsoVisitor<ExecutionContext> {
     private final JsonPathMatcher matcher;
     private final String value;
     private final @Nullable List<String> existingSequenceValues;
@@ -43,15 +44,14 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.Exec
     }
 
     @Override
-    public Yaml.Sequence visitSequence(Yaml.Sequence existingSeq, ExecutionContext executionContext) {
+    public Yaml.Sequence visitSequence(Yaml.Sequence existingSeq, ExecutionContext ctx) {
         Cursor parent = getCursor().getParent();
-        if (matcher.matches(parent) && !alreadyVisited(existingSeq, executionContext) && checkExistingSequenceValues(existingSeq, parent)) {
-            setVisited(existingSeq, executionContext);
-            Yaml.Sequence newSeq = appendToSequence(existingSeq, this.value, executionContext);
-            setVisited(newSeq, executionContext);
-            return newSeq;
+        if (matcher.matches(parent) &&
+            !existingSeq.getMarkers().findFirst(AlreadyReplaced.class).filter(m -> m.getFind().equals(value)).isPresent() &&
+            checkExistingSequenceValues(existingSeq, parent)) {
+            return appendToSequence(existingSeq, this.value, ctx);
         }
-        return super.visitSequence(existingSeq, executionContext);
+        return super.visitSequence(existingSeq, ctx);
     }
 
     protected boolean checkExistingSequenceValues(final Yaml.Sequence seq, final Cursor cursor) {
@@ -59,31 +59,30 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.Exec
             return true;
         } else {
             final List<String> values = seq.getEntries()
-                                                .stream()
-                                                .map(entry -> entry.getBlock())
-                                                .map(block -> convertBlockToString(block, cursor))
-                                                .collect(Collectors.toList());
+                    .stream()
+                    .map(Yaml.Sequence.Entry::getBlock)
+                    .map(block -> convertBlockToString(block, cursor))
+                    .sorted()
+                    .collect(Collectors.toList());
             if (this.matchExistingSequenceValuesInAnyOrder) {
                 List<String> sorted = new ArrayList<String>(this.existingSequenceValues);
                 Collections.sort(sorted);
-                Collections.sort(values);
-                return (values.equals(sorted));
+                return values.equals(sorted);
             } else {
-                return (values.equals(this.existingSequenceValues));
+                return values.equals(this.existingSequenceValues);
             }
         }
     }
 
     private String convertBlockToString(Yaml.Block block, Cursor cursor) {
         if (block instanceof Yaml.Scalar) {
-           return ((Yaml.Scalar) block).getValue();
-        }
-        else {
+            return ((Yaml.Scalar) block).getValue();
+        } else {
             return block.printTrimmed(cursor);
         }
     }
 
-    private Yaml.Sequence appendToSequence(Yaml.Sequence existingSequence, String value, ExecutionContext executionContext) {
+    private Yaml.Sequence appendToSequence(Yaml.Sequence existingSequence, String value, ExecutionContext ctx) {
         Yaml.Sequence newSequence = existingSequence.copyPaste();
         List<Yaml.Sequence.Entry> entries = newSequence.getEntries();
         boolean hasDash = false;
@@ -105,8 +104,7 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.Exec
                     Yaml.Mapping.Entry entry = mappingEntries.get(0);
                     itemPrefix = entry.getPrefix();
                 }
-            }
-            else if (block instanceof Yaml.Sequence.Scalar) {
+            } else if (block instanceof Yaml.Sequence.Scalar) {
                 itemPrefix = block.getPrefix();
                 style = ((Yaml.Sequence.Scalar) block).getStyle();
             }
@@ -117,18 +115,6 @@ public class AppendToSequenceVisitor extends YamlIsoVisitor<org.openrewrite.Exec
         Yaml.Scalar newItem = new Yaml.Scalar(randomId(), itemPrefix, Markers.EMPTY, style, null, value);
         Yaml.Sequence.Entry newEntry = new Yaml.Sequence.Entry(randomId(), entryPrefix, Markers.EMPTY, newItem, hasDash, entryTrailingCommaPrefix);
         entries.add(newEntry);
-        return newSequence;
-    }
-
-    private static void setVisited(Yaml.Sequence seq, ExecutionContext context) {
-        context.putMessage(makeAlreadyVisitedKey(seq), Boolean.TRUE);
-    }
-
-    private static boolean alreadyVisited(Yaml.Sequence seq, ExecutionContext context) {
-       return context.getMessage(makeAlreadyVisitedKey(seq), Boolean.FALSE);
-    }
-
-    private static String makeAlreadyVisitedKey(Yaml.Sequence seq) {
-        return AppendToSequenceVisitor.class.getName() + ".alreadyVisited." + seq.getId().toString();
+        return newSequence.withMarkers(Markers.EMPTY.addIfAbsent(new AlreadyReplaced(randomId(), value, value)));
     }
 }

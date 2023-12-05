@@ -72,13 +72,13 @@ public class ClasspathScanningLoader implements ResourceLoader {
      */
     public ClasspathScanningLoader(Properties properties, ClassLoader classLoader) {
         scanClasses(new ClassGraph()
-                 .ignoreParentClassLoaders()
-                 .overrideClassLoaders(classLoader), classLoader);
+                .ignoreParentClassLoaders()
+                .overrideClassLoaders(classLoader), classLoader);
 
         scanYaml(new ClassGraph()
-                 .ignoreParentClassLoaders()
-                 .overrideClassLoaders(classLoader)
-                 .acceptPaths("META-INF/rewrite"),
+                        .ignoreParentClassLoaders()
+                        .overrideClassLoaders(classLoader)
+                        .acceptPaths("META-INF/rewrite"),
                 properties,
                 emptyList(),
                 classLoader);
@@ -163,10 +163,10 @@ public class ClasspathScanningLoader implements ResourceLoader {
     private void configureRecipes(ScanResult result, String className) {
         for (ClassInfo classInfo : result.getSubclasses(className)) {
             Class<?> recipeClass = classInfo.loadClass();
-            if (recipeClass.getName().equals(DeclarativeRecipe.class.getName())
-                || recipeClass.getEnclosingClass() != null
+            if (recipeClass.getName().equals(DeclarativeRecipe.class.getName()) ||
+                (recipeClass.getModifiers() & Modifier.PUBLIC) == 0 ||
                 // `ScanningRecipe` is an example of an abstract `Recipe` subtype
-                || (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
+                (recipeClass.getModifiers() & Modifier.ABSTRACT) != 0) {
                 continue;
             }
             Timer.Builder builder = Timer.builder("rewrite.scan.configure.recipe");

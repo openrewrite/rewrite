@@ -20,8 +20,6 @@ import org.openrewrite.DocumentExample;
 import org.openrewrite.test.RecipeSpec;
 import org.openrewrite.test.RewriteTest;
 
-import java.io.File;
-import java.nio.file.Path;
 
 import static org.openrewrite.xml.Assertions.xml;
 
@@ -80,6 +78,83 @@ class RemoveXmlTagTest implements RewriteTest {
               </beans>
               """,
             documentSourceSpec -> documentSourceSpec.path("my/project/notBeans.xml")
+          )
+        );
+    }
+
+    @Test
+    void fileMatcherEmpty() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveXmlTag("//bean", null)),
+          xml(
+            """
+              <beans>
+                  <bean id='myBean.subpackage.subpackage2'/>
+                  <other id='myBean.subpackage.subpackage2'/>
+              </beans>
+              """,
+            """
+              <beans>
+                  <other id='myBean.subpackage.subpackage2'/>
+              </beans>
+              """,
+            documentSourceSpec -> documentSourceSpec.path("my/project/notBeans.xml")
+          )
+        );
+    }
+
+    @Test
+    void removeEmptyParentTag() {
+        rewriteRun(
+          spec -> spec.recipe(new RemoveXmlTag("//project/build/pluginManagement/plugins/plugin", null)),
+          xml(
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>sample-app</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <build>
+                      <pluginManagement>
+                          <plugins>
+                              <plugin>
+                                  <groupId>org.apache.maven.plugins</groupId>
+                                  <artifactId>maven-compiler-plugin</artifactId>
+                                  <version>3.8.1</version>
+                              </plugin>
+                          </plugins>
+                      </pluginManagement>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <configuration>
+                                  <release>11</release>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """,
+            """
+              <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>sample-app</artifactId>
+                  <version>1.0-SNAPSHOT</version>
+                  <build>
+                      <plugins>
+                          <plugin>
+                              <groupId>org.apache.maven.plugins</groupId>
+                              <artifactId>maven-compiler-plugin</artifactId>
+                              <configuration>
+                                  <release>11</release>
+                              </configuration>
+                          </plugin>
+                      </plugins>
+                  </build>
+              </project>
+              """
           )
         );
     }

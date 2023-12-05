@@ -26,7 +26,6 @@ import org.openrewrite.gradle.util.GradleWrapper;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.ipc.http.HttpSender;
 import org.openrewrite.marker.BuildTool;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesParser;
@@ -118,7 +117,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         return gradleWrapper;
     }
 
-    static class GradleWrapperState {
+    public static class GradleWrapperState {
         boolean needsWrapperUpdate = false;
         BuildTool updatedMarker;
         boolean addGradleWrapperProperties = true;

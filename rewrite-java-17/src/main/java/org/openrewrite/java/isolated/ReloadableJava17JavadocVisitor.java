@@ -15,12 +15,14 @@
  */
 package org.openrewrite.java.isolated;
 
+import com.sun.source.doctree.ErroneousTree;
+import com.sun.source.doctree.LiteralTree;
+import com.sun.source.doctree.ProvidesTree;
+import com.sun.source.doctree.ReturnTree;
+import com.sun.source.doctree.UsesTree;
 import com.sun.source.doctree.*;
 import com.sun.source.tree.IdentifierTree;
-import com.sun.source.tree.ArrayTypeTree;
-import com.sun.source.tree.MemberSelectTree;
-import com.sun.source.tree.ParameterizedTypeTree;
-import com.sun.source.tree.PrimitiveTypeTree;
+import com.sun.source.tree.*;
 import com.sun.source.util.DocTreeScanner;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.TreeScanner;
@@ -88,8 +90,6 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     }
 
     private void init() {
-        char[] sourceArr = source.toCharArray();
-
         StringBuilder firstPrefixBuilder = new StringBuilder();
         StringBuilder javadocContent = new StringBuilder();
         StringBuilder marginBuilder = null;
@@ -98,12 +98,12 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
         // skip past the opening '/**'
         int i = 3;
-        for (; i < sourceArr.length; i++) {
-            char c = sourceArr[i];
+        for (; i < source.length(); i++) {
+            char c = source.charAt(i);
             if (inFirstPrefix) {
                 // '*' characters are considered a part of the margin until a non '*' is parsed.
                 if (Character.isWhitespace(c) || c == '*' && isPrefixAsterisk) {
-                    if (isPrefixAsterisk && i + 1 <= sourceArr.length - 1 && sourceArr[i + 1] != '*') {
+                    if (isPrefixAsterisk && i + 1 <= source.length() - 1 && source.charAt(i + 1) != '*') {
                         isPrefixAsterisk = false;
                     }
                     firstPrefixBuilder.append(c);
@@ -118,30 +118,31 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             }
 
             if (c == '\n') {
+                char prev = source.charAt(i - 1);
                 if (inFirstPrefix) {
                     firstPrefix = firstPrefixBuilder.toString();
                     inFirstPrefix = false;
                 } else {
                     // Handle consecutive new lines.
-                    if ((sourceArr[i - 1] == '\n' ||
-                            sourceArr[i - 1] == '\r' && sourceArr[i - 2] == '\n')) {
-                        String prevLineLine = sourceArr[i - 1] == '\n' ? "\n" : "\r\n";
+                    if ((prev == '\n' ||
+                            prev == '\r' && source.charAt(i - 2) == '\n')) {
+                        String prevLineLine = prev == '\n' ? "\n" : "\r\n";
                         lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), prevLineLine, Markers.EMPTY));
                     } else if (marginBuilder != null) { // A new line with no '*' that only contains whitespace.
-                        String newLine = sourceArr[i - 1] == '\r' ? "\r\n" : "\n";
+                        String newLine = prev == '\r' ? "\r\n" : "\n";
                         lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(), newLine, Markers.EMPTY));
                         javadocContent.append(marginBuilder.substring(marginBuilder.indexOf("\n") + 1));
                     }
                     javadocContent.append(c);
                 }
-                String newLine = sourceArr[i - 1] == '\r' ? "\r\n" : "\n";
+                String newLine = prev == '\r' ? "\r\n" : "\n";
                 marginBuilder = new StringBuilder(newLine);
             } else if (marginBuilder != null) {
                 if (!Character.isWhitespace(c)) {
                     if (c == '*') {
                         // '*' characters are considered a part of the margin until a non '*' is parsed.
                         marginBuilder.append(c);
-                        if (i + 1 <= sourceArr.length - 1 && sourceArr[i + 1] != '*') {
+                        if (i + 1 <= source.length() - 1 && source.charAt(i + 1) != '*') {
                             lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
                                     marginBuilder.toString(), Markers.EMPTY));
                             marginBuilder = null;
@@ -152,7 +153,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                                     marginBuilder.toString(), Markers.EMPTY));
                             javadocContent.append(c);
                         } else {
-                            String newLine = marginBuilder.toString().startsWith("\r") ? "\r\n" : "\n";
+                            String newLine = marginBuilder.charAt(0) == '\r' ? "\r\n" : "\n";
                             lineBreaks.put(javadocContent.length(), new Javadoc.LineBreak(randomId(),
                                     newLine, Markers.EMPTY));
                             String margin = marginBuilder.toString();
@@ -338,7 +339,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         }
 
         // The javadoc ends with trailing whitespace.
-        if (cursor < source.length() && source.substring(cursor).contains(" ")) {
+        if (cursor < source.length()) {
             String trailingWhitespace = source.substring(cursor);
             if (trailingWhitespace.contains("\n")) {
                 // 1 or more newlines.
@@ -533,6 +534,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                     Space.EMPTY,
                     Markers.EMPTY,
                     emptyList(),
+                    emptyList(),
                     visitIdentifier(node.getName(), whitespaceBefore()).withPrefix(namePrefix),
                     null
             );
@@ -579,14 +581,14 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
         if (ref.qualifierExpression != null) {
             try {
                 attr.attribType(ref.qualifierExpression, symbol);
-            } catch(NullPointerException ignored) {
+            } catch (NullPointerException ignored) {
                 // best effort, can result in:
                 // java.lang.NullPointerException: Cannot read field "info" because "env" is null
                 //   at com.sun.tools.javac.comp.Attr.attribType(Attr.java:404)
             }
         }
 
-        if(ref.qualifierExpression != null) {
+        if (ref.qualifierExpression != null) {
             qualifier = (TypedTree) javaVisitor.scan(ref.qualifierExpression, Space.EMPTY);
             qualifierType = qualifier.getType();
             if (ref.memberName != null) {
@@ -600,7 +602,6 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             } else {
                 qualifier = null;
             }
-
         }
 
         if (ref.memberName != null) {
@@ -678,7 +679,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
 
     @Nullable
     private JavaType.Method methodReferenceType(DCTree.DCReference ref, @Nullable JavaType type) {
-        if (type instanceof  JavaType.Class) {
+        if (type instanceof JavaType.Class) {
             JavaType.Class classType = (JavaType.Class) type;
 
             nextMethod:
@@ -689,7 +690,11 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                             for (JavaType testParamType : method.getParameterTypes()) {
                                 Type paramType = attr.attribType(param, symbol);
                                 if (testParamType instanceof JavaType.GenericTypeVariable) {
-                                    for (JavaType bound : ((JavaType.GenericTypeVariable) testParamType).getBounds()) {
+                                    List<JavaType> bounds = ((JavaType.GenericTypeVariable) testParamType).getBounds();
+                                    if (bounds.isEmpty() && paramType.tsym != null && "java.lang.Object".equals(paramType.tsym.getQualifiedName().toString())) {
+                                        return method;
+                                    }
+                                    for (JavaType bound : bounds) {
                                         if (paramTypeMatches(bound, paramType)) {
                                             return method;
                                         }
@@ -790,6 +795,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     @Override
     public Tree visitSerialField(SerialFieldTree node, List<Javadoc> body) {
         body.addAll(sourceBefore("@serialField"));
+
         return new Javadoc.SerialField(randomId(), Markers.EMPTY,
                 visitIdentifier(node.getName(), whitespaceBefore()),
                 visitReference(node.getType(), whitespaceBefore()),
@@ -864,9 +870,9 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
             node = node.stripLeading();
         }
 
-        char[] textArr = node.toCharArray();
         StringBuilder text = new StringBuilder();
-        for (char c : textArr) {
+        for (int i = 0; i < node.length(); i++) {
+            char c = node.charAt(i);
             cursor++;
             if (c == '\n') {
                 if (text.length() > 0) {
@@ -1078,7 +1084,7 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
     /**
      * A {@link J} may contain new lines in each {@link Space} and each new line will have a corresponding
      * {@link org.openrewrite.java.tree.Javadoc.LineBreak}.
-     *
+     * <p>
      * This method collects the linebreaks associated to new lines in a Space, and removes the applicable linebreaks
      * from the map.
      */
@@ -1143,19 +1149,23 @@ public class ReloadableJava17JavadocVisitor extends DocTreeScanner<Tree, List<Ja
                 typeIdent = ((ArrayTypeTree) typeIdent).getType();
             }
 
-            TypeTree elemType = (TypeTree) scan(typeIdent, fmt);
+            TypeTree elemType = (TypeTree) scan(typeIdent, Space.EMPTY);
 
             List<JRightPadded<Space>> dimensions = emptyList();
             if (dimCount > 0) {
                 dimensions = new ArrayList<>(dimCount);
                 for (int n = 0; n < dimCount; n++) {
-                    dimensions.add(padRight(Space.build(sourceBeforeAsString("["), emptyList()), Space.build(sourceBeforeAsString("]"), emptyList())));
+                    if (!source.substring(cursor).startsWith("...")) {
+                        dimensions.add(padRight(
+                                Space.build(sourceBeforeAsString("["), emptyList()),
+                                Space.build(sourceBeforeAsString("]"), emptyList())));
+                    }
                 }
             }
 
             return new J.ArrayType(
                     randomId(),
-                    Space.EMPTY,
+                    fmt,
                     Markers.EMPTY,
                     elemType,
                     dimensions

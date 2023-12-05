@@ -33,4 +33,17 @@ class RangeTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void parenthesized() {
+        rewriteRun(
+          groovy(
+            """
+              ( 8..19 ).each { majorVersion ->
+                if (majorVersion == 9) return
+              }
+              """
+          )
+        );
+    }
 }

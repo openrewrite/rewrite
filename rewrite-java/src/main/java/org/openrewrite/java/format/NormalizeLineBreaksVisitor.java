@@ -71,9 +71,8 @@ public class NormalizeLineBreaksVisitor<P> extends JavaIsoVisitor<P> {
             return text;
         }
         StringBuilder normalized = new StringBuilder();
-        char[] charArray = text.toCharArray();
-        for (int i = 0; i < charArray.length; i++) {
-            char c = charArray[i];
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
             if (useCrlf && c == '\n' && (i == 0 || text.charAt(i - 1) != '\r')) {
                 normalized.append('\r').append('\n');
             } else if (useCrlf || c != '\r') {

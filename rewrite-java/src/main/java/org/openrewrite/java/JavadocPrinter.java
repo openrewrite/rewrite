@@ -35,7 +35,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
     public Javadoc visitAttribute(Javadoc.Attribute attribute, PrintOutputCapture<P> p) {
         beforeSyntax(attribute, p);
         p.append(attribute.getName());
-        if (attribute.getSpaceBeforeEqual() != null) {
+        if (attribute.getSpaceBeforeEqual() != null && !attribute.getSpaceBeforeEqual().isEmpty()) {
             visit(attribute.getSpaceBeforeEqual(), p);
             if (attribute.getValue() != null) {
                 p.append('=');
@@ -438,8 +438,10 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
             List<Javadoc.LineBreak> lineBreaks = getCursor().getNearestMessage("JAVADOC_LINE_BREAKS");
             Integer index = getCursor().getNearestMessage("JAVADOC_LINE_BREAK_INDEX");
 
-            if (lineBreaks != null && !lineBreaks.isEmpty() && index != null && space.getWhitespace().contains("\n")) {
-                for (char c : space.getWhitespace().toCharArray()) {
+            String whitespace = space.getWhitespace();
+            if (lineBreaks != null && !lineBreaks.isEmpty() && index != null && whitespace.contains("\n")) {
+                for (int i = 0; i < whitespace.length(); i++) {
+                    char c = whitespace.charAt(i);
                     // The Space from a JavaDoc will not contain a CR because the JavaDoc parser
                     // filters out other new line characters. CRLF is detected through the source
                     // and only exists through LineBreaks.
@@ -452,7 +454,7 @@ public class JavadocPrinter<P> extends JavadocVisitor<PrintOutputCapture<P>> {
                 }
                 getCursor().putMessageOnFirstEnclosing(Javadoc.DocComment.class, "JAVADOC_LINE_BREAK_INDEX", index);
             } else {
-                p.append(space.getWhitespace());
+                p.append(whitespace);
             }
             return space;
         }

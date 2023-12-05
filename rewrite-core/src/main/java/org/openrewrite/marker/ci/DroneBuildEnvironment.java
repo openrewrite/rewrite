@@ -24,6 +24,7 @@ import org.openrewrite.marker.GitProvenance;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.marker.OperatingSystemProvenance.hostname;
 
@@ -67,7 +68,8 @@ public class DroneBuildEnvironment implements BuildEnvironment {
             throw new IncompleteGitConfigException();
         }
         return new GitProvenance(UUID.randomUUID(), remoteURL,
-                StringUtils.isBlank(branch)? tag: branch, commitSha, null, null);
+                StringUtils.isBlank(branch)? tag: branch, commitSha,
+                null, null, emptyList());
     }
 
     public String getBuildUrl() {

@@ -103,13 +103,11 @@ public class StringUtils {
         if (end == start) {
             end++;
         }
-        char[] charArray = text.substring(start, end).toCharArray();
-
         StringBuilder trimmed = new StringBuilder();
-        for (int i = 0; i < charArray.length; i++) {
+        for (int i = start; i < end; i++) {
             int j = i;
-            for (; j < charArray.length; j++) {
-                char c = charArray[j];
+            for (; j < end; j++) {
+                char c = text.charAt(j);
                 if (c == '\r' || c == '\n') {
                     trimmed.append(c);
                     break;
@@ -139,7 +137,8 @@ public class StringUtils {
         int minIndent = Integer.MAX_VALUE;
         int whiteSpaceCount = 0;
         boolean contentEncountered = false;
-        for (char c : text.toCharArray()) {
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
             if (c == '\n' || c == '\r') {
                 if (contentEncountered) {
                     minIndent = Math.min(whiteSpaceCount, minIndent);
@@ -356,7 +355,6 @@ public class StringUtils {
      * @return the number of times the substring is found in the target. 0 if no occurrences are found.
      */
     public static int countOccurrences(@NonNull String text, @NonNull String substring) {
-
         if (text.isEmpty() || substring.isEmpty()) {
             return 0;
         }
@@ -565,7 +563,8 @@ public class StringUtils {
 
     public static String indent(String text) {
         StringBuilder indent = new StringBuilder();
-        for (char c : text.toCharArray()) {
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
             if (c == '\n' || c == '\r') {
                 return indent.toString();
             } else if (Character.isWhitespace(c)) {

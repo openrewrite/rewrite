@@ -662,6 +662,14 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
     }
 
     @Override
+    public J visitIntersectionType(IntersectionType intersectionType, PrintOutputCapture<P> p) {
+        beforeSyntax(intersectionType, Space.Location.INTERSECTION_TYPE_PREFIX, p);
+        visitContainer("", intersectionType.getPadding().getBounds(), JContainer.Location.TYPE_BOUNDS, "&", "", p);
+        afterSyntax(intersectionType, p);
+        return intersectionType;
+    }
+
+    @Override
     public J visitLabel(Label label, PrintOutputCapture<P> p) {
         beforeSyntax(label, Space.Location.LABEL_PREFIX, p);
         visitRightPadded(label.getPadding().getLabel(), JRightPadded.Location.LABEL, ":", p);
@@ -707,8 +715,9 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
                 }
             }
 
-            char[] valueSourceArr = literal.getValueSource().toCharArray();
-            for (char c : valueSourceArr) {
+            String valueSource = literal.getValueSource();
+            for (int j = 0; j < valueSource.length(); j++) {
+                char c = valueSource.charAt(j);
                 p.append(c);
                 if (surrogate != null && surrogate.getValueSourceIndex() == ++i) {
                     while (surrogate != null && surrogate.getValueSourceIndex() == i) {

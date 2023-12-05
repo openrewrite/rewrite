@@ -17,6 +17,8 @@ package org.openrewrite.java.search;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.DocumentExample;
 import org.openrewrite.Issue;
 import org.openrewrite.java.JavaParser;
@@ -39,7 +41,6 @@ class FindAnnotationsTest implements RewriteTest {
     @Test
     void matchMetaAnnotation() {
         rewriteRun(
-//          JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath()).logCompilationWarningsAndErrors(true).build(),
           spec -> spec.recipe(new FindAnnotations("@javax.annotation.Nonnull", true))
             .parser(JavaParser.fromJavaVersion().classpath(JavaParser.runtimeClasspath())),
           java(
@@ -94,17 +95,17 @@ class FindAnnotationsTest implements RewriteTest {
         );
     }
 
-    @Test
-    void matchesSimpleFullyQualifiedAnnotation() {
+    @ParameterizedTest
+    @ValueSource(strings = {"@java.lang.Deprecated", "java.lang.Deprecated"})
+    void matchesSimpleFullyQualifiedAnnotation(String annotationPattern) {
         rewriteRun(
-          spec -> spec.recipe(new FindAnnotations("@java.lang.Deprecated", null)),
+          spec -> spec.recipe(new FindAnnotations(annotationPattern, null)),
           java(
             "@Deprecated public class A {}",
             "/*~~>*/@Deprecated public class A {}"
           )
         );
     }
-
 
     @Test
     void matchesWildcard() {
@@ -296,7 +297,7 @@ class FindAnnotationsTest implements RewriteTest {
           java(
             """
               package com.foo;
-              
+                            
               @Example(Foo.class)
               public class Foo {}
               """,

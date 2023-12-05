@@ -55,12 +55,11 @@ public class SetDefaultEstimatedEffortPerOccurrence extends Recipe {
                             "@Override public Duration getEstimatedEffortPerOccurrence() {\n" +
                             "return Duration.ofMinutes(5);\n" +
                             "}")
-                    .contextSensitive()
                     .imports("java.time.Duration")
                     .build();
 
             @Override
-            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext executionContext) {
+            public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 JavaType.FullyQualified type = TypeUtils.asFullyQualified(classDecl.getType());
                 if (TypeUtils.isAssignableTo("org.openrewrite.Recipe", type)) {
                     assert type != null;
@@ -87,7 +86,7 @@ public class SetDefaultEstimatedEffortPerOccurrence extends Recipe {
                         throw new RuntimeException(e);
                     }
                 }
-                return super.visitClassDeclaration(classDecl, executionContext);
+                return super.visitClassDeclaration(classDecl, ctx);
             }
         });
     }

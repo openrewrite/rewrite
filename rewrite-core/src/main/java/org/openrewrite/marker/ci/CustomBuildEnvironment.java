@@ -24,6 +24,7 @@ import org.openrewrite.marker.GitProvenance;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 
 @Value
@@ -50,7 +51,8 @@ public class CustomBuildEnvironment implements BuildEnvironment{
                 || StringUtils.isBlank(sha)) {
             throw new IncompleteGitConfigException();
         } else {
-            return new GitProvenance(UUID.randomUUID(), cloneURL, ref, sha, null, null);
+            return new GitProvenance(UUID.randomUUID(), cloneURL, ref, sha,
+                    null, null, emptyList());
         }
     }
 

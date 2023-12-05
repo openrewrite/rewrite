@@ -17,7 +17,9 @@ package org.openrewrite.java.tree;
 
 import org.junit.jupiter.api.Test;
 import org.openrewrite.Issue;
+import org.openrewrite.java.MinimumJava11;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.openrewrite.java.Assertions.java;
 
@@ -389,6 +391,7 @@ class JavadocTest implements RewriteTest {
     @Test
     void exception() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
           java(
             """
               public class A {
@@ -721,6 +724,7 @@ class JavadocTest implements RewriteTest {
     @Test
     void multipleReferenceParameters() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
           java(
             """
               class Test {
@@ -1064,6 +1068,7 @@ class JavadocTest implements RewriteTest {
     @Test
     void methodNotFound() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().methodInvocations(false).build()),
           java(
             """
               interface Test {
@@ -1082,6 +1087,7 @@ class JavadocTest implements RewriteTest {
     @Test
     void typeNotFound() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.builder().identifiers(false).build()),
           java(
             """
               interface Test {
@@ -1650,6 +1656,7 @@ class JavadocTest implements RewriteTest {
 
     @Test
     @Issue("https://github.com/openrewrite/rewrite/issues/3530")
+    @MinimumJava11
     void arrayTypeLiterals2() {
         rewriteRun(
           java("" +
@@ -1657,6 +1664,87 @@ class JavadocTest implements RewriteTest {
             " * <p>Values are converted to strings using {@link java.util.Arrays#compare(Comparable[], Comparable[])}}.\n" +
             " */\n" +
             "class A {}"
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3575")
+    void varargsMethod() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  /**
+                   * A dummy main method. This method is not actually called, but we'll use its Javadoc comment to test that
+                   * OpenRewrite can handle references like the following: {@link A#varargsMethod(String...)}.
+                   *
+                   * @param args The arguments to the method.
+                   */
+                  public static void main(String[] args) {
+                      System.out.println("Hello, world! This is my original class' main method.");
+                  }
+                  public static void varargsMethod(String... args) {
+                      System.out.println("Hello, world! This is my original class' varargs method.");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3575")
+    void arrayMethod() {
+        rewriteRun(
+          java(
+            """
+              class A {
+                  /**
+                   * A dummy main method. This method is not actually called, but we'll use its Javadoc comment to test that
+                   * OpenRewrite can handle references like the following: {@link A#main(String[])}.
+                   *
+                   * @param args The arguments to the method.
+                   */
+                  public static void main(String[] args) {
+                      System.out.println("Hello, world! This is my original class' main method.");
+                  }
+              }
+              """
+          )
+        );
+    }
+
+    @Test
+    void emptyAttributes() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * DEFINE TENANCY TenantB AS <TenantB OCID>
+               * ENDORSE GROUP <TenantA user group name> TO {OBJECTSTORAGE_NAMESPACE_READ} IN TENANCY TenantB
+               *
+               * DEFINE TENANCY TenantA AS <TenantA OCID>
+               * DEFINE GROUP TenantAGroup AS <TenantA user group OCID>
+               * ADMIT GROUP TenantAGroup OF TENANCY TenantA TO {OBJECTSTORAGE_NAMESPACE_READ} IN TENANCY
+               */
+              class Test {}
+              """
+          )
+        );
+    }
+
+    @Test
+    void trailingTab() {
+        rewriteRun(
+          java(
+            """
+              /**
+               * See <a href="">here</a>\t
+               */
+              class Test {
+              }
+              """
           )
         );
     }

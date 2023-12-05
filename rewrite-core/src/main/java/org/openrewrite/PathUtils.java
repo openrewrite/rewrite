@@ -24,7 +24,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class PathUtils {
-    private PathUtils() {}
+    private PathUtils() {
+    }
 
     private static final char UNIX_SEPARATOR = '/';
 
@@ -34,7 +35,6 @@ public class PathUtils {
      * Compare two paths, returning true if they indicate the same path, regardless of separators.
      * Does not account for comparison of a relative path to an absolute path, but within the context of OpenRewrite
      * all paths should be relative anyway.
-     *
      * "foo/a.txt" is considered to be equal to "foo\a.txt"
      */
     public static boolean equalIgnoringSeparators(Path a, Path b) {
@@ -44,7 +44,7 @@ public class PathUtils {
     /**
      * Compare two strings representing file paths, returning true if they indicate the same path regardless of separators
      */
-    public static boolean equalIgnoringSeparators(String a , String b) {
+    public static boolean equalIgnoringSeparators(String a, String b) {
         return separatorsToSystem(a).equals(separatorsToSystem(b));
     }
 
@@ -128,7 +128,7 @@ public class PathUtils {
                 return false;
             }
             if (pattIdxEnd == (pattTokens.length - 1)
-                    && (isFileSeparator(pattern.charAt(pattern.length() - 1)) ^ isFileSeparator(path.charAt(path.length() - 1)))) {
+                && (isFileSeparator(pattern.charAt(pattern.length() - 1)) ^ isFileSeparator(path.charAt(path.length() - 1)))) {
                 return false;
             }
             pattIdxEnd--;
@@ -136,7 +136,7 @@ public class PathUtils {
         }
         if (pathIdxStart > pathIdxEnd) {
             // Path exhausted
-            for (int i = pattIdxStart; i < pattIdxEnd; i++) {
+            for (int i = pattIdxStart; i <= pattIdxEnd; i++) {
                 if (!pattTokens[i].equals("**")) {
                     return false;
                 }
@@ -212,6 +212,7 @@ public class PathUtils {
         return isFileSeparator(false, ch);
     }
 
+    @SuppressWarnings("SameParameterValue")
     private static boolean isFileSeparator(boolean strict, char ch) {
         return strict
                 ? ch == File.separatorChar

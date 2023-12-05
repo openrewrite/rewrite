@@ -32,6 +32,7 @@ import org.openrewrite.InMemoryExecutionContext;
 import org.openrewrite.Issue;
 import org.openrewrite.ipc.http.HttpUrlConnectionSender;
 import org.openrewrite.maven.MavenDownloadingException;
+import org.openrewrite.maven.MavenExecutionContextView;
 import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.GroupArtifactVersion;
@@ -41,6 +42,7 @@ import org.openrewrite.maven.tree.MavenRepository;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
@@ -51,7 +53,7 @@ import static java.util.Collections.emptyMap;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @SuppressWarnings({"NullableProblems", "HttpUrlsUsage"})
 class MavenPomDownloaderTest {
@@ -269,12 +271,12 @@ class MavenPomDownloaderTest {
                       new MockResponse().setResponseCode(200).setBody(
                         //language=xml
                         """
-                        <project>
-                            <groupId>org.springframework.cloud</groupId>
-                            <artifactId>spring-cloud-dataflow-build</artifactId>
-                            <version>2.10.0-SNAPSHOT</version>
-                        </project>
-                        """) :
+                          <project>
+                              <groupId>org.springframework.cloud</groupId>
+                              <artifactId>spring-cloud-dataflow-build</artifactId>
+                              <version>2.10.0-SNAPSHOT</version>
+                          </project>
+                          """) :
                       new MockResponse().setResponseCode(401).setBody("");
                 }
             });
@@ -485,4 +487,100 @@ class MavenPomDownloaderTest {
         assertThat(merged.getVersioning().getSnapshotVersions().get(0).getValue()).isNotNull();
         assertThat(merged.getVersioning().getSnapshotVersions().get(0).getUpdated()).isNotNull();
     }
+
+    @Test
+    void skipsLocalInvalidArtifactsMissingJar(@TempDir Path localRepository) throws IOException {
+        Path localArtifact = localRepository.resolve("com/bad/bad-artifact");
+        assertThat(localArtifact.toFile().mkdirs()).isTrue();
+        Files.createDirectories(localArtifact.resolve("1"));
+
+        Path localPom = localRepository.resolve("com/bad/bad-artifact/1/bad-artifact-1.pom");
+        Files.writeString(localPom,
+          //language=xml
+          """
+             <project>
+               <groupId>com.bad</groupId>
+               <artifactId>bad-artifact</artifactId>
+               <version>1</version>
+             </project>
+            """
+        );
+
+        MavenRepository mavenLocal = MavenRepository.builder()
+          .id("local")
+          .uri(localRepository.toUri().toString())
+          .snapshots(false)
+          .knownToExist(true)
+          .build();
+
+        // Does not return invalid dependency.
+        assertThrows(MavenDownloadingException.class, () ->
+          new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext())
+            .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
+    }
+
+    @Test
+    void skipsLocalInvalidArtifactsEmptyJar(@TempDir Path localRepository) throws IOException {
+        Path localArtifact = localRepository.resolve("com/bad/bad-artifact");
+        assertThat(localArtifact.toFile().mkdirs()).isTrue();
+        Files.createDirectories(localArtifact.resolve("1"));
+
+        Path localPom = localRepository.resolve("com/bad/bad-artifact/1/bad-artifact-1.pom");
+        Files.writeString(localPom,
+          //language=xml
+          """
+             <project>
+               <groupId>com.bad</groupId>
+               <artifactId>bad-artifact</artifactId>
+               <version>1</version>
+             </project>
+            """
+        );
+        Path localJar = localRepository.resolve("com/bad/bad-artifact/1/bad-artifact-1.jar");
+        Files.writeString(localJar, "");
+
+        MavenRepository mavenLocal = MavenRepository.builder()
+          .id("local")
+          .uri(localRepository.toUri().toString())
+          .snapshots(false)
+          .knownToExist(true)
+          .build();
+
+        // Does not return invalid dependency.
+        assertThrows(MavenDownloadingException.class, () ->
+          new MavenPomDownloader(emptyMap(), new InMemoryExecutionContext())
+            .download(new GroupArtifactVersion("com.bad", "bad-artifact", "1"), null, null, List.of(mavenLocal)));
+    }
+
+    @Test
+    void doNotRenameRepoForCustomMavenLocal(@TempDir Path tempDir) throws MavenDownloadingException, IOException {
+        GroupArtifactVersion gav = createArtifact(tempDir);
+        MavenExecutionContextView.view(ctx).setLocalRepository(MavenRepository.MAVEN_LOCAL_DEFAULT.withUri(tempDir.toUri().toString()));
+        var downloader = new MavenPomDownloader(emptyMap(), ctx);
+
+        var result = downloader.download(gav, null, null, List.of());
+        assertThat(result.getRepository().getUri()).startsWith(tempDir.toUri().toString());
+    }
+
+    private static GroupArtifactVersion createArtifact(Path repository) throws IOException {
+        Path target = repository.resolve(Paths.get("org", "openrewrite", "rewrite", "1.0.0"));
+        Path pom = target.resolve("rewrite-1.0.0.pom");
+        Path jar = target.resolve("rewrite-1.0.0.jar");
+        Files.createDirectories(target);
+        Files.createFile(pom);
+        Files.createFile(jar);
+
+        Files.write(pom,
+          //language=xml
+          """
+            <project>
+                <groupId>org.openrewrite</groupId>
+                <artifactId>rewrite</artifactId>
+                <version>1.0.0</version>
+            </project>
+            """.getBytes());
+        Files.write(jar, "I'm a jar".getBytes()); // empty jars get ignored
+        return new GroupArtifactVersion("org.openrewrite", "rewrite", "1.0.0");
+    }
+
 }

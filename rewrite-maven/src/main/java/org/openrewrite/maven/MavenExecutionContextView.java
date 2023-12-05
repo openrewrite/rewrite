@@ -90,10 +90,10 @@ public class MavenExecutionContextView extends DelegatingExecutionContext {
      * @return The mirrors to use for dependency resolution.
      */
     public Collection<MavenRepositoryMirror> getMirrors(@Nullable MavenSettings mavenSettings) {
-        if (mavenSettings != null) {
+        if (mavenSettings != null && !mavenSettings.equals(getSettings())) {
             return mapMirrors(mavenSettings);
         }
-        return getMessage(MAVEN_MIRRORS, emptyList());
+        return getMirrors();
     }
 
     public MavenExecutionContextView setCredentials(Collection<MavenRepositoryCredentials> credentials) {
