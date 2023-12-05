@@ -31,6 +31,7 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "",
             "true",
+            null,
             null
           )),
           properties(
@@ -47,6 +48,7 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "",
+            null,
             null
           )),
           properties(
@@ -63,6 +65,7 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
+            null,
             null
           )),
           properties(
@@ -80,6 +83,7 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
+            null,
             null
           )),
           properties(
@@ -101,6 +105,7 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
+            null,
             ":"
           )),
           properties(
@@ -122,6 +127,7 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
+            null,
             "    "
           )),
           properties(
@@ -142,11 +148,51 @@ class AddPropertyTest implements RewriteTest {
           spec -> spec.recipe(new AddProperty(
             "management.metrics.enable.process.files",
             "true",
+            null,
             null
           )),
           properties(
             "",
             """
+              management.metrics.enable.process.files=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void addCommentedPropertyToEmptyFile() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "management.metrics.enable.process.files",
+            "true",
+            "Management metrics",
+            null
+          )),
+          properties(
+            "",
+            """
+              # Management metrics
+              management.metrics.enable.process.files=true
+              """
+          )
+        );
+    }
+
+    @Test
+    void addCommentedPropertyToExistingFile() {
+        rewriteRun(
+          spec -> spec.recipe(new AddProperty(
+            "management.metrics.enable.process.files",
+            "true",
+            "Management metrics",
+            null
+          )),
+          properties(
+            "management=true",
+            """
+              management=true
+              # Management metrics
               management.metrics.enable.process.files=true
               """
           )
