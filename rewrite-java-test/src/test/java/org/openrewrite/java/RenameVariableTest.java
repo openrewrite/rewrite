@@ -30,7 +30,7 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.test.RewriteTest.toRecipe;
 
-@SuppressWarnings({"SimplifyStreamApiCallChains", "ConstantConditions"})
+@SuppressWarnings({"SimplifyStreamApiCallChains", "ConstantConditions", "UnnecessaryLocalVariable", "LocalVariableUsedAndDeclaredInDifferentSwitchBranches", "Convert2Diamond", "UnusedAssignment"})
 class RenameVariableTest implements RewriteTest {
     private static Recipe renameVariableTest(String hasName, String toName, boolean includeMethodParameters) {
         return toRecipe(() -> new JavaVisitor<>() {
@@ -68,6 +68,44 @@ class RenameVariableTest implements RewriteTest {
                 return super.visitClassDeclaration(classDecl, p);
             }
         });
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/3772")
+    @Test
+    void renameFieldWithSameNameAsParameterWithJavaDoc() {
+        rewriteRun(
+          spec -> spec.recipe(renameVariableTest("name", "_name", false)),
+          java(
+            """
+            public class A {
+                private String name;
+                
+                /**
+                 * The length of <code>name</code> added to the length of {@link #name}.
+                 *
+                 * @param name My parameter.
+                 */
+                int fooA(String name) {
+                    return name.length() + this.name.length();
+                }
+            }
+            """,
+            """
+            public class A {
+                private String _name;
+                
+                /**
+                 * The length of <code>name</code> added to the length of {@link #_name}.
+                 *
+                 * @param name My parameter.
+                 */
+                int fooA(String name) {
+                    return name.length() + this._name.length();
+                }
+            }
+            """
+          )
+        );
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/2285")
@@ -245,7 +283,7 @@ class RenameVariableTest implements RewriteTest {
             """
               package org.openrewrite;
 
-              public class A {
+              /** @noinspection ReassignedVariable*/ public class A {
                   int fooA() {
                       // refers to class declaration scope.
                       for (v = 0; v < 10; ++v) {
@@ -560,7 +598,7 @@ class RenameVariableTest implements RewriteTest {
                   public Integer v = 1;
 
                   int onlyChangeInScope() {
-                      BiFunction<String, Integer, Integer> x = (String k, Integer v) -> 
+                      BiFunction<String, Integer, Integer> x = (String k, Integer v) ->
                       v == null ? 42 : v + 41;
 
                       // Class scope.
@@ -577,7 +615,7 @@ class RenameVariableTest implements RewriteTest {
                   public Integer VALUE = 1;
 
                   int onlyChangeInScope() {
-                      BiFunction<String, Integer, Integer> x = (String k, Integer v) -> 
+                      BiFunction<String, Integer, Integer> x = (String k, Integer v) ->
                       v == null ? 42 : v + 41;
 
                       // Class scope.
