@@ -18,6 +18,7 @@ package org.openrewrite.maven.tree;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import com.fasterxml.jackson.databind.JsonNode;
 import lombok.Getter;
 import lombok.Value;
 import lombok.With;
@@ -487,15 +488,89 @@ public class ResolvedPom {
             }
         }
 
+        @Value
+        private class PluginKey {
+            String groupId;
+            String artifactId;
+        }
+
+        private PluginKey getPluginKey(Plugin plugin) {
+            return new PluginKey(
+                    plugin.getGroupId(),
+                    plugin.getArtifactId()
+            );
+        }
+
+        private List<Dependency> mergePluginDependencies(List<Dependency> dependencies, List<Dependency> incomingDependencies) {
+            if (incomingDependencies.isEmpty()) {
+                return dependencies;
+            }
+            if (dependencies.isEmpty()) {
+                return incomingDependencies;
+            }
+
+            List<Dependency> merged = new ArrayList<>();
+            Set<GroupArtifact> uniqueDependencies = new HashSet<>();
+            for (Dependency dependency : dependencies) {
+                merged.add(dependency);
+                uniqueDependencies.add(new GroupArtifact(dependency.getGroupId(), dependency.getArtifactId()));
+            }
+            for (Dependency dependency : incomingDependencies) {
+                if (!uniqueDependencies.contains(new GroupArtifact(dependency.getGroupId(), dependency.getArtifactId()))) {
+                    merged.add(dependency);
+                }
+            }
+
+            return merged;
+        }
+
+        private JsonNode mergePluginConfigurations(JsonNode configuration, JsonNode incomingConfiguration) {
+            return configuration; // TODO
+        }
+
+        private List<Plugin.Execution> mergePluginExecutions(List<Plugin.Execution> executions, List<Plugin.Execution> incomingExecutions) {
+            return executions; // TODO
+        }
+
+        private Plugin mergePlugins(Plugin plugin, Plugin incoming) {
+            return new Plugin(
+                    plugin.getGroupId(),
+                    plugin.getArtifactId(),
+                    Optional.ofNullable(plugin.getVersion()).orElse(incoming.getVersion()),
+                    Optional.ofNullable(plugin.getExtensions()).orElse(incoming.getExtensions()),
+                    Optional.ofNullable(plugin.getInherited()).orElse(incoming.getInherited()),
+                    mergePluginConfigurations(plugin.getConfiguration(), incoming.getConfiguration()),
+                    mergePluginDependencies(plugin.getDependencies(), incoming.getDependencies()),
+                    mergePluginExecutions(plugin.getExecutions(), incoming.getExecutions())
+            );
+        }
+
+        private void mergePlugins(List<Plugin> plugins, List<Plugin> incomingPlugins) {
+            Map<PluginKey, Plugin> pluginMap = new HashMap<>();
+            plugins.forEach(p -> pluginMap.put(getPluginKey(p), p));
+
+            for (Plugin incomingPlugin : incomingPlugins) {
+                if ("false".equals(incomingPlugin.getInherited())) {
+                    continue;
+                }
+                Plugin plugin = pluginMap.get(getPluginKey(incomingPlugin));
+                if (plugin != null) {
+                    plugins.remove(plugin);
+                    plugins.add(mergePlugins(plugin, incomingPlugin));
+                } else {
+                    plugins.add(incomingPlugin);
+                }
+            }
+        }
+
         private void mergePlugins(List<Plugin> incomingPlugins) {
             if (!incomingPlugins.isEmpty()) {
                 if (plugins == null || plugins.isEmpty()) {
                     //It is possible for the plugins to be an empty, immutable list.
                     //If it's empty, we ensure to create a mutable list.
-                    plugins = new ArrayList<>(incomingPlugins);
-                } else {
-                    plugins.addAll(incomingPlugins);
+                    plugins = new ArrayList<>();
                 }
+                mergePlugins(plugins, incomingPlugins);
             }
         }
 
@@ -504,10 +579,9 @@ public class ResolvedPom {
                 if (pluginManagement == null || pluginManagement.isEmpty()) {
                     //It is possible for the plugins to be an empty, immutable list.
                     //If it's empty, we ensure to create a mutable list.
-                    pluginManagement = new ArrayList<>(incomingPlugins);
-                } else {
-                    pluginManagement.addAll(incomingPlugins);
+                    pluginManagement = new ArrayList<>();
                 }
+                mergePlugins(pluginManagement, incomingPlugins);
             }
         }
 
