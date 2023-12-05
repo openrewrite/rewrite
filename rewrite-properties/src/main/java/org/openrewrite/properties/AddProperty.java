@@ -58,16 +58,6 @@ public class AddProperty extends Recipe {
     @Nullable
     String delimiter;
 
-    /**
-     * Keeping this constructor just for compatibility purposes
-     * @deprecated Use {@link AddProperty#AddProperty(String, String, String, String)}}
-     */
-    @Deprecated
-    public AddProperty(String property, String value, @Nullable String delimiter) {
-        this(property, value, null, delimiter);
-    }
-
-    @JsonCreator
     public AddProperty(String property, String value, @Nullable String comment, @Nullable String delimiter) {
         this.property = property;
         this.value = value;
