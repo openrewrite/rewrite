@@ -55,7 +55,7 @@ public class IsInRepository extends Recipe {
                 Optional<GitProvenance> maybeGp = tree.getMarkers().findFirst(GitProvenance.class);
                 if (maybeGp.isPresent()) {
                     GitProvenance gp = maybeGp.get();
-                    if (!allowedRepositories.contains(gp.getRepositoryName())) {
+                    if (allowedRepositories.contains(gp.getRepositoryName())) {
                         return SearchResult.found(tree);
                     }
                 }
