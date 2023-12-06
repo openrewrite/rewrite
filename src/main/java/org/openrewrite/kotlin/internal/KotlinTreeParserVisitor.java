@@ -947,7 +947,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             throw new UnsupportedOperationException("TODO");
         }
 
-        return new J.MethodDeclaration(
+        return mapType(new J.MethodDeclaration(
                 randomId(),
                 deepPrefix(constructor),
                 Markers.build(singletonList(new PrimaryConstructor(randomId()))),
@@ -964,7 +964,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 null,
                 null,
                 type
-        );
+        ));
     }
 
     @Override
@@ -1019,7 +1019,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     .withMarkers(Markers.EMPTY.addIfAbsent(new OmitParentheses(randomId())));
         }
 
-        return new J.MethodDeclaration(
+        return mapType(new J.MethodDeclaration(
                 randomId(),
                 deepPrefix(accessor),
                 markers,
@@ -1036,7 +1036,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 body,
                 null,
                 type
-        );
+        ));
     }
 
     @Override
@@ -1133,7 +1133,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             body = (J.Block) constructor.getBodyExpression().accept(this, data);
         }
 
-        J.MethodDeclaration methodDeclaration = new J.MethodDeclaration(
+        J.MethodDeclaration methodDeclaration = mapType(new J.MethodDeclaration(
                 randomId(),
                 deepPrefix(constructor),
                 markers,
@@ -1147,7 +1147,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 body,
                 null,
                 type
-        );
+        ));
 
         return delegationCall != null ? new K.Constructor(randomId(), Markers.EMPTY, methodDeclaration, prefix(constructor.getColon()), delegationCall) :
                 methodDeclaration;
@@ -2632,7 +2632,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             body = null;
         }
 
-        J.MethodDeclaration methodDeclaration = new J.MethodDeclaration(
+        J.MethodDeclaration methodDeclaration = mapType(new J.MethodDeclaration(
                 randomId(),
                 deepPrefix(function),
                 markers,
@@ -2646,7 +2646,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 body,
                 null,
                 type
-        );
+        ));
 
         return (typeConstraints == null) ? methodDeclaration : new K.MethodDeclaration(randomId(), Markers.EMPTY, methodDeclaration, typeConstraints);
     }
@@ -3371,140 +3371,216 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     /*====================================================================
      * Type related methods
      * ====================================================================*/
-    @SuppressWarnings("unchecked")
-    private <T extends J> T mapType(T tree) {
-        // TODO: polish, prevent unnecessary casts
-        T updated = tree;
-        /* Java trees */
-        if (updated instanceof J.Annotation) {
-            if (isNotFullyQualified(((J.Annotation) updated).getAnnotationType().getType())) {
-                J.Annotation a = (J.Annotation) updated;
-                if (a.getAnnotationType().getType() instanceof JavaType.Method) {
-                    a = a.withAnnotationType(a.getAnnotationType().withType(((JavaType.Method) a.getAnnotationType().getType()).getReturnType()));
-                } else {
-                    // Type association error, add marker for use in data table.
-                }
-                updated = (T) a;
-            }
-        } else if (updated instanceof J.Assignment) {
-            if (isNotFullyQualified(((J.Assignment) updated).getType())) {
-                J.Assignment a = (J.Assignment) updated;
-                if (a.getType() instanceof JavaType.Method) {
-                    a = a.withType(((JavaType.Method) a.getType()).getReturnType());
-                } else if (a.getType() instanceof JavaType.Variable) {
-                    a = a.withType(((JavaType.Variable) a.getType()).getType());
-                } else {
-                    // Type association error, add marker for use in data table.
-                }
-                updated = (T) a;
-            }
-        } else if (updated instanceof J.AssignmentOperation) {
-            if (isNotFullyQualified(((J.AssignmentOperation) updated).getType())) {
-                J.AssignmentOperation a = (J.AssignmentOperation) updated;
-                if (a.getType() instanceof JavaType.Method) {
-                    a = a.withType(((JavaType.Method) a.getType()).getReturnType());
-                } else if (a.getType() instanceof JavaType.Variable) {
-                    a = a.withType(((JavaType.Variable) a.getType()).getType());
-                } else {
-                    // Type association error, add marker for use in data table.
-                }
-                updated = (T) a;
-            }
-        } else if (updated instanceof J.Binary && ((J.Binary) updated).getType() != null) {
-            if (isNotFullyQualified(((J.Binary) updated).getType())) {
-                J.Binary b = (J.Binary) updated;
-                if (b.getType() instanceof JavaType.Method) {
-                    b = b.withType(((JavaType.Method) b.getType()).getReturnType());
-                } else {
-                    // Type association error, add marker for use in data table.
-                }
-                updated = (T) b;
-            }
-        } else if (updated instanceof J.FieldAccess) {
-            if (isNotFullyQualified(((J.FieldAccess) updated).getType())) {
-                J.FieldAccess f = (J.FieldAccess) updated;
-                if (f.getType() instanceof JavaType.Method) {
-                    f = f.withType(((JavaType.Method) f.getType()).getReturnType());
-                } else if (f.getType() instanceof JavaType.Variable) {
-                    f = f.withType(((JavaType.Variable) f.getType()).getType());
-                } else {
-                    // Type association error, add marker for use in data table.
-                }
-                updated = (T) f;
-            }
 
-            if (((J.FieldAccess) updated).getTarget() instanceof J.Identifier &&
-                isNotFullyQualified((((J.FieldAccess) updated).getTarget()).getType())) {
+    /**
+     * Aligns types between the PSI and FIR to the Java compiler for use in recipes and type utilities.
+     * <p>
+     * The types associated from the PSI to the FIR do not always align with the expected types on the
+     * J tree. An example is binary operations; In Kotlin, binary operations are method invocations where
+     * the source code appears to be a binary expression like `1 + 1`, but the FIR is a function call `1.plus(1)`.
+     * <p>
+     * The function call will be mapped to a `JavaType$Method`, which is only necessary if the function is not overloaded.
+     * Otherwise, a J.Binary is created, which should have a type field of `JavaType.Class`. This method will assign
+     * the appropriate JavaType based on the tree and the trees fields.
+     * <p>
+     * The expected types on fields of `J` trees varies. An example is the name of J.MethodInvocation should
+     * have a type of `JavaType$Method` whereas the name of an Annotation should be a `JavaType.Class`.
+     * <p>
+     * Finally, we can identify and fix mis-mapped types by detecting unexpected types, marking the elements,
+     * and finding the elements through data-tables.
+     *
+     * @param tree J tree to align types on.
+     * @return Tree with updated types.
+     */
+    @SuppressWarnings("unchecked")
+    private <J2 extends J> J2 mapType(J2 tree) {
+        J2 updated = tree;
+        if (tree instanceof J.Annotation) {
+            updated = (J2) mapType((J.Annotation) tree);
+        } else if (tree instanceof J.Assignment) {
+            updated = (J2) mapType((J.Assignment) tree);
+        } else if (tree instanceof J.AssignmentOperation) {
+            updated = (J2) mapType((J.AssignmentOperation) tree);
+        } else if (tree instanceof J.Binary) {
+            updated = (J2) mapType((J.Binary) tree);
+        } else if (tree instanceof J.FieldAccess) {
+            updated = (J2) mapType((J.FieldAccess) tree);
+        } else if (tree instanceof J.MethodDeclaration) {
+            updated = (J2) mapType((J.MethodDeclaration) tree);
+        } else if (tree instanceof J.MethodInvocation) {
+            updated = (J2) mapType((J.MethodInvocation) tree);
+        } else if (tree instanceof J.NewClass) {
+            updated = (J2) mapType((J.NewClass) tree);
+        } else if (tree instanceof J.ParameterizedType) {
+            updated = (J2) mapType((J.ParameterizedType) tree);
+        } else if (tree instanceof J.Unary) {
+            updated = (J2) mapType((J.Unary) tree);
+        } else if (tree instanceof K.Binary) {
+            updated = (J2) mapType((K.Binary) tree);
+        } else if (tree instanceof K.Unary) {
+            updated = (J2) mapType((K.Unary) tree);
+        }
+        return updated;
+    }
+
+    private J.Annotation mapType(J.Annotation tree) {
+        J.Annotation a = tree;
+        if (isNotFullyQualified(tree.getAnnotationType().getType())) {
+            if (a.getAnnotationType().getType() instanceof JavaType.Method) {
+                a = a.withAnnotationType(a.getAnnotationType().withType(((JavaType.Method) a.getAnnotationType().getType()).getReturnType()));
+            }
+//            else {
                 // Type association error, add marker for use in data table.
+//            }
+        }
+        return a;
+    }
+
+    private J.Assignment mapType(J.Assignment tree) {
+        J.Assignment a = tree;
+        if (isNotFullyQualified(tree.getType())) {
+            if (a.getType() instanceof JavaType.Method) {
+                a = a.withType(((JavaType.Method) a.getType()).getReturnType());
+            } else if (a.getType() instanceof JavaType.Variable) {
+                a = a.withType(((JavaType.Variable) a.getType()).getType());
             }
-        } else if (updated instanceof J.MethodDeclaration) {
-            if (!(((J.MethodDeclaration) updated).getName().getType() instanceof JavaType.Method)) {
-                J.MethodDeclaration m = (J.MethodDeclaration) updated;
-                m = m.withName(m.getName().withType(m.getMethodType()));
-                updated = (T) m;
+//            else {
+                // Type association error, add marker for use in data table.
+//            }
+        }
+        return a;
+    }
+
+    private J.AssignmentOperation mapType(J.AssignmentOperation tree) {
+        J.AssignmentOperation a = tree;
+        if (isNotFullyQualified(tree.getType())) {
+            if (a.getType() instanceof JavaType.Method) {
+                a = a.withType(((JavaType.Method) a.getType()).getReturnType());
+            } else if (a.getType() instanceof JavaType.Variable) {
+                a = a.withType(((JavaType.Variable) a.getType()).getType());
             }
-        } else if (updated instanceof J.MethodInvocation) {
-            if (!(((J.MethodInvocation) updated).getName().getType() instanceof JavaType.Method)) {
-                J.MethodInvocation m = (J.MethodInvocation) updated;
-                m = m.withName(m.getName().withType(m.getMethodType()));
-                updated = (T) m;
+//            else {
+                // Type association error, add marker for use in data table.
+//            }
+        }
+        return a;
+    }
+
+    private J.Binary mapType(J.Binary tree) {
+        J.Binary b = tree;
+        if (isNotFullyQualified(tree.getType())) {
+            if (b.getType() instanceof JavaType.Method) {
+                b = b.withType(((JavaType.Method) b.getType()).getReturnType());
             }
-        } else if (updated instanceof J.NewClass) {
-            J.NewClass n = (J.NewClass) updated;
-            if (n.getClazz() != null && n.getClazz() instanceof J.Identifier &&
-                n.getClazz().getType() instanceof JavaType.Parameterized) {
+//            else {
+                // Type association error, add marker for use in data table.
+//            }
+        }
+        return b;
+    }
+
+    private J.FieldAccess mapType(J.FieldAccess tree) {
+        J.FieldAccess f = tree;
+        if (isNotFullyQualified(tree.getType())) {
+            if (f.getType() instanceof JavaType.Method) {
+                f = f.withType(((JavaType.Method) f.getType()).getReturnType());
+            } else if (f.getType() instanceof JavaType.Variable) {
+                f = f.withType(((JavaType.Variable) f.getType()).getType());
+            }
+//            else {
+                // Type association error, add marker for use in data table.
+//            }
+            return f;
+        }
+        if (f.getTarget() instanceof J.Identifier && isNotFullyQualified(f.getTarget().getType())) {
+            // Type association error, add marker for use in data table.
+        }
+        return f;
+    }
+
+    private J.MethodDeclaration mapType(J.MethodDeclaration tree) {
+        J.MethodDeclaration m = tree;
+        if (!(m.getName().getType() instanceof JavaType.Method)) {
+            m = m.withName(m.getName().withType(m.getMethodType()));
+        }
+        return m;
+    }
+
+    private J.MethodInvocation mapType(J.MethodInvocation tree) {
+        J.MethodInvocation m = tree;
+        if (!(m.getName().getType() instanceof JavaType.Method)) {
+            m = m.withName(m.getName().withType(m.getMethodType()));
+        }
+        return m;
+    }
+
+    private J.NewClass mapType(J.NewClass tree) {
+        J.NewClass n = tree;
+        if (n.getClazz() != null && n.getClazz() instanceof J.Identifier) {
+            if (n.getClazz().getType() instanceof JavaType.Parameterized) {
                 J.Identifier clazz = (J.Identifier) n.getClazz();
                 n = n.withClazz(clazz.withType(((JavaType.Parameterized) clazz.getType()).getType()));
             }
-            updated = (T) n;
-        } else if (updated instanceof J.ParameterizedType) {
-            J.ParameterizedType p = (J.ParameterizedType) updated;
-            if (p.getType() != null && !(p.getType() instanceof JavaType.Parameterized)) {
-                if (p.getType() instanceof JavaType.Method) {
-                    if (((JavaType.Method) p.getType()).getReturnType() instanceof JavaType.Parameterized) {
-                        p = p.withType(((JavaType.Method) p.getType()).getReturnType());
-                    } else {
-                        // Type association error, add marker for use in data table.
-                    }
-                } else {
-                    // Type association error, add marker for use in data table.
-                }
-            }
-            if (p.getClazz() != null && p.getClazz().getType() instanceof JavaType.Parameterized) {
-                p = p.withClazz(p.getClazz().withType(((JavaType.Parameterized) p.getClazz().getType()).getType()));
-            }
-            updated = (T) p;
-        } else if (updated instanceof J.Unary) {
-            if (isNotFullyQualified(((J.Unary) updated).getType())) {
-                J.Unary u = (J.Unary) updated;
-                if (u.getType() instanceof JavaType.Method) {
-                    u = u.withType(((JavaType.Method) u.getType()).getReturnType());
-                } else {
-                    // Type association error, add marker for use in data table.
-                }
-                updated = (T) u;
-            }
-        }
-        /* Kotlin trees */
-        else if (updated instanceof K.Binary) {
-            if (isNotFullyQualified(((K.Binary) updated).getType())) {
-                K.Binary b = (K.Binary) updated;
-                if (b.getType() instanceof JavaType.Method) {
-                    b = b.withType(((JavaType.Method) b.getType()).getReturnType());
-                } else {
-                    // Type association error, add marker for use in data table.
-                }
-                updated = (T) b;
-            }
-        } else if (updated instanceof K.Unary) {
-            if (isNotFullyQualified(((K.Unary) updated).getType())) {
+//            else if (n.getClazz().getType() != null && isNotFullyQualified(n.getClazz().getType())) {
                 // Type association error, add marker for use in data table.
-            }
-        } else {
-            throw new UnsupportedOperationException("Unsupported mapped type: " + updated.getClass().getName());
+//            }
         }
+        return n;
+    }
 
-        return updated;
+    private J.ParameterizedType mapType(J.ParameterizedType tree) {
+        J.ParameterizedType p = tree;
+        if (p.getType() != null && !(p.getType() instanceof JavaType.Parameterized)) {
+            if (p.getType() instanceof JavaType.Method) {
+                if (((JavaType.Method) p.getType()).getReturnType() instanceof JavaType.Parameterized) {
+                    p = p.withType(((JavaType.Method) p.getType()).getReturnType());
+                }
+//                else {
+                    // Type association error, add marker for use in data table.
+//                }
+            }
+//            else {
+                // Type association error, add marker for use in data table.
+//            }
+        }
+        if (p.getClazz() != null && p.getClazz().getType() instanceof JavaType.Parameterized) {
+            p = p.withClazz(p.getClazz().withType(((JavaType.Parameterized) p.getClazz().getType()).getType()));
+        }
+        return p;
+    }
+
+    private J.Unary mapType(J.Unary tree) {
+        J.Unary u = tree;
+        if (isNotFullyQualified(tree.getType())) {
+            if (u.getType() instanceof JavaType.Method) {
+                u = u.withType(((JavaType.Method) u.getType()).getReturnType());
+            }
+//            else {
+                // Type association error, add marker for use in data table.
+//            }
+        }
+        return u;
+    }
+
+    private K.Binary mapType(K.Binary tree) {
+        K.Binary b = tree;
+        if (isNotFullyQualified(b.getType())) {
+            if (b.getType() instanceof JavaType.Method) {
+                b = b.withType(((JavaType.Method) b.getType()).getReturnType());
+            }
+//            else {
+                // Type association error, add marker for use in data table.
+//            }
+        }
+        return b;
+    }
+
+    private K.Unary mapType(K.Unary tree) {
+        K.Unary u = tree;
+//        if (isNotFullyQualified(tree.getType())) {
+            // Type association error, add marker for use in data table.
+//        }
+        return u;
     }
 
     private boolean isNotFullyQualified(@Nullable JavaType type) {
