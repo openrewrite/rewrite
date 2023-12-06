@@ -1190,15 +1190,133 @@ class MavenParserTest implements RewriteTest {
                         <artifactId>d</artifactId>
                         <version>0.1.0-SNAPSHOT</version>
 
-                        <properties>
-                            <maven.compiler.source>1.8</maven.compiler.source>
-                            <maven.compiler.target>1.8</maven.compiler.target>
-                        </properties>
-                    </project>
-                """
-            )
-          )
-        );
+						<properties>
+							<maven.compiler.source>1.8</maven.compiler.source>
+							<maven.compiler.target>1.8</maven.compiler.target>
+						</properties>
+					</project>
+				"""
+			)
+		  )
+		);
+	}
+
+    // a depends on d without specifying version number. a's parent is b
+    // b imports c first into its dependencyManagement section
+    // and b depends on d in its dependencyManagement section; here another version of d is specified
+    // c's dependencyManagement specifies an earlier version of d to use
+    // So if all goes well we will have the version of d from b's dependencyManagement because it's nearest to our pom
+	// and therefore overrides the version from c
+    @Issue("https://github.com/openrewrite/rewrite/issues/3745")
+    @Test
+    void versionConflictBetweenParentAndImportedFromParent() {
+		rewriteRun(
+		  mavenProject("a",
+			pomXml(
+			  """
+					<project>
+						<parent>
+							<groupId>org.openrewrite.maven</groupId>
+							<artifactId>b</artifactId>
+							<version>0.1.0-SNAPSHOT</version>
+							<relativePath />
+						</parent>
+						<artifactId>a</artifactId>
+						<dependencies>
+							<dependency>
+								<groupId>org.openrewrite.maven</groupId>
+								<artifactId>d</artifactId>
+							</dependency>
+						</dependencies>
+					</project>
+				""",
+			  spec -> spec.afterRecipe(pomXml ->
+				assertThat(pomXml.getMarkers().findFirst(MavenResolutionResult.class).orElseThrow().getDependencies()
+				  .get(Scope.Compile).get(0).getVersion())
+				  .isEqualTo("0.2.0-SNAPSHOT")
+			  )
+			)
+		  ),
+		  mavenProject("b",
+			pomXml(
+			  """
+					<project>
+						<modelVersion>4.0.0</modelVersion>
+
+						<artifactId>b</artifactId>
+						<groupId>org.openrewrite.maven</groupId>
+						<version>0.1.0-SNAPSHOT</version>
+						<packaging>pom</packaging>
+
+						<properties>
+							<maven.compiler.source>1.8</maven.compiler.source>
+							<maven.compiler.target>1.8</maven.compiler.target>
+							<version.d>0.2.0-SNAPSHOT</version.d>
+						</properties>
+
+						<dependencyManagement>
+							<dependencies>
+								<dependency>
+									<groupId>org.openrewrite.maven</groupId>
+									<artifactId>c</artifactId>
+									<version>0.1.0-SNAPSHOT</version>
+									<type>pom</type>
+									<scope>import</scope>
+								</dependency>
+								<dependency>
+									<groupId>org.openrewrite.maven</groupId>
+									<artifactId>d</artifactId>
+									<version>${version.d}</version>
+								</dependency>
+							</dependencies>
+						</dependencyManagement>
+					</project>
+				"""
+			)
+		  ),
+		  mavenProject("c",
+			pomXml(
+			  """
+					<project>
+						<modelVersion>4.0.0</modelVersion>
+
+						<artifactId>c</artifactId>
+						<groupId>org.openrewrite.maven</groupId>
+						<version>0.1.0-SNAPSHOT</version>
+						<packaging>pom</packaging>
+
+						<dependencyManagement>
+							<dependencies>
+								<dependency>
+									<groupId>org.openrewrite.maven</groupId>
+									<artifactId>d</artifactId>
+									<version>0.1.0-SNAPSHOT</version>
+								</dependency>
+							</dependencies>
+						</dependencyManagement>
+					</project>
+				"""
+			)
+		  ),
+		  mavenProject("d",
+			pomXml(
+			  """
+					<project>
+						<modelVersion>4.0.0</modelVersion>
+
+						<groupId>org.openrewrite.maven</groupId>
+						<artifactId>d</artifactId>
+						<version>0.1.0-SNAPSHOT</version>
+
+						<properties>
+							<maven.compiler.source>1.8</maven.compiler.source>
+							<maven.compiler.target>1.8</maven.compiler.target>
+						</properties>
+					</project>
+				"""
+			)
+		  )
+		);
     }
 
     @Issue("https://github.com/openrewrite/rewrite/issues/378")
