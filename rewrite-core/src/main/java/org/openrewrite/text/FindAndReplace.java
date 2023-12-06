@@ -43,7 +43,7 @@ public class FindAndReplace extends Recipe {
     String find;
 
     @Option(displayName = "Replace",
-            description = "The replacement text for `find`.",
+            description = "The replacement text for `find`. This supports multiline strings.",
             example = "denylist",
             required = false)
     @Nullable
