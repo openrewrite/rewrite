@@ -44,13 +44,6 @@ public class UnnecessaryTypeParentheses extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new KotlinVisitor<ExecutionContext>() {
-
-            @Override
-            public J visitCompilationUnit(K.CompilationUnit cu, ExecutionContext ctx) {
-                System.out.println(PsiTreePrinter.print(cu));
-                return super.visitCompilationUnit(cu, ctx);
-            }
-
             @Override
             public J visitParenthesizedTypeTree(J.ParenthesizedTypeTree parTree, ExecutionContext ctx) {
                 Space prefix = parTree.getPrefix();
