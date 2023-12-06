@@ -291,7 +291,10 @@ public abstract class Recipe implements Cloneable {
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
+        } else if (!Files.exists(workingDirectory)) {
+            throw new IllegalArgumentException("Working directory does not exist: " + workingDirectory);
         }
+
         try {
             return new RecipeScheduler().scheduleRun(this, before, ctx, maxCycles, minCycles);
         } finally {
