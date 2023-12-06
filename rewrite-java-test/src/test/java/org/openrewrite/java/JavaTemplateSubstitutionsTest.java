@@ -425,6 +425,7 @@ class JavaTemplateSubstitutionsTest implements RewriteTest {
         );
     }
 
+	@Issue("https://github.com/openrewrite/rewrite/issues/3716")
     @Test
     void anyIsGenericWithUnknownType() {
         rewriteRun(

@@ -1045,7 +1045,8 @@ class JavaTemplateTest implements RewriteTest {
         );
     }
 
-    @Test
+	@Issue("https://github.com/openrewrite/rewrite/issues/3716")
+	@Test
     void replaceMethodCallWithGenericParameterWithUnknownType() {
         rewriteRun(
           spec -> spec.parser(JavaParser.fromJavaVersion().classpath("junit-jupiter-api"))
