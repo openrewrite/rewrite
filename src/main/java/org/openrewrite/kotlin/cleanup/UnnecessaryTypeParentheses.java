@@ -20,8 +20,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinVisitor;
-import org.openrewrite.kotlin.internal.PsiTreePrinter;
-import org.openrewrite.kotlin.tree.K;
 
 import java.time.Duration;
 
