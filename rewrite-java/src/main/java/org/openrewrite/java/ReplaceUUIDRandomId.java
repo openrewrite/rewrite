@@ -68,12 +68,22 @@ public class ReplaceUUIDRandomId extends Recipe {
 
     private static class ReplaceUUIDRandomIdVisitor extends JavaIsoVisitor<ExecutionContext> {
         @Override
-        public J.@NotNull Literal visitLiteral(J.@NotNull Literal literal, @NotNull ExecutionContext ctx) {
+        public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
             J.Literal l = super.visitLiteral(literal, ctx);
-            if (l.getValue() instanceof java.util.UUID) {
+
+            // Check if the literal is an argument in an LST constructor call
+            if (isArgumentInLSTConstructorCall(l)) {
+                // Replace UUID.randomUUID() with Tree.randomId()
                 return l.withValue(Tree.randomId());
             }
+
             return l;
+        }
+
+        private boolean isArgumentInLSTConstructorCall(J.Literal literal) {
+            // Check if the literal is a direct argument in an LST constructor call
+            J.NewClass enclosingNewClass = getCursor().firstEnclosing(J.NewClass.class);
+            return enclosingNewClass != null && enclosingNewClass.getArguments().stream().anyMatch(arg -> arg.equals(literal));
         }
     }
 }
