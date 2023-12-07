@@ -1071,4 +1071,72 @@ class AutodetectTest implements RewriteTest {
             assertThat(tabsAndIndents.getContinuationIndent()).isEqualTo(3);
         }
     }
+
+    @Test
+    void useTrailingCommaDetection() {
+        var cus = kp().parse(
+          """
+            class A(
+                val a: Boolean,
+                val b: Boolean,
+            ) {}
+
+            fun method(
+                arg1: String,
+                arg2: String,
+            ) {
+            }
+
+            val x = method(
+                "foo",
+                "bar"
+            )
+
+            val y = method(
+                "x",
+                if (true) "foo" else "bar",
+            )
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var otherStyle = NamedStyles.merge(OtherStyle.class, singletonList(styles));
+        assertThat(otherStyle.getUseTrailingComma()).isTrue();
+    }
+
+    @Test
+    void unuseTrailingCommaDetection() {
+        var cus = kp().parse(
+          """
+            class A(
+                val a: Boolean,
+                val b: Boolean
+            ) {}
+
+            fun method(
+                arg1: String,
+                arg2: String,
+            ) {
+            }
+
+            val x = method(
+                "foo",
+                "bar"
+            )
+
+            val y = method(
+                "x",
+                if (true) "foo" else "bar"
+            )
+            """
+        );
+
+        var detector = Autodetect.detector();
+        cus.forEach(detector::sample);
+        var styles = detector.build();
+        var otherStyle = NamedStyles.merge(OtherStyle.class, singletonList(styles));
+        assertThat(otherStyle.getUseTrailingComma()).isFalse();
+    }
 }

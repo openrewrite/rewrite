@@ -24,9 +24,11 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.marker.TrailingComma;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.kotlin.tree.K;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.style.GeneralFormatStyle;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
@@ -57,12 +59,14 @@ public class Autodetect extends NamedStyles {
         private final SpacesStatistics spacesStatistics = new SpacesStatistics();
         private final WrappingAndBracesStatistics wrappingAndBracesStatistics = new WrappingAndBracesStatistics();
         private final GeneralFormatStatistics generalFormatStatistics = new GeneralFormatStatistics();
+        private final TrailingCommaStatistics trailingCommaStatistics = new TrailingCommaStatistics();
 
         private final FindImportLayout findImportLayout = new FindImportLayout();
         private final FindIndentJavaVisitor findIndent = new FindIndentJavaVisitor();
         private final FindSpacesStyle findSpaces = new FindSpacesStyle();
         private final FindWrappingAndBracesStyle findWrappingAndBraces = new FindWrappingAndBracesStyle();
         private final FindLineFormatJavaVisitor findLineFormat = new FindLineFormatJavaVisitor();
+        private final FindTrailingCommaVisitor findTrailingComma = new FindTrailingCommaVisitor();
 
         public void sample(SourceFile cu) {
             if(cu instanceof JavaSourceFile) {
@@ -71,6 +75,7 @@ public class Autodetect extends NamedStyles {
                 findSpaces.visitNonNull(cu, spacesStatistics);
                 findWrappingAndBraces.visitNonNull(cu, wrappingAndBracesStatistics);
                 findLineFormat.visitNonNull(cu, generalFormatStatistics);
+                findTrailingComma.visitNonNull(cu, trailingCommaStatistics);
             }
         }
 
@@ -80,7 +85,9 @@ public class Autodetect extends NamedStyles {
                     findImportLayout.getImportLayoutStyle(),
                     spacesStatistics.getSpacesStyle(),
                     wrappingAndBracesStatistics.getWrappingAndBracesStyle(),
-                    generalFormatStatistics.getFormatStyle()));
+                    generalFormatStatistics.getFormatStyle(),
+                    trailingCommaStatistics.getOtherStyle()
+                    ));
         }
     }
 
@@ -252,6 +259,16 @@ public class Autodetect extends NamedStyles {
                     new TabsAndIndentsStyle.FunctionDeclarationParameters(
                             multilineAlignedToFirstArgument >= multilineNotAlignedToFirstArgument)
             );
+        }
+    }
+
+    private static class TrailingCommaStatistics {
+        private long usedTrailingCommaCount = 0;
+        private long unusedTrailingCommaCount = 0;
+
+        public OtherStyle getOtherStyle() {
+            boolean useTrailingComma = usedTrailingCommaCount > unusedTrailingCommaCount;
+            return new OtherStyle(useTrailingComma);
         }
     }
 
@@ -498,6 +515,38 @@ public class Autodetect extends NamedStyles {
                         stats.spaceContinuationIndentFrequencies.record(depth, stats.getContinuationDepth(), spaceIndent);
                         stats.tabContinuationIndentFrequencies.record(depth, stats.getContinuationDepth(), tabIndent);
                     }
+                }
+            }
+        }
+    }
+
+    private static class FindTrailingCommaVisitor extends KotlinIsoVisitor<TrailingCommaStatistics> {
+        @Override
+        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, TrailingCommaStatistics statistics) {
+            J.MethodDeclaration m = super.visitMethodDeclaration(method, statistics);
+            sample(m.getPadding().getParameters(), statistics);
+            return m;
+        }
+
+        @Override
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, TrailingCommaStatistics statistics) {
+            J.MethodInvocation m = super.visitMethodInvocation(method, statistics);
+            sample(m.getPadding().getArguments(), statistics);
+            return m;
+        }
+
+        private <T extends J> void sample(JContainer<T> container, TrailingCommaStatistics statistics) {
+            List<JRightPadded<T>> rps = container.getPadding().getElements();
+
+            if (!rps.isEmpty()) {
+                JRightPadded<T> last = rps.get(rps.size() - 1);
+
+                Markers markers = last.getMarkers();
+                Optional<TrailingComma> maybeTrailingComma = markers.findFirst(TrailingComma.class);
+                if (maybeTrailingComma.isPresent()) {
+                    statistics.usedTrailingCommaCount++;
+                } else {
+                    statistics.unusedTrailingCommaCount++;
                 }
             }
         }
