@@ -608,7 +608,6 @@ public class GroovyParserVisitor {
         public void visitArgumentlistExpression(ArgumentListExpression expression) {
             List<JRightPadded<Expression>> args = new ArrayList<>(expression.getExpressions().size());
 
-            int saveCursor = cursor;
             Space beforeOpenParen = whitespace();
 
             org.openrewrite.java.marker.OmitParentheses omitParentheses = null;
@@ -616,8 +615,6 @@ public class GroovyParserVisitor {
                 cursor++;
             } else {
                 omitParentheses = new org.openrewrite.java.marker.OmitParentheses(randomId());
-                beforeOpenParen = EMPTY;
-                cursor = saveCursor;
             }
 
             List<org.codehaus.groovy.ast.expr.Expression> unparsedArgs = expression.getExpressions();
@@ -641,7 +638,7 @@ public class GroovyParserVisitor {
             } else if (!unparsedArgs.isEmpty() && unparsedArgs.get(0) instanceof MapExpression) {
                 // The map literal may or may not be wrapped in "[]"
                 // If it is wrapped in "[]" then this isn't a named arguments situation and we should not lift the parameters out of the enclosing MapExpression
-                saveCursor = cursor;
+                int saveCursor = cursor;
                 whitespace();
                 boolean isOpeningBracketPresent = '[' == source.charAt(cursor);
                 cursor = saveCursor;
@@ -688,14 +685,12 @@ public class GroovyParserVisitor {
             if (unparsedArgs.isEmpty()) {
                 Expression element = new J.Empty(randomId(),
                         omitParentheses == null ? sourceBefore(")") : EMPTY, Markers.EMPTY);
-                if (omitParentheses != null) {
-                    element = element.withMarkers(element.getMarkers().add(omitParentheses));
-                }
-
                 args.add(JRightPadded.build(element));
             }
 
-            queue.add(JContainer.build(beforeOpenParen, args, Markers.EMPTY));
+            queue.add(JContainer.build(beforeOpenParen, args, omitParentheses != null ?
+                    Markers.EMPTY.add(omitParentheses) : Markers.EMPTY)
+            );
         }
 
         @Override

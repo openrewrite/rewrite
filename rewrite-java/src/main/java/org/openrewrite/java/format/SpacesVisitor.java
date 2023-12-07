@@ -20,6 +20,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.marker.OmitParentheses;
 import org.openrewrite.java.style.EmptyForInitializerPadStyle;
 import org.openrewrite.java.style.EmptyForIteratorPadStyle;
 import org.openrewrite.java.style.SpacesStyle;
@@ -69,6 +70,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     <T> JContainer<T> spaceBefore(JContainer<T> container, boolean spaceBefore) {
+        spaceBefore = spaceBefore || container.getMarkers().findFirst(OmitParentheses.class).isPresent();
         if (!container.getBefore().getComments().isEmpty()) {
             // Perform the space rule for the suffix of the last comment only. Same as IntelliJ.
             List<Comment> comments = spaceLastCommentSuffix(container.getBefore().getComments(), spaceBefore);
