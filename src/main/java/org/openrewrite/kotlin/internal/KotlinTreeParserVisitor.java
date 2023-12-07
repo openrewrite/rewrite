@@ -2452,7 +2452,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         ASTNode node = importDirective.getNode().findChildByType(KtTokens.IMPORT_KEYWORD);
         LeafPsiElement importPsi = (LeafPsiElement) node;
 
-        PsiElement first = findFirstNonSpaceNextSibling(importPsi);
+        PsiElement first = PsiTreeUtil.skipWhitespacesAndCommentsForward(importPsi);
         PsiElement last = findLastChild(importDirective, psi -> !(psi instanceof KtImportAlias) &&
                                                                 !isSpace(psi.getNode()) &&
                                                                 psi.getNode().getElementType() != KtTokens.SEMICOLON);
@@ -3677,7 +3677,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             return new JRightPadded<>(j, prefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
         }
 
-        maybeSemicolon = findFirstNonSpaceNextSibling(element);
+        maybeSemicolon = PsiTreeUtil.skipWhitespacesAndCommentsForward(element);
         if (maybeSemicolon instanceof LeafPsiElement && ((LeafPsiElement) maybeSemicolon).getElementType() == KtTokens.SEMICOLON) {
             return new JRightPadded<>(j, deepPrefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
         }
@@ -3686,7 +3686,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     private <J2 extends J> JRightPadded<J2> maybeFollowingSemicolon(J2 j, KtElement element) {
-        PsiElement maybeSemicolon = findFirstNonSpaceNextSibling(element);
+        PsiElement maybeSemicolon = PsiTreeUtil.skipWhitespacesAndCommentsForward(element);
         if (isSemicolon(maybeSemicolon)) {
             return new JRightPadded<>(j, deepPrefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
         }
@@ -3803,35 +3803,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return null;
     }
 
-    @Nullable
-    private PsiElement findFirstNonSpacePrevSibling(@Nullable PsiElement element) {
-        if (element == null) {
-            return null;
-        }
-
-        PsiElement pre = element.getPrevSibling();
-        while (pre != null) {
-            if (!isSpace(pre.getNode())) {
-                return pre;
-            }
-            pre = pre.getPrevSibling();
-        }
-
-        return null;
-    }
-
-    @Nullable
-    private PsiElement findFirstNonSpaceNextSibling(@Nullable PsiElement element) {
-        if (element == null) {
-            return null;
-        }
-        PsiElement next = element.getNextSibling();
-        while (next != null && isSpace(next.getNode())) {
-            next = next.getNextSibling();
-        }
-        return next;
-    }
-
     private Space suffix(@Nullable PsiElement element) {
         if (element == null) {
             return Space.EMPTY;
@@ -3873,7 +3844,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     private Space endFixPrefixAndInfix(@Nullable PsiElement element) {
-        return merge(endFix(findFirstNonSpacePrevSibling(element)), prefixAndInfix(element, null));
+        return merge(endFix(PsiTreeUtil.skipWhitespacesAndCommentsBackward(element)), prefixAndInfix(element, null));
     }
 
     private Space deepPrefix(@Nullable PsiElement element) {
