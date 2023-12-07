@@ -15,12 +15,14 @@
  */
 package org.openrewrite.java.search;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.java.Assertions.java;
 import static org.openrewrite.java.Assertions.version;
+import static org.openrewrite.test.SourceSpecs.text;
 
 class HasJavaVersionTest implements RewriteTest {
 
@@ -61,4 +63,23 @@ class HasJavaVersionTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void declarativePrecondition() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml("""
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            name: org.openrewrite.PreconditionTest
+            preconditions:
+              - org.openrewrite.java.search.HasJavaVersion:
+                  version: 11
+            recipeList:
+              - org.openrewrite.text.ChangeText:
+                 toText: 2
+            """, "org.openrewrite.PreconditionTest"),
+          text("1")
+        );
+    }
+
 }
