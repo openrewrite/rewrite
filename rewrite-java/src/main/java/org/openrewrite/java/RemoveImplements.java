@@ -99,7 +99,11 @@ public class RemoveImplements extends Recipe {
                     return super.visitMethodDeclaration(md, context);
                 }
                 JavaType.Class cdt = (JavaType.Class) maybeClassType;
-                md = md.withMethodType(md.getMethodType().withDeclaringType(cdt));
+                JavaType.Method mt = md.getMethodType().withDeclaringType(cdt);
+                md = md.withMethodType(mt);
+                if (md.getName().getType() != null) {
+                    md = md.withName(md.getName().withType(mt));
+                }
                 if (md.getAllAnnotations().stream().noneMatch(ann -> isOfClassType(ann.getType(), "java.lang.Override")) || TypeUtils.isOverride(md.getMethodType())) {
                     return super.visitMethodDeclaration(md, context);
                 }
