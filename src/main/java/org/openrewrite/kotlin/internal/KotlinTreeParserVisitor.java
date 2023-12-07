@@ -1255,12 +1255,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         if (typeAlias.getTypeParameterList() != null) {
             typeExpression = (TypeTree) typeAlias.getTypeParameterList().accept(this, data);
-
-            if (typeExpression instanceof J.ParameterizedType) {
-                typeExpression = mapType(typeExpression);
-                Space prefix = name.getPrefix();
-                typeExpression = ((J.ParameterizedType) typeExpression).withClazz(name.withPrefix(Space.EMPTY).withPrefix(prefix));
-            }
         }
 
         Expression expr = convertToExpression(typeAlias.getTypeReference().accept(this, data));
