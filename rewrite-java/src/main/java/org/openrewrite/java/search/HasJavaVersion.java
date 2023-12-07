@@ -19,9 +19,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.marker.JavaVersion;
-import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaSourceFile;
 import org.openrewrite.marker.SearchResult;
 import org.openrewrite.semver.Semver;
@@ -69,9 +67,9 @@ public class HasJavaVersion extends Recipe {
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         VersionComparator versionComparator = requireNonNull(Semver.validate(version, null).getValue());
-        return new JavaIsoVisitor<ExecutionContext>() {
+        return new TreeVisitor<Tree, ExecutionContext>() {
             @Override
-            public J visit(@Nullable Tree tree, ExecutionContext ctx) {
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof JavaSourceFile) {
                     JavaSourceFile cu = (JavaSourceFile) requireNonNull(tree);
                     return cu.getMarkers().findFirst(JavaVersion.class)
@@ -82,7 +80,7 @@ public class HasJavaVersion extends Recipe {
                             .map(version -> SearchResult.found(cu))
                             .orElse(cu);
                 }
-                return (J) tree;
+                return tree;
             }
         };
     }
