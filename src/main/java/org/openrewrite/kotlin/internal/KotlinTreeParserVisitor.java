@@ -4256,7 +4256,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         return space;
     }
 
-    private static Space merge(@Nullable Space s1, @Nullable Space s2) {
+    public static Space merge(@Nullable Space s1, @Nullable Space s2) {
         if (s1 == null || s1.isEmpty()) {
             return s2 != null ? s2 : Space.EMPTY;
         } else if (s2 == null || s2.isEmpty()) {

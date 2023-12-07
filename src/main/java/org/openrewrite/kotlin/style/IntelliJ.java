@@ -108,4 +108,7 @@ public class IntelliJ extends NamedStyles {
         );
     }
 
+    public static OtherStyle other() {
+        return new OtherStyle(false);
+    }
 }

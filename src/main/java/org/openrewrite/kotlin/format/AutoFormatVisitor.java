@@ -122,6 +122,8 @@ public class AutoFormatVisitor<P> extends KotlinIsoVisitor<P> {
                     stopAfter
             ).visit(t, p);
 
+            t = (JavaSourceFile) new TrailingCommaVisitor<>(IntelliJ.other().getUseTrailingComma()).visit(t, p);
+
             assert t != null;
             return t;
         }
