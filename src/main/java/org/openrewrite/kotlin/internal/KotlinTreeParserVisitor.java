@@ -194,7 +194,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         JContainer<Expression> args = JContainer.build(Space.EMPTY, expressions, markers);
-        return new J.MethodInvocation(
+        return mapType(new J.MethodInvocation(
                 randomId(),
                 prefix(expression),
                 markers,
@@ -203,7 +203,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 name,
                 args,
                 type
-        );
+        ));
     }
 
     @Override
@@ -2370,7 +2370,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         padLeft(suffix(expression.getReceiverExpression()), (J.Identifier) pt.getClazz()),
                         pt.getType()
                 ));
-                return pt.withClazz(newName).withPrefix(prefix);
+                return mapType(pt.withClazz(newName).withPrefix(prefix));
             } else if (j instanceof J.MethodInvocation) {
                 J.MethodInvocation m = (J.MethodInvocation) j;
                 return m.getPadding().withSelect(padRight(receiver, suffix(expression.getReceiverExpression())))
@@ -3307,7 +3307,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         JContainer<Expression> args = JContainer.build(Space.EMPTY, expressions, paramMarkers);
         JavaType.Method methodType = methodInvocationType(expression);
 
-        return new J.MethodInvocation(
+        return mapType(new J.MethodInvocation(
                 randomId(),
                 prefix(expression),
                 markers,
@@ -3316,7 +3316,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 name,
                 args,
                 methodType
-        );
+        ));
     }
 
     private J.ControlParentheses<Expression> buildIfCondition(KtIfExpression expression) {
@@ -3482,19 +3482,11 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
     }
 
     private J.MethodDeclaration mapType(J.MethodDeclaration tree) {
-        J.MethodDeclaration m = tree;
-        if (!(m.getName().getType() instanceof JavaType.Method)) {
-            m = m.withName(m.getName().withType(m.getMethodType()));
-        }
-        return m;
+        return tree.withName(tree.getName().withType(tree.getMethodType()));
     }
 
     private J.MethodInvocation mapType(J.MethodInvocation tree) {
-        J.MethodInvocation m = tree;
-        if (!(m.getName().getType() instanceof JavaType.Method)) {
-            m = m.withName(m.getName().withType(m.getMethodType()));
-        }
-        return m;
+        return tree.withName(tree.getName().withType(tree.getMethodType()));
     }
 
     private J.NewClass mapType(J.NewClass tree) {

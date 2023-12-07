@@ -450,11 +450,11 @@ public class KotlinTypeMappingTest {
                   """, spec -> spec.afterRecipe(cu -> {
                     AtomicBoolean found = new AtomicBoolean(false);
                     new KotlinIsoVisitor<AtomicBoolean>() {
-                        final MethodMatcher matcher = new MethodMatcher("kotlin.Function1 invoke(..)");
+                        final MethodMatcher matcher = new MethodMatcher("kotlin.Function1 block(..)");
                         @Override
                         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, AtomicBoolean atomicBoolean) {
                             if (matcher.matches(method)) {
-                                assertThat(method.getMethodType().toString()).isEqualTo("kotlin.Function1<kotlin.collections.Collection<kotlin.Any>, kotlin.Unit>{name=invoke,return=kotlin.Unit,parameters=[kotlin.collections.Collection<kotlin.Any>]}");
+                                assertThat(method.getMethodType().toString()).isEqualTo("kotlin.Function1<kotlin.collections.Collection<kotlin.Any>, kotlin.Unit>{name=block,return=kotlin.Unit,parameters=[kotlin.collections.Collection<kotlin.Any>]}");
                                 found.set(true);
                             }
                             return super.visitMethodInvocation(method, atomicBoolean);
@@ -1268,6 +1268,29 @@ public class KotlinTypeMappingTest {
                             assertThat(String.valueOf(annotation.getType().toString())).isEqualTo(type);
                             found.set(true);
                             return super.visitAnnotation(annotation, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/506")
+        @Test
+        void methodTypeOnMethodInvocation() {
+            //noinspection RemoveRedundantBackticks
+            rewriteRun(
+              kotlin(
+                "val arr = listOf(1, 2, 3)",
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+                            assertThat(method.getName().getType()).isEqualTo(method.getMethodType());
+                            found.set(true);
+                            return super.visitMethodInvocation(method, integer);
                         }
                     }.visit(cu, 0);
                     assertThat(found.get()).isTrue();
