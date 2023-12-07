@@ -156,6 +156,9 @@ public class DependencyUseMapNotation extends Recipe {
                     return m;
                 }
                 mtype = mtype.withParameterTypes(singletonList(JavaType.ShallowClass.build("java.util.Map")));
+                if (m.getName().getType() != null) {
+                    m = m.withName(m.getName().withType(mtype));
+                }
                 return m.withMethodType(mtype);
             }
         });

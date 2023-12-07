@@ -186,11 +186,14 @@ public class ReorderMethodArguments extends Recipe {
                 }
 
                 if (changed) {
+                    JavaType.Method mt = m.getMethodType()
+                            .withParameterNames(reorderedNames)
+                            .withParameterTypes(reorderedTypes);
                     m = withPaddedArguments(m, reordered)
-                            .withMethodType(m.getMethodType()
-                                    .withParameterNames(reorderedNames)
-                                    .withParameterTypes(reorderedTypes)
-                            );
+                            .withMethodType(mt);
+                    if (m instanceof J.MethodInvocation && ((J.MethodInvocation) m).getName().getType() != null) {
+                        m = ((J.MethodInvocation) m).withName(((J.MethodInvocation) m).getName().withType(mt));
+                    }
                 }
             }
             return m;

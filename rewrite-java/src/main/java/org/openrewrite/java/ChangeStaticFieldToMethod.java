@@ -116,8 +116,14 @@ public class ChangeStaticFieldToMethod extends Recipe {
                     throw new IllegalArgumentException("Error while changing a static field to a method. The generated template using a the new class ["
                                                        + newClass + "] and the method [" + newMethodName + "] resulted in a null method type.");
                 }
-                return tree.getType() == null ? method :
-                        method.withMethodType(method.getMethodType().withReturnType(tree.getType()));
+                if (tree.getType() != null) {
+                    JavaType.Method mt = method.getMethodType().withReturnType(tree.getType());
+                    method = method.withMethodType(mt);
+                    if (method.getName().getType() != null) {
+                        method = method.withName(method.getName().withType(mt));
+                    }
+                }
+                return method;
             }
 
             @NonNull
