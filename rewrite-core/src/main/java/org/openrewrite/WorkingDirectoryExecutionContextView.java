@@ -23,37 +23,47 @@ import java.util.stream.Stream;
 
 public class WorkingDirectoryExecutionContextView extends DelegatingExecutionContext implements AutoCloseable {
     private static final String WORKING_DIRECTORY = "org.openrewrite.workingDirectory";
+    private final boolean create;
 
-    public WorkingDirectoryExecutionContextView(ExecutionContext delegate) {
+    private WorkingDirectoryExecutionContextView(ExecutionContext delegate, boolean create) {
         super(delegate);
+        this.create = create;
     }
 
-    public static WorkingDirectoryExecutionContextView view(ExecutionContext ctx) {
+    public static WorkingDirectoryExecutionContextView create(ExecutionContext ctx) {
         if (ctx instanceof WorkingDirectoryExecutionContextView) {
             return (WorkingDirectoryExecutionContextView) ctx;
         }
-        return new WorkingDirectoryExecutionContextView(ctx);
+        return new WorkingDirectoryExecutionContextView(ctx, true);
     }
 
-    public WorkingDirectoryExecutionContextView setWorkingDirectory(Path directory) {
-        putMessage(WORKING_DIRECTORY, directory);
-        return this;
+    public static WorkingDirectoryExecutionContextView useExisting(ExecutionContext ctx, Path dir) {
+        if (ctx instanceof WorkingDirectoryExecutionContextView) {
+            return (WorkingDirectoryExecutionContextView) ctx;
+        }
+        ctx.putMessage(WORKING_DIRECTORY, dir);
+        return new WorkingDirectoryExecutionContextView(ctx, false);
     }
 
     public Path getWorkingDirectory() {
         Path workingDirectory = getMessage(WORKING_DIRECTORY);
-        if (workingDirectory == null) {
+        if (workingDirectory == null && create) {
             try {
-                workingDirectory = Files.createTempDirectory("recipe-execution-dir");
+                putMessage(WORKING_DIRECTORY, workingDirectory = Files.createTempDirectory("recipe-wd"));
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
+        } else if (workingDirectory == null) {
+            throw new IllegalStateException("Working directory not set");
         }
         return workingDirectory;
     }
 
-    public void deleteWorkingDirectory() {
-        delete(getWorkingDirectory());
+    @Override
+    public void close() {
+        if (create) {
+            delete(getWorkingDirectory());
+        }
     }
 
     private void delete(Path path) {
@@ -66,10 +76,5 @@ public class WorkingDirectoryExecutionContextView extends DelegatingExecutionCon
             Files.delete(path);
         } catch (IOException ignore) {
         }
-    }
-
-    @Override
-    public void close() {
-        deleteWorkingDirectory();
     }
 }
