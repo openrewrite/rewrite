@@ -391,6 +391,7 @@ public class PsiTreePrinter {
                 tree instanceof J.If ||
                 tree instanceof J.If.Else ||
                 tree instanceof J.EnumValueSet ||
+                tree instanceof J.ParenthesizedTypeTree ||
                 tree instanceof J.TypeParameter ||
                 tree instanceof K.ClassDeclaration ||
                 tree instanceof K.CompilationUnit ||

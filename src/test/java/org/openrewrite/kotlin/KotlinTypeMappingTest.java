@@ -574,7 +574,7 @@ public class KotlinTypeMappingTest {
           "n++~kotlin.Int",
           "--n~kotlin.Int",
           "n += a~kotlin.Int",
-          "n = a + b~kotlin.Int{name=plus,return=kotlin.Int,parameters=[kotlin.Int]}"
+          "n = a + b~kotlin.Int"
         }, delimiter = '~')
         void operatorOverload(String p1, String p2) {
             rewriteRun(
@@ -607,7 +607,7 @@ public class KotlinTypeMappingTest {
 
                         @Override
                         public J.Binary visitBinary(J.Binary binary, AtomicBoolean b) {
-                            JavaType.Method mt = (JavaType.Method) binary.getType();
+                            JavaType.Class mt = (JavaType.Class) binary.getType();
                             if (p2.equals(mt.toString())) {
                                 found.set(true);
                             }
@@ -686,31 +686,110 @@ public class KotlinTypeMappingTest {
                       val b = 1 !in listOf(2)
                       val a = 1 !in Foo()
                   }
+                  """, spec -> spec.afterRecipe(cu -> new KotlinIsoVisitor<Integer>() {
+                      @Override
+                      public K.Binary visitBinary(K.Binary binary, Integer integer) {
+                          JavaType type = binary.getType();
+                          assertThat(type).isInstanceOf(JavaType.Class.class);
+                          assertThat(((JavaType.Class) type).getFullyQualifiedName()).isEqualTo("kotlin.Boolean");
+                          return binary;
+                      }
+                  }.visit(cu, 0))
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/464")
+        @Test
+        void fieldAccessOnSuperType() {
+            rewriteRun(
+              kotlin(
+                """
+                  open class A {
+                      val id: Int = 0
+                  }
+                  class B : A() {
+                      fun get(): Int {
+                          return super.id
+                      }
+                  }
                   """, spec -> spec.afterRecipe(cu -> {
-                    MethodMatcher kotlinCollection = new MethodMatcher("kotlin.collections.List contains(..)");
-                    AtomicBoolean kotlinCollectionFound = new AtomicBoolean(false);
-                    MethodMatcher operatorOverload = new MethodMatcher("Foo contains(..)");
-                    AtomicBoolean operatorOverloadFound = new AtomicBoolean(false);
+                    AtomicBoolean found = new AtomicBoolean(false);
                     new KotlinIsoVisitor<Integer>() {
                         @Override
-                        public K.Binary visitBinary(K.Binary binary, Integer integer) {
-                            JavaType.Method methodType = (JavaType.Method) binary.getType();
-                            if (kotlinCollection.matches(methodType)) {
-                                assertThat(methodType.toString())
-                                  .isEqualTo("kotlin.collections.List<kotlin.Int>{name=contains,return=kotlin.Boolean,parameters=[kotlin.Int]}");
-                                kotlinCollectionFound.set(true);
-                            }
-                            if (operatorOverload.matches(methodType)) {
-                                assertThat(methodType.toString())
-                                  .isEqualTo("Foo{name=contains,return=kotlin.Boolean,parameters=[kotlin.Int]}");
-                                operatorOverloadFound.set(true);
-                            }
-                            return binary;
+                        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer integer) {
+                            assertThat(fieldAccess.getType().toString()).isEqualTo("kotlin.Int");
+                            found.set(true);
+                            return super.visitFieldAccess(fieldAccess, integer);
                         }
                     }.visit(cu, 0);
-                    assertThat(kotlinCollectionFound.get()).isTrue();
-                    assertThat(operatorOverloadFound.get()).isTrue();
+                    assertThat(found.get()).isTrue();
                 })
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/464")
+        @Test
+        void parameterizedType() {
+            rewriteRun(
+              kotlin(
+                """
+                  import java.util.ArrayList
+                  
+                  class Foo {
+                      val l: ArrayList<String> = ArrayList<String>()
+                  }
+                  """, spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.ParameterizedType visitParameterizedType(J.ParameterizedType type, Integer integer) {
+                            assertThat(type.getType().toString()).isEqualTo("java.util.ArrayList<kotlin.String>");
+                            assertThat(type.getClazz().getType().toString()).isEqualTo("java.util.ArrayList");
+                            found.set(true);
+                            return super.visitParameterizedType(type, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
+
+        @SuppressWarnings("UnusedReceiverParameter")
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/464")
+        @Test
+        void parameterizedReceiver() {
+            rewriteRun(
+              kotlin(
+                """
+                  class SomeParameterized<T>
+                  val SomeParameterized < Int > . receivedMember : Int
+                      get ( ) = 42
+                  """, spec -> spec.afterRecipe(cu -> new KotlinIsoVisitor<Integer>() {
+                      @Override
+                      public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, Integer integer) {
+                          assertThat(classDecl.getType().toString()).isEqualTo("SomeParameterized<Generic{T}>");
+                          assertThat(classDecl.getName().getType().toString()).isEqualTo("SomeParameterized<Generic{T}>");
+                          return super.visitClassDeclaration(classDecl, integer);
+                      }
+
+                      @Override
+                      public K.Property visitProperty(K.Property property, Integer integer) {
+                          assertThat(property.getReceiver().getType().toString()).isEqualTo("SomeParameterized<kotlin.Int>");
+                          assertThat(((J.ParameterizedType) property.getReceiver()).getClazz().getType().toString()).isEqualTo("SomeParameterized");
+                          return super.visitProperty(property, integer);
+                      }
+
+                      @Override
+                      public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Integer integer) {
+                          assertThat(variable.getVariableType().toString()).isEqualTo("openRewriteFile0Kt{name=receivedMember,type=kotlin.Int}");
+                          assertThat(variable.getName().getType().toString()).isEqualTo("kotlin.Int");
+                          assertThat(variable.getName().getFieldType().toString()).isEqualTo("openRewriteFile0Kt{name=receivedMember,type=kotlin.Int}");
+                          return super.visitVariable(variable, integer);
+                      }
+                  }.visit(cu, 0))
               )
             );
         }
@@ -736,7 +815,7 @@ public class KotlinTypeMappingTest {
                         @Override
                         public J.NewClass visitNewClass(J.NewClass newClass, AtomicBoolean found) {
                             if ("Triple".equals(((J.Identifier) newClass.getClazz()).getSimpleName())) {
-                                assertThat(newClass.getClazz().getType().toString()).isEqualTo("kotlin.Triple<kotlin.Int, kotlin.Int, kotlin.Int>");
+                                assertThat(newClass.getClazz().getType().toString()).isEqualTo("kotlin.Triple");
                                 assertThat(newClass.getConstructorType().toString()).isEqualTo("kotlin.Triple<kotlin.Int, kotlin.Int, kotlin.Int>{name=<constructor>,return=kotlin.Triple<kotlin.Int, kotlin.Int, kotlin.Int>,parameters=[kotlin.Int,kotlin.Int,kotlin.Int]}");
                             }
                             return super.visitNewClass(newClass, found);
@@ -1100,6 +1179,95 @@ public class KotlinTypeMappingTest {
                                 found.set(true);
                             }
                             return super.visitMethodInvocation(method, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/493")
+        @Test
+        void escapedImport() {
+            //noinspection RemoveRedundantBackticks
+            rewriteRun(
+              kotlin(
+                """
+                  @file:Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+                  import `java`.`util`.`List`
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
+                            assertThat(identifier.getSimpleName().startsWith("`")).isFalse();
+                            return super.visitIdentifier(identifier, integer);
+                        }
+
+                        @Override
+                        public J.Import visitImport(J.Import _import, Integer integer) {
+                            assertThat(_import.getQualid().getType().toString()).isEqualTo("java.util.List");
+                            found.set(true);
+                            return super.visitImport(_import, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
+
+        @SuppressWarnings("SuspiciousCallableReferenceInLambda")
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/485")
+        @Test
+        void memberReference() {
+            //noinspection RemoveRedundantBackticks
+            rewriteRun(
+              kotlin(
+                """
+                  class Test ( val answer : Int )
+                  fun method ( ) {
+                      val l = listOf ( Test ( 42 ) )
+                      l . map { Test :: answer }
+                  }
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.MemberReference visitMemberReference(J.MemberReference memberRef, Integer integer) {
+                            assertThat(memberRef.getType().toString()).isEqualTo("kotlin.reflect.KProperty1<Test, kotlin.Int>");
+                            found.set(true);
+                            return super.visitMemberReference(memberRef, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/485")
+        @ParameterizedTest
+        @CsvSource(value = {
+          "fun foo(l: MutableList<String>) { @Suppress l += \"x\" }~kotlin.Suppress",
+          "val releaseDates: List< @Suppress String > = emptyList()~kotlin.Suppress"
+        }, delimiter = '~')
+        void annotationOnKotlinConeType(String input, String type) {
+            //noinspection RemoveRedundantBackticks
+            rewriteRun(
+              kotlin(
+                String.format("%s", input),
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.Annotation visitAnnotation(J.Annotation annotation, Integer integer) {
+                            assertThat(String.valueOf(annotation.getType().toString())).isEqualTo(type);
+                            found.set(true);
+                            return super.visitAnnotation(annotation, integer);
                         }
                     }.visit(cu, 0);
                     assertThat(found.get()).isTrue();

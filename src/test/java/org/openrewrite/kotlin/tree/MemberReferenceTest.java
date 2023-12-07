@@ -21,7 +21,7 @@ import org.openrewrite.test.RewriteTest;
 
 import static org.openrewrite.kotlin.Assertions.kotlin;
 
-class MethodReferenceTest implements RewriteTest {
+class MemberReferenceTest implements RewriteTest {
 
     @Test
     void fieldReference() {

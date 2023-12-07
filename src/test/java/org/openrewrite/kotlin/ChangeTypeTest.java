@@ -88,6 +88,34 @@ class ChangeTypeTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/493")
+    @Test
+    void changeEscapedImport() {
+        rewriteRun(
+          kotlin(
+            """
+              package a.b
+              class Original
+              """),
+          kotlin(
+            """
+              import a.b.`Original`
+              
+              class A {
+                  val type : Original = Original()
+              }
+              """,
+            """
+              import x.y.Target
+              
+              class A {
+                  val type : Target = Target()
+              }
+              """
+          )
+        );
+    }
+
     @Test
     void changeImportAlias() {
         rewriteRun(
