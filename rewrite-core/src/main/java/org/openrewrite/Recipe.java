@@ -33,16 +33,11 @@ import org.openrewrite.table.SourcesFileResults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.*;
-import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.internal.RecipeIntrospectionUtils.dataTableDescriptorFromDataTable;
@@ -283,35 +278,7 @@ public abstract class Recipe implements Cloneable {
     }
 
     public final RecipeRun run(LargeSourceSet before, ExecutionContext ctx, int maxCycles, int minCycles) {
-        Path workingDirectory = ctx.getMessage(ExecutionContext.WORKING_DIRECTORY);
-        if (workingDirectory == null) {
-            try {
-                workingDirectory = Files.createTempDirectory("recipe-run");
-                ctx.putMessage(ExecutionContext.WORKING_DIRECTORY, workingDirectory);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        } else if (!Files.exists(workingDirectory)) {
-            throw new IllegalArgumentException("Working directory does not exist: " + workingDirectory);
-        }
-
-        try {
-            return new RecipeScheduler().scheduleRun(this, before, ctx, maxCycles, minCycles);
-        } finally {
-            delete(workingDirectory);
-        }
-    }
-
-    private void delete(Path path) {
-        try {
-            if (Files.isDirectory(path)) {
-                try (Stream<Path> files = Files.list(path)) {
-                    files.forEach(this::delete);
-                }
-            }
-            Files.delete(path);
-        } catch (IOException ignore) {
-        }
+        return new RecipeScheduler().scheduleRun(this, before, ctx, maxCycles, minCycles);
     }
 
     public Validated<Object> validate(ExecutionContext ctx) {
