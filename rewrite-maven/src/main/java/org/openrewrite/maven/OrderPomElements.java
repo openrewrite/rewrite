@@ -24,38 +24,9 @@ import org.openrewrite.xml.tree.Xml;
 import java.time.Duration;
 import java.util.*;
 
-public class OrderPomElements extends Recipe {
-    private static final List<String> REQUIRED_ORDER = Arrays.asList(
-            "modelVersion",
-            "parent",
-            "groupId",
-            "artifactId",
-            "version",
-            "packaging",
-            "name",
-            "description",
-            "url",
-            "inceptionYear",
-            "organization",
-            "licenses",
-            "developers",
-            "contributors",
-            "mailingLists",
-            "prerequisites",
-            "modules",
-            "scm",
-            "issueManagement",
-            "ciManagement",
-            "distributionManagement",
-            "properties",
-            "dependencyManagement",
-            "dependencies",
-            "repositories",
-            "pluginRepositories",
-            "build",
-            "reporting",
-            "profiles");
+import static org.openrewrite.maven.MavenTagInsertionComparator.canonicalOrdering;
 
+public class OrderPomElements extends Recipe {
     @Override
     public String getDisplayName() {
         return "Order POM elements";
@@ -116,7 +87,7 @@ public class OrderPomElements extends Recipe {
 
                     List<Content> updatedOrder = new ArrayList<>(root.getContent().size());
                     // Apply required order.
-                    for (String order : REQUIRED_ORDER) {
+                    for (String order : canonicalOrdering) {
                         if (groupedContents.containsKey(order)) {
                             updatedOrder.addAll(groupedContents.get(order));
                             groupedContents.remove(order);

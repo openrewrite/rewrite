@@ -18,8 +18,8 @@ package org.openrewrite.yaml;
 import lombok.EqualsAndHashCode;
 import lombok.Value;
 import org.intellij.lang.annotations.Language;
-import org.junit.platform.commons.util.StringUtils;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -84,7 +84,6 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
         }
         return emptyList();
     }
-
 
     @Override
     public TreeVisitor<?, ExecutionContext> getVisitor(AtomicBoolean created) {

@@ -20,7 +20,6 @@ import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import okhttp3.mockwebserver.RecordedRequest;
 import org.intellij.lang.annotations.Language;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.InMemoryExecutionContext;
@@ -30,6 +29,7 @@ import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
+import org.openrewrite.xml.tree.Xml;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -857,7 +857,7 @@ class MavenParserTest implements RewriteTest {
         try (MockWebServer mockRepo = new MockWebServer()) {
             mockRepo.setDispatcher(new Dispatcher() {
                 @Override
-                public @NotNull MockResponse dispatch(RecordedRequest request) {
+                public MockResponse dispatch(RecordedRequest request) {
                     MockResponse resp = new MockResponse();
                     if (StreamSupport.stream(request.getHeaders().spliterator(), false)
                       .noneMatch(it -> it.getFirst().equals("Authorization") &&
@@ -2253,9 +2253,8 @@ class MavenParserTest implements RewriteTest {
               <dependency>
                 <groupId>junit</groupId>
                 <artifactId>junit</artifactId>
-                <version>4.11</version>&gt;
+                <version>4.11</version>
               </dependency>
-            </dependencies>
           </project>
           """;
         assertThat(MavenParser.builder().build().parse(malformedPomXml))

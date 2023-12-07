@@ -53,7 +53,8 @@ class JavaTemplateTest4Test implements RewriteTest {
               }
           })).afterRecipe(run -> {
               J.CompilationUnit cu = (J.CompilationUnit) run.getChangeset().getAllResults().get(0).getAfter();
-              JavaType.Method type = ((J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0)).getMethodType();
+              J.MethodDeclaration m = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(0);
+              JavaType.Method type = m.getMethodType();
               assertThat(type.getParameterNames())
                 .as("Changing the method's parameters should have also updated its type's parameter names")
                 .containsExactly("m", "n");
@@ -67,6 +68,7 @@ class JavaTemplateTest4Test implements RewriteTest {
                                && TypeUtils.asFullyQualified(((JavaType.Parameterized) jt).getTypeParameters().get(0)).getFullyQualifiedName().equals("java.lang.String"),
                   "Changing the method's parameters should have resulted in the second parameter's type being 'List<String>'"
                 );
+              assertThat(m.getName().getType()).isEqualTo(type);
           }),
           java(
             """
