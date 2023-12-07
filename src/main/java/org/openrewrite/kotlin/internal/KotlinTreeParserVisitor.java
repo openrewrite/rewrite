@@ -867,7 +867,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         J.Identifier name = createIdentifier(requireNonNull(parameter.getNameIdentifier()), vt, consumedSpaces);
 
         if (parameter.getTypeReference() != null) {
-            markers = markers.addIfAbsent(new TypeReferencePrefix(randomId(), prefix(parameter.getColon())));
             typeExpression = (TypeTree) parameter.getTypeReference().accept(this, data);
             // TODO: get type from IR of KtProperty.
         }
