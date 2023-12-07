@@ -180,8 +180,9 @@ public class GroovyParser implements Parser {
 
     @Override
     public boolean accept(Path path) {
-        return path.toString().endsWith(".groovy") ||
-               path.toFile().getName().startsWith("Jenkinsfile");
+        return path.toString().endsWith(".groovy");
+        // Imperfections make it inconvenient to parse Jenkinsfiles for now #3783 #3777 #3737
+        // || path.toFile().getName().startsWith("Jenkinsfile");
     }
 
     @Override
