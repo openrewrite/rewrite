@@ -15,54 +15,60 @@
  */
 package org.openrewrite;
 
+import org.openrewrite.internal.lang.Nullable;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 public class WorkingDirectoryExecutionContextView extends DelegatingExecutionContext implements AutoCloseable {
-    private static final String WORKING_DIRECTORY = "org.openrewrite.workingDirectory";
-    private final boolean create;
+    @Nullable
+    private final Path existing;
 
-    private WorkingDirectoryExecutionContextView(ExecutionContext delegate, boolean create) {
+    private WorkingDirectoryExecutionContextView(ExecutionContext delegate, @Nullable Path existing) {
         super(delegate);
-        this.create = create;
-    }
-
-    public static WorkingDirectoryExecutionContextView create(ExecutionContext ctx) {
-        if (ctx instanceof WorkingDirectoryExecutionContextView) {
-            return (WorkingDirectoryExecutionContextView) ctx;
-        }
-        return new WorkingDirectoryExecutionContextView(ctx, true);
-    }
-
-    public static WorkingDirectoryExecutionContextView useExisting(ExecutionContext ctx, Path dir) {
-        if (ctx instanceof WorkingDirectoryExecutionContextView) {
-            return (WorkingDirectoryExecutionContextView) ctx;
-        }
-        ctx.putMessage(WORKING_DIRECTORY, dir);
-        return new WorkingDirectoryExecutionContextView(ctx, false);
-    }
-
-    public Path getWorkingDirectory() {
-        Path workingDirectory = getMessage(WORKING_DIRECTORY);
-        if (workingDirectory == null && create) {
-            try {
-                putMessage(WORKING_DIRECTORY, workingDirectory = Files.createTempDirectory("recipe-wd"));
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
+        this.existing = existing;
+        try {
+            if (existing != null) {
+                if (!Files.isDirectory(existing)) {
+                    Files.createDirectories(existing);
+                }
+                putMessage(WORKING_DIRECTORY, existing);
+            } else {
+                putMessage(WORKING_DIRECTORY, Files.createTempDirectory("recipe-wd"));
             }
-        } else if (workingDirectory == null) {
-            throw new IllegalStateException("Working directory not set");
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
-        return workingDirectory;
+    }
+
+    public static WorkingDirectoryExecutionContextView createNew(ExecutionContext ctx) {
+        if (ctx instanceof WorkingDirectoryExecutionContextView) {
+            return (WorkingDirectoryExecutionContextView) ctx;
+        }
+        return new WorkingDirectoryExecutionContextView(ctx, null);
+    }
+
+    public static WorkingDirectoryExecutionContextView useExisting(ExecutionContext ctx, Path existing) {
+        if (ctx instanceof WorkingDirectoryExecutionContextView) {
+            return (WorkingDirectoryExecutionContextView) ctx;
+        }
+        return new WorkingDirectoryExecutionContextView(ctx, existing);
+    }
+
+    public static Path getWorkingDirectory(ExecutionContext ctx) {
+        return Optional.ofNullable(ctx.<Path>getMessage(WORKING_DIRECTORY))
+                .orElseThrow(() -> new IllegalStateException("Working directory not set"));
     }
 
     @Override
     public void close() {
-        if (create) {
-            delete(getWorkingDirectory());
+        if (existing == null) {
+            delete(Objects.requireNonNull(getMessage(WORKING_DIRECTORY)));
         }
     }
 

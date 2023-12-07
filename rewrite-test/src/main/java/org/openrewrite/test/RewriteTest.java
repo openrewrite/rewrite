@@ -342,7 +342,7 @@ public interface RewriteTest extends SourceSpecs {
         }
 
         RecipeRun recipeRun;
-        try (WorkingDirectoryExecutionContextView ctx = WorkingDirectoryExecutionContextView.create(recipeExecutionContext)) {
+        try (WorkingDirectoryExecutionContextView ctx = WorkingDirectoryExecutionContextView.createNew(recipeExecutionContext)) {
             recipeRun = recipe.run(
                     lss,
                     ctx,
