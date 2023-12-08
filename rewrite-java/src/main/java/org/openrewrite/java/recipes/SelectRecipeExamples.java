@@ -33,11 +33,10 @@ import static java.util.Comparator.comparing;
 public class SelectRecipeExamples extends Recipe {
 
     private static final String DOCUMENT_EXAMPLE_ANNOTATION_FQN = "org.openrewrite.DocumentExample";
-    private static final AnnotationMatcher TEST_ANNOTATION_MATCHER = new AnnotationMatcher("@org.junit.jupiter.api" +
-                                                                                           ".Test");
+    private static final AnnotationMatcher TEST_ANNOTATION_MATCHER = new AnnotationMatcher("@org.junit.jupiter.api.Test");
     private static final AnnotationMatcher ISSUE_ANNOTATION_MATCHER = new AnnotationMatcher("@org.openrewrite.Issue");
-    private static final AnnotationMatcher DISABLED_ANNOTATION_MATCHER = new AnnotationMatcher("@org.junit.jupiter" +
-                                                                                               ".api.Disabled");
+    private static final AnnotationMatcher DISABLED_ANNOTATION_MATCHER = new AnnotationMatcher("@org.junit.jupiter.api.Disabled");
+    private static final AnnotationMatcher NESTED_ANNOTATION_MATCHER = new AnnotationMatcher("@org.junit.jupiter.api.Nested");
     private static final AnnotationMatcher DOCUMENT_EXAMPLE_ANNOTATION_MATCHER =
             new AnnotationMatcher("@" + DOCUMENT_EXAMPLE_ANNOTATION_FQN);
 
@@ -98,6 +97,12 @@ public class SelectRecipeExamples extends Recipe {
                         );
 
                 if (hasIssueOrDisabledAnnotation) {
+                    return method;
+                }
+
+                J.ClassDeclaration clazz = getCursor().dropParentUntil(J.ClassDeclaration.class::isInstance).getValue();
+                boolean insideNestedClass = clazz != null && clazz.getLeadingAnnotations().stream().anyMatch(NESTED_ANNOTATION_MATCHER::matches);
+                if (insideNestedClass) {
                     return method;
                 }
 

@@ -18,19 +18,16 @@ package org.openrewrite.java.cleanup;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.search.SemanticallyEqual;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
 
 import java.util.Collections;
 
 public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionContext> {
-    private static final String MAYBE_AUTO_FORMAT_ME = "MAYBE_AUTO_FORMAT_ME";
-
     @Override
     public J visitBinary(J.Binary binary, ExecutionContext ctx) {
         J j = super.visitBinary(binary, ctx);
@@ -45,8 +42,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 j = asBinary.getRight();
             } else if (isLiteralTrue(asBinary.getRight())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
-            } else if (removeAllSpace(asBinary.getLeft()).printTrimmed(getCursor())
-                    .equals(removeAllSpace(asBinary.getRight()).printTrimmed(getCursor()))) {
+            } else if (SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Or) {
@@ -58,8 +54,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 j = asBinary.getRight();
             } else if (isLiteralFalse(asBinary.getRight())) {
                 j = asBinary.getLeft().withPrefix(asBinary.getLeft().getPrefix().withWhitespace(""));
-            } else if (removeAllSpace(asBinary.getLeft()).printTrimmed(getCursor())
-                    .equals(removeAllSpace(asBinary.getRight()).printTrimmed(getCursor()))) {
+            } else if (SemanticallyEqual.areEqual(asBinary.getLeft(), asBinary.getRight())) {
                 j = asBinary.getLeft();
             }
         } else if (asBinary.getOperator() == J.Binary.Type.Equal) {
@@ -88,7 +83,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             }
         }
         if (asBinary != j) {
-            getCursor().getParentTreeCursor().putMessage(MAYBE_AUTO_FORMAT_ME, "");
+            j = j.withPrefix(asBinary.getPrefix());
         }
         return j;
     }
@@ -98,9 +93,6 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
         J j = tree;
         if (j instanceof J.Parentheses) {
             j = new UnnecessaryParenthesesVisitor<>().visit(j, ctx, getCursor().getParentOrThrow());
-        }
-        if (j != null && getCursor().pollMessage(MAYBE_AUTO_FORMAT_ME) != null) {
-            j = autoFormat(j, ctx);
         }
         return j;
     }
@@ -133,7 +125,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             }
         }
         if (asUnary != j) {
-            getCursor().getParentTreeCursor().putMessage(MAYBE_AUTO_FORMAT_ME, "");
+            j = j.withPrefix(asUnary.getPrefix());
         }
         return j;
     }
@@ -214,16 +206,6 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
                 String.valueOf(value),
                 Collections.emptyList(),
                 JavaType.Primitive.Boolean);
-    }
-
-    private J removeAllSpace(J j) {
-        //noinspection ConstantConditions
-        return new JavaIsoVisitor<Integer>() {
-            @Override
-            public Space visitSpace(Space space, Space.Location loc, Integer integer) {
-                return Space.EMPTY;
-            }
-        }.visit(j, 0);
     }
 
     /**
