@@ -349,9 +349,17 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
 
                 SourceFile sourceFile = (SourceFile) tree;
                 if (acc.updatedMarker != null) {
-                    sourceFile = sourceFile.getMarkers().findFirst(BuildTool.class)
-                            .map(buildTool -> (SourceFile) tree.withMarkers(tree.getMarkers().setByType(acc.updatedMarker)))
-                            .orElse(sourceFile);
+                    Optional<BuildTool> maybeCurrentMarker = sourceFile.getMarkers().findFirst(BuildTool.class);
+                    if (maybeCurrentMarker.isPresent()) {
+                        BuildTool currentMarker = maybeCurrentMarker.get();
+                        VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(distributionVersion) ? "latest.release" : distributionVersion, null).getValue());
+                        int compare = versionComparator.compare(null, currentMarker.getVersion(), acc.updatedMarker.getVersion());
+                        if (compare < 0) {
+                            sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(acc.updatedMarker));
+                        } else {
+                            return sourceFile;
+                        }
+                    }
                 }
 
                 MavenWrapper mavenWrapper = getMavenWrapper(ctx);

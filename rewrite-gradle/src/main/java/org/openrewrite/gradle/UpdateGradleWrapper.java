@@ -293,7 +293,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                         VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(version) ? "latest.release" : version, null).getValue());
                         int compare = versionComparator.compare(null, currentMarker.getVersion(), acc.updatedMarker.getVersion());
                         if (compare < 0) {
-                            sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().computeByType(currentMarker, (b, a) -> acc.updatedMarker));
+                            sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().setByType(acc.updatedMarker));
                         } else {
                             return sourceFile;
                         }
