@@ -148,8 +148,9 @@ public class AddPlugin extends Recipe {
                 if (maybePlugin.isPresent()) {
                     Xml.Tag plugin = maybePlugin.get();
                     if (version != null && !version.equals(plugin.getChildValue("version").orElse(null))) {
-                        //noinspection OptionalGetWithoutIsPresent
-                        t = (Xml.Tag) new ChangeTagValueVisitor<>(plugin.getChild("version").get(), version).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                        if (plugin.getChild("version").isPresent()) {
+                            t = (Xml.Tag) new ChangeTagValueVisitor<>(plugin.getChild("version").get(), version).visitNonNull(t, ctx, getCursor().getParentOrThrow());
+                        }
                     }
                 } else {
                     Xml.Tag pluginTag = Xml.Tag.build("<plugin>\n" +
