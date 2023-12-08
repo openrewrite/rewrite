@@ -32,7 +32,6 @@ import static java.util.Objects.requireNonNull;
 public interface ExecutionContext {
     String CURRENT_CYCLE = "org.openrewrite.currentCycle";
     String CURRENT_RECIPE = "org.openrewrite.currentRecipe";
-    String WORKING_DIRECTORY = "org.openrewrite.workingDirectory";
     String DATA_TABLES = "org.openrewrite.dataTables";
     String RUN_TIMEOUT = "org.openrewrite.runTimeout";
     String REQUIRE_PRINT_EQUALS_INPUT = "org.openrewrite.requirePrintEqualsInput";
