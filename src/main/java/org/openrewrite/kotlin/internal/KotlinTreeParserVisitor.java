@@ -2333,6 +2333,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                 deepPrefix(multiDeclaration),
                 Markers.EMPTY,
                 variableDeclarations,
+                null,
                 JContainer.build(prefix(multiDeclaration.getLPar()), destructVars, Markers.EMPTY)
         );
     }

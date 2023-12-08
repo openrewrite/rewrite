@@ -618,6 +618,7 @@ public interface K extends J {
     @SuppressWarnings({"unused", "unchecked"})
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class ConstructorInvocation implements K, TypeTree {
 
@@ -650,14 +651,6 @@ public interface K extends J {
 
         public ConstructorInvocation withArguments(List<Expression> arguments) {
             return getPadding().withArguments(JContainer.withElements(this.arguments, arguments));
-        }
-
-        public ConstructorInvocation(UUID id, Space prefix, Markers markers, TypeTree typeTree, JContainer<Expression> arguments) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.typeTree = typeTree;
-            this.arguments = arguments;
         }
 
         @Override
@@ -790,15 +783,6 @@ public interface K extends J {
 
         JContainer<Statement> destructAssignments;
 
-        public DestructuringDeclaration(UUID id, Space prefix, Markers markers, VariableDeclarations initializer, JContainer<Statement> destructAssignments) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.initializer = initializer;
-            this.assignments = null;
-            this.destructAssignments = destructAssignments;
-        }
-
         @Deprecated
         @Nullable
         public List<J.VariableDeclarations.NamedVariable> getAssignments() {
@@ -864,7 +848,7 @@ public interface K extends J {
             }
 
             public DestructuringDeclaration withDestructAssignments(JContainer<Statement> assignments) {
-                return t.destructAssignments == assignments ? t : new DestructuringDeclaration(t.id, t.prefix, t.markers, t.initializer, assignments);
+                return t.destructAssignments == assignments ? t : new DestructuringDeclaration(t.id, t.prefix, t.markers, t.initializer, null, assignments);
             }
         }
 
