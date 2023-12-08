@@ -390,19 +390,16 @@ public interface K extends J {
     @SuppressWarnings("unchecked")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
     final class AnnotatedExpression implements K, Expression {
 
-        @With
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         Markers markers;
 
-        @With
         List<J.Annotation> annotations;
 
-        @With
         Expression expression;
 
         public AnnotatedExpression(UUID id, Markers markers, List<J.Annotation> annotations, Expression expression) {
@@ -567,19 +564,14 @@ public interface K extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
+    @With
     final class ClassDeclaration implements K, Statement, TypedTree {
 
-        @With
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         Markers markers;
-
-        @With
         J.ClassDeclaration classDeclaration;
-
-        @With
         TypeConstraints typeConstraints;
 
         public ClassDeclaration(UUID id, Markers markers, J.ClassDeclaration classDeclaration, TypeConstraints typeConstraints) {
@@ -624,27 +616,16 @@ public interface K extends J {
     @SuppressWarnings({"unused", "LombokGetterMayBeUsed", "unchecked"})
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Getter
+    @With
     final class Constructor implements K, Statement, TypedTree {
 
-        @Getter
-        @With
         @EqualsAndHashCode.Include
         UUID id;
 
-        @Getter
-        @With
         Markers markers;
-
-        @Getter
-        @With
         J.MethodDeclaration methodDeclaration;
-
-        @Getter
-        @With
         Space colon;
-
-        @Getter
-        @With
         ConstructorInvocation constructorInvocation;
 
         public Constructor(UUID id, Markers markers, J.MethodDeclaration methodDeclaration, Space colon, ConstructorInvocation constructorInvocation) {
@@ -789,22 +770,15 @@ public interface K extends J {
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
     final class DelegatedSuperType implements K, TypeTree {
 
-        @With
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         Markers markers;
-
-        @With
         TypeTree typeTree;
-
-        @With
         Space by;
-
-        @With
         Expression delegate;
 
         public DelegatedSuperType(UUID id, Markers markers, TypeTree typeTree, Space by, Expression delegate) {
@@ -968,13 +942,12 @@ public interface K extends J {
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
     final class ExpressionStatement implements K, Expression, Statement {
 
-        @With
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         Expression expression;
 
         // For backwards compatibility with older ASTs before there was an id field
@@ -1152,27 +1125,22 @@ public interface K extends J {
             return v.visitFunctionType(this, p);
         }
 
-        @SuppressWarnings({"unchecked", "LombokGetterMayBeUsed"})
+        @SuppressWarnings("unchecked")
         @ToString
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Getter
+        @With
         public static final class Parameter implements K, TypeTree {
-            @With
+
             @EqualsAndHashCode.Include
-            @Getter
             UUID id;
 
-            @With
-            @Getter
             Markers markers;
 
-            @With
-            @Getter
             @Nullable
             Identifier name;
 
-            @With
-            @Getter
             TypeTree parameterType;
 
             public Parameter(UUID id, Markers markers, @Nullable Identifier name, TypeTree parameterType) {
@@ -1244,9 +1212,9 @@ public interface K extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
+    @With
     final class KReturn implements K, Statement, Expression {
 
-        @With
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1254,13 +1222,9 @@ public interface K extends J {
          * @deprecated Wrap with {@link AnnotatedExpression} to add annotations. To be deleted.
          */
         @Deprecated
-        @With
         List<J.Annotation> annotations;
-
-        @With
         J.Return expression;
 
-        @With
         @Nullable
         J.Identifier label;
 
@@ -1336,6 +1300,7 @@ public interface K extends J {
 
         @EqualsAndHashCode.Include
         UUID id;
+
         Space prefix;
         Markers markers;
         String delimiter;
@@ -1411,23 +1376,18 @@ public interface K extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
+    @With
     final class KThis implements K, Expression {
 
-        @With
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         Space prefix;
-
-        @With
         Markers markers;
 
-        @With
         @Nullable
         J.Identifier label;
 
-        @With
         @Nullable
         JavaType type;
 
@@ -1545,19 +1505,14 @@ public interface K extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
+    @With
     final class MethodDeclaration implements K, Statement, TypedTree {
 
-        @With
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         Markers markers;
-
-        @With
         J.MethodDeclaration methodDeclaration;
-
-        @With
         TypeConstraints typeConstraints;
 
         public MethodDeclaration(UUID id, Markers markers, J.MethodDeclaration methodDeclaration, TypeConstraints typeConstraints) {
@@ -1729,7 +1684,6 @@ public interface K extends J {
 
         Space prefix;
         Markers markers;
-
         List<J> initializations;
 
         @Override
@@ -1763,7 +1717,6 @@ public interface K extends J {
 
         Space prefix;
         Markers markers;
-
         Expression expression;
 
         public SpreadArgument(UUID id, Space prefix, Markers markers, Expression expression) {
@@ -1804,13 +1757,12 @@ public interface K extends J {
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
     final class StatementExpression implements K, Expression, Statement {
 
-        @With
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         Statement statement;
 
         public StatementExpression(UUID id, Statement statement) {
@@ -1953,13 +1905,12 @@ public interface K extends J {
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @With
     final class TypeParameterExpression implements K, Expression {
 
-        @With
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         TypeParameter typeParameter;
 
         public TypeParameterExpression(UUID id, TypeParameter typeParameter) {
