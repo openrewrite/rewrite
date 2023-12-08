@@ -15,7 +15,6 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -749,7 +748,7 @@ public interface K extends J {
         }
     }
 
-    @SuppressWarnings({"unused", "DeprecatedIsStillUsed"})
+    @SuppressWarnings("unused")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -1105,7 +1104,6 @@ public interface K extends J {
         }
     }
 
-    @SuppressWarnings("DeprecatedIsStillUsed")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -1436,12 +1434,17 @@ public interface K extends J {
         @Nullable
         TypeConstraints typeConstraints;
 
+        JContainer<J.MethodDeclaration> accessors;
+
+        @Deprecated // Use `accessors` field instead
         @Nullable
         J.MethodDeclaration getter;
 
+        @Deprecated // Use `accessors` field instead
         @Nullable
         J.MethodDeclaration setter;
 
+        @Deprecated // Use `accessors` field instead
         boolean isSetterFirst;
 
         @Nullable
@@ -1495,7 +1498,7 @@ public interface K extends J {
 
             public Property withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
                 return t.typeParameters == typeParameters ? t : new Property(t.id, t.prefix, t.markers, typeParameters,
-                        t.variableDeclarations, t.typeConstraints, t.getter, t.setter, t.isSetterFirst, t.receiver);
+                        t.variableDeclarations, t.typeConstraints, t.accessors ,null, null, false, t.receiver);
             }
 
             @Nullable
@@ -1506,7 +1509,7 @@ public interface K extends J {
             @Nullable
             public Property withReceiver(@Nullable JRightPadded<Expression> receiver) {
                 return t.receiver == receiver ? t : new Property(t.id, t.prefix, t.markers, t.typeParameters,
-                        t.variableDeclarations, t.typeConstraints, t.getter, t.setter, t.isSetterFirst, receiver);
+                        t.variableDeclarations, t.typeConstraints, t.accessors, null, null, false, receiver);
             }
         }
     }

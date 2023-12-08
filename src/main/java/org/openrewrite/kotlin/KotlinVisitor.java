@@ -277,8 +277,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
 
         pr = pr.withVariableDeclarations(visitAndCast(pr.getVariableDeclarations(), p));
         pr = pr.getPadding().withReceiver(visitRightPadded(pr.getPadding().getReceiver(), p));
-        pr = pr.withGetter(visitAndCast(pr.getGetter(), p));
-        pr = pr.withSetter(visitAndCast(pr.getSetter(), p));
+        pr = pr.withAccessors(visitContainer(pr.getAccessors(), p));
         return pr;
     }
 

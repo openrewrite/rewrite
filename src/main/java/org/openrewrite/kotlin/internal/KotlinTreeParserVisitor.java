@@ -2892,6 +2892,22 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         }
 
         if (getter != null || setter != null || receiver != null || typeConstraints != null) {
+            List<JRightPadded<J.MethodDeclaration>> rps = new ArrayList<>(2);
+
+            if (setter != null) {
+                rps.add(padRight(setter, Space.EMPTY));
+            }
+
+            if (getter != null) {
+                rps.add(padRight(getter, Space.EMPTY));
+            }
+
+            if (!isSetterFirst) {
+                Collections.reverse(rps);
+            }
+
+            JContainer<J.MethodDeclaration> accessors = JContainer.build(rps);
+
             return new K.Property(
                     randomId(),
                     deepPrefix(property),
@@ -2899,9 +2915,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     typeParameters,
                     variableDeclarations.withPrefix(Space.EMPTY),
                     typeConstraints,
-                    getter,
-                    setter,
-                    isSetterFirst,
+                    accessors,
+                    null,
+                    null,
+                    false,
                     receiver
             );
         } else {
