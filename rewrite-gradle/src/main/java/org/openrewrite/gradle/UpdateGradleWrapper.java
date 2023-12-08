@@ -58,13 +58,17 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
     @Override
     public String getDescription() {
-        return "Update the version of Gradle used in an existing Gradle wrapper.";
+        return "Update the version of Gradle used in an existing Gradle wrapper. " +
+               "Queries services.gradle.org to determine the available releases, but prefers the artifact repository URL " +
+               "which already exists within the wrapper properties file. " +
+               "If your artifact repository does not contain the same Gradle distributions as services.gradle.org, " +
+               "then the recipe may suggest a version which is not available in your artifact repository.";
     }
 
     @Getter
     @Option(displayName = "New version",
             description = "An exact version number or node-style semver selector used to select the version number. " +
-                          "Defaults to the latest release if not specified.",
+                          "Defaults to the latest release available from services.gradle.org if not specified.",
             example = "7.x",
             required = false)
     @Nullable
@@ -80,16 +84,6 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
     )
     @Nullable
     final String distribution;
-
-    @Getter
-    @Option(displayName = "Repository URL",
-            description = "The URL of the repository to download the Gradle distribution from. Currently only supports " +
-                          "repositories like services.gradle.org, not arbitrary maven or ivy repositories. " +
-                          "Defaults to `https://services.gradle.org/versions/all`.",
-            example = "https://services.gradle.org/versions/all",
-            required = false)
-    @Nullable
-    final String repositoryUrl;
 
     @Getter
     @Option(displayName = "Add if missing",
@@ -112,7 +106,7 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
     private GradleWrapper getGradleWrapper(ExecutionContext ctx) {
         if (gradleWrapper == null) {
-            gradleWrapper = GradleWrapper.create(distribution, version, repositoryUrl, ctx);
+            gradleWrapper = GradleWrapper.create(distribution, version, null, ctx);
         }
         return gradleWrapper;
     }
@@ -411,8 +405,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         @Override
         public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
             Properties p = super.visitFile(file, executionContext);
-            Set<Properties.Entry> properties = FindProperties.find(p, DISTRIBUTION_SHA_256_SUM_KEY, false);
-            if (properties.isEmpty()) {
+            Set<Properties.Entry> checksumKey = FindProperties.find(p, DISTRIBUTION_SHA_256_SUM_KEY, false);
+            if (checksumKey.isEmpty()) {
                 Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, gradleWrapper.getDistributionChecksum().getHexValue());
                 Properties.Entry entry = new Properties.Entry(Tree.randomId(), "\n", Markers.EMPTY, DISTRIBUTION_SHA_256_SUM_KEY, "", Properties.Entry.Delimiter.EQUALS, propertyValue);
                 List<Properties.Content> contentList = ListUtils.concat(((Properties.File) p).getContent(), entry);
@@ -422,9 +416,19 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         }
 
         @Override
-        public Properties visitEntry(Properties.Entry entry, ExecutionContext context) {
+        public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
             if ("distributionUrl".equals(entry.getKey())) {
-                return entry.withValue(entry.getValue().withText(gradleWrapper.getPropertiesFormattedUrl()));
+                Properties.Value value = entry.getValue();
+                String currentUrl = value.getText();
+                // Prefer the existing artifact repository URL over changing to services.gradle.org if that isn't already what's in use
+                if(currentUrl.startsWith("https\\://services.gradle.org/distributions/")) {
+                    return entry.withValue(value.withText(gradleWrapper.getPropertiesFormattedUrl()));
+                } else {
+                    String gradleServicesDistributionUrl = gradleWrapper.getDistributionUrl();
+                    String newDistributionFile = gradleServicesDistributionUrl.substring(gradleServicesDistributionUrl.lastIndexOf('/') + 1);
+                    String repositoryUrlPrefix = currentUrl.substring(0, currentUrl.lastIndexOf('/'));
+                    return entry.withValue(value.withText(repositoryUrlPrefix + "/" + newDistributionFile));
+                }
             }
             if (DISTRIBUTION_SHA_256_SUM_KEY.equals(entry.getKey())) {
                 return entry.withValue(entry.getValue().withText(gradleWrapper.getDistributionChecksum().getHexValue()));
