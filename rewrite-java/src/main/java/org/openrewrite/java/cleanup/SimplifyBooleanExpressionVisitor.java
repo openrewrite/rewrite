@@ -88,6 +88,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             }
         }
         if (asBinary != j) {
+            j = j.withPrefix(asBinary.getPrefix());
             getCursor().getParentTreeCursor().putMessage(MAYBE_AUTO_FORMAT_ME, "");
         }
         return j;
@@ -133,6 +134,7 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
             }
         }
         if (asUnary != j) {
+            j = j.withPrefix(asUnary.getPrefix());
             getCursor().getParentTreeCursor().putMessage(MAYBE_AUTO_FORMAT_ME, "");
         }
         return j;

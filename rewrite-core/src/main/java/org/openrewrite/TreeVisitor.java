@@ -269,13 +269,6 @@ public abstract class TreeVisitor<T extends Tree, P> {
         // Do you visitor take tree and do you tree take visitor?
         boolean isAcceptable = tree.isAcceptable(this, p) && (!(tree instanceof SourceFile) || isAcceptable((SourceFile) tree, p));
 
-        if (isAcceptable && !(tree instanceof SourceFile)) {
-            Cursor root = getCursor().dropParentUntil(it -> it instanceof SourceFile || it == Cursor.ROOT_VALUE);
-            if (root.getValue() instanceof SourceFile && !isAcceptable(root.getValue(), p)) {
-                isAcceptable = false;
-            }
-        }
-
         try {
             if (isAcceptable) {
                 //noinspection unchecked
