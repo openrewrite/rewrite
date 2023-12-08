@@ -35,7 +35,7 @@ class RenameVariableTest implements RewriteTest {
     private static Recipe renameVariableTest(String hasName, String toName, boolean includeMethodParameters) {
         return toRecipe(() -> new JavaVisitor<>() {
             @Override
-            public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext p) {
+            public J visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
                 if (classDecl.getSimpleName().equals("A")) {
                     List<J.VariableDeclarations> variableDecls = classDecl.getBody().getStatements().stream()
                       .filter(J.VariableDeclarations.class::isInstance)
@@ -65,7 +65,7 @@ class RenameVariableTest implements RewriteTest {
                         }
                     }
                 }
-                return super.visitClassDeclaration(classDecl, p);
+                return super.visitClassDeclaration(classDecl, ctx);
             }
         });
     }
@@ -807,13 +807,13 @@ class RenameVariableTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
-              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext p) {
+              public J visitVariableDeclarations(J.VariableDeclarations multiVariable, ExecutionContext ctx) {
                   if (getCursor().getParentTreeCursor().getValue() instanceof J.MethodDeclaration) {
                       doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "n2"));
                   } else if (!(getCursor().getParentTreeCursor().getParentTreeCursor().getValue() instanceof J.ClassDeclaration)) {
                       doAfterVisit(new RenameVariable<>(multiVariable.getVariables().get(0), "n1"));
                   }
-                  return super.visitVariableDeclarations(multiVariable, p);
+                  return super.visitVariableDeclarations(multiVariable, ctx);
               }
           })),
           java(

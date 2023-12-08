@@ -56,8 +56,8 @@ public class MigrateJavaTemplateToRewrite8 extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>(){
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
-                return super.visitCompilationUnit(cu, executionContext);
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+                return super.visitCompilationUnit(cu, ctx);
             }
 
             @Override

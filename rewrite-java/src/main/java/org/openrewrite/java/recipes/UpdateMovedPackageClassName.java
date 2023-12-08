@@ -52,17 +52,17 @@ public class UpdateMovedPackageClassName extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext executionContext) {
+            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 if (fieldAccess.toString().equals(fullyQualifiedClassNameMovedFrom)) {
                     return TypeTree.build(fullyQualifiedClassNameMovedTo)
                         .withPrefix(fieldAccess.getPrefix());
                 }
-                return super.visitFieldAccess(fieldAccess, executionContext);
+                return super.visitFieldAccess(fieldAccess, ctx);
             }
 
             @Override
-            public J.Import visitImport(J.Import _import, ExecutionContext executionContext) {
-                J.Import after = super.visitImport(_import, executionContext);
+            public J.Import visitImport(J.Import _import, ExecutionContext ctx) {
+                J.Import after = super.visitImport(_import, ctx);
                 if (_import != after) {
                     maybeRemoveImport(fullyQualifiedClassNameMovedFrom);
                     maybeAddImport(fullyQualifiedClassNameMovedTo);

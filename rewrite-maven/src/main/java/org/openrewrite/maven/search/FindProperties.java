@@ -59,8 +59,8 @@ public class FindProperties extends Recipe {
         Pattern propertyUsageMatcher = Pattern.compile(".*\\$\\{" + propertyMatcher.pattern() + "}.*");
         return new MavenVisitor<ExecutionContext>() {
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext context) {
-                Xml.Tag t = (Xml.Tag) super.visitTag(tag, context);
+            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
                 if (isPropertyTag() && propertyMatcher.matcher(t.getName()).matches()) {
                     t = SearchResult.found(t);
                 }

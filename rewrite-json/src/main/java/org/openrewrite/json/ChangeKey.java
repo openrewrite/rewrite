@@ -48,8 +48,8 @@ public class ChangeKey extends Recipe {
         JsonPathMatcher matcher = new JsonPathMatcher(oldKeyPath);
         return new JsonIsoVisitor<ExecutionContext>() {
             @Override
-            public Json.Member visitMember(Json.Member member, ExecutionContext executionContext) {
-                Json.Member m = super.visitMember(member, executionContext);
+            public Json.Member visitMember(Json.Member member, ExecutionContext ctx) {
+                Json.Member m = super.visitMember(member, ctx);
                 if (matcher.matches(getCursor())) {
                     String value = ChangeKey.this.newKey;
                     if (value.startsWith("'") || value.startsWith("\"")) {

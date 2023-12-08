@@ -193,8 +193,8 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                     }
 
                     @Override
-                    public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
-                        Properties p = super.visitFile(file, executionContext);
+                    public Properties visitFile(Properties.File file, ExecutionContext ctx) {
+                        Properties p = super.visitFile(file, ctx);
                         if (FindProperties.find(p, DISTRIBUTION_SHA_256_SUM_KEY, null).isEmpty() ||
                             FindProperties.find(p, WRAPPER_SHA_256_SUM_KEY, null).isEmpty()) {
                             acc.needsWrapperUpdate = true;
@@ -425,8 +425,8 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
         MavenWrapper mavenWrapper;
 
         @Override
-        public Properties.File visitFile(Properties.File file, ExecutionContext executionContext) {
-            Properties.File p = super.visitFile(file, executionContext);
+        public Properties.File visitFile(Properties.File file, ExecutionContext ctx) {
+            Properties.File p = super.visitFile(file, ctx);
             Checksum mavenDistributionChecksum = mavenWrapper.getDistributionChecksum();
             if (FindProperties.find(p, DISTRIBUTION_SHA_256_SUM_KEY, null).isEmpty() && mavenDistributionChecksum != null) {
                 Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, mavenDistributionChecksum.getHexValue());
@@ -445,7 +445,7 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
         }
 
         @Override
-        public Properties.Entry visitEntry(Properties.Entry entry, ExecutionContext executionContext) {
+        public Properties.Entry visitEntry(Properties.Entry entry, ExecutionContext ctx) {
             if (DISTRIBUTION_URL_KEY.equals(entry.getKey())) {
                 Properties.Value value = entry.getValue();
                 if (!mavenWrapper.getPropertiesFormattedDistributionUrl().equals(value.getText())) {

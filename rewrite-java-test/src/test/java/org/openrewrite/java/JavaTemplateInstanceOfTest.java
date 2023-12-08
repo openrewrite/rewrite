@@ -55,7 +55,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         //noinspection DataFlowIssue
         spec.recipe(toRecipe(() -> new JavaVisitor<>() {
               @Override
-              public J visitLiteral(J.Literal literal, ExecutionContext executionContext) {
+              public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
                   return literal.getValue() == Integer.valueOf(42) ?
                     JavaTemplate.builder("s.length()")
                       .contextSensitive()
@@ -64,7 +64,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                         getCursor(),
                         literal.getCoordinates().replace()
                       ) :
-                    super.visitLiteral(literal, executionContext);
+                    super.visitLiteral(literal, ctx);
               }
           }))
           // custom missing type validation
@@ -472,8 +472,8 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(toRecipe(() -> new JavaVisitor<>() {
                 @Override
-                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext p) {
-                    J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, p);
+                public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                    J.MethodInvocation mi = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                     if (!new MethodMatcher("java.lang.String format(String, Object[])").matches(mi)) {
                         return mi;
                     }
@@ -489,7 +489,7 @@ class JavaTemplateInstanceOfTest implements RewriteTest {
                       );
 
                     mi = maybeAutoFormat(mi, mi.withArguments(
-                      ListUtils.map(arguments.subList(1, arguments.size()), (a, b) -> b.withPrefix(arguments.get(a + 1).getPrefix()))), p);
+                      ListUtils.map(arguments.subList(1, arguments.size()), (a, b) -> b.withPrefix(arguments.get(a + 1).getPrefix()))), ctx);
                     return mi;
                 }
             }

@@ -60,13 +60,13 @@ public class FindTypeMappings extends ScanningRecipe<FindTypeMappings.Accumulato
         return new JavaIsoVisitor<ExecutionContext>() {
             String sourcePath = "";
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
                 sourcePath = cu.getSourcePath().toString();
-                return super.visitCompilationUnit(cu, executionContext);
+                return super.visitCompilationUnit(cu, ctx);
             }
 
             @Override
-            public @Nullable J visit(@Nullable Tree tree, ExecutionContext executionContext) {
+            public @Nullable J visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof TypedTree) {
                     Map<String, AtomicInteger> counts = acc.getSourceToMappedTypeCount()
                             .computeIfAbsent(sourcePath, k -> new HashMap<>())
@@ -116,7 +116,7 @@ public class FindTypeMappings extends ScanningRecipe<FindTypeMappings.Accumulato
                                     ((TypedTree) tree).getType().getClass().getName(), k -> new AtomicInteger(0))
                             .incrementAndGet();
                 }
-                return super.visit(tree, executionContext);
+                return super.visit(tree, ctx);
             }
         };
     }

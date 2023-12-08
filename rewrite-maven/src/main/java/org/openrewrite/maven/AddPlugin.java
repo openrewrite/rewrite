@@ -105,11 +105,11 @@ public class AddPlugin extends Recipe {
     private class AddPluginVisitor extends MavenIsoVisitor<ExecutionContext> {
 
         @Override
-        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
+        public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
             if (filePattern != null) {
-                return PathUtils.matchesGlob(sourceFile.getSourcePath(), filePattern) && super.isAcceptable(sourceFile, executionContext);
+                return PathUtils.matchesGlob(sourceFile.getSourcePath(), filePattern) && super.isAcceptable(sourceFile, ctx);
             }
-            return super.isAcceptable(sourceFile, executionContext);
+            return super.isAcceptable(sourceFile, ctx);
         }
 
         @Override

@@ -68,7 +68,7 @@ public class AddProperty extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new MavenVisitor<ExecutionContext>() {
             @Override
-            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 String currentValue = getResolutionResult().getPom().getProperties().get(key);
                 boolean trust = Boolean.TRUE.equals(trustParent);
                 if (!trust && !value.equals(currentValue)) {
