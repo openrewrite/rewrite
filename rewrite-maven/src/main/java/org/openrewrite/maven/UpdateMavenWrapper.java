@@ -352,6 +352,9 @@ public class UpdateMavenWrapper extends ScanningRecipe<UpdateMavenWrapper.MavenW
                     Optional<BuildTool> maybeCurrentMarker = sourceFile.getMarkers().findFirst(BuildTool.class);
                     if (maybeCurrentMarker.isPresent()) {
                         BuildTool currentMarker = maybeCurrentMarker.get();
+                        if (currentMarker.getType() != BuildTool.Type.Maven) {
+                            return sourceFile;
+                        }
                         VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(distributionVersion) ? "latest.release" : distributionVersion, null).getValue());
                         int compare = versionComparator.compare(null, currentMarker.getVersion(), acc.updatedMarker.getVersion());
                         if (compare < 0) {

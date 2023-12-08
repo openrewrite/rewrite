@@ -290,6 +290,9 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                     Optional<BuildTool> maybeCurrentMarker = sourceFile.getMarkers().findFirst(BuildTool.class);
                     if (maybeCurrentMarker.isPresent()) {
                         BuildTool currentMarker = maybeCurrentMarker.get();
+                        if (currentMarker.getType() != BuildTool.Type.Gradle) {
+                            return sourceFile;
+                        }
                         VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(version) ? "latest.release" : version, null).getValue());
                         int compare = versionComparator.compare(null, currentMarker.getVersion(), acc.updatedMarker.getVersion());
                         if (compare < 0) {
