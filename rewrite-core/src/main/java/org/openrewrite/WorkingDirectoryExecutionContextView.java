@@ -46,6 +46,12 @@ public class WorkingDirectoryExecutionContextView extends DelegatingExecutionCon
         }
     }
 
+    /**
+     * Create a new {@link WorkingDirectoryExecutionContextView} which will create a new temporary directory for the
+     * working directory. This temporary working directory will automatically get deleted once this object is closed.
+     * <p>
+     * For recipes which only want to access the provided working directory, use {@link #getWorkingDirectory(ExecutionContext)}.
+     */
     public static WorkingDirectoryExecutionContextView createNew(ExecutionContext ctx) {
         if (ctx instanceof WorkingDirectoryExecutionContextView) {
             return (WorkingDirectoryExecutionContextView) ctx;
@@ -53,7 +59,14 @@ public class WorkingDirectoryExecutionContextView extends DelegatingExecutionCon
         return new WorkingDirectoryExecutionContextView(ctx, null);
     }
 
-    public static WorkingDirectoryExecutionContextView useExisting(ExecutionContext ctx, Path existing) {
+    /**
+     * Create a new {@link WorkingDirectoryExecutionContextView} using a provided working directory. While the directory
+     * will get created if it doesn't already exist, it is the responsibility of the caller to delete it. Thus, the
+     * {@link #close()} method is a no-op.
+     * <p>
+     * For recipes which only want to access the provided working directory, use {@link #getWorkingDirectory(ExecutionContext)}.
+     */
+    public static WorkingDirectoryExecutionContextView useProvided(ExecutionContext ctx, Path existing) {
         if (ctx instanceof WorkingDirectoryExecutionContextView) {
             return (WorkingDirectoryExecutionContextView) ctx;
         }
