@@ -78,6 +78,7 @@ public interface K extends J {
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class CompilationUnit implements K, JavaSourceFile, SourceFile {
         @Nullable
@@ -122,34 +123,6 @@ public interface K extends J {
         @Getter
         @Nullable
         Checksum checksum;
-
-        public CompilationUnit(UUID id,
-                               Space prefix,
-                               Markers markers,
-                               Path sourcePath,
-                               @Nullable FileAttributes fileAttributes,
-                               @Nullable String charsetName,
-                               boolean charsetBomMarked,
-                               @Nullable Checksum checksum,
-                               List<Annotation> annotations,
-                               @Nullable JRightPadded<Package> packageDeclaration,
-                               List<JRightPadded<Import>> imports,
-                               List<JRightPadded<Statement>> statements,
-                               Space eof) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.sourcePath = sourcePath;
-            this.fileAttributes = fileAttributes;
-            this.charsetName = charsetName;
-            this.charsetBomMarked = charsetBomMarked;
-            this.checksum = checksum;
-            this.annotations = annotations;
-            this.packageDeclaration = packageDeclaration;
-            this.imports = imports;
-            this.statements = statements;
-            this.eof = eof;
-        }
 
         @Transient
         @Override
@@ -390,6 +363,7 @@ public interface K extends J {
     @SuppressWarnings("unchecked")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @With
     final class AnnotatedExpression implements K, Expression {
 
@@ -401,13 +375,6 @@ public interface K extends J {
         List<J.Annotation> annotations;
 
         Expression expression;
-
-        public AnnotatedExpression(UUID id, Markers markers, List<J.Annotation> annotations, Expression expression) {
-            this.id = id;
-            this.markers = markers;
-            this.annotations = annotations;
-            this.expression = expression;
-        }
 
         @Override
         public Space getPrefix() {
@@ -451,6 +418,7 @@ public interface K extends J {
     @SuppressWarnings("unused")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @Data
     final class Binary implements K, Expression, TypedTree {
@@ -473,17 +441,6 @@ public interface K extends J {
         Expression left;
 
         JLeftPadded<K.Binary.Type> operator;
-
-        public Binary(UUID id, Space prefix, Markers markers, Expression left, JLeftPadded<Type> operator, Expression right, Space after, @Nullable JavaType type) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.left = left;
-            this.operator = operator;
-            this.right = right;
-            this.after = after;
-            this.type = type;
-        }
 
         public K.Binary.Type getOperator() {
             return operator.getElement();
@@ -574,13 +531,6 @@ public interface K extends J {
         J.ClassDeclaration classDeclaration;
         TypeConstraints typeConstraints;
 
-        public ClassDeclaration(UUID id, Markers markers, J.ClassDeclaration classDeclaration, TypeConstraints typeConstraints) {
-            this.id = id;
-            this.markers = markers;
-            this.classDeclaration = classDeclaration;
-            this.typeConstraints = typeConstraints;
-        }
-
         @Override
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
             return v.visitClassDeclaration(this, p);
@@ -613,9 +563,10 @@ public interface K extends J {
         }
     }
 
-    @SuppressWarnings({"unused", "LombokGetterMayBeUsed", "unchecked"})
+    @SuppressWarnings({"unused", "unchecked"})
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @Getter
     @With
     final class Constructor implements K, Statement, TypedTree {
@@ -627,14 +578,6 @@ public interface K extends J {
         J.MethodDeclaration methodDeclaration;
         Space colon;
         ConstructorInvocation constructorInvocation;
-
-        public Constructor(UUID id, Markers markers, J.MethodDeclaration methodDeclaration, Space colon, ConstructorInvocation constructorInvocation) {
-            this.id = id;
-            this.markers = markers;
-            this.methodDeclaration = methodDeclaration;
-            this.colon = colon;
-            this.constructorInvocation = constructorInvocation;
-        }
 
         @Override
         public Constructor withType(@Nullable JavaType type) {
@@ -770,6 +713,7 @@ public interface K extends J {
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @With
     final class DelegatedSuperType implements K, TypeTree {
 
@@ -780,14 +724,6 @@ public interface K extends J {
         TypeTree typeTree;
         Space by;
         Expression delegate;
-
-        public DelegatedSuperType(UUID id, Markers markers, TypeTree typeTree, Space by, Expression delegate) {
-            this.id = id;
-            this.markers = markers;
-            this.typeTree = typeTree;
-            this.by = by;
-            this.delegate = delegate;
-        }
 
         @Override
         public DelegatedSuperType withType(@Nullable JavaType type) {
@@ -823,6 +759,7 @@ public interface K extends J {
     @SuppressWarnings({"unused", "DeprecatedIsStillUsed"})
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class DestructuringDeclaration implements K, Statement {
 
@@ -942,6 +879,7 @@ public interface K extends J {
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @With
     final class ExpressionStatement implements K, Expression, Statement {
 
@@ -954,12 +892,6 @@ public interface K extends J {
         @SuppressWarnings("unused")
         public ExpressionStatement(Expression expression) {
             this.id = Tree.randomId();
-            this.expression = expression;
-        }
-
-        @JsonCreator
-        public ExpressionStatement(UUID id, Expression expression) {
-            this.id = id;
             this.expression = expression;
         }
 
@@ -1016,6 +948,7 @@ public interface K extends J {
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class FunctionType implements K, TypeTree, Expression {
 
@@ -1030,20 +963,6 @@ public interface K extends J {
 
         @With
         Space prefix;
-
-        public FunctionType(UUID id, Space prefix, Markers markers, List<Annotation> leadingAnnotations,
-                            List<Modifier> modifiers, @Nullable JRightPadded<NameTree> receiver,
-                            @Nullable JContainer<TypeTree> parameters, @Nullable Space arrow, JRightPadded<TypedTree> returnType) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.leadingAnnotations = leadingAnnotations;
-            this.modifiers = modifiers;
-            this.receiver = receiver;
-            this.parameters = parameters;
-            this.arrow = arrow;
-            this.returnType = returnType;
-        }
 
         public Space getPrefix() {
             //noinspection ConstantConditions
@@ -1130,6 +1049,7 @@ public interface K extends J {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Getter
+        @RequiredArgsConstructor
         @With
         public static final class Parameter implements K, TypeTree {
 
@@ -1142,13 +1062,6 @@ public interface K extends J {
             Identifier name;
 
             TypeTree parameterType;
-
-            public Parameter(UUID id, Markers markers, @Nullable Identifier name, TypeTree parameterType) {
-                this.id = id;
-                this.markers = markers;
-                this.name = name;
-                this.parameterType = parameterType;
-            }
 
             @Override
             public Space getPrefix() {
@@ -1211,6 +1124,7 @@ public interface K extends J {
     @SuppressWarnings("DeprecatedIsStillUsed")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @Data
     @With
     final class KReturn implements K, Statement, Expression {
@@ -1230,14 +1144,6 @@ public interface K extends J {
 
         public KReturn(UUID id, Return expression, @Nullable J.Identifier label) {
             this(id, Collections.emptyList(), expression, label);
-        }
-
-        @JsonCreator
-        public KReturn(UUID id, List<Annotation> annotations, Return expression, @Nullable J.Identifier label) {
-            this.id = id;
-            this.annotations = annotations;
-            this.expression = expression;
-            this.label = label;
         }
 
         @Override
@@ -1294,6 +1200,7 @@ public interface K extends J {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @Data
     @With
     final class KString implements K, Statement, Expression {
@@ -1309,15 +1216,6 @@ public interface K extends J {
         @Nullable
         JavaType type;
 
-        public KString(UUID id, Space prefix, Markers markers, String delimiter, List<J> strings, @Nullable JavaType type) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.delimiter = delimiter;
-            this.strings = strings;
-            this.type = type;
-        }
-
         @Override
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
             return v.visitKString(this, p);
@@ -1331,6 +1229,7 @@ public interface K extends J {
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @RequiredArgsConstructor
         @Data
         @With
         public static final class Value implements K {
@@ -1339,15 +1238,6 @@ public interface K extends J {
 
             @Nullable
             Space prefix;
-
-            public Value(UUID id, @Nullable Space prefix, Markers markers, J tree, @Nullable Space after, boolean enclosedInBraces) {
-                this.id = id;
-                this.prefix = prefix;
-                this.markers = markers;
-                this.tree = tree;
-                this.after = after;
-                this.enclosedInBraces = enclosedInBraces;
-            }
 
             @Override
             public Space getPrefix() {
@@ -1391,14 +1281,6 @@ public interface K extends J {
         @Nullable
         JavaType type;
 
-        public KThis(UUID id, Space prefix, Markers markers, @Nullable J.Identifier label, @Nullable JavaType type) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.label = label;
-            this.type = type;
-        }
-
         @Override
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
             return v.visitKThis(this, p);
@@ -1419,6 +1301,7 @@ public interface K extends J {
     @SuppressWarnings("unused")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class ListLiteral implements K, Expression, TypedTree {
         @Nullable
@@ -1439,14 +1322,6 @@ public interface K extends J {
         Markers markers;
 
         JContainer<Expression> elements;
-
-        public ListLiteral(UUID id, Space prefix, Markers markers, JContainer<Expression> elements, @Nullable JavaType type) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.elements = elements;
-            this.type = type;
-        }
 
         public List<Expression> getElements() {
             return elements.getElements();
@@ -1515,13 +1390,6 @@ public interface K extends J {
         J.MethodDeclaration methodDeclaration;
         TypeConstraints typeConstraints;
 
-        public MethodDeclaration(UUID id, Markers markers, J.MethodDeclaration methodDeclaration, TypeConstraints typeConstraints) {
-            this.id = id;
-            this.markers = markers;
-            this.methodDeclaration = methodDeclaration;
-            this.typeConstraints = typeConstraints;
-        }
-
         @Override
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
             return v.visitMethodDeclaration(this, p);
@@ -1556,9 +1424,10 @@ public interface K extends J {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @With
     @Data
-    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class Property implements K, Statement {
         @Nullable
         @NonFinal
@@ -1597,22 +1466,6 @@ public interface K extends J {
         @Nullable
         public Expression getReceiver() {
             return receiver == null ? null : receiver.getElement();
-        }
-
-        public Property(UUID id, Space prefix, Markers markers, @Nullable JContainer<TypeParameter> typeParameters, VariableDeclarations variableDeclarations,
-                        @Nullable K.TypeConstraints typeConstraints,
-                        @Nullable J.MethodDeclaration getter, @Nullable J.MethodDeclaration setter, boolean isSetterFirst,
-                        @Nullable JRightPadded<Expression> receiver) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.typeParameters = typeParameters;
-            this.variableDeclarations = variableDeclarations;
-            this.typeConstraints = typeConstraints;
-            this.getter = getter;
-            this.setter = setter;
-            this.isSetterFirst = isSetterFirst;
-            this.receiver = receiver;
         }
 
         @Override
@@ -1719,13 +1572,6 @@ public interface K extends J {
         Markers markers;
         Expression expression;
 
-        public SpreadArgument(UUID id, Space prefix, Markers markers, Expression expression) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.expression = expression;
-        }
-
         @Override
         public @Nullable JavaType getType() {
             return expression.getType() != null ? new JavaType.Array(null, expression.getType()) : null;
@@ -1757,6 +1603,7 @@ public interface K extends J {
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @With
     final class StatementExpression implements K, Expression, Statement {
 
@@ -1764,11 +1611,6 @@ public interface K extends J {
         UUID id;
 
         Statement statement;
-
-        public StatementExpression(UUID id, Statement statement) {
-            this.id = id;
-            this.statement = statement;
-        }
 
         @Override
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
@@ -1822,6 +1664,7 @@ public interface K extends J {
     @Getter
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class TypeConstraints implements K {
         @Nullable
@@ -1836,12 +1679,6 @@ public interface K extends J {
         Markers markers;
 
         JContainer<J.TypeParameter> constraints;
-
-        public TypeConstraints(UUID id, Markers markers, JContainer<J.TypeParameter> constraints) {
-            this.id = id;
-            this.markers = markers;
-            this.constraints = constraints;
-        }
 
         public List<J.TypeParameter> getConstraints() {
             return constraints.getElements();
@@ -1905,6 +1742,7 @@ public interface K extends J {
     @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @With
     final class TypeParameterExpression implements K, Expression {
 
@@ -1912,11 +1750,6 @@ public interface K extends J {
         UUID id;
 
         TypeParameter typeParameter;
-
-        public TypeParameterExpression(UUID id, TypeParameter typeParameter) {
-            this.id = id;
-            this.typeParameter = typeParameter;
-        }
 
         @Override
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
@@ -1990,15 +1823,6 @@ public interface K extends J {
         @Nullable
         JavaType type;
 
-        public When(UUID id, Space prefix, Markers markers, @Nullable ControlParentheses<J> selector, Block branches, @Nullable JavaType type) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.selector = selector;
-            this.branches = branches;
-            this.type = type;
-        }
-
         @Override
         public <P> J acceptKotlin(KotlinVisitor<P> v, P p) {
             return v.visitWhen(this, p);
@@ -2029,6 +1853,7 @@ public interface K extends J {
     @SuppressWarnings("unused")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class WhenBranch implements K, Statement {
         @Nullable
@@ -2049,14 +1874,6 @@ public interface K extends J {
         Markers markers;
 
         JContainer<Expression> expressions;
-
-        public WhenBranch(UUID id, Space prefix, Markers markers, JContainer<Expression> expressions, JRightPadded<J> body) {
-            this.id = id;
-            this.prefix = prefix;
-            this.markers = markers;
-            this.expressions = expressions;
-            this.body = body;
-        }
 
         public List<Expression> getExpressions() {
             return expressions.getElements();
