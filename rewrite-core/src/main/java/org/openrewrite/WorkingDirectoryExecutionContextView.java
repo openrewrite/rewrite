@@ -78,6 +78,10 @@ public class WorkingDirectoryExecutionContextView extends DelegatingExecutionCon
                 .orElseThrow(() -> new IllegalStateException("Working directory not set"));
     }
 
+    public static void deleteWorkingDirectory(ExecutionContext ctx) {
+        delete(getWorkingDirectory(ctx));
+    }
+
     @Override
     public void close() {
         if (existing == null) {
@@ -85,11 +89,11 @@ public class WorkingDirectoryExecutionContextView extends DelegatingExecutionCon
         }
     }
 
-    private void delete(Path path) {
+    private static void delete(Path path) {
         try {
             if (Files.isDirectory(path)) {
                 try (Stream<Path> files = Files.list(path)) {
-                    files.forEach(this::delete);
+                    files.forEach(WorkingDirectoryExecutionContextView::delete);
                 }
             }
             Files.delete(path);
