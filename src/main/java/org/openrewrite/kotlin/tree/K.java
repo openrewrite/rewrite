@@ -393,6 +393,7 @@ public interface K extends J {
     final class AnnotatedExpression implements K, Expression {
 
         @With
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -970,6 +971,7 @@ public interface K extends J {
     final class ExpressionStatement implements K, Expression, Statement {
 
         @With
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1048,11 +1050,11 @@ public interface K extends J {
         @NonFinal
         transient WeakReference<Padding> padding;
 
-        @EqualsAndHashCode.Include
         @With
+        @EqualsAndHashCode.Include
         @Getter
-
         UUID id;
+
         @With
         Space prefix;
 
@@ -1331,6 +1333,8 @@ public interface K extends J {
     @Data
     @With
     final class KString implements K, Statement, Expression {
+
+        @EqualsAndHashCode.Include
         UUID id;
         Space prefix;
         Markers markers;
@@ -1365,6 +1369,7 @@ public interface K extends J {
         @Data
         @With
         public static final class Value implements K {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @Nullable
@@ -1719,6 +1724,7 @@ public interface K extends J {
     @With
     class NamedVariableInitializer implements K, Expression {
 
+        @EqualsAndHashCode.Include
         UUID id;
 
         Space prefix;
@@ -1752,6 +1758,7 @@ public interface K extends J {
     @With
     class SpreadArgument implements K, Expression {
 
+        @EqualsAndHashCode.Include
         UUID id;
 
         Space prefix;
@@ -1800,6 +1807,7 @@ public interface K extends J {
     final class StatementExpression implements K, Expression, Statement {
 
         @With
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1948,6 +1956,7 @@ public interface K extends J {
     final class TypeParameterExpression implements K, Expression {
 
         @With
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
