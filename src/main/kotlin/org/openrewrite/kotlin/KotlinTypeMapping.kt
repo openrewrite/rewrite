@@ -1102,7 +1102,7 @@ class KotlinTypeMapping(
             PrimitiveType.INT -> Primitive.Int
             PrimitiveType.LONG -> Primitive.Long
             PrimitiveType.SHORT -> Primitive.Short
-            null -> Primitive.Null
+            null -> Primitive.Void
         }
     }
 

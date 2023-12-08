@@ -623,7 +623,7 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
             PrimitiveType.INT -> JavaType.Primitive.Int.className
             PrimitiveType.LONG -> JavaType.Primitive.Long.className
             PrimitiveType.SHORT -> JavaType.Primitive.Short.className
-            null -> JavaType.Primitive.Null.className
+            null -> JavaType.Primitive.Void.className
         }
     }
 

@@ -1331,5 +1331,32 @@ public class KotlinTypeMappingTest {
               )
             );
         }
+
+
+        @Test
+        void returnTypeIsVoid() {
+            rewriteRun(
+              kotlin(
+                """
+                 import java.lang.AutoCloseable
+                 abstract class Test : AutoCloseable
+                 """, spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
+                            if ("AutoCloseable".equals(identifier.getSimpleName()) && identifier.getType() != null) {
+                                assertThat(((JavaType.Class) identifier.getType()).getMethods().get(0).toString())
+                                  .isEqualTo("java.lang.AutoCloseable{name=close,return=void,parameters=[]}");
+                                found.set(true);
+                            }
+                            return super.visitIdentifier(identifier, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
     }
 }
