@@ -442,6 +442,70 @@ class UpdateGradleWrapperTest implements RewriteTest {
         );
     }
 
+    @Test
+    void skipWorkIfUpdatedEarlier() {
+        rewriteRun(
+          spec -> spec.recipeFromYaml(
+            """
+              type: specs.openrewrite.org/v1beta/recipe
+              name: org.openrewrite.gradle.MultipleWrapperUpdates
+              displayName: Multiple wrapper updates
+              description: Multiple wrapper updates.
+              recipeList:
+                - org.openrewrite.gradle.UpdateGradleWrapper:
+                    version: 7.6.3
+                    addIfMissing: false
+                - org.openrewrite.gradle.UpdateGradleWrapper:
+                    version: 6.9.4
+                    addIfMissing: false
+            """,
+              "org.openrewrite.gradle.MultipleWrapperUpdates")
+            .cycles(1)
+            .allSources(source -> source.markers(new BuildTool(Tree.randomId(), BuildTool.Type.Gradle, "5.6.4")))
+            .afterRecipe(run -> {
+                var gradleSh = result(run, PlainText.class, "gradlew");
+                assertThat(gradleSh.getSourcePath()).isEqualTo(WRAPPER_SCRIPT_LOCATION);
+                assertThat(gradleSh.getText()).isNotBlank();
+                assertThat(gradleSh.getFileAttributes()).isNotNull();
+                assertThat(gradleSh.getFileAttributes().isReadable()).isTrue();
+                assertThat(gradleSh.getFileAttributes().isExecutable()).isTrue();
+
+                var gradleBat = result(run, PlainText.class, "gradlew.bat");
+                assertThat(gradleBat.getSourcePath()).isEqualTo(WRAPPER_BATCH_LOCATION);
+                assertThat(gradleBat.getText()).isNotBlank();
+
+                var gradleWrapperJar = result(run, Remote.class, "gradle-wrapper.jar");
+                assertThat(gradleWrapperJar.getSourcePath()).isEqualTo(WRAPPER_JAR_LOCATION);
+                //noinspection OptionalGetWithoutIsPresent
+                BuildTool buildTool = gradleWrapperJar.getMarkers().findFirst(BuildTool.class).get();
+                assertThat(buildTool.getVersion()).isEqualTo("7.6.3");
+                assertThat(gradleWrapperJar.getUri()).isEqualTo(URI.create("https://services.gradle.org/distributions/gradle-" + buildTool.getVersion() + "-bin.zip"));
+                assertThat(isValidWrapperJar(gradleWrapperJar)).as("Wrapper jar is not valid").isTrue();
+            }),
+          properties(
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-5.6.4-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              """,
+            """
+              distributionBase=GRADLE_USER_HOME
+              distributionPath=wrapper/dists
+              distributionUrl=https\\://services.gradle.org/distributions/gradle-7.6.3-bin.zip
+              zipStoreBase=GRADLE_USER_HOME
+              zipStorePath=wrapper/dists
+              distributionSha256Sum=740c2e472ee4326c33bf75a5c9f5cd1e69ecf3f9b580f6e236c86d1f3d98cfac
+              """,
+            spec -> spec.path("gradle/wrapper/gradle-wrapper.properties")
+          ),
+          gradlew,
+          gradlewBat,
+          gradleWrapperJarQuark
+        );
+    }
+
     private <S extends SourceFile> S result(RecipeRun run, Class<S> clazz, String endsWith) {
         return run.getChangeset().getAllResults().stream()
           .map(Result::getAfter)
