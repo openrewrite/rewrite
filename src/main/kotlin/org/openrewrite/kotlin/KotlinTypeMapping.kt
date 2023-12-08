@@ -73,7 +73,7 @@ class KotlinTypeMapping(
     private val signatureBuilder: KotlinTypeSignatureBuilder = KotlinTypeSignatureBuilder(firSession, firFile)
 
     override fun type(type: Any?): JavaType {
-        if (type == null || type is FirErrorTypeRef || type is FirExpression && type.typeRef is FirErrorTypeRef) {
+        if (type == null || type is FirErrorTypeRef || type is FirExpression && type.typeRef is FirErrorTypeRef || type is FirResolvedQualifier && type.classId == null) {
             return Unknown.getInstance()
         }
 
@@ -87,7 +87,7 @@ class KotlinTypeMapping(
     }
 
     fun type(type: Any?, parent: Any?): JavaType? {
-        if (type == null || type is FirErrorTypeRef || type is FirExpression && type.typeRef is FirErrorTypeRef) {
+        if (type == null || type is FirErrorTypeRef || type is FirExpression && type.typeRef is FirErrorTypeRef || type is FirResolvedQualifier && type.classId == null) {
             return Unknown.getInstance()
         }
         val signature = signatureBuilder.signature(type, parent)

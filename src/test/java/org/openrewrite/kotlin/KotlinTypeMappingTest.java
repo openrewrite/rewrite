@@ -1298,5 +1298,38 @@ public class KotlinTypeMappingTest {
               )
             );
         }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/510")
+        @Test
+        void fullyQualifiedClassConstructor() {
+            rewriteRun(
+              kotlin(
+                """
+                 class Test {
+                     val sb = java.lang.StringBuilder().toString()
+                 }
+                 """, spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean isFieldTargetNull = new AtomicBoolean(false);
+                    AtomicBoolean isStringBuilderTyped = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
+                            if (identifier.getSimpleName().equals("lang")) {
+                                assertThat(identifier.getType()).isNull();
+                                isFieldTargetNull.set(true);
+                            }
+                            if (identifier.getSimpleName().equals("StringBuilder")) {
+                                assertThat(identifier.getType().toString()).isEqualTo("java.lang.StringBuilder");
+                                isStringBuilderTyped.set(true);
+                            }
+                            return super.visitIdentifier(identifier, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(isFieldTargetNull.get()).isTrue();
+                    assertThat(isStringBuilderTyped.get()).isTrue();
+                })
+              )
+            );
+        }
     }
 }

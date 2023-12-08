@@ -451,6 +451,7 @@ public class KotlinParser implements Parser {
             kotlinSources.get(i).setFirFile(result.getSecond().get(i));
         }
         // IR generation.
+//        BaseDiagnosticsCollector diagnosticsReporter = DiagnosticReporterFactory.INSTANCE.createReporter(false);
 //        AnalyseKt.runCheckers(firSession, result.getFirst(), result.getSecond(), diagnosticsReporter);
 //        ModuleCompilerAnalyzedOutput analyzedOutput = new ModuleCompilerAnalyzedOutput(firSession, result.getFirst(), result.getSecond());
 //        FirResult firResult = new FirResult(singletonList(analyzedOutput));
