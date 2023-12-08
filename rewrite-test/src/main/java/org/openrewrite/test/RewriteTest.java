@@ -341,15 +341,12 @@ public interface RewriteTest extends SourceSpecs {
             lss = new LargeSourceSetCheckingExpectedCycles(expectedCyclesThatMakeChanges, runnableSourceFiles);
         }
 
-        RecipeRun recipeRun;
-        try (WorkingDirectoryExecutionContextView ctx = WorkingDirectoryExecutionContextView.createNew(recipeExecutionContext)) {
-            recipeRun = recipe.run(
-                    lss,
-                    ctx,
-                    cycles,
-                    expectedCyclesThatMakeChanges + 1
-            );
-        }
+        RecipeRun recipeRun = recipe.run(
+                lss,
+                recipeExecutionContext,
+                cycles,
+                expectedCyclesThatMakeChanges + 1
+        );
 
         for (Consumer<RecipeRun> afterRecipe : testClassSpec.afterRecipes) {
             afterRecipe.accept(recipeRun);
