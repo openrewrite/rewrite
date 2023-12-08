@@ -287,9 +287,17 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
 
                 SourceFile sourceFile = (SourceFile) tree;
                 if (acc.updatedMarker != null) {
-                    sourceFile = sourceFile.getMarkers().findFirst(BuildTool.class)
-                            .map(buildTool -> (SourceFile) tree.withMarkers(tree.getMarkers().computeByType(buildTool, (b, a) -> acc.updatedMarker)))
-                            .orElse(sourceFile);
+                    Optional<BuildTool> maybeCurrentMarker = sourceFile.getMarkers().findFirst(BuildTool.class);
+                    if (maybeCurrentMarker.isPresent()) {
+                        BuildTool currentMarker = maybeCurrentMarker.get();
+                        VersionComparator versionComparator = requireNonNull(Semver.validate(isBlank(version) ? "latest.release" : version, null).getValue());
+                        int compare = versionComparator.compare(null, currentMarker.getVersion(), acc.updatedMarker.getVersion());
+                        if (compare < 0) {
+                            sourceFile = sourceFile.withMarkers(sourceFile.getMarkers().computeByType(currentMarker, (b, a) -> acc.updatedMarker));
+                        } else {
+                            return sourceFile;
+                        }
+                    }
                 }
 
                 if (sourceFile instanceof PlainText && PathUtils.matchesGlob(sourceFile.getSourcePath(), "**/" + WRAPPER_SCRIPT_LOCATION_RELATIVE_PATH)) {
