@@ -1042,7 +1042,7 @@ public interface K extends J {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
-    class FunctionType implements K, TypeTree, Expression {
+    final class FunctionType implements K, TypeTree, Expression {
 
         @Nullable
         @NonFinal
