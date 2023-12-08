@@ -36,7 +36,8 @@ class HclAttributeTest implements RewriteTest {
     @Test
     void objectValueAttributes() {
         rewriteRun(
-          hcl("""
+          hcl(
+                """
             locals {
                 simple_str = "str1"
                 objectvalue = {

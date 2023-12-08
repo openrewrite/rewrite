@@ -112,7 +112,8 @@ class JavaVisitorTest implements RewriteTest {
                 }
             })
           ),
-          java("""
+          java(
+                """
            class A {
              public void method1() {
              }

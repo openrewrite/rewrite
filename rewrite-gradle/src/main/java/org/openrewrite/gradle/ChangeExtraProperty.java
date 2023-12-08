@@ -57,7 +57,7 @@ public class ChangeExtraProperty extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new FindGradleProject(FindGradleProject.SearchCriteria.File).getVisitor(), new GroovyIsoVisitor<ExecutionContext>() {
             @Override
-            public J.Assignment visitAssignment(J.Assignment as, ExecutionContext executionContext) {
+            public J.Assignment visitAssignment(J.Assignment as, ExecutionContext ctx) {
                 if(!(as.getAssignment() instanceof J.Literal)) {
                     return as;
                 }

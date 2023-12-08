@@ -84,7 +84,8 @@ class RemoveManagedDependencyTest implements RewriteTest {
             "javax.activation-api",
             null
           )),
-          pomXml("""
+          pomXml(
+                """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -136,7 +137,8 @@ class RemoveManagedDependencyTest implements RewriteTest {
             "javax.activation-api",
             "test"
           )),
-          pomXml("""
+          pomXml(
+                """
               <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -188,7 +190,8 @@ class RemoveManagedDependencyTest implements RewriteTest {
             "javax.activation-api",
             "compile"
           )),
-          pomXml("""
+          pomXml(
+                """
             <project>
                 <modelVersion>4.0.0</modelVersion>
                 <groupId>com.mycompany.app</groupId>

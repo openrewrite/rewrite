@@ -29,7 +29,8 @@ class UpdateMovedRecipeXmlTest implements RewriteTest {
         rewriteRun(
           spec -> spec.recipe(new UpdateMovedRecipeXml("org.openrewrite.java.cleanup.AddSerialVersionUidToSerializable",
             "org.openrewrite.staticanalysis.AddSerialVersionUidToSerializable")),
-          pomXml("""
+          pomXml(
+                """
             <project>
               <groupId>org.example</groupId>
               <artifactId>foo</artifactId>

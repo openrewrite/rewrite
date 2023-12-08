@@ -90,13 +90,13 @@ public class RemoveImplements extends Recipe {
             }
 
             @Override
-            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration md, ExecutionContext context) {
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration md, ExecutionContext ctx) {
                 if (md.getMethodType() == null) {
-                    return super.visitMethodDeclaration(md, context);
+                    return super.visitMethodDeclaration(md, ctx);
                 }
                 Object maybeClassType = getCursor().getNearestMessage(md.getMethodType().getDeclaringType().getFullyQualifiedName());
                 if (!(maybeClassType instanceof JavaType.Class)) {
-                    return super.visitMethodDeclaration(md, context);
+                    return super.visitMethodDeclaration(md, ctx);
                 }
                 JavaType.Class cdt = (JavaType.Class) maybeClassType;
                 JavaType.Method mt = md.getMethodType().withDeclaringType(cdt);
@@ -105,10 +105,10 @@ public class RemoveImplements extends Recipe {
                     md = md.withName(md.getName().withType(mt));
                 }
                 if (md.getAllAnnotations().stream().noneMatch(ann -> isOfClassType(ann.getType(), "java.lang.Override")) || TypeUtils.isOverride(md.getMethodType())) {
-                    return super.visitMethodDeclaration(md, context);
+                    return super.visitMethodDeclaration(md, ctx);
                 }
-                md = (J.MethodDeclaration) new RemoveAnnotation("@java.lang.Override").getVisitor().visitNonNull(md, context, getCursor().getParentOrThrow());
-                return super.visitMethodDeclaration(md, context);
+                md = (J.MethodDeclaration) new RemoveAnnotation("@java.lang.Override").getVisitor().visitNonNull(md, ctx, getCursor().getParentOrThrow());
+                return super.visitMethodDeclaration(md, ctx);
             }
         });
     }

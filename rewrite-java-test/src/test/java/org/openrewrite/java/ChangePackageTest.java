@@ -554,7 +554,8 @@ class ChangePackageTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
     void annotationArgument() {
         rewriteRun(
-          java("""
+          java(
+                """
               package org.openrewrite;
               public class Argument {}
               """,
@@ -605,7 +606,8 @@ class ChangePackageTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
     void annotationArgumentNamed() {
         rewriteRun(
-          java("""
+          java(
+                """
               package org.openrewrite;
               public class Argument {}
               """,
@@ -656,7 +658,8 @@ class ChangePackageTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
     void annotationArgumentFullyQualified() {
         rewriteRun(
-          java("""
+          java(
+                """
               package org.openrewrite;
               public class Argument {}
               """,
@@ -705,7 +708,8 @@ class ChangePackageTest implements RewriteTest {
     @Issue("https://github.com/openrewrite/rewrite/issues/3200")
     void annotationArgumentNamedFullyQualified() {
         rewriteRun(
-          java("""
+          java(
+                """
               package org.openrewrite;
               public class Argument {}
               """,

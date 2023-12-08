@@ -144,7 +144,8 @@ class UpdateStaticAnalysisPackageTest implements RewriteTest {
     @Test
     void changePomXmlConfiguration() {
         rewriteRun(
-          pomXml("""
+          pomXml(
+                """
             <project>
               <groupId>org.example</groupId>
               <artifactId>foo</artifactId>

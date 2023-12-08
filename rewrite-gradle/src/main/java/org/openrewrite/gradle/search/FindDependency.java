@@ -66,7 +66,7 @@ public class FindDependency extends Recipe {
         MethodMatcher dependency = new MethodMatcher("DependencyHandlerSpec *(..)");
         return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
                 if (dependency.matches(method)) {
                     if (StringUtils.isBlank(configuration) || method.getSimpleName().equals(configuration)) {
                         List<Expression> depArgs = method.getArguments();
@@ -83,7 +83,7 @@ public class FindDependency extends Recipe {
                         }
                     }
                 }
-                return super.visitMethodInvocation(method, context);
+                return super.visitMethodInvocation(method, ctx);
             }
         });
     }

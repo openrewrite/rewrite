@@ -111,7 +111,7 @@ public class CreateEmptyJavaClass extends ScanningRecipe<AtomicBoolean> {
         Path path = getSourcePath();
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
+            public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
                 if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(cu.getSourcePath())) {
                     Optional<SourceFile> sourceFile = createEmptyClass().findFirst();
                     if (sourceFile.isPresent() && sourceFile.get() instanceof J.CompilationUnit) {

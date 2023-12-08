@@ -32,7 +32,8 @@ class OrderPomElementsTest implements RewriteTest {
     @Test
     void validOrderNoChange() {
         rewriteRun(
-          pomXml("""
+          pomXml(
+                """
             <project>
                 <modelVersion>4.0.0</modelVersion>
 

@@ -52,11 +52,11 @@ public class ChangeTagName extends Recipe {
             private final XPathMatcher xPathMatcher = new XPathMatcher(elementName);
 
             @Override
-            public Xml.Tag visitTag(final Xml.Tag tag, final ExecutionContext executionContext) {
+            public Xml.Tag visitTag(final Xml.Tag tag, final ExecutionContext ctx) {
                 if (xPathMatcher.matches(getCursor())) {
                     return tag.withName(newName);
                 }
-                return super.visitTag(tag, executionContext);
+                return super.visitTag(tag, ctx);
             }
         };
     }

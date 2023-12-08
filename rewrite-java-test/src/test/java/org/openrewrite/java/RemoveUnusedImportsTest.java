@@ -1722,7 +1722,8 @@ class RemoveUnusedImportsTest implements RewriteTest {
               }
               """
           )),
-          java("""
+          java(
+                """
             package pzrep.p2;
 
             import pzrep.p1.Record;

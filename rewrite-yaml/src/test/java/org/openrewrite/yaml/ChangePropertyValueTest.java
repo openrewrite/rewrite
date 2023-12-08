@@ -28,7 +28,8 @@ class ChangePropertyValueTest implements RewriteTest {
     void simpleDotSeparated() {
         rewriteRun(
           spec -> spec.recipe(new ChangePropertyValue("my.prop", "bar", null, null, null)),
-          yaml("""
+          yaml(
+                """
             my.prop: foo
             """, """
             my.prop: bar

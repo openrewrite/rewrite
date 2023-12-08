@@ -43,11 +43,11 @@ public class FindPlugin extends Recipe {
         Set<Xml.Tag> ds = new HashSet<>();
         new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext context) {
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isPluginTag(groupId, artifactId)) {
                     ds.add(tag);
                 }
-                return super.visitTag(tag, context);
+                return super.visitTag(tag, ctx);
             }
         }.visit(maven, new InMemoryExecutionContext());
         return ds;

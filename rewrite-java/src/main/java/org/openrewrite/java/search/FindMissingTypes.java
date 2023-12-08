@@ -206,8 +206,8 @@ public class FindMissingTypes extends Recipe {
         }
 
         @Override
-        public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
-            J.NewClass n = super.visitNewClass(newClass, executionContext);
+        public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+            J.NewClass n = super.visitNewClass(newClass, ctx);
             if (n == newClass && !isWellFormedType(n.getType(), seenTypes)) {
                 n = SearchResult.found(n, "NewClass type is missing or malformed");
             }
@@ -219,8 +219,8 @@ public class FindMissingTypes extends Recipe {
         }
 
         @Override
-        public J.ParameterizedType visitParameterizedType(J.ParameterizedType type, ExecutionContext executionContext) {
-            J.ParameterizedType p = super.visitParameterizedType(type, executionContext);
+        public J.ParameterizedType visitParameterizedType(J.ParameterizedType type, ExecutionContext ctx) {
+            J.ParameterizedType p = super.visitParameterizedType(type, ctx);
             if (p.getClazz() instanceof J.Identifier && p.getClazz().getType() != null &&
                     !(p.getClazz().getType() instanceof JavaType.Class || p.getClazz().getType() instanceof JavaType.Unknown)) {
                 p = SearchResult.found(p, "ParameterizedType#clazz is J.Identifier and the type is is not JavaType$Class.");

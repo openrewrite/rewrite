@@ -53,8 +53,8 @@ public class FindMethodDeclaration extends Recipe {
         return Preconditions.check(new DeclaresMethod<>(methodPattern, matchOverrides), new JavaIsoVisitor<ExecutionContext>() {
             final MethodMatcher m = new MethodMatcher(methodPattern, matchOverrides);
             @Override
-            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext executionContext) {
-                J.MethodDeclaration md = super.visitMethodDeclaration(method, executionContext);
+            public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+                J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
                 J.ClassDeclaration cd = getCursor().firstEnclosing(J.ClassDeclaration.class);
                 if(cd == null) {
                     return md;

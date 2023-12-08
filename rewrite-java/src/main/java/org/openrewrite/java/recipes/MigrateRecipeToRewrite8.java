@@ -121,7 +121,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
 
             @Override
             public J.MemberReference visitMemberReference(final J.MemberReference memberRef,
-                                                          final ExecutionContext executionContext) {
+                                                          final ExecutionContext ctx) {
                 if (MigrateRecipeToRewrite8.VISIT_JAVA_SOURCE_FILE_METHOD_MATCHER.matches(memberRef.getMethodType())) {
                     maybeAddImport("org.openrewrite.TreeVisitor");
                     return getVisitMemberReferenceTemplate();
@@ -195,11 +195,11 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                     return (J.ClassDeclaration) new JavaIsoVisitor<ExecutionContext>() {
                         @Override
                         public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method,
-                                                                          ExecutionContext executionContext) {
+                                                                          ExecutionContext ctx) {
                             if (VISIT_METHOD_MATCHER.matches(method.getMethodType())) {
                                 return (J.MethodDeclaration) commentOf(method, VISIT_SOURCE_FILES_COMMENT);
                             }
-                            return super.visitMethodDeclaration(method, executionContext);
+                            return super.visitMethodDeclaration(method, ctx);
                         }
                     }.visitNonNull(classDecl, ctx);
                 }
@@ -318,7 +318,7 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                     visitMethod = (J.MethodDeclaration) new JavaVisitor<ExecutionContext>() {
                         @Override
                         public J visitMethodInvocation(J.MethodInvocation method,
-                                                       ExecutionContext executionContext) {
+                                                       ExecutionContext ctx) {
 
                             if (method.getSimpleName().equals("visitJavaSourceFile")) {
                                 boolean isVariableDeclaration = getCursor().dropParentUntil(p -> p instanceof J.VariableDeclarations ||
@@ -333,12 +333,12 @@ public class MigrateRecipeToRewrite8 extends Recipe {
                                     return getVisitMethodInvocationTemplate().withSelect(method.getSelect()).withArguments(method.getArguments());
                                 }
                             }
-                            return super.visitMethodInvocation(method, executionContext);
+                            return super.visitMethodInvocation(method, ctx);
                         }
 
                         @Override
                         public J.MemberReference visitMemberReference(J.MemberReference memberRef,
-                                                                      ExecutionContext executionContext) {
+                                                                      ExecutionContext ctx) {
                             if (memberRef.getReference().getSimpleName().equals("visitJavaSourceFile")) {
                                 maybeAddImport("org.openrewrite.TreeVisitor");
                                 return getVisitMemberReferenceTemplate();
@@ -387,8 +387,8 @@ public class MigrateRecipeToRewrite8 extends Recipe {
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method,
-                                                            ExecutionContext executionContext) {
-                method = super.visitMethodInvocation(method, executionContext);
+                                                            ExecutionContext ctx) {
+                method = super.visitMethodInvocation(method, ctx);
                 if (method.getSelect() instanceof J.Identifier &&
                     ((J.Identifier) method.getSelect()).getSimpleName().equals("Applicability")) {
                     switch (method.getSimpleName()) {

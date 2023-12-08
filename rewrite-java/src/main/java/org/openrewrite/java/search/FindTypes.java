@@ -64,7 +64,7 @@ public class FindTypes extends Recipe {
 
         return Preconditions.check(new UsesType<>(fullyQualifiedTypeName, false), new JavaVisitor<ExecutionContext>() {
             @Override
-            public J visitIdentifier(J.Identifier ident, ExecutionContext executionContext) {
+            public J visitIdentifier(J.Identifier ident, ExecutionContext ctx) {
                 if (ident.getType() != null &&
                     getCursor().firstEnclosing(J.Import.class) == null &&
                     getCursor().firstEnclosing(J.FieldAccess.class) == null &&
@@ -75,7 +75,7 @@ public class FindTypes extends Recipe {
                         return SearchResult.found(ident);
                     }
                 }
-                return super.visitIdentifier(ident, executionContext);
+                return super.visitIdentifier(ident, ctx);
             }
 
             @Override

@@ -60,7 +60,7 @@ public class CommentOutProperty extends Recipe {
 
             @Override
             public Yaml.Sequence.Entry visitSequenceEntry(Yaml.Sequence.Entry entry,
-                                                          ExecutionContext executionContext) {
+                                                          ExecutionContext ctx) {
                 indentation = entry.getPrefix();
                 if (!comment.isEmpty()) {
                     // add comment and return
@@ -68,7 +68,7 @@ public class CommentOutProperty extends Recipe {
                     comment = "";
                     return entry.withPrefix(newPrefix);
                 }
-                return super.visitSequenceEntry(entry, executionContext);
+                return super.visitSequenceEntry(entry, ctx);
             }
 
             @Override

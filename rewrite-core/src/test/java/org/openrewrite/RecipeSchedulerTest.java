@@ -74,7 +74,7 @@ class BoomRecipe extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new PlainTextVisitor<>() {
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 throw new BoomException();
             }
         };
