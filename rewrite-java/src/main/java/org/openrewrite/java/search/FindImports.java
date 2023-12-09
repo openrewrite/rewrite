@@ -58,11 +58,11 @@ public class FindImports extends Recipe {
         TypeMatcher typeMatcher = new TypeMatcher(typePattern, Boolean.TRUE.equals(matchInherited));
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.Import visitImport(J.Import anImport, ExecutionContext executionContext) {
+            public J.Import visitImport(J.Import anImport, ExecutionContext ctx) {
                 if (typeMatcher.matchesPackage(anImport.getTypeName())) {
                     return SearchResult.found(anImport);
                 }
-                return super.visitImport(anImport, executionContext);
+                return super.visitImport(anImport, ctx);
             }
         };
     }

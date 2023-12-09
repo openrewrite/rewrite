@@ -43,21 +43,21 @@ public class RemoveObjectsIsNull extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(Preconditions.or(new UsesMethod<>(IS_NULL), new UsesMethod<>(NON_NULL)), new JavaVisitor<ExecutionContext>() {
             @Override
-            public Expression visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, executionContext);
+            public Expression visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (IS_NULL.matches(m)) {
-                    return replace(executionContext, m, "(#{any(boolean)}) == null");
+                    return replace(ctx, m, "(#{any(boolean)}) == null");
                 } else if (NON_NULL.matches(m)) {
-                    return replace(executionContext, m, "(#{any(boolean)}) != null");
+                    return replace(ctx, m, "(#{any(boolean)}) != null");
                 }
                 return m;
             }
 
-            private Expression replace(ExecutionContext executionContext, J.MethodInvocation m, String pattern) {
+            private Expression replace(ExecutionContext ctx, J.MethodInvocation m, String pattern) {
                 Expression e = m.getArguments().get(0);
                 Expression replaced = JavaTemplate.apply(pattern, getCursor(), m.getCoordinates().replace(), e);
                 return (Expression) new UnnecessaryParenthesesVisitor()
-                        .visitNonNull(replaced, executionContext, getCursor());
+                        .visitNonNull(replaced, ctx, getCursor());
             }
         });
     }

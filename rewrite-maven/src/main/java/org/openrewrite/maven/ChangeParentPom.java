@@ -155,7 +155,7 @@ public class ChangeParentPom extends Recipe {
 
         return Preconditions.check(new MavenVisitor<ExecutionContext>() {
             @Override
-            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
+            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
                 Parent parent = getResolutionResult().getPom().getRequested().getParent();
                 if (parent != null &&
                     matchesGlob(parent.getArtifactId(), oldArtifactId) &&

@@ -180,8 +180,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
                 },
                 new TreeVisitor<Tree, ExecutionContext>() {
                     @Override
-                    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext executionContext) {
-                        if (!super.isAcceptable(sourceFile, executionContext)) {
+                    public boolean isAcceptable(SourceFile sourceFile, ExecutionContext ctx) {
+                        if (!super.isAcceptable(sourceFile, ctx)) {
                             return false;
                         }
 
@@ -403,8 +403,8 @@ public class UpdateGradleWrapper extends ScanningRecipe<UpdateGradleWrapper.Grad
         }
 
         @Override
-        public Properties visitFile(Properties.File file, ExecutionContext executionContext) {
-            Properties p = super.visitFile(file, executionContext);
+        public Properties visitFile(Properties.File file, ExecutionContext ctx) {
+            Properties p = super.visitFile(file, ctx);
             Set<Properties.Entry> checksumKey = FindProperties.find(p, DISTRIBUTION_SHA_256_SUM_KEY, false);
             if (checksumKey.isEmpty()) {
                 Properties.Value propertyValue = new Properties.Value(Tree.randomId(), "", Markers.EMPTY, gradleWrapper.getDistributionChecksum().getHexValue());

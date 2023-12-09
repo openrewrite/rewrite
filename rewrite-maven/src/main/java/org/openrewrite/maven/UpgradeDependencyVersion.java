@@ -128,7 +128,7 @@ public class UpgradeDependencyVersion extends ScanningRecipe<Set<GroupArtifact>>
     public TreeVisitor<?, ExecutionContext> getScanner(Set<GroupArtifact> projectArtifacts) {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 ResolvedPom pom = getResolutionResult().getPom();
                 projectArtifacts.add(new GroupArtifact(pom.getGroupId(), pom.getArtifactId()));
                 return document;

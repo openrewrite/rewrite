@@ -90,7 +90,7 @@ public class CreateYamlFile extends ScanningRecipe<AtomicBoolean> {
         Path path = Paths.get(relativeFileName);
         return new YamlVisitor<ExecutionContext>() {
             @Override
-            public Yaml visitDocuments(Yaml.Documents documents, ExecutionContext executionContext) {
+            public Yaml visitDocuments(Yaml.Documents documents, ExecutionContext ctx) {
                 if ((created.get() || Boolean.TRUE.equals(overwriteExisting)) && path.equals(documents.getSourcePath())) {
                     if (StringUtils.isBlank(fileContents)) {
                         return documents.withDocuments(emptyList());

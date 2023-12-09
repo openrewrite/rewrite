@@ -66,19 +66,19 @@ public class SelectRecipeExamples extends Recipe {
 
             @Override
             public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl,
-                                                            ExecutionContext executionContext) {
+                                                            ExecutionContext ctx) {
                 if (classDecl.getImplements() != null && !classDecl.getImplements().isEmpty()) {
                     if (!TypeUtils.isOfClassType(classDecl.getImplements().get(0).getType(), REWRITE_TEST_FQN)) {
                         return classDecl;
                     }
                 }
                 selectedCount = 0;
-                return super.visitClassDeclaration(classDecl, executionContext);
+                return super.visitClassDeclaration(classDecl, ctx);
             }
 
             @Override
             public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method,
-                                                              ExecutionContext executionContext) {
+                                                              ExecutionContext ctx) {
                 if (selectedCount > 0) {
                     return method;
                 }

@@ -126,8 +126,8 @@ public class ReorderMethodArguments extends Recipe {
         }
 
         @Override
-        public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
-            return (J.NewClass) visitMethodCall(super.visitNewClass(newClass, executionContext));
+        public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+            return (J.NewClass) visitMethodCall(super.visitNewClass(newClass, ctx));
         }
 
         private MethodCall visitMethodCall(MethodCall m) {

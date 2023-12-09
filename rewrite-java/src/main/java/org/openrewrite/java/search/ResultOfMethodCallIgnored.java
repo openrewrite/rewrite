@@ -60,8 +60,8 @@ public class ResultOfMethodCallIgnored extends Recipe {
         MethodMatcher methodMatcher = new MethodMatcher(methodPattern, matchOverrides);
         return new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext executionContext) {
-                J.MethodInvocation m = super.visitMethodInvocation(method, executionContext);
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
                 if (methodMatcher.matches(method)) {
                     if (getCursor().getParentTreeCursor().getValue() instanceof J.Block) {
                         m = SearchResult.found(m);

@@ -53,11 +53,11 @@ public class RemovePlugin extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
                 for (Xml.Tag plugin : FindPlugin.find(document, groupId, artifactId)) {
                     doAfterVisit(new RemoveContentVisitor<>(plugin, true));
                 }
-                return super.visitDocument(document, executionContext);
+                return super.visitDocument(document, ctx);
             }
         };
     }

@@ -102,7 +102,7 @@ public class UseStaticImport extends Recipe {
                  * Otherwise, the Javadoc method reference would eventually be refactored to static import, which is not valid for Javadoc.
                  */
                 @Override
-                public Javadoc visitReference(Javadoc.Reference reference, ExecutionContext p) {
+                public Javadoc visitReference(Javadoc.Reference reference, ExecutionContext ctx) {
                     return reference;
                 }
             };
