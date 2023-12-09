@@ -66,7 +66,7 @@ import kotlin.collections.ArrayList
 @Suppress("DuplicatedCode")
 class KotlinTypeMapping(
     private val typeCache: JavaTypeCache,
-    private val firSession: FirSession,
+    val firSession: FirSession,
     private val firFile: FirFile
 ) : JavaTypeMapping<Any> {
 

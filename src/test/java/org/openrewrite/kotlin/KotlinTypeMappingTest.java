@@ -37,6 +37,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
@@ -1334,6 +1335,109 @@ public class KotlinTypeMappingTest {
             );
         }
 
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/510")
+        @Test
+        void innerClasses() {
+            rewriteRun(
+              kotlin(
+                """
+                  @Suppress("UNUSED_PARAMETER")
+                  fun foo(l: List<Pair<String, String>>) {}
+                  """, spec -> spec.afterRecipe(cu -> {
+                    AtomicInteger count = new AtomicInteger(0);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
+                            switch (identifier.getSimpleName()) {
+                                case "List" -> {
+                                    assertThat(identifier.getType().toString()).isEqualTo("kotlin.collections.List");
+                                    count.incrementAndGet();
+                                }
+                                case "Pair" -> {
+                                    assertThat(identifier.getType().toString()).isEqualTo("kotlin.Pair");
+                                    count.incrementAndGet();
+                                }
+                                case "String" -> {
+                                    assertThat(identifier.getType().toString()).isEqualTo("kotlin.String");
+                                    count.incrementAndGet();
+                                }
+                            }
+                            return super.visitIdentifier(identifier, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(count.get()).isEqualTo(4);
+                })
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/510")
+        @Test
+        void parameterizedParentClasses() {
+            rewriteRun(
+              kotlin(
+                """
+                  val m: MutableMap.MutableEntry<String, String>? = null
+                  """, spec -> spec.afterRecipe(cu -> {
+                    AtomicInteger count = new AtomicInteger(0);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
+                            switch (identifier.getSimpleName()) {
+                                case "MutableMap" -> {
+                                    assertThat(identifier.getType().toString()).isEqualTo("kotlin.collections.MutableMap<Generic{K}, Generic{V}>");
+                                    count.incrementAndGet();
+                                }
+                                case "MutableEntry" -> {
+                                    assertThat(identifier.getType().toString()).isEqualTo("kotlin.collections.MutableMap$MutableEntry<kotlin.String, kotlin.String>");
+                                    count.incrementAndGet();
+                                }
+                                case "String" -> {
+                                    assertThat(identifier.getType().toString()).isEqualTo("kotlin.String");
+                                    count.incrementAndGet();
+                                }
+                            }
+                            return super.visitIdentifier(identifier, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(count.get()).isEqualTo(4);
+                })
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/510")
+        @Test
+        void coneTypeProjectInAndOut() {
+            rewriteRun(
+              kotlin(
+                """
+                  @file:Suppress("UNUSED_PARAMETER")
+                  fun foo(a: Array<in String>) {}
+                  fun bar(b: Array<out Number>) {}
+                  """, spec -> spec.afterRecipe(cu -> {
+                    AtomicInteger count = new AtomicInteger(0);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
+                            switch (identifier.getSimpleName()) {
+                                case "String" -> {
+                                    assertThat(identifier.getType().toString()).isEqualTo("kotlin.String");
+                                    count.incrementAndGet();
+                                }
+                                case "Number" -> {
+                                    assertThat(identifier.getType().toString()).isEqualTo("kotlin.Number");
+                                    count.incrementAndGet();
+                                }
+                            }
+                            return super.visitIdentifier(identifier, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(count.get()).isEqualTo(2);
+                })
+              )
+            );
+        }
 
         @Test
         void returnTypeIsVoid() {
