@@ -1027,6 +1027,44 @@ class MavenParserTest implements RewriteTest {
         );
     }
 
+    @Test
+    void nestedParentWithDownloadedParent() {
+        rewriteRun(
+          mavenProject("root",
+            pomXml(
+              """
+                    <project>
+                        <parent>
+                            <groupId>org.apache</groupId>
+                            <artifactId>apache</artifactId>
+                            <version>16</version>
+                            <relativePath/>
+                        </parent>
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>parent</artifactId>
+                        <version>0.1.0-SNAPSHOT</version>
+                    </project>
+                """,
+              spec -> spec.path("parent/pom.xml")
+            ),
+            pomXml(
+              """
+                    <project>
+                        <parent>
+                            <groupId>org.openrewrite.maven</groupId>
+                            <artifactId>parent</artifactId>
+                            <version>0.1.0-SNAPSHOT</version>
+                            <relativePath>parent/pom.xml</relativePath>
+                        </parent>
+                        <artifactId>root</artifactId>
+                    </project>
+                """,
+              spec -> spec.path("pom.xml")
+            )
+          )
+        );
+    }
+
     // a depends on d without specifying version number. a's parent is b
     // b imports c into its dependencyManagement section
     // c's dependencyManagement specifies the version of d to use
