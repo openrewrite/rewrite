@@ -571,7 +571,7 @@ class ClassDeclarationTest implements RewriteTest {
                               cause -> assertThat(cause).isInstanceOf(J.VariableDeclarations.class)
                           );
                           assertThat(constructor.getMethodDeclaration().getBody()).isNull();
-                          assertThat(constructor.getConstructorInvocation().getArguments()).satisfiesExactly(
+                          assertThat(constructor.getInvocation().getElement().getArguments()).satisfiesExactly(
                               message -> assertThat(message).isInstanceOf(J.Identifier.class),
                               cause -> assertThat(cause).isInstanceOf(J.Identifier.class)
                           );
