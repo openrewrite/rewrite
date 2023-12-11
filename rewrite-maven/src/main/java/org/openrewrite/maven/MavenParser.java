@@ -121,7 +121,7 @@ public class MavenParser implements Parser {
                         null);
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(parseExceptionResult)));
                 ctx.getOnError().accept(e);
-            } catch (MavenDownloadingException e) {
+            } catch (MavenDownloadingException | UncheckedIOException e) {
                 parsed.add(docToPom.getKey().withMarkers(docToPom.getKey().getMarkers().add(ParseExceptionResult.build(this, e))));
                 ctx.getOnError().accept(e);
             }
