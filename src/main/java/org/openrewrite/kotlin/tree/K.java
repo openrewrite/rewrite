@@ -600,9 +600,9 @@ public interface K extends J {
         // For backward compatibility, handle removed fields `colon` and `constructorInvocation` which has been relocated to `invocation`
         // Todo, Remove when we feel good that kotlin LSTs have been rebuilt.
         @JsonCreator
-        public Constructor(UUID id,
-                           Markers markers,
-                           J.MethodDeclaration methodDeclaration,
+        public Constructor(@JsonProperty("id") UUID id,
+                           @JsonProperty("markers") Markers markers,
+                           @JsonProperty("methodDeclaration") J.MethodDeclaration methodDeclaration,
                            @JsonProperty("colon") Space colon,
                            @JsonProperty("constructorInvocation") ConstructorInvocation constructorInvocation) {
             padding = null;
