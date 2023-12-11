@@ -23,7 +23,7 @@ public class ReplaceUUIDRandomIdTest implements RewriteTest {
             import java.util.UUID;
             
             class Test {
-                J.Literal literal = new J.Literal(UUID.randomUUID(), Space.SINGLE_SPACE, Markers.EMPTY, defaultValue, defaultValue, null, JavaType.Primitive.Boolean);
+                J.Literal literal = new J.Literal(UUID.randomUUID(), Space.EMPTY, Markers.EMPTY, null, null, null, JavaType.Primitive.Boolean);
             }
             """,
             """
@@ -33,12 +33,13 @@ public class ReplaceUUIDRandomIdTest implements RewriteTest {
                 import java.util.UUID;
                 
                 class Test {
-                    J.Literal literal = new J.Literal(Tree.randomId(), Space.SINGLE_SPACE, Markers.EMPTY, defaultValue, defaultValue, null, JavaType.Primitive.Boolean);
+                    J.Literal literal = new J.Literal(Tree.randomId(), Space.EMPTY, Markers.EMPTY, null, null, null, JavaType.Primitive.Boolean);
                 }
-        """)
+                """)
         );
     }
 
+    @Test
     void notReplaceUUIDRandomID() {
         rewriteRun(
           java(

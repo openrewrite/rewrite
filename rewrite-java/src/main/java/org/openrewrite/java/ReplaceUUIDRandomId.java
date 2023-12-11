@@ -5,6 +5,8 @@ import lombok.Value;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.config.RecipeDescriptor;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
 import java.time.Duration;
@@ -17,27 +19,30 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import org.openrewrite.internal.lang.NonNull;
 
 @Value
-@EqualsAndHashCode(callSuper = false)
+@EqualsAndHashCode(callSuper = true)
 public class ReplaceUUIDRandomId extends Recipe {
-    @Option(displayName = "Fully Qualified Class Name",
-            description = "A fully qualified class name indicating in which class to replace UUId.randomUUID() method to Tree.randomId() .",
-            example = "com.yourorg.FooBar")
-    @NonNull
-    String fullyQualifiedClassName;
+    /**
+     * A method pattern that is used to find matching LST constructor invocations.
+     * See {@link MethodMatcher} for details on the expression's syntax.
+     */
+    @Option(displayName = "LST Constructor pattern",
+            description = "A method pattern that is used to find matching LST constructor invocations.",
+            example = "com.example.LST *.*(..)")
+    String constructorPattern;
 
     @Override
     public String getDisplayName() {
-        return "Replace UUID.randomUUID() with Tree.randomId()";
+        return "Replace UUID.randomUUID() with Tree.randomId() in LST constructor call";
     }
 
     @Override
     public String getDescription() {
-        return "This recipe replaces occurrences of UUID.randomUUID() with Tree.randomId().";
+        return "This recipe replaces occurrences of UUID.randomUUID() with Tree.randomId() when passed as an argument inside a constructor call for an LST class.";
     }
 
     @JsonCreator
-    public ReplaceUUIDRandomId(@NonNull @JsonProperty("fullyQualifiedClassName") String fullyQualifiedClassName) {
-        this.fullyQualifiedClassName = fullyQualifiedClassName;
+    public ReplaceUUIDRandomId(@NonNull @JsonProperty("fullyQualifiedClassName") String constructorPattern) {
+        this.constructorPattern = constructorPattern;
     }
 
     @Override
@@ -63,27 +68,44 @@ public class ReplaceUUIDRandomId extends Recipe {
 
     @Override
     public @NotNull TreeVisitor<J, ExecutionContext> getVisitor() {
-        return new ReplaceUUIDRandomIdVisitor();
+        MethodMatcher lstConstructorMatcher = new MethodMatcher(constructorPattern);
+        return new ReplaceUUIDRandomIdVisitor(lstConstructorMatcher);
     }
 
     private static class ReplaceUUIDRandomIdVisitor extends JavaIsoVisitor<ExecutionContext> {
-        @Override
-        public J.Literal visitLiteral(J.Literal literal, ExecutionContext ctx) {
-            J.Literal l = super.visitLiteral(literal, ctx);
+        private final MethodMatcher methodMatcher;
 
-            // Check if the literal is an argument in an LST constructor call
-            if (isArgumentInLSTConstructorCall(l)) {
-                // Replace UUID.randomUUID() with Tree.randomId()
-                return l.withValue(Tree.randomId());
-            }
-
-            return l;
+        public ReplaceUUIDRandomIdVisitor(MethodMatcher methodMatcher) {
+            this.methodMatcher = methodMatcher;
         }
 
-        private boolean isArgumentInLSTConstructorCall(J.Literal literal) {
-            // Check if the literal is a direct argument in an LST constructor call
-            J.NewClass enclosingNewClass = getCursor().firstEnclosing(J.NewClass.class);
-            return enclosingNewClass != null && enclosingNewClass.getArguments().stream().anyMatch(arg -> arg.equals(literal));
+        @Override
+        public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+            J.NewClass n = super.visitNewClass(newClass, ctx);
+            if (methodMatcher.matches(n)) {
+                List<Expression> arguments = n.getArguments();
+                if (!arguments.isEmpty()) {
+                    Expression firstArgument = arguments.get(0);
+                    if (firstArgument instanceof J.MethodInvocation &&
+                            ((J.MethodInvocation) firstArgument).getSelect() instanceof J.Identifier &&
+                            "UUID".equals(((J.Identifier) ((J.MethodInvocation) firstArgument).getSelect()).getSimpleName()) &&
+                            "randomUUID".equals(((J.MethodInvocation) firstArgument).getSimpleName())) {
+
+                        Expression replacement = JavaTemplate.builder("Tree.randomId()")
+                                .imports("org.openrewrite.java.tree.Tree")
+                                .build()
+                                .matcher(new Cursor(getCursor(), arguments.get(0)))
+                                .find()
+                                ? (Expression) JavaTemplate.builder("ListUtils.mapFirst(arguments, __ -> Tree.randomId())")
+                                .imports("org.openrewrite.java.tree.Tree", "org.openrewrite.java.tree.ListUtils")
+                                .build()
+                                : null;
+
+                        n = n.withArguments(ListUtils.mapFirst(arguments, a -> replacement));
+                    }
+                }
+            }
+            return n;
         }
     }
 }
