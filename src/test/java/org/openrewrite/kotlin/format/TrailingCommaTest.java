@@ -31,11 +31,11 @@ class TrailingCommaTest implements RewriteTest {
 
     @Override
     public void defaults(RecipeSpec spec) {
-        spec.recipe(toRecipe(() -> new TrailingCommaVisitor(IntelliJ.other().getUseTrailingComma())));
+        spec.recipe(toRecipe(() -> new TrailingCommaVisitor<>(IntelliJ.other().getUseTrailingComma())));
     }
 
     private static Consumer<RecipeSpec> trailingCommaStyle(UnaryOperator<OtherStyle> with) {
-        return spec -> spec.recipe(toRecipe(() -> new TrailingCommaVisitor(with.apply(IntelliJ.other()).getUseTrailingComma())));
+        return spec -> spec.recipe(toRecipe(() -> new TrailingCommaVisitor<>(with.apply(IntelliJ.other()).getUseTrailingComma())));
     }
 
     @Test
