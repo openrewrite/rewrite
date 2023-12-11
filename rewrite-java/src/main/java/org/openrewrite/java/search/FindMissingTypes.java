@@ -140,8 +140,10 @@ public class FindMissingTypes extends Recipe {
                 } else if (!type.getName().equals(mi.getSimpleName()) && !type.isConstructor()) {
                     mi = SearchResult.found(mi, "type information has a different method name '" + type.getName() + "'");
                 }
-                if (mi.getName().getType() != null && type != mi.getName().getType()) {
-                    mi = SearchResult.found(mi, "MethodInvocation#name type is not the MethodType of MethodInvocation.");
+                if (mi.getName().getType() != null && type != null && type != mi.getName().getType()) {
+                    // The MethodDeclaration#name#type and the methodType field should be the same object.
+                    // A different object in one implies a type has changed, either in the method signature or deeper in the type tree.
+                    mi = SearchResult.found(mi, "MethodInvocation#name#type is not a referentially object to the MethodType of MethodInvocation.");
                 }
             }
             return mi;
@@ -177,8 +179,10 @@ public class FindMissingTypes extends Recipe {
             } else if (!md.getSimpleName().equals(type.getName()) && !type.isConstructor()) {
                 md = SearchResult.found(md, "type information has a different method name '" + type.getName() + "'");
             }
-            if (md.getName().getType() != null && type != md.getName().getType()) {
-                md = SearchResult.found(md, "MethodDeclaration#name type is not the MethodType of MethodDeclaration.");
+            if (md.getName().getType() != null && type != null && type != md.getName().getType()) {
+                // The MethodDeclaration#name#type and the methodType field should be the same object.
+                // A different object in one implies a type has changed, either in the method signature or deeper in the type tree.
+                md = SearchResult.found(md, "MethodDeclaration#name#type is not a referentially object to the MethodType of MethodDeclaration.");
             }
             return md;
         }
