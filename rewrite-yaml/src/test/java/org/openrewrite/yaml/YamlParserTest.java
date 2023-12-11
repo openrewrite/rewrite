@@ -129,4 +129,14 @@ class YamlParserTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void projectBasedir() {
+    rewriteRun(
+        yaml(
+            """
+              server:
+                  keyStore: file:@project.basedir@/src/test/resources/keystore.jks
+              """));
+    }
 }
