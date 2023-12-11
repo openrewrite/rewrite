@@ -15,6 +15,8 @@
  */
 package org.openrewrite.kotlin.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -565,6 +567,7 @@ public interface K extends J {
     @SuppressWarnings({"unused", "unchecked"})
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @Data
     final class Constructor implements K, Statement, TypedTree {
@@ -594,21 +597,19 @@ public interface K extends J {
             return getPadding().withInvocation(this.invocation.withElement(invocation));
         }
 
-        // For backward compatibility, handle removed fields `colon` and `constructorInvocation` which has been replaced by `invocation`
-        public Constructor(UUID id, Markers markers, J.MethodDeclaration methodDeclaration, Space colon, ConstructorInvocation constructorInvocation) {
+        // For backward compatibility, handle removed fields `colon` and `constructorInvocation` which has been relocated to `invocation`
+        // Todo, Remove when we feel good that kotlin LSTs have been rebuilt.
+        @JsonCreator
+        public Constructor(UUID id,
+                           Markers markers,
+                           J.MethodDeclaration methodDeclaration,
+                           @JsonProperty("colon") Space colon,
+                           @JsonProperty("constructorInvocation") ConstructorInvocation constructorInvocation) {
             padding = null;
             this.id = id;
             this.markers = markers;
             this.methodDeclaration = methodDeclaration;
             this.invocation = new JLeftPadded<>(colon, constructorInvocation, Markers.EMPTY);
-        }
-
-        public Constructor(UUID id, Markers markers, J.MethodDeclaration methodDeclaration, JLeftPadded<ConstructorInvocation> invocation) {
-            padding = null;
-            this.id = id;
-            this.markers = markers;
-            this.methodDeclaration = methodDeclaration;
-            this.invocation = invocation;
         }
 
         @Override
