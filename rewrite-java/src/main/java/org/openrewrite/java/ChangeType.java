@@ -160,10 +160,14 @@ public class ChangeType extends Recipe {
             J j = super.postVisit(tree, ctx);
             if (j instanceof J.MethodDeclaration) {
                 J.MethodDeclaration method = (J.MethodDeclaration) j;
-                j = method.withMethodType(updateType(method.getMethodType()));
+                JavaType.Method mt = updateType(method.getMethodType());
+                j = method.withMethodType(mt)
+                        .withName(method.getName().withType(mt));
             } else if (j instanceof J.MethodInvocation) {
                 J.MethodInvocation method = (J.MethodInvocation) j;
-                j = method.withMethodType(updateType(method.getMethodType()));
+                JavaType.Method mt = updateType(method.getMethodType());
+                j = method.withMethodType(mt)
+                        .withName(method.getName().withType(mt));
             } else if (j instanceof J.NewClass) {
                 J.NewClass n = (J.NewClass) j;
                 j = n.withConstructorType(updateType(n.getConstructorType()));
@@ -507,7 +511,7 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public J.Package visitPackage(J.Package pkg, ExecutionContext ctxext) {
+        public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
             String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
             if (original.equals(originalType.getPackageName())) {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(targetType);

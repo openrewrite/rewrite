@@ -112,6 +112,9 @@ public class DeleteMethodArgument extends Recipe {
                     m = m.withMethodType(methodType
                             .withParameterNames(parameterNames)
                             .withParameterTypes(parameterTypes));
+                    if (m instanceof J.MethodInvocation && ((J.MethodInvocation) m).getName().getType() != null) {
+                        m = ((J.MethodInvocation) m).withName(((J.MethodInvocation) m).getName().withType(m.getMethodType()));
+                    }
                 }
             }
             return m;

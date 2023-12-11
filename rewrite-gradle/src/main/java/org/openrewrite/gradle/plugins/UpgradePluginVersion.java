@@ -96,7 +96,7 @@ public class UpgradePluginVersion extends Recipe {
             private GradleSettings gradleSettings;
 
             @Override
-            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext executionContext) {
+            public J visitCompilationUnit(G.CompilationUnit cu, ExecutionContext ctx) {
                 Optional<GradleProject> maybeGradleProject = cu.getMarkers().findFirst(GradleProject.class);
                 Optional<GradleSettings> maybeGradleSettings = cu.getMarkers().findFirst(GradleSettings.class);
                 if (!maybeGradleProject.isPresent() && !maybeGradleSettings.isPresent()) {
@@ -105,7 +105,7 @@ public class UpgradePluginVersion extends Recipe {
 
                 gradleProject = maybeGradleProject.orElse(null);
                 gradleSettings = maybeGradleSettings.orElse(null);
-                return super.visitCompilationUnit(cu, executionContext);
+                return super.visitCompilationUnit(cu, ctx);
             }
 
             @Override

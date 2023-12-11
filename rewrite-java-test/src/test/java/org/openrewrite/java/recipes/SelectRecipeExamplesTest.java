@@ -412,4 +412,29 @@ class SelectRecipeExamplesTest implements RewriteTest {
           )
         );
     }
+
+    @Test
+    void skipNestedClasses() {
+        rewriteRun(
+          java(
+            """
+              import org.junit.jupiter.api.Nested;
+              import org.junit.jupiter.api.Test;
+              import org.openrewrite.test.RewriteTest;
+              
+              import static org.openrewrite.test.SourceSpecs.text;
+
+              class OuterClass implements RewriteTest {
+                @Nested
+                class InnerClass {
+                  @Test
+                  void test1() {
+                    rewriteRun(text("before", "after"));
+                  }
+                }
+              }
+              """
+          )
+        );
+    }
 }

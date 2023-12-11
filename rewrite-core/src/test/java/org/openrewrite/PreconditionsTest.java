@@ -97,7 +97,7 @@ class PreconditionsTest implements RewriteTest {
     Recipe recipe(TreeVisitor<?, ExecutionContext> applicability) {
         return toRecipe(() -> Preconditions.check(applicability, new PlainTextVisitor<>() {
             @Override
-            public PlainText visitText(PlainText text, ExecutionContext executionContext) {
+            public PlainText visitText(PlainText text, ExecutionContext ctx) {
                 return text.withText("goodbye");
             }
         }));

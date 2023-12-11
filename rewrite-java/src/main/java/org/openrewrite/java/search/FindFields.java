@@ -63,18 +63,18 @@ public class FindFields extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return Preconditions.check(new UsesField<>(fullyQualifiedTypeName, fieldName), new JavaIsoVisitor<ExecutionContext>() {
             @Override
-            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext executionContext) {
+            public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
                 JavaType.Variable varType = fieldAccess.getName().getFieldType();
                 if (varType != null && new TypeMatcher(fullyQualifiedTypeName, Boolean.TRUE.equals(matchInherited)).matches(varType.getOwner()) &&
                     StringUtils.matchesGlob(varType.getName(), fieldName)) {
                     return SearchResult.found(fieldAccess);
                 }
-                return super.visitFieldAccess(fieldAccess, executionContext);
+                return super.visitFieldAccess(fieldAccess, ctx);
             }
 
             @Override
-            public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext executionContext) {
-                J.Identifier i = super.visitIdentifier(identifier, executionContext);
+            public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+                J.Identifier i = super.visitIdentifier(identifier, ctx);
                 JavaType.Variable varType = identifier.getFieldType();
                 if (varType != null && new TypeMatcher(fullyQualifiedTypeName, Boolean.TRUE.equals(matchInherited)).matches(varType.getOwner()) &&
                     StringUtils.matchesGlob(varType.getName(), fieldName)) {

@@ -208,7 +208,9 @@ public class MavenPomDownloader {
                 .resolve("..")
                 .resolve(Paths.get(relativePath))
                 .normalize();
-        return projectPoms.get(parentPath);
+        Pom parentPom = projectPoms.get(parentPath);
+        return parentPom != null && parentPom.getGav().getGroupId().equals(parent.getGav().getGroupId()) &&
+               parentPom.getGav().getArtifactId().equals(parent.getGav().getArtifactId()) ? parentPom : null;
     }
 
     public MavenMetadata downloadMetadata(GroupArtifact groupArtifact, @Nullable ResolvedPom containingPom, List<MavenRepository> repositories) throws MavenDownloadingException {

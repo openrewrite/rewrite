@@ -61,7 +61,7 @@ public class CopyValue extends Recipe {
                 if (oldPathMatcher.matches(getCursor()) && entry.getValue() instanceof Yaml.Scalar) {
                     doAfterVisit(new YamlIsoVisitor<ExecutionContext>() {
                         @Override
-                        public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext executionContext) {
+                        public Yaml.Mapping.Entry visitMappingEntry(Yaml.Mapping.Entry entry, ExecutionContext ctx) {
                             Yaml.Mapping.Entry dest = super.visitMappingEntry(entry, ctx);
                             if (newPathMatcher.matches(getCursor())) {
                                 dest = dest.withValue(source.getValue());

@@ -98,7 +98,7 @@ public class ChangeMethodName extends Recipe {
                     if (type != null) {
                         type = type.withName(newMethodName);
                     }
-                    m = m.withName(m.getName().withSimpleName(newMethodName))
+                    m = m.withName(m.getName().withSimpleName(newMethodName).withType(type))
                             .withMethodType(type);
                 }
                 return m;
@@ -112,15 +112,15 @@ public class ChangeMethodName extends Recipe {
                     if (type != null) {
                         type = type.withName(newMethodName);
                     }
-                    m = m.withName(m.getName().withSimpleName(newMethodName))
+                    m = m.withName(m.getName().withSimpleName(newMethodName).withType(type))
                             .withMethodType(type);
                 }
                 return m;
             }
 
             @Override
-            public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext context) {
-                J.MemberReference m = super.visitMemberReference(memberRef, context);
+            public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
+                J.MemberReference m = super.visitMemberReference(memberRef, ctx);
                 if (methodMatcher.matches(m.getMethodType()) && !m.getReference().getSimpleName().equals(newMethodName)) {
                     JavaType.Method type = m.getMethodType();
                     if (type != null) {

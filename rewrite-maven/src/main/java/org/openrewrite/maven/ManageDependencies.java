@@ -90,8 +90,8 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
     public TreeVisitor<?, ExecutionContext> getScanner(Map<GroupArtifactVersion, Collection<ResolvedDependency>> rootGavToDependencies) {
         return Preconditions.check(Boolean.TRUE.equals(addToRootPom), new MavenIsoVisitor<ExecutionContext>() {
             @Override
-            public Xml.Document visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                Xml.Document doc = super.visitDocument(document, executionContext);
+            public Xml.Document visitDocument(Xml.Document document, ExecutionContext ctx) {
+                Xml.Document doc = super.visitDocument(document, ctx);
                 Collection<ResolvedDependency> manageableDependencies = findDependencies(groupPattern, artifactPattern != null ? artifactPattern : "*");
                 ResolvedGroupArtifactVersion root = findRootPom(getResolutionResult()).getPom().getGav();
                 rootGavToDependencies.computeIfAbsent(new GroupArtifactVersion(root.getGroupId(), root.getArtifactId(), root.getVersion()), v -> new ArrayList<>()).addAll(manageableDependencies);
@@ -104,8 +104,8 @@ public class ManageDependencies extends ScanningRecipe<Map<GroupArtifactVersion,
     public TreeVisitor<?, ExecutionContext> getVisitor(Map<GroupArtifactVersion, Collection<ResolvedDependency>> rootGavToDependencies) {
         return new MavenVisitor<ExecutionContext>() {
             @Override
-            public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
-                Xml maven = super.visitDocument(document, executionContext);
+            public Xml visitDocument(Xml.Document document, ExecutionContext ctx) {
+                Xml maven = super.visitDocument(document, ctx);
 
                 Collection<ResolvedDependency> manageableDependencies;
                 if (Boolean.TRUE.equals(addToRootPom)) {

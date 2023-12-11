@@ -135,8 +135,8 @@ public class OrderPomElements extends Recipe {
             }
 
             @Override
-            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext executionContext) {
-                Xml.Tag tg = super.visitTag(tag, executionContext);
+            public Xml.Tag visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                Xml.Tag tg = super.visitTag(tag, ctx);
                 if ("dependency".equals(tg.getName()) || "parent".equals(tg.getName())) {
                     tg = orderGav(tg);
                 }

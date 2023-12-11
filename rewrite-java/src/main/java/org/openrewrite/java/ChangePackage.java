@@ -141,7 +141,7 @@ public class ChangePackage extends Recipe {
         }
 
         @Override
-        public J.Package visitPackage(J.Package pkg, ExecutionContext context) {
+        public J.Package visitPackage(J.Package pkg, ExecutionContext ctx) {
             String original = pkg.getExpression().printTrimmed(getCursor()).replaceAll("\\s", "");
             getCursor().putMessageOnFirstEnclosing(JavaSourceFile.class, RENAME_FROM_KEY, original);
 
@@ -168,13 +168,13 @@ public class ChangePackage extends Recipe {
         }
 
         @Override
-        public J visitImport(J.Import _import, ExecutionContext executionContext) {
+        public J visitImport(J.Import _import, ExecutionContext ctx) {
             // Polls message before calling super to change the prefix of the first import if applicable.
             Boolean updatePrefix = getCursor().pollNearestMessage("UPDATE_PREFIX");
             if (updatePrefix != null && updatePrefix) {
                 _import = _import.withPrefix(Space.EMPTY);
             }
-            return super.visitImport(_import, executionContext);
+            return super.visitImport(_import, ctx);
         }
 
         @Override
@@ -189,19 +189,21 @@ public class ChangePackage extends Recipe {
         }
 
         @Override
-        public @Nullable JavaType visitType(@Nullable JavaType javaType, ExecutionContext executionContext) {
+        public @Nullable JavaType visitType(@Nullable JavaType javaType, ExecutionContext ctx) {
             return updateType(javaType);
         }
 
         @Override
-        public J postVisit(J tree, ExecutionContext executionContext) {
-            J j = super.postVisit(tree, executionContext);
+        public J postVisit(J tree, ExecutionContext ctx) {
+            J j = super.postVisit(tree, ctx);
             if (j instanceof J.MethodDeclaration) {
                 J.MethodDeclaration m = (J.MethodDeclaration) j;
-                return m.withMethodType(updateType(m.getMethodType()));
+                JavaType.Method mt = updateType(m.getMethodType());
+                return m.withMethodType(mt).withName(m.getName().withType(mt));
             } else if (j instanceof J.MethodInvocation) {
                 J.MethodInvocation m = (J.MethodInvocation) j;
-                return m.withMethodType(updateType(m.getMethodType()));
+                JavaType.Method mt = updateType(m.getMethodType());
+                return m.withMethodType(mt).withName(m.getName().withType(mt));
             } else if (j instanceof J.NewClass) {
                 J.NewClass n = (J.NewClass) j;
                 return n.withConstructorType(updateType(n.getConstructorType()));
@@ -222,7 +224,7 @@ public class ChangePackage extends Recipe {
 
                     for (J.Import anImport : sf.getImports()) {
                         if (anImport.getPackageName().equals(changingTo) && !anImport.isStatic()) {
-                            sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(anImport.getTypeName(), true).visit(sf, executionContext, getCursor());
+                            sf = (JavaSourceFile) new RemoveImport<ExecutionContext>(anImport.getTypeName(), true).visit(sf, ctx, getCursor());
                             assert sf != null;
                         }
                     }

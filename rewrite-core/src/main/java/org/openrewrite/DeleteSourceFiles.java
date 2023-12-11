@@ -46,7 +46,7 @@ public class DeleteSourceFiles extends Recipe {
         return new TreeVisitor<Tree, ExecutionContext>() {
             @Nullable
             @Override
-            public Tree visit(@Nullable Tree tree, ExecutionContext executionContext) {
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
                 if (tree instanceof SourceFile) {
                     SourceFile sourceFile = (SourceFile) tree;
                     Path sourcePath = sourceFile.getSourcePath();

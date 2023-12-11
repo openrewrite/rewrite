@@ -126,8 +126,8 @@ public class ReorderMethodArguments extends Recipe {
         }
 
         @Override
-        public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext executionContext) {
-            return (J.NewClass) visitMethodCall(super.visitNewClass(newClass, executionContext));
+        public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+            return (J.NewClass) visitMethodCall(super.visitNewClass(newClass, ctx));
         }
 
         private MethodCall visitMethodCall(MethodCall m) {
@@ -186,11 +186,14 @@ public class ReorderMethodArguments extends Recipe {
                 }
 
                 if (changed) {
+                    JavaType.Method mt = m.getMethodType()
+                            .withParameterNames(reorderedNames)
+                            .withParameterTypes(reorderedTypes);
                     m = withPaddedArguments(m, reordered)
-                            .withMethodType(m.getMethodType()
-                                    .withParameterNames(reorderedNames)
-                                    .withParameterTypes(reorderedTypes)
-                            );
+                            .withMethodType(mt);
+                    if (m instanceof J.MethodInvocation && ((J.MethodInvocation) m).getName().getType() != null) {
+                        m = ((J.MethodInvocation) m).withName(((J.MethodInvocation) m).getName().withType(mt));
+                    }
                 }
             }
             return m;

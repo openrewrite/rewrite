@@ -54,8 +54,8 @@ public class DependencyUseMapNotation extends Recipe {
         final MethodMatcher dependencyDsl = new MethodMatcher("DependencyHandlerSpec *(..)");
         return Preconditions.check(new IsBuildGradle<>(), new GroovyVisitor<ExecutionContext>() {
             @Override
-            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext context) {
-                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, context);
+            public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+                J.MethodInvocation m = (J.MethodInvocation) super.visitMethodInvocation(method, ctx);
                 if (!dependencyDsl.matches(m)) {
                     return m;
                 }
@@ -156,6 +156,9 @@ public class DependencyUseMapNotation extends Recipe {
                     return m;
                 }
                 mtype = mtype.withParameterTypes(singletonList(JavaType.ShallowClass.build("java.util.Map")));
+                if (m.getName().getType() != null) {
+                    m = m.withName(m.getName().withType(mtype));
+                }
                 return m.withMethodType(mtype);
             }
         });

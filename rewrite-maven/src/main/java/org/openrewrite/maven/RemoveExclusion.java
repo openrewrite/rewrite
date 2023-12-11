@@ -77,7 +77,7 @@ public class RemoveExclusion extends Recipe {
     public TreeVisitor<?, ExecutionContext> getVisitor() {
         return new MavenVisitor<ExecutionContext>() {
             @Override
-            public Xml visitTag(Xml.Tag tag, ExecutionContext executionContext) {
+            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
                 if (isDependencyTag(groupId, artifactId) || isManagedDependencyTag(groupId, artifactId)) {
                     Optional<Xml.Tag> maybeExclusions = tag.getChild("exclusions");
                     if (maybeExclusions.isPresent()) {
@@ -110,7 +110,7 @@ public class RemoveExclusion extends Recipe {
                         }));
                     }
                 }
-                return super.visitTag(tag, executionContext);
+                return super.visitTag(tag, ctx);
             }
 
             private GroupArtifact groupArtifact(Xml.Tag tag) {
