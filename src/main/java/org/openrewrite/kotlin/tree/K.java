@@ -15,7 +15,7 @@
  */
 package org.openrewrite.kotlin.tree;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
@@ -563,7 +563,7 @@ public interface K extends J {
         }
     }
 
-    @SuppressWarnings({"unused", "unchecked"})
+    @SuppressWarnings({"unused", "unchecked", "DeprecatedIsStillUsed"})
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Getter
@@ -575,22 +575,28 @@ public interface K extends J {
 
         Markers markers;
         J.MethodDeclaration methodDeclaration;
+
+        @Deprecated
+        @Nullable
+        @JsonIgnore
         Space colon;
 
+        @Deprecated
         @Nullable
+        @JsonIgnore
         ConstructorInvocation constructorInvocation;
 
         // A replacement of `colon` and `constructorInvocation`
         JLeftPadded<ConstructorInvocation> invocation;
 
-        public Constructor(UUID id, Markers markers, J.MethodDeclaration methodDeclaration, Space colon, @Nullable ConstructorInvocation constructorInvocation, JLeftPadded<ConstructorInvocation> invocation) {
+        public Constructor(UUID id, Markers markers, J.MethodDeclaration methodDeclaration, @Nullable Space colon, @Nullable ConstructorInvocation constructorInvocation, JLeftPadded<ConstructorInvocation> invocation) {
             this.id = id;
             this.markers = markers;
             this.methodDeclaration = methodDeclaration;
-            this.colon = Space.EMPTY;
+            this.colon = null;
             this.constructorInvocation = null;
 
-            if (constructorInvocation != null) {
+            if (colon != null && constructorInvocation != null) {
                 // For backward compatibility
                 this.invocation = new JLeftPadded<>(colon, constructorInvocation, Markers.EMPTY);
             } else {
@@ -768,7 +774,7 @@ public interface K extends J {
         }
     }
 
-    @SuppressWarnings({"unused", "DeprecatedIsStillUsed"})
+    @SuppressWarnings("unused")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
@@ -1124,7 +1130,6 @@ public interface K extends J {
         }
     }
 
-    @SuppressWarnings("DeprecatedIsStillUsed")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
