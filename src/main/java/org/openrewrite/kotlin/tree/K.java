@@ -566,7 +566,6 @@ public interface K extends J {
     @SuppressWarnings({"unused", "unchecked"})
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @RequiredArgsConstructor
     @Getter
     @With
     final class Constructor implements K, Statement, TypedTree {
@@ -577,7 +576,27 @@ public interface K extends J {
         Markers markers;
         J.MethodDeclaration methodDeclaration;
         Space colon;
+
+        @Nullable
         ConstructorInvocation constructorInvocation;
+
+        // A replacement of `colon` and `constructorInvocation`
+        JLeftPadded<ConstructorInvocation> invocation;
+
+        public Constructor(UUID id, Markers markers, J.MethodDeclaration methodDeclaration, Space colon, @Nullable ConstructorInvocation constructorInvocation, JLeftPadded<ConstructorInvocation> invocation) {
+            this.id = id;
+            this.markers = markers;
+            this.methodDeclaration = methodDeclaration;
+            this.colon = Space.EMPTY;
+            this.constructorInvocation = null;
+
+            if (constructorInvocation != null) {
+                // For backward compatibility
+                this.invocation = new JLeftPadded<>(colon, constructorInvocation, Markers.EMPTY);
+            } else {
+                this.invocation = invocation;
+            }
+        }
 
         @Override
         public Constructor withType(@Nullable JavaType type) {
