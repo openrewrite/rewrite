@@ -737,12 +737,12 @@ class KotlinTypeMapping(
                             createShallowClass(source.className.fqNameForTopLevelClassMaybeWithDollars.asString())
                         }
                     }
+                } else if (!resolvedSymbol.fir.origin.generated &&
+                    !resolvedSymbol.fir.origin.fromSupertypes &&
+                    !resolvedSymbol.fir.origin.fromSource
+                ) {
+                    declaringType = createShallowClass("kotlin.Library")
                 }
-            } else if (!resolvedSymbol.fir.origin.generated &&
-                !resolvedSymbol.fir.origin.fromSupertypes &&
-                !resolvedSymbol.fir.origin.fromSource
-            ) {
-                declaringType = createShallowClass("kotlin.Library")
             }
         } else {
             declaringType = TypeUtils.asFullyQualified(type(function.typeRef))

@@ -375,12 +375,12 @@ class KotlinTypeSignatureBuilder(private val firSession: FirSession, private val
                             source.className.fqNameForTopLevelClassMaybeWithDollars.asString()
                         }
                     }
+                } else if (!resolvedSymbol.fir.origin.generated &&
+                    !resolvedSymbol.fir.origin.fromSupertypes &&
+                    !resolvedSymbol.fir.origin.fromSource
+                ) {
+                    declaringSig = "kotlin.Library"
                 }
-            } else if (!resolvedSymbol.fir.origin.generated &&
-                !resolvedSymbol.fir.origin.fromSupertypes &&
-                !resolvedSymbol.fir.origin.fromSource
-            ) {
-                declaringSig = "kotlin.Library"
             }
         } else if (sym is FirFunctionSymbol<*>) {
             declaringSig = signature(function.typeRef)

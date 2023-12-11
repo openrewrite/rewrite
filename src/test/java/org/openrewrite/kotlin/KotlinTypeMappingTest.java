@@ -1519,5 +1519,28 @@ public class KotlinTypeMappingTest {
               )
             );
         }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/526")
+        @Test
+        void methodDeclarationType() {
+            rewriteRun(
+              kotlin(
+                """
+                 val arr = arrayOf(1, 2, 3)
+                 """, spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Integer integer) {
+                            assertThat(method.getMethodType().toString()).isEqualTo("kotlin.Library{name=arrayOf,return=kotlin.Array<kotlin.Int>,parameters=[kotlin.Array<Generic{? extends Generic{T}}>]}");
+                            found.set(true);
+                            return super.visitMethodInvocation(method, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
     }
 }
