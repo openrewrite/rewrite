@@ -111,7 +111,7 @@ public class KotlinVisitor<P> extends JavaVisitor<P> {
         K.Constructor c = constructor;
         c = c.withMarkers(visitMarkers(c.getMarkers(), p));
         c = c.withMethodDeclaration(visitAndCast(c.getMethodDeclaration(), p));
-        c = c.withInvocation(visitLeftPadded(c.getInvocation(), p));
+        c = c.getPadding().withInvocation(visitLeftPadded(c.getPadding().getInvocation(), p));
         return c;
     }
 

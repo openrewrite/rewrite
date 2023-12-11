@@ -566,30 +566,50 @@ public interface K extends J {
     @SuppressWarnings({"unused", "unchecked", "DeprecatedIsStillUsed"})
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Getter
-    @With
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
+    @Data
     final class Constructor implements K, Statement, TypedTree {
 
+        @Nullable
+        @NonFinal
+        transient WeakReference<K.Constructor.Padding> padding;
+
         @EqualsAndHashCode.Include
+        @With
         UUID id;
 
+        @With
         Markers markers;
+
+        @With
         J.MethodDeclaration methodDeclaration;
 
         @Deprecated
         @Nullable
         @JsonIgnore
+        @With
         Space colon;
 
         @Deprecated
         @Nullable
         @JsonIgnore
+        @With
         ConstructorInvocation constructorInvocation;
 
         // A replacement of `colon` and `constructorInvocation`
         JLeftPadded<ConstructorInvocation> invocation;
 
+
+        public ConstructorInvocation getInvocation() {
+            return invocation.getElement();
+        }
+
+        public K.Constructor withInvocation(ConstructorInvocation invocation) {
+            return getPadding().withInvocation(this.invocation.withElement(invocation));
+        }
+
         public Constructor(UUID id, Markers markers, J.MethodDeclaration methodDeclaration, @Nullable Space colon, @Nullable ConstructorInvocation constructorInvocation, JLeftPadded<ConstructorInvocation> invocation) {
+            padding = null;
             this.id = id;
             this.markers = markers;
             this.methodDeclaration = methodDeclaration;
@@ -637,6 +657,34 @@ public interface K extends J {
         @Override
         public String toString() {
             return withPrefix(Space.EMPTY).printTrimmed(new KotlinPrinter<>());
+        }
+
+        public K.Constructor.Padding getPadding() {
+            K.Constructor.Padding p;
+            if (this.padding == null) {
+                p = new K.Constructor.Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new K.Constructor.Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
+            }
+            return p;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final K.Constructor t;
+
+            public JLeftPadded<ConstructorInvocation> getInvocation() {
+                return t.invocation;
+            }
+
+            public K.Constructor withInvocation(JLeftPadded<ConstructorInvocation> invocation) {
+                return t.invocation == invocation ? t : new K.Constructor(t.id, t.markers, t.methodDeclaration, t.colon, t.constructorInvocation, t.invocation);
+            }
         }
     }
 

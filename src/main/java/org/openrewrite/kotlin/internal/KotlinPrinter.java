@@ -156,9 +156,9 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
         afterSyntax(params.getMarkers(), p);
         p.append(")");
 
-        visitSpace(constructor.getInvocation().getBefore(), KSpace.Location.CONSTRUCTOR_COLON, p);
+        visitSpace(constructor.getPadding().getInvocation().getBefore(), KSpace.Location.CONSTRUCTOR_COLON, p);
         p.append(':');
-        visit(constructor.getInvocation().getElement(), p);
+        visit(constructor.getInvocation(), p);
         afterSyntax(constructor, p);
 
         visit(method.getBody(), p);
