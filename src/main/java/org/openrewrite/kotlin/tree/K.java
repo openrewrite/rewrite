@@ -576,14 +576,8 @@ public interface K extends J {
 
         Markers markers;
         J.MethodDeclaration methodDeclaration;
-
-        @Deprecated // use `invocation` instead
         Space colon;
-
-        @Deprecated // use `invocation` instead
         ConstructorInvocation constructorInvocation;
-
-        JLeftPadded<ConstructorInvocation> invocation;
 
         @Override
         public Constructor withType(@Nullable JavaType type) {
