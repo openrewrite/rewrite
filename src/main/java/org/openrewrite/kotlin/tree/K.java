@@ -563,7 +563,7 @@ public interface K extends J {
         }
     }
 
-    @SuppressWarnings({"unused", "unchecked", "DeprecatedIsStillUsed"})
+    @SuppressWarnings({"unused", "unchecked"})
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -584,21 +584,8 @@ public interface K extends J {
         @With
         J.MethodDeclaration methodDeclaration;
 
-        @Deprecated
-        @Nullable
-        @JsonIgnore
-        @With
-        Space colon;
-
-        @Deprecated
-        @Nullable
-        @JsonIgnore
-        @With
-        ConstructorInvocation constructorInvocation;
-
         // A replacement of `colon` and `constructorInvocation`
         JLeftPadded<ConstructorInvocation> invocation;
-
 
         public ConstructorInvocation getInvocation() {
             return invocation.getElement();
@@ -608,20 +595,21 @@ public interface K extends J {
             return getPadding().withInvocation(this.invocation.withElement(invocation));
         }
 
-        public Constructor(UUID id, Markers markers, J.MethodDeclaration methodDeclaration, @Nullable Space colon, @Nullable ConstructorInvocation constructorInvocation, JLeftPadded<ConstructorInvocation> invocation) {
+        // For backward compatibility, handle removed fields `colon` and `constructorInvocation` which has been replaced by `invocation`
+        public Constructor(UUID id, Markers markers, J.MethodDeclaration methodDeclaration, Space colon, ConstructorInvocation constructorInvocation) {
             padding = null;
             this.id = id;
             this.markers = markers;
             this.methodDeclaration = methodDeclaration;
-            this.colon = null;
-            this.constructorInvocation = null;
+            this.invocation = new JLeftPadded<>(colon, constructorInvocation, Markers.EMPTY);
+        }
 
-            if (colon != null && constructorInvocation != null) {
-                // For backward compatibility
-                this.invocation = new JLeftPadded<>(colon, constructorInvocation, Markers.EMPTY);
-            } else {
-                this.invocation = invocation;
-            }
+        public Constructor(UUID id, Markers markers, J.MethodDeclaration methodDeclaration, JLeftPadded<ConstructorInvocation> invocation) {
+            padding = null;
+            this.id = id;
+            this.markers = markers;
+            this.methodDeclaration = methodDeclaration;
+            this.invocation = invocation;
         }
 
         @Override
@@ -683,7 +671,7 @@ public interface K extends J {
             }
 
             public K.Constructor withInvocation(JLeftPadded<ConstructorInvocation> invocation) {
-                return t.invocation == invocation ? t : new K.Constructor(t.id, t.markers, t.methodDeclaration, t.colon, t.constructorInvocation, t.invocation);
+                return t.invocation == invocation ? t : new K.Constructor(t.id, t.markers, t.methodDeclaration, t.invocation);
             }
         }
     }
