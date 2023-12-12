@@ -1462,5 +1462,38 @@ public class KotlinTypeMappingTest {
               )
             );
         }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/533")
+        @Test
+        void enumConstructorType() {
+            rewriteRun(
+              kotlin(
+                """
+                  enum class Code {
+                      YES ,
+                  }
+                  enum class Test ( val arg: Code , ) {
+                      FOO ( Code.YES , ) {
+                          // Body is required to reproduce issue
+                      }
+                  }
+                  """, spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.EnumValue visitEnumValue(J.EnumValue _enum, Integer integer) {
+                            if ("FOO".equals(_enum.getName().getSimpleName())) {
+                                assertThat(_enum.getInitializer().getConstructorType().toString())
+                                  .isEqualTo("Test{name=<constructor>,return=Test,parameters=[Code]}");
+                                found.set(true);
+                            }
+                            return super.visitEnumValue(_enum, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
     }
 }

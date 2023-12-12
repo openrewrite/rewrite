@@ -28,6 +28,7 @@ import org.jetbrains.kotlin.fir.analysis.checkers.modality
 import org.jetbrains.kotlin.fir.analysis.checkers.toRegularClassSymbol
 import org.jetbrains.kotlin.fir.declarations.*
 import org.jetbrains.kotlin.fir.declarations.impl.FirOuterClassTypeParameterRef
+import org.jetbrains.kotlin.fir.declarations.impl.FirPrimaryConstructor
 import org.jetbrains.kotlin.fir.declarations.utils.isLocal
 import org.jetbrains.kotlin.fir.declarations.utils.isStatic
 import org.jetbrains.kotlin.fir.declarations.utils.modality
@@ -480,6 +481,23 @@ class KotlinTypeMapping(
             return pt
         }
         return clazz
+    }
+
+    @OptIn(SymbolInternals::class)
+    fun methodDeclarationType(enumEntry: FirEnumEntry): Method? {
+        val type = when (val fir = enumEntry.symbol.getContainingClassSymbol(firSession)?.fir) {
+            is FirClass -> {
+                when (val primary = fir.declarations.firstOrNull { it is FirPrimaryConstructor }) {
+                    is FirPrimaryConstructor -> type(primary as FirFunction)
+                    else -> null
+                }
+            }
+            else -> null
+        }
+        return when (type) {
+            is Method -> type
+            else -> null
+        }
     }
 
     fun methodDeclarationType(function: FirFunction, parent: Any?): Method {

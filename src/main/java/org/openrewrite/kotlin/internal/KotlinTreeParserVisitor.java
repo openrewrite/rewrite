@@ -494,14 +494,13 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
         Set<PsiElement> consumedSpaces = preConsumedInfix(enumEntry);
 
-        // TODO: in java the EnumValue has a type of JavaType.Variable with a null fieldType.
         J.Identifier name = createIdentifier(requireNonNull(enumEntry.getNameIdentifier()), type(enumEntry), consumedSpaces);
         J.NewClass initializer = null;
 
+        JavaType.Method mt = methodDeclarationType(enumEntry);
         if (enumEntry.getInitializerList() != null) {
-            // TODO: this creates an empty init with no type attribution: enum class Foo { BAR() }
-            //   Add constructor method type.
             initializer = (J.NewClass) enumEntry.getInitializerList().accept(this, data);
+            initializer = initializer.withMethodType(mt);
         }
 
         if (enumEntry.getBody() != null) {
@@ -522,7 +521,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                         null,
                         args,
                         body,
-                        null
+                        mt
                 );
             }
         }

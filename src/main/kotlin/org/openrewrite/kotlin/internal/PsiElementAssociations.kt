@@ -159,6 +159,7 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
 
     fun methodDeclarationType(psi: PsiElement): JavaType.Method? {
         return when (val fir = primary(psi)) {
+            is FirEnumEntry -> typeMapping.methodDeclarationType(fir)
             is FirFunction -> typeMapping.methodDeclarationType(fir, null)
             is FirAnonymousFunctionExpression -> typeMapping.methodDeclarationType(fir.anonymousFunction, null)
             else -> {
