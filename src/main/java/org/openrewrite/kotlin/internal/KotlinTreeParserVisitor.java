@@ -31,6 +31,7 @@ import org.jetbrains.kotlin.fir.references.FirResolvedCallableReference;
 import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol;
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc;
+import org.jetbrains.kotlin.kdoc.psi.impl.KDocSection;
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken;
 import org.jetbrains.kotlin.lexer.KtTokens;
 import org.jetbrains.kotlin.parsing.ParseUtilsKt;
@@ -4179,17 +4180,9 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             PsiElement it = iterator.next();
             String text = it.getText();
             if (it instanceof PsiWhiteSpace) {
-                // replace `\n` to CRLF back if it's CRLF in the source
-                TextRange range = it.getTextRange();
-                int left = findFirstGreaterOrEqual(cRLFLocations, range.getStartOffset());
-                int right = left != -1 ? findFirstLessOrEqual(cRLFLocations, range.getEndOffset(), left) : -1;
-                boolean hasCRLF = left != -1 && left <= right;
-
-                if (hasCRLF) {
-                    for (int i = right; i >= left; i--) {
-                        text = replaceNewLineWithCRLF(text, cRLFLocations.get(i) - range.getStartOffset());
-                    }
-                }
+                text = replaceCRLF((PsiWhiteSpace) it);
+            } else if (it instanceof KDocSection) {
+                text = KDocSectionToString((KDocSection) it);
             }
 
             sb.append(text);
@@ -4200,6 +4193,37 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<Comment> comments = new ArrayList<>(1);
         comments.add(new TextComment(true, comment, "", Markers.EMPTY));
         return Space.build("", comments);
+    }
+
+    private String KDocSectionToString(KDocSection kDocSection) {
+        StringBuilder sb = new StringBuilder();
+        Iterator<PsiElement> iterator = PsiUtilsKt.getAllChildren(kDocSection).iterator();
+        while (iterator.hasNext()) {
+            PsiElement it = iterator.next();
+            String text = it.getText();
+            if (it instanceof PsiWhiteSpace) {
+                text = replaceCRLF((PsiWhiteSpace) it);
+            }
+            sb.append(text);
+        }
+
+        return sb.toString();
+    }
+
+    // replace `\n` to CRLF back if it's CRLF in the source
+    private String replaceCRLF(PsiWhiteSpace wp) {
+        String text = wp.getText();
+        TextRange range = wp.getTextRange();
+        int left = findFirstGreaterOrEqual(cRLFLocations, range.getStartOffset());
+        int right = left != -1 ? findFirstLessOrEqual(cRLFLocations, range.getEndOffset(), left) : -1;
+        boolean hasCRLF = left != -1 && left <= right;
+
+        if (hasCRLF) {
+            for (int i = right; i >= left; i--) {
+                text = replaceNewLineWithCRLF(text, cRLFLocations.get(i) - range.getStartOffset());
+            }
+        }
+        return text;
     }
 
     private Space space(@Nullable PsiElement node) {

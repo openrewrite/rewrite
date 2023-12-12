@@ -55,11 +55,13 @@ class CRLFTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/520")
     @Test
     void crlfInKdoc() {
         String windowsJavadoc =
           "/**\r\n" +
           " *\r\n" +
+          " * Foo\r\n" +
           " */\r\n" +
           "class Test {\r\n" +
           "}";
