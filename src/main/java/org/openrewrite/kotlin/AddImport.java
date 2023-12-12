@@ -168,7 +168,7 @@ public class AddImport<P> extends KotlinIsoVisitor<P> {
                     String whitespace = "";
                     if (!cu.getAnnotations().isEmpty()) {
                         // The 1st import added after annotation needs to be in a new line
-                        whitespace = "\n";
+                        whitespace = "\n\n";
                     }
                     Space firstStatementPrefix = cu.getStatements().get(0).getPrefix();
                     importToAdd = importToAdd.withPrefix(firstStatementPrefix

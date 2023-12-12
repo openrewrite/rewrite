@@ -396,6 +396,7 @@ public class AddImportTest implements RewriteTest {
               """,
             """
               @file:Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+
               import java.util.List
 
               class A
