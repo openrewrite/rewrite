@@ -1001,6 +1001,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.NullableType nt = nullableType;
         nt = nt.withPrefix(visitSpace(nt.getPrefix(), Space.Location.NULLABLE_PREFIX, p));
         nt = nt.withMarkers(visitMarkers(nt.getMarkers(), p));
+        nt = nt.withAnnotations(ListUtils.map(nt.getAnnotations(), a -> visitAndCast(a, p)));
 
         Expression temp = (Expression) visitExpression(nt, p);
         if (!(temp instanceof J.NullableType)) {
