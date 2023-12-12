@@ -845,9 +845,9 @@ public class JavaPrinter<P> extends JavaVisitor<PrintOutputCapture<P>> {
 
     @Override
     public J visitNullableType(J.NullableType nt, PrintOutputCapture<P> p) {
-        beforeSyntax(nt, Space.Location.UNARY_PREFIX, p);
+        beforeSyntax(nt, Space.Location.NULLABLE_PREFIX, p);
         visit(nt.getTypeTree(), p);
-        visitSpace(nt.getPadding().getTypeTree().getAfter(), Space.Location.UNARY_OPERATOR, p);
+        visitSpace(nt.getPadding().getTypeTree().getAfter(), Space.Location.NULLABLE_PREFIX, p);
         p.append("?");
         afterSyntax(nt, p);
         return nt;
