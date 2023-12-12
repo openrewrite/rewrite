@@ -171,18 +171,15 @@ public class AddPluginVisitor extends GroovyIsoVisitor<ExecutionContext> {
             }.visitCompilationUnit(cu, 0);
 
             String delimiter = singleQuote.get() < doubleQuote.get() ? "\"" : "'";
+            String source = "plugins {\n" +
+                            "    id " + delimiter + pluginId + delimiter + (version.map(s -> " version " + delimiter + s + delimiter).orElse("")) + "\n" +
+                            "}";
             Statement statement = GradleParser.builder().build()
-                    .parseInputs(
-                            singletonList(
-                                    Parser.Input.fromString("plugins {\n" +
-                                            "    id " + delimiter + pluginId + delimiter + (version.map(s -> " version " + delimiter + s + delimiter).orElse("")) + "\n" +
-                                            "}")),
-                            null,
-                            ctx
-                    )
+                    .parseInputs(singletonList(Parser.Input.fromString(source)), null, ctx)
                     .findFirst()
+                    .filter(G.CompilationUnit.class::isInstance)
                     .map(G.CompilationUnit.class::cast)
-                    .orElseThrow(() -> new IllegalArgumentException("Could not parse"))
+                    .orElseThrow(() -> new IllegalArgumentException("Could not parse: " + source))
                     .getStatements()
                     .get(0);
 
