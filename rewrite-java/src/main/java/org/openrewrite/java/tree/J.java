@@ -2668,6 +2668,7 @@ public interface J extends Tree {
                 JavaType.FullyQualified fq = TypeUtils.asFullyQualified(qualid.getType());
 
                 // the compiler doesn't type attribute static imports of classes
+                Expression target = qualid.getTarget();
                 if (fq == null) {
                     String possibleInnerClassFqn = getTypeName(qualid);
                     String possibleInnerClassName = possibleInnerClassFqn.substring(possibleInnerClassFqn.lastIndexOf('$') + 1);
@@ -2678,8 +2679,8 @@ public interface J extends Tree {
                         possibleInnerClassName = possibleInnerClassName.substring(possibleInnerClassName.indexOf('$') + 1);
                     }
 
-                    JavaType.Class owner = TypeUtils.asClass(qualid.getTarget().getType());
-                    if (owner != null && !(qualid.getTarget().getType() instanceof JavaType.ShallowClass)) {
+                    JavaType.Class owner = TypeUtils.asClass(target.getType());
+                    if (owner != null && !(target.getType() instanceof JavaType.ShallowClass)) {
                         Iterator<JavaType.Method> visibleMethods = owner.getVisibleMethods();
                         while (visibleMethods.hasNext()) {
                             JavaType.Method method = visibleMethods.next();
@@ -2700,7 +2701,7 @@ public interface J extends Tree {
                     }
                 }
 
-                return getTypeName((FieldAccess) qualid.getTarget());
+                return target instanceof Identifier ? ((Identifier) target).getSimpleName() : getTypeName((FieldAccess) target);
             }
 
             return getTypeName(qualid);
