@@ -398,6 +398,7 @@ public class Space {
         NEW_CLASS_ENCLOSING_SUFFIX,
         NEW_CLASS_PREFIX,
         NEW_PREFIX,
+        NULLABLE_PREFIX,
         PACKAGE_PREFIX,
         PACKAGE_SUFFIX,
         PARAMETERIZED_TYPE_PREFIX,
