@@ -39,6 +39,7 @@ import org.jetbrains.kotlin.fir.references.FirErrorNamedReference
 import org.jetbrains.kotlin.fir.references.FirResolvedNamedReference
 import org.jetbrains.kotlin.fir.references.FirSuperReference
 import org.jetbrains.kotlin.fir.references.toResolvedBaseSymbol
+import org.jetbrains.kotlin.fir.resolve.calls.FirSyntheticFunctionSymbol
 import org.jetbrains.kotlin.fir.resolve.providers.toSymbol
 import org.jetbrains.kotlin.fir.resolve.toFirRegularClass
 import org.jetbrains.kotlin.fir.resolve.toSymbol
@@ -698,12 +699,10 @@ class KotlinTypeMapping(
                 }
             },
             null,
-            when (sym) {
-                is FirConstructorSymbol -> "<constructor>"
-                is FirNamedFunctionSymbol -> sym.name.asString()
-                else -> {
-                    ""
-                }
+            when {
+                sym is FirConstructorSymbol ||
+                        sym is FirSyntheticFunctionSymbol && sym.origin == FirDeclarationOrigin.SamConstructor -> "<constructor>"
+                else -> (sym as FirNamedFunctionSymbol).name.asString()
             },
             null,
             paramNames,
@@ -742,6 +741,12 @@ class KotlinTypeMapping(
                     !resolvedSymbol.fir.origin.fromSource
                 ) {
                     declaringType = createShallowClass("kotlin.Library")
+                }
+            } else if (resolvedSymbol.origin == FirDeclarationOrigin.SamConstructor) {
+                declaringType = when(val type = type(function.typeRef)) {
+                    is Class -> type
+                    is Parameterized -> type.type
+                    else -> Unknown.getInstance()
                 }
             }
         } else {

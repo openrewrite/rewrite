@@ -1542,5 +1542,32 @@ public class KotlinTypeMappingTest {
               )
             );
         }
+
+        @Test
+        void anonymousConstructor() {
+            rewriteRun(
+              kotlin(
+                """
+                 val s = java.util.function.Supplier<String> {
+                     @Suppress("UNCHECKED_CAST")
+                     requireNotNull("x")
+                 }
+                 """, spec -> spec.afterRecipe(cu -> {
+                    AtomicInteger count = new AtomicInteger(0);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.NewClass visitNewClass(J.NewClass newClass, Integer integer) {
+                            assertThat(newClass.getMethodType().toString()).isEqualTo("java.util.function.Supplier{name=<constructor>,return=java.util.function.Supplier<kotlin.String>,parameters=[kotlin.Function0<Generic{T extends kotlin.Any}>]}");
+                            count.getAndIncrement();
+                            assertThat(newClass.getClazz().getType().toString()).isEqualTo("java.util.function.Supplier<kotlin.String>");
+                            count.getAndIncrement();
+                            return super.visitNewClass(newClass, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(count.get()).isEqualTo(2);
+                })
+              )
+            );
+        }
     }
 }
