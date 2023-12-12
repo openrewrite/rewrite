@@ -29,7 +29,6 @@ import org.openrewrite.maven.internal.MavenParsingException;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.tree.ParseError;
-import org.openrewrite.xml.tree.Xml;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -2298,5 +2297,53 @@ class MavenParserTest implements RewriteTest {
         assertThat(MavenParser.builder().build().parse(malformedPomXml))
           .singleElement()
           .isInstanceOf(ParseError.class);
+    }
+
+    @Test
+    @Issue("https://github.com/openrewrite/rewrite/issues/3811")
+    void escapedA() {
+        rewriteRun(
+          spec -> spec.recipe(new AddManagedDependency("ch.qos.logback", "logback-classic", "1.4.14", null, null, null, null, null, null, null)),
+          //language=xml
+          pomXml(
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-&#0097;pi</artifactId>
+                    <version>2.0.9</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """,
+            """
+              <project>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>ch.qos.logback</groupId>
+                      <artifactId>logback-classic</artifactId>
+                      <version>1.4.14</version>
+                    </dependency>
+                  </dependencies>
+                </dependencyManagement>
+                <dependencies>
+                  <dependency>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-&#0097;pi</artifactId>
+                    <version>2.0.9</version>
+                  </dependency>
+                </dependencies>
+              </project>
+              """
+          )
+        );
     }
 }
