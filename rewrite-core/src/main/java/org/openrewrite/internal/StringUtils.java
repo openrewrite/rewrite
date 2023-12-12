@@ -625,7 +625,7 @@ public class StringUtils {
     }
 
     public static boolean isNumeric(@Nullable String str) {
-        if (str == null) {
+        if (str == null || str.isEmpty()) {
             return false;
         }
         int sz = str.length();
