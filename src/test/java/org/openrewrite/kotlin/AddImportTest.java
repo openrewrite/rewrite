@@ -383,6 +383,27 @@ public class AddImportTest implements RewriteTest {
         );
     }
 
+    @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/500")
+    @Test
+    void addImportWithUseSiteAnnotation() {
+        rewriteRun(
+          spec -> spec.recipe(importTypeRecipe("java.util.List")),
+          kotlin(
+            """
+              @file:Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+
+              class A
+              """,
+            """
+              @file:Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+              import java.util.List
+
+              class A
+              """
+          )
+        );
+    }
+
     static Recipe importTypeRecipe(String type) {
         return toRecipe(() -> new KotlinIsoVisitor<>() {
             @Override
