@@ -45,7 +45,7 @@ public class JavaParserExecutionContextView extends DelegatingExecutionContext {
         File target = getMessage(PARSER_CLASSPATH_DOWNLOAD_LOCATION);
         if (target == null) {
             File defaultTarget = new File(System.getProperty("user.home") + "/.rewrite/classpath");
-            if (!defaultTarget.exists() && !defaultTarget.mkdirs()) {
+            if (!defaultTarget.mkdirs() && !defaultTarget.exists()) {
                 throw new UncheckedIOException(new IOException("Failed to create directory " + defaultTarget.getAbsolutePath()));
             }
             return defaultTarget;
