@@ -1162,7 +1162,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
                     p.append("val");
                 }
 
-                if (m.getType() == J.Modifier.Type.LanguageExtension && m.getKeyword().equals("typealias")) {
+                if (m.getType() == J.Modifier.Type.LanguageExtension && m.getKeyword() != null && m.getKeyword().equals("typealias")) {
                     isTypeAlias = true;
                 }
             }

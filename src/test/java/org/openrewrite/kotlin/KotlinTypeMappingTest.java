@@ -31,6 +31,7 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
@@ -947,6 +948,7 @@ public class KotlinTypeMappingTest {
         @Test
         void unknownIdentifier() {
             rewriteRun(
+              spec -> spec.typeValidationOptions(TypeValidation.none()),
               kotlin(
                 //language=none
                 "class A : RemoteStub",

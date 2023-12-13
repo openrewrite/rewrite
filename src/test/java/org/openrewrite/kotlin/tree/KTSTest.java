@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.KotlinIsoVisitor;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -61,6 +62,7 @@ class KTSTest implements RewriteTest {
     @Test
     void dslSample() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
           kotlinScript(
             //language=none
             """

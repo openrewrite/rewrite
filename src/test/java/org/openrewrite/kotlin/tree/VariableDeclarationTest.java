@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.Statement;
 import org.openrewrite.kotlin.KotlinParser;
 import org.openrewrite.kotlin.marker.Implicit;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import java.util.Objects;
 
@@ -393,6 +394,7 @@ class VariableDeclarationTest implements RewriteTest {
     @Test
     void unresolvedNameFirSource() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
           kotlin(
             //language=none, disabled due to invalid code
             """

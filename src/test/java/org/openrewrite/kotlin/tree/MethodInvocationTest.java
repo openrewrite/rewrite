@@ -20,6 +20,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.kotlin.marker.IndexedAccess;
 import org.openrewrite.test.RewriteTest;
+import org.openrewrite.test.TypeValidation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.openrewrite.kotlin.Assertions.kotlin;
@@ -426,6 +427,7 @@ class MethodInvocationTest implements RewriteTest {
     @Test
     void unresolvedMethodInvocationName() {
         rewriteRun(
+          spec -> spec.typeValidationOptions(TypeValidation.none()),
           kotlin(
             """
               val x = some .  qualified   . fooBar ( )

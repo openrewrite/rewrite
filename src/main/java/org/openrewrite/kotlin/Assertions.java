@@ -21,30 +21,43 @@ import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.internal.ThrowingConsumer;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.TextComment;
+import org.openrewrite.java.search.FindMissingTypes;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.kotlin.marker.AnnotationUseSite;
+import org.openrewrite.kotlin.marker.Extension;
+import org.openrewrite.kotlin.marker.IndexedAccess;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.kotlin.tree.KSpace;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.test.SourceSpec;
 import org.openrewrite.test.SourceSpecs;
+import org.openrewrite.test.TypeValidation;
 import org.openrewrite.test.UncheckedConsumer;
 import org.opentest4j.AssertionFailedError;
 
-import java.util.Collections;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.openrewrite.java.Assertions.sourceSet;
+import static org.openrewrite.java.tree.TypeUtils.isWellFormedType;
 import static org.openrewrite.test.SourceSpecs.dir;
 
 @SuppressWarnings({"unused", "unchecked", "OptionalGetWithoutIsPresent", "DataFlowIssue"})
 public final class Assertions {
 
     private Assertions() {
+    }
+
+    public static SourceFile validateTypes(SourceFile source, TypeValidation typeValidation) {
+        if (source instanceof JavaSourceFile) {
+            assertValidTypes(typeValidation, (JavaSourceFile) source);
+        }
+        return source;
     }
 
     static void customizeExecutionContext(ExecutionContext ctx) {
@@ -110,7 +123,7 @@ public final class Assertions {
     public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before, Consumer<SourceSpec<K.CompilationUnit>> spec) {
         SourceSpec<K.CompilationUnit> kotlin = new SourceSpec<>(
                 K.CompilationUnit.class, null, KotlinParser.builder(), before,
-                SourceSpec.ValidateSource.noop,
+                Assertions::validateTypes,
                 Assertions::customizeExecutionContext
         );
         acceptSpec(spec, kotlin);
@@ -120,7 +133,7 @@ public final class Assertions {
     public static SourceSpecs kotlinScript(@Language("kts") @Nullable String before, Consumer<SourceSpec<K.CompilationUnit>> spec) {
         SourceSpec<K.CompilationUnit> kotlinScript = new SourceSpec<>(
                 K.CompilationUnit.class, null, KotlinParser.builder().isKotlinScript(true), before,
-                SourceSpec.ValidateSource.noop,
+                Assertions::validateTypes,
                 Assertions::customizeExecutionContext
         );
         acceptSpec(spec, kotlinScript);
@@ -135,7 +148,7 @@ public final class Assertions {
     public static SourceSpecs kotlin(@Language("kotlin") @Nullable String before, @Language("kotlin") String after,
                                      Consumer<SourceSpec<K.CompilationUnit>> spec) {
         SourceSpec<K.CompilationUnit> kotlin = new SourceSpec<>(K.CompilationUnit.class, null, KotlinParser.builder(), before,
-                SourceSpec.ValidateSource.noop,
+                Assertions::validateTypes,
                 Assertions::customizeExecutionContext).after(s -> after);
         acceptSpec(spec, kotlin);
         return kotlin;
@@ -196,6 +209,36 @@ public final class Assertions {
         };
     }
 
+    private static void assertValidTypes(TypeValidation typeValidation, J sf) {
+        if (typeValidation.identifiers() || typeValidation.methodInvocations() || typeValidation.methodDeclarations() || typeValidation.classDeclarations()
+            || typeValidation.constructorInvocations()) {
+            List<FindMissingTypes.MissingTypeResult> missingTypeResults = findMissingTypes(sf);
+            missingTypeResults = missingTypeResults.stream()
+                    .filter(missingType -> {
+                        if (missingType.getJ() instanceof J.Identifier) {
+                            return typeValidation.identifiers();
+                        } else if (missingType.getJ() instanceof J.ClassDeclaration) {
+                            return typeValidation.classDeclarations();
+                        } else if (missingType.getJ() instanceof J.MethodInvocation || missingType.getJ() instanceof J.MemberReference) {
+                            return typeValidation.methodInvocations();
+                        } else if (missingType.getJ() instanceof J.NewClass) {
+                            return typeValidation.constructorInvocations();
+                        } else if (missingType.getJ() instanceof J.MethodDeclaration) {
+                            return typeValidation.methodDeclarations();
+                        } else if (missingType.getJ() instanceof J.VariableDeclarations.NamedVariable) {
+                            return typeValidation.variableDeclarations();
+                        } else {
+                            return true;
+                        }
+                    })
+                    .collect(Collectors.toList());
+            if (!missingTypeResults.isEmpty()) {
+                throw new IllegalStateException("LST contains missing or invalid type information\n" + missingTypeResults.stream().map(v -> v.getPath() + "\n" + v.getPrintedTree())
+                        .collect(Collectors.joining("\n\n")));
+            }
+        }
+    }
+
     public static ThrowingConsumer<K.CompilationUnit> spaceConscious(SourceSpec<K.CompilationUnit> spec) {
         return cu -> {
             K.CompilationUnit visited = (K.CompilationUnit) new KotlinIsoVisitor<Integer>() {
@@ -246,5 +289,288 @@ public final class Assertions {
                 fail(e);
             }
         };
+    }
+
+    public static List<FindMissingTypes.MissingTypeResult> findMissingTypes(J j) {
+        J j1 = new FindMissingTypesVisitor().visit(j, new InMemoryExecutionContext());
+        List<FindMissingTypes.MissingTypeResult> results = new ArrayList<>();
+        if (j1 != j) {
+            new KotlinIsoVisitor<List<FindMissingTypes.MissingTypeResult>>() {
+                @Override
+                public <M extends Marker> M visitMarker(Marker marker, List<FindMissingTypes.MissingTypeResult> missingTypeResults) {
+                    if (marker instanceof SearchResult) {
+                        String message = ((SearchResult) marker).getDescription();
+                        String path = getCursor()
+                                .getPathAsStream(j -> j instanceof J || j instanceof Javadoc)
+                                .map(t -> t.getClass().getSimpleName())
+                                .collect(Collectors.joining("->"));
+                        J j = getCursor().firstEnclosing(J.class);
+                        String printedTree;
+                        if (getCursor().firstEnclosing(JavaSourceFile.class) != null) {
+                            printedTree = j != null ? j.printTrimmed(new InMemoryExecutionContext(), getCursor().getParentOrThrow()) : "";
+                        } else {
+                            printedTree = String.valueOf(j);
+                        }
+                        missingTypeResults.add(new FindMissingTypes.MissingTypeResult(message, path, printedTree, j));
+                    }
+                    return super.visitMarker(marker, missingTypeResults);
+                }
+            }.visit(j1, results);
+        }
+        return results;
+    }
+
+    static class FindMissingTypesVisitor extends KotlinIsoVisitor<ExecutionContext> {
+
+        private final Set<JavaType> seenTypes = new HashSet<>();
+
+        @Override
+        public J.Identifier visitIdentifier(J.Identifier identifier, ExecutionContext ctx) {
+            // The non-nullability of J.Identifier.getType() in our AST is a white lie
+            // J.Identifier.getType() is allowed to be null in places where the containing AST element fully specifies the type
+            if (!isWellFormedType(identifier.getType(), seenTypes) && !isAllowedToHaveNullType(identifier)) {
+                if (isValidated(identifier)) {
+                    identifier = SearchResult.found(identifier, "Identifier type is missing or malformed");
+                }
+            }
+            if (identifier.getFieldType() != null && !identifier.getSimpleName().equals(identifier.getFieldType().getName()) && isNotDestructType(identifier.getFieldType())) {
+                identifier = SearchResult.found(identifier, "type information has a different variable name '" + identifier.getFieldType().getName() + "'");
+            }
+            return identifier;
+        }
+
+        @Override
+        public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, ExecutionContext ctx) {
+            J.VariableDeclarations.NamedVariable v = super.visitVariable(variable, ctx);
+            if (v == variable) {
+                JavaType.Variable variableType = v.getVariableType();
+                if (!isWellFormedType(variableType, seenTypes) && !isAllowedToHaveUnknownType()) {
+                    if (isValidated(variable)) {
+                        v = SearchResult.found(v, "Variable type is missing or malformed");
+                    }
+                } else if (variableType != null && !variableType.getName().equals(v.getSimpleName()) && isNotDestructType(variableType)) {
+                    v = SearchResult.found(v, "type information has a different variable name '" + variableType.getName() + "'");
+                }
+            }
+            return v;
+        }
+
+        private boolean isAllowedToHaveUnknownType() {
+            Cursor parent = getCursor().getParent();
+            while (parent != null && parent.getParent() != null && !(parent.getParentTreeCursor().getValue() instanceof J.ClassDeclaration)) {
+                parent = parent.getParentTreeCursor();
+            }
+            // If the variable is declared in a class initializer, then it's allowed to have unknown type
+            return parent != null && parent.getValue() instanceof J.Block;
+        }
+
+        @Override
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            J.MethodInvocation mi = super.visitMethodInvocation(method, ctx);
+            // If one of the method's arguments or type parameters is missing type, then the invocation very likely will too
+            // Avoid over-reporting the same problem by checking the invocation only when its elements are well-formed
+            if (mi == method) {
+                JavaType.Method type = mi.getMethodType();
+                if (!isWellFormedType(type, seenTypes)) {
+                    mi = SearchResult.found(mi, "MethodInvocation type is missing or malformed");
+                } else if (!type.getName().equals(mi.getSimpleName()) && !type.isConstructor() && isValidated(mi)) {
+                    mi = SearchResult.found(mi, "type information has a different method name '" + type.getName() + "'");
+                }
+                if (mi.getName().getType() != null && type != mi.getName().getType()) {
+                    mi = SearchResult.found(mi, "MethodInvocation#name type is not the MethodType of MethodInvocation.");
+                }
+            }
+            return mi;
+        }
+
+        @Override
+        public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
+            J.MemberReference mr = super.visitMemberReference(memberRef, ctx);
+            JavaType.Method type = mr.getMethodType();
+            if (type != null) {
+                if (!isWellFormedType(type, seenTypes)) {
+                    mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
+                } else if (!type.getName().equals(mr.getReference().getSimpleName()) && !type.isConstructor()) {
+                    mr = SearchResult.found(mr, "type information has a different method name '" + type.getName() + "'");
+                }
+            } else {
+                JavaType.Variable variableType = mr.getVariableType();
+                if (!isWellFormedType(variableType, seenTypes)) {
+                    if (!"class".equals(mr.getReference().getSimpleName())) {
+                        mr = SearchResult.found(mr, "MemberReference type is missing or malformed");
+                    }
+                } else if (!variableType.getName().equals(mr.getReference().getSimpleName())) {
+                    mr = SearchResult.found(mr, "type information has a different variable name '" + variableType.getName() + "'");
+                }
+            }
+            return mr;
+        }
+
+        @Override
+        public J.MethodDeclaration visitMethodDeclaration(J.MethodDeclaration method, ExecutionContext ctx) {
+            J.MethodDeclaration md = super.visitMethodDeclaration(method, ctx);
+            JavaType.Method type = md.getMethodType();
+            if (!isWellFormedType(type, seenTypes)) {
+                md = SearchResult.found(md, "MethodDeclaration type is missing or malformed");
+            } else if (!md.getSimpleName().equals(type.getName()) && !type.isConstructor() && !"anonymous".equals(type.getName())) {
+                md = SearchResult.found(md, "type information has a different method name '" + type.getName() + "'");
+            }
+            if (md.getName().getType() != null && type != md.getName().getType()) {
+                md = SearchResult.found(md, "MethodDeclaration#name type is not the MethodType of MethodDeclaration.");
+            }
+            return md;
+        }
+
+        @Override
+        public J.ClassDeclaration visitClassDeclaration(J.ClassDeclaration classDecl, ExecutionContext ctx) {
+            J.ClassDeclaration cd = super.visitClassDeclaration(classDecl, ctx);
+            JavaType.FullyQualified t = cd.getType();
+            if (!isWellFormedType(t, seenTypes)) {
+                return SearchResult.found(cd, "ClassDeclaration type is missing or malformed");
+            }
+            if (!cd.getKind().name().equals(t.getKind().name())) {
+                cd = SearchResult.found(cd,
+                        " J.ClassDeclaration kind " + cd.getKind() + " does not match the kind in its type information " + t.getKind());
+            }
+            J.CompilationUnit jc = getCursor().firstEnclosing(J.CompilationUnit.class);
+            if (jc != null) {
+                J.Package pkg = jc.getPackageDeclaration();
+                if (pkg != null && t.getPackageName().equals(pkg.printTrimmed(getCursor()))) {
+                    cd = SearchResult.found(cd,
+                            " J.ClassDeclaration package " + pkg + " does not match the package in its type information " + pkg.printTrimmed(getCursor()));
+                }
+            }
+            return cd;
+        }
+
+        @Override
+        public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+            J.NewClass n = super.visitNewClass(newClass, ctx);
+            if (n == newClass && !isWellFormedType(n.getType(), seenTypes)) {
+                n = SearchResult.found(n, "NewClass type is missing or malformed");
+            }
+            if (n.getClazz() instanceof J.Identifier && n.getClazz().getType() != null &&
+                !(n.getClazz().getType() instanceof JavaType.Class || n.getClazz().getType() instanceof JavaType.Unknown)) {
+                n = SearchResult.found(n, "NewClass#clazz is J.Identifier and the type is is not JavaType$Class.");
+            }
+            return n;
+        }
+
+        @Override
+        public J.ParameterizedType visitParameterizedType(J.ParameterizedType type, ExecutionContext ctx) {
+            J.ParameterizedType p = super.visitParameterizedType(type, ctx);
+            if (p.getClazz() instanceof J.Identifier && p.getClazz().getType() != null &&
+                !(p.getClazz().getType() instanceof JavaType.Class || p.getClazz().getType() instanceof JavaType.Unknown)) {
+                p = SearchResult.found(p, "ParameterizedType#clazz is J.Identifier and the type is is not JavaType$Class.");
+            }
+            return p;
+        }
+
+        private boolean isAllowedToHaveNullType(J.Identifier ident) {
+            return inPackageDeclaration() || inImport() || isClassName()
+                   || isMethodName() || isMethodInvocationName() || isFieldAccess(ident) || isBeingDeclared(ident) || isParameterizedType(ident)
+                   || isNewClass(ident) || isTypeParameter() || isMemberReference(ident) || isCaseLabel() || isLabel() || isAnnotationField(ident)
+                   || isInJavaDoc(ident) || isWhenLabel();
+        }
+
+        private boolean inPackageDeclaration() {
+            return getCursor().firstEnclosing(J.Package.class) != null;
+        }
+
+        private boolean inImport() {
+            return getCursor().firstEnclosing(J.Import.class) != null;
+        }
+
+        private boolean isClassName() {
+            Cursor parent = getCursor().getParent();
+            return parent != null && parent.getValue() instanceof J.ClassDeclaration;
+        }
+
+        private boolean isMethodName() {
+            Cursor parent = getCursor().getParent();
+            return parent != null && parent.getValue() instanceof J.MethodDeclaration;
+        }
+
+        private boolean isMethodInvocationName() {
+            Cursor parent = getCursor().getParent();
+            return parent != null && parent.getValue() instanceof J.MethodInvocation;
+        }
+
+        private boolean isFieldAccess(J.Identifier ident) {
+            Tree value = getCursor().getParentTreeCursor().getValue();
+            return value instanceof J.FieldAccess
+                   && (ident == ((J.FieldAccess) value).getName() ||
+                       ident == ((J.FieldAccess) value).getTarget() && !((J.FieldAccess) value).getSimpleName().equals("class"));
+        }
+
+        private boolean isBeingDeclared(J.Identifier ident) {
+            Tree value = getCursor().getParentTreeCursor().getValue();
+            return value instanceof J.VariableDeclarations.NamedVariable && ident == ((J.VariableDeclarations.NamedVariable) value).getName();
+        }
+
+        private boolean isParameterizedType(J.Identifier ident) {
+            Tree value = getCursor().getParentTreeCursor().getValue();
+            return value instanceof J.ParameterizedType && ident == ((J.ParameterizedType) value).getClazz();
+        }
+
+        private boolean isNewClass(J.Identifier ident) {
+            Tree value = getCursor().getParentTreeCursor().getValue();
+            return value instanceof J.NewClass && ident == ((J.NewClass) value).getClazz();
+        }
+
+        private boolean isTypeParameter() {
+            return getCursor().getParent() != null
+                   && getCursor().getParent().getValue() instanceof J.TypeParameter;
+        }
+
+        private boolean isMemberReference(J.Identifier ident) {
+            Tree value = getCursor().getParentTreeCursor().getValue();
+            return value instanceof J.MemberReference &&
+                   ident == ((J.MemberReference) value).getReference();
+        }
+
+        private boolean isInJavaDoc(J.Identifier ident) {
+            Tree value = getCursor().getParentTreeCursor().getValue();
+            return value instanceof Javadoc.Reference &&
+                   ident == ((Javadoc.Reference) value).getTree();
+        }
+
+        private boolean isCaseLabel() {
+            return getCursor().getParentTreeCursor().getValue() instanceof J.Case;
+        }
+
+
+        private boolean isWhenLabel() {
+            return getCursor().getParentTreeCursor().getValue() instanceof K.WhenBranch;
+        }
+
+        private boolean isLabel() {
+            return getCursor().firstEnclosing(J.Label.class) != null;
+        }
+
+        private boolean isAnnotationField(J.Identifier ident) {
+            Cursor parent = getCursor().getParent();
+            return parent != null && parent.getValue() instanceof J.Assignment
+                   && (ident == ((J.Assignment) parent.getValue()).getVariable() && getCursor().firstEnclosing(J.Annotation.class) != null);
+        }
+
+        private boolean isValidated(J.Identifier i) {
+            J j = getCursor().dropParentUntil(it -> it instanceof J).getValue();
+            // TODO: replace with AnnotationUseSite tree.
+            return !j.getMarkers().findFirst(AnnotationUseSite.class).isPresent() && !(j instanceof K.KReturn);
+        }
+
+        private boolean isValidated(J.MethodInvocation mi) {
+            return !mi.getMarkers().findFirst(IndexedAccess.class).isPresent();
+        }
+
+        private boolean isValidated(J.VariableDeclarations.NamedVariable v) {
+            J.VariableDeclarations j = getCursor().firstEnclosing(J.VariableDeclarations.class);
+            return j.getModifiers().stream().noneMatch(it -> "typealias".equals(it.getKeyword())) && !j.getMarkers().findFirst(Extension.class).isPresent();
+        }
+
+        private boolean isNotDestructType(JavaType.Variable variable) {
+            return !"<destruct>".equals(variable.getName());
+        }
     }
 }
