@@ -4504,7 +4504,7 @@ public interface J extends Tree {
                         t.prefix,
                         t.markers,
                         t.annotations,
-                        t.typeTree);
+                        typeTree);
             }
         }
     }
