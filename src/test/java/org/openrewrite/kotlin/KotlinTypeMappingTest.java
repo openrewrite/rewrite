@@ -1495,5 +1495,29 @@ public class KotlinTypeMappingTest {
               )
             );
         }
+
+        @Test
+        void functionTypeOnParams() {
+            rewriteRun(
+              kotlin(
+                """
+                 fun foo() :   suspend    ( param : Int )  -> Unit = { }
+                 """, spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
+                            if ("param".equals(identifier.getSimpleName()) && identifier.getType() != null) {
+                                assertThat(identifier.getType().toString()).isEqualTo("kotlin.Int");
+                                found.set(true);
+                            }
+                            return super.visitIdentifier(identifier, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isTrue();
+                })
+              )
+            );
+        }
     }
 }

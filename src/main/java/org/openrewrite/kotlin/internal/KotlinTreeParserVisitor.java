@@ -623,7 +623,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     typeTree = new K.FunctionType.Parameter(
                             randomId(),
                             Markers.EMPTY.addIfAbsent(new TypeReferencePrefix(randomId(), prefix(ktParameter.getColon()))),
-                            createIdentifier(ktParameter.getNameIdentifier(), null),
+                            createIdentifier(ktParameter.getNameIdentifier(), type(ktParameter.getTypeReference())),
                             (TypeTree) requireNonNull(ktParameter.getTypeReference()).accept(this, data)
                     );
                 } else {
