@@ -365,6 +365,7 @@ public interface JavaType {
         @With
         @Nullable
         @NonFinal
+        @JsonIgnore
         Integer managedReference;
 
         @With(AccessLevel.NONE)
@@ -638,6 +639,7 @@ public interface JavaType {
         @With
         @Nullable
         @NonFinal
+        @JsonIgnore
         Integer managedReference;
 
         @With
@@ -779,6 +781,7 @@ public interface JavaType {
         @Getter
         @Nullable
         @NonFinal
+        @JsonIgnore
         Integer managedReference;
 
         @With
@@ -874,6 +877,7 @@ public interface JavaType {
         @Getter
         @Nullable
         @NonFinal
+        @JsonIgnore
         Integer managedReference;
 
         @NonFinal
@@ -1065,6 +1069,7 @@ public interface JavaType {
         @With
         @Nullable
         @NonFinal
+        @JsonIgnore
         Integer managedReference;
 
         @With(AccessLevel.PRIVATE)
@@ -1344,6 +1349,7 @@ public interface JavaType {
         @With
         @Nullable
         @NonFinal
+        @JsonIgnore
         Integer managedReference;
 
         @With(AccessLevel.PRIVATE)
