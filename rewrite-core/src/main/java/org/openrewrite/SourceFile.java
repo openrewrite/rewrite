@@ -17,13 +17,14 @@ package org.openrewrite;
 
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.service.SourceFileService;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
+import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 
 public interface SourceFile extends Tree {
@@ -122,16 +123,20 @@ public interface SourceFile extends Tree {
      * @return The weight of the AST.
      */
     default long getWeight(Predicate<Object> uniqueIdentity) {
-        AtomicInteger n = new AtomicInteger();
-        new TreeVisitor<Tree, AtomicInteger>() {
-            @Override
-            public @Nullable Tree visit(@Nullable Tree tree, AtomicInteger atomicInteger) {
-                if (tree != null) {
-                    n.incrementAndGet();
-                }
-                return super.visit(tree, atomicInteger);
+        return service(SourceFileService.class).computeWeight(this, uniqueIdentity);
+    }
+
+    @Incubating(since = "8.12.0")
+    default <S> S service(Class<S> service) {
+        try {
+            // use name indirection due to possibility of multiple class loaders being used
+            if (SourceFileService.class.getName().equals(service.getName())) {
+                return service.getConstructor().newInstance();
+            } else {
+                throw new UnsupportedOperationException("Service " + service + " not supported");
             }
-        }.visit(this, n);
-        return n.get();
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

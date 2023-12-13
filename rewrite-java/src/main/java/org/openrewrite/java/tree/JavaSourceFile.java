@@ -21,12 +21,14 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.TypesInUse;
 import org.openrewrite.java.service.AutoFormatService;
 import org.openrewrite.java.service.ImportService;
+import org.openrewrite.java.service.JavaSourceFileService;
+import org.openrewrite.service.SourceFileService;
 
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Path;
 import java.util.List;
 
-public interface JavaSourceFile extends J {
+public interface JavaSourceFile extends J, SourceFile {
     TypesInUse getTypesInUse();
 
     @Nullable
@@ -53,20 +55,27 @@ public interface JavaSourceFile extends J {
      */
     Path getSourcePath();
 
-    SourceFile withSourcePath(Path path);
+    <T extends SourceFile> T withSourcePath(Path path);
 
     @Incubating(since = "8.2.0")
+    @Override
     default <S> S service(Class<S> service) {
         try {
             // use name indirection due to possibility of multiple class loaders being used
-            if (ImportService.class.getName().equals(service.getName())) {
+            String serviceName = service.getName();
+            if (ImportService.class.getName().equals(serviceName)) {
                 return service.getConstructor().newInstance();
-            } else if (AutoFormatService.class.getName().equals(service.getName())) {
+            } else if (AutoFormatService.class.getName().equals(serviceName)) {
                 return service.getConstructor().newInstance();
+            } else if (SourceFileService.class.getName().equals(serviceName)) {
+                @SuppressWarnings("unchecked")
+                Class<S> serviceClass = (Class<S>) service.getClassLoader().loadClass(JavaSourceFileService.class.getName());
+                return serviceClass.getConstructor().newInstance();
             } else {
-                throw new UnsupportedOperationException("Service " + service + " not supported");
+                return SourceFile.super.service(service);
             }
-        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException |
+                 ClassNotFoundException e) {
             throw new RuntimeException(e);
         }
     }

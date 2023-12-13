@@ -20,7 +20,10 @@ import org.openrewrite.*;
 import org.openrewrite.internal.EncodingDetectingInputStream;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.service.ParseErrorSourceFileService;
+import org.openrewrite.service.SourceFileService;
 
+import java.lang.reflect.InvocationTargetException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -103,5 +106,23 @@ public class ParseError implements SourceFile {
                 is.readFully(),
                 null
         );
+    }
+
+    @Override
+    public <S> S service(Class<S> service) {
+        try {
+            // use name indirection due to possibility of multiple class loaders being used
+            String serviceName = service.getName();
+            if (SourceFileService.class.getName().equals(serviceName)) {
+                @SuppressWarnings("unchecked")
+                Class<S> serviceClass = (Class<S>) service.getClassLoader().loadClass(ParseErrorSourceFileService.class.getName());
+                return serviceClass.getConstructor().newInstance();
+            } else {
+                return SourceFile.super.service(service);
+            }
+        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException |
+                 ClassNotFoundException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
