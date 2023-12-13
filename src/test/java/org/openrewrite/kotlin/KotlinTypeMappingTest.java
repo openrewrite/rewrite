@@ -1569,5 +1569,35 @@ public class KotlinTypeMappingTest {
               )
             );
         }
+
+        @Test
+        void constructorMemberReferenceType() {
+            rewriteRun(
+              kotlin(
+                """
+                  open class A(
+                    val foo : ( ( Any ) -> A) -> A
+                  )
+                  class B : A ( foo = { x -> ( :: A ) ( x ) } ) {
+                    @Suppress("UNUSED_PARAMETER")
+                    fun mRef(a: Any) {}
+                  }
+                  """, spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.MemberReference visitMemberReference(J.MemberReference memberRef, Integer integer) {
+                            if ("A".equals(memberRef.getReference().getSimpleName())) {
+                                assertThat(memberRef.getMethodType().toString()).isEqualTo("A{name=<constructor>,return=A,parameters=[kotlin.Function1<kotlin.Function1<kotlin.Any, A>, A>]}");
+                                found.set(true);
+                            }
+                            return super.visitMemberReference(memberRef, integer);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isEqualTo(true);
+                })
+              )
+            );
+        }
     }
 }

@@ -28,6 +28,7 @@ import org.jetbrains.kotlin.com.intellij.psi.util.PsiTreeUtil;
 import org.jetbrains.kotlin.fir.FirElement;
 import org.jetbrains.kotlin.fir.declarations.FirResolvedImport;
 import org.jetbrains.kotlin.fir.references.FirResolvedCallableReference;
+import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol;
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol;
 import org.jetbrains.kotlin.kdoc.psi.api.KDoc;
@@ -283,6 +284,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         if (reference != null && reference.getResolvedSymbol() instanceof FirNamedFunctionSymbol) {
             methodReferenceType = psiElementAssociations.getTypeMapping().methodDeclarationType(
                     ((FirNamedFunctionSymbol) reference.getResolvedSymbol()).getFir(),
+                    expression.getReceiverExpression()
+            );
+        }
+        if (reference != null && reference.getResolvedSymbol() instanceof FirConstructorSymbol) {
+            methodReferenceType = psiElementAssociations.getTypeMapping().methodDeclarationType(
+                    ((FirConstructorSymbol) reference.getResolvedSymbol()).getFir(),
                     expression.getReceiverExpression()
             );
         }
