@@ -17,6 +17,10 @@ package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -35,6 +39,8 @@ public interface ExecutionContext {
     String DATA_TABLES = "org.openrewrite.dataTables";
     String RUN_TIMEOUT = "org.openrewrite.runTimeout";
     String REQUIRE_PRINT_EQUALS_INPUT = "org.openrewrite.requirePrintEqualsInput";
+    String WORKING_DIRECTORY_ROOT = "org.openrewrite.workingDirectoryRoot";
+    String WORKING_DIRECTORY = "org.openrewrite.workingDirectory";
 
     @Incubating(since = "7.20.0")
     default ExecutionContext addObserver(TreeObserver.Subscription observer) {
@@ -98,5 +104,22 @@ public interface ExecutionContext {
 
     default int getCycle() {
         return requireNonNull(getMessage(CURRENT_CYCLE));
+    }
+
+    default Path getWorkingDirectory() {
+        try {
+            String workingDirectory = getMessage(WORKING_DIRECTORY);
+            if (workingDirectory == null) {
+                throw new IllegalStateException("Working directory not set");
+            }
+            Path root = getMessage(WORKING_DIRECTORY_ROOT);
+            if (root == null) {
+                root = Files.createTempDirectory("rewrite-work");
+                putMessage(WORKING_DIRECTORY_ROOT, root);
+            }
+            return Files.createDirectories(root.resolve(workingDirectory));
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 }

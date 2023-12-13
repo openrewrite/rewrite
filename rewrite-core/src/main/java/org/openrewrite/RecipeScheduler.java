@@ -21,6 +21,7 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.FindRecipeRunException;
 import org.openrewrite.internal.RecipeRunException;
+import org.openrewrite.internal.WorkingDirectoryExecutionContextView;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Generated;
 import org.openrewrite.marker.RecipesThatMadeChanges;
@@ -54,6 +55,10 @@ public class RecipeScheduler {
         LargeSourceSet after = sourceSet;
 
         for (int i = 1; i <= maxCycles; i++) {
+            if (ctx.getMessage(PANIC) != null) {
+                break;
+            }
+
             ctxWithWatch.putCycle(i);
             after.beforeCycle();
 
@@ -168,10 +173,15 @@ public class RecipeScheduler {
 
         public LargeSourceSet generateSources(LargeSourceSet sourceSet, int cycle) {
             List<SourceFile> generatedInThisCycle = new ArrayList<>();
+            WorkingDirectoryExecutionContextView ctxWithWorkingDirectory = WorkingDirectoryExecutionContextView.view(ctx);
 
             Stack<Stack<Recipe>> allRecipesStack = initRecipeStack();
             LargeSourceSet acc = sourceSet;
-            while (!allRecipesStack.isEmpty()) {
+            for (int i = 0; !allRecipesStack.isEmpty(); i++) {
+                if (ctx.getMessage(PANIC) != null) {
+                    break;
+                }
+
                 Stack<Recipe> recipeStack = allRecipesStack.pop();
                 Recipe recipe = recipeStack.peek();
                 if (recipe.maxCycles() < cycle) {
@@ -182,6 +192,7 @@ public class RecipeScheduler {
                     //noinspection unchecked
                     ScanningRecipe<Object> scanningRecipe = (ScanningRecipe<Object>) recipe;
                     sourceSet.setRecipe(recipeStack);
+                    ctxWithWorkingDirectory.setWorkingDirectory(Integer.toString(i));
                     List<SourceFile> generated = new ArrayList<>(scanningRecipe.generate(scanningRecipe.getAccumulator(rootCursor, ctx), generatedInThisCycle, ctx));
                     generated.replaceAll(source -> addRecipesThatMadeChanges(recipeStack, source));
                     generatedInThisCycle.addAll(generated);
@@ -233,7 +244,7 @@ public class RecipeScheduler {
                     });
 
                     if (after != sourceFile) {
-                        madeChangesInThisCycle.add(recipeStack.peek());
+                        madeChangesInThisCycle.add(recipe);
                         recordSourceFileResult(sourceFile, after, recipeStack, ctx);
                         if (sourceFile.getMarkers().findFirst(Generated.class).isPresent()) {
                             // skip edits made to generated source files so that they don't show up in a diff
@@ -243,7 +254,7 @@ public class RecipeScheduler {
                         recipeRunStats.recordSourceFileChanged(sourceFile, after);
                     } else if (ctx.hasNewMessages()) {
                         // consider any recipes adding new messages as a changing recipe (which can request another cycle)
-                        madeChangesInThisCycle.add(recipeStack.peek());
+                        madeChangesInThisCycle.add(recipe);
                         ctx.resetHasNewMessages();
                     }
                 } catch (Throwable t) {
@@ -326,12 +337,17 @@ public class RecipeScheduler {
         private LargeSourceSet mapForRecipeRecursively(LargeSourceSet sourceSet, BiFunction<Stack<Recipe>, @Nullable SourceFile, @Nullable SourceFile> mapFn) {
             return sourceSet.edit(sourceFile -> {
                 Stack<Stack<Recipe>> allRecipesStack = initRecipeStack();
+                WorkingDirectoryExecutionContextView ctxWithWorkingDirectory = WorkingDirectoryExecutionContextView.view(ctx);
 
                 SourceFile acc = sourceFile;
-                while (!allRecipesStack.isEmpty()) {
+                for (int i = 0; !allRecipesStack.isEmpty(); i++) {
                     Stack<Recipe> recipeStack = allRecipesStack.pop();
                     sourceSet.setRecipe(recipeStack);
+                    ctxWithWorkingDirectory.setWorkingDirectory(Integer.toString(i));
                     acc = mapFn.apply(recipeStack, acc);
+                    if (ctx.getMessage(PANIC) != null) {
+                        break;
+                    }
                     recurseRecipeList(allRecipesStack, recipeStack);
                 }
 
@@ -351,9 +367,6 @@ public class RecipeScheduler {
             List<Recipe> recipeList = recipeLists.computeIfAbsent(recipeStack.peek(), Recipe::getRecipeList);
             for (int i = recipeList.size() - 1; i >= 0; i--) {
                 Recipe r = recipeList.get(i);
-                if (ctx.getMessage(PANIC) != null) {
-                    break;
-                }
                 Stack<Recipe> nextStack = new Stack<>();
                 nextStack.addAll(recipeStack);
                 nextStack.push(r);
