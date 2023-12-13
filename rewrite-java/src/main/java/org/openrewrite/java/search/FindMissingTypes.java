@@ -182,7 +182,7 @@ public class FindMissingTypes extends Recipe {
             if (md.getName().getType() != null && type != null && type != md.getName().getType()) {
                 // The MethodDeclaration#name#type and the methodType field should be the same object.
                 // A different object in one implies a type has changed, either in the method signature or deeper in the type tree.
-                md = SearchResult.found(md, "MethodDeclaration#name#type is not a referentially object to the MethodType of MethodDeclaration.");
+                md = SearchResult.found(md, "MethodDeclaration#name#type is not the same instance as the MethodType of MethodDeclaration.");
             }
             return md;
         }
