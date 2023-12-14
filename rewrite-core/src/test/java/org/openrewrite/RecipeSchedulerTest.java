@@ -159,8 +159,12 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
 
     @Override
     public Accumulator getInitialValue(ExecutionContext ctx) {
-        assertThat(ctx.getWorkingDirectory()).isDirectory();
-        return new Accumulator(ctx.getWorkingDirectory());
+        Path workingDirectory = ctx.getWorkingDirectory();
+        assertThat(workingDirectory).isDirectory();
+        assertThat(workingDirectory).hasParent(ctx.getMessage(ExecutionContext.WORKING_DIRECTORY_ROOT));
+        assertThat(workingDirectory).isEmptyDirectory();
+        assertThat(workingDirectory.getFileName().toString()).isEqualTo("0");
+        return new Accumulator(workingDirectory);
     }
 
     @Override
