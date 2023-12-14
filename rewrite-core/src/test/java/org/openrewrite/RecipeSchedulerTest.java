@@ -16,16 +16,25 @@
 package org.openrewrite;
 
 import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
+import lombok.Data;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markup;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.text.PlainText;
 import org.openrewrite.text.PlainTextVisitor;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.openrewrite.test.RewriteTest.toRecipe;
 import static org.openrewrite.test.SourceSpecs.text;
 
 class RecipeSchedulerTest implements RewriteTest {
@@ -55,6 +64,44 @@ class RecipeSchedulerTest implements RewriteTest {
             "~~(boom)~~>hello"
           )
         );
+    }
+
+    @Test
+    void suppliedWorkingDirectoryRoot(@TempDir Path path) {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        ctx.putMessage(ExecutionContext.WORKING_DIRECTORY_ROOT, path);
+        AtomicInteger cycle = new AtomicInteger(0);
+        rewriteRun(
+          spec -> spec.executionContext(ctx).recipe(toRecipe(() -> new TreeVisitor<>() {
+              @Override
+              public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                  assert tree != null;
+                  PlainText plainText = (PlainText) tree;
+                  Path workingDirectory = ctx.getWorkingDirectory();
+                  assertThat(workingDirectory).hasParent(path);
+                  if (cycle.incrementAndGet() == 2) {
+                      assertThat(workingDirectory.resolve("foo.txt")).hasContent("foo");
+                  }
+                  assertDoesNotThrow(() -> {
+                      Files.writeString(workingDirectory.resolve("foo.txt"), plainText.getText());
+                  });
+                  return plainText.withText("bar");
+              }
+          })),
+          text("foo", "bar")
+        );
+        assertThat(path).doesNotExist();
+    }
+
+    @Test
+    void managedWorkingDirectoryWithScanningRecipe(@TempDir Path path) {
+        InMemoryExecutionContext ctx = new InMemoryExecutionContext();
+        ctx.putMessage(ExecutionContext.WORKING_DIRECTORY_ROOT, path);
+        rewriteRun(
+          spec -> spec.executionContext(ctx).recipe(new RecipeWritingToFile()),
+          text("foo", "bar")
+        );
+        assertThat(path).doesNotExist();
     }
 }
 
@@ -94,5 +141,68 @@ class BoomException extends RuntimeException {
         return Arrays.stream(super.getStackTrace())
           .filter(st -> st.getClassName().startsWith(BoomRecipe.class.getName()))
           .toArray(StackTraceElement[]::new);
+    }
+}
+
+@AllArgsConstructor
+class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator> {
+
+    @Override
+    public String getDisplayName() {
+        return "Write text to a file";
+    }
+
+    @Override
+    public String getDescription() {
+        return "Writes text to a file.";
+    }
+
+    @Override
+    public Accumulator getInitialValue(ExecutionContext ctx) {
+        assertThat(ctx.getWorkingDirectory()).isDirectory();
+        return new Accumulator(ctx.getWorkingDirectory());
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getScanner(Accumulator acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                assert tree != null;
+                Path workingDirectory = ctx.getWorkingDirectory();
+                assertThat(workingDirectory).isDirectory();
+                assertThat(acc.getWorkingDirectory()).isEqualTo(workingDirectory);
+                assertDoesNotThrow(() -> {
+                    Files.writeString(workingDirectory.resolve("manifest.txt"), ((SourceFile) tree).getSourcePath().toString(), StandardOpenOption.APPEND, StandardOpenOption.CREATE);
+                });
+                return tree;
+            }
+        };
+    }
+
+    @Override
+    public Collection<? extends SourceFile> generate(Accumulator acc, ExecutionContext ctx) {
+        return super.generate(acc, ctx);
+    }
+
+    @Override
+    public TreeVisitor<?, ExecutionContext> getVisitor(Accumulator acc) {
+        return new TreeVisitor<>() {
+            @Override
+            public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
+                Path workingDirectory = ctx.getWorkingDirectory();
+                assertThat(workingDirectory).isDirectory();
+                assertThat(acc.getWorkingDirectory()).isEqualTo(workingDirectory);
+                assertDoesNotThrow(() -> {
+                    assertThat(workingDirectory.resolve("manifest.txt")).hasContent("file.txt");
+                });
+                return ((PlainText) tree).withText("bar");
+            }
+        };
+    }
+
+    @Data
+    public class Accumulator {
+        final Path workingDirectory;
     }
 }

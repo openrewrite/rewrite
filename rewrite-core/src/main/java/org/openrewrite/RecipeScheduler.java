@@ -103,6 +103,9 @@ public class RecipeScheduler {
                 // recommended, but isn't possible for us to guard against at an API level, and so we are
                 // defensive about memory consumption here.
                 rootCursor.clearMessages();
+
+                // Delete any files created in the working directory
+                WorkingDirectoryExecutionContextView.view(ctx).delete();
             }
         }
 
