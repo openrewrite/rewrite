@@ -291,25 +291,47 @@ class AnnotationTest implements RewriteTest {
               import static java.lang.annotation.ElementType.*;
               
               public class A {
-                @Leading java. @Single util. @Multi1 @Multi2 List<String> l;
+                @Leading java. util. @Multi1 @Multi2 List<String> l;
+                @Leading java. util. @Multi1 @Multi2 List<String> m() { return null; }
               }
               
               @Retention(RetentionPolicy.RUNTIME)
-              @Target(value={CONSTRUCTOR, FIELD, LOCAL_VARIABLE, METHOD, PACKAGE, PARAMETER, TYPE})
+              @Target(value={FIELD, METHOD})
               public @interface Leading {}
-
+              
               @Retention(RetentionPolicy.RUNTIME)
-              @Target(value={CONSTRUCTOR, FIELD, LOCAL_VARIABLE, METHOD, PACKAGE, PARAMETER, TYPE})
-              public @interface Single {}
-
-              @Retention(RetentionPolicy.RUNTIME)
-              @Target(value={CONSTRUCTOR, FIELD, LOCAL_VARIABLE, METHOD, PACKAGE, PARAMETER, TYPE})
+              @Target(value=TYPE_USE)
               public @interface Multi1 {}
-
+              
               @Retention(RetentionPolicy.RUNTIME)
-              @Target(value={CONSTRUCTOR, FIELD, LOCAL_VARIABLE, METHOD, PACKAGE, PARAMETER, TYPE})
+              @Target(value=TYPE_USE)
               public @interface Multi2 {}
-              """
+              """,
+            spec -> spec.afterRecipe(cu -> {
+                J.VariableDeclarations field = (J.VariableDeclarations) cu.getClasses().get(0).getBody().getStatements().get(0);
+                assertThat(field.getAllAnnotations()).satisfiesExactly(
+                  leading -> assertThat(leading.getSimpleName()).isEqualTo("Leading")
+                );
+                J.ParameterizedType fieldType = (J.ParameterizedType) field.getTypeExpression();
+                assertThat(fieldType).isNotNull();
+                J.AnnotatedType annotatedType = (J.AnnotatedType) fieldType.getClazz();
+                assertThat(annotatedType.getAllAnnotations()).satisfiesExactly(
+                  multi1 -> assertThat(multi1.getSimpleName()).isEqualTo("Multi1"),
+                  multi2 -> assertThat(multi2.getSimpleName()).isEqualTo("Multi2")
+                );
+
+                J.MethodDeclaration method = (J.MethodDeclaration) cu.getClasses().get(0).getBody().getStatements().get(1);
+                assertThat(method.getAllAnnotations()).satisfiesExactly(
+                  leading -> assertThat(leading.getSimpleName()).isEqualTo("Leading")
+                );
+                J.ParameterizedType returnType = (J.ParameterizedType) method.getReturnTypeExpression();
+                assertThat(returnType).isNotNull();
+                annotatedType = (J.AnnotatedType) returnType.getClazz();
+                assertThat(annotatedType.getAllAnnotations()).satisfiesExactly(
+                  multi1 -> assertThat(multi1.getSimpleName()).isEqualTo("Multi1"),
+                  multi2 -> assertThat(multi2.getSimpleName()).isEqualTo("Multi2")
+                );
+            })
           )
         );
     }
