@@ -254,14 +254,7 @@ public class AddDependencyVisitor extends GroovyIsoVisitor<ExecutionContext> {
                     .orElseThrow(() -> new IllegalArgumentException("Could not parse as Gradle"));
 
             if (parsed instanceof ParseError) {
-                ParseError error = (ParseError) parsed;
-                if (error.getErroneous() != null) {
-                    throw new IllegalStateException("Failed to parse the generated dependency because of parse-to-print idempotence.");
-                } else {
-                    ParseExceptionResult ex = error.getMarkers().findFirst(ParseExceptionResult.class)
-                            .orElseThrow(() -> new IllegalStateException("No ParseExceptionResult marker on parser failure."));
-                    throw new IllegalStateException(ex.getExceptionType() + ": " + ex.getMessage());
-                }
+                throw ((ParseError) parsed).toException();
             }
 
             J.MethodInvocation addDependencyInvocation = requireNonNull((J.MethodInvocation) ((J.Return) (((J.Block) ((J.Lambda) ((J.MethodInvocation)

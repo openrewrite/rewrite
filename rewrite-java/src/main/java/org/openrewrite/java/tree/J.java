@@ -134,6 +134,21 @@ public interface J extends Tree {
             return withTypeExpression(typeExpression.withType(type));
         }
 
+        public List<Annotation> getAllAnnotations() {
+            List<J.Annotation> allAnnotations = annotations;
+            List<J.Annotation> moreAnnotations;
+            if (typeExpression instanceof FieldAccess &&
+                !(moreAnnotations = ((FieldAccess) typeExpression).getName().getAnnotations()).isEmpty()) {
+                if (allAnnotations.isEmpty()) {
+                    allAnnotations = moreAnnotations;
+                } else {
+                    allAnnotations = new ArrayList<>(annotations);
+                    allAnnotations.addAll(moreAnnotations);
+                }
+            }
+            return allAnnotations;
+        }
+
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAnnotatedType(this, p);
@@ -3626,9 +3641,6 @@ public interface J extends Tree {
             if (typeParameters != null) {
                 allAnnotations.addAll(typeParameters.getAnnotations());
             }
-            if (returnTypeExpression instanceof AnnotatedType) {
-                allAnnotations.addAll(((AnnotatedType) returnTypeExpression).getAnnotations());
-            }
             allAnnotations.addAll(name.getAnnotations());
             return allAnnotations;
         }
@@ -5660,9 +5672,6 @@ public interface J extends Tree {
             List<Annotation> allAnnotations = new ArrayList<>(leadingAnnotations);
             for (J.Modifier modifier : modifiers) {
                 allAnnotations.addAll(modifier.getAnnotations());
-            }
-            if (typeExpression != null && typeExpression instanceof J.AnnotatedType) {
-                allAnnotations.addAll(((J.AnnotatedType) typeExpression).getAnnotations());
             }
             return allAnnotations;
         }
