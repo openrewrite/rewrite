@@ -34,10 +34,7 @@ import org.jetbrains.kotlin.fir.references.resolved
 import org.jetbrains.kotlin.fir.resolve.calls.FirSyntheticFunctionSymbol
 import org.jetbrains.kotlin.fir.resolve.providers.toSymbol
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
-import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirFunctionSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
-import org.jetbrains.kotlin.fir.symbols.impl.FirVariableSymbol
+import org.jetbrains.kotlin.fir.symbols.impl.*
 import org.jetbrains.kotlin.fir.types.*
 import org.jetbrains.kotlin.fir.visitors.FirDefaultVisitor
 import org.jetbrains.kotlin.name.ClassId
@@ -152,7 +149,47 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
             return typeMapping.type(typeMap[parent], owner)
         }
         val fir = primary(psiElement)
+        if (psiElement != null && fir is FirResolvedQualifier && fir.source != null && fir.source.psi is KtDotQualifiedExpression) {
+            if (fir.symbol is FirRegularClassSymbol) {
+                val classId = (fir.symbol as FirRegularClassSymbol).classId
+                return if (isPackage(psiElement, classId)) {
+                    null
+                } else {
+                    val found = matchClassId(psiElement, classId)
+                    typeMapping.type(found, owner)
+                }
+            }
+        }
         return if (fir != null) typeMapping.type(fir, owner) else null
+    }
+
+    private fun isPackage(psi: PsiElement, classId: ClassId): Boolean {
+        return !classId.packageFqName.isRoot && psi.parent.text == classId.packageFqName.asString()
+    }
+
+    private fun matchClassId(psi: PsiElement, classId: ClassId): ClassId {
+        if (psi.parent is KtDotQualifiedExpression) {
+            val parts = psi.parent.text.split(".")
+            if (classId.packageFqName.isRoot && parts.size == 2 && psi.text == parts[0]) {
+                // Match the current PSI to the ClassId if the PSI is the outermost class of a dot qualified expression.
+                // For a multi-nested class like A.B.A.C, the PSI#parent field will have the same result (A.B) for both the LHS A and B.
+                // To match the PSI to the ClassId the outermost class `A` should use the current PSI rather than the parent field `A.B`.
+                return matchClassId0(psi, classId)
+            }
+        }
+        return matchClassId0(psi.parent, classId)
+    }
+
+    private fun matchClassId0(psi: PsiElement, classId: ClassId): ClassId {
+        if (psi.text == classId.asFqNameString()) {
+            return classId
+        }
+
+        if (classId.outerClassId != null) {
+            return matchClassId0(psi, classId.outerClassId!!)
+        }
+
+        return classId
     }
 
     fun primary(psiElement: PsiElement?) =

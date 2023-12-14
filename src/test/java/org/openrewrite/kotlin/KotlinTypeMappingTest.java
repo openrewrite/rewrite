@@ -25,10 +25,7 @@ import org.openrewrite.Issue;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.tree.Flag;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 import org.openrewrite.kotlin.tree.K;
 import org.openrewrite.test.RewriteTest;
 import org.openrewrite.test.TypeValidation;
@@ -1597,6 +1594,162 @@ public class KotlinTypeMappingTest {
                         }
                     }.visit(cu, 0);
                     assertThat(found.get()).isEqualTo(true);
+                })
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/517")
+        @Test
+        void nestedFieldAccessType() {
+            rewriteRun(
+              kotlin(
+                """
+                  class A {
+                      class B {
+                          class A {
+                              class C
+                          }
+                      }
+                  }
+                  
+                  val x = A.B.A.C()
+                  """,
+                spec -> spec.afterRecipe(cu -> {
+                      AtomicInteger count = new AtomicInteger(0);
+                      new KotlinIsoVisitor<Integer>() {
+                          @Override
+                          public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer n) {
+                              // 1. A fieldAccess should have the matched name and type
+                              assert fieldAccess.getType() != null;
+                              String expectedType = fieldAccess.toString().replace(".","$");
+                              String actualType = fieldAccess.getType().toString();
+                              assertThat(expectedType).isEqualTo(actualType);
+                              count.getAndIncrement();
+
+                              // 2. The 1st element of the field access should have the right type
+                              Expression target = fieldAccess.getTarget();
+                              if (target instanceof J.Identifier id) {
+                                  assert id.getType() != null;
+                                  assertThat (id.getType().toString()).isEqualTo(id.getSimpleName());
+                                  count.getAndIncrement();
+                              }
+
+                              return super.visitFieldAccess(fieldAccess, n);
+                          }
+                      }.visit(cu, 0);
+                      assertThat(count.get()).isEqualTo(4);
+                  }
+                )
+              )
+            );
+        }
+
+        @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/517")
+        @Test
+        void nestedFieldAccessWithPackage() {
+            rewriteRun(
+              kotlin(
+                """
+                  package    foo.bar
+                  class A {
+                      class B {
+                          class A {
+                              class C<T>
+                          }
+                      }
+                  }
+                  """
+              ),
+              kotlin(
+                "val x = foo.bar.A.B.A.C<String>()",
+                spec -> spec.afterRecipe(cu -> {
+                      AtomicInteger count = new AtomicInteger(0);
+                      new KotlinIsoVisitor<Integer>() {
+
+                          @Override
+                          public J.Identifier visitIdentifier(J.Identifier identifier, Integer integer) {
+                              if ("foo".equals(identifier.getSimpleName())) {
+                                  assertThat(identifier.getType()).isNull();
+                                  count.getAndIncrement();
+                              }
+                              return super.visitIdentifier(identifier, integer);
+                          }
+
+                          @Override
+                          public J.ParameterizedType visitParameterizedType(J.ParameterizedType type, Integer integer) {
+                              if ("C".equals(((J.FieldAccess) type.getClazz()).getSimpleName())) {
+                                  assertThat(type.getType().toString()).isEqualTo("foo.bar.A$B$A$C<kotlin.String>");
+                              }
+                              return super.visitParameterizedType(type, integer);
+                          }
+
+                          @Override
+                          public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer n) {
+                              // A fieldAccess should have the matched name and type
+                              String text = fieldAccess.toString();
+                              String fieldAccessSignature = fieldAccess.getType() != null ? fieldAccess.getType().toString() : "";
+                              String nameSignature = fieldAccess.getName().getType() != null ? fieldAccess.getName().getType().toString() : "";
+                              assertThat(fieldAccessSignature).isEqualTo(nameSignature);
+
+                              switch (text) {
+                                  case "foo.bar.A.B.A.C":
+                                      assertThat(fieldAccessSignature).isEqualTo("foo.bar.A$B$A$C");
+                                      count.getAndIncrement();
+                                      break;
+                                  case "foo.bar.A.B.A":
+                                      assertThat(fieldAccessSignature).isEqualTo("foo.bar.A$B$A");
+                                      count.getAndIncrement();
+                                      break;
+                                  case "foo.bar.A.B":
+                                      assertThat(fieldAccessSignature).isEqualTo("foo.bar.A$B");
+                                      count.getAndIncrement();
+                                      break;
+                                  case "foo.bar.A":
+                                      assertThat(fieldAccessSignature).isEqualTo("foo.bar.A");
+                                      count.getAndIncrement();
+                                      break;
+                                  case "foo.bar":
+                                      assertThat(fieldAccessSignature).isEqualTo("");
+                                      count.getAndIncrement();
+                                      break;
+                              }
+
+                              return super.visitFieldAccess(fieldAccess, n);
+                          }
+                      }.visit(cu, 0);
+                      assertThat(count.get()).isEqualTo(6);
+                  }
+                )
+              )
+            );
+        }
+
+        @Test
+        void packageFieldAccess() {
+            rewriteRun(
+              kotlin(
+                """
+                  package   foo.bar
+                  class A
+                  """
+              ),
+              kotlin(
+                "val x = foo.bar.A()",
+                spec -> spec.afterRecipe(cu -> {
+                    AtomicBoolean found = new AtomicBoolean(false);
+                    new KotlinIsoVisitor<Integer>() {
+                        @Override
+                        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, Integer n) {
+                            if ("foo.bar".equals(fieldAccess.toString())) {
+                                String fieldAccessSignature = fieldAccess.getType() != null ? fieldAccess.getType().toString() : "";
+                                assertThat(fieldAccessSignature).isEqualTo("Unknown");
+                                found.set(true);
+                            }
+                            return super.visitFieldAccess(fieldAccess, n);
+                        }
+                    }.visit(cu, 0);
+                    assertThat(found.get()).isTrue();
                 })
               )
             );

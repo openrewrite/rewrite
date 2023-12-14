@@ -51,6 +51,7 @@ import org.jetbrains.kotlin.fir.types.jvm.FirJavaTypeRef
 import org.jetbrains.kotlin.load.java.structure.*
 import org.jetbrains.kotlin.load.java.structure.impl.classFiles.*
 import org.jetbrains.kotlin.load.kotlin.JvmPackagePartSource
+import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.isOneSegmentFQN
 import org.jetbrains.kotlin.resolve.jvm.JvmClassName
 import org.jetbrains.kotlin.types.ConstantValueKind
@@ -100,6 +101,19 @@ class KotlinTypeMapping(
         return type(type, parent, signature)
     }
 
+    @OptIn(SymbolInternals::class)
+    fun type(classId: ClassId?, parent: Any?): JavaType? {
+        if (classId == null) {
+            return Unknown.getInstance()
+        }
+        val fir = classId.toSymbol(firSession)?.fir
+        val signature = signatureBuilder.signature(fir, parent)
+        val existing = typeCache.get<JavaType>(signature)
+        if (existing != null) {
+            return existing
+        }
+        return type(fir, parent, signature)
+    }
 
     @OptIn(SymbolInternals::class)
     fun type(type: Any?, parent: Any?, signature: String): JavaType? {
