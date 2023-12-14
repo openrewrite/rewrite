@@ -65,7 +65,6 @@ public class MavenRepository implements Serializable {
 
     @EqualsAndHashCode.Include
     @With
-    @NonFinal
     boolean knownToExist;
 
     // Prevent user credentials from being inadvertently serialized
