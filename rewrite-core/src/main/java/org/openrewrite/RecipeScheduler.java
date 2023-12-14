@@ -22,6 +22,7 @@ import org.openrewrite.internal.ExceptionUtils;
 import org.openrewrite.internal.FindRecipeRunException;
 import org.openrewrite.internal.RecipeRunException;
 import org.openrewrite.internal.WorkingDirectoryExecutionContextView;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Generated;
 import org.openrewrite.marker.RecipesThatMadeChanges;
@@ -46,6 +47,21 @@ public class RecipeScheduler {
                                  ExecutionContext ctx,
                                  int maxCycles,
                                  int minCycles) {
+
+        try {
+            LargeSourceSet after = runRecipeCycles(recipe, sourceSet, ctx, maxCycles, minCycles);
+            return new RecipeRun(
+                    after.getChangeset(),
+                    ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap())
+            );
+        } finally {
+            // Delete any files created in the working directory
+            WorkingDirectoryExecutionContextView.view(ctx).delete();
+        }
+    }
+
+    @NonNull
+    private LargeSourceSet runRecipeCycles(Recipe recipe, LargeSourceSet sourceSet, ExecutionContext ctx, int maxCycles, int minCycles) {
         WatchableExecutionContext ctxWithWatch = new WatchableExecutionContext(ctx);
 
         RecipeRunStats recipeRunStats = new RecipeRunStats(Recipe.noop());
@@ -103,18 +119,11 @@ public class RecipeScheduler {
                 // recommended, but isn't possible for us to guard against at an API level, and so we are
                 // defensive about memory consumption here.
                 rootCursor.clearMessages();
-
-                // Delete any files created in the working directory
-                WorkingDirectoryExecutionContextView.view(ctx).delete();
             }
         }
 
         recipeRunStats.flush(ctx);
-
-        return new RecipeRun(
-                after.getChangeset(),
-                ctx.getMessage(ExecutionContext.DATA_TABLES, emptyMap())
-        );
+        return after;
     }
 
     private boolean hasScanningRecipe(Recipe recipe) {

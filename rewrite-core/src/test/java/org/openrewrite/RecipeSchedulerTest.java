@@ -162,7 +162,11 @@ class RecipeWritingToFile extends ScanningRecipe<RecipeWritingToFile.Accumulator
         Path workingDirectory = ctx.getWorkingDirectory();
         assertThat(workingDirectory).isDirectory();
         assertThat(workingDirectory).hasParent(ctx.getMessage(ExecutionContext.WORKING_DIRECTORY_ROOT));
-        assertThat(workingDirectory).isEmptyDirectory();
+        if (ctx.getCycle() == 1) {
+            assertThat(workingDirectory).isEmptyDirectory();
+        } else {
+            assertThat(workingDirectory).isNotEmptyDirectory();
+        }
         assertThat(workingDirectory.getFileName().toString()).isEqualTo("0");
         return new Accumulator(workingDirectory);
     }
