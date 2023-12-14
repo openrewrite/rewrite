@@ -275,7 +275,8 @@ public class MavenPomDownloader {
                                     .tag("repositoryUri", repo.getUri())
                                     .tag("group", gav.getGroupId())
                                     .tag("artifact", gav.getArtifactId())
-                                    .register(Metrics.globalRegistry);
+                                    .register(Metrics.globalRegistry)
+                                    .increment();
                             result = Optional.of(derivedMeta);
                         }
                     } catch (HttpSenderResponseException | MavenDownloadingException e) {
@@ -333,7 +334,7 @@ public class MavenPomDownloader {
         String scheme = URI.create(repo.getUri()).getScheme();
         String uri = repo.getUri() + (repo.getUri().endsWith("/") ? "" : "/") +
                      requireNonNull(gav.getGroupId()).replace('.', '/') + '/' +
-                     gav.getArtifactId();
+                     gav.getArtifactId() + '/';
 
         try {
             MavenMetadata.Versioning versioning;
@@ -366,7 +367,7 @@ public class MavenPomDownloader {
             try (DirectoryStream<Path> stream = Files.newDirectoryStream(dir)) {
                 List<String> versions = new ArrayList<>();
                 for (Path path : stream) {
-                    if (Files.isDirectory(path)) {
+                    if (Files.isDirectory(path) && hasPomFile(dir, path, gav)) {
                         versions.add(path.getFileName().toString());
                     }
                 }
@@ -731,7 +732,7 @@ public class MavenPomDownloader {
                 MavenRepository normalized = null;
                 try {
                     sendRequest.apply(request.build());
-                    normalized = repository.withUri(httpsUri);
+                    normalized = repository.withUri(httpsUri).withKnownToExist(true);
                 } catch (Throwable t) {
                     if (t instanceof HttpSenderResponseException) {
                         HttpSenderResponseException e = (HttpSenderResponseException) t;
@@ -905,4 +906,18 @@ public class MavenPomDownloader {
         return releasesRaw == null || Boolean.parseBoolean(releasesRaw.trim());
     }
 
+    /**
+     * Check if <tt>dir</tt> has a folder named <tt>versionPath</tt> and a pom file for the artifact.
+     * Maven might have tried to download the artifact before and failed, so the folder might exist but contains only
+     * a <tt>artifact-version.pom.lastUpdated</tt> file, indicating last time maven attempted to download the artifact.
+     *
+     * @param dir         root directory of the artifact
+     * @param versionPath version path of the artifact
+     * @param gav         the artifact
+     * @return <tt>true</tt> if the artifact has a pom file, <tt>false</tt> otherwise.
+     */
+    private static boolean hasPomFile(Path dir, Path versionPath, GroupArtifactVersion gav) {
+        String artifactPomFile = gav.getArtifactId() + "-" + versionPath.getFileName() + ".pom";
+        return Files.exists(dir.resolve(versionPath.resolve(artifactPomFile)));
+    }
 }
