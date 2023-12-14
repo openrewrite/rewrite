@@ -274,7 +274,44 @@ class AnnotationTest implements RewriteTest {
             }.visit(cu, 0))
           )
         );
+    }
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/3683")
+    @Test
+    void annotationAfterVariableTypePackageName() {
+        rewriteRun(
+          java(
+            """
+              import java.lang.annotation.ElementType;
+              import java.lang.annotation.Retention;
+              import java.lang.annotation.RetentionPolicy;
+              import java.lang.annotation.Target;
+              import java.util.List;
+              
+              import static java.lang.annotation.ElementType.*;
+              
+              public class A {
+                @Leading java. @Single util. @Multi1 @Multi2 List<String> l;
+              }
+              
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(value={CONSTRUCTOR, FIELD, LOCAL_VARIABLE, METHOD, PACKAGE, PARAMETER, TYPE})
+              public @interface Leading {}
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(value={CONSTRUCTOR, FIELD, LOCAL_VARIABLE, METHOD, PACKAGE, PARAMETER, TYPE})
+              public @interface Single {}
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(value={CONSTRUCTOR, FIELD, LOCAL_VARIABLE, METHOD, PACKAGE, PARAMETER, TYPE})
+              public @interface Multi1 {}
+
+              @Retention(RetentionPolicy.RUNTIME)
+              @Target(value={CONSTRUCTOR, FIELD, LOCAL_VARIABLE, METHOD, PACKAGE, PARAMETER, TYPE})
+              public @interface Multi2 {}
+              """
+          )
+        );
     }
 
 }

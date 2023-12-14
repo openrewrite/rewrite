@@ -1314,9 +1314,49 @@ public class ReloadableJava21ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     @Override
-    public J visitAnnotatedType(AnnotatedTypeTree node, Space fmt) {
-        return new J.AnnotatedType(randomId(), fmt, Markers.EMPTY, convertAll(node.getAnnotations()),
-                convert(node.getUnderlyingType()));
+    public J visitAnnotatedType(AnnotatedTypeTree node, Space fmt) {Map<Integer, JCAnnotation> annotationPosTable = new HashMap<>();
+        for (AnnotationTree annotationNode : node.getAnnotations()) {
+            JCAnnotation annotation = (JCAnnotation) annotationNode;
+            annotationPosTable.put(annotation.pos, annotation);
+        }
+        return new J.AnnotatedType(randomId(), fmt, Markers.EMPTY, leadingAnnotations(annotationPosTable),
+                annotationPosTable.isEmpty() ? convert(node.getUnderlyingType()) : annotatedTypeTree(node.getUnderlyingType(), annotationPosTable));
+    }
+
+    private List<J.Annotation> leadingAnnotations(Map<Integer, JCAnnotation> annotationPosTable) {
+        List<J.Annotation> annotations = new ArrayList<>();
+        int saveCursor = cursor;
+        whitespace();
+        while (annotationPosTable.containsKey(cursor)) {
+            JCTree.JCAnnotation jcAnnotation = annotationPosTable.get(cursor);
+            annotationPosTable.remove(cursor);
+            cursor = saveCursor;
+            J.Annotation ann = convert(jcAnnotation);
+            annotations.add(ann);
+            saveCursor = cursor;
+            whitespace();
+        }
+        cursor = saveCursor;
+        return annotations.isEmpty() ? emptyList() : annotations;
+    }
+
+    private TypeTree annotatedTypeTree(Tree node, Map<Integer, JCAnnotation> annotationPosTable) {
+        Space prefix = whitespace();
+        if (node instanceof JCFieldAccess) {
+            JCFieldAccess fieldAccess = (JCFieldAccess) node;
+            JavaType type = typeMapping.type(node);
+            Expression select = (Expression) annotatedTypeTree(fieldAccess.selected, annotationPosTable);
+            Space dotPrefix = sourceBefore(".");
+            List<J.Annotation> annotations = leadingAnnotations(annotationPosTable);
+            return new J.FieldAccess(randomId(), prefix, Markers.EMPTY,
+                    select,
+                    padLeft(dotPrefix, new J.Identifier(randomId(),
+                            sourceBefore(fieldAccess.name.toString()), Markers.EMPTY,
+                            annotations, fieldAccess.name.toString(), type, typeMapping.variableType(fieldAccess.sym))),
+                    type
+            );
+        }
+        return convert(node);
     }
 
     @Override
