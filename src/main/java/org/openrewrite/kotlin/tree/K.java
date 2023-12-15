@@ -604,13 +604,19 @@ public interface K extends J {
         public Constructor(UUID id,
                            Markers markers,
                            J.MethodDeclaration methodDeclaration,
-                           @JsonProperty("colon") Space colon,
-                           @JsonProperty("constructorInvocation") ConstructorInvocation constructorInvocation) {
+                           @Nullable @JsonProperty("colon") Space colon,
+                           @Nullable @JsonProperty("constructorInvocation") ConstructorInvocation constructorInvocation,
+                           JLeftPadded<ConstructorInvocation> invocation
+        ) {
             padding = null;
             this.id = id;
             this.markers = markers;
             this.methodDeclaration = methodDeclaration;
-            this.invocation = new JLeftPadded<>(colon, constructorInvocation, Markers.EMPTY);
+            if (colon != null && constructorInvocation != null) {
+                this.invocation = new JLeftPadded<>(colon, constructorInvocation, Markers.EMPTY);
+            } else {
+                this.invocation = invocation;
+            }
         }
 
         @Override
