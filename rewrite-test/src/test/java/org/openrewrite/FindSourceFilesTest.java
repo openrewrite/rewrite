@@ -110,12 +110,8 @@ class FindSourceFilesTest implements RewriteTest {
             spec -> spec.path("a/hello.txt")
           ),
           text(
-            """
-              name: hello-world
-              """,
-            """
-              ~~>name: hello-world
-              """,
+            "name: hello-world",
+            "~~>name: hello-world",
             spec -> spec.path(".github/workflows/hello.yml")
           ),
           text(
