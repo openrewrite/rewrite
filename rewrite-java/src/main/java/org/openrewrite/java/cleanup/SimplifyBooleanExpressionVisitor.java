@@ -89,9 +89,9 @@ public class SimplifyBooleanExpressionVisitor extends JavaVisitor<ExecutionConte
     }
 
     @Override
-    public J postVisit(J tree, ExecutionContext ctx) {
-        J j = tree;
-        if (j instanceof J.Parentheses) {
+    public <T extends J> J visitParentheses(J.Parentheses<T> parens, ExecutionContext ctx) {
+        J j = super.visitParentheses(parens, ctx);
+        if (j != parens && j instanceof J.Parentheses) {
             j = new UnnecessaryParenthesesVisitor<>().visit(j, ctx, getCursor().getParentOrThrow());
         }
         return j;
