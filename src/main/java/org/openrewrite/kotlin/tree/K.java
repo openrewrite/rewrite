@@ -672,7 +672,7 @@ public interface K extends J {
             }
 
             public K.Constructor withInvocation(JLeftPadded<ConstructorInvocation> invocation) {
-                return t.invocation == invocation ? t : new K.Constructor(t.id, t.markers, t.methodDeclaration, t.invocation);
+                return t.invocation == invocation ? t : new K.Constructor(t.id, t.markers, t.methodDeclaration, invocation);
             }
         }
     }
