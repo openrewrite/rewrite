@@ -395,14 +395,7 @@ public class KotlinPrinter<P> extends KotlinVisitor<PrintOutputCapture<P>> {
             delegate.visitContainer("where", property.getTypeConstraints().getPadding().getConstraints(), JContainer.Location.TYPE_PARAMETERS, ",", "", p);
         }
 
-        if (property.isSetterFirst()) {
-            visit(property.getSetter(), p);
-            visit(property.getGetter(), p);
-        } else {
-            visit(property.getGetter(), p);
-            visit(property.getSetter(), p);
-        }
-
+        visitContainer(property.getAccessors(), p);
         afterSyntax(property, p);
         return property;
     }

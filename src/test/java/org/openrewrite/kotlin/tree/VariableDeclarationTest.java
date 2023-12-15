@@ -485,6 +485,23 @@ class VariableDeclarationTest implements RewriteTest {
         );
     }
 
+    @Test
+    void getterSetterWithTrailingSemiColon() {
+        rewriteRun(
+          kotlin(
+            """
+              class Test {
+                  var stringRepresentation : String = ""
+                      get ( ) = field   ;
+                      set ( value ) {
+                          field = value
+                      } ;
+              }
+              """
+          )
+        );
+    }
+
     @Issue("https://github.com/openrewrite/rewrite-kotlin/issues/93")
     @Test
     void setterBeforeGetter() {

@@ -41,6 +41,7 @@ import java.lang.ref.WeakReference;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -1503,16 +1504,57 @@ public interface K extends J {
         @Nullable
         TypeConstraints typeConstraints;
 
-        @Nullable
-        J.MethodDeclaration getter;
-
-        @Nullable
-        J.MethodDeclaration setter;
-
-        boolean isSetterFirst;
+        // A replacement of `getter`,`setter` and `isSetterFirst`
+        JContainer<J.MethodDeclaration> accessors;
 
         @Nullable
         JRightPadded<Expression> receiver;
+
+        // For backward compatibility, handle removed fields `getter`, 'setter' and `isSetterFirst` which has been relocated to `accessors`
+        // Todo, Remove when all kotlin LSTs have been rebuilt.
+        @Deprecated
+        @JsonCreator
+        public Property(UUID id,
+                        Space prefix,
+                        Markers markers,
+                        JContainer<TypeParameter> typeParameters,
+                        VariableDeclarations variableDeclarations,
+                        @Nullable K.TypeConstraints typeConstraints,
+                        @Nullable @JsonProperty("getter") J.MethodDeclaration getter,
+                        @Nullable @JsonProperty("setter") J.MethodDeclaration setter,
+                        @Nullable @JsonProperty("isSetterFirst") Boolean isSetterFirst,
+                        JContainer<J.MethodDeclaration> accessors,
+                        @Nullable JRightPadded<Expression> receiver
+                        ) {
+            this.id = id;
+            this.prefix = prefix;
+            this.markers = markers;
+            this.typeParameters = typeParameters;
+            this.variableDeclarations = variableDeclarations;
+            this.typeConstraints = typeConstraints;
+
+            if (getter != null || setter != null || isSetterFirst != null) {
+                List<JRightPadded<J.MethodDeclaration>> rps = new ArrayList<>(2);
+
+                // handle old LST removed fields `getter`, 'setter' and `isSetterFirst` which has been relocated to `accessors`
+                if (setter != null) {
+                    rps.add(new JRightPadded<>(setter, Space.EMPTY, Markers.EMPTY));
+                }
+
+                if (getter != null) {
+                    rps.add(new JRightPadded<>(getter, Space.EMPTY, Markers.EMPTY));
+                }
+
+                if (Boolean.FALSE.equals(isSetterFirst)) {
+                    Collections.reverse(rps);
+                }
+                this.accessors = JContainer.build(rps);
+            } else {
+                this.accessors = accessors;
+            }
+
+            this.receiver = receiver;
+        }
 
         @Nullable
         public Expression getReceiver() {
@@ -1562,7 +1604,7 @@ public interface K extends J {
 
             public Property withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
                 return t.typeParameters == typeParameters ? t : new Property(t.id, t.prefix, t.markers, typeParameters,
-                        t.variableDeclarations, t.typeConstraints, t.getter, t.setter, t.isSetterFirst, t.receiver);
+                        t.variableDeclarations, t.typeConstraints, t.accessors, t.receiver);
             }
 
             @Nullable
@@ -1573,7 +1615,7 @@ public interface K extends J {
             @Nullable
             public Property withReceiver(@Nullable JRightPadded<Expression> receiver) {
                 return t.receiver == receiver ? t : new Property(t.id, t.prefix, t.markers, t.typeParameters,
-                        t.variableDeclarations, t.typeConstraints, t.getter, t.setter, t.isSetterFirst, receiver);
+                        t.variableDeclarations, t.typeConstraints, t.accessors, receiver);
             }
         }
     }

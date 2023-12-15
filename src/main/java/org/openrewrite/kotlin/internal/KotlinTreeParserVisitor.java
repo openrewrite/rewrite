@@ -2811,13 +2811,10 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
         List<J.Modifier> modifiers = mapModifiers(property.getModifierList(), leadingAnnotations, lastAnnotations, data);
         TypeTree typeExpression = null;
         List<JRightPadded<J.VariableDeclarations.NamedVariable>> variables = new ArrayList<>();
-        J.MethodDeclaration getter = null;
-        J.MethodDeclaration setter = null;
         JRightPadded<Expression> receiver = null;
         JContainer<J.TypeParameter> typeParameters = property.getTypeParameterList() != null ?
                 JContainer.build(prefix(property.getTypeParameterList()), mapTypeParameters(property.getTypeParameterList(), data), Markers.EMPTY) : null;
         K.TypeConstraints typeConstraints = null;
-        boolean isSetterFirst = false;
         Set<PsiElement> prefixConsumedSet = preConsumedInfix(property);
 
         modifiers.add(new J.Modifier(
@@ -2867,18 +2864,6 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
             typeExpression = (TypeTree) requireNonNull(property.getTypeReference()).accept(this, data);
         }
 
-        if (property.getGetter() != null) {
-            getter = (J.MethodDeclaration) property.getGetter().accept(this, data);
-        }
-
-        if (property.getSetter() != null) {
-            setter = (J.MethodDeclaration) property.getSetter().accept(this, data);
-        }
-
-        if (getter != null && setter != null) {
-            isSetterFirst = property.getSetter().getTextRange().getStartOffset() < property.getGetter().getTextRange().getStartOffset();
-        }
-
         J.VariableDeclarations variableDeclarations = new J.VariableDeclarations(
                 Tree.randomId(),
                 endFixPrefixAndInfix(property), // overlaps with right-padding of previous statement
@@ -2898,7 +2883,16 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     .withPrefix(prefix(whereKeyword));
         }
 
-        if (getter != null || setter != null || receiver != null || typeConstraints != null) {
+        List<KtPropertyAccessor> ktPropertyAccessors = property.getAccessors();
+        if (!ktPropertyAccessors.isEmpty() || receiver != null || typeConstraints != null) {
+            List<JRightPadded<J.MethodDeclaration>> accessors = new ArrayList<>(ktPropertyAccessors.size());
+            PsiElement lastChild = findLastChild(property, c -> !isSpace(c.getNode()) && !isSemicolon(c));
+
+            for (KtPropertyAccessor ktPropertyAccessor : ktPropertyAccessors) {
+                J.MethodDeclaration accessor = (J.MethodDeclaration) ktPropertyAccessor.accept(this, data);
+                accessors.add((lastChild == ktPropertyAccessor) ? padRight(accessor, Space.EMPTY) : maybeTrailingSemicolon(accessor, ktPropertyAccessor));
+            }
+
             return new K.Property(
                     randomId(),
                     deepPrefix(property),
@@ -2906,9 +2900,7 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
                     typeParameters,
                     variableDeclarations.withPrefix(Space.EMPTY),
                     typeConstraints,
-                    getter,
-                    setter,
-                    isSetterFirst,
+                    JContainer.build(accessors),
                     receiver
             );
         } else {
@@ -3671,14 +3663,12 @@ public class KotlinTreeParserVisitor extends KtVisitor<J, ExecutionContext> {
 
     private <J2 extends J> JRightPadded<J2> maybeTrailingSemicolon(J2 j, KtElement element) {
         PsiElement maybeSemicolon = findLastNotSpaceChild(element);
-        boolean hasSemicolon = maybeSemicolon instanceof LeafPsiElement && ((LeafPsiElement) maybeSemicolon).getElementType() == KtTokens.SEMICOLON;
-
-        if (hasSemicolon) {
+        if (isSemicolon(maybeSemicolon)) {
             return new JRightPadded<>(j, prefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
         }
 
         maybeSemicolon = PsiTreeUtil.skipWhitespacesAndCommentsForward(element);
-        if (maybeSemicolon instanceof LeafPsiElement && ((LeafPsiElement) maybeSemicolon).getElementType() == KtTokens.SEMICOLON) {
+        if (isSemicolon(maybeSemicolon)) {
             return new JRightPadded<>(j, deepPrefix(maybeSemicolon), Markers.EMPTY.add(new Semicolon(randomId())));
         }
 
