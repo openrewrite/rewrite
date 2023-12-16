@@ -587,6 +587,12 @@ public class SemanticallyEqual {
                     isEqual.set(false);
                     return fieldAccess;
                 }
+
+                if (nullMissMatch(fieldAccess.getTarget(), compareTo.getTarget())) {
+                    isEqual.set(false);
+                    return fieldAccess;
+                }
+                visit(fieldAccess.getTarget(), compareTo.getTarget());
             }
             return fieldAccess;
         }
