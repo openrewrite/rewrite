@@ -169,8 +169,8 @@ class PsiElementAssociations(val typeMapping: KotlinTypeMapping, val file: FirFi
 
     private fun matchClassId(psi: PsiElement, classId: ClassId): ClassId {
         if (psi.parent is KtDotQualifiedExpression) {
-            val parts = psi.parent.text.split(".")
-            if (classId.packageFqName.isRoot && parts.size == 2 && psi.text == parts[0]) {
+            val parent: KtDotQualifiedExpression = psi.parent as KtDotQualifiedExpression
+            if (classId.packageFqName.isRoot && psi !is KtDotQualifiedExpression && psi == parent.receiverExpression) {
                 // Match the current PSI to the ClassId if the PSI is the outermost class of a dot qualified expression.
                 // For a multi-nested class like A.B.A.C, the PSI#parent field will have the same result (A.B) for both the LHS A and B.
                 // To match the PSI to the ClassId the outermost class `A` should use the current PSI rather than the parent field `A.B`.

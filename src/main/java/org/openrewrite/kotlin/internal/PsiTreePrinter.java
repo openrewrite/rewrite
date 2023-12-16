@@ -549,6 +549,10 @@ public class PsiTreePrinter {
             return printConeKotlinType(coneKotlinType);
         } else if (firElement instanceof FirResolvedNamedReference) {
             return ((FirResolvedNamedReference) firElement).getName().toString();
+        } else if (firElement instanceof FirResolvedQualifier) {
+            FirResolvedQualifier qualifier = (FirResolvedQualifier) firElement;
+            FqName fqName = qualifier.getRelativeClassFqName();
+            return fqName != null ? " RelativeClassFqName: " + fqName : "";
         } else if (firElement instanceof FirFunctionCall) {
             FirFunctionCall functionCall = (FirFunctionCall) firElement;
             if (functionCall.getExplicitReceiver() != null) {
