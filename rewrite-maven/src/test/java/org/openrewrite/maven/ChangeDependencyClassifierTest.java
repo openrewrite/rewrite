@@ -128,7 +128,6 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                   <dependency>
                     <groupId>org.ehcache</groupId>
                     <artifactId>ehcache</artifactId>
-                    <classifier>jakarta</classifier>
                   </dependency>
                 </dependencies>
               </project>
