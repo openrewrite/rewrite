@@ -76,19 +76,28 @@ public class SemanticallyEqualTest {
     void compareFieldAccess() {
         assertExpressionsEqual(
           """
-            class A {
+            class T {
                 int n = 1;
-                int a = A.this.n;
-                int b = A.this.n;
+                int a = T.this.n;
+                int b = T.this.n;
             }
             """
         );
         assertExpressionsEqual(
           """
-            class A {
+            class T {
                 int n = 1;
-                int a = A.this.n;
+                int a = T.this.n;
                 int b = this.n;
+            }
+            """
+        );
+        assertExpressionsEqual(
+          """
+            class T {
+                int n = 1;
+                int a = T.this.n;
+                int b = n;
             }
             """
         );
