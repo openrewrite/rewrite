@@ -17,8 +17,14 @@ package org.openrewrite.java.search;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -67,6 +73,24 @@ public class SemanticallyEqualTest {
         );
     }
 
+    @Test
+    void compareFieldAccess() {
+        assertExpressionsEqual("""
+          class A {
+              int n = 1;
+              int a = A.this.n;
+              int b = A.this.n;
+          }
+          """);
+        assertExpressionsEqual("""
+          class A {
+              int n = 1;
+              int a = A.this.n;
+              int b = this.n;
+          }
+          """);
+    }
+
     private void assertEqualToSelf(@Language("java") String a) {
         assertEqual(a, a);
     }
@@ -77,6 +101,26 @@ public class SemanticallyEqualTest {
         javaParser.reset();
         J.CompilationUnit cub = (J.CompilationUnit) javaParser.parse(b).findFirst().get();
         assertEqual(cua, cub);
+    }
+
+    @SuppressWarnings("OptionalGetWithoutIsPresent")
+    private void assertExpressionsEqual(@Language(value = "java") String source) {
+        J.CompilationUnit cu = (J.CompilationUnit) javaParser.parse(source).findFirst().get();
+        javaParser.reset();
+
+        JavaIsoVisitor<Map<String, J.VariableDeclarations.NamedVariable>> visitor = new JavaIsoVisitor<>() {
+            @Override
+            public J.VariableDeclarations.NamedVariable visitVariable(J.VariableDeclarations.NamedVariable variable, Map<String, J.VariableDeclarations.NamedVariable> map) {
+                map.put(variable.getSimpleName(), variable);
+                return super.visitVariable(variable, map);
+            }
+        };
+
+        Map<String, J.VariableDeclarations.NamedVariable> result = new HashMap<>();
+        visitor.visit(cu, result);
+        Expression ea = result.get("a").getInitializer();
+        Expression eb = result.get("b").getInitializer();
+        assertEqual(Objects.requireNonNull(ea), Objects.requireNonNull(eb));
     }
 
     private void assertEqual(J a, J b) {
