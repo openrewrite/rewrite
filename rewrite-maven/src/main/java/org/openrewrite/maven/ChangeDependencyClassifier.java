@@ -54,6 +54,13 @@ public class ChangeDependencyClassifier extends Recipe {
     @Nullable
     String newClassifier;
 
+    @Option(displayName = "Include managed dependencies",
+            description = "Whether to include managed dependencies in the search. Defaults to false.",
+            example = "true",
+            required = false)
+    @Nullable
+    Boolean includeManaged;
+
     @Override
     public String getDisplayName() {
         return "Change Maven dependency classifier";
@@ -69,7 +76,7 @@ public class ChangeDependencyClassifier extends Recipe {
         return new MavenVisitor<ExecutionContext>() {
             @Override
             public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
-                if (isDependencyTag(groupId, artifactId)) {
+                if (isDependencyTag(groupId, artifactId) || (includeManaged != null && includeManaged && isManagedDependencyTag(groupId, artifactId))) {
                     Optional<Xml.Tag> scope = tag.getChild("classifier");
                     if (scope.isPresent()) {
                         if (newClassifier == null) {
@@ -81,7 +88,6 @@ public class ChangeDependencyClassifier extends Recipe {
                         doAfterVisit(new AddToTagVisitor<>(tag, Xml.Tag.build("<classifier>" + newClassifier + "</classifier>")));
                     }
                 }
-
                 return super.visitTag(tag, ctx);
             }
         };
