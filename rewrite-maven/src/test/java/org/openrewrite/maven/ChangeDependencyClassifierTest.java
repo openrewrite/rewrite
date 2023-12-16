@@ -96,6 +96,13 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                     </dependency>
                   </dependencies>
                 </dependencyManagement>
+              
+                <dependencies>
+                  <dependency>
+                    <groupId>org.ehcache</groupId>
+                    <artifactId>ehcache</artifactId>
+                  </dependency>
+                </dependencies>
               </project>
               """,
             """
@@ -116,6 +123,14 @@ class ChangeDependencyClassifierTest implements RewriteTest {
                     </dependency>
                   </dependencies>
                 </dependencyManagement>
+              
+                <dependencies>
+                  <dependency>
+                    <groupId>org.ehcache</groupId>
+                    <artifactId>ehcache</artifactId>
+                    <classifier>jakarta</classifier>
+                  </dependency>
+                </dependencies>
               </project>
               """
           )
