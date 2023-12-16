@@ -19,7 +19,6 @@ import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
 import java.util.HashMap;
@@ -75,20 +74,24 @@ public class SemanticallyEqualTest {
 
     @Test
     void compareFieldAccess() {
-        assertExpressionsEqual("""
-          class A {
-              int n = 1;
-              int a = A.this.n;
-              int b = A.this.n;
-          }
-          """);
-        assertExpressionsEqual("""
-          class A {
-              int n = 1;
-              int a = A.this.n;
-              int b = this.n;
-          }
-          """);
+        assertExpressionsEqual(
+          """
+            class A {
+                int n = 1;
+                int a = A.this.n;
+                int b = A.this.n;
+            }
+            """
+        );
+        assertExpressionsEqual(
+          """
+            class A {
+                int n = 1;
+                int a = A.this.n;
+                int b = this.n;
+            }
+            """
+        );
     }
 
     private void assertEqualToSelf(@Language("java") String a) {
@@ -116,11 +119,11 @@ public class SemanticallyEqualTest {
             }
         };
 
-        Map<String, J.VariableDeclarations.NamedVariable> result = new HashMap<>();
-        visitor.visit(cu, result);
-        Expression ea = result.get("a").getInitializer();
-        Expression eb = result.get("b").getInitializer();
-        assertEqual(Objects.requireNonNull(ea), Objects.requireNonNull(eb));
+        Map<String, J.VariableDeclarations.NamedVariable> result = visitor.reduce(cu, new HashMap<>());
+        assertEqual(
+          Objects.requireNonNull(result.get("a").getInitializer()),
+          Objects.requireNonNull(result.get("b").getInitializer())
+        );
     }
 
     private void assertEqual(J a, J b) {
