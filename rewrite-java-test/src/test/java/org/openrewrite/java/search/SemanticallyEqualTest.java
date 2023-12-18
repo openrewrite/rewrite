@@ -128,6 +128,19 @@ public class SemanticallyEqualTest {
         );
     }
 
+    @CartesianTest
+    void methodReferences(@CartesianTest.Values(strings = {
+      "java.lang.Object::toString",
+      "Object::toString",
+    }) String a, @CartesianTest.Values(strings = {
+      "java.lang.Object::toString",
+      "Object::toString",
+    }) String b) {
+        assertExpressionsEqual(
+          "import java.util.function.Function; class T { Function<Object, String> a = " + a + "; Function<Object, String> b = " + b + "; }"
+        );
+    }
+
     @Test
     void typeCasts() {
         assertExpressionsEqual(
