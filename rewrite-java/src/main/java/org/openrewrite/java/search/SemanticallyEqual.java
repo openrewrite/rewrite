@@ -574,11 +574,16 @@ public class SemanticallyEqual {
         @Override
         public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, J j) {
             if (isEqual.get()) {
+                JavaType.Variable fieldType = fieldAccess.getName().getFieldType();
                 if (!(j instanceof J.FieldAccess)) {
                     if (!(j instanceof J.Identifier) ||
-                        !TypeUtils.isOfType(fieldAccess.getName().getFieldType(), ((J.Identifier) j).getFieldType()) ||
+                        !TypeUtils.isOfType(fieldType, ((J.Identifier) j).getFieldType()) ||
                         !fieldAccess.getSimpleName().equals(((J.Identifier) j).getSimpleName())) {
                         isEqual.set(false);
+                    } else {
+                        if (fieldType != null && !fieldType.hasFlags(Flag.Static)) {
+                            isEqual.set(false);
+                        }
                     }
                     return fieldAccess;
                 }
@@ -590,7 +595,7 @@ public class SemanticallyEqual {
                         return fieldAccess;
                     }
                 } else if (!TypeUtils.isOfType(fieldAccess.getType(), compareTo.getType())
-                           || !TypeUtils.isOfType(fieldAccess.getName().getFieldType(), compareTo.getName().getFieldType())) {
+                           || !TypeUtils.isOfType(fieldType, compareTo.getName().getFieldType())) {
                     isEqual.set(false);
                     return fieldAccess;
                 }
@@ -671,6 +676,8 @@ public class SemanticallyEqual {
             if (isEqual.get()) {
                 if (!(j instanceof J.Identifier)) {
                     if (!(j instanceof J.FieldAccess) || !TypeUtils.isOfType(identifier.getFieldType(), ((J.FieldAccess) j).getName().getFieldType())) {
+                        isEqual.set(false);
+                    } else if (identifier.getFieldType() != null && !identifier.getFieldType().hasFlags(Flag.Static)) {
                         isEqual.set(false);
                     }
                     return identifier;

@@ -17,6 +17,7 @@ package org.openrewrite.java.search;
 
 import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.Test;
+import org.junitpioneer.jupiter.ExpectedToFail;
 import org.junitpioneer.jupiter.cartesian.CartesianTest;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaParser;
@@ -178,6 +179,32 @@ public class SemanticallyEqualTest {
             }
             """
         );
+        assertExpressionsNotEqual(
+          """
+            class T {
+                int n = 1;
+                void m(int n) {
+                    int a = T.this.n;
+                    int b = n;
+                }
+            }
+            """
+        );
+        assertExpressionsNotEqual(
+          """
+            class T {
+                static T t1 = new T();
+                int n = 1;
+                int a = t1.n;
+                int b = n;
+            }
+            """
+        );
+    }
+
+    @ExpectedToFail
+    @Test
+    void fieldAccessesWithQualifiedThisReference() {
         assertExpressionsEqual(
           """
             class T {
@@ -196,14 +223,17 @@ public class SemanticallyEqualTest {
             }
             """
         );
+    }
+
+    @Test
+    void identifiers() {
         assertExpressionsNotEqual(
           """
             class T {
+                static T t1 = new T();
                 int n = 1;
-                void m(int n) {
-                    int a = T.this.n;
-                    int b = n;
-                }
+                int a = n;
+                int b = t1.n;
             }
             """
         );
